@@ -1,0 +1,70 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Header from '@/components/layout/Header'
+import Button from '@/components/ui/Button'
+import Modal from '@/components/ui/Modal'
+import ClientForm from '@/components/clients/ClientForm'
+import ClientsTable from '@/components/clients/ClientsTable'
+import { createClient } from '@/lib/supabase/client'
+import { Client } from '@/lib/supabase/types'
+
+export default function ClientsPage() {
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+
+  async function loadClients() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setClients(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadClients()
+  }, [])
+
+  function handleSuccess() {
+    setShowCreate(false)
+    loadClients()
+  }
+
+  return (
+    <div>
+      <Header
+        title="לקוחות"
+        subtitle={`סה"כ ${clients.length} לקוחות`}
+        actions={
+          <Button onClick={() => setShowCreate(true)}>
+            + הוסף לקוח
+          </Button>
+        }
+      />
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-slate-400">
+          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
+          טוען...
+        </div>
+      ) : (
+        <ClientsTable clients={clients} />
+      )}
+
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="הוספת לקוח חדש"
+        size="md"
+      >
+        <ClientForm
+          onSuccess={handleSuccess}
+          onCancel={() => setShowCreate(false)}
+        />
+      </Modal>
+    </div>
+  )
+}

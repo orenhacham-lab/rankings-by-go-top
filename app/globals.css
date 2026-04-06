@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* ── Base RTL setup ────────────────────────────────────────────── */
+html {
+  direction: rtl;
+}
+
+body {
+  /* Rubik loaded from Google Fonts in layout.tsx */
+  font-family: 'Rubik', 'Segoe UI', Arial, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* ── Table defaults — explicit RTL alignment ───────────────────── */
+table {
+  width: 100%;
+}
+
+th,
+td {
+  text-align: right;
+}
+
+/* ── Form inputs — RTL ─────────────────────────────────────────── */
+input,
+textarea,
+select {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ── Native dialog backdrop ────────────────────────────────────── */
+dialog::backdrop {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
+}

@@ -1,0 +1,136 @@
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+export interface Database {
+  public: {
+    Tables: {
+      clients: {
+        Row: Client
+        Insert: Omit<Client, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Client, 'id' | 'created_at'>>
+      }
+      projects: {
+        Row: Project
+        Insert: Omit<Project, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Project, 'id' | 'created_at'>>
+      }
+      tracking_targets: {
+        Row: TrackingTarget
+        Insert: Omit<TrackingTarget, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<TrackingTarget, 'id' | 'created_at'>>
+      }
+      scans: {
+        Row: Scan
+        Insert: Omit<Scan, 'id' | 'created_at'>
+        Update: Partial<Omit<Scan, 'id' | 'created_at'>>
+      }
+      scan_results: {
+        Row: ScanResult
+        Insert: Omit<ScanResult, 'id' | 'created_at'>
+        Update: Partial<Omit<ScanResult, 'id' | 'created_at'>>
+      }
+    }
+  }
+}
+
+export interface Client {
+  id: string
+  name: string
+  contact_name: string | null
+  email: string | null
+  phone: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Project {
+  id: string
+  client_id: string
+  name: string
+  target_domain: string
+  business_name: string | null
+  country: string
+  language: string
+  city: string | null
+  device_type: 'desktop' | 'mobile' | null
+  is_active: boolean
+  scan_frequency: 'manual' | 'weekly' | 'monthly'
+  auto_scan_enabled: boolean
+  next_scan_at: string | null
+  last_scan_at: string | null
+  created_at: string
+  updated_at: string
+  // joins
+  clients?: Client
+}
+
+export type EngineType = 'google_search' | 'google_maps'
+
+export interface TrackingTarget {
+  id: string
+  project_id: string
+  keyword: string
+  engine_type: EngineType
+  target_domain: string | null
+  target_business_name: string | null
+  preferred_landing_page: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // joins
+  projects?: Project
+}
+
+export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+export interface Scan {
+  id: string
+  project_id: string
+  status: ScanStatus
+  triggered_by: 'manual' | 'scheduled'
+  total_targets: number
+  completed_targets: number
+  failed_targets: number
+  started_at: string | null
+  completed_at: string | null
+  error_message: string | null
+  created_at: string
+  // joins
+  projects?: Project
+}
+
+export interface ScanResult {
+  id: string
+  scan_id: string
+  tracking_target_id: string
+  engine_type: EngineType
+  keyword: string
+  found: boolean
+  position: number | null
+  previous_position: number | null
+  change_value: number | null
+  result_url: string | null
+  result_title: string | null
+  result_address: string | null
+  checked_at: string
+  error_message: string | null
+  created_at: string
+  // joins
+  tracking_targets?: TrackingTarget
+  scans?: Scan
+}
+
+export interface RankingSummary {
+  tracking_target_id: string
+  keyword: string
+  engine_type: EngineType
+  latest_position: number | null
+  previous_position: number | null
+  change_value: number | null
+  best_position: number | null
+  worst_position: number | null
+  last_checked_at: string | null
+  found: boolean
+}
