@@ -25,6 +25,65 @@ export async function createTrackingTargetAction(formData: FormData) {
   revalidatePath('/keywords')
 }
 
+export async function createBulkTrackingTargetsAction(formData: FormData) {
+  const supabase = await createClient()
+
+  const projectId = formData.get('project_id') as string
+  const engineType = formData.get('engine_type') as string
+  const targetDomain = (formData.get('target_domain') as string) || null
+  const targetBusinessName = (formData.get('target_business_name') as string) || null
+  const preferredLandingPage = (formData.get('preferred_landing_page') as string) || null
+  const notes = (formData.get('notes') as string) || null
+  const rawKeywords = formData.get('keywords') as string
+
+  // Parse: split by newline, trim, filter empty lines, deduplicate
+  const keywords = [
+    ...new Set(
+      rawKeywords
+        .split('\n')
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0)
+    ),
+  ]
+
+  if (keywords.length === 0) {
+    throw new Error('לא הוזנו מילות מפתח')
+  }
+
+  // Fetch existing keywords for this project to avoid duplicates
+  const { data: existing } = await supabase
+    .from('tracking_targets')
+    .select('keyword')
+    .eq('project_id', projectId)
+
+  const existingSet = new Set((existing || []).map((r) => r.keyword.trim().toLowerCase()))
+
+  const toInsert = keywords
+    .filter((k) => !existingSet.has(k.toLowerCase()))
+    .map((keyword) => ({
+      project_id: projectId,
+      keyword,
+      engine_type: engineType,
+      target_domain: targetDomain,
+      target_business_name: targetBusinessName,
+      preferred_landing_page: preferredLandingPage,
+      notes,
+      is_active: true,
+    }))
+
+  if (toInsert.length === 0) {
+    throw new Error('כל מילות המפתח שהוזנו כבר קיימות בפרויקט')
+  }
+
+  const { error } = await supabase.from('tracking_targets').insert(toInsert)
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/projects/${projectId}`)
+  revalidatePath('/keywords')
+
+  return { created: toInsert.length, skipped: keywords.length - toInsert.length }
+}
+
 export async function updateTrackingTargetAction(id: string, formData: FormData) {
   const supabase = await createClient()
 

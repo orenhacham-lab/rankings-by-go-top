@@ -27,6 +27,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [scanning, setScanning] = useState(false)
   const [scanningTargets, setScanningTargets] = useState<Set<string>>(new Set())
   const [scanMessage, setScanMessage] = useState('')
+  const [scanError, setScanError] = useState(false)
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
@@ -70,6 +71,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     loadData()
   }, [loadData])
 
+  function showScanResult(message: string, isError: boolean) {
+    setScanMessage(message)
+    setScanError(isError)
+    setTimeout(() => setScanMessage(''), 5000)
+  }
+
   async function handleScanAll() {
     setScanning(true)
     setScanMessage('')
@@ -81,13 +88,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       })
       const data = await response.json()
       if (response.ok) {
-        setScanMessage(`סריקה הושלמה: ${data.completed} / ${data.total} הצליחו`)
         await loadData()
+        showScanResult(`סריקה הושלמה: ${data.completed} / ${data.total} הצליחו`, data.failed > 0 && data.completed === 0)
       } else {
-        setScanMessage(`שגיאה: ${data.error}`)
+        showScanResult(`שגיאה: ${data.error}`, true)
       }
     } catch {
-      setScanMessage('שגיאת רשת בסריקה')
+      showScanResult('שגיאת רשת בסריקה', true)
     } finally {
       setScanning(false)
     }
@@ -104,13 +111,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       })
       const data = await response.json()
       if (response.ok) {
-        setScanMessage('סריקה הושלמה בהצלחה')
         await loadData()
+        showScanResult('סריקה הושלמה בהצלחה', false)
       } else {
-        setScanMessage(`שגיאה: ${data.error}`)
+        showScanResult(`שגיאה: ${data.error}`, true)
       }
     } catch {
-      setScanMessage('שגיאת רשת')
+      showScanResult('שגיאת רשת', true)
     } finally {
       setScanningTargets((prev) => {
         const next = new Set(prev)
@@ -153,15 +160,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               loading={scanning}
               disabled={activeTargets.length === 0}
             >
-              🔍 סרוק הכל
+              {scanning ? 'סורק...' : '🔍 סרוק הכל'}
             </Button>
           </div>
         }
       />
 
       {scanMessage && (
-        <div className={`mb-4 p-3 rounded-lg text-sm ${scanMessage.startsWith('שגיאה') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
-          {scanMessage}
+        <div className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${scanError ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
+          <span>{scanError ? '✗' : '✓'}</span>
+          <span>{scanMessage}</span>
         </div>
       )}
 

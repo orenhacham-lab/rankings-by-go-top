@@ -27,10 +27,12 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     return makeError('No target domain specified')
   }
 
-  const targetHostname = normalizeDomain(rawDomain)
-  if (!targetHostname) {
+  const normalizedTarget = normalizeDomain(rawDomain)
+  if (!normalizedTarget) {
     return makeError(`Could not parse target domain: "${rawDomain}"`)
   }
+
+  console.log(`[GoogleSearch] Scanning keyword="${input.keyword}" target="${rawDomain}" → normalized="${normalizedTarget}"`)
 
   try {
     const body: Record<string, unknown> = {
@@ -80,11 +82,30 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
 
     const results = data.organic ?? []
 
-    for (const result of results) {
-      if (isDomainMatch(result.link, targetHostname)) {
+    console.log(`[GoogleSearch] Got ${results.length} organic results from Serper`)
+
+    if (results.length === 0) {
+      console.log('[GoogleSearch] No organic results returned')
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
+    }
+
+    // Log all URLs for debugging
+    results.forEach((r, idx) => {
+      const norm = normalizeDomain(r.link)
+      console.log(`[GoogleSearch] #${idx + 1} url="${r.link}" normalized="${norm}"`)
+    })
+
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      const resultNormalized = normalizeDomain(result.link)
+      const position = i + 1 // use loop index as reliable 1-based position
+
+      const matched = isDomainMatch(resultNormalized, normalizedTarget)
+      if (matched) {
+        console.log(`[GoogleSearch] MATCH at position ${position}: "${result.link}" (normalized="${resultNormalized}")`)
         return {
           found: true,
-          position: result.position,
+          position,
           resultUrl: result.link,
           resultTitle: result.title || null,
           resultAddress: null,
@@ -93,7 +114,7 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       }
     }
 
-    // Keyword searched successfully, domain not found in results
+    console.log(`[GoogleSearch] No match found for "${normalizedTarget}" in ${results.length} results`)
     return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
@@ -104,23 +125,28 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
 }
 
 /**
- * Strict domain matching:
- * - Exact: "example.co.il" matches "example.co.il"
- * - Subdomain: "blog.example.co.il" matches target "example.co.il"
- * - Does NOT match "best-example.co.il" or "example.co.il.evil.com"
+ * Domain match using includes() so that:
+ * - "gotop.co.il" matches result "gotop.co.il"
+ * - "gotop.co.il" matches result "www.gotop.co.il" (after normalization strips www.)
+ * - "gotop.co.il" matches result "blog.gotop.co.il"
  */
-function isDomainMatch(resultUrl: string, targetHostname: string): boolean {
-  const resultHostname = normalizeDomain(resultUrl)
-  if (!resultHostname) return false
-  if (resultHostname === targetHostname) return true
-  // Subdomain check: resultHostname must end with exactly "." + targetHostname
-  if (resultHostname.endsWith('.' + targetHostname)) return true
+function isDomainMatch(resultNormalized: string, targetNormalized: string): boolean {
+  if (!resultNormalized || !targetNormalized) return false
+  // Exact match
+  if (resultNormalized === targetNormalized) return true
+  // Subdomain: result must end with "." + target
+  if (resultNormalized.endsWith('.' + targetNormalized)) return true
+  // Fallback: includes check (target is fully contained in result domain)
+  if (resultNormalized.includes(targetNormalized)) return true
   return false
 }
 
 /**
- * Extract and normalize hostname from a URL or plain domain.
- * Strips www., lowercases, removes trailing dot.
+ * Normalize a URL or plain domain:
+ * - Remove protocol (https://, http://)
+ * - Remove www.
+ * - Lowercase
+ * - Extract only the hostname (no path/query)
  */
 function normalizeDomain(input: string): string {
   try {
@@ -128,7 +154,6 @@ function normalizeDomain(input: string): string {
     const hostname = new URL(url).hostname
     return hostname.replace(/^www\./, '').toLowerCase().replace(/\.$/, '')
   } catch {
-    // Fallback: strip protocol and path manually
     return input
       .replace(/^https?:\/\//, '')
       .replace(/^www\./, '')
