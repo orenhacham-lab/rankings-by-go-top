@@ -11,7 +11,7 @@ interface ExportData {
 }
 
 let hebrewFontLoaded = false
-const forceLtr = (value: string): string => `\u200E${value}\u200E`
+const reverseForRtl = (value: string): string => value.split('').reverse().join('')
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
   if (hebrewFontLoaded) {
@@ -111,7 +111,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     doc.setFontSize(13)
     // ספרות ואחוזים מוצגים יציב יותר עם Helvetica
     doc.setFont('helvetica', 'bold')
-    doc.text(forceLtr(box.value), x + boxW / 2, boxY + 13, { align: 'center' })
+    doc.text(reverseForRtl(box.value), x + boxW / 2, boxY + 13, { align: 'center' })
   })
 
   // ── Rankings table ────────────────────────────────────────────────
@@ -144,12 +144,12 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     const currentPosition = result?.position != null ? String(result.position) : '—'
 
     return [
-      urlDisplay ? forceLtr(urlDisplay) : '—',
-      checkedAt !== '—' ? forceLtr(checkedAt) : '—',
+      urlDisplay ? reverseForRtl(urlDisplay) : '—',
+      checkedAt !== '—' ? reverseForRtl(checkedAt) : '—',
       result ? (result.found ? 'כן' : 'לא') : '—',
-      changeStr !== '—' ? forceLtr(changeStr) : '—',
-      previousPosition !== '—' ? forceLtr(previousPosition) : '—',
-      currentPosition !== '—' ? forceLtr(currentPosition) : '—',
+      changeStr !== '—' ? reverseForRtl(changeStr) : '—',
+      previousPosition !== '—' ? reverseForRtl(previousPosition) : '—',
+      currentPosition !== '—' ? reverseForRtl(currentPosition) : '—',
       getEngineDisplayLabel(target.engine_type, data.project.device_type),
       target.keyword,
     ]
