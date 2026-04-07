@@ -13,6 +13,14 @@ interface ExportData {
 let hebrewFontLoaded = false
 const reverseForRtl = (value: string): string => value.split('').reverse().join('')
 const normalizeKeyword = (value: string): string => value.replace(/\u05F4/g, '"').replace(/\u05F3/g, "'")
+const formatKeywordForPdf = (value: string): string => {
+  const normalized = normalizeKeyword(value)
+  // Mixed RTL/LTR (e.g. Hebrew + SEO) tends to disappear in jsPDF RTL mode unless pre-reversed.
+  if (/[A-Za-z"']/.test(normalized)) {
+    return reverseForRtl(normalized)
+  }
+  return normalized
+}
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
   if (hebrewFontLoaded) {
@@ -154,7 +162,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
       previousPosition !== '—' ? reverseForRtl(previousPosition) : '—',
       currentPosition !== '—' ? reverseForRtl(currentPosition) : '—',
       getEngineDisplayLabel(target.engine_type, data.project.device_type),
-      normalizeKeyword(target.keyword),
+      formatKeywordForPdf(target.keyword),
       ],
     }
   })
