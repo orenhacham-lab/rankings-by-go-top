@@ -44,7 +44,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     format: 'a4',
   })
   await ensureHebrewFont(doc)
-  doc.setR2L(true)
+  doc.setR2L(false)
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -113,7 +113,8 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   })
 
   // ── Rankings table ────────────────────────────────────────────────
-  const tableHead = [['ביטוי', 'מנוע', 'מיקום', 'מיקום קודם', 'שינוי', 'נמצא', 'תאריך', 'כתובת תוצאה']]
+  // חשוב: אנחנו שומרים סדר עמודות כך ש"ביטוי" יהיה בצד ימין (RTL ויזואלי)
+  const tableHead = [['כתובת תוצאה', 'תאריך', 'נמצא', 'שינוי', 'מיקום קודם', 'מיקום', 'מנוע', 'ביטוי']]
 
   const sortedTargets = [...data.targets].sort((a, b) => {
     const aResult = data.latestResults[a.id]
@@ -138,14 +139,14 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     const urlDisplay = urlRaw.length > 50 ? urlRaw.slice(0, 50) + '…' : urlRaw
 
     return [
-      target.keyword,
-      getEngineDisplayLabel(target.engine_type, data.project.device_type),
-      result?.found ? `#${result.position}` : 'לא נמצא',
-      result?.previous_position != null ? `#${result.previous_position}` : '—',
-      changeStr,
-      result ? (result.found ? 'כן' : 'לא') : '—',
-      result?.checked_at ? new Date(result.checked_at).toLocaleDateString('he-IL') : '—',
       urlDisplay || '—',
+      result?.checked_at ? new Date(result.checked_at).toLocaleDateString('he-IL') : '—',
+      result ? (result.found ? 'כן' : 'לא') : '—',
+      changeStr,
+      result?.previous_position != null ? String(result.previous_position) : '—',
+      result?.position != null ? String(result.position) : '—',
+      getEngineDisplayLabel(target.engine_type, data.project.device_type),
+      target.keyword,
     ]
   })
 
@@ -157,7 +158,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     styles: {
       fontSize: 8,
       cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
-      font: 'NotoSansHebrew',
+      font: 'helvetica',
       textColor: [30, 41, 59],
       lineColor: [226, 232, 240],
       lineWidth: 0.2,
@@ -174,18 +175,24 @@ export async function exportToPDF(data: ExportData): Promise<void> {
       fillColor: [248, 250, 252],
     },
     columnStyles: {
-      0: { cellWidth: 46 },
-      1: { cellWidth: 28 },
-      2: { cellWidth: 22, halign: 'center' },
-      3: { cellWidth: 14, halign: 'center' },
+      0: { cellWidth: 'auto', halign: 'left' },
+      1: { cellWidth: 20, halign: 'center' },
+      2: { cellWidth: 12, halign: 'center' },
+      3: { cellWidth: 16, halign: 'center' },
       4: { cellWidth: 16, halign: 'center' },
       5: { cellWidth: 14, halign: 'center' },
-      6: { cellWidth: 20 },
-      7: { cellWidth: 'auto', halign: 'left' },
+      6: { cellWidth: 24, halign: 'right' },
+      7: { cellWidth: 40, halign: 'right' },
+    },
+    didParseCell: (hookData) => {
+      // Hebrew columns use Hebrew font; numeric/url columns stay in Helvetica for robust rendering
+      if (hookData.section === 'body' && [2, 6, 7].includes(hookData.column.index)) {
+        hookData.cell.styles.font = 'NotoSansHebrew'
+      }
     },
     // Use willDrawCell to color the change column BEFORE text is drawn (no double-render)
     willDrawCell: (hookData) => {
-      if (hookData.section === 'body' && hookData.column.index === 4) {
+      if (hookData.section === 'body' && hookData.column.index === 3) {
         const val = hookData.cell.text[0] ?? ''
         if (val.startsWith('+')) {
           hookData.cell.styles.textColor = [22, 163, 74]
