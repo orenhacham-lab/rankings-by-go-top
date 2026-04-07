@@ -44,7 +44,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     format: 'a4',
   })
   await ensureHebrewFont(doc)
-  doc.setR2L(false)
+  doc.setR2L(true)
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -108,7 +108,8 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
     doc.setTextColor(29, 78, 216)
     doc.setFontSize(13)
-    doc.setFont('NotoSansHebrew', 'normal')
+    // ספרות ואחוזים מוצגים יציב יותר עם Helvetica
+    doc.setFont('helvetica', 'bold')
     doc.text(box.value, x + boxW / 2, boxY + 13, { align: 'center' })
   })
 
