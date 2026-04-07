@@ -27,6 +27,7 @@ function ReportsContent() {
   } | null>(null)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+  const [positionSort, setPositionSort] = useState<'none' | 'best' | 'worst'>('none')
 
   useEffect(() => {
     async function loadProjects() {
@@ -123,6 +124,24 @@ function ReportsContent() {
 
   const foundCount = reportData ? Object.values(reportData.latestResults).filter((r) => r.found).length : 0
   const total = reportData?.targets.length || 0
+  const sortedTargets = reportData
+    ? [...reportData.targets].sort((a, b) => {
+      if (positionSort === 'none') return 0
+      const aResult = reportData.latestResults[a.id]
+      const bResult = reportData.latestResults[b.id]
+      const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
+      const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
+      return positionSort === 'best' ? aPos - bPos : bPos - aPos
+    })
+    : []
+
+  function togglePositionSort() {
+    setPositionSort((prev) => {
+      if (prev === 'none') return 'best'
+      if (prev === 'best') return 'worst'
+      return 'none'
+    })
+  }
 
   return (
     <div>
@@ -233,7 +252,19 @@ function ReportsContent() {
               <tr>
                 <Th>מילת מפתח</Th>
                 <Th>מנוע</Th>
-                <Th>מיקום</Th>
+                <Th>
+                  <button
+                    type="button"
+                    onClick={togglePositionSort}
+                    className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
+                    title="מיין לפי מיקום"
+                  >
+                    מיקום
+                    <span className="text-xs">
+                      {positionSort === 'best' ? '▲' : positionSort === 'worst' ? '▼' : '↕'}
+                    </span>
+                  </button>
+                </Th>
                 <Th>מיקום קודם</Th>
                 <Th>שינוי</Th>
                 <Th>נמצא</Th>
@@ -242,10 +273,10 @@ function ReportsContent() {
               </tr>
             </TableHead>
             <TableBody>
-              {reportData.targets.length === 0 && (
+              {sortedTargets.length === 0 && (
                 <EmptyRow colSpan={8} message="אין מילות מפתח בפרויקט זה" />
               )}
-              {reportData.targets.map((target) => {
+              {sortedTargets.map((target) => {
                 const result = reportData.latestResults[target.id]
                 return (
                   <TableRow key={target.id}>
