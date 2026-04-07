@@ -43,6 +43,21 @@ async function ensureHebrewFont(doc: jsPDF): Promise<void> {
 
   doc.addFileToVFS('NotoSansHebrew-Regular.ttf', base64)
   doc.addFont('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew', 'normal')
+
+  const notoRes = await fetch('/fonts/NotoSans-Regular.ttf')
+  if (!notoRes.ok) {
+    throw new Error('לא ניתן לטעון פונט NotoSans ל-PDF')
+  }
+  const notoBuffer = await notoRes.arrayBuffer()
+  const notoBytes = new Uint8Array(notoBuffer)
+  let notoBinary = ''
+  for (let i = 0; i < notoBytes.length; i++) {
+    notoBinary += String.fromCharCode(notoBytes[i])
+  }
+  const notoBase64 = btoa(notoBinary)
+  doc.addFileToVFS('NotoSans-Regular.ttf', notoBase64)
+  doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal')
+
   doc.setFont('NotoSansHebrew', 'normal')
   hebrewFontLoaded = true
 }
@@ -203,8 +218,11 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     },
     didParseCell: (hookData) => {
       // Hebrew columns use Hebrew font; numeric/url columns stay in Helvetica for robust rendering
-      if (hookData.section === 'body' && [2, 6, 7].includes(hookData.column.index)) {
+      if (hookData.section === 'body' && [2, 6].includes(hookData.column.index)) {
         hookData.cell.styles.font = 'NotoSansHebrew'
+      }
+      if (hookData.section === 'body' && hookData.column.index === 7) {
+        hookData.cell.styles.font = 'NotoSans'
       }
     },
     didDrawCell: (hookData) => {
