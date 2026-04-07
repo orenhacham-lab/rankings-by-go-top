@@ -159,7 +159,8 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     headStyles: {
       fillColor: [29, 78, 216],
       textColor: [255, 255, 255],
-      fontStyle: 'bold',
+      font: 'NotoSansHebrew',
+      fontStyle: 'normal',
       fontSize: 8,
     },
     alternateRowStyles: {
