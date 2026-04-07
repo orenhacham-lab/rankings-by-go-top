@@ -12,9 +12,9 @@ interface ExportData {
 
 let hebrewFontLoaded = false
 const reverseForRtl = (value: string): string => value.split('').reverse().join('')
-const normalizeKeyword = (value: string): string => value.replace(/\u05F4/g, '"').replace(/\u05F3/g, "'")
 const formatKeywordForPdf = (value: string): string => {
-  return normalizeKeyword(value)
+  // Preserve keyword exactly as entered, while forcing RTL embedding for mixed-direction terms.
+  return `\u2067${value}\u2069`
 }
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
@@ -134,7 +134,6 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
   const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
-    const normalizedKeyword = normalizeKeyword(target.keyword)
 
     let changeStr = '—'
     if (result?.change_value != null) {
@@ -159,7 +158,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
       previousPosition !== '—' ? reverseForRtl(previousPosition) : '—',
       currentPosition !== '—' ? reverseForRtl(currentPosition) : '—',
       getEngineDisplayLabel(target.engine_type, data.project.device_type),
-      formatKeywordForPdf(normalizedKeyword),
+      formatKeywordForPdf(target.keyword),
       ],
     }
   })
