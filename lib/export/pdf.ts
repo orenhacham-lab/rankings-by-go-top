@@ -15,11 +15,8 @@ const reverseForRtl = (value: string): string => value.split('').reverse().join(
 const normalizeKeyword = (value: string): string => value.replace(/\u05F4/g, '"').replace(/\u05F3/g, "'")
 const formatKeywordForPdf = (value: string): string => {
   const normalized = normalizeKeyword(value)
-  // Mixed RTL/LTR (e.g. Hebrew + SEO) tends to disappear in jsPDF RTL mode unless pre-reversed.
-  if (/[A-Za-z"']/.test(normalized)) {
-    return reverseForRtl(normalized)
-  }
-  return normalized
+  // Keep English tokens in visual LTR while preserving Hebrew RTL text.
+  return normalized.replace(/[A-Za-z]+/g, (token) => `\u202A${token}\u202C`)
 }
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
@@ -154,7 +151,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
     const normalizedKeyword = normalizeKeyword(target.keyword)
-    const keywordHasLatin = /[A-Za-z"']/.test(normalizedKeyword)
+    const keywordHasLatin = /[A-Za-z]/.test(normalizedKeyword)
 
     let changeStr = '—'
     if (result?.change_value != null) {
