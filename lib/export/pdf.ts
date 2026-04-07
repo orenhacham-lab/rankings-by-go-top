@@ -11,6 +11,7 @@ interface ExportData {
 }
 
 let hebrewFontLoaded = false
+const forceLtr = (value: string): string => `\u200E${value}\u200E`
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
   if (hebrewFontLoaded) {
@@ -110,7 +111,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     doc.setFontSize(13)
     // ספרות ואחוזים מוצגים יציב יותר עם Helvetica
     doc.setFont('helvetica', 'bold')
-    doc.text(box.value, x + boxW / 2, boxY + 13, { align: 'center' })
+    doc.text(forceLtr(box.value), x + boxW / 2, boxY + 13, { align: 'center' })
   })
 
   // ── Rankings table ────────────────────────────────────────────────
@@ -138,14 +139,17 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
     const urlRaw = result?.result_url ?? ''
     const urlDisplay = urlRaw.length > 50 ? urlRaw.slice(0, 50) + '…' : urlRaw
+    const checkedAt = result?.checked_at ? new Date(result.checked_at).toLocaleDateString('he-IL') : '—'
+    const previousPosition = result?.previous_position != null ? String(result.previous_position) : '—'
+    const currentPosition = result?.position != null ? String(result.position) : '—'
 
     return [
-      urlDisplay || '—',
-      result?.checked_at ? new Date(result.checked_at).toLocaleDateString('he-IL') : '—',
+      urlDisplay ? forceLtr(urlDisplay) : '—',
+      checkedAt !== '—' ? forceLtr(checkedAt) : '—',
       result ? (result.found ? 'כן' : 'לא') : '—',
-      changeStr,
-      result?.previous_position != null ? String(result.previous_position) : '—',
-      result?.position != null ? String(result.position) : '—',
+      changeStr !== '—' ? forceLtr(changeStr) : '—',
+      previousPosition !== '—' ? forceLtr(previousPosition) : '—',
+      currentPosition !== '—' ? forceLtr(currentPosition) : '—',
       getEngineDisplayLabel(target.engine_type, data.project.device_type),
       target.keyword,
     ]
