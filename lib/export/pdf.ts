@@ -44,6 +44,9 @@ async function ensureHebrewFont(doc: jsPDF): Promise<void> {
 }
 
 export async function exportToPDF(data: ExportData): Promise<void> {
+  // Temporary business rule: omit mixed English/quoted keywords from PDF output.
+  const reportTargets = data.targets.filter((t) => !/[A-Za-z\u05F4\u05F3"']/.test(t.keyword))
+
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
@@ -56,9 +59,9 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   const pageHeight = doc.internal.pageSize.getHeight()
   const now = new Date().toLocaleDateString('he-IL')
 
-  const found = Object.values(data.latestResults).filter((r) => r.found).length
-  const notFound = Object.values(data.latestResults).filter((r) => !r.found).length
-  const total = data.targets.length
+  const found = reportTargets.filter((t) => data.latestResults[t.id]?.found).length
+  const notFound = reportTargets.length - found
+  const total = reportTargets.length
   const coverage = total > 0 ? `${Math.round((found / total) * 100)}%` : '0%'
 
   // ── Header bar ────────────────────────────────────────────────────
@@ -123,7 +126,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   // חשוב: אנחנו שומרים סדר עמודות כך ש"ביטוי" יהיה בצד ימין (RTL ויזואלי)
   const tableHead = [['כתובת תוצאה', 'תאריך', 'נמצא', 'שינוי', 'מיקום קודם', 'מיקום', 'מנוע', 'ביטוי']]
 
-  const sortedTargets = [...data.targets].sort((a, b) => {
+  const sortedTargets = [...reportTargets].sort((a, b) => {
     const aResult = data.latestResults[a.id]
     const bResult = data.latestResults[b.id]
 
