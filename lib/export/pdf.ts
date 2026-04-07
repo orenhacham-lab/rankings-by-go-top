@@ -62,7 +62,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15)
   doc.setFont('NotoSansHebrew', 'normal')
-  doc.text('Rankings by Go Top', pageWidth - 14, 14, { align: 'right' })
+  doc.text('Go Top - דוח דירוגים', pageWidth - 14, 14, { align: 'right' })
 
   doc.setFontSize(9)
   doc.setFont('NotoSansHebrew', 'normal')
@@ -113,11 +113,18 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   })
 
   // ── Rankings table ────────────────────────────────────────────────
-  const tableHead = [
-    ['מילת מפתח', 'מנוע', 'מיקום', 'מיקום קודם', 'שינוי', 'נמצא', 'תאריך', 'כתובת תוצאה'],
-  ]
+  const tableHead = [['ביטוי', 'מנוע', 'מיקום', 'מיקום קודם', 'שינוי', 'נמצא', 'תאריך', 'כתובת תוצאה']]
 
-  const tableBody = data.targets.map((target) => {
+  const sortedTargets = [...data.targets].sort((a, b) => {
+    const aResult = data.latestResults[a.id]
+    const bResult = data.latestResults[b.id]
+
+    const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
+    const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
+    return aPos - bPos
+  })
+
+  const tableBody = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
 
     let changeStr = '—'
@@ -133,7 +140,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     return [
       target.keyword,
       getEngineDisplayLabel(target.engine_type, data.project.device_type),
-      result?.found ? `#${result.position}` : '—',
+      result?.found ? `#${result.position}` : 'לא נמצא',
       result?.previous_position != null ? `#${result.previous_position}` : '—',
       changeStr,
       result ? (result.found ? 'כן' : 'לא') : '—',
@@ -169,7 +176,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     columnStyles: {
       0: { cellWidth: 46 },
       1: { cellWidth: 28 },
-      2: { cellWidth: 18, halign: 'center' },
+      2: { cellWidth: 22, halign: 'center' },
       3: { cellWidth: 14, halign: 'center' },
       4: { cellWidth: 16, halign: 'center' },
       5: { cellWidth: 14, halign: 'center' },
@@ -207,7 +214,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     doc.setFont('NotoSansHebrew', 'normal')
     doc.setTextColor(148, 163, 184)
     doc.text(
-      `Rankings by Go Top  |  Generated ${now}  |  Page ${i} of ${pageCount}`,
+      `Go Top | הופק בתאריך ${now} | עמוד ${i} מתוך ${pageCount}`,
       pageWidth / 2,
       pageHeight - 4,
       { align: 'center' }
@@ -216,6 +223,6 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
   // ── Save ──────────────────────────────────────────────────────────
   const safeName = data.project.name.replace(/[/\\:*?"<>|]/g, '-').replace(/\s+/g, '_').slice(0, 60)
-  const filename = `rankings_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`
+  const filename = `דוח_דירוגים_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`
   doc.save(filename)
 }
