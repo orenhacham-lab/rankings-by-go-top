@@ -14,9 +14,7 @@ let hebrewFontLoaded = false
 const reverseForRtl = (value: string): string => value.split('').reverse().join('')
 const normalizeKeyword = (value: string): string => value.replace(/\u05F4/g, '"').replace(/\u05F3/g, "'")
 const formatKeywordForPdf = (value: string): string => {
-  const normalized = normalizeKeyword(value)
-  // Keep English tokens in visual LTR while preserving Hebrew RTL text.
-  return normalized.replace(/[A-Za-z]+/g, (token) => `\u202A${token}\u202C`)
+  return normalizeKeyword(value)
 }
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
@@ -40,20 +38,6 @@ async function ensureHebrewFont(doc: jsPDF): Promise<void> {
 
   doc.addFileToVFS('NotoSansHebrew-Regular.ttf', base64)
   doc.addFont('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew', 'normal')
-
-  const notoRes = await fetch('/fonts/NotoSans-Regular.ttf')
-  if (!notoRes.ok) {
-    throw new Error('לא ניתן לטעון פונט NotoSans ל-PDF')
-  }
-  const notoBuffer = await notoRes.arrayBuffer()
-  const notoBytes = new Uint8Array(notoBuffer)
-  let notoBinary = ''
-  for (let i = 0; i < notoBytes.length; i++) {
-    notoBinary += String.fromCharCode(notoBytes[i])
-  }
-  const notoBase64 = btoa(notoBinary)
-  doc.addFileToVFS('NotoSans-Regular.ttf', notoBase64)
-  doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal')
 
   doc.setFont('NotoSansHebrew', 'normal')
   hebrewFontLoaded = true
@@ -151,7 +135,6 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
     const normalizedKeyword = normalizeKeyword(target.keyword)
-    const keywordHasLatin = /[A-Za-z]/.test(normalizedKeyword)
 
     let changeStr = '—'
     if (result?.change_value != null) {
@@ -168,7 +151,6 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
     return {
       resultUrl: result?.result_url ?? null,
-      keywordHasLatin,
       cells: [
       urlDisplay ? reverseForRtl(urlDisplay) : '—',
       checkedAt !== '—' ? reverseForRtl(checkedAt) : '—',
@@ -222,8 +204,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
         hookData.cell.styles.font = 'NotoSansHebrew'
       }
       if (hookData.section === 'body' && hookData.column.index === 7) {
-        const rowData = tableRows[hookData.row.index]
-        hookData.cell.styles.font = rowData?.keywordHasLatin ? 'NotoSans' : 'NotoSansHebrew'
+        hookData.cell.styles.font = 'NotoSansHebrew'
       }
     },
     didDrawCell: (hookData) => {
