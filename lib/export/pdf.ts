@@ -153,6 +153,8 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
   const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
+    const normalizedKeyword = normalizeKeyword(target.keyword)
+    const keywordHasLatin = /[A-Za-z"']/.test(normalizedKeyword)
 
     let changeStr = '—'
     if (result?.change_value != null) {
@@ -169,6 +171,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
 
     return {
       resultUrl: result?.result_url ?? null,
+      keywordHasLatin,
       cells: [
       urlDisplay ? reverseForRtl(urlDisplay) : '—',
       checkedAt !== '—' ? reverseForRtl(checkedAt) : '—',
@@ -177,7 +180,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
       previousPosition !== '—' ? reverseForRtl(previousPosition) : '—',
       currentPosition !== '—' ? reverseForRtl(currentPosition) : '—',
       getEngineDisplayLabel(target.engine_type, data.project.device_type),
-      formatKeywordForPdf(target.keyword),
+      formatKeywordForPdf(normalizedKeyword),
       ],
     }
   })
@@ -222,7 +225,8 @@ export async function exportToPDF(data: ExportData): Promise<void> {
         hookData.cell.styles.font = 'NotoSansHebrew'
       }
       if (hookData.section === 'body' && hookData.column.index === 7) {
-        hookData.cell.styles.font = 'NotoSans'
+        const rowData = tableRows[hookData.row.index]
+        hookData.cell.styles.font = rowData?.keywordHasLatin ? 'NotoSans' : 'NotoSansHebrew'
       }
     },
     didDrawCell: (hookData) => {
