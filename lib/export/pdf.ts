@@ -12,6 +12,7 @@ interface ExportData {
 
 let hebrewFontLoaded = false
 const reverseForRtl = (value: string): string => value.split('').reverse().join('')
+const normalizeKeyword = (value: string): string => value.replace(/\u05F4/g, '"').replace(/\u05F3/g, "'")
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
   if (hebrewFontLoaded) {
@@ -63,11 +64,11 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15)
   doc.setFont('NotoSansHebrew', 'normal')
-  doc.text('Go Top - דוח דירוגים', pageWidth - 14, 14, { align: 'right' })
+  doc.text('דוח דירוגים', pageWidth - 14, 14, { align: 'right' })
 
   doc.setFontSize(9)
   doc.setFont('NotoSansHebrew', 'normal')
-  doc.text('דוח דירוגים', 14, 14)
+  doc.text(data.project.name, 14, 14)
 
   // ── Project / client info ─────────────────────────────────────────
   doc.setTextColor(15, 23, 42)
@@ -127,7 +128,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     return aPos - bPos
   })
 
-  const tableBody = sortedTargets.map((target) => {
+  const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
 
     let changeStr = '—'
@@ -143,7 +144,9 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     const previousPosition = result?.previous_position != null ? String(result.previous_position) : '—'
     const currentPosition = result?.position != null ? String(result.position) : '—'
 
-    return [
+    return {
+      resultUrl: result?.result_url ?? null,
+      cells: [
       urlDisplay ? reverseForRtl(urlDisplay) : '—',
       checkedAt !== '—' ? reverseForRtl(checkedAt) : '—',
       result ? (result.found ? 'כן' : 'לא') : '—',
@@ -151,13 +154,14 @@ export async function exportToPDF(data: ExportData): Promise<void> {
       previousPosition !== '—' ? reverseForRtl(previousPosition) : '—',
       currentPosition !== '—' ? reverseForRtl(currentPosition) : '—',
       getEngineDisplayLabel(target.engine_type, data.project.device_type),
-      target.keyword,
-    ]
+      normalizeKeyword(target.keyword),
+      ],
+    }
   })
 
   autoTable(doc, {
     head: tableHead,
-    body: tableBody,
+    body: tableRows.map((row) => row.cells),
     startY: 68,
     theme: 'grid',
     styles: {
@@ -194,6 +198,14 @@ export async function exportToPDF(data: ExportData): Promise<void> {
       if (hookData.section === 'body' && [2, 6, 7].includes(hookData.column.index)) {
         hookData.cell.styles.font = 'NotoSansHebrew'
       }
+    },
+    didDrawCell: (hookData) => {
+      if (hookData.section !== 'body' || hookData.column.index !== 0) return
+      const rowData = tableRows[hookData.row.index]
+      if (!rowData?.resultUrl) return
+      doc.link(hookData.cell.x, hookData.cell.y, hookData.cell.width, hookData.cell.height, {
+        url: rowData.resultUrl,
+      })
     },
     // Use willDrawCell to color the change column BEFORE text is drawn (no double-render)
     willDrawCell: (hookData) => {
