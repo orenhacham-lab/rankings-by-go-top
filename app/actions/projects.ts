@@ -39,6 +39,9 @@ export async function updateProjectAction(id: string, formData: FormData) {
 
   const scanFrequency = formData.get('scan_frequency') as string
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
+  const nextScanAt = autoScanEnabled && scanFrequency !== 'manual'
+    ? calculateNextScanDate(scanFrequency)
+    : null
 
   const data = {
     name: formData.get('name') as string,
@@ -50,6 +53,7 @@ export async function updateProjectAction(id: string, formData: FormData) {
     device_type: (formData.get('device_type') as string) || null,
     scan_frequency: scanFrequency || 'manual',
     auto_scan_enabled: autoScanEnabled,
+    next_scan_at: nextScanAt?.toISOString() || null,
   }
 
   const { error } = await supabase.from('projects').update(data).eq('id', id)

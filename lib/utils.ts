@@ -47,9 +47,21 @@ export function getEngineLabel(engine: string): string {
   return engine
 }
 
+export function getEngineDisplayLabel(
+  engine: string,
+  deviceType?: 'desktop' | 'mobile' | null
+): string {
+  const base = getEngineLabel(engine)
+  if (engine !== 'google_search') return base
+  if (deviceType === 'mobile') return `${base} (מובייל)`
+  if (deviceType === 'desktop') return `${base} (מחשב)`
+  return base
+}
+
 export function getFrequencyLabel(freq: string): string {
   if (freq === 'weekly') return 'פעם בשבוע'
   if (freq === 'monthly') return 'פעם בחודש'
+  if (freq === 'monthly_first_day') return 'כל חודש ב-1 לחודש'
   return 'ידני'
 }
 
@@ -66,6 +78,11 @@ export function calculateNextScanDate(frequency: string, fromDate: Date = new Da
   }
   if (frequency === 'monthly') {
     d.setMonth(d.getMonth() + 1)
+    return d
+  }
+  if (frequency === 'monthly_first_day') {
+    d.setMonth(d.getMonth() + 1, 1)
+    d.setHours(fromDate.getHours(), fromDate.getMinutes(), fromDate.getSeconds(), fromDate.getMilliseconds())
     return d
   }
   return null

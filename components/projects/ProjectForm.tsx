@@ -25,7 +25,9 @@ export default function ProjectForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [autoScan, setAutoScan] = useState(project?.auto_scan_enabled ?? false)
-  const [scanFreq, setScanFreq] = useState<'manual' | 'weekly' | 'monthly'>(project?.scan_frequency || 'manual')
+  const [scanFreq, setScanFreq] = useState<'manual' | 'weekly' | 'monthly' | 'monthly_first_day'>(
+    project?.scan_frequency || 'manual'
+  )
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -145,13 +147,14 @@ export default function ProjectForm({
           name="scan_frequency"
           value={scanFreq}
           onChange={(e) => {
-            setScanFreq(e.target.value as 'manual' | 'weekly' | 'monthly')
+            setScanFreq(e.target.value as 'manual' | 'weekly' | 'monthly' | 'monthly_first_day')
             if (e.target.value === 'manual') setAutoScan(false)
           }}
           options={[
             { value: 'manual', label: 'ידני בלבד' },
             { value: 'weekly', label: 'פעם בשבוע' },
             { value: 'monthly', label: 'פעם בחודש' },
+            { value: 'monthly_first_day', label: 'כל חודש ב-1 לחודש' },
           ]}
         />
 

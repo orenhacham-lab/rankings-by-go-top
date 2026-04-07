@@ -19,14 +19,14 @@ export function ScanStatusBadge({ status }: { status: string }) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>
 }
 
-export function EngineBadge({ engine }: { engine: string }) {
+export function EngineBadge({ engine, label }: { engine: string; label?: string }) {
   if (engine === 'google_search') {
-    return <Badge variant="info">גוגל חיפוש</Badge>
+    return <Badge variant="info">{label || 'גוגל חיפוש'}</Badge>
   }
   if (engine === 'google_maps') {
-    return <Badge variant="success">גוגל מפות</Badge>
+    return <Badge variant="success">{label || 'גוגל מפות'}</Badge>
   }
-  return <Badge>{engine}</Badge>
+  return <Badge>{label || engine}</Badge>
 }
 
 export function PositionChange({ change }: { change: number | null }) {

@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, getEngineDisplayLabel } from '@/lib/utils'
 
 function ReportsContent() {
   const searchParams = useSearchParams()
@@ -108,14 +108,17 @@ function ReportsContent() {
   async function handleExportPDF() {
     if (!reportData) return
     setExporting('pdf')
-    const { exportToPDF } = await import('@/lib/export/pdf')
-    exportToPDF({
-      client: reportData.project.clients!,
-      project: reportData.project,
-      targets: reportData.targets,
-      latestResults: reportData.latestResults,
-    })
-    setExporting(null)
+    try {
+      const { exportToPDF } = await import('@/lib/export/pdf')
+      await exportToPDF({
+        client: reportData.project.clients!,
+        project: reportData.project,
+        targets: reportData.targets,
+        latestResults: reportData.latestResults,
+      })
+    } finally {
+      setExporting(null)
+    }
   }
 
   const foundCount = reportData ? Object.values(reportData.latestResults).filter((r) => r.found).length : 0
@@ -250,7 +253,10 @@ function ReportsContent() {
                       <span className="font-medium">{target.keyword}</span>
                     </Td>
                     <Td>
-                      <EngineBadge engine={target.engine_type} />
+                      <EngineBadge
+                        engine={target.engine_type}
+                        label={getEngineDisplayLabel(target.engine_type, reportData.project.device_type)}
+                      />
                     </Td>
                     <Td>
                       {result?.found ? (

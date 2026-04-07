@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/types'
-import { getEngineLabel } from '@/lib/utils'
+import { getEngineDisplayLabel } from '@/lib/utils'
 
 interface ExportData {
   client: Client
@@ -10,24 +10,41 @@ interface ExportData {
   latestResults: Record<string, ScanResult>
 }
 
-/**
- * NOTE ON HEBREW IN PDF:
- * jsPDF's built-in fonts (Helvetica, Times, Courier) do not include Hebrew
- * Unicode glyphs. Hebrew keywords and names will appear as boxes in some
- * PDF viewers. All UI labels (column headers, section titles) use English
- * for reliable rendering. The data columns (keyword, URL, title) display
- * the raw values — these render correctly in Chrome's built-in PDF viewer
- * and Adobe Acrobat but may not in older viewers.
- *
- * To add full Hebrew support: embed a Hebrew TTF font via jsPDF.addFont().
- */
+let hebrewFontLoaded = false
 
-export function exportToPDF(data: ExportData): void {
+async function ensureHebrewFont(doc: jsPDF): Promise<void> {
+  if (hebrewFontLoaded) {
+    doc.setFont('NotoSansHebrew', 'normal')
+    return
+  }
+
+  const res = await fetch('/fonts/NotoSansHebrew-Regular.ttf')
+  if (!res.ok) {
+    throw new Error('לא ניתן לטעון פונט עברי ל-PDF')
+  }
+
+  const buffer = await res.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  const base64 = btoa(binary)
+
+  doc.addFileToVFS('NotoSansHebrew-Regular.ttf', base64)
+  doc.addFont('NotoSansHebrew-Regular.ttf', 'NotoSansHebrew', 'normal')
+  doc.setFont('NotoSansHebrew', 'normal')
+  hebrewFontLoaded = true
+}
+
+export async function exportToPDF(data: ExportData): Promise<void> {
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
     format: 'a4',
   })
+  await ensureHebrewFont(doc)
+  doc.setR2L(true)
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -44,21 +61,20 @@ export function exportToPDF(data: ExportData): void {
 
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15)
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('NotoSansHebrew', 'normal')
   doc.text('Rankings by Go Top', pageWidth - 14, 14, { align: 'right' })
 
   doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  doc.text('SEO Ranking Report', 14, 14)
+  doc.setFont('NotoSansHebrew', 'normal')
+  doc.text('דוח דירוגים', 14, 14)
 
   // ── Project / client info ─────────────────────────────────────────
   doc.setTextColor(15, 23, 42)
   doc.setFontSize(12)
-  doc.setFont('helvetica', 'bold')
-  // Safe: project name may contain Hebrew — renders in Chrome PDF viewer
+  doc.setFont('NotoSansHebrew', 'normal')
   doc.text(data.project.name, pageWidth - 14, 33, { align: 'right' })
 
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('NotoSansHebrew', 'normal')
   doc.setFontSize(8.5)
   doc.setTextColor(100, 116, 139)
   const subtitle = `${data.client.name}  |  ${data.project.target_domain}  |  ${now}`
@@ -66,10 +82,10 @@ export function exportToPDF(data: ExportData): void {
 
   // ── Summary stat boxes ────────────────────────────────────────────
   const boxes = [
-    { label: 'Keywords', value: String(total) },
-    { label: 'Found', value: String(found) },
-    { label: 'Not Found', value: String(notFound) },
-    { label: 'Coverage', value: coverage },
+    { label: 'סה״כ ביטויים', value: String(total) },
+    { label: 'נמצאו', value: String(found) },
+    { label: 'לא נמצאו', value: String(notFound) },
+    { label: 'כיסוי', value: coverage },
   ]
 
   const boxW = 54
@@ -87,18 +103,18 @@ export function exportToPDF(data: ExportData): void {
 
     doc.setTextColor(71, 85, 105)
     doc.setFontSize(7)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('NotoSansHebrew', 'normal')
     doc.text(box.label, x + boxW / 2, boxY + 5.5, { align: 'center' })
 
     doc.setTextColor(29, 78, 216)
     doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('NotoSansHebrew', 'normal')
     doc.text(box.value, x + boxW / 2, boxY + 13, { align: 'center' })
   })
 
   // ── Rankings table ────────────────────────────────────────────────
   const tableHead = [
-    ['Keyword', 'Engine', 'Position', 'Prev.', 'Change', 'Found', 'Date', 'Result URL'],
+    ['מילת מפתח', 'מנוע', 'מיקום', 'מיקום קודם', 'שינוי', 'נמצא', 'תאריך', 'כתובת תוצאה'],
   ]
 
   const tableBody = data.targets.map((target) => {
@@ -116,11 +132,11 @@ export function exportToPDF(data: ExportData): void {
 
     return [
       target.keyword,
-      getEngineLabel(target.engine_type),
+      getEngineDisplayLabel(target.engine_type, data.project.device_type),
       result?.found ? `#${result.position}` : '—',
       result?.previous_position != null ? `#${result.previous_position}` : '—',
       changeStr,
-      result ? (result.found ? 'Yes' : 'No') : '—',
+      result ? (result.found ? 'כן' : 'לא') : '—',
       result?.checked_at ? new Date(result.checked_at).toLocaleDateString('he-IL') : '—',
       urlDisplay || '—',
     ]
@@ -134,10 +150,11 @@ export function exportToPDF(data: ExportData): void {
     styles: {
       fontSize: 8,
       cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
-      font: 'helvetica',
+      font: 'NotoSansHebrew',
       textColor: [30, 41, 59],
       lineColor: [226, 232, 240],
       lineWidth: 0.2,
+      halign: 'right',
     },
     headStyles: {
       fillColor: [29, 78, 216],
@@ -150,13 +167,13 @@ export function exportToPDF(data: ExportData): void {
     },
     columnStyles: {
       0: { cellWidth: 46 },
-      1: { cellWidth: 22 },
+      1: { cellWidth: 28 },
       2: { cellWidth: 18, halign: 'center' },
       3: { cellWidth: 14, halign: 'center' },
       4: { cellWidth: 16, halign: 'center' },
       5: { cellWidth: 14, halign: 'center' },
       6: { cellWidth: 20 },
-      7: { cellWidth: 'auto' },
+      7: { cellWidth: 'auto', halign: 'left' },
     },
     // Use willDrawCell to color the change column BEFORE text is drawn (no double-render)
     willDrawCell: (hookData) => {
@@ -186,7 +203,7 @@ export function exportToPDF(data: ExportData): void {
     doc.line(14, pageHeight - 9, pageWidth - 14, pageHeight - 9)
 
     doc.setFontSize(7)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('NotoSansHebrew', 'normal')
     doc.setTextColor(148, 163, 184)
     doc.text(
       `Rankings by Go Top  |  Generated ${now}  |  Page ${i} of ${pageCount}`,

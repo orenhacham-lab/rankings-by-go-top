@@ -6,7 +6,7 @@ import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, getEngineDisplayLabel } from '@/lib/utils'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 
@@ -16,13 +16,14 @@ export default function KeywordsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [engineFilter, setEngineFilter] = useState('')
+  const [positionSort, setPositionSort] = useState<'none' | 'asc' | 'desc'>('none')
 
   useEffect(() => {
     async function loadData() {
       const supabase = createClient()
       const { data: targetsData } = await supabase
         .from('tracking_targets')
-        .select('*, projects(id, name, clients(name))')
+        .select('*, projects(id, name, device_type, clients(name))')
         .order('created_at', { ascending: false })
 
       setTargets(targetsData || [])
@@ -57,6 +58,26 @@ export default function KeywordsPage() {
     const matchEngine = !engineFilter || t.engine_type === engineFilter
     return matchSearch && matchEngine
   })
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (positionSort === 'none') return 0
+
+    const aResult = latestResults[a.id]
+    const bResult = latestResults[b.id]
+
+    const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
+    const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
+
+    return positionSort === 'asc' ? aPos - bPos : bPos - aPos
+  })
+
+  function togglePositionSort() {
+    setPositionSort((prev) => {
+      if (prev === 'none') return 'asc'
+      if (prev === 'asc') return 'desc'
+      return 'none'
+    })
+  }
 
   return (
     <div>
@@ -97,7 +118,19 @@ export default function KeywordsPage() {
               <Th>פרויקט</Th>
               <Th>לקוח</Th>
               <Th>מנוע</Th>
-              <Th>מיקום</Th>
+              <Th>
+                <button
+                  type="button"
+                  onClick={togglePositionSort}
+                  className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
+                  title="מיין לפי מיקום"
+                >
+                  מיקום
+                  <span className="text-xs">
+                    {positionSort === 'asc' ? '▲' : positionSort === 'desc' ? '▼' : '↕'}
+                  </span>
+                </button>
+              </Th>
               <Th>שינוי</Th>
               <Th>בדיקה אחרונה</Th>
               <Th>סטטוס</Th>
@@ -105,10 +138,10 @@ export default function KeywordsPage() {
             </tr>
           </TableHead>
           <TableBody>
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <EmptyRow colSpan={9} message="לא נמצאו מילות מפתח" />
             )}
-            {filtered.map((target) => {
+            {sorted.map((target) => {
               const result = latestResults[target.id]
               return (
                 <TableRow key={target.id}>
@@ -128,7 +161,13 @@ export default function KeywordsPage() {
                     </span>
                   </Td>
                   <Td>
-                    <EngineBadge engine={target.engine_type} />
+                    <EngineBadge
+                      engine={target.engine_type}
+                      label={getEngineDisplayLabel(
+                        target.engine_type,
+                        (target.projects as { device_type?: 'desktop' | 'mobile' | null } | undefined)?.device_type
+                      )}
+                    />
                   </Td>
                   <Td>
                     {result?.found ? (

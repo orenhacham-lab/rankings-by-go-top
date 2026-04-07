@@ -34,7 +34,7 @@ create table if not exists projects (
   city text,
   device_type text check (device_type in ('desktop', 'mobile')),
   is_active boolean not null default true,
-  scan_frequency text not null default 'manual' check (scan_frequency in ('manual', 'weekly', 'monthly')),
+  scan_frequency text not null default 'manual' check (scan_frequency in ('manual', 'weekly', 'monthly', 'monthly_first_day')),
   auto_scan_enabled boolean not null default false,
   next_scan_at timestamptz,
   last_scan_at timestamptz,
