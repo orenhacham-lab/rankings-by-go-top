@@ -5,12 +5,12 @@ export const metadata: Metadata = {
   title: 'Rankings by Go Top',
   description: 'מערכת מעקב דירוגים לקידום אתרים',
   icons: {
-    icon: '/gotop-primary.svg',
-    shortcut: '/gotop-primary.svg',
-    apple: '/gotop-primary.svg',
+    icon: '/gotop-primary.png',
+    shortcut: '/gotop-primary.png',
+    apple: '/gotop-primary.png',
   },
   openGraph: {
-    images: ['/gotop-primary.svg'],
+    images: ['/gotop-primary.png'],
   },
 }
 

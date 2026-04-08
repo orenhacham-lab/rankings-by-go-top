@@ -6,7 +6,7 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
       {/* Top bar */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
         <Image
-          src="/gotop-primary.svg"
+          src="/gotop-primary.png"
           alt="Go Top logo"
           width={120}
           height={120}

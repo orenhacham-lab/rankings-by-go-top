@@ -31,7 +31,7 @@ export default function Sidebar() {
           <div className="font-bold text-blue-600 text-lg leading-tight">Go Top</div>
         </div>
         <Image
-          src="/gotop-primary.svg"
+          src="/gotop-primary.png"
           alt="Go Top logo"
           width={140}
           height={140}
@@ -41,8 +41,8 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 overflow-x-auto md:overflow-y-auto">
-        <ul className="flex md:block gap-2 md:space-y-1 min-w-max md:min-w-0">
+      <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
+        <ul className="grid grid-cols-4 gap-2 md:block md:space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
@@ -50,7 +50,7 @@ export default function Sidebar() {
                 <Link
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap',
+                    'flex items-center justify-center md:justify-start gap-1.5 md:gap-3 px-2 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 md:whitespace-nowrap',
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
