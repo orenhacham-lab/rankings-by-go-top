@@ -23,22 +23,26 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-64 bg-white border-l border-slate-200 flex flex-col h-full fixed top-0 right-0 z-40 shadow-sm">
+    <aside className="w-full md:w-64 bg-white border-l border-slate-200 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-5 border-b border-slate-200">
+      <div className="p-4 md:p-5 border-b border-slate-200 flex items-center justify-between gap-3">
+        <div className="text-right">
+          <div className="font-bold text-slate-800 text-lg leading-tight">Rankings by</div>
+          <div className="font-bold text-blue-600 text-lg leading-tight">Go Top</div>
+        </div>
         <Image
           src="/gotop-primary.svg"
           alt="Go Top logo"
-          width={150}
-          height={150}
-          className="h-auto w-28"
+          width={140}
+          height={140}
+          className="h-auto w-24 md:w-28"
           priority
         />
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 overflow-y-auto">
-        <ul className="space-y-1">
+      <nav className="flex-1 p-3 overflow-x-auto md:overflow-y-auto">
+        <ul className="flex md:block gap-2 md:space-y-1 min-w-max md:min-w-0">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
@@ -46,7 +50,7 @@ export default function Sidebar() {
                 <Link
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                    'flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap',
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -62,7 +66,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Admin */}
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-3 hidden md:block">
         <p className="text-xs font-medium text-slate-400 px-3 mb-1">מערכת</p>
         <ul className="space-y-1">
           {adminItems.map((item) => {
@@ -88,7 +92,7 @@ export default function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-200">
+      <div className="p-4 border-t border-slate-200 hidden md:block">
         <form action="/api/auth/signout" method="post">
           <button
             type="submit"

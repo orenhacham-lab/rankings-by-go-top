@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
+import { TrackingTarget, ScanResult, Project } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
@@ -11,6 +11,8 @@ import Link from 'next/link'
 import Button from '@/components/ui/Button'
 
 export default function KeywordsPage() {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState('')
   const [targets, setTargets] = useState<(TrackingTarget & { projects?: { name: string; id: string; clients?: { name: string } } })[]>([])
   const [latestResults, setLatestResults] = useState<Record<string, ScanResult>>({})
   const [loading, setLoading] = useState(true)
@@ -19,11 +21,34 @@ export default function KeywordsPage() {
   const [positionSort, setPositionSort] = useState<'none' | 'asc' | 'desc'>('none')
 
   useEffect(() => {
+    async function loadProjects() {
+      const supabase = createClient()
+      const { data: projectsData } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+
+      setProjects(projectsData || [])
+      setLoading(false)
+    }
+    loadProjects()
+  }, [])
+
+  useEffect(() => {
     async function loadData() {
+      if (!selectedProjectId) {
+        setTargets([])
+        setLatestResults({})
+        return
+      }
+
+      setLoading(true)
       const supabase = createClient()
       const { data: targetsData } = await supabase
         .from('tracking_targets')
         .select('*, projects(id, name, device_type, clients(name))')
+        .eq('project_id', selectedProjectId)
         .order('created_at', { ascending: false })
 
       setTargets(targetsData || [])
@@ -47,8 +72,9 @@ export default function KeywordsPage() {
 
       setLoading(false)
     }
+
     loadData()
-  }, [])
+  }, [selectedProjectId])
 
   const filtered = targets.filter((t) => {
     const matchSearch =
@@ -83,10 +109,21 @@ export default function KeywordsPage() {
     <div>
       <Header
         title="מילות מפתח"
-        subtitle={`סה"כ ${targets.length} מילות מפתח`}
+        subtitle={selectedProjectId ? `סה"כ ${targets.length} מילות מפתח` : 'בחר פרויקט לצפייה במילות המפתח'}
       />
 
       <div className="flex gap-3 mb-4">
+        <select
+          value={selectedProjectId}
+          onChange={(e) => setSelectedProjectId(e.target.value)}
+          className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">בחר פרויקט (חובה)</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>{project.name}</option>
+          ))}
+        </select>
+
         <input
           type="text"
           placeholder="חיפוש מילת מפתח, פרויקט..."
@@ -105,7 +142,11 @@ export default function KeywordsPage() {
         </select>
       </div>
 
-      {loading ? (
+      {!selectedProjectId ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500">
+          יש לבחור פרויקט כדי להציג מילות מפתח.
+        </div>
+      ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
           טוען...

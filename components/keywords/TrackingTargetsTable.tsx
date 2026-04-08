@@ -32,6 +32,7 @@ export default function TrackingTargetsTable({
 }: TrackingTargetsTableProps) {
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [positionSort, setPositionSort] = useState<'none' | 'asc' | 'desc'>('none')
 
   async function handleToggleActive(target: TrackingTarget) {
     setTogglingId(target.id)
@@ -42,6 +43,23 @@ export default function TrackingTargetsTable({
     }
   }
 
+  const sortedTargets = [...targets].sort((a, b) => {
+    if (positionSort === 'none') return 0
+    const aResult = latestResults[a.id]
+    const bResult = latestResults[b.id]
+    const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
+    const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
+    return positionSort === 'asc' ? aPos - bPos : bPos - aPos
+  })
+
+  function togglePositionSort() {
+    setPositionSort((prev) => {
+      if (prev === 'none') return 'asc'
+      if (prev === 'asc') return 'desc'
+      return 'none'
+    })
+  }
+
   return (
     <>
       <Table>
@@ -49,7 +67,19 @@ export default function TrackingTargetsTable({
           <tr>
             <Th>מילת מפתח</Th>
             <Th>מנוע</Th>
-            <Th>מיקום נוכחי</Th>
+            <Th>
+              <button
+                type="button"
+                onClick={togglePositionSort}
+                className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
+                title="מיין לפי מיקום נוכחי"
+              >
+                מיקום נוכחי
+                <span className="text-xs">
+                  {positionSort === 'asc' ? '▲' : positionSort === 'desc' ? '▼' : '↕'}
+                </span>
+              </button>
+            </Th>
             <Th>שינוי</Th>
             <Th>בדיקה אחרונה</Th>
             <Th>סטטוס</Th>
@@ -57,10 +87,10 @@ export default function TrackingTargetsTable({
           </tr>
         </TableHead>
         <TableBody>
-          {targets.length === 0 && (
+          {sortedTargets.length === 0 && (
             <EmptyRow colSpan={7} message="אין מילות מפתח עדיין. הוסף את הראשונה!" />
           )}
-          {targets.map((target) => {
+          {sortedTargets.map((target) => {
             const result = latestResults[target.id]
             const isScanning = scanningTargets.has(target.id)
             return (
