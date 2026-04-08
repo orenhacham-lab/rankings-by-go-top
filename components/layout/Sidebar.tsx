@@ -25,7 +25,7 @@ export default function Sidebar() {
   return (
     <aside className="w-full md:w-64 bg-white border-l border-slate-200 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-3 md:p-5 border-b border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-2 md:gap-3">
+      <div className="p-3 md:p-5 border-b border-slate-200 flex flex-col md:flex-row items-center justify-center md:justify-between gap-2 md:gap-3">
         <div className="text-center md:text-right">
           <div className="font-bold text-slate-800 text-lg leading-tight">Rankings by</div>
           <div className="font-bold text-blue-600 text-lg leading-tight">Go Top</div>
@@ -38,11 +38,12 @@ export default function Sidebar() {
           className="h-auto w-16 md:w-24"
           priority
         />
+        <div className="text-blue-600 font-bold text-xs tracking-[0.25em] md:hidden">GO TOP</div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
-        <ul className="grid grid-cols-4 gap-2 md:block md:space-y-1">
+        <ul className="grid grid-cols-3 gap-2 md:block md:space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
