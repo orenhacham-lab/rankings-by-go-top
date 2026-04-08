@@ -25,17 +25,17 @@ export default function Sidebar() {
   return (
     <aside className="w-full md:w-64 bg-white border-l border-slate-200 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-4 md:p-5 border-b border-slate-200 flex items-center justify-between gap-3">
-        <div className="text-right">
+      <div className="p-3 md:p-5 border-b border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-2 md:gap-3">
+        <div className="text-center md:text-right">
           <div className="font-bold text-slate-800 text-lg leading-tight">Rankings by</div>
           <div className="font-bold text-blue-600 text-lg leading-tight">Go Top</div>
         </div>
         <Image
-          src="/gotop-primary.png"
+          src="/gotop-primary-white.png"
           alt="Go Top logo"
-          width={140}
-          height={140}
-          className="h-auto w-24 md:w-28"
+          width={120}
+          height={120}
+          className="h-auto w-16 md:w-24"
           priority
         />
       </div>
