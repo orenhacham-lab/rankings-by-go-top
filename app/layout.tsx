@@ -4,6 +4,14 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Rankings by Go Top',
   description: 'מערכת מעקב דירוגים לקידום אתרים',
+  icons: {
+    icon: '/gotop-primary.svg',
+    shortcut: '/gotop-primary.svg',
+    apple: '/gotop-primary.svg',
+  },
+  openGraph: {
+    images: ['/gotop-primary.svg'],
+  },
 }
 
 export default function RootLayout({

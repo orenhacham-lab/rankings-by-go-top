@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
@@ -10,10 +11,14 @@ import { createClient } from '@/lib/supabase/client'
 import { Project, Client } from '@/lib/supabase/types'
 
 export default function ProjectsPage() {
+  const searchParams = useSearchParams()
+  const defaultClientId = searchParams.get('client_id') || ''
+  const shouldOpenCreate = searchParams.get('create') === '1'
+
   const [projects, setProjects] = useState<(Project & { clients?: Client })[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
+  const [showCreate, setShowCreate] = useState(shouldOpenCreate)
 
   async function loadData() {
     const supabase = createClient()
@@ -67,6 +72,7 @@ export default function ProjectsPage() {
       >
         <ProjectForm
           clients={clients}
+          defaultClientId={defaultClientId}
           onSuccess={handleSuccess}
           onCancel={() => setShowCreate(false)}
         />

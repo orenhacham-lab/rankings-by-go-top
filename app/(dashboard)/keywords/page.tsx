@@ -170,7 +170,9 @@ export default function KeywordsPage() {
                     />
                   </Td>
                   <Td>
-                    {result?.found ? (
+                    {result?.error_message ? (
+                      <span className="text-amber-600 text-sm" title={result.error_message}>שגיאת סריקה</span>
+                    ) : result?.found ? (
                       <span className="font-bold">#{result.position}</span>
                     ) : result ? (
                       <span className="text-slate-400 text-sm">לא נמצא</span>

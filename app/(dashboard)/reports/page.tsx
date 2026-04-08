@@ -290,7 +290,9 @@ function ReportsContent() {
                       />
                     </Td>
                     <Td>
-                      {result?.found ? (
+                      {result?.error_message ? (
+                        <span className="text-amber-600 text-sm" title={result.error_message}>שגיאת סריקה</span>
+                      ) : result?.found ? (
                         <span className="font-bold text-slate-800">#{result.position}</span>
                       ) : '—'}
                     </Td>
@@ -301,8 +303,8 @@ function ReportsContent() {
                       {result ? <PositionChange change={result.change_value} /> : '—'}
                     </Td>
                     <Td>
-                      <Badge variant={result?.found ? 'success' : result ? 'neutral' : 'neutral'}>
-                        {result ? (result.found ? 'כן' : 'לא') : '—'}
+                      <Badge variant={result?.error_message ? 'warning' : result?.found ? 'success' : result ? 'neutral' : 'neutral'}>
+                        {result ? (result.error_message ? 'שגיאה' : result.found ? 'כן' : 'לא') : '—'}
                       </Badge>
                     </Td>
                     <Td>
