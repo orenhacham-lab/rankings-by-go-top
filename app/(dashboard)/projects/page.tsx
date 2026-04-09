@@ -20,7 +20,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(shouldOpenCreate)
 
-  async function loadData() {
+  async function fetchProjectsAndClients() {
     const supabase = createClient()
     const [{ data: projectsData }, { data: clientsData }] = await Promise.all([
       supabase
@@ -29,13 +29,37 @@ export default function ProjectsPage() {
         .order('created_at', { ascending: false }),
       supabase.from('clients').select('*').eq('is_active', true).order('name'),
     ])
-    setProjects(projectsData || [])
-    setClients(clientsData || [])
+
+    return {
+      projects: projectsData || [],
+      clients: clientsData || [],
+    }
+  }
+
+  async function loadData() {
+    setLoading(true)
+    const { projects: loadedProjects, clients: loadedClients } = await fetchProjectsAndClients()
+    setProjects(loadedProjects)
+    setClients(loadedClients)
     setLoading(false)
   }
 
   useEffect(() => {
-    loadData()
+    let isMounted = true
+
+    async function initializeData() {
+      const { projects: loadedProjects, clients: loadedClients } = await fetchProjectsAndClients()
+      if (!isMounted) return
+      setProjects(loadedProjects)
+      setClients(loadedClients)
+      setLoading(false)
+    }
+
+    void initializeData()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   function handleSuccess() {

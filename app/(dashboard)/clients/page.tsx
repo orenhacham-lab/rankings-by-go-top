@@ -14,18 +14,40 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
 
-  async function loadClients() {
+  // ✅ פונקציה שמביאה נתונים בלבד
+  async function fetchClients() {
     const supabase = createClient()
     const { data } = await supabase
       .from('clients')
       .select('*')
       .order('created_at', { ascending: false })
-    setClients(data || [])
+    return data || []
+  }
+
+  // ✅ פונקציה לרענון רגיל
+  async function loadClients() {
+    setLoading(true)
+    const data = await fetchClients()
+    setClients(data)
     setLoading(false)
   }
 
+  // ✅ useEffect מתוקן (מונע בעיות טעינה)
   useEffect(() => {
-    loadClients()
+    let isMounted = true
+
+    async function initializeClients() {
+      const data = await fetchClients()
+      if (!isMounted) return
+      setClients(data)
+      setLoading(false)
+    }
+
+    void initializeClients()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   function handleSuccess() {
