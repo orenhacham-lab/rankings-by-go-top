@@ -150,7 +150,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <StatCard label="לקוחות פעילים" value={stats.totalClients} icon="👥" color="blue" href="/clients" />
         <StatCard label="פרויקטים פעילים" value={stats.totalProjects} icon="📁" color="purple" href="/projects" />
         <StatCard label="מילות מפתח" value={stats.totalKeywords} icon="🔑" color="green" href="/keywords" />
