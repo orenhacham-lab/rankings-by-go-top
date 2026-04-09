@@ -33,9 +33,9 @@ export default function Sidebar() {
         <Image
           src="/gotop-primary.png"
           alt="Go Top logo"
-          width={120}
-          height={120}
-          className="h-auto w-16 md:w-24"
+          width={140}
+          height={140}
+          className="h-auto w-20 md:w-24"
           priority
         />
       </div>
