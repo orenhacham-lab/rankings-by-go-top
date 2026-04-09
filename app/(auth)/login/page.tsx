@@ -42,7 +42,7 @@ function LoginForm() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Image
-            src="/gotop-primary-white.png"
+            src="/gotop-primary.png"
             alt="Go Top logo"
             width={180}
             height={180}

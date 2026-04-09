@@ -31,7 +31,7 @@ export default function Sidebar() {
           <div className="font-bold text-blue-600 text-lg leading-tight">Go Top</div>
         </div>
         <Image
-          src="/gotop-primary-white.png"
+          src="/gotop-primary.png"
           alt="Go Top logo"
           width={120}
           height={120}
@@ -42,7 +42,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
-        <ul className="grid grid-cols-3 gap-2 md:block md:space-y-1 w-full">
+        <ul className="grid grid-cols-2 gap-2 md:block md:space-y-1 w-full">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
@@ -50,7 +50,7 @@ export default function Sidebar() {
                 <Link
                   href={item.href}
                   className={cn(
-                    'w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right',
+                    'w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
