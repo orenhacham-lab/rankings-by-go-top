@@ -30,14 +30,18 @@ export default function Sidebar() {
           <div className="font-bold text-slate-800 text-lg leading-tight">Rankings by</div>
           <div className="font-bold text-blue-600 text-lg leading-tight">Go Top</div>
         </div>
-        <Image
-          src="/gotop-primary.png"
-          alt="Go Top logo"
-          width={140}
-          height={140}
-          className="h-auto w-20 md:w-24"
-          priority
-        />
+
+        {/* ✅ לוגו מתוקן */}
+        <div className="flex items-center justify-center bg-white p-1">
+          <Image
+            src="/gotop-primary.png"
+            alt="Go Top logo"
+            width={200}
+            height={80}
+            className="w-[120px] md:w-[150px] h-auto object-contain"
+            priority
+          />
+        </div>
       </div>
 
       {/* Nav */}
