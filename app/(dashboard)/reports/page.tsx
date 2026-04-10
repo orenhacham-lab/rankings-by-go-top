@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import { formatDateTime, getEngineDisplayLabel } from '@/lib/utils'
+import { formatDateTime, getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
 
 function ReportsContent() {
   const searchParams = useSearchParams()
@@ -27,7 +27,6 @@ function ReportsContent() {
   } | null>(null)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
-  const [positionSort, setPositionSort] = useState<'none' | 'best' | 'worst'>('none')
 
   useEffect(() => {
     async function loadProjects() {
@@ -109,39 +108,19 @@ function ReportsContent() {
   async function handleExportPDF() {
     if (!reportData) return
     setExporting('pdf')
-    try {
-      const { exportToPDF } = await import('@/lib/export/pdf')
-      await exportToPDF({
-        client: reportData.project.clients!,
-        project: reportData.project,
-        targets: reportData.targets,
-        latestResults: reportData.latestResults,
-      })
-    } finally {
-      setExporting(null)
-    }
+    const { exportToPDF } = await import('@/lib/export/pdf')
+    exportToPDF({
+      client: reportData.project.clients!,
+      project: reportData.project,
+      targets: reportData.targets,
+      latestResults: reportData.latestResults,
+    })
+    setExporting(null)
   }
 
   const foundCount = reportData ? Object.values(reportData.latestResults).filter((r) => r.found).length : 0
   const total = reportData?.targets.length || 0
-  const sortedTargets = reportData
-    ? [...reportData.targets].sort((a, b) => {
-      if (positionSort === 'none') return 0
-      const aResult = reportData.latestResults[a.id]
-      const bResult = reportData.latestResults[b.id]
-      const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
-      const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
-      return positionSort === 'best' ? aPos - bPos : bPos - aPos
-    })
-    : []
-
-  function togglePositionSort() {
-    setPositionSort((prev) => {
-      if (prev === 'none') return 'best'
-      if (prev === 'best') return 'worst'
-      return 'none'
-    })
-  }
+  const primaryEngine = reportData?.targets[0]?.engine_type || 'google_search'
 
   return (
     <div>
@@ -198,6 +177,11 @@ function ReportsContent() {
                 <p className="text-blue-300 text-xs mt-1">
                   הופק בתאריך {new Date().toLocaleDateString('he-IL')}
                 </p>
+                {reportData && (
+                  <p className="text-blue-200 text-xs mt-1">
+                    engine: {getSearchTypeLabel(primaryEngine, reportData.project.device_type)} · device: {getDeviceLabel(reportData.project.device_type)} · gl: {reportData.project.country.toLowerCase()} · hl: {reportData.project.language} · location: {reportData.project.city || '—'}
+                  </p>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button
@@ -252,19 +236,7 @@ function ReportsContent() {
               <tr>
                 <Th>מילת מפתח</Th>
                 <Th>מנוע</Th>
-                <Th>
-                  <button
-                    type="button"
-                    onClick={togglePositionSort}
-                    className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
-                    title="מיין לפי מיקום"
-                  >
-                    מיקום
-                    <span className="text-xs">
-                      {positionSort === 'best' ? '▲' : positionSort === 'worst' ? '▼' : '↕'}
-                    </span>
-                  </button>
-                </Th>
+                <Th>מיקום</Th>
                 <Th>מיקום קודם</Th>
                 <Th>שינוי</Th>
                 <Th>נמצא</Th>
@@ -273,10 +245,10 @@ function ReportsContent() {
               </tr>
             </TableHead>
             <TableBody>
-              {sortedTargets.length === 0 && (
+              {reportData.targets.length === 0 && (
                 <EmptyRow colSpan={8} message="אין מילות מפתח בפרויקט זה" />
               )}
-              {sortedTargets.map((target) => {
+              {reportData.targets.map((target) => {
                 const result = reportData.latestResults[target.id]
                 return (
                   <TableRow key={target.id}>
@@ -284,15 +256,10 @@ function ReportsContent() {
                       <span className="font-medium">{target.keyword}</span>
                     </Td>
                     <Td>
-                      <EngineBadge
-                        engine={target.engine_type}
-                        label={getEngineDisplayLabel(target.engine_type, reportData.project.device_type)}
-                      />
+                      <EngineBadge engine={target.engine_type} device={reportData.project.device_type} />
                     </Td>
                     <Td>
-                      {result?.error_message ? (
-                        <span className="text-amber-600 text-sm" title={result.error_message}>שגיאת סריקה</span>
-                      ) : result?.found ? (
+                      {result?.found ? (
                         <span className="font-bold text-slate-800">#{result.position}</span>
                       ) : '—'}
                     </Td>
@@ -303,8 +270,8 @@ function ReportsContent() {
                       {result ? <PositionChange change={result.change_value} /> : '—'}
                     </Td>
                     <Td>
-                      <Badge variant={result?.error_message ? 'warning' : result?.found ? 'success' : result ? 'neutral' : 'neutral'}>
-                        {result ? (result.error_message ? 'שגיאה' : result.found ? 'כן' : 'לא') : '—'}
+                      <Badge variant={result?.found ? 'success' : result ? 'neutral' : 'neutral'}>
+                        {result ? (result.found ? 'כן' : 'לא') : '—'}
                       </Badge>
                     </Td>
                     <Td>
