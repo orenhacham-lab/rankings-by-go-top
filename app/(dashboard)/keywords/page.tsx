@@ -6,7 +6,7 @@ import { TrackingTarget, ScanResult, Project } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
-import { formatDateTime, getEngineDisplayLabel } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 
@@ -204,10 +204,7 @@ export default function KeywordsPage() {
                   <Td>
                     <EngineBadge
                       engine={target.engine_type}
-                      label={getEngineDisplayLabel(
-                        target.engine_type,
-                        (target.projects as { device_type?: 'desktop' | 'mobile' | null } | undefined)?.device_type
-                      )}
+                      device={(target.projects as { device_type?: 'desktop' | 'mobile' | null } | undefined)?.device_type}
                     />
                   </Td>
                   <Td>
