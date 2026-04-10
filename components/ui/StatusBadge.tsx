@@ -1,4 +1,5 @@
 import Badge from './Badge'
+import { getSearchTypeLabel } from '@/lib/utils'
 
 export function ActiveBadge({ active }: { active: boolean }) {
   return (
@@ -19,9 +20,9 @@ export function ScanStatusBadge({ status }: { status: string }) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>
 }
 
-export function EngineBadge({ engine }: { engine: string }) {
+export function EngineBadge({ engine, device }: { engine: string; device?: string | null }) {
   if (engine === 'google_search') {
-    return <Badge variant="info">גוגל חיפוש</Badge>
+    return <Badge variant="info">{getSearchTypeLabel(engine, device)}</Badge>
   }
   if (engine === 'google_maps') {
     return <Badge variant="success">גוגל מפות</Badge>

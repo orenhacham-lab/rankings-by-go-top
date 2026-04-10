@@ -3,6 +3,7 @@
 import { useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
@@ -40,9 +41,14 @@ function LoginForm() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg mb-4">
-            <span className="text-white font-bold text-2xl select-none">GT</span>
-          </div>
+          <Image
+            src="/gotop-primary.png"
+            alt="Go Top logo"
+            width={180}
+            height={180}
+            className="mx-auto mb-4 h-auto w-36"
+            priority
+          />
           <h1 className="text-2xl font-bold text-slate-800">Rankings by Go Top</h1>
           <p className="text-slate-500 mt-1 text-sm">מערכת מעקב דירוגים לקידום אתרים</p>
         </div>

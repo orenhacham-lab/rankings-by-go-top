@@ -7,6 +7,8 @@ import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import { ActiveBadge } from '@/components/ui/StatusBadge'
 import Button from '@/components/ui/Button'
+import Modal from '@/components/ui/Modal'
+import ProjectForm from '@/components/projects/ProjectForm'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 
@@ -15,6 +17,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   const [client, setClient] = useState<Client | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCreateProject, setShowCreateProject] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -95,17 +98,13 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-800">פרויקטים ({projects.length})</h3>
-            <Link href={`/projects/new?client_id=${client.id}`}>
-              <Button size="sm">+ פרויקט חדש</Button>
-            </Link>
+            <Button size="sm" onClick={() => setShowCreateProject(true)}>+ פרויקט חדש</Button>
           </div>
 
           {projects.length === 0 ? (
             <Card className="text-center py-12">
               <p className="text-slate-400 mb-4">אין פרויקטים ללקוח זה עדיין</p>
-              <Link href={`/projects/new?client_id=${client.id}`}>
-                <Button>הוסף פרויקט ראשון</Button>
-              </Link>
+              <Button onClick={() => setShowCreateProject(true)}>הוסף פרויקט ראשון</Button>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -131,6 +130,20 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           )}
         </div>
       </div>
+
+      <Modal
+        open={showCreateProject}
+        onClose={() => setShowCreateProject(false)}
+        title="פרויקט חדש"
+        size="lg"
+      >
+        <ProjectForm
+          clients={[client]}
+          defaultClientId={client.id}
+          onSuccess={() => window.location.reload()}
+          onCancel={() => setShowCreateProject(false)}
+        />
+      </Modal>
     </div>
   )
 }

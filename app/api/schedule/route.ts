@@ -126,6 +126,7 @@ export async function GET(request: Request) {
         const previousPosition = prevResult?.position ?? null
 
         const scanOutput = await runScan(target.engine_type, {
+          engine: target.engine_type,
           keyword: target.keyword,
           targetDomain: target.target_domain || project.target_domain,
           targetBusinessName: target.target_business_name || project.business_name,

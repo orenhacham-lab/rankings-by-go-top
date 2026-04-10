@@ -42,7 +42,22 @@ export function getChangeLabel(change: number | null): string {
 }
 
 export function getEngineLabel(engine: string): string {
-  if (engine === 'google_search') return 'גוגל חיפוש'
+  if (engine === 'google_search') return 'גוגל אורגני'
+  if (engine === 'google_maps') return 'גוגל מפות'
+  return engine
+}
+
+export function getDeviceLabel(device: string | null | undefined): string {
+  if (device === 'desktop') return 'מחשב'
+  if (device === 'mobile') return 'מובייל'
+  return 'ברירת מחדל'
+}
+
+export function getSearchTypeLabel(engine: string, device: string | null | undefined): string {
+  if (engine === 'google_search') {
+    if (device === 'mobile') return 'גוגל אורגני — מובייל'
+    return 'גוגל אורגני — מחשב'
+  }
   if (engine === 'google_maps') return 'גוגל מפות'
   return engine
 }

@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
 
 function ReportsContent() {
   const searchParams = useSearchParams()
@@ -120,6 +120,7 @@ function ReportsContent() {
 
   const foundCount = reportData ? Object.values(reportData.latestResults).filter((r) => r.found).length : 0
   const total = reportData?.targets.length || 0
+  const primaryEngine = reportData?.targets[0]?.engine_type || 'google_search'
 
   return (
     <div>
@@ -176,6 +177,11 @@ function ReportsContent() {
                 <p className="text-blue-300 text-xs mt-1">
                   הופק בתאריך {new Date().toLocaleDateString('he-IL')}
                 </p>
+                {reportData && (
+                  <p className="text-blue-200 text-xs mt-1">
+                    engine: {getSearchTypeLabel(primaryEngine, reportData.project.device_type)} · device: {getDeviceLabel(reportData.project.device_type)} · gl: {reportData.project.country.toLowerCase()} · hl: {reportData.project.language} · location: {reportData.project.city || '—'}
+                  </p>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button
@@ -250,7 +256,7 @@ function ReportsContent() {
                       <span className="font-medium">{target.keyword}</span>
                     </Td>
                     <Td>
-                      <EngineBadge engine={target.engine_type} />
+                      <EngineBadge engine={target.engine_type} device={reportData.project.device_type} />
                     </Td>
                     <Td>
                       {result?.found ? (

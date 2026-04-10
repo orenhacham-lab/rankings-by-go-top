@@ -55,7 +55,7 @@ export interface Project {
   city: string | null
   device_type: 'desktop' | 'mobile' | null
   is_active: boolean
-  scan_frequency: 'manual' | 'weekly' | 'monthly'
+  scan_frequency: 'manual' | 'weekly' | 'monthly' | 'monthly_first_day'
   auto_scan_enabled: boolean
   next_scan_at: string | null
   last_scan_at: string | null

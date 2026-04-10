@@ -97,7 +97,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">המיקום הגרוע ביותר</div>
+          <div className="text-xs text-slate-500 mb-1">המיקום הנמוך ביותר</div>
           <div className="text-2xl font-bold text-red-500">
             {worstPosition !== null ? `#${worstPosition}` : '—'}
           </div>

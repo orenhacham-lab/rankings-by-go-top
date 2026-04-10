@@ -15,6 +15,8 @@ export async function POST(request: Request) {
     targetBusinessName?: string
     country?: string
     language?: string
+    city?: string
+    deviceType?: 'desktop' | 'mobile'
   }
 
   try {
@@ -65,11 +67,14 @@ export async function POST(request: Request) {
   let scanResult
   try {
     scanResult = await runScan(engine, {
+      engine,
       keyword,
       targetDomain: body.targetDomain?.trim() || null,
       targetBusinessName: body.targetBusinessName?.trim() || null,
       country: body.country || 'IL',
       language: body.language || 'he',
+      city: body.city?.trim() || null,
+      deviceType: body.deviceType || 'desktop',
     })
   } finally {
     global.fetch = originalFetch
@@ -78,7 +83,16 @@ export async function POST(request: Request) {
   const completedAt = new Date().toISOString()
 
   return Response.json({
-    input: { keyword, engine, targetDomain: body.targetDomain, targetBusinessName: body.targetBusinessName },
+    input: {
+      keyword,
+      engine,
+      targetDomain: body.targetDomain,
+      targetBusinessName: body.targetBusinessName,
+      device: body.deviceType || 'desktop',
+      gl: (body.country || 'IL').toLowerCase(),
+      hl: body.language || 'he',
+      location: body.city || null,
+    },
     parsed: scanResult,
     raw: rawResponse,
     timing: { startedAt, completedAt },

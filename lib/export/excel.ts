@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/types'
-import { getEngineLabel } from '@/lib/utils'
+import { getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
 
 interface ExportData {
   client: Client
@@ -31,6 +31,7 @@ export function exportToExcel(data: ExportData): void {
   const notFoundCount = totalCount - foundCount
   const coverage = totalCount > 0 ? `${Math.round((foundCount / totalCount) * 100)}%` : '0%'
   const generatedAt = new Date().toLocaleDateString('he-IL')
+  const primaryEngine = data.targets[0]?.engine_type || 'google_search'
 
   // ── Sheet 1: Summary ──────────────────────────────────────────────
   const summaryRows: (string | number)[][] = [
@@ -40,6 +41,11 @@ export function exportToExcel(data: ExportData): void {
     ['פרויקט', data.project.name],
     ['דומיין', data.project.target_domain],
     ['תאריך הפקה', generatedAt],
+    ['engine', getSearchTypeLabel(primaryEngine, data.project.device_type)],
+    ['device', getDeviceLabel(data.project.device_type)],
+    ['gl', data.project.country.toLowerCase()],
+    ['hl', data.project.language],
+    ['location', data.project.city || '—'],
     [],
     ['— סיכום —'],
     ['סה"כ ביטויים', totalCount],
@@ -79,7 +85,7 @@ export function exportToExcel(data: ExportData): void {
 
     return [
       target.keyword,
-      getEngineLabel(target.engine_type),
+      getSearchTypeLabel(target.engine_type, data.project.device_type),
       result?.found ? result.position ?? '' : '',
       result?.previous_position ?? '',
       changeDisplay,
@@ -117,7 +123,7 @@ export function exportToExcel(data: ExportData): void {
 
     return [
       target?.keyword ?? result.keyword,
-      getEngineLabel(result.engine_type),
+      getSearchTypeLabel(result.engine_type, data.project.device_type),
       result.found ? result.position ?? '' : '',
       result.previous_position ?? '',
       changeDisplay,

@@ -1,4 +1,5 @@
 export interface ScanInput {
+  engine: string
   keyword: string
   targetDomain?: string | null
   targetBusinessName?: string | null

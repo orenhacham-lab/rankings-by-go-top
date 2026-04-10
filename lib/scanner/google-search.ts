@@ -32,19 +32,37 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     return makeError(`Could not parse target domain: "${rawDomain}"`)
   }
 
-  console.log(`[GoogleSearch] Scanning keyword="${input.keyword}" target="${rawDomain}" → normalized="${normalizedTarget}"`)
+  const requestParams: Record<string, string> = {
+    engine: input.engine,
+    device: input.deviceType || 'desktop',
+    gl: (input.country || 'IL').toLowerCase(),
+    hl: input.language || 'he',
+    location: input.city?.trim() || '—',
+    mode: 'organic',
+  }
+
+  console.log(
+    `[GoogleSearch] Scanning keyword="${input.keyword}" target="${rawDomain}" params=${JSON.stringify(requestParams)}`
+  )
 
   try {
     const body: Record<string, unknown> = {
       q: input.keyword,
-      gl: (input.country || 'IL').toLowerCase(),
-      hl: input.language || 'he',
+      gl: requestParams.gl,
+      hl: requestParams.hl,
+      type: 'search',
       num: 100,
+    }
+
+    if (requestParams.device) {
+      body.device = requestParams.device
     }
 
     if (input.city) {
       body.location = input.city
     }
+
+    console.log(`[GoogleSearch] Serper request body: ${JSON.stringify(body)}`)
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
