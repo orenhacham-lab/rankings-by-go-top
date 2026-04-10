@@ -12,7 +12,7 @@ import ProjectForm from '@/components/projects/ProjectForm'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import Link from 'next/link'
-import { formatDate, formatDateTime, getFrequencyLabel } from '@/lib/utils'
+import { formatDate, formatDateTime, getDeviceLabel, getFrequencyLabel, getSearchTypeLabel } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -141,6 +141,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const activeTargets = targets.filter((t) => t.is_active)
+  const primaryEngine = activeTargets[0]?.engine_type || 'google_search'
+  const scanParams = {
+    engine: getSearchTypeLabel(primaryEngine, project.device_type),
+    device: getDeviceLabel(project.device_type),
+    gl: project.country.toLowerCase(),
+    hl: project.language,
+    location: project.city || '—',
+  }
 
   return (
     <div>
@@ -197,6 +205,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </Badge>
           </div>
         </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">פרמטרים לסריקה</div>
+          <div className="text-xs text-slate-700 space-y-1">
+            <div><b>engine:</b> {scanParams.engine}</div>
+            <div><b>device:</b> {scanParams.device}</div>
+            <div><b>gl:</b> {scanParams.gl}</div>
+            <div><b>hl:</b> {scanParams.hl}</div>
+            <div><b>location:</b> {scanParams.location}</div>
+          </div>
+        </Card>
       </div>
 
       {/* Tracking Targets */}
@@ -222,6 +240,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         projectBusinessName={project.business_name || undefined}
         onScanTarget={handleScanTarget}
         scanningTargets={scanningTargets}
+        projectDevice={project.device_type}
       />
 
       {/* Edit Modal */}
