@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import TrackingTargetForm from './TrackingTargetForm'
 import { toggleTrackingTargetActiveAction } from '@/app/actions/tracking-targets'
@@ -19,6 +20,7 @@ interface TrackingTargetsTableProps {
   projectBusinessName?: string
   onScanTarget?: (targetId: string) => void
   scanningTargets?: Set<string>
+  projectDevice?: string | null
 }
 
 export default function TrackingTargetsTable({
@@ -29,10 +31,56 @@ export default function TrackingTargetsTable({
   projectBusinessName,
   onScanTarget,
   scanningTargets = new Set(),
+  projectDevice,
 }: TrackingTargetsTableProps) {
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [positionSort, setPositionSort] = useState<'none' | 'asc' | 'desc'>('none')
+  const [sortBy, setSortBy] = useState<'position' | 'keyword' | 'date' | 'found'>('position')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(column: 'position' | 'keyword' | 'date' | 'found') {
+    if (sortBy === column) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortBy(column)
+    setSortDir(column === 'keyword' ? 'asc' : 'desc')
+  }
+
+  const sortedTargets = useMemo(() => {
+    const copy = [...targets]
+    copy.sort((a, b) => {
+      const aResult = latestResults[a.id]
+      const bResult = latestResults[b.id]
+      const dir = sortDir === 'asc' ? 1 : -1
+
+      if (sortBy === 'keyword') {
+        return a.keyword.localeCompare(b.keyword, 'he') * dir
+      }
+
+      if (sortBy === 'position') {
+        const aPos = aResult?.found && aResult.position != null ? aResult.position : Number.POSITIVE_INFINITY
+        const bPos = bResult?.found && bResult.position != null ? bResult.position : Number.POSITIVE_INFINITY
+        return (aPos - bPos) * dir
+      }
+
+      if (sortBy === 'date') {
+        const aDate = aResult?.checked_at ? new Date(aResult.checked_at).getTime() : 0
+        const bDate = bResult?.checked_at ? new Date(bResult.checked_at).getTime() : 0
+        return (aDate - bDate) * dir
+      }
+
+      const aFound = aResult?.found ? 1 : 0
+      const bFound = bResult?.found ? 1 : 0
+      return (aFound - bFound) * dir
+    })
+    return copy
+  }, [targets, latestResults, sortBy, sortDir])
+
+  function sortLabel(column: 'position' | 'keyword' | 'date' | 'found') {
+    if (sortBy !== column) return ''
+    return sortDir === 'asc' ? ' ▲' : ' ▼'
+  }
 
   async function handleToggleActive(target: TrackingTarget) {
     setTogglingId(target.id)
@@ -43,52 +91,32 @@ export default function TrackingTargetsTable({
     }
   }
 
-  const sortedTargets = [...targets].sort((a, b) => {
-    if (positionSort === 'none') return 0
-    const aResult = latestResults[a.id]
-    const bResult = latestResults[b.id]
-    const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
-    const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
-    return positionSort === 'asc' ? aPos - bPos : bPos - aPos
-  })
-
-  function togglePositionSort() {
-    setPositionSort((prev) => {
-      if (prev === 'none') return 'asc'
-      if (prev === 'asc') return 'desc'
-      return 'none'
-    })
-  }
-
   return (
     <>
       <Table>
         <TableHead>
           <tr>
-            <Th>מילת מפתח</Th>
-            <Th>מנוע</Th>
             <Th>
-              <button
-                type="button"
-                onClick={togglePositionSort}
-                className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
-                title="מיין לפי מיקום נוכחי"
-              >
-                מיקום נוכחי
-                <span className="text-xs">
-                  {positionSort === 'asc' ? '▲' : positionSort === 'desc' ? '▼' : '↕'}
-                </span>
-              </button>
+              <button type="button" onClick={() => handleSort('keyword')} className="font-semibold">מילת מפתח{sortLabel('keyword')}</button>
+            </Th>
+            <Th>סוג סריקה</Th>
+            <Th>
+              <button type="button" onClick={() => handleSort('position')} className="font-semibold">מיקום נוכחי{sortLabel('position')}</button>
             </Th>
             <Th>שינוי</Th>
-            <Th>בדיקה אחרונה</Th>
+            <Th>
+              <button type="button" onClick={() => handleSort('date')} className="font-semibold">בדיקה אחרונה{sortLabel('date')}</button>
+            </Th>
+            <Th>
+              <button type="button" onClick={() => handleSort('found')} className="font-semibold">נמצא{sortLabel('found')}</button>
+            </Th>
             <Th>סטטוס</Th>
             <Th>פעולות</Th>
           </tr>
         </TableHead>
         <TableBody>
-          {sortedTargets.length === 0 && (
-            <EmptyRow colSpan={7} message="אין מילות מפתח עדיין. הוסף את הראשונה!" />
+          {targets.length === 0 && (
+            <EmptyRow colSpan={8} message="אין מילות מפתח עדיין. הוסף את הראשונה!" />
           )}
           {sortedTargets.map((target) => {
             const result = latestResults[target.id]
@@ -104,7 +132,7 @@ export default function TrackingTargetsTable({
                   </div>
                 </Td>
                 <Td>
-                  <EngineBadge engine={target.engine_type} />
+                  <EngineBadge engine={target.engine_type} device={projectDevice} />
                 </Td>
                 <Td>
                   {result ? (
@@ -140,6 +168,11 @@ export default function TrackingTargetsTable({
                       )}
                     </div>
                   ) : '—'}
+                </Td>
+                <Td>
+                  <Badge variant={result?.found ? 'success' : 'neutral'}>
+                    {result ? (result.found ? 'כן' : 'לא') : '—'}
+                  </Badge>
                 </Td>
                 <Td>
                   <ActiveBadge active={target.is_active} />
