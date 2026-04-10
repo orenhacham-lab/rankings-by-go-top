@@ -85,3 +85,8 @@ export function calculateNextScanDate(frequency: string, fromDate: Date = new Da
   }
   return null
 }
+
+
+export function getEngineDisplayLabel(engine: string, device?: string | null): string {
+  return getSearchTypeLabel(engine, device)
+}
