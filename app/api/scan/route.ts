@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { runScan } from '@/lib/scanner'
+import { getUserEntitlement } from '@/lib/subscription'
 
 export async function POST(request: Request) {
   // Auth check
@@ -21,6 +22,33 @@ export async function POST(request: Request) {
 
   if (!projectId) {
     return Response.json({ error: 'projectId is required' }, { status: 400 })
+  }
+
+  // Check entitlement and scan limits
+  const entitlement = await getUserEntitlement(user.id, supabase)
+  if (!entitlement.isAdmin) {
+    if (entitlement.plan === 'trial') {
+      // Trial users get 1 scan total for the project
+      const { count: projectScanCount } = await supabase
+        .from('scans')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+
+      if ((projectScanCount ?? 0) >= 1) {
+        return Response.json(
+          { error: 'הגעת למגבלת סריקה אחת בתוכנית הניסיון' },
+          { status: 403 }
+        )
+      }
+    } else {
+      // Paid users are limited by scans_this_period
+      if (entitlement.scansThisPeriod >= entitlement.limits.maxScansPerPeriod) {
+        return Response.json(
+          { error: `הגעת למגבלת ${entitlement.limits.maxScansPerPeriod} סריקות בחודש בתוכנית ${entitlement.limits.label}` },
+          { status: 403 }
+        )
+      }
+    }
   }
 
   const admin = createAdminClient()
@@ -163,6 +191,16 @@ export async function POST(request: Request) {
       completed_at: new Date().toISOString(),
     })
     .eq('id', scan.id)
+
+  // Increment scan counter for paid subscriptions
+  if (!entitlement.isAdmin && entitlement.plan !== 'trial' && entitlement.subscriptionId) {
+    await admin
+      .from('subscriptions')
+      .update({
+        scans_this_period: entitlement.scansThisPeriod + 1,
+      })
+      .eq('id', entitlement.subscriptionId)
+  }
 
   // Update project last_scan_at only — manual scans never change the scheduled next_scan_at
   await admin

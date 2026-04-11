@@ -3,9 +3,28 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { calculateNextScanDate } from '@/lib/utils'
+import { getUserEntitlement } from '@/lib/subscription'
 
 export async function createProjectAction(formData: FormData) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('לא מחובר')
+
+  // Enforce plan limits
+  const entitlement = await getUserEntitlement(user.id, supabase)
+  if (!entitlement.isAdmin) {
+    const { count } = await supabase
+      .from('projects')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true)
+
+    if ((count ?? 0) >= entitlement.limits.maxProjects) {
+      throw new Error(
+        `הגעת למגבלת ${entitlement.limits.maxProjects} פרויקטים בתוכנית ${entitlement.limits.label}. שדרג את המנוי להוספת פרויקטים נוספים.`
+      )
+    }
+  }
 
   const scanFrequency = formData.get('scan_frequency') as string
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
@@ -39,9 +58,6 @@ export async function updateProjectAction(id: string, formData: FormData) {
 
   const scanFrequency = formData.get('scan_frequency') as string
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
-  const nextScanAt = autoScanEnabled && scanFrequency !== 'manual'
-    ? calculateNextScanDate(scanFrequency)
-    : null
 
   const data = {
     name: formData.get('name') as string,
@@ -53,7 +69,6 @@ export async function updateProjectAction(id: string, formData: FormData) {
     device_type: (formData.get('device_type') as string) || null,
     scan_frequency: scanFrequency || 'manual',
     auto_scan_enabled: autoScanEnabled,
-    next_scan_at: nextScanAt?.toISOString() || null,
   }
 
   const { error } = await supabase.from('projects').update(data).eq('id', id)

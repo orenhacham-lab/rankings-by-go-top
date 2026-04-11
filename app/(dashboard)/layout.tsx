@@ -14,10 +14,19 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  // Fetch profile to determine admin status
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isAdmin = profile?.role === 'admin'
+
   return (
-    <div className="flex md:flex-row flex-col h-full min-h-screen overflow-x-hidden">
-      <Sidebar />
-      <main className="flex-1 md:mr-64 p-4 md:p-8 overflow-x-hidden overflow-y-auto min-h-screen">
+    <div className="flex h-full min-h-screen">
+      <Sidebar isAdmin={isAdmin} />
+      <main className="flex-1 mr-64 p-8 overflow-auto min-h-screen">
         {children}
       </main>
     </div>

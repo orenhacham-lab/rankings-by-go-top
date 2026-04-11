@@ -2,12 +2,34 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getUserEntitlement } from '@/lib/subscription'
 
 export async function createTrackingTargetAction(formData: FormData) {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('לא מחובר')
+
+  const projectId = formData.get('project_id') as string
+
+  // Enforce keyword limit per project
+  const entitlement = await getUserEntitlement(user.id, supabase)
+  if (!entitlement.isAdmin) {
+    const { count } = await supabase
+      .from('tracking_targets')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .eq('is_active', true)
+
+    if ((count ?? 0) >= entitlement.limits.maxKeywordsPerProject) {
+      throw new Error(
+        `הגעת למגבלת ${entitlement.limits.maxKeywordsPerProject} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}. שדרג את המנוי להוספת מילות מפתח נוספות.`
+      )
+    }
+  }
+
   const data = {
-    project_id: formData.get('project_id') as string,
+    project_id: projectId,
     keyword: formData.get('keyword') as string,
     engine_type: formData.get('engine_type') as string,
     target_domain: (formData.get('target_domain') as string) || null,
@@ -20,13 +42,15 @@ export async function createTrackingTargetAction(formData: FormData) {
   const { error } = await supabase.from('tracking_targets').insert(data)
   if (error) throw new Error(error.message)
 
-  const projectId = formData.get('project_id') as string
   revalidatePath(`/projects/${projectId}`)
   revalidatePath('/keywords')
 }
 
 export async function createBulkTrackingTargetsAction(formData: FormData) {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('לא מחובר')
 
   const projectId = formData.get('project_id') as string
   const engineType = formData.get('engine_type') as string
@@ -73,6 +97,26 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
 
   if (toInsert.length === 0) {
     throw new Error('כל מילות המפתח שהוזנו כבר קיימות בפרויקט')
+  }
+
+  // Enforce keyword limit per project
+  const entitlement = await getUserEntitlement(user.id, supabase)
+  if (!entitlement.isAdmin) {
+    const currentCount = existingSet.size
+    const limit = entitlement.limits.maxKeywordsPerProject
+    const available = Math.max(0, limit - currentCount)
+
+    if (available === 0) {
+      throw new Error(
+        `הגעת למגבלת ${limit} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}.`
+      )
+    }
+
+    if (toInsert.length > available) {
+      throw new Error(
+        `ניתן להוסיף עוד ${available} מילות מפתח בלבד (מגבלת ${limit} בתוכנית ${entitlement.limits.label}).`
+      )
+    }
   }
 
   const { error } = await supabase.from('tracking_targets').insert(toInsert)

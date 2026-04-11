@@ -196,3 +196,102 @@ select
 from tracking_targets tt
 left join latest_rankings lr on lr.tracking_target_id = tt.id
 group by tt.project_id;
+
+-- ============================================================
+-- PROFILES (one per auth user — auto-created on signup)
+-- ============================================================
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'user',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create trigger update_profiles_updated_at
+  before update on profiles
+  for each row execute function update_updated_at_column();
+
+alter table profiles enable row level security;
+
+create policy "Users can view own profile"
+  on profiles for select to authenticated
+  using (id = auth.uid());
+
+create policy "Users can insert own profile"
+  on profiles for insert to authenticated
+  with check (id = auth.uid());
+
+create policy "Users can update own profile"
+  on profiles for update to authenticated
+  using (id = auth.uid());
+
+-- Service role (API) can do everything on profiles
+create policy "Service role full access on profiles"
+  on profiles for all to service_role
+  using (true) with check (true);
+
+-- ============================================================
+-- SUBSCRIPTIONS
+-- ============================================================
+create table if not exists subscriptions (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  plan text not null default 'regular' check (plan in ('regular', 'advanced', 'premium')),
+  status text not null default 'trial' check (status in ('trial', 'active', 'inactive', 'cancelled', 'expired')),
+  paypal_subscription_id text unique,
+  trial_ends_at timestamptz,
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  scans_this_period integer not null default 0,
+  scans_period_key text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_subscriptions_user_id on subscriptions(user_id);
+create index if not exists idx_subscriptions_paypal_id on subscriptions(paypal_subscription_id);
+
+create trigger update_subscriptions_updated_at
+  before update on subscriptions
+  for each row execute function update_updated_at_column();
+
+alter table subscriptions enable row level security;
+
+create policy "Users can view own subscription"
+  on subscriptions for select to authenticated
+  using (user_id = auth.uid());
+
+create policy "Users can insert own subscription"
+  on subscriptions for insert to authenticated
+  with check (user_id = auth.uid());
+
+create policy "Users can update own subscription"
+  on subscriptions for update to authenticated
+  using (user_id = auth.uid());
+
+create policy "Service role full access on subscriptions"
+  on subscriptions for all to service_role
+  using (true) with check (true);
+
+-- ============================================================
+-- SIGNUP TRIGGER: create profile + trial subscription
+-- ============================================================
+create or replace function handle_new_user()
+returns trigger as $$
+begin
+  -- Create profile with role='user'
+  insert into profiles (id, role, created_at, updated_at)
+  values (new.id, 'user', now(), now())
+  on conflict (id) do nothing;
+
+  -- Create trial subscription (7-day free trial)
+  insert into subscriptions (user_id, status, trial_ends_at, created_at, updated_at)
+  values (new.id, 'trial', now() + interval '7 days', now(), now());
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();

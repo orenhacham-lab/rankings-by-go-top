@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { hasAccess } from '@/lib/subscription'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -59,6 +60,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/keywords') ||
     pathname.startsWith('/scans') ||
     pathname.startsWith('/reports') ||
+    pathname.startsWith('/billing') ||
     pathname.startsWith('/admin')
 
   if (!user && isProtectedRoute) {
@@ -76,6 +78,25 @@ export async function proxy(request: NextRequest) {
     redirectUrl.pathname = destination
     redirectUrl.search = ''
     return NextResponse.redirect(redirectUrl)
+  }
+
+  // ── Subscription / trial wall ───────────────────────────────────
+  // Only check page routes (not API, not /billing itself, not /setup)
+  const needsSubscriptionCheck =
+    user &&
+    isProtectedRoute &&
+    !pathname.startsWith('/billing') &&
+    !pathname.startsWith('/admin') &&
+    !pathname.startsWith('/api/')
+
+  if (needsSubscriptionCheck) {
+    const allowed = await hasAccess(user.id, supabase)
+    if (!allowed) {
+      const billingUrl = request.nextUrl.clone()
+      billingUrl.pathname = '/billing'
+      billingUrl.search = ''
+      return NextResponse.redirect(billingUrl)
+    }
   }
 
   return supabaseResponse

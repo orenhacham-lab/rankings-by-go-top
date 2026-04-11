@@ -122,6 +122,31 @@ export interface ScanResult {
   scans?: Scan
 }
 
+export interface Profile {
+  id: string
+  role: string
+  created_at: string
+  updated_at: string
+}
+
+export type SubscriptionPlan = 'regular' | 'advanced' | 'premium'
+export type SubscriptionStatus = 'trial' | 'active' | 'inactive' | 'cancelled' | 'expired'
+
+export interface Subscription {
+  id: string
+  user_id: string
+  plan: SubscriptionPlan
+  status: SubscriptionStatus
+  paypal_subscription_id: string | null
+  trial_ends_at: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+  scans_this_period: number
+  scans_period_key: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface RankingSummary {
   tracking_target_id: string
   keyword: string
