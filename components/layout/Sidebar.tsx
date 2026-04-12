@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -29,15 +30,21 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   return (
     <aside className="w-64 bg-white border-l border-slate-200 flex flex-col h-full fixed top-0 right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-5 border-b border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-            GT
-          </div>
-          <div>
-            <div className="font-bold text-slate-800 text-sm leading-tight">Rankings by</div>
-            <div className="font-bold text-blue-600 text-sm leading-tight">Go Top</div>
-          </div>
+      <div className="p-5 border-b border-slate-200 flex flex-col items-center justify-center gap-3">
+        <div className="flex items-center justify-center bg-white">
+          <Image
+            src="/gotop-primary.png"
+            alt="Go Top logo"
+            width={140}
+            height={56}
+            className="w-[110px] h-auto object-contain"
+            priority
+          />
+        </div>
+
+        <div className="text-center">
+          <div className="font-bold text-slate-800 text-sm leading-tight">Rankings by</div>
+          <div className="font-bold text-blue-600 text-sm leading-tight">Go Top</div>
         </div>
       </div>
 
