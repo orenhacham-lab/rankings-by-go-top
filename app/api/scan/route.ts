@@ -41,10 +41,16 @@ export async function POST(request: Request) {
         )
       }
     } else {
-      // Paid users are limited by scans_this_period
-      if (entitlement.scansThisPeriod >= entitlement.limits.maxScansPerPeriod) {
+      // Paid users are limited by scans per project per period
+      const { count: projectScansThisPeriod } = await supabase
+        .from('scans')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+
+      if ((projectScansThisPeriod ?? 0) >= entitlement.limits.maxScansPerPeriod) {
         return Response.json(
-          { error: `הגעת למגבלת ${entitlement.limits.maxScansPerPeriod} סריקות בחודש בתוכנית ${entitlement.limits.label}` },
+          { error: `הגעת למגבלת ${entitlement.limits.maxScansPerPeriod} סריקות בחודש לפרוייקט זה בתוכנית ${entitlement.limits.label}` },
           { status: 403 }
         )
       }
