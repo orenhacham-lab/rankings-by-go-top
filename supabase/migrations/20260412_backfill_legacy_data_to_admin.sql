@@ -1,15 +1,16 @@
--- Backfill existing rows to admin user
--- This ensures existing data (created before user_id was added) is assigned to the admin account
+-- Backfill existing rows to specific admin user
+-- This ensures existing data (created before user_id was added) is assigned to the correct admin account
+-- Uses explicit admin email (orenhacham@gmail.com) for deterministic assignment
 -- New users will NOT see this legacy data (they see only their own)
 
 -- ============================================================
--- FIND ADMIN USER AND ASSIGN LEGACY DATA
+-- FETCH ADMIN USER ID FROM SPECIFIC EMAIL
 -- ============================================================
 
--- Get the first admin user ID
+-- Get the admin user ID by email
 WITH admin_user AS (
-  SELECT id FROM profiles
-  WHERE role = 'admin'
+  SELECT id FROM auth.users
+  WHERE email = 'orenhacham@gmail.com'
   LIMIT 1
 )
 UPDATE clients
@@ -18,8 +19,8 @@ WHERE user_id IS NULL
   AND (SELECT id FROM admin_user) IS NOT NULL;
 
 WITH admin_user AS (
-  SELECT id FROM profiles
-  WHERE role = 'admin'
+  SELECT id FROM auth.users
+  WHERE email = 'orenhacham@gmail.com'
   LIMIT 1
 )
 UPDATE projects
@@ -28,8 +29,8 @@ WHERE user_id IS NULL
   AND (SELECT id FROM admin_user) IS NOT NULL;
 
 WITH admin_user AS (
-  SELECT id FROM profiles
-  WHERE role = 'admin'
+  SELECT id FROM auth.users
+  WHERE email = 'orenhacham@gmail.com'
   LIMIT 1
 )
 UPDATE tracking_targets
@@ -38,8 +39,8 @@ WHERE user_id IS NULL
   AND (SELECT id FROM admin_user) IS NOT NULL;
 
 WITH admin_user AS (
-  SELECT id FROM profiles
-  WHERE role = 'admin'
+  SELECT id FROM auth.users
+  WHERE email = 'orenhacham@gmail.com'
   LIMIT 1
 )
 UPDATE scans
@@ -52,5 +53,7 @@ WHERE user_id IS NULL
 -- ============================================================
 
 -- All existing rows with NULL user_id are now assigned to the admin user
--- Admin user (profile.role = 'admin') can now see all data (including legacy data)
+--   (orenhacham@gmail.com)
+-- Admin user can see all data (including legacy data)
 -- New regular users see only their own data (created after this migration)
+-- Assignment is deterministic based on email, not LIMIT 1 randomness
