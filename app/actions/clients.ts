@@ -4,36 +4,51 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export async function createClientAction(formData: FormData) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  // Get current user
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError) {
-    console.error('[Clients] Auth error:', userError.message)
-    throw new Error('שגיאה בקבלת פרטי משתמש')
-  }
-  if (!user) {
-    console.error('[Clients] No authenticated user')
-    throw new Error('משתמש לא מחובר')
-  }
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError) {
+      console.error('[Clients] Auth error:', userError.message)
+      throw new Error('שגיאה בקבלת פרטי משתמש')
+    }
+    if (!user) {
+      console.error('[Clients] No authenticated user')
+      throw new Error('משתמש לא מחובר')
+    }
 
-  const data = {
-    user_id: user.id,
-    name: formData.get('name') as string,
-    contact_name: (formData.get('contact_name') as string) || null,
-    email: (formData.get('email') as string) || null,
-    phone: (formData.get('phone') as string) || null,
-    notes: (formData.get('notes') as string) || null,
-    is_active: true,
-  }
+    const name = formData.get('name') as string
+    if (!name || !name.trim()) {
+      console.error('[Clients] Missing required field: name')
+      throw new Error('שם הלקוח הוא שדה חובה')
+    }
 
-  const { error } = await supabase.from('clients').insert(data)
-  if (error) {
-    console.error('[Clients] Insert error:', error.message, error.code)
-    throw new Error('שגיאה בהוספת לקוח. בדוק שהנתונים תקינים.')
-  }
+    const data = {
+      user_id: user.id,
+      name: name.trim(),
+      contact_name: (formData.get('contact_name') as string) || null,
+      email: (formData.get('email') as string) || null,
+      phone: (formData.get('phone') as string) || null,
+      notes: (formData.get('notes') as string) || null,
+      is_active: true,
+    }
 
-  revalidatePath('/clients')
+    const { error } = await supabase.from('clients').insert(data)
+    if (error) {
+      console.error('[Clients] Insert error:', {
+        message: error.message,
+        code: error.code,
+      })
+      throw new Error('שגיאה בהוספת לקוח. בדוק שהנתונים תקינים.')
+    }
+
+    revalidatePath('/clients')
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'שגיאה בעיבוד הבקשה'
+    console.error('[Clients] Action error:', message)
+    throw new Error(message)
+  }
 }
 
 export async function updateClientAction(id: string, formData: FormData) {

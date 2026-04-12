@@ -19,7 +19,7 @@ function AuthForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null)
+  const [oauthLoading, setOauthLoading] = useState<'google' | null>(null)
   const [error, setError] = useState(() => {
     if (oauthErrorParam === 'oauth') {
       return 'כניסה עם ספק חיצוני נכשלה. בדוק שהספק מופעל בהגדרות Supabase.'
@@ -74,7 +74,7 @@ function AuthForm() {
     }
   }
 
-  async function handleOAuth(provider: 'google' | 'apple') {
+  async function handleOAuth(provider: 'google') {
     setError('')
     setSuccess('')
     setOauthLoading(provider)
@@ -87,7 +87,7 @@ function AuthForm() {
         },
       })
       if (authError) {
-        const providerName = provider === 'google' ? 'Google' : 'Apple'
+        const providerName = 'Google'
         if (
           authError.message?.toLowerCase().includes('not enabled') ||
           authError.message?.toLowerCase().includes('provider') ||
@@ -101,7 +101,7 @@ function AuthForm() {
       }
       // If no error, redirect is handled by Supabase SDK
     } catch {
-      const providerName = provider === 'google' ? 'Google' : 'Apple'
+      const providerName = 'Google'
       setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
       setOauthLoading(null)
     }
@@ -185,22 +185,6 @@ function AuthForm() {
                 </svg>
               )}
               {mode === 'login' ? 'כניסה' : 'רישום'} עם Google
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleOAuth('apple')}
-              disabled={!!oauthLoading || loading}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors disabled:opacity-60"
-            >
-              {oauthLoading === 'apple' ? (
-                <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
-                  <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
-                </svg>
-              )}
-              {mode === 'login' ? 'כניסה' : 'רישום'} עם Apple
             </button>
           </div>
 
