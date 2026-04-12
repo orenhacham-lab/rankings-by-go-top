@@ -4,6 +4,7 @@ export type PlanType = 'trial' | SubscriptionPlan
 
 export interface PlanLimits {
   maxProjects: number
+  maxClients: number
   maxKeywordsPerProject: number
   maxScansPerPeriod: number
   price: number
@@ -11,10 +12,10 @@ export interface PlanLimits {
 }
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
-  trial:    { maxProjects: 1,  maxKeywordsPerProject: 30,  maxScansPerPeriod: 1,  price: 0,   label: 'ניסיון' },
-  regular:  { maxProjects: 3,  maxKeywordsPerProject: 50,  maxScansPerPeriod: 1,  price: 29,  label: 'רגיל' },
-  advanced: { maxProjects: 10, maxKeywordsPerProject: 50,  maxScansPerPeriod: 2,  price: 69,  label: 'מתקדם' },
-  premium:  { maxProjects: 50, maxKeywordsPerProject: 100, maxScansPerPeriod: 4,  price: 129, label: 'פרמיום' },
+  trial:    { maxProjects: 1,  maxClients: 1,  maxKeywordsPerProject: 30,  maxScansPerPeriod: 1,  price: 0,   label: 'ניסיון' },
+  regular:  { maxProjects: 3,  maxClients: 5,  maxKeywordsPerProject: 50,  maxScansPerPeriod: 1,  price: 29,  label: 'רגיל' },
+  advanced: { maxProjects: 10, maxClients: 20, maxKeywordsPerProject: 50,  maxScansPerPeriod: 2,  price: 69,  label: 'מתקדם' },
+  premium:  { maxProjects: 50, maxClients: 100, maxKeywordsPerProject: 100, maxScansPerPeriod: 4,  price: 129, label: 'פרמיום' },
 }
 
 export const PLAN_FEATURES: Record<PlanType, string[]> = {

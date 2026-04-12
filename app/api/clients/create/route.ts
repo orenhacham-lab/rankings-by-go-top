@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
+import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
 
 // API Route for creating new clients
 // Replaces deprecated Server Action approach to avoid production crashes
@@ -24,6 +25,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'משתמש לא מחובר' },
         { status: 401 }
+      )
+    }
+
+    // Check user's plan and quotas
+    const entitlement = await getUserEntitlement(user.id, supabase)
+    const planLimits = PLAN_LIMITS[entitlement.plan]
+
+    // Count existing clients for this user
+    const { count: clientCount, error: countError } = await supabase
+      .from('clients')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+
+    if (countError) {
+      console.error('[API] Error counting clients:', countError.message)
+      return NextResponse.json(
+        { error: 'שגיאה בבדיקת הלקוחות הקיימים' },
+        { status: 500 }
+      )
+    }
+
+    // Check if user has reached their client quota
+    if ((clientCount || 0) >= planLimits.maxClients) {
+      console.log('[API] User reached client quota:', { userId: user.id, plan: entitlement.plan, limit: planLimits.maxClients })
+      return NextResponse.json(
+        { error: `הגעת למכסה של ${planLimits.maxClients} לקוחות בתוכנית ${planLimits.label}. שדרג את התוכנית כדי להוסיף עוד לקוחות.` },
+        { status: 403 }
       )
     }
 
