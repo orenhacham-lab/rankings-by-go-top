@@ -39,9 +39,21 @@ export default function ProjectForm({
 
     try {
       if (project) {
+        // Update existing project - use server action
         await updateProjectAction(project.id, formData)
       } else {
-        await createProjectAction(formData)
+        // Create new project - use API route
+        const response = await fetch('/api/projects/create', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'שגיאה בהוספת פרויקט')
+        }
+
+        await response.json()
       }
       onSuccess()
     } catch (err) {

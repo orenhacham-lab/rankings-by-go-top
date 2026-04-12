@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { calculateNextScanDate } from '@/lib/utils'
 import { getUserEntitlement } from '@/lib/subscription'
 
+// Note: createProjectAction is deprecated - project creation now uses API route /api/projects/create
+// Kept here for backwards compatibility if needed
 export async function createProjectAction(formData: FormData) {
   const supabase = await createClient()
 
