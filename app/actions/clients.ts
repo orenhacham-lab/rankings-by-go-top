@@ -6,6 +6,15 @@ import { revalidatePath } from 'next/cache'
 export async function createClientAction(formData: FormData) {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    throw new Error('המשתמש לא מחובר')
+  }
+
   const data = {
     name: formData.get('name') as string,
     contact_name: (formData.get('contact_name') as string) || null,
@@ -13,10 +22,14 @@ export async function createClientAction(formData: FormData) {
     phone: (formData.get('phone') as string) || null,
     notes: (formData.get('notes') as string) || null,
     is_active: true,
+    user_id: user.id,
   }
 
   const { error } = await supabase.from('clients').insert(data)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('createClientAction error:', error)
+    throw new Error(error.message)
+  }
 
   revalidatePath('/clients')
 }
@@ -33,17 +46,26 @@ export async function updateClientAction(id: string, formData: FormData) {
   }
 
   const { error } = await supabase.from('clients').update(data).eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('updateClientAction error:', error)
+    throw new Error(error.message)
+  }
 
   revalidatePath('/clients')
 }
 
 export async function toggleClientActiveAction(id: string, isActive: boolean) {
   const supabase = await createClient()
+
   const { error } = await supabase
     .from('clients')
     .update({ is_active: !isActive })
     .eq('id', id)
-  if (error) throw new Error(error.message)
+
+  if (error) {
+    console.error('toggleClientActiveAction error:', error)
+    throw new Error(error.message)
+  }
+
   revalidatePath('/clients')
 }
