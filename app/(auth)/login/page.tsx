@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { PLAN_LIMITS } from '@/lib/subscription'
 
 function AuthForm() {
   const router = useRouter()
@@ -250,20 +251,20 @@ function AuthForm() {
             <p className="text-slate-600 font-medium mb-3 text-sm">תוכניות מנויים</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <div className="text-xs text-slate-600 mb-1">7 ימי</div>
-                <div className="font-bold text-slate-900 text-sm">ניסיון חינם</div>
+                <div className="text-xs text-slate-600 mb-1">7 ימי ניסיון</div>
+                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.trial.label}</div>
               </div>
               <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <div className="text-xs text-slate-600 mb-1">₪99</div>
-                <div className="font-bold text-slate-900 text-sm">רגיל</div>
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.regular.price}</div>
+                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.regular.label}</div>
               </div>
               <div className="bg-amber-50 rounded-lg p-3 text-center border border-amber-200">
-                <div className="text-xs text-slate-600 mb-1">₪199</div>
-                <div className="font-bold text-slate-900 text-sm">מתקדם</div>
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.advanced.price}</div>
+                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.advanced.label}</div>
               </div>
               <div className="bg-purple-50 rounded-lg p-3 text-center">
-                <div className="text-xs text-slate-600 mb-1">₪399</div>
-                <div className="font-bold text-slate-900 text-sm">פרימיום</div>
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.premium.price}</div>
+                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.premium.label}</div>
               </div>
             </div>
           </div>

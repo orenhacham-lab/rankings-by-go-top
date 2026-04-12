@@ -7,8 +7,15 @@ export async function createClientAction(formData: FormData) {
   const supabase = await createClient()
 
   // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('User not authenticated')
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError) {
+    console.error('[Clients] Auth error:', userError.message)
+    throw new Error('שגיאה בקבלת פרטי משתמש')
+  }
+  if (!user) {
+    console.error('[Clients] No authenticated user')
+    throw new Error('משתמש לא מחובר')
+  }
 
   const data = {
     user_id: user.id,
@@ -21,7 +28,10 @@ export async function createClientAction(formData: FormData) {
   }
 
   const { error } = await supabase.from('clients').insert(data)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[Clients] Insert error:', error.message, error.code)
+    throw new Error('שגיאה בהוספת לקוח. בדוק שהנתונים תקינים.')
+  }
 
   revalidatePath('/clients')
 }
@@ -38,7 +48,10 @@ export async function updateClientAction(id: string, formData: FormData) {
   }
 
   const { error } = await supabase.from('clients').update(data).eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[Clients] Update error:', error.message, error.code)
+    throw new Error('שגיאה בעדכון לקוח')
+  }
 
   revalidatePath('/clients')
 }
@@ -49,6 +62,9 @@ export async function toggleClientActiveAction(id: string, isActive: boolean) {
     .from('clients')
     .update({ is_active: !isActive })
     .eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[Clients] Toggle error:', error.message, error.code)
+    throw new Error('שגיאה בעדכון סטטוס הלקוח')
+  }
   revalidatePath('/clients')
 }
