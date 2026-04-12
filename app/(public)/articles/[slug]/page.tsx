@@ -5,6 +5,19 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 
+// ============================================================
+// ARTICLE ACCESS CONTROL NOTE
+// ============================================================
+// Articles are accessible via direct URL /articles/[slug]
+// SECURITY: RLS ensures only published articles (is_published=true) are readable
+// DISCOVERY: Articles are ONLY linked from /articles listing page
+// LIMITATION: Direct URL access is technically possible if user knows the slug
+//   This is standard web app behavior - cannot be prevented without:
+//   - Token-based access (overkill for public content)
+//   - Infrastructure-level reverse proxy rules
+// MITIGATION: No internal links point directly to article URLs
+//   Articles are only discoverable via /articles page
+
 interface Article {
   id: string
   slug: string
