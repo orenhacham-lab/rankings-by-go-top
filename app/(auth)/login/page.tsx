@@ -11,13 +11,19 @@ function AuthForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const nextPath = searchParams.get('next') || '/dashboard'
+  const oauthErrorParam = searchParams.get('error')
 
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => {
+    if (oauthErrorParam === 'oauth') {
+      return 'כניסה עם ספק חיצוני נכשלה. בדוק שהספק מופעל בהגדרות Supabase.'
+    }
+    return ''
+  })
   const [success, setSuccess] = useState('')
 
   function resetForm() {

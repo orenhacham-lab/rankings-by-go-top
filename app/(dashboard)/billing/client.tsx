@@ -47,8 +47,12 @@ export default function BillingClient() {
 
       const planId = planIds[plan]
       if (!planId) {
-        console.warn(`[PayPal] Plan ID for "${plan}" not configured (NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()})`)
-        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">תשלום טרם הוגדר</p>'
+        const envVarName = `NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()}`
+        console.warn(`[PayPal] Plan ID for "${plan}" not configured. Set env var: ${envVarName}`)
+        container.innerHTML = `<p class="text-xs text-slate-500 text-center py-3 p-2 bg-amber-50 rounded border border-amber-200">
+          תוכנית ${plan} טרם הוגדרה.<br/>
+          <span class="text-xs">משתנה סביבה: ${envVarName}</span>
+        </p>`
         continue
       }
 
@@ -109,9 +113,9 @@ export default function BillingClient() {
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
 
     if (!clientId) {
-      console.warn('[PayPal] NEXT_PUBLIC_PAYPAL_CLIENT_ID is not set')
+      console.warn('[PayPal] NEXT_PUBLIC_PAYPAL_CLIENT_ID is not configured. Set: NEXT_PUBLIC_PAYPAL_CLIENT_ID=<client-id>')
       setTimeout(() => {
-        setConfigError('PayPal אינו מוגדר כרגע. אנא פנה למנהל המערכת.')
+        setConfigError('PayPal אינו מוגדר כרגע. משתנה סביבה חסר: NEXT_PUBLIC_PAYPAL_CLIENT_ID')
         setLoading(false)
       }, 0)
       return
@@ -134,8 +138,8 @@ export default function BillingClient() {
       setLoading(false)
     }
     script.onerror = () => {
-      console.error('[PayPal] Failed to load SDK')
-      setConfigError('לא ניתן לטעון את PayPal. בדוק את החיבור לאינטרנט ונסה שנית.')
+      console.error('[PayPal] Failed to load SDK from:', script.src)
+      setConfigError('לא ניתן לטעון את PayPal SDK. בדוק את החיבור לאינטרנט, את NEXT_PUBLIC_PAYPAL_CLIENT_ID, וspam filter ב-browser console.')
       setLoading(false)
     }
     document.body.appendChild(script)
