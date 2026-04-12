@@ -19,7 +19,16 @@ ALTER TABLE scans
 ADD COLUMN IF NOT EXISTS user_id uuid references auth.users(id) on delete cascade;
 
 -- ============================================================
--- 2. CREATE HELPER FUNCTION: Check if user is admin
+-- 2. ASSIGN EXISTING DATA TO ADMIN USER
+-- ============================================================
+
+-- Note: Existing rows with NULL user_id are treated as admin legacy data
+-- They are accessible only to users with profile.role = 'admin'
+-- New users (regular users) will not see existing data
+-- This ensures data isolation while preserving admin's existing data
+
+-- ============================================================
+-- 3. CREATE HELPER FUNCTION: Check if user is admin
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION is_admin(user_id uuid)
@@ -32,7 +41,7 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 -- ============================================================
--- 3. DROP OLD RLS POLICIES (too permissive)
+-- 4. DROP OLD RLS POLICIES (too permissive)
 -- ============================================================
 
 DROP POLICY IF EXISTS "Authenticated users can do everything on clients" ON clients;
@@ -42,10 +51,10 @@ DROP POLICY IF EXISTS "Authenticated users can do everything on scans" ON scans;
 DROP POLICY IF EXISTS "Authenticated users can do everything on scan_results" ON scan_results;
 
 -- ============================================================
--- 4. CREATE NEW RLS POLICIES (proper data isolation)
+-- 5. CREATE NEW RLS POLICIES (proper data isolation)
 -- ============================================================
 
--- CLIENTS: users see own data OR admin sees all
+-- CLIENTS: users see own data OR admin sees all (including legacy NULL user_id data)
 CREATE POLICY "clients_isolation_policy"
   ON clients FOR ALL TO authenticated
   USING (
@@ -63,7 +72,7 @@ CREATE POLICY "clients_service_role"
   USING (true)
   WITH CHECK (true);
 
--- PROJECTS: users see own data OR admin sees all
+-- PROJECTS: users see own data OR admin sees all (including legacy NULL user_id data)
 CREATE POLICY "projects_isolation_policy"
   ON projects FOR ALL TO authenticated
   USING (
@@ -81,7 +90,7 @@ CREATE POLICY "projects_service_role"
   USING (true)
   WITH CHECK (true);
 
--- TRACKING_TARGETS: users see own data OR admin sees all
+-- TRACKING_TARGETS: users see own data OR admin sees all (including legacy NULL user_id data)
 CREATE POLICY "tracking_targets_isolation_policy"
   ON tracking_targets FOR ALL TO authenticated
   USING (
@@ -99,7 +108,7 @@ CREATE POLICY "tracking_targets_service_role"
   USING (true)
   WITH CHECK (true);
 
--- SCANS: users see own data OR admin sees all
+-- SCANS: users see own data OR admin sees all (including legacy NULL user_id data)
 CREATE POLICY "scans_isolation_policy"
   ON scans FOR ALL TO authenticated
   USING (
@@ -149,10 +158,11 @@ CREATE POLICY "scan_results_service_role"
   WITH CHECK (true);
 
 -- ============================================================
--- 5. CREATE INDEXES for performance
+-- 6. CREATE INDEXES for performance
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS idx_clients_user_id ON clients(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_tracking_targets_user_id ON tracking_targets(user_id);
 CREATE INDEX IF NOT EXISTS idx_scans_user_id ON scans(user_id);
+

@@ -288,7 +288,7 @@ function AuthForm() {
             <a
               href="https://www.gotop.co.il"
               target="_blank"
-              rel="noopener noreferrer nofollow"
+              rel="noopener noreferrer"
               className="text-blue-600 hover:underline mx-1"
             >
               Go Top

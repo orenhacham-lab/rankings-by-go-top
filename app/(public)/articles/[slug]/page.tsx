@@ -22,7 +22,16 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   useEffect(() => {
     async function loadArticle() {
+      if (!slug) {
+        setNotFound(true)
+        setLoading(false)
+        return
+      }
+
       const supabase = createClient()
+
+      // CRITICAL: Only fetch published articles
+      // This prevents unauthorized access to unpublished articles
       const { data, error } = await supabase
         .from('articles')
         .select('id, slug, title, content, author, published_at')
@@ -31,6 +40,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
         .single()
 
       if (error || !data) {
+        // Not found OR not published - both show 404
         setNotFound(true)
       } else {
         setArticle(data)
