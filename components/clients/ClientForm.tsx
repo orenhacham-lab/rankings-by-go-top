@@ -5,7 +5,7 @@ import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
 import { Client } from '@/lib/supabase/types'
-import { createClientAction, updateClientAction } from '@/app/actions/clients'
+import { updateClientAction } from '@/app/actions/clients'
 
 interface ClientFormProps {
   client?: Client
@@ -24,27 +24,27 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
     const formData = new FormData(e.currentTarget)
 
-    // Log form submission
-    console.log('[ClientForm] Form submit - new client:', !client)
-    const formDataObj: Record<string, string> = {}
-    formData.forEach((value, key) => {
-      formDataObj[key] = value as string
-    })
-    console.log('[ClientForm] FormData being submitted:', formDataObj)
-
     try {
       if (client) {
-        console.log('[ClientForm] Calling updateClientAction for client:', client.id)
+        // Update existing client - use server action
         await updateClientAction(client.id, formData)
       } else {
-        console.log('[ClientForm] Calling createClientAction')
-        await createClientAction(formData)
+        // Create new client - use API route
+        const response = await fetch('/api/clients/create', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'שגיאה בהוספת לקוח')
+        }
+
+        await response.json()
       }
-      console.log('[ClientForm] Action completed successfully')
       onSuccess()
     } catch (err) {
       const errorMessage = (err as Error).message || 'שגיאה בשמירה'
-      console.error('[ClientForm] Action error caught:', errorMessage, err)
       setError(errorMessage)
     } finally {
       setLoading(false)
