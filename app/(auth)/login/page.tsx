@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
@@ -244,9 +245,57 @@ function AuthForm() {
           </form>
         </div>
 
-        <p className="text-center text-slate-400 text-xs mt-6">
-          Rankings by Go Top &copy; {new Date().getFullYear()}
-        </p>
+        <div className="mt-8 pt-6 border-t border-slate-200">
+          <div className="text-center mb-6">
+            <p className="text-slate-600 font-medium mb-3 text-sm">תוכניות מנויים</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 rounded-lg p-3 text-center">
+                <div className="text-xs text-slate-600 mb-1">7 ימי</div>
+                <div className="font-bold text-slate-900 text-sm">ניסיון חינם</div>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <div className="text-xs text-slate-600 mb-1">₪99</div>
+                <div className="font-bold text-slate-900 text-sm">רגיל</div>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3 text-center border border-amber-200">
+                <div className="text-xs text-slate-600 mb-1">₪199</div>
+                <div className="font-bold text-slate-900 text-sm">מתקדם</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-3 text-center">
+                <div className="text-xs text-slate-600 mb-1">₪399</div>
+                <div className="font-bold text-slate-900 text-sm">פרימיום</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-slate-200 text-center text-slate-500 text-xs space-y-2">
+          <div className="flex items-center justify-center gap-3">
+            <Link href="/accessibility" className="hover:text-slate-700 transition-colors">
+              נגישות
+            </Link>
+            <span>•</span>
+            <Link href="/privacy" className="hover:text-slate-700 transition-colors">
+              פרטיות
+            </Link>
+            <span>•</span>
+            <Link href="/articles" className="hover:text-slate-700 transition-colors">
+              מאמרים
+            </Link>
+          </div>
+          <p>
+            Rankings by
+            <a
+              href="https://www.gotop.co.il"
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="text-blue-600 hover:underline mx-1"
+            >
+              Go Top
+            </a>
+            &copy; {new Date().getFullYear()}
+          </p>
+        </div>
       </div>
     </div>
   )
