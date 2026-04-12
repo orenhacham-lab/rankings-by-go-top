@@ -34,15 +34,23 @@ export async function createClientAction(formData: FormData) {
       is_active: true,
     }
 
+    // Log before insert for debugging
+    console.log('[Clients] Insert attempt:', {
+      userId: user.id,
+      payloadKeys: Object.keys(data),
+      name: data.name,
+    })
+
     const { error } = await supabase.from('clients').insert(data)
     if (error) {
-      console.error('[Clients] Insert error:', {
+      console.error('[Clients] Insert failed:', {
         message: error.message,
         code: error.code,
       })
       throw new Error('שגיאה בהוספת לקוח. בדוק שהנתונים תקינים.')
     }
 
+    console.log('[Clients] Insert successful for user:', user.id)
     revalidatePath('/clients')
   } catch (err) {
     const message = err instanceof Error ? err.message : 'שגיאה בעיבוד הבקשה'

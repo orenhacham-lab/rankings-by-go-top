@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { PLAN_LIMITS } from '@/lib/subscription'
+import { PLAN_LIMITS, PLAN_FEATURES } from '@/lib/subscription'
 
 function AuthForm() {
   const router = useRouter()
@@ -234,21 +234,60 @@ function AuthForm() {
           <div className="text-center mb-6">
             <p className="text-slate-600 font-medium mb-3 text-sm">תוכניות מנויים</p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 rounded-lg p-3 text-center">
+              {/* Trial Plan */}
+              <div className="bg-slate-50 rounded-lg p-4 text-center text-right">
                 <div className="text-xs text-slate-600 mb-1">7 ימי ניסיון</div>
-                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.trial.label}</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.trial.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.trial.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.regular.price}</div>
-                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.regular.label}</div>
+
+              {/* Regular Plan */}
+              <div className="bg-blue-50 rounded-lg p-4 text-center text-right">
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.regular.price} לחודש</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.regular.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.regular.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="bg-amber-50 rounded-lg p-3 text-center border border-amber-200">
-                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.advanced.price}</div>
-                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.advanced.label}</div>
+
+              {/* Advanced Plan */}
+              <div className="bg-amber-50 rounded-lg p-4 text-center text-right border border-amber-200">
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.advanced.price} לחודש</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.advanced.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.advanced.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="bg-purple-50 rounded-lg p-3 text-center">
-                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.premium.price}</div>
-                <div className="font-bold text-slate-900 text-sm">{PLAN_LIMITS.premium.label}</div>
+
+              {/* Premium Plan */}
+              <div className="bg-purple-50 rounded-lg p-4 text-center text-right">
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.premium.price} לחודש</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.premium.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.premium.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>
