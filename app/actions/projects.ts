@@ -17,6 +17,7 @@ export async function createProjectAction(formData: FormData) {
     const { count } = await supabase
       .from('projects')
       .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
       .eq('is_active', true)
 
     if ((count ?? 0) >= entitlement.limits.maxProjects) {
@@ -33,6 +34,7 @@ export async function createProjectAction(formData: FormData) {
     : null
 
   const data = {
+    user_id: user.id,
     client_id: formData.get('client_id') as string,
     name: formData.get('name') as string,
     target_domain: formData.get('target_domain') as string,

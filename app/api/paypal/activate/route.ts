@@ -75,17 +75,20 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Failed to create subscription record:', error)
+      console.error('Database error details:', error.message)
       return Response.json(
-        { error: 'Failed to activate subscription' },
+        { error: `Failed to save subscription: ${error.message}` },
         { status: 500 }
       )
     }
 
     return Response.json({ success: true })
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
     console.error('Subscription activation error:', error)
+    console.error('Error details:', errorMsg)
     return Response.json(
-      { error: 'Internal server error' },
+      { error: `Subscription activation failed: ${errorMsg}` },
       { status: 500 }
     )
   }

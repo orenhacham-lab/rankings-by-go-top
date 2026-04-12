@@ -45,6 +45,8 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadDashboard() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
       const [
         { count: clientCount },
@@ -54,18 +56,20 @@ export default function DashboardPage() {
         { data: scansData },
         { data: resultsData },
       ] = await Promise.all([
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('projects').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('tracking_targets').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('scans').select('*', { count: 'exact', head: true }),
+        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_active', true),
+        supabase.from('projects').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_active', true),
+        supabase.from('tracking_targets').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_active', true),
+        supabase.from('scans').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase
           .from('scans')
           .select('id, status, completed_targets, total_targets, started_at, projects(id, name)')
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(5),
         supabase
           .from('scan_results')
           .select('tracking_target_id, keyword, engine_type, position, change_value, checked_at, tracking_targets(project_id, projects(name))')
+          .eq('tracking_targets.user_id', user.id)
           .not('change_value', 'is', null)
           .order('checked_at', { ascending: false })
           .limit(200),

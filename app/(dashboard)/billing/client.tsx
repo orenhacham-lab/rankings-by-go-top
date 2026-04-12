@@ -72,8 +72,9 @@ export default function BillingClient() {
               console.log(`[PayPal] Subscription created: ${subscriptionId}`)
               return subscriptionId
             } catch (error) {
-              console.error('[PayPal] Failed to create subscription:', error)
-              alert('שגיאה ביצירת המנוי. בדוק שמזהה התוכנית תקין אצל PayPal.')
+              const errorMsg = error instanceof Error ? error.message : String(error)
+              console.error('[PayPal] Failed to create subscription:', errorMsg)
+              alert(`שגיאה ביצירת המנוי. פרטים: ${errorMsg}`)
               throw error
             }
           },
@@ -87,20 +88,37 @@ export default function BillingClient() {
               })
               if (!response.ok) {
                 const err = await response.json() as Record<string, unknown>
+                const errorMsg = (err.error as string) || 'שגיאה לא ידועה'
                 console.error('[PayPal] Activate error:', err)
-                alert(`שגיאה בהפעלת המנוי: ${err.error || 'שגיאה לא ידועה'}`)
+                console.error('[PayPal] Error message:', errorMsg)
+                alert(`שגיאה בהפעלת המנוי: ${errorMsg}`)
                 return
               }
+              const result = await response.json()
+              console.log('[PayPal] Subscription activation successful:', result)
               alert('המנוי הופעל בהצלחה! 🎉')
               window.location.reload()
             } catch (error) {
+              const errorMsg = error instanceof Error ? error.message : String(error)
               console.error('[PayPal] Failed to activate subscription:', error)
-              alert('שגיאה בהפעלת המנוי. אנא צור קשר עם התמיכה.')
+              console.error('[PayPal] Error details:', errorMsg)
+              alert(`שגיאה בהפעלת המנוי: ${errorMsg}`)
             }
           },
           onError: (err: unknown) => {
+            const errorDetails = err instanceof Error ? err.message : String(err)
             console.error('[PayPal] Button error:', err)
-            alert('שגיאה ב-PayPal. אנא נסה שנית או פנה לתמיכה.')
+            console.error('[PayPal] Error details:', errorDetails)
+
+            // Show detailed error to help debug
+            let userMessage = `שגיאה ב-PayPal: ${errorDetails}`
+            if (errorDetails.includes('Invalid plan')) {
+              userMessage = `מזהה התוכנית אינו תקין: ${planId}. בדוק את משתני הסביבה NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()}`
+            } else if (errorDetails.toLowerCase().includes('client')) {
+              userMessage = 'שגיאה ב-client ID של PayPal. בדוק את NEXT_PUBLIC_PAYPAL_CLIENT_ID'
+            }
+
+            alert(userMessage)
           },
         }).render(`#${id}`)
       } catch (error) {
