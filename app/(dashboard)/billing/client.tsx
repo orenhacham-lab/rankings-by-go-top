@@ -111,7 +111,7 @@ export default function BillingClient() {
     }
 
     const script = document.createElement('script')
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription`
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription&locale=he_IL`
     script.async = true
     script.onload = () => {
       initPayPalButtons()
