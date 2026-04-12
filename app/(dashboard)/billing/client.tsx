@@ -11,7 +11,7 @@ interface PayPalButtonsOptions {
   }
   createSubscription: (data: Record<string, unknown>, actions: Record<string, unknown>) => Promise<string>
   onApprove: (data: Record<string, unknown>) => Promise<void>
-  onError: (err: Record<string, unknown>) => void
+  onError: (err: unknown) => void
 }
 
 interface PayPalWindow extends Window {
@@ -22,20 +22,35 @@ interface PayPalWindow extends Window {
 
 export default function BillingClient() {
   const [loading, setLoading] = useState(true)
+  const [configError, setConfigError] = useState('')
 
   const initPayPalButtons = useCallback(() => {
     const paypalWindow = window as PayPalWindow
     if (!paypalWindow.paypal) return
 
+    // Read plan IDs from env — must be real PayPal plan IDs from your account
+    const planIds: Record<string, string | undefined> = {
+      regular:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_REGULAR,
+      advanced: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ADVANCED,
+      premium:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PREMIUM,
+    }
+
     const plans = [
-      { id: 'paypal-button-regular', plan: 'regular' },
+      { id: 'paypal-button-regular',  plan: 'regular'  },
       { id: 'paypal-button-advanced', plan: 'advanced' },
-      { id: 'paypal-button-premium', plan: 'premium' },
+      { id: 'paypal-button-premium',  plan: 'premium'  },
     ]
 
     for (const { id, plan } of plans) {
       const container = document.getElementById(id)
       if (!container) continue
+
+      const planId = planIds[plan]
+      if (!planId) {
+        console.warn(`[PayPal] Plan ID for "${plan}" not configured (NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()})`)
+        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">תשלום טרם הוגדר</p>'
+        continue
+      }
 
       try {
         paypalWindow.paypal!.Buttons({
@@ -45,94 +60,103 @@ export default function BillingClient() {
             layout: 'vertical',
             label: 'subscribe',
           },
-          createSubscription: async (data: Record<string, unknown>, actions: Record<string, unknown>) => {
-            // Map our plans to PayPal plan IDs
-            // In production, these would be real PayPal plan IDs from your PayPal account
-            const planIds: Record<string, string> = {
-              regular: 'P-1234567890',
-              advanced: 'P-0987654321',
-              premium: 'P-1122334455',
-            }
-
+          createSubscription: async (_data: Record<string, unknown>, actions: Record<string, unknown>) => {
+            console.log(`[PayPal] Creating subscription for plan: ${plan}, planId: ${planId}`)
             try {
               const subscriptionActions = actions as Record<string, Record<string, (config: Record<string, string>) => Promise<string>>>
-              return await subscriptionActions.subscription.create({
-                plan_id: planIds[plan],
-              })
+              const subscriptionId = await subscriptionActions.subscription.create({ plan_id: planId })
+              console.log(`[PayPal] Subscription created: ${subscriptionId}`)
+              return subscriptionId
             } catch (error) {
-              console.error('Failed to create subscription:', error)
-              alert('שגיאה ביצירת המנוי. אנא נסה שוב.')
+              console.error('[PayPal] Failed to create subscription:', error)
+              alert('שגיאה ביצירת המנוי. בדוק שמזהה התוכנית תקין אצל PayPal.')
               throw error
             }
           },
           onApprove: async (data: Record<string, unknown>) => {
-            // Send subscription ID to our API to activate the subscription
+            console.log('[PayPal] Subscription approved:', data.subscriptionID)
             try {
               const response = await fetch('/api/paypal/activate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  subscriptionId: data.subscriptionID,
-                  plan,
-                }),
+                body: JSON.stringify({ subscriptionId: data.subscriptionID, plan }),
               })
-
               if (!response.ok) {
-                const error = await response.json() as Record<string, unknown>
-                alert(`שגיאה: ${error.error}`)
+                const err = await response.json() as Record<string, unknown>
+                console.error('[PayPal] Activate error:', err)
+                alert(`שגיאה בהפעלת המנוי: ${err.error || 'שגיאה לא ידועה'}`)
                 return
               }
-
-              // Success
-              alert('המנוי הופעל בהצלחה!')
+              alert('המנוי הופעל בהצלחה! 🎉')
               window.location.reload()
             } catch (error) {
-              console.error('Failed to activate subscription:', error)
-              alert('שגיאה בהפעלת המנוי. אנא צור קשר תמיכה.')
+              console.error('[PayPal] Failed to activate subscription:', error)
+              alert('שגיאה בהפעלת המנוי. אנא צור קשר עם התמיכה.')
             }
           },
-          onError: (err: Record<string, unknown>) => {
-            console.error('PayPal error:', err)
-            alert('שגיאה ב-PayPal. אנא נסה שוב.')
+          onError: (err: unknown) => {
+            console.error('[PayPal] Button error:', err)
+            alert('שגיאה ב-PayPal. אנא נסה שנית או פנה לתמיכה.')
           },
         }).render(`#${id}`)
       } catch (error) {
-        console.error(`Failed to render PayPal button for ${plan}:`, error)
+        console.error(`[PayPal] Failed to render button for plan "${plan}":`, error)
       }
     }
   }, [])
 
   useEffect(() => {
-    // Load PayPal SDK
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
+
     if (!clientId) {
-      console.error('PayPal client ID not configured')
+      console.warn('[PayPal] NEXT_PUBLIC_PAYPAL_CLIENT_ID is not set')
+      setTimeout(() => {
+        setConfigError('PayPal אינו מוגדר כרגע. אנא פנה למנהל המערכת.')
+        setLoading(false)
+      }, 0)
+      return
+    }
+
+    const existingScript = document.getElementById('paypal-sdk')
+    if (existingScript) {
+      initPayPalButtons()
+      setTimeout(() => setLoading(false), 0)
       return
     }
 
     const script = document.createElement('script')
+    script.id = 'paypal-sdk'
     script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription&locale=he_IL`
     script.async = true
     script.onload = () => {
+      console.log('[PayPal] SDK loaded successfully')
       initPayPalButtons()
       setLoading(false)
     }
     script.onerror = () => {
-      console.error('Failed to load PayPal SDK')
+      console.error('[PayPal] Failed to load SDK')
+      setConfigError('לא ניתן לטעון את PayPal. בדוק את החיבור לאינטרנט ונסה שנית.')
       setLoading(false)
     }
     document.body.appendChild(script)
 
     return () => {
-      setLoading(true)
-      if (script.parentNode) {
-        script.parentNode.removeChild(script)
-      }
+      if (script.parentNode) script.parentNode.removeChild(script)
     }
   }, [initPayPalButtons])
 
   if (loading) {
-    return <div className="text-center py-8">טוען PayPal...</div>
+    return (
+      <div className="text-center py-4 text-slate-400 text-sm">טוען PayPal...</div>
+    )
+  }
+
+  if (configError) {
+    return (
+      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm text-center">
+        {configError}
+      </div>
+    )
   }
 
   return null

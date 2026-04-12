@@ -24,9 +24,9 @@ export default async function DashboardLayout({
   const isAdmin = profile?.role === 'admin'
 
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="flex flex-col md:flex-row h-full min-h-screen">
       <Sidebar isAdmin={isAdmin} />
-      <main className="flex-1 mr-64 p-8 overflow-auto min-h-screen">
+      <main className="flex-1 md:mr-64 p-4 md:p-8 overflow-auto min-h-screen">
         {children}
       </main>
     </div>
