@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 
+// API Route for creating new clients
+// Replaces deprecated Server Action approach to avoid production crashes
+// v2: Force Vercel rebuild
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -70,7 +74,7 @@ export async function POST(request: NextRequest) {
     revalidatePath('/clients')
 
     return NextResponse.json(
-      { success: true, data: insertResult },
+      { success: true, data: insertResult, version: 'v2-api-route' },
       { status: 201 }
     )
   } catch (err) {
