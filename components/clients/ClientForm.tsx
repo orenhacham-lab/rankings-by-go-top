@@ -24,27 +24,21 @@ export default function ClientForm({ client, onSuccess, onCancel }: ClientFormPr
 
     const formData = new FormData(e.currentTarget)
 
-    // Log form submission
-    console.log('[ClientForm] Form submit - new client:', !client)
-    const formDataObj: Record<string, string> = {}
-    formData.forEach((value, key) => {
-      formDataObj[key] = value as string
-    })
-    console.log('[ClientForm] FormData being submitted:', formDataObj)
-
     try {
       if (client) {
-        console.log('[ClientForm] Calling updateClientAction for client:', client.id)
         await updateClientAction(client.id, formData)
       } else {
-        console.log('[ClientForm] Calling createClientAction')
-        await createClientAction(formData)
+        const result = await createClientAction(formData)
+
+        if (!result?.success) {
+          setError(result?.error || 'שגיאה בשמירה')
+          return
+        }
       }
-      console.log('[ClientForm] Action completed successfully')
+
       onSuccess()
     } catch (err) {
       const errorMessage = (err as Error).message || 'שגיאה בשמירה'
-      console.error('[ClientForm] Action error caught:', errorMessage, err)
       setError(errorMessage)
     } finally {
       setLoading(false)
