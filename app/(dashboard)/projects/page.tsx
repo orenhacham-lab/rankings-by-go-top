@@ -22,12 +22,22 @@ export default function ProjectsPage() {
 
   async function fetchProjectsAndClients() {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return {
+        projects: [],
+        clients: [],
+      }
+    }
+
     const [{ data: projectsData }, { data: clientsData }] = await Promise.all([
       supabase
         .from('projects')
         .select('*, clients(*)')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
-      supabase.from('clients').select('*').eq('is_active', true).order('name'),
+      supabase.from('clients').select('*').eq('user_id', user.id).eq('is_active', true).order('name'),
     ])
 
     return {

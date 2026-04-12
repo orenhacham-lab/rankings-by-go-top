@@ -27,13 +27,19 @@ function ReportsContent() {
   } | null>(null)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     async function loadProjects() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
       const { data } = await supabase
         .from('projects')
         .select('*, clients(*)')
+        .eq('user_id', user.id)
         .eq('is_active', true)
         .order('name')
       setProjects(data || [])
@@ -121,6 +127,33 @@ function ReportsContent() {
   const foundCount = reportData ? Object.values(reportData.latestResults).filter((r) => r.found).length : 0
   const total = reportData?.targets.length || 0
   const primaryEngine = reportData?.targets[0]?.engine_type || 'google_search'
+
+  function getSortedTargets() {
+    if (!reportData) return []
+    if (!sortColumn) return reportData.targets
+
+    const sorted = [...reportData.targets].sort((a, b) => {
+      if (sortColumn === 'position') {
+        const resultA = reportData.latestResults[a.id]
+        const resultB = reportData.latestResults[b.id]
+        const posA = resultA?.found && resultA.position ? resultA.position : 999
+        const posB = resultB?.found && resultB.position ? resultB.position : 999
+        return sortOrder === 'asc' ? posA - posB : posB - posA
+      }
+      return 0
+    })
+
+    return sorted
+  }
+
+  function handleSortClick(column: string) {
+    if (sortColumn === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortOrder('asc')
+    }
+  }
 
   return (
     <div>
@@ -236,7 +269,21 @@ function ReportsContent() {
               <tr>
                 <Th>מילת מפתח</Th>
                 <Th>מנוע</Th>
-                <Th>מיקום</Th>
+                <Th>
+                  <button
+                    onClick={() => handleSortClick('position')}
+                    className="cursor-pointer hover:bg-slate-100 select-none w-full h-full px-4 py-3 flex items-center justify-center text-right"
+                  >
+                    <span className="flex items-center gap-2">
+                      מיקום
+                      {sortColumn === 'position' && (
+                        <span className="text-sm">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </Th>
                 <Th>מיקום קודם</Th>
                 <Th>שינוי</Th>
                 <Th>נמצא</Th>
@@ -248,7 +295,7 @@ function ReportsContent() {
               {reportData.targets.length === 0 && (
                 <EmptyRow colSpan={8} message="אין מילות מפתח בפרויקט זה" />
               )}
-              {reportData.targets.map((target) => {
+              {getSortedTargets().map((target) => {
                 const result = reportData.latestResults[target.id]
                 return (
                   <TableRow key={target.id}>

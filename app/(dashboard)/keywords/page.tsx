@@ -23,9 +23,16 @@ export default function KeywordsPage() {
   useEffect(() => {
     async function loadProjects() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
       const { data: projectsData } = await supabase
         .from('projects')
         .select('*')
+        .eq('user_id', user.id)
         .eq('is_active', true)
         .order('name')
 
