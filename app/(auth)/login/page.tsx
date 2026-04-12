@@ -1,52 +1,108 @@
 'use client'
 
 import { useState, Suspense } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { PLAN_LIMITS, PLAN_FEATURES } from '@/lib/subscription'
 
-function LoginForm() {
+function AuthForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const nextPath = searchParams.get('next') || '/dashboard'
+  const oauthErrorParam = searchParams.get('error')
 
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null)
-  const [error, setError] = useState('')
+  const [oauthLoading, setOauthLoading] = useState<'google' | null>(null)
+  const [error, setError] = useState(() => {
+    if (oauthErrorParam === 'oauth') {
+      return 'כניסה עם ספק חיצוני נכשלה. בדוק שהספק מופעל בהגדרות Supabase.'
+    }
+    return ''
+  })
+  const [success, setSuccess] = useState('')
 
-  async function handleLogin(e: React.FormEvent) {
+  function resetForm() {
+    setError('')
+    setSuccess('')
+    setEmail('')
+    setPassword('')
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
     const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (authError) {
-      setError('שם משתמש או סיסמה שגויים')
+    if (mode === 'login') {
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+      if (authError) {
+        setError('שם משתמש או סיסמה שגויים')
+        setLoading(false)
+        return
+      }
+      router.replace(nextPath)
+      router.refresh()
+    } else {
+      const { error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        },
+      })
+      if (authError) {
+        if (authError.message?.includes('already registered')) {
+          setError('כתובת האימייל כבר רשומה. נסה להתחבר.')
+        } else {
+          setError('שגיאה בהרשמה: ' + authError.message)
+        }
+        setLoading(false)
+        return
+      }
+      setSuccess('נשלח אימייל אישור. בדוק את תיבת הדואר שלך.')
       setLoading(false)
-      return
     }
-
-    router.replace(nextPath)
-    router.refresh()
   }
 
-  async function handleOAuth(provider: 'google' | 'apple') {
+  async function handleOAuth(provider: 'google') {
     setError('')
+    setSuccess('')
     setOauthLoading(provider)
     const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
-      },
-    })
-    if (authError) {
-      setError('שגיאה בכניסה, נסה שנית')
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        },
+      })
+      if (authError) {
+        const providerName = 'Google'
+        if (
+          authError.message?.toLowerCase().includes('not enabled') ||
+          authError.message?.toLowerCase().includes('provider') ||
+          authError.message?.toLowerCase().includes('unsupported')
+        ) {
+          setError(`כניסה עם ${providerName} אינה מופעלת. אנא השתמש באימייל וסיסמה.`)
+        } else {
+          setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
+        }
+        setOauthLoading(null)
+      }
+      // If no error, redirect is handled by Supabase SDK
+    } catch {
+      const providerName = 'Google'
+      setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
       setOauthLoading(null)
     }
   }
@@ -56,8 +112,15 @@ function LoginForm() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg mb-4">
-            <span className="text-white font-bold text-2xl select-none">GT</span>
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/gotop-primary.png"
+              alt="Go Top logo"
+              width={160}
+              height={64}
+              className="h-16 w-auto object-contain"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Rankings by Go Top</h1>
           <p className="text-slate-500 mt-1 text-sm">מערכת מעקב דירוגים לקידום אתרים</p>
@@ -65,14 +128,41 @@ function LoginForm() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <h2 className="text-xl font-semibold text-slate-800 mb-6">כניסה למערכת</h2>
+          {/* Mode toggle */}
+          <div className="flex rounded-lg bg-slate-100 p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => { setMode('login'); resetForm() }}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === 'login'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              כניסה
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('signup'); resetForm() }}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === 'signup'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              רישום
+            </button>
+          </div>
 
           {error && (
-            <div
-              role="alert"
-              className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
-            >
+            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div role="status" className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              {success}
             </div>
           )}
 
@@ -94,23 +184,7 @@ function LoginForm() {
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
               )}
-              כניסה עם Google
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleOAuth('apple')}
-              disabled={!!oauthLoading || loading}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors disabled:opacity-60"
-            >
-              {oauthLoading === 'apple' ? (
-                <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
-                  <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
-                </svg>
-              )}
-              כניסה עם Apple
+              {mode === 'login' ? 'כניסה' : 'רישום'} עם Google
             </button>
           </div>
 
@@ -123,13 +197,13 @@ function LoginForm() {
             </div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <Input
               label="כתובת אימייל"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@example.com"
+              placeholder="you@example.com"
               required
               autoComplete="email"
               autoFocus
@@ -142,7 +216,7 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              autoComplete="current-password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
 
             <Button
@@ -151,14 +225,101 @@ function LoginForm() {
               className="w-full"
               size="lg"
             >
-              כניסה
+              {mode === 'login' ? 'כניסה' : 'יצירת חשבון'}
             </Button>
           </form>
         </div>
 
-        <p className="text-center text-slate-400 text-xs mt-6">
-          Rankings by Go Top &copy; {new Date().getFullYear()}
-        </p>
+        <div className="mt-8 pt-6 border-t border-slate-200">
+          <div className="text-center mb-6">
+            <p className="text-slate-600 font-medium mb-3 text-sm">תוכניות מנויים</p>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Trial Plan */}
+              <div className="bg-slate-50 rounded-lg p-4 text-center text-right">
+                <div className="text-xs text-slate-600 mb-1">7 ימי ניסיון</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.trial.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.trial.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Regular Plan */}
+              <div className="bg-blue-50 rounded-lg p-4 text-center text-right">
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.regular.price} לחודש</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.regular.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.regular.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Advanced Plan */}
+              <div className="bg-amber-50 rounded-lg p-4 text-center text-right border border-amber-200">
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.advanced.price} לחודש</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.advanced.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.advanced.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Premium Plan */}
+              <div className="bg-purple-50 rounded-lg p-4 text-center text-right">
+                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.premium.price} לחודש</div>
+                <div className="font-bold text-slate-900 text-sm mb-3">{PLAN_LIMITS.premium.label}</div>
+                <ul className="text-xs text-slate-600 space-y-1">
+                  {PLAN_FEATURES.premium.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-slate-200 text-center text-slate-500 text-xs space-y-2">
+          <div className="flex items-center justify-center gap-3">
+            <Link href="/accessibility" className="hover:text-slate-700 transition-colors">
+              נגישות
+            </Link>
+            <span>•</span>
+            <Link href="/privacy" className="hover:text-slate-700 transition-colors">
+              פרטיות
+            </Link>
+            <span>•</span>
+            <Link href="/articles" className="hover:text-slate-700 transition-colors">
+              מאמרים
+            </Link>
+          </div>
+          <p>
+            Rankings by
+            <a
+              href="https://www.gotop.co.il"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline mx-1"
+            >
+              Go Top
+            </a>
+            &copy; {new Date().getFullYear()}
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -167,7 +328,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" />}>
-      <LoginForm />
+      <AuthForm />
     </Suspense>
   )
 }

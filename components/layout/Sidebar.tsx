@@ -1,7 +1,7 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
@@ -28,29 +28,29 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="w-64 bg-white border-l border-slate-200 flex flex-col h-full fixed top-0 right-0 z-40 shadow-sm">
+    <aside className="w-full md:w-64 bg-white border-l border-slate-200 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-5 border-b border-slate-200 flex flex-col items-center justify-center gap-3">
+      <div className="p-3 md:p-5 border-b border-slate-200 flex flex-col items-center justify-center gap-3">
         <div className="flex items-center justify-center bg-white">
           <Image
             src="/gotop-primary.png"
             alt="Go Top logo"
             width={140}
             height={56}
-            className="w-[110px] h-auto object-contain"
+            className="w-[90px] md:w-[110px] h-auto object-contain"
             priority
           />
         </div>
 
         <div className="text-center">
-          <div className="font-bold text-slate-800 text-sm leading-tight">Rankings by</div>
-          <div className="font-bold text-blue-600 text-sm leading-tight">Go Top</div>
+          <div className="font-bold text-slate-800 text-lg leading-tight">Rankings by</div>
+          <div className="font-bold text-blue-600 text-lg leading-tight">Go Top</div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 overflow-y-auto">
-        <ul className="space-y-1">
+      <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
+        <ul className="grid grid-cols-2 gap-2 md:block md:space-y-1 w-full">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
@@ -58,7 +58,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                 <Link
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                    'w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -75,7 +75,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
 
       {/* Admin section — only shown to admins */}
       {isAdmin && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 hidden md:block">
           <p className="text-xs font-medium text-slate-400 px-3 mb-1">מערכת</p>
           <ul className="space-y-1">
             {adminItems.map((item) => {
@@ -103,7 +103,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
 
       {/* Support link — shown to non-admins */}
       {!isAdmin && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 hidden md:block">
           <a
             href="mailto:oren@gotop.co.il"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -115,7 +115,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       )}
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-200">
+      <div className="p-4 border-t border-slate-200 hidden md:block">
         <form action="/api/auth/signout" method="post">
           <button
             type="submit"

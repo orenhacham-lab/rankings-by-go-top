@@ -93,6 +93,7 @@ export async function GET(request: Request) {
       const { data: scan, error: scanCreateError } = await admin
         .from('scans')
         .insert({
+          user_id: project.user_id,
           project_id: project.id,
           status: 'running',
           triggered_by: 'scheduled',

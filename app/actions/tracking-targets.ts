@@ -29,6 +29,7 @@ export async function createTrackingTargetAction(formData: FormData) {
   }
 
   const data = {
+    user_id: user.id,
     project_id: projectId,
     keyword: formData.get('keyword') as string,
     engine_type: formData.get('engine_type') as string,
@@ -85,6 +86,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   const toInsert = keywords
     .filter((k) => !existingSet.has(k.toLowerCase()))
     .map((keyword) => ({
+      user_id: user.id,
       project_id: projectId,
       keyword,
       engine_type: engineType,

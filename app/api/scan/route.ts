@@ -88,6 +88,7 @@ export async function POST(request: Request) {
   const { data: scan, error: scanError } = await admin
     .from('scans')
     .insert({
+      user_id: user.id,
       project_id: projectId,
       status: 'running',
       triggered_by: triggeredBy,
