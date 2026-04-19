@@ -46,15 +46,26 @@ async function querySerperMaps(
     hl: language,
   }
 
-  // Use explicit coordinates if available, otherwise use location string
+  // Always set location string for proper geocoding context
+  // If coordinates available, add as ll for precision
+  if (location) {
+    body.location = location
+  }
+
   if (coordinates) {
     body.ll = `${coordinates.lat},${coordinates.lng}`
-  } else if (location) {
-    body.location = location
   }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  console.log('[Maps:API] Sending to Serper:', {
+    q: body.q,
+    gl: body.gl,
+    hl: body.hl,
+    location: body.location ?? '(not set)',
+    ll: body.ll ?? '(not set)',
+  })
 
   try {
     const response = await fetch(SERPER_MAPS_URL, {
@@ -105,10 +116,15 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
+  const defaultIsraeliCity = 'Tel Aviv'
+  const defaultIsraeliCoords = ISRAELI_CITIES['tel aviv']!
 
   // Resolve coordinates for Israeli cities
   const cityLower = input.city?.toLowerCase() || ''
   const cityCoordinates = cityLower ? ISRAELI_CITIES[cityLower] : undefined
+
+  // For Israeli projects, ensure we always have a location context
+  const effectiveCity = input.city || (country === 'il' ? defaultIsraeliCity : undefined)
 
   console.log('[Maps] ========== SCAN START ==========')
   console.log('[Maps] Input:', {
@@ -117,26 +133,29 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     country,
     language,
     city: input.city,
-    ...(cityCoordinates && { cityCoordinates }),
+    ...(cityCoordinates && { resolvedCoordinates: cityCoordinates }),
   })
 
   // Context-only retries — keyword text NEVER changes between attempts
-  // For Israeli cities, use explicit coordinates; otherwise use location string
+  // For Israeli projects, always include a city context; coordinates provide precision
   const contextAttempts: Array<{ label: string; location: string | undefined; coordinates?: { lat: number; lng: number } }> = [
     {
-      label: 'city',
-      location: input.city || undefined,
-      coordinates: cityCoordinates,
+      label: effectiveCity ? `city (${effectiveCity})` : 'no specific city',
+      location: effectiveCity,
+      coordinates: cityCoordinates || (country === 'il' ? defaultIsraeliCoords : undefined),
     },
-    ...(input.city && !cityCoordinates
-      ? [{ label: 'city+country', location: `${input.city}, ${country.toUpperCase()}`, coordinates: undefined }]
+    ...(input.city
+      ? [{
+          label: 'city+country',
+          location: `${input.city}, ${country.toUpperCase()}`,
+          coordinates: cityCoordinates,
+        }]
       : []),
     {
       label: 'country',
       location: country.toUpperCase(),
-      coordinates: country === 'il' ? { lat: 31.5, lng: 34.75 } : undefined, // Israel center
+      coordinates: country === 'il' ? { lat: 31.5, lng: 34.75 } : undefined,
     },
-    { label: 'no location', location: undefined, coordinates: undefined },
   ]
 
   try {
