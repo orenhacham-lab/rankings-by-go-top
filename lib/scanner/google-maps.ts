@@ -17,7 +17,26 @@ interface SerperMapsResponse {
   error?: string
 }
 
-async function querySerperMaps(query: string, country: string, language: string, location?: string): Promise<SerperMapsResponse | null> {
+// Israeli cities with their coordinates for proper geo context
+const ISRAELI_CITIES: Record<string, { lat: number; lng: number }> = {
+  'tel aviv': { lat: 32.0853, lng: 34.7818 },
+  'תל אביב': { lat: 32.0853, lng: 34.7818 },
+  'jerusalem': { lat: 31.7683, lng: 35.2137 },
+  'ירושלים': { lat: 31.7683, lng: 35.2137 },
+  'haifa': { lat: 32.8193, lng: 34.9991 },
+  'חיפה': { lat: 32.8193, lng: 34.9991 },
+  'be\'er sheva': { lat: 31.2507, lng: 34.7915 },
+  'beersheva': { lat: 31.2507, lng: 34.7915 },
+  'באר שבע': { lat: 31.2507, lng: 34.7915 },
+}
+
+async function querySerperMaps(
+  query: string,
+  country: string,
+  language: string,
+  location?: string,
+  coordinates?: { lat: number; lng: number }
+): Promise<SerperMapsResponse | null> {
   const apiKey = process.env.SERPER_API_KEY
   if (!apiKey) return null
 
@@ -27,7 +46,10 @@ async function querySerperMaps(query: string, country: string, language: string,
     hl: language,
   }
 
-  if (location) {
+  // Use explicit coordinates if available, otherwise use location string
+  if (coordinates) {
+    body.ll = `${coordinates.lat},${coordinates.lng}`
+  } else if (location) {
     body.location = location
   }
 
@@ -84,6 +106,10 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
 
+  // Resolve coordinates for Israeli cities
+  const cityLower = input.city?.toLowerCase() || ''
+  const cityCoordinates = cityLower ? ISRAELI_CITIES[cityLower] : undefined
+
   console.log('[Maps] ========== SCAN START ==========')
   console.log('[Maps] Input:', {
     keyword: input.keyword,
@@ -91,21 +117,34 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     country,
     language,
     city: input.city,
+    ...(cityCoordinates && { cityCoordinates }),
   })
 
   // Context-only retries — keyword text NEVER changes between attempts
-  const contextAttempts: Array<{ label: string; location: string | undefined }> = [
-    { label: 'city location', location: input.city || undefined },
-    ...(input.city ? [{ label: 'city+country location', location: `${input.city}, ${country.toUpperCase()}` }] : []),
-    { label: 'country-only location', location: country.toUpperCase() },
-    { label: 'no location', location: undefined },
+  // For Israeli cities, use explicit coordinates; otherwise use location string
+  const contextAttempts: Array<{ label: string; location: string | undefined; coordinates?: { lat: number; lng: number } }> = [
+    {
+      label: 'city',
+      location: input.city || undefined,
+      coordinates: cityCoordinates,
+    },
+    ...(input.city && !cityCoordinates
+      ? [{ label: 'city+country', location: `${input.city}, ${country.toUpperCase()}`, coordinates: undefined }]
+      : []),
+    {
+      label: 'country',
+      location: country.toUpperCase(),
+      coordinates: country === 'il' ? { lat: 31.5, lng: 34.75 } : undefined, // Israel center
+    },
+    { label: 'no location', location: undefined, coordinates: undefined },
   ]
 
   try {
     for (const attempt of contextAttempts) {
-      console.log(`[Maps] Attempt "${attempt.label}": keyword="${input.keyword}" location=${attempt.location ?? '(none)'}`)
+      const coordStr = attempt.coordinates ? `[${attempt.coordinates.lat},${attempt.coordinates.lng}]` : '(none)'
+      console.log(`[Maps] Attempt "${attempt.label}": keyword="${input.keyword}" location=${attempt.location ?? '(none)'} coordinates=${coordStr}`)
 
-      const response = await querySerperMaps(input.keyword, country, language, attempt.location)
+      const response = await querySerperMaps(input.keyword, country, language, attempt.location, attempt.coordinates)
 
       if (!response) {
         console.log(`[Maps] Attempt "${attempt.label}": no response, skipping`)
