@@ -128,6 +128,18 @@ export async function POST(request: Request) {
     const previousPosition = prevResult?.position ?? null
 
     // Run the actual scan
+    console.log('[Scan] Running scan for target:', {
+      keyword: target.keyword,
+      engine: target.engine_type,
+      projectLocation: {
+        city: project.city,
+        country: project.country,
+        language: project.language,
+        deviceType: project.device_type,
+      },
+      businessName: target.target_business_name || project.business_name,
+    })
+
     const scanOutput = await runScan(target.engine_type, {
       engine: target.engine_type,
       keyword: target.keyword,

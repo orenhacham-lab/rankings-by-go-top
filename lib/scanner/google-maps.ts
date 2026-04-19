@@ -28,16 +28,19 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     return makeError('No target business name specified')
   }
 
-  console.log('[Maps] Starting scan', {
+  console.log('[Maps] ========== SCAN START ==========')
+  console.log('[Maps] Input context:', {
     keyword: input.keyword,
+    engine: input.engine,
     businessName,
     country: input.country,
     language: input.language,
     city: input.city,
-    device: input.deviceType,
+    deviceType: input.deviceType,
   })
 
   try {
+    // Build exact request payload
     const body: Record<string, unknown> = {
       q: input.keyword,
       gl: (input.country || 'IL').toLowerCase(),
@@ -48,7 +51,14 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       body.location = input.city
     }
 
-    console.log('[Maps] Request payload:', body)
+    console.log('[Maps] Serper request payload (EXACT):', JSON.stringify(body, null, 2))
+    console.log('[Maps] Request details:', {
+      q: body.q,
+      gl: body.gl,
+      hl: body.hl,
+      location: body.location || '(not set)',
+      hasLocation: !!body.location,
+    })
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -85,26 +95,41 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     }
 
     const places = data.places ?? []
-    console.log('[Maps] Found places:', places.length, places.map(p => ({ title: p.title, position: p.position })))
+    console.log('[Maps] Serper response:', {
+      placesCount: places.length,
+      firstFivePlaces: places.slice(0, 5).map(p => ({
+        position: p.position,
+        title: p.title,
+        address: p.address,
+      })),
+    })
 
     const normalizedTarget = normalizeBusinessName(businessName)
-    console.log('[Maps] Normalized target:', normalizedTarget)
+    console.log('[Maps] Target business name normalized:', {
+      original: businessName,
+      normalized: normalizedTarget,
+    })
 
     for (const place of places) {
       const normalizedPlace = normalizeBusinessName(place.title)
+      const similarity = diceSimilarity(normalizedPlace, normalizedTarget)
       const matches = isBusinessMatch(normalizedPlace, normalizedTarget)
 
-      console.log('[Maps] Checking place', {
-        original: place.title,
-        normalized: normalizedPlace,
-        target: normalizedTarget,
-        position: place.position,
-        matches,
-        similarity: diceSimilarity(normalizedPlace, normalizedTarget),
-      })
+      if (place.position <= 10) {
+        // Log first 10 results for debugging
+        console.log('[Maps] Checking place #' + place.position, {
+          title: place.title,
+          address: place.address,
+          normalized: normalizedPlace,
+          targetNormalized: normalizedTarget,
+          diceSimilarity: similarity.toFixed(3),
+          matches,
+        })
+      }
 
       if (matches) {
-        console.log('[Maps] MATCH FOUND at position', place.position)
+        console.log('[Maps] ✓ MATCH FOUND at position', place.position, '| title:', place.title)
+        console.log('[Maps] ========== SCAN END (FOUND) ==========')
         return {
           found: true,
           position: place.position,
@@ -116,7 +141,8 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       }
     }
 
-    console.log('[Maps] No match found in results')
+    console.log('[Maps] ✗ NO MATCH - Business not found in results')
+    console.log('[Maps] ========== SCAN END (NOT FOUND) ==========')
     return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
