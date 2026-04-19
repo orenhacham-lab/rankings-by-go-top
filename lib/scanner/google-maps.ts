@@ -10,16 +10,32 @@ interface SerperMapsPlace {
   rating?: number
   phoneNumber?: string
   website?: string
+  latitude?: number
+  longitude?: number
+  cid?: string
 }
 
 interface SerperMapsResponse {
   places?: SerperMapsPlace[]
   error?: string
+  searchParameters?: {
+    ll?: string
+    [key: string]: unknown
+  }
+}
+
+// Country bounding boxes — used to reject provider responses that return
+// results clearly outside the project's country
+const COUNTRY_BOUNDS: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
+  il: { minLat: 29.0, maxLat: 33.5, minLng: 34.0, maxLng: 36.0 },
+  us: { minLat: 24.0, maxLat: 50.0, minLng: -125.0, maxLng: -66.0 },
+  gb: { minLat: 49.0, maxLat: 61.0, minLng: -8.5, maxLng: 2.0 },
 }
 
 // Israeli cities with their coordinates for proper geo context
 const ISRAELI_CITIES: Record<string, { lat: number; lng: number }> = {
   'tel aviv': { lat: 32.0853, lng: 34.7818 },
+  'tel-aviv': { lat: 32.0853, lng: 34.7818 },
   'תל אביב': { lat: 32.0853, lng: 34.7818 },
   'jerusalem': { lat: 31.7683, lng: 35.2137 },
   'ירושלים': { lat: 31.7683, lng: 35.2137 },
@@ -28,6 +44,124 @@ const ISRAELI_CITIES: Record<string, { lat: number; lng: number }> = {
   'be\'er sheva': { lat: 31.2507, lng: 34.7915 },
   'beersheva': { lat: 31.2507, lng: 34.7915 },
   'באר שבע': { lat: 31.2507, lng: 34.7915 },
+  'ramat gan': { lat: 32.0684, lng: 34.8248 },
+  'רמת גן': { lat: 32.0684, lng: 34.8248 },
+  'petah tikva': { lat: 32.0878, lng: 34.8878 },
+  'petach tikva': { lat: 32.0878, lng: 34.8878 },
+  'פתח תקווה': { lat: 32.0878, lng: 34.8878 },
+  'netanya': { lat: 32.3215, lng: 34.8532 },
+  'נתניה': { lat: 32.3215, lng: 34.8532 },
+  'holon': { lat: 32.0167, lng: 34.7792 },
+  'חולון': { lat: 32.0167, lng: 34.7792 },
+  'rishon lezion': { lat: 31.9594, lng: 34.8048 },
+  'ראשון לציון': { lat: 31.9594, lng: 34.8048 },
+  'ashdod': { lat: 31.8044, lng: 34.6553 },
+  'אשדוד': { lat: 31.8044, lng: 34.6553 },
+  'bat yam': { lat: 32.0171, lng: 34.7506 },
+  'בת ים': { lat: 32.0171, lng: 34.7506 },
+  'herzliya': { lat: 32.1663, lng: 34.8434 },
+  'הרצליה': { lat: 32.1663, lng: 34.8434 },
+  'givatayim': { lat: 32.0719, lng: 34.8108 },
+  'גבעתיים': { lat: 32.0719, lng: 34.8108 },
+  'kfar saba': { lat: 32.1750, lng: 34.9069 },
+  'כפר סבא': { lat: 32.1750, lng: 34.9069 },
+  'raanana': { lat: 32.1836, lng: 34.8708 },
+  'רעננה': { lat: 32.1836, lng: 34.8708 },
+  'beit shemesh': { lat: 31.7486, lng: 34.9886 },
+  'בית שמש': { lat: 31.7486, lng: 34.9886 },
+  'eilat': { lat: 29.5577, lng: 34.9519 },
+  'אילת': { lat: 29.5577, lng: 34.9519 },
+}
+
+// Parse "lat,lng" or "@lat,lng,zoom" or "@lat,lng" into coordinates
+function parseCoordinates(raw: string | undefined): { lat: number; lng: number } | null {
+  if (!raw) return null
+  const cleaned = raw.replace(/^@/, '')
+  const parts = cleaned.split(',').map(s => s.trim())
+  if (parts.length < 2) return null
+  const lat = parseFloat(parts[0])
+  const lng = parseFloat(parts[1])
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  return { lat, lng }
+}
+
+// Check if a point is inside a country's bounding box
+function isInBounds(
+  coords: { lat: number; lng: number },
+  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }
+): boolean {
+  return (
+    coords.lat >= bounds.minLat &&
+    coords.lat <= bounds.maxLat &&
+    coords.lng >= bounds.minLng &&
+    coords.lng <= bounds.maxLng
+  )
+}
+
+// Validate that the provider's response geo context actually belongs to the
+// project's country. Returns { valid, returnedLl, placesInCountry, placesWithCoords }
+function validateGeoContext(
+  response: SerperMapsResponse,
+  country: string
+): {
+  valid: boolean
+  returnedLl: string | null
+  returnedCoords: { lat: number; lng: number } | null
+  placesWithCoords: number
+  placesInCountry: number
+  reason: string
+} {
+  const bounds = COUNTRY_BOUNDS[country.toLowerCase()]
+  if (!bounds) {
+    return { valid: true, returnedLl: null, returnedCoords: null, placesWithCoords: 0, placesInCountry: 0, reason: 'no bounds defined for country' }
+  }
+
+  const returnedLl = response.searchParameters?.ll ?? null
+  const returnedCoords = parseCoordinates(returnedLl ?? undefined)
+
+  // If the provider returned ll and it's outside the country, reject
+  if (returnedCoords && !isInBounds(returnedCoords, bounds)) {
+    return {
+      valid: false,
+      returnedLl,
+      returnedCoords,
+      placesWithCoords: 0,
+      placesInCountry: 0,
+      reason: `returned ll ${returnedLl} is outside ${country.toUpperCase()} bounds`,
+    }
+  }
+
+  const places = response.places ?? []
+  const placesWithCoords = places.filter(
+    p => typeof p.latitude === 'number' && typeof p.longitude === 'number'
+  )
+  const placesInCountry = placesWithCoords.filter(p =>
+    isInBounds({ lat: p.latitude as number, lng: p.longitude as number }, bounds)
+  )
+
+  // If we have place coordinates, majority must be in-country
+  if (placesWithCoords.length > 0) {
+    const ratio = placesInCountry.length / placesWithCoords.length
+    if (ratio < 0.5) {
+      return {
+        valid: false,
+        returnedLl,
+        returnedCoords,
+        placesWithCoords: placesWithCoords.length,
+        placesInCountry: placesInCountry.length,
+        reason: `only ${placesInCountry.length}/${placesWithCoords.length} places are inside ${country.toUpperCase()}`,
+      }
+    }
+  }
+
+  return {
+    valid: true,
+    returnedLl,
+    returnedCoords,
+    placesWithCoords: placesWithCoords.length,
+    placesInCountry: placesInCountry.length,
+    reason: 'geo context valid',
+  }
 }
 
 async function querySerperMaps(
@@ -116,52 +250,70 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
-  const defaultIsraeliCity = 'Tel Aviv'
-  const defaultIsraeliCoords = ISRAELI_CITIES['tel aviv']!
+  const hasCity = Boolean(input.city?.trim())
 
-  // Resolve coordinates for Israeli cities
-  const cityLower = input.city?.toLowerCase() || ''
+  // Resolve coordinates for Israeli cities (if city matches our lookup)
+  const cityLower = input.city?.trim().toLowerCase() || ''
   const cityCoordinates = cityLower ? ISRAELI_CITIES[cityLower] : undefined
-
-  // For Israeli projects, ensure we always have a location context
-  const effectiveCity = input.city || (country === 'il' ? defaultIsraeliCity : undefined)
 
   console.log('[Maps] ========== SCAN START ==========')
   console.log('[Maps] Input:', {
     keyword: input.keyword,
     businessName,
-    country,
+    projectCountry: country.toUpperCase(),
+    projectCity: input.city || '(not set)',
     language,
-    city: input.city,
-    ...(cityCoordinates && { resolvedCoordinates: cityCoordinates }),
+    cityCoordinatesResolved: cityCoordinates ?? null,
   })
 
-  // Context-only retries — keyword text NEVER changes between attempts
-  // For Israeli projects, always include a city context; coordinates provide precision
-  const contextAttempts: Array<{ label: string; location: string | undefined; coordinates?: { lat: number; lng: number } }> = [
-    {
-      label: effectiveCity ? `city (${effectiveCity})` : 'no specific city',
-      location: effectiveCity,
-      coordinates: cityCoordinates || (country === 'il' ? defaultIsraeliCoords : undefined),
-    },
-    ...(input.city
-      ? [{
-          label: 'city+country',
-          location: `${input.city}, ${country.toUpperCase()}`,
-          coordinates: cityCoordinates,
-        }]
-      : []),
-    {
-      label: 'country',
+  // Build context attempts — project city is PRIMARY, never replaced by
+  // generic country-level context when a city is set.
+  // Exact keyword is passed unchanged to every attempt.
+  const contextAttempts: Array<{
+    label: string
+    location: string | undefined
+    coordinates?: { lat: number; lng: number }
+  }> = []
+
+  if (hasCity) {
+    // Project city — primary and only context attempts
+    contextAttempts.push({
+      label: `project city "${input.city}"`,
+      location: input.city!,
+      coordinates: cityCoordinates,
+    })
+    contextAttempts.push({
+      label: `project city+country "${input.city}, ${country.toUpperCase()}"`,
+      location: `${input.city}, ${country.toUpperCase()}`,
+      coordinates: cityCoordinates,
+    })
+    if (cityCoordinates) {
+      contextAttempts.push({
+        label: `project city via explicit coordinates only`,
+        location: input.city!,
+        coordinates: cityCoordinates,
+      })
+    }
+  } else {
+    // No project city — fall back to country-level only (generic)
+    contextAttempts.push({
+      label: `country "${country.toUpperCase()}" (no city set)`,
       location: country.toUpperCase(),
       coordinates: country === 'il' ? { lat: 31.5, lng: 34.75 } : undefined,
-    },
-  ]
+    })
+  }
 
   try {
     for (const attempt of contextAttempts) {
-      const coordStr = attempt.coordinates ? `[${attempt.coordinates.lat},${attempt.coordinates.lng}]` : '(none)'
-      console.log(`[Maps] Attempt "${attempt.label}": keyword="${input.keyword}" location=${attempt.location ?? '(none)'} coordinates=${coordStr}`)
+      const outgoingCoords = attempt.coordinates ? `${attempt.coordinates.lat},${attempt.coordinates.lng}` : '(none)'
+      console.log(`[Maps] ---- Attempt: ${attempt.label} ----`)
+      console.log('[Maps] Outgoing:', {
+        keyword: input.keyword,
+        location: attempt.location ?? '(none)',
+        ll: outgoingCoords,
+        gl: country,
+        hl: language,
+      })
 
       const response = await querySerperMaps(input.keyword, country, language, attempt.location, attempt.coordinates)
 
@@ -174,7 +326,24 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       }
 
       const places = response.places ?? []
-      console.log(`[Maps] Attempt "${attempt.label}": ${places.length} places returned`)
+
+      // Validate returned geo context against project country
+      const geoCheck = validateGeoContext(response, country)
+      console.log('[Maps] Geo validation:', {
+        returnedLl: geoCheck.returnedLl ?? '(not in response)',
+        placesTotal: places.length,
+        placesWithCoords: geoCheck.placesWithCoords,
+        placesInCountry: geoCheck.placesInCountry,
+        valid: geoCheck.valid,
+        reason: geoCheck.reason,
+      })
+
+      if (!geoCheck.valid) {
+        console.log(`[Maps] ✗ REJECTED attempt "${attempt.label}" — wrong geo context (${geoCheck.reason})`)
+        continue
+      }
+
+      console.log(`[Maps] Attempt "${attempt.label}": ${places.length} places returned (geo OK)`)
 
       const matchedPlace = findBusinessMatch(places, businessName)
       if (matchedPlace) {
@@ -193,7 +362,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       console.log(`[Maps] ✗ No match for attempt "${attempt.label}"`)
     }
 
-    console.log('[Maps] ✗ NO MATCH — all context attempts exhausted, keyword was never modified')
+    console.log('[Maps] ✗ NO MATCH — all project-location attempts exhausted (keyword unchanged)')
     console.log('[Maps] ========== SCAN END (NOT FOUND) ==========')
     return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
   } catch (err) {
