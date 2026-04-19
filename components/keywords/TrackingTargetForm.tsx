@@ -15,6 +15,7 @@ import {
 interface TrackingTargetFormProps {
   target?: TrackingTarget
   projectId: string
+  projectCity?: string | null
   defaultDomain?: string
   defaultBusinessName?: string
   onSuccess: () => void
@@ -24,6 +25,7 @@ interface TrackingTargetFormProps {
 export default function TrackingTargetForm({
   target,
   projectId,
+  projectCity,
   defaultDomain,
   defaultBusinessName,
   onSuccess,
@@ -33,8 +35,17 @@ export default function TrackingTargetForm({
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [engine, setEngine] = useState<'google_search' | 'google_maps'>(target?.engine_type || 'google_search')
-  // Bulk mode only available when creating (not editing)
+  const [locationMode, setLocationMode] = useState<'project' | 'custom' | 'grid'>(
+    target?.location_mode || 'project'
+  )
+  const [customCity, setCustomCity] = useState(target?.custom_city || '')
   const [bulkMode, setBulkMode] = useState(false)
+
+  const customCityDiffers =
+    (locationMode === 'custom' || locationMode === 'grid') &&
+    customCity.trim() !== '' &&
+    projectCity != null &&
+    customCity.trim().toLowerCase() !== projectCity.toLowerCase()
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -107,7 +118,6 @@ export default function TrackingTargetForm({
         </div>
       )}
 
-      {/* Keyword input — single or bulk */}
       {bulkMode ? (
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -171,6 +181,76 @@ export default function TrackingTargetForm({
         defaultValue={target?.preferred_landing_page || ''}
         placeholder="/שירותים/קידום-אתרים"
       />
+
+      {/* Location Mode */}
+      <Select
+        label="מצב מיקום"
+        name="location_mode"
+        value={locationMode}
+        onChange={(e) => setLocationMode(e.target.value as 'project' | 'custom' | 'grid')}
+        options={[
+          { value: 'project', label: `עיר הפרויקט${projectCity ? ` (${projectCity})` : ''}` },
+          { value: 'custom', label: 'עיר מותאמת אישית' },
+          { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
+        ]}
+      />
+
+      {locationMode === 'custom' && (
+        <div>
+          <Input
+            label="עיר מותאמת *"
+            name="custom_city"
+            value={customCity}
+            onChange={(e) => setCustomCity(e.target.value)}
+            placeholder="תל אביב"
+            required
+          />
+          {customCityDiffers && (
+            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+              הביטוי משתמש בעיר שונה מהעיר המוגדרת בפרויקט
+            </div>
+          )}
+        </div>
+      )}
+
+      {locationMode === 'grid' && (
+        <div className="space-y-3">
+          <div>
+            <Input
+              label="עיר לגריד (ברירת מחדל: עיר הפרויקט)"
+              name="custom_city"
+              value={customCity}
+              onChange={(e) => setCustomCity(e.target.value)}
+              placeholder={projectCity || 'תל אביב'}
+            />
+            {customCityDiffers && (
+              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+                הביטוי משתמש בעיר שונה מהעיר המוגדרת בפרויקט
+              </div>
+            )}
+          </div>
+          <Select
+            label="גודל רשת"
+            name="grid_size"
+            defaultValue={target?.grid_size || 'medium'}
+            options={[
+              { value: 'small', label: 'קטן — 5 נקודות' },
+              { value: 'medium', label: 'בינוני — 9 נקודות' },
+              { value: 'large', label: 'גדול — 13 נקודות' },
+            ]}
+          />
+          <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded">
+            סריקת גריד מחזירה מיקום ממוצע, טוב ביותר וגרוע ביותר ממספר נקודות בעיר. המיקום המוצג הוא המיקום הטוב ביותר.
+          </div>
+        </div>
+      )}
+
+      {locationMode !== 'grid' && (
+        <input type="hidden" name="grid_size" value="" />
+      )}
+      {locationMode === 'project' && (
+        <input type="hidden" name="custom_city" value="" />
+      )}
 
       <Textarea
         label="הערות"

@@ -140,6 +140,12 @@ export async function POST(request: Request) {
       businessName: target.target_business_name || project.business_name,
     })
 
+    const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid'
+    const effectiveCity =
+      locationMode === 'custom' && target.custom_city?.trim()
+        ? target.custom_city.trim()
+        : project.city
+
     const scanOutput = await runScan(target.engine_type, {
       engine: target.engine_type,
       keyword: target.keyword,
@@ -147,8 +153,11 @@ export async function POST(request: Request) {
       targetBusinessName: target.target_business_name || project.business_name,
       country: project.country,
       language: project.language,
-      city: project.city,
+      city: effectiveCity,
       deviceType: project.device_type,
+      locationMode,
+      customCity: target.custom_city,
+      gridSize: (target.grid_size || null) as 'small' | 'medium' | 'large' | null,
     })
 
     // change_value: positive = improved (moved up), negative = dropped

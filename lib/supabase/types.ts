@@ -66,6 +66,8 @@ export interface Project {
 }
 
 export type EngineType = 'google_search' | 'google_maps'
+export type LocationMode = 'project' | 'custom' | 'grid'
+export type GridSize = 'small' | 'medium' | 'large'
 
 export interface TrackingTarget {
   id: string
@@ -77,6 +79,9 @@ export interface TrackingTarget {
   preferred_landing_page: string | null
   notes: string | null
   is_active: boolean
+  location_mode: LocationMode
+  custom_city: string | null
+  grid_size: GridSize | null
   created_at: string
   updated_at: string
   // joins

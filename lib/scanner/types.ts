@@ -7,6 +7,9 @@ export interface ScanInput {
   language?: string
   city?: string | null
   deviceType?: string | null
+  locationMode?: 'project' | 'custom' | 'grid'
+  customCity?: string | null
+  gridSize?: 'small' | 'medium' | 'large' | null
 }
 
 export interface ScanAttempt {
@@ -22,12 +25,24 @@ export interface ScanAttempt {
   rejectionReason?: string | null
 }
 
+export interface GridPointResult {
+  point_index: number
+  lat: number
+  lng: number
+  label: string
+  found: boolean
+  position: number | null
+  places_count: number
+  matched_title?: string | null
+  matched_address?: string | null
+}
+
 export interface ScanAudit {
   request: {
     keyword: string
     engine: string
     projectCity?: string | null
-    projectCountry?: string
+    projectCountry: string
     locationSent?: string | null
     llSent?: string | null
     gl?: string
@@ -49,6 +64,14 @@ export interface ScanAudit {
     successfulAttemptIndex?: number
     geoValidationPassed?: boolean
     rejectionReason?: string | null
+    // Grid fields
+    grid_enabled?: boolean
+    grid_size?: string
+    grid_points?: Array<{ lat: number; lng: number; label: string }>
+    per_point_results?: GridPointResult[]
+    best_position?: number | null
+    avg_position?: number | null
+    worst_position?: number | null
   }
 }
 

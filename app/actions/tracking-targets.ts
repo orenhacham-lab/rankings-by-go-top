@@ -37,6 +37,9 @@ export async function createTrackingTargetAction(formData: FormData) {
     target_business_name: (formData.get('target_business_name') as string) || null,
     preferred_landing_page: (formData.get('preferred_landing_page') as string) || null,
     notes: (formData.get('notes') as string) || null,
+    location_mode: (formData.get('location_mode') as string) || 'project',
+    custom_city: (formData.get('custom_city') as string) || null,
+    grid_size: (formData.get('grid_size') as string) || null,
     is_active: true,
   }
 
@@ -83,6 +86,10 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
 
   const existingSet = new Set((existing || []).map((r) => r.keyword.trim().toLowerCase()))
 
+  const locationMode = (formData.get('location_mode') as string) || 'project'
+  const customCity = (formData.get('custom_city') as string) || null
+  const gridSize = (formData.get('grid_size') as string) || null
+
   const toInsert = keywords
     .filter((k) => !existingSet.has(k.toLowerCase()))
     .map((keyword) => ({
@@ -94,6 +101,9 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
       target_business_name: targetBusinessName,
       preferred_landing_page: preferredLandingPage,
       notes,
+      location_mode: locationMode,
+      custom_city: customCity,
+      grid_size: gridSize,
       is_active: true,
     }))
 
@@ -140,6 +150,9 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     target_business_name: (formData.get('target_business_name') as string) || null,
     preferred_landing_page: (formData.get('preferred_landing_page') as string) || null,
     notes: (formData.get('notes') as string) || null,
+    location_mode: (formData.get('location_mode') as string) || 'project',
+    custom_city: (formData.get('custom_city') as string) || null,
+    grid_size: (formData.get('grid_size') as string) || null,
   }
 
   const { error } = await supabase.from('tracking_targets').update(data).eq('id', id)
