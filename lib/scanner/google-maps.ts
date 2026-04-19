@@ -187,7 +187,9 @@ async function querySerperMaps(
   }
 
   if (coordinates) {
-    body.ll = `${coordinates.lat},${coordinates.lng}`
+    // Serper Maps expects ll in "@lat,lng,zoom" format (Google Maps URL format)
+    // Zoom level 13 = city-level view; 12 = wider city area
+    body.ll = `@${coordinates.lat},${coordinates.lng},13z`
   }
 
   const controller = new AbortController()
@@ -305,12 +307,12 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
   try {
     for (const attempt of contextAttempts) {
-      const outgoingCoords = attempt.coordinates ? `${attempt.coordinates.lat},${attempt.coordinates.lng}` : '(none)'
+      const outgoingLl = attempt.coordinates ? `@${attempt.coordinates.lat},${attempt.coordinates.lng},13z` : '(none)'
       console.log(`[Maps] ---- Attempt: ${attempt.label} ----`)
-      console.log('[Maps] Outgoing:', {
+      console.log('[Maps] Outgoing request:', {
         keyword: input.keyword,
         location: attempt.location ?? '(none)',
-        ll: outgoingCoords,
+        ll: outgoingLl,
         gl: country,
         hl: language,
       })
