@@ -28,6 +28,15 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     return makeError('No target business name specified')
   }
 
+  console.log('[Maps] Starting scan', {
+    keyword: input.keyword,
+    businessName,
+    country: input.country,
+    language: input.language,
+    city: input.city,
+    device: input.deviceType,
+  })
+
   try {
     const body: Record<string, unknown> = {
       q: input.keyword,
@@ -38,6 +47,8 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     if (input.city) {
       body.location = input.city
     }
+
+    console.log('[Maps] Request payload:', body)
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -74,12 +85,26 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     }
 
     const places = data.places ?? []
+    console.log('[Maps] Found places:', places.length, places.map(p => ({ title: p.title, position: p.position })))
+
     const normalizedTarget = normalizeBusinessName(businessName)
+    console.log('[Maps] Normalized target:', normalizedTarget)
 
     for (const place of places) {
       const normalizedPlace = normalizeBusinessName(place.title)
+      const matches = isBusinessMatch(normalizedPlace, normalizedTarget)
 
-      if (isBusinessMatch(normalizedPlace, normalizedTarget)) {
+      console.log('[Maps] Checking place', {
+        original: place.title,
+        normalized: normalizedPlace,
+        target: normalizedTarget,
+        position: place.position,
+        matches,
+        similarity: diceSimilarity(normalizedPlace, normalizedTarget),
+      })
+
+      if (matches) {
+        console.log('[Maps] MATCH FOUND at position', place.position)
         return {
           found: true,
           position: place.position,
@@ -91,6 +116,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       }
     }
 
+    console.log('[Maps] No match found in results')
     return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
@@ -103,12 +129,13 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 /**
  * Determine if a Maps result title matches the target business name.
  *
- * Strategy (in order of strictness):
+ * Strategy (in order):
  * 1. Exact match after normalization
  * 2. One is a prefix of the other (handles "Foo Bar" vs "Foo Bar Restaurant")
- *    — only if the shorter string is >= 5 chars to avoid false positives
- * 3. Dice-coefficient similarity >= 0.82 for strings >= 6 chars
- *    — higher threshold than before to reduce false positives
+ *    — only if the shorter string is >= 4 chars to avoid false positives
+ * 3. For Maps results, check if all major words in target appear in place
+ *    (handles business names with descriptions)
+ * 4. Dice-coefficient similarity >= 0.75 for strings >= 6 chars
  */
 function isBusinessMatch(place: string, target: string): boolean {
   if (place === target) return true
@@ -116,11 +143,22 @@ function isBusinessMatch(place: string, target: string): boolean {
   const shorter = place.length <= target.length ? place : target
   const longer = place.length > target.length ? place : target
 
-  // Prefix match only if shorter side is long enough
-  if (shorter.length >= 5 && longer.startsWith(shorter)) return true
+  // Prefix match — more lenient (>= 4 chars instead of 5)
+  if (shorter.length >= 4 && longer.startsWith(shorter)) return true
 
-  // Fuzzy match only for sufficiently long strings
-  if (shorter.length >= 6 && diceSimilarity(place, target) >= 0.82) return true
+  // Word-based matching: check if all main words from target are in place
+  // Handles "Go Top - שיווק דיגיטלי..." where Maps shows just the name
+  const targetWords = target.split(' ').filter(w => w.length > 2)
+  const placeWords = place.split(' ')
+  if (targetWords.length > 0 && targetWords.every(word => placeWords.some(pw => pw.includes(word) || word.includes(pw)))) {
+    return true
+  }
+
+  // Fuzzy match — more lenient (0.75 instead of 0.82)
+  if (shorter.length >= 6) {
+    const similarity = diceSimilarity(place, target)
+    if (similarity >= 0.75) return true
+  }
 
   return false
 }
