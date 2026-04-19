@@ -307,10 +307,28 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
   try {
     for (const attempt of contextAttempts) {
+      // GUARD: if city was configured, block any generic country-level fallback
+      if (hasCity) {
+        const isGenericFallback =
+          attempt.location === 'IL' ||
+          attempt.location === 'is' ||
+          attempt.location === country.toUpperCase() ||
+          attempt.location === country ||
+          (attempt.coordinates?.lat === 31.5 && attempt.coordinates?.lng === 34.75)
+
+        if (isGenericFallback) {
+          const msg = `FORBIDDEN: Generic country fallback attempt for city-configured project (city="${input.city}", location="${attempt.location}", ll="${attempt.coordinates ? `@${attempt.coordinates.lat},${attempt.coordinates.lng},13z` : 'none'}")`
+          console.error('[Maps] ERROR:', msg)
+          throw new Error(msg)
+        }
+      }
+
       const outgoingLl = attempt.coordinates ? `@${attempt.coordinates.lat},${attempt.coordinates.lng},13z` : '(none)'
       console.log(`[Maps] ---- Attempt: ${attempt.label} ----`)
-      console.log('[Maps] Outgoing request:', {
+      console.log('[Maps] FINAL outgoing request:', {
         keyword: input.keyword,
+        projectCity: input.city ?? null,
+        projectCountry: input.country ?? null,
         location: attempt.location ?? '(none)',
         ll: outgoingLl,
         gl: country,
