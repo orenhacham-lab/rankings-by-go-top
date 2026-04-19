@@ -319,6 +319,7 @@ async function runGridScan(
   const avgPosition = found
     ? Math.round((foundPositions.reduce((a, b) => a + b, 0) / foundPositions.length) * 10) / 10
     : null
+  const coverage = Math.round((foundPositions.length / gridPoints.length) * 1000) / 1000
 
   const audit: ScanAudit = {
     request: {
@@ -346,7 +347,10 @@ async function runGridScan(
       per_point_results: perPointResults,
       best_position: bestPosition,
       avg_position: avgPosition,
+      avg_position_mode: 'found_only' as const,
       worst_position: worstPosition,
+      coverage,
+      position_source: 'best_of_grid' as const,
     },
   }
 

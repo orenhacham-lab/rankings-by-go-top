@@ -71,7 +71,10 @@ export interface ScanAudit {
     per_point_results?: GridPointResult[]
     best_position?: number | null
     avg_position?: number | null
+    avg_position_mode?: 'found_only'
     worst_position?: number | null
+    coverage?: number
+    position_source?: 'best_of_grid'
   }
 }
 
