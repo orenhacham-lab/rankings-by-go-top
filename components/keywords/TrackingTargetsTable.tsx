@@ -189,6 +189,13 @@ export default function TrackingTargetsTable({
                         סרוק
                       </Button>
                     )}
+                    {result && (
+                      <Link href={`/scans/${result.scan_id}/details`}>
+                        <Button size="sm" variant="ghost">
+                          פרטים
+                        </Button>
+                      </Link>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"

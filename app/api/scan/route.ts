@@ -160,7 +160,17 @@ export async function POST(request: Request) {
         ? previousPosition - scanOutput.position
         : null
 
-    const resultData = {
+    // Get git branch and commit for version tracking
+    let scannerVersion: string | null = null
+    try {
+      const branch = process.env.GIT_BRANCH || 'unknown'
+      const commit = process.env.GIT_COMMIT || 'unknown'
+      scannerVersion = `${branch}@${commit}`
+    } catch {
+      scannerVersion = null
+    }
+
+    const resultData: Record<string, unknown> = {
       scan_id: scan.id,
       tracking_target_id: target.id,
       engine_type: target.engine_type,
@@ -174,6 +184,14 @@ export async function POST(request: Request) {
       result_address: scanOutput.resultAddress,
       checked_at: new Date().toISOString(),
       error_message: scanOutput.error,
+    }
+
+    // Store audit data for all outcomes: found, not found, geo rejected, provider error, timeout
+    if (scanOutput.audit) {
+      resultData.audit_request = scanOutput.audit.request
+      resultData.audit_response = scanOutput.audit.response
+      resultData.audit_decision = scanOutput.audit.decision
+      resultData.audit_scanner_version = scannerVersion
     }
 
     const { error: resultError } = await admin.from('scan_results').insert(resultData)

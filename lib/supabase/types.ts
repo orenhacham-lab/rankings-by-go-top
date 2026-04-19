@@ -116,6 +116,10 @@ export interface ScanResult {
   result_address: string | null
   checked_at: string
   error_message: string | null
+  audit_request: Json | null
+  audit_response: Json | null
+  audit_decision: Json | null
+  audit_scanner_version: string | null
   created_at: string
   // joins
   tracking_targets?: TrackingTarget

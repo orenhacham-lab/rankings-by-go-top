@@ -1,4 +1,4 @@
-import { ScanInput, ScanOutput } from './types'
+import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -242,12 +242,12 @@ function findBusinessMatch(places: SerperMapsPlace[], targetName: string): Serpe
 export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const apiKey = process.env.SERPER_API_KEY
   if (!apiKey) {
-    return makeError('SERPER_API_KEY is not configured')
+    return makeError('SERPER_API_KEY is not configured', null, null)
   }
 
   const businessName = input.targetBusinessName?.trim()
   if (!businessName) {
-    return makeError('No target business name specified')
+    return makeError('No target business name specified', null, null)
   }
 
   const country = (input.country || 'IL').toLowerCase()
@@ -305,8 +305,14 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     })
   }
 
+  const auditAttempts: ScanAttempt[] = []
+  let lastResponse: SerperMapsResponse | null = null
+  let successfulAttemptIndex: number | undefined
+
   try {
-    for (const attempt of contextAttempts) {
+    for (let attemptIndex = 0; attemptIndex < contextAttempts.length; attemptIndex++) {
+      const attempt = contextAttempts[attemptIndex]
+
       // GUARD: if city was configured, block any generic country-level fallback
       if (hasCity) {
         const isGenericFallback =
@@ -323,26 +329,37 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         }
       }
 
-      const outgoingLl = attempt.coordinates ? `@${attempt.coordinates.lat},${attempt.coordinates.lng},13z` : '(none)'
+      const outgoingLl = attempt.coordinates ? `@${attempt.coordinates.lat},${attempt.coordinates.lng},13z` : undefined
       console.log(`[Maps] ---- Attempt: ${attempt.label} ----`)
       console.log('[Maps] FINAL outgoing request:', {
         keyword: input.keyword,
         projectCity: input.city ?? null,
         projectCountry: input.country ?? null,
         location: attempt.location ?? '(none)',
-        ll: outgoingLl,
+        ll: outgoingLl ?? '(none)',
         gl: country,
         hl: language,
       })
 
       const response = await querySerperMaps(input.keyword, country, language, attempt.location, attempt.coordinates)
+      lastResponse = response
 
       if (!response) {
         console.log(`[Maps] Attempt "${attempt.label}": no response, skipping`)
+        auditAttempts.push({
+          attemptNumber: attemptIndex + 1,
+          context: attempt.label,
+          location: attempt.location,
+          ll: outgoingLl,
+          found: false,
+        })
         continue
       }
       if (response.error) {
-        return makeError(`Serper API error: ${response.error}`)
+        const errorMsg = `Serper API error: ${response.error}`
+        console.error('[Maps] ERROR:', errorMsg)
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg)
+        return { ...makeError(errorMsg, input, audit), audit }
       }
 
       const places = response.places ?? []
@@ -360,6 +377,15 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
       if (!geoCheck.valid) {
         console.log(`[Maps] ✗ REJECTED attempt "${attempt.label}" — wrong geo context (${geoCheck.reason})`)
+        auditAttempts.push({
+          attemptNumber: attemptIndex + 1,
+          context: attempt.label,
+          location: attempt.location,
+          ll: outgoingLl,
+          found: false,
+          geoValidationPassed: false,
+          rejectionReason: geoCheck.reason,
+        })
         continue
       }
 
@@ -367,8 +393,21 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
       const matchedPlace = findBusinessMatch(places, businessName)
       if (matchedPlace) {
+        successfulAttemptIndex = attemptIndex
+        auditAttempts.push({
+          attemptNumber: attemptIndex + 1,
+          context: attempt.label,
+          location: attempt.location,
+          ll: outgoingLl,
+          found: true,
+          matchedTitle: matchedPlace.title,
+          matchedPosition: matchedPlace.position,
+          matchedAddress: matchedPlace.address || null,
+          geoValidationPassed: true,
+        })
         console.log(`[Maps] ✓ FOUND via "${attempt.label}" at position ${matchedPlace.position}`)
         console.log('[Maps] ========== SCAN END (FOUND) ==========')
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, successfulAttemptIndex, null)
         return {
           found: true,
           position: matchedPlace.position,
@@ -376,20 +415,32 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
           resultTitle: matchedPlace.title,
           resultAddress: matchedPlace.address || null,
           error: null,
+          audit,
         }
       }
 
       console.log(`[Maps] ✗ No match for attempt "${attempt.label}"`)
+      auditAttempts.push({
+        attemptNumber: attemptIndex + 1,
+        context: attempt.label,
+        location: attempt.location,
+        ll: outgoingLl,
+        found: false,
+        geoValidationPassed: true,
+      })
     }
 
     console.log('[Maps] ✗ NO MATCH — all project-location attempts exhausted (keyword unchanged)')
     console.log('[Maps] ========== SCAN END (NOT FOUND) ==========')
-    return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
+    const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null)
+    return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
-      return makeError('Serper API request timed out')
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, 'Serper API request timed out')
+      return { ...makeError('Serper API request timed out', input, audit), audit }
     }
-    return makeError((err as Error).message)
+    const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message)
+    return { ...makeError((err as Error).message, input, audit), audit }
   }
 }
 
@@ -466,6 +517,67 @@ function diceSimilarity(a: string, b: string): number {
   return (2 * intersection) / (a.length - 1 + (b.length - 1))
 }
 
-function makeError(message: string): ScanOutput {
-  return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: message }
+function makeError(message: string, input: ScanInput | null, audit: ScanAudit | null): ScanOutput {
+  return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: message, audit: audit || undefined }
+}
+
+function buildAudit(
+  input: ScanInput,
+  country: string,
+  language: string,
+  lastResponse: SerperMapsResponse | null,
+  attempts: ScanAttempt[],
+  found: boolean,
+  matchedPosition: number | null,
+  matchedTitle: string | null,
+  matchedAddress: string | null,
+  successfulAttemptIndex: number | undefined,
+  rejectionReason: string | null
+): ScanAudit {
+  // Limit raw response to prevent excessively large audit data
+  let rawResponse: unknown = lastResponse || null
+  let rawResponseTruncated = false
+
+  if (lastResponse && typeof lastResponse === 'object') {
+    const jsonStr = JSON.stringify(lastResponse)
+    if (jsonStr.length > 50000) {
+      rawResponseTruncated = true
+      // Keep only the structure without full places array
+      rawResponse = {
+        places: (lastResponse.places ?? []).slice(0, 10),
+        searchParameters: lastResponse.searchParameters,
+        error: lastResponse.error,
+      }
+    }
+  }
+
+  return {
+    request: {
+      keyword: input.keyword,
+      engine: 'google_maps',
+      projectCity: input.city || null,
+      projectCountry: country.toUpperCase(),
+      locationSent: undefined,
+      llSent: undefined,
+      gl: country,
+      hl: language,
+    },
+    response: {
+      searchParameters: lastResponse?.searchParameters,
+      placesCount: (lastResponse?.places || []).length,
+      placesSample: (lastResponse?.places || []).slice(0, 10).map(p => ({ title: p.title })),
+      rawResponse,
+      rawResponseTruncated,
+    },
+    decision: {
+      found,
+      matchedPosition,
+      matchedTitle,
+      matchedAddress,
+      attempts,
+      successfulAttemptIndex,
+      geoValidationPassed: attempts.length > 0 ? attempts.some(a => a.geoValidationPassed !== false) : undefined,
+      rejectionReason,
+    },
+  }
 }
