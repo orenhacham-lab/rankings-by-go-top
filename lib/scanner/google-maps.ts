@@ -17,6 +17,67 @@ interface SerperMapsResponse {
   error?: string
 }
 
+interface MapsScanAttempt {
+  query: string
+  places: SerperMapsPlace[]
+  matchFound: boolean
+  matchedPlace?: SerperMapsPlace
+  fallbackAttempt?: number
+}
+
+async function querySerperMaps(query: string, country: string, language: string, location?: string): Promise<SerperMapsResponse | null> {
+  const apiKey = process.env.SERPER_API_KEY
+  if (!apiKey) return null
+
+  const body: Record<string, unknown> = {
+    q: query,
+    gl: country.toLowerCase(),
+    hl: language,
+  }
+
+  if (location) {
+    body.location = location
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(SERPER_MAPS_URL, {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    return await response.json()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function findBusinessMatch(places: SerperMapsPlace[], targetName: string): SerperMapsPlace | null {
+  const normalizedTarget = normalizeBusinessName(targetName)
+
+  for (const place of places) {
+    const normalizedPlace = normalizeBusinessName(place.title)
+    if (isBusinessMatch(normalizedPlace, normalizedTarget)) {
+      return place
+    }
+  }
+
+  return null
+}
+
 export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const apiKey = process.env.SERPER_API_KEY
   if (!apiKey) {
@@ -28,121 +89,121 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     return makeError('No target business name specified')
   }
 
+  const country = (input.country || 'IL').toLowerCase()
+  const language = input.language || 'he'
+
   console.log('[Maps] ========== SCAN START ==========')
-  console.log('[Maps] Input context:', {
+  console.log('[Maps] Input:', {
     keyword: input.keyword,
-    engine: input.engine,
     businessName,
-    country: input.country,
-    language: input.language,
+    country,
+    language,
     city: input.city,
-    deviceType: input.deviceType,
   })
 
   try {
-    // Build exact request payload
-    const body: Record<string, unknown> = {
-      q: input.keyword,
-      gl: (input.country || 'IL').toLowerCase(),
-      hl: input.language || 'he',
+    // ATTEMPT 1: Original keyword with standard location
+    console.log('[Maps] Attempt 1: Original keyword query')
+    let response = await querySerperMaps(input.keyword, country, language, input.city || undefined)
+
+    if (!response || response.error) {
+      return makeError(`Serper API error: ${response?.error || 'Unknown error'}`)
     }
 
-    if (input.city) {
-      body.location = input.city
-    }
+    const places1 = response.places ?? []
+    console.log('[Maps] Attempt 1 results:', places1.length, 'places')
 
-    console.log('[Maps] Serper request payload (EXACT):', JSON.stringify(body, null, 2))
-    console.log('[Maps] Request details:', {
-      q: body.q,
-      gl: body.gl,
-      hl: body.hl,
-      location: body.location || '(not set)',
-      hasLocation: !!body.location,
-    })
+    let matchedPlace = findBusinessMatch(places1, businessName)
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-
-    let response: Response
-    try {
-      response = await fetch(SERPER_MAPS_URL, {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-    } finally {
-      clearTimeout(timer)
-    }
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => '')
-      return makeError(`Serper API error: ${response.status} ${response.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`)
-    }
-
-    let data: SerperMapsResponse
-    try {
-      data = await response.json()
-    } catch {
-      return makeError('Serper API returned invalid JSON')
-    }
-
-    if (data.error) {
-      return makeError(`Serper: ${data.error}`)
-    }
-
-    const places = data.places ?? []
-    console.log('[Maps] Serper response:', {
-      placesCount: places.length,
-      firstFivePlaces: places.slice(0, 5).map(p => ({
-        position: p.position,
-        title: p.title,
-        address: p.address,
-      })),
-    })
-
-    const normalizedTarget = normalizeBusinessName(businessName)
-    console.log('[Maps] Target business name normalized:', {
-      original: businessName,
-      normalized: normalizedTarget,
-    })
-
-    for (const place of places) {
-      const normalizedPlace = normalizeBusinessName(place.title)
-      const similarity = diceSimilarity(normalizedPlace, normalizedTarget)
-      const matches = isBusinessMatch(normalizedPlace, normalizedTarget)
-
-      if (place.position <= 10) {
-        // Log first 10 results for debugging
-        console.log('[Maps] Checking place #' + place.position, {
-          title: place.title,
-          address: place.address,
-          normalized: normalizedPlace,
-          targetNormalized: normalizedTarget,
-          diceSimilarity: similarity.toFixed(3),
-          matches,
-        })
+    if (matchedPlace) {
+      console.log('[Maps] ✓ FOUND in attempt 1 at position', matchedPlace.position)
+      console.log('[Maps] ========== SCAN END (ATTEMPT 1) ==========')
+      return {
+        found: true,
+        position: matchedPlace.position,
+        resultUrl: matchedPlace.website || null,
+        resultTitle: matchedPlace.title,
+        resultAddress: matchedPlace.address || null,
+        error: null,
       }
+    }
 
-      if (matches) {
-        console.log('[Maps] ✓ MATCH FOUND at position', place.position, '| title:', place.title)
-        console.log('[Maps] ========== SCAN END (FOUND) ==========')
+    // ATTEMPT 2: Keyword with full location string (e.g., "Tel Aviv, Israel")
+    if (input.city) {
+      console.log('[Maps] Attempt 2: Keyword with full location context')
+      const fullLocation = `${input.city}, ${country.toUpperCase()}`
+
+      response = await querySerperMaps(input.keyword, country, language, fullLocation || undefined)
+      if (response && !response.error) {
+        const places2 = response.places ?? []
+        console.log('[Maps] Attempt 2 results:', places2.length, 'places')
+
+        matchedPlace = findBusinessMatch(places2, businessName)
+        if (matchedPlace) {
+          console.log('[Maps] ✓ FOUND in attempt 2 (full location) at position', matchedPlace.position)
+          console.log('[Maps] ========== SCAN END (ATTEMPT 2) ==========')
+          return {
+            found: true,
+            position: matchedPlace.position,
+            resultUrl: matchedPlace.website || null,
+            resultTitle: matchedPlace.title,
+            resultAddress: matchedPlace.address || null,
+            error: null,
+          }
+        }
+      }
+    }
+
+    // ATTEMPT 3: Keyword + city in Hebrew (branded local variant)
+    if (language === 'he' || input.city) {
+      console.log('[Maps] Attempt 3: Keyword with Hebrew city variant')
+      const query3 = `${input.keyword} תל אביב` // Default to Tel Aviv for Hebrew
+
+      response = await querySerperMaps(query3, country, language, input.city || undefined)
+      if (response && !response.error) {
+        const places3 = response.places ?? []
+        console.log('[Maps] Attempt 3 results:', places3.length, 'places')
+
+        matchedPlace = findBusinessMatch(places3, businessName)
+        if (matchedPlace) {
+          console.log('[Maps] ✓ FOUND in attempt 3 (Hebrew variant) at position', matchedPlace.position)
+          console.log('[Maps] ========== SCAN END (ATTEMPT 3) ==========')
+          return {
+            found: true,
+            position: matchedPlace.position,
+            resultUrl: matchedPlace.website || null,
+            resultTitle: matchedPlace.title,
+            resultAddress: matchedPlace.address || null,
+            error: null,
+          }
+        }
+      }
+    }
+
+    // ATTEMPT 4: Business name itself as final fallback
+    console.log('[Maps] Attempt 4: Business name as final fallback query')
+    response = await querySerperMaps(businessName, country, language, input.city || undefined)
+    if (response && !response.error) {
+      const places4 = response.places ?? []
+      console.log('[Maps] Attempt 4 results:', places4.length, 'places')
+
+      matchedPlace = findBusinessMatch(places4, businessName)
+      if (matchedPlace) {
+        console.log('[Maps] ✓ FOUND in attempt 4 (business name) at position', matchedPlace.position)
+        console.log('[Maps] ========== SCAN END (ATTEMPT 4) ==========')
         return {
           found: true,
-          position: place.position,
-          resultUrl: place.website || null,
-          resultTitle: place.title,
-          resultAddress: place.address || null,
+          position: matchedPlace.position,
+          resultUrl: matchedPlace.website || null,
+          resultTitle: matchedPlace.title,
+          resultAddress: matchedPlace.address || null,
           error: null,
         }
       }
     }
 
-    console.log('[Maps] ✗ NO MATCH - Business not found in results')
-    console.log('[Maps] ========== SCAN END (NOT FOUND) ==========')
+    console.log('[Maps] ✗ NO MATCH - All 4 fallback attempts failed')
+    console.log('[Maps] ========== SCAN END (NO MATCH) ==========')
     return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
