@@ -189,21 +189,12 @@ export default function TrackingTargetsTable({
                         סרוק
                       </Button>
                     )}
-                    {result && result.audit_request && (
+                    {result && result.audit_request != null && (
                       <Link href={`/scans/${result.scan_id}/details`}>
                         <Button size="sm" variant="ghost">
                           פרטים
                         </Button>
                       </Link>
-                    )}
-                    {result && !result.audit_request && (
-                      <button
-                        disabled
-                        title="No audit data available"
-                        className="text-xs text-slate-300 cursor-not-allowed"
-                      >
-                        פרטים
-                      </button>
                     )}
                     <Button
                       size="sm"
