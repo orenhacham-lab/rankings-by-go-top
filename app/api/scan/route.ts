@@ -142,7 +142,7 @@ export async function POST(request: Request) {
 
     const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid'
     const effectiveCity =
-      locationMode === 'custom' && target.custom_city?.trim()
+      (locationMode === 'custom' || locationMode === 'grid') && target.custom_city?.trim()
         ? target.custom_city.trim()
         : project.city
 
@@ -169,15 +169,7 @@ export async function POST(request: Request) {
         ? previousPosition - scanOutput.position
         : null
 
-    // Get git branch and commit for version tracking
-    let scannerVersion: string | null = null
-    try {
-      const branch = process.env.GIT_BRANCH || 'unknown'
-      const commit = process.env.GIT_COMMIT || 'unknown'
-      scannerVersion = `${branch}@${commit}`
-    } catch {
-      scannerVersion = null
-    }
+    const scannerVersion = (scanOutput.audit?.request as Record<string, string> | undefined)?.scanner_version || null
 
     const resultData: Record<string, unknown> = {
       scan_id: scan.id,

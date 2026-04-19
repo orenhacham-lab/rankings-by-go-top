@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import TrackingTargetForm from './TrackingTargetForm'
-import { toggleTrackingTargetActiveAction } from '@/app/actions/tracking-targets'
+import { toggleTrackingTargetActiveAction, deleteTrackingTargetAction } from '@/app/actions/tracking-targets'
 import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -37,6 +37,8 @@ export default function TrackingTargetsTable({
 }: TrackingTargetsTableProps) {
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'position' | 'keyword' | 'date' | 'found'>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -90,6 +92,16 @@ export default function TrackingTargetsTable({
       await toggleTrackingTargetActiveAction(target.id, target.is_active, projectId)
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  async function handleDelete(targetId: string) {
+    setDeletingId(targetId)
+    try {
+      await deleteTrackingTargetAction(targetId, projectId)
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
     }
   }
 
@@ -218,6 +230,37 @@ export default function TrackingTargetsTable({
                         היסטוריה
                       </Button>
                     </Link>
+                    {!target.is_active && (
+                      confirmDeleteId === target.id ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            loading={deletingId === target.id}
+                            onClick={() => handleDelete(target.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            אשר מחיקה
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setConfirmDeleteId(null)}
+                          >
+                            ביטול
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmDeleteId(target.id)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          מחק
+                        </Button>
+                      )
+                    )}
                   </div>
                 </Td>
               </TableRow>

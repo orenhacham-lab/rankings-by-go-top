@@ -5,28 +5,31 @@ import { createClient } from '@/lib/supabase/client'
 import { ScanResult } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
 import { formatDateTime } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
+import Link from 'next/link'
 
 export default function ScanDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [results, setResults] = useState<ScanResult[]>([])
+  const [projectId, setProjectId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedRawId, setExpandedRawId] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadData() {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from('scan_results')
-        .select('*')
-        .eq('scan_id', id)
-        .order('checked_at', { ascending: false })
+      const [{ data: scanData }, { data: resultsData, error }] = await Promise.all([
+        supabase.from('scans').select('project_id').eq('id', id).single(),
+        supabase.from('scan_results').select('*').eq('scan_id', id).order('checked_at', { ascending: false }),
+      ])
 
       if (error) {
         console.error('Error loading scan results:', error)
       }
-      setResults(data || [])
+      setProjectId(scanData?.project_id || null)
+      setResults(resultsData || [])
       setLoading(false)
     }
     loadData()
@@ -42,9 +45,18 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
   }
 
   if (results.length === 0) {
+    const emptyBackHref = projectId ? `/projects/${projectId}` : '/projects'
     return (
       <div>
-        <Header title="פרטי סריקה" subtitle="תיעוד מלא של תוצאות הסריקה" />
+        <Header
+          title="פרטי סריקה"
+          subtitle="תיעוד מלא של תוצאות הסריקה"
+          actions={
+            <Link href={emptyBackHref}>
+              <Button variant="outline" size="sm">← חזור לפרויקט</Button>
+            </Link>
+          }
+        />
         <Card>
           <div className="p-6 text-center text-slate-500">אין תוצאות סריקה</div>
         </Card>
@@ -52,9 +64,19 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
     )
   }
 
+  const backHref = projectId ? `/projects/${projectId}` : '/projects'
+
   return (
     <div>
-      <Header title="פרטי סריקה" subtitle="תיעוד מלא של תוצאות הסריקה" />
+      <Header
+        title="פרטי סריקה"
+        subtitle="תיעוד מלא של תוצאות הסריקה"
+        actions={
+          <Link href={backHref}>
+            <Button variant="outline" size="sm">← חזור לפרויקט</Button>
+          </Link>
+        }
+      />
 
       <div className="space-y-6">
         {results.map((result) => {

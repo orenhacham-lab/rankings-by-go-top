@@ -440,15 +440,15 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
 
-  // Resolve effective city: custom > project
+  // Resolve effective city: custom/grid override > project city
   const effectiveCity =
-    input.locationMode === 'custom' && input.customCity?.trim()
+    (input.locationMode === 'custom' || input.locationMode === 'grid') && input.customCity?.trim()
       ? input.customCity.trim()
       : input.city?.trim() || null
 
   // Grid mode: run multi-point scan if city has known coordinates
   if (input.locationMode === 'grid' && input.gridSize) {
-    const gridCity = input.customCity?.trim() || input.city?.trim() || ''
+    const gridCity = effectiveCity || ''
     const gridCityCoords = ISRAELI_CITIES[gridCity.toLowerCase()]
     if (gridCityCoords) {
       return runGridScan(
