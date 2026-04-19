@@ -129,6 +129,12 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                               <span className="text-slate-600">hl:</span>
                               <div className="font-mono text-slate-900">{auditRequest.hl}</div>
                             </div>
+                            {auditRequest.scanner_version && (
+                              <div>
+                                <span className="text-slate-600">scanner_version:</span>
+                                <div className="font-mono text-slate-900">{auditRequest.scanner_version}</div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -240,22 +246,59 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
 
                         {/* Per-point results */}
                         {auditDecision.per_point_results && auditDecision.per_point_results.length > 0 && (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {auditDecision.per_point_results.map((pt: any, idx: number) => (
-                              <div key={idx} className={`p-3 rounded text-xs border-l-4 ${pt.found ? 'bg-green-50 border-green-400' : 'bg-slate-50 border-slate-300'}`}>
-                                <div className="flex items-center justify-between">
-                                  <span className="font-semibold text-slate-700">
+                              <div key={idx} className={`p-3 rounded border-l-4 ${pt.found ? 'bg-green-50 border-green-400' : 'bg-slate-50 border-slate-300'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-semibold text-slate-700 text-sm">
                                     #{pt.point_index + 1} {pt.label}
-                                    <span className="font-normal text-slate-400 ml-2">{pt.lat}, {pt.lng}</span>
+                                    <span className="font-normal text-slate-400 ml-2 text-xs">{pt.lat}, {pt.lng}</span>
                                   </span>
-                                  <span className={`font-mono font-semibold ${pt.found ? 'text-green-700' : 'text-slate-400'}`}>
+                                  <span className={`font-mono font-semibold text-sm ${pt.found ? 'text-green-700' : 'text-slate-400'}`}>
                                     {pt.found ? `#${pt.position}` : 'not found'}
                                   </span>
                                 </div>
-                                {pt.found && pt.matched_title && (
-                                  <div className="text-slate-600 mt-1">{pt.matched_title}{pt.matched_address ? ` — ${pt.matched_address}` : ''}</div>
+
+                                {/* Match Status Debug */}
+                                <div className="bg-white p-2 rounded text-xs space-y-1 mb-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <span className="text-slate-600">business_returned:</span>
+                                      <span className="font-mono ml-1">{pt.business_returned ? 'yes' : 'no'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-600">business_rejected:</span>
+                                      <span className="font-mono ml-1">{pt.business_rejected ? 'yes' : 'no'}</span>
+                                    </div>
+                                  </div>
+                                  {pt.rejection_reason && (
+                                    <div className="text-red-600">
+                                      <span>rejection reason:</span>
+                                      <span className="font-mono ml-1">{pt.rejection_reason}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Top Places */}
+                                {pt.top_places && pt.top_places.length > 0 && (
+                                  <div className="bg-white p-2 rounded text-xs mb-2">
+                                    <div className="text-slate-600 font-semibold mb-1">Top {pt.top_places.length} places:</div>
+                                    <ul className="space-y-0.5 ml-2">
+                                      {pt.top_places.map((place: any, pidx: number) => (
+                                        <li key={pidx} className="text-slate-700">
+                                          #{place.position}: {place.title}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
                                 )}
-                                <div className="text-slate-400 mt-0.5">{pt.places_count} places returned</div>
+
+                                {pt.found && pt.matched_title && (
+                                  <div className="text-slate-600 text-xs mt-1">
+                                    <strong>Matched:</strong> {pt.matched_title}{pt.matched_address ? ` — ${pt.matched_address}` : ''}
+                                  </div>
+                                )}
+                                <div className="text-slate-400 text-xs mt-1">{pt.places_count} places returned</div>
                               </div>
                             ))}
                           </div>

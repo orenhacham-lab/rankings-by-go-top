@@ -239,6 +239,56 @@ function findBusinessMatch(places: SerperMapsPlace[], targetName: string): Serpe
   return null
 }
 
+function analyzeMatchDebug(places: SerperMapsPlace[], targetName: string): {
+  top_places: Array<{ title: string; position: number }>
+  business_returned: boolean
+  business_rejected: boolean
+  rejection_reason?: 'title_mismatch' | 'domain_mismatch' | 'phone_mismatch'
+} {
+  const normalizedTarget = normalizeBusinessName(targetName)
+  const topPlaces = places.slice(0, 5).map(p => ({ title: p.title, position: p.position }))
+
+  // Check if business appears in the returned places
+  let foundIndex = -1
+  for (let i = 0; i < places.length; i++) {
+    const normalizedPlace = normalizeBusinessName(places[i].title)
+    if (normalizedPlace === normalizedTarget) {
+      foundIndex = i
+      break
+    }
+  }
+
+  if (foundIndex >= 0) {
+    return {
+      top_places: topPlaces,
+      business_returned: true,
+      business_rejected: false,
+    }
+  }
+
+  // Check if business was in results but title didn't match closely
+  const normalizedTarget2 = normalizeBusinessName(targetName)
+  for (const place of places) {
+    const normalizedPlace = normalizeBusinessName(place.title)
+    // Check if it's close but isBusinessMatch rejected it
+    const similarity = diceSimilarity(normalizedPlace, normalizedTarget2)
+    if (similarity > 0.5) {
+      return {
+        top_places: topPlaces,
+        business_returned: true,
+        business_rejected: true,
+        rejection_reason: 'title_mismatch',
+      }
+    }
+  }
+
+  return {
+    top_places: topPlaces,
+    business_returned: false,
+    business_rejected: false,
+  }
+}
+
 // Grid offsets as [dlat, dlng] from city center
 // lat step ~0.009° ≈ 1 km; lng step ~0.011° ≈ 1 km at 32°N
 const GRID_CONFIGS: Record<string, [number, number][]> = {
@@ -277,7 +327,8 @@ async function runGridScan(
   gridSize: 'small' | 'medium' | 'large',
   businessName: string,
   country: string,
-  language: string
+  language: string,
+  effectiveCity: string | null
 ): Promise<ScanOutput> {
   const gridPoints = generateGridPoints(center, gridSize)
   const perPointResults: GridPointResult[] = []
@@ -291,6 +342,7 @@ async function runGridScan(
     const response = await querySerperMaps(input.keyword, country, language, input.city || undefined, point)
     const places = response?.places ?? []
     const matched = response ? findBusinessMatch(places, businessName) : null
+    const debug = analyzeMatchDebug(places, businessName)
 
     perPointResults.push({
       point_index: i,
@@ -302,6 +354,10 @@ async function runGridScan(
       places_count: places.length,
       matched_title: matched ? matched.title : null,
       matched_address: matched ? matched.address || null : null,
+      top_places: debug.top_places,
+      business_returned: debug.business_returned,
+      business_rejected: debug.business_rejected,
+      rejection_reason: debug.rejection_reason,
     })
 
     if (matched) {
@@ -321,14 +377,19 @@ async function runGridScan(
     : null
   const coverage = Math.round((foundPositions.length / gridPoints.length) * 1000) / 1000
 
+  const centerLl = `@${center.lat},${center.lng},13z`
+
   const audit: ScanAudit = {
     request: {
       keyword: input.keyword,
       engine: 'google_maps',
-      projectCity: input.city || null,
+      projectCity: effectiveCity || null,
       projectCountry: country.toUpperCase(),
+      locationSent: effectiveCity || 'grid',
+      llSent: centerLl,
       gl: country,
       hl: language,
+      scanner_version: '2.0-grid',
     },
     response: {
       placesCount: perPointResults.reduce((s, p) => s + p.places_count, 0),
@@ -396,7 +457,8 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         input.gridSize,
         businessName,
         country,
-        language
+        language,
+        effectiveCity
       )
     }
     // Unknown city for grid — fall through to normal scan
@@ -703,16 +765,21 @@ function buildAudit(
     }
   }
 
+  // For non-grid scans, determine what was actually sent
+  const sentLocation = attempts.find(a => a.location)?.location || null
+  const sentLl = attempts.find(a => a.ll)?.ll || null
+
   return {
     request: {
       keyword: input.keyword,
       engine: 'google_maps',
       projectCity: effectiveCity || null,
       projectCountry: country.toUpperCase(),
-      locationSent: undefined,
-      llSent: undefined,
+      locationSent: sentLocation,
+      llSent: sentLl,
       gl: country,
       hl: language,
+      scanner_version: '2.0',
     },
     response: {
       searchParameters: lastResponse?.searchParameters,

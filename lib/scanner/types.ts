@@ -35,6 +35,11 @@ export interface GridPointResult {
   places_count: number
   matched_title?: string | null
   matched_address?: string | null
+  // Debug fields for match investigation
+  top_places: Array<{ title: string; position: number }>
+  business_returned: boolean
+  business_rejected: boolean
+  rejection_reason?: 'title_mismatch' | 'domain_mismatch' | 'phone_mismatch'
 }
 
 export interface ScanAudit {
@@ -47,6 +52,7 @@ export interface ScanAudit {
     llSent?: string | null
     gl?: string
     hl?: string
+    scanner_version?: string
   }
   response: {
     searchParameters?: Record<string, unknown>
