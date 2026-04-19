@@ -182,7 +182,12 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                               </div>
                               <div>
                                 <span className="text-slate-600">matched position:</span>
-                                <div className="font-mono text-slate-900">#{auditDecision.matchedPosition}</div>
+                                <div className="font-mono text-slate-900">
+                                  #{auditDecision.matchedPosition}
+                                  {auditDecision.position_source && (
+                                    <span className="text-slate-500 text-xs ml-2">({auditDecision.position_source})</span>
+                                  )}
+                                </div>
                               </div>
                               <div>
                                 <span className="text-slate-600">matched address:</span>
@@ -190,10 +195,12 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                               </div>
                             </>
                           )}
-                          <div>
-                            <span className="text-slate-600">geo validation result:</span>
-                            <div className="font-mono text-slate-900">{auditDecision.geoValidationPassed ? 'passed' : 'failed'}</div>
-                          </div>
+                          {!auditDecision.grid_enabled && (
+                            <div>
+                              <span className="text-slate-600">geo validation result:</span>
+                              <div className="font-mono text-slate-900">{auditDecision.geoValidationPassed ? 'passed' : 'failed'}</div>
+                            </div>
+                          )}
                           {auditDecision.rejectionReason && (
                             <div>
                               <span className="text-red-600">rejection reason:</span>
@@ -204,8 +211,60 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                       </div>
                     )}
 
-                    {/* Attempts Section */}
-                    {auditDecision?.attempts && auditDecision.attempts.length > 0 && (
+                    {/* Grid Results Section */}
+                    {auditDecision?.grid_enabled && (
+                      <div>
+                        <h4 className="font-semibold text-slate-900 mb-3">
+                          Grid Scan — {auditDecision.grid_size} ({auditDecision.per_point_results?.length || 0} points)
+                        </h4>
+
+                        {/* Summary metrics */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                          {[
+                            { label: 'Best position', value: auditDecision.best_position != null ? `#${auditDecision.best_position}` : '—' },
+                            { label: 'Avg position', value: auditDecision.avg_position != null ? `#${auditDecision.avg_position}` : '—',
+                              sub: auditDecision.avg_position_mode },
+                            { label: 'Worst position', value: auditDecision.worst_position != null ? `#${auditDecision.worst_position}` : '—' },
+                            { label: 'Coverage', value: auditDecision.coverage != null
+                              ? `${Math.round(auditDecision.coverage * 100)}%`
+                              : '—',
+                              sub: `${auditDecision.per_point_results?.filter((p: any) => p.found).length || 0} / ${auditDecision.per_point_results?.length || 0} points` },
+                          ].map((m, i) => (
+                            <div key={i} className="bg-slate-50 p-3 rounded text-sm">
+                              <div className="text-slate-500 text-xs mb-1">{m.label}</div>
+                              <div className="font-mono font-semibold text-slate-900">{m.value}</div>
+                              {m.sub && <div className="text-slate-400 text-xs mt-0.5">{m.sub}</div>}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Per-point results */}
+                        {auditDecision.per_point_results && auditDecision.per_point_results.length > 0 && (
+                          <div className="space-y-2">
+                            {auditDecision.per_point_results.map((pt: any, idx: number) => (
+                              <div key={idx} className={`p-3 rounded text-xs border-l-4 ${pt.found ? 'bg-green-50 border-green-400' : 'bg-slate-50 border-slate-300'}`}>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-semibold text-slate-700">
+                                    #{pt.point_index + 1} {pt.label}
+                                    <span className="font-normal text-slate-400 ml-2">{pt.lat}, {pt.lng}</span>
+                                  </span>
+                                  <span className={`font-mono font-semibold ${pt.found ? 'text-green-700' : 'text-slate-400'}`}>
+                                    {pt.found ? `#${pt.position}` : 'not found'}
+                                  </span>
+                                </div>
+                                {pt.found && pt.matched_title && (
+                                  <div className="text-slate-600 mt-1">{pt.matched_title}{pt.matched_address ? ` — ${pt.matched_address}` : ''}</div>
+                                )}
+                                <div className="text-slate-400 mt-0.5">{pt.places_count} places returned</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Attempts Section — only for non-grid scans */}
+                    {!auditDecision?.grid_enabled && auditDecision?.attempts && auditDecision.attempts.length > 0 && (
                       <div>
                         <h4 className="font-semibold text-slate-900 mb-3">Attempts ({auditDecision.attempts.length})</h4>
                         <div className="space-y-3">

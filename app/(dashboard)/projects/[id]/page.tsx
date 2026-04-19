@@ -236,6 +236,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         targets={targets}
         latestResults={latestResults}
         projectId={id}
+        projectCity={project.city}
         projectDomain={project.target_domain}
         projectBusinessName={project.business_name || undefined}
         onScanTarget={handleScanTarget}

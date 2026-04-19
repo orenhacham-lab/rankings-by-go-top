@@ -16,6 +16,7 @@ interface TrackingTargetsTableProps {
   targets: TrackingTarget[]
   latestResults?: Record<string, ScanResult>
   projectId: string
+  projectCity?: string | null
   projectDomain?: string
   projectBusinessName?: string
   onScanTarget?: (targetId: string) => void
@@ -27,6 +28,7 @@ export default function TrackingTargetsTable({
   targets,
   latestResults = {},
   projectId,
+  projectCity,
   projectDomain,
   projectBusinessName,
   onScanTarget,
@@ -234,6 +236,7 @@ export default function TrackingTargetsTable({
           <TrackingTargetForm
             target={editingTarget}
             projectId={projectId}
+            projectCity={projectCity}
             defaultDomain={projectDomain}
             defaultBusinessName={projectBusinessName}
             onSuccess={() => setEditingTarget(null)}
