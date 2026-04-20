@@ -141,6 +141,15 @@ export async function POST(request: Request) {
     })
 
     const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip'
+
+    // Validate ZIP mode only allowed for US projects
+    if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
+      return Response.json(
+        { error: 'ZIP code mode is only supported for US projects' },
+        { status: 400 }
+      )
+    }
+
     const effectiveCity =
       (locationMode === 'custom' || locationMode === 'grid') && target.custom_city?.trim()
         ? target.custom_city.trim()

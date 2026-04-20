@@ -485,7 +485,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
 
-  // ZIP code mode: use postal code as location, no coordinates
+  // ZIP code mode: use postal code as location, force US context (no coordinates)
   if (input.locationMode === 'zip' && input.postalCode?.trim()) {
     const postalCode = input.postalCode.trim()
     const contextAttempts = [
@@ -495,15 +495,15 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     let lastResponse: SerperMapsResponse | null = null
 
     try {
-      const response = await querySerperMaps(input.keyword, country, language, postalCode, undefined)
+      const response = await querySerperMaps(input.keyword, 'us', 'en', postalCode, undefined)
       lastResponse = response
 
       if (!response) {
-        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
         return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
       }
       if (response.error) {
-        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
         return { ...makeError(response.error, input, audit), audit }
       }
 
@@ -520,7 +520,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
           matchedPosition: matchedPlace.position,
           matchedAddress: matchedPlace.address || null,
         })
-        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
         return {
           found: true,
           position: matchedPlace.position,
@@ -538,10 +538,10 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         location: postalCode,
         found: false,
       })
-      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
       return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
     } catch (err) {
-      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
       return { ...makeError((err as Error).message, input, audit), audit }
     }
   }

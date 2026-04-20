@@ -16,6 +16,7 @@ interface TrackingTargetFormProps {
   target?: TrackingTarget
   projectId: string
   projectCity?: string | null
+  projectCountry?: string
   defaultDomain?: string
   defaultBusinessName?: string
   onSuccess: () => void
@@ -26,6 +27,7 @@ export default function TrackingTargetForm({
   target,
   projectId,
   projectCity,
+  projectCountry,
   defaultDomain,
   defaultBusinessName,
   onSuccess,
@@ -184,18 +186,34 @@ export default function TrackingTargetForm({
       />
 
       {/* Location Mode */}
-      <Select
-        label="מצב מיקום"
-        name="location_mode"
-        value={locationMode}
-        onChange={(e) => setLocationMode(e.target.value as LocationMode)}
-        options={[
-          { value: 'project', label: `עיר הפרויקט${projectCity ? ` (${projectCity})` : ''}` },
-          { value: 'custom', label: 'עיר מותאמת אישית' },
-          { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
-          { value: 'zip', label: 'ZIP code (US only)' },
-        ]}
-      />
+      <div>
+        <Select
+          label="מצב מיקום"
+          name="location_mode"
+          value={locationMode}
+          onChange={(e) => {
+            const mode = e.target.value as LocationMode
+            // Reset to 'project' if trying to select disabled ZIP mode
+            if (mode === 'zip' && projectCountry?.toUpperCase() !== 'US') {
+              return
+            }
+            setLocationMode(mode)
+          }}
+          options={[
+            { value: 'project', label: `עיר הפרויקט${projectCity ? ` (${projectCity})` : ''}` },
+            { value: 'custom', label: 'עיר מותאמת אישית' },
+            { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
+            ...(projectCountry?.toUpperCase() === 'US'
+              ? [{ value: 'zip', label: 'ZIP code (US only)' }]
+              : []),
+          ]}
+        />
+        {projectCountry?.toUpperCase() !== 'US' && (
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+            ZIP code is supported for US projects only
+          </div>
+        )}
+      </div>
 
       {locationMode === 'custom' && (
         <div>
