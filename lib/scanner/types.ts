@@ -15,9 +15,8 @@ export interface ScanInput {
   language?: string
   city?: string | null
   deviceType?: string | null
-  locationMode?: 'project' | 'custom' | 'grid' | 'zip' | 'exact_point'
+  locationMode?: 'project' | 'custom' | 'zip' | 'exact_point'
   customCity?: string | null
-  gridSize?: 'small' | 'medium' | 'large' | null
   postalCode?: string | null
   exactPoint?: ExactPointInput | null
 }
@@ -33,28 +32,6 @@ export interface ScanAttempt {
   matchedAddress?: string | null
   geoValidationPassed?: boolean
   rejectionReason?: string | null
-}
-
-export interface GridPointResult {
-  point_index: number
-  lat: number
-  lng: number
-  label: string
-  found: boolean
-  position: number | null
-  places_count: number
-  matched_title?: string | null
-  matched_address?: string | null
-  // Debug fields for match investigation
-  top_places: Array<{ title: string; position: number }>
-  business_returned: boolean
-  business_rejected: boolean
-  rejection_reason?: 'title_mismatch' | 'domain_mismatch' | 'phone_mismatch'
-  // Scope tracking
-  places_checked_count: number
-  target_checked_against_all_places: boolean
-  // Dedup signature
-  result_signature: string
 }
 
 export interface ScanAudit {
@@ -92,22 +69,6 @@ export interface ScanAudit {
     successfulAttemptIndex?: number
     geoValidationPassed?: boolean
     rejectionReason?: string | null
-    // Grid fields
-    grid_enabled?: boolean
-    grid_size?: string
-    grid_points?: Array<{ lat: number; lng: number; label: string }>
-    per_point_results?: GridPointResult[]
-    best_position?: number | null
-    avg_position?: number | null
-    avg_position_mode?: 'found_only'
-    worst_position?: number | null
-    coverage?: number
-    position_source?: 'best_of_grid'
-    // Early-stop tracking
-    early_stopped?: boolean
-    early_stop_reason?: string
-    executed_points?: number
-    skipped_points?: number
   }
 }
 

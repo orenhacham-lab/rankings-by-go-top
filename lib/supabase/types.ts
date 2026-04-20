@@ -66,7 +66,7 @@ export interface Project {
 }
 
 export type EngineType = 'google_search' | 'google_maps'
-export type LocationMode = 'project' | 'custom' | 'grid' | 'zip' | 'exact_point'
+export type LocationMode = 'project' | 'custom' | 'zip' | 'exact_point'
 export type GridSize = 'small' | 'medium' | 'large'
 export type ExactPointResolutionSource =
   | 'user_provided_coordinates'

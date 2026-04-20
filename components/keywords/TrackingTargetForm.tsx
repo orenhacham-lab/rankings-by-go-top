@@ -259,7 +259,6 @@ export default function TrackingTargetForm({
           options={[
             { value: 'project', label: `עיר הפרויקט${projectCity ? ` (${projectCity})` : ''}` },
             { value: 'custom', label: 'עיר מותאמת אישית' },
-            { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
             ...(projectCountry?.toUpperCase() === 'US'
               ? [
                   { value: 'zip', label: 'ZIP Code (US Only)' },
@@ -317,47 +316,6 @@ export default function TrackingTargetForm({
           pattern="\d{5}"
           hint="5-digit US ZIP code"
         />
-      )}
-
-      {locationMode === 'grid' && (
-        <div className="space-y-3">
-          <div>
-            <Input
-              label={`עיר לגריד${projectCity ? ` (ברירת מחדל: ${projectCity})` : ''}`}
-              name="custom_city"
-              value={customCity}
-              onChange={(e) => {
-                setCustomCity(e.target.value)
-                setValidationError('')
-              }}
-              placeholder={projectCity || (projectCountry?.toUpperCase() === 'US' ? 'San Francisco, CA' : 'תל אביב')}
-              hint={projectCountry?.toUpperCase() === 'US' ? 'פורמט: "עיר, קוד מדינה" (לדוגמה: "Miami, FL")' : ''}
-            />
-            {validationError && (
-              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
-                {validationError}
-              </div>
-            )}
-            {customCityDiffers && (
-              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
-                הביטוי משתמש בעיר שונה מהעיר המוגדרת בפרויקט
-              </div>
-            )}
-          </div>
-          <Select
-            label="גודל רשת"
-            name="grid_size"
-            defaultValue={target?.grid_size || 'medium'}
-            options={[
-              { value: 'small', label: 'קטן — 5 נקודות' },
-              { value: 'medium', label: 'בינוני — 9 נקודות' },
-              { value: 'large', label: 'גדול — 13 נקודות' },
-            ]}
-          />
-          <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded">
-            סריקת גריד מחזירה מיקום ממוצע, טוב ביותר וגרוע ביותר ממספר נקודות בעיר. המיקום המוצג הוא המיקום הטוב ביותר.
-          </div>
-        </div>
       )}
 
       {locationMode === 'exact_point' && (
@@ -452,9 +410,7 @@ export default function TrackingTargetForm({
         </div>
       )}
 
-      {locationMode !== 'grid' && (
-        <input type="hidden" name="grid_size" value="" />
-      )}
+      <input type="hidden" name="grid_size" value="" />
       {locationMode === 'project' && (
         <input type="hidden" name="custom_city" value="" />
       )}

@@ -144,13 +144,19 @@ export async function POST(request: Request) {
           businessName: target.target_business_name || project.business_name,
         })
 
-        const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip' | 'exact_point'
+        let locationMode: 'project' | 'custom' | 'zip' | 'exact_point' = target.location_mode || 'project'
+
+        // Backward compatibility: convert removed 'grid' mode to custom or project
+        if (locationMode === 'grid' as any) {
+          locationMode = target.custom_city?.trim() ? 'custom' : 'project'
+        }
 
         // DEBUG: log what was actually loaded
         console.log('[Scan] Target loaded from DB:', {
           id: target.id,
           keyword: target.keyword,
           location_mode: target.location_mode,
+          effective_location_mode: locationMode,
           exact_address_input: target.exact_address_input,
           exact_resolved_lat: target.exact_resolved_lat,
           exact_resolved_lng: target.exact_resolved_lng,
@@ -188,7 +194,7 @@ export async function POST(request: Request) {
         }
 
         const effectiveCity =
-          (locationMode === 'custom' || locationMode === 'grid') && target.custom_city?.trim()
+          locationMode === 'custom' && target.custom_city?.trim()
             ? target.custom_city.trim()
             : project.city
 
@@ -203,7 +209,6 @@ export async function POST(request: Request) {
           deviceType: project.device_type,
           locationMode,
           customCity: target.custom_city,
-          gridSize: (target.grid_size || null) as 'small' | 'medium' | 'large' | null,
           postalCode: locationMode === 'zip'
             ? ((target.postal_code || null) as string | null)
             : null,

@@ -130,7 +130,7 @@ export async function createTrackingTargetAction(formData: FormData) {
     notes: (formData.get('notes') as string) || null,
     location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
-    grid_size: safeStringFromFormData(formData, 'grid_size'),
+    grid_size: null,
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     is_active: true,
   }
@@ -212,7 +212,6 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
 
   const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
   const customCity = safeStringFromFormData(formData, 'custom_city')
-  const gridSize = safeStringFromFormData(formData, 'grid_size')
   const postalCode = safeStringFromFormData(formData, 'postal_code')
 
   // Resolve exact_point ONCE for the whole bulk batch (all new rows share the same location)
@@ -239,7 +238,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
       notes,
       location_mode: locationMode,
       custom_city: customCity,
-      grid_size: gridSize,
+      grid_size: null,
       postal_code: postalCode,
       exact_address_input: resolvedExact?.exact_address_input ?? null,
       exact_resolved_lat: resolvedExact?.exact_resolved_lat ?? null,
@@ -315,7 +314,7 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     notes: (formData.get('notes') as string) || null,
     location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
-    grid_size: safeStringFromFormData(formData, 'grid_size'),
+    grid_size: null,
     postal_code: safeStringFromFormData(formData, 'postal_code'),
   }
 
