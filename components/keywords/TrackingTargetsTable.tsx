@@ -8,33 +8,42 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import TrackingTargetForm from './TrackingTargetForm'
-import { toggleTrackingTargetActiveAction } from '@/app/actions/tracking-targets'
+import { toggleTrackingTargetActiveAction, deleteTrackingTargetAction } from '@/app/actions/tracking-targets'
 import { formatDateTime } from '@/lib/utils'
+import { sortTargetsByPosition } from '@/lib/sorting'
 import Link from 'next/link'
 
 interface TrackingTargetsTableProps {
   targets: TrackingTarget[]
   latestResults?: Record<string, ScanResult>
   projectId: string
+  projectCity?: string | null
+  projectCountry?: string
   projectDomain?: string
   projectBusinessName?: string
   onScanTarget?: (targetId: string) => void
   scanningTargets?: Set<string>
   projectDevice?: string | null
+  onActionComplete?: () => void
 }
 
 export default function TrackingTargetsTable({
   targets,
   latestResults = {},
   projectId,
+  projectCity,
+  projectCountry,
   projectDomain,
   projectBusinessName,
   onScanTarget,
   scanningTargets = new Set(),
   projectDevice,
+  onActionComplete,
 }: TrackingTargetsTableProps) {
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'position' | 'keyword' | 'date' | 'found'>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -48,6 +57,11 @@ export default function TrackingTargetsTable({
   }
 
   const sortedTargets = useMemo(() => {
+    if (sortBy === 'position') {
+      const sorted = sortTargetsByPosition(targets, latestResults)
+      return sortDir === 'desc' ? sorted.reverse() : sorted
+    }
+
     const copy = [...targets]
     copy.sort((a, b) => {
       const aResult = latestResults[a.id]
@@ -56,12 +70,6 @@ export default function TrackingTargetsTable({
 
       if (sortBy === 'keyword') {
         return a.keyword.localeCompare(b.keyword, 'he') * dir
-      }
-
-      if (sortBy === 'position') {
-        const aPos = aResult?.found && aResult.position != null ? aResult.position : Number.POSITIVE_INFINITY
-        const bPos = bResult?.found && bResult.position != null ? bResult.position : Number.POSITIVE_INFINITY
-        return (aPos - bPos) * dir
       }
 
       if (sortBy === 'date') {
@@ -86,8 +94,20 @@ export default function TrackingTargetsTable({
     setTogglingId(target.id)
     try {
       await toggleTrackingTargetActiveAction(target.id, target.is_active, projectId)
+      onActionComplete?.()
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  async function handleDelete(targetId: string) {
+    setDeletingId(targetId)
+    try {
+      await deleteTrackingTargetAction(targetId, projectId)
+      onActionComplete?.()
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
     }
   }
 
@@ -189,6 +209,13 @@ export default function TrackingTargetsTable({
                         סרוק
                       </Button>
                     )}
+                    {result && result.audit_request != null && (
+                      <Link href={`/scans/${result.scan_id}/details`}>
+                        <Button size="sm" variant="ghost">
+                          פרטים
+                        </Button>
+                      </Link>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -209,6 +236,37 @@ export default function TrackingTargetsTable({
                         היסטוריה
                       </Button>
                     </Link>
+                    {!target.is_active && (
+                      confirmDeleteId === target.id ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            loading={deletingId === target.id}
+                            onClick={() => handleDelete(target.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            אשר מחיקה
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setConfirmDeleteId(null)}
+                          >
+                            ביטול
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmDeleteId(target.id)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          מחק
+                        </Button>
+                      )
+                    )}
                   </div>
                 </Td>
               </TableRow>
@@ -227,9 +285,11 @@ export default function TrackingTargetsTable({
           <TrackingTargetForm
             target={editingTarget}
             projectId={projectId}
+            projectCity={projectCity}
+            projectCountry={projectCountry}
             defaultDomain={projectDomain}
             defaultBusinessName={projectBusinessName}
-            onSuccess={() => setEditingTarget(null)}
+            onSuccess={() => { setEditingTarget(null); onActionComplete?.() }}
             onCancel={() => setEditingTarget(null)}
           />
         </Modal>

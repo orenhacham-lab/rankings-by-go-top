@@ -66,6 +66,12 @@ export interface Project {
 }
 
 export type EngineType = 'google_search' | 'google_maps'
+export type LocationMode = 'project' | 'custom' | 'zip' | 'exact_point'
+export type GridSize = 'small' | 'medium' | 'large'
+export type ExactPointResolutionSource =
+  | 'user_provided_coordinates'
+  | 'geocoded_google'
+  | 'geocoded_nominatim'
 
 export interface TrackingTarget {
   id: string
@@ -77,6 +83,15 @@ export interface TrackingTarget {
   preferred_landing_page: string | null
   notes: string | null
   is_active: boolean
+  location_mode: LocationMode
+  custom_city: string | null
+  grid_size: GridSize | null
+  postal_code: string | null
+  exact_address_input: string | null
+  exact_resolved_lat: number | null
+  exact_resolved_lng: number | null
+  exact_resolution_source: ExactPointResolutionSource | null
+  exact_geocoding_provider: string | null
   created_at: string
   updated_at: string
   // joins
@@ -116,6 +131,10 @@ export interface ScanResult {
   result_address: string | null
   checked_at: string
   error_message: string | null
+  audit_request: Json | null
+  audit_response: Json | null
+  audit_decision: Json | null
+  audit_scanner_version: string | null
   created_at: string
   // joins
   tracking_targets?: TrackingTarget

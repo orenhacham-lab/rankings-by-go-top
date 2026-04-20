@@ -55,11 +55,12 @@ export default function ScansPage() {
               <Th>תוצאות</Th>
               <Th>התחיל</Th>
               <Th>הסתיים</Th>
+              <Th>פעולות</Th>
             </tr>
           </TableHead>
           <TableBody>
             {scans.length === 0 && (
-              <EmptyRow colSpan={7} message="אין סריקות עדיין" />
+              <EmptyRow colSpan={8} message="אין סריקות עדיין" />
             )}
             {scans.map((scan) => (
               <TableRow key={scan.id}>
@@ -102,6 +103,11 @@ export default function ScansPage() {
                   <span className="text-xs text-slate-500">
                     {scan.completed_at ? formatDateTime(scan.completed_at) : '—'}
                   </span>
+                </Td>
+                <Td>
+                  <Link href={`/scans/${scan.id}/details`} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                    צפה בפרטים
+                  </Link>
                 </Td>
               </TableRow>
             ))}

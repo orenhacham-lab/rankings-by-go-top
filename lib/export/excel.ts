@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/types'
 import { getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
+import { sortTargetsByPosition } from '@/lib/sorting'
 
 interface ExportData {
   client: Client
@@ -15,12 +16,15 @@ function safeFilename(name: string): string {
   return name.replace(/[/\\:*?"<>|]/g, '-').replace(/\s+/g, '_').slice(0, 80)
 }
 
-/** Apply RTL view, freeze header row, and autofit columns to a sheet */
-function applySheetDefaults(ws: XLSX.WorkSheet, frozenRows = 1): void {
-  // RTL direction for Hebrew content
-  ws['!views'] = [{ rightToLeft: true }]
+/** Apply RTL view for Hebrew projects, freeze header row */
+function applySheetDefaults(ws: XLSX.WorkSheet, frozenRows = 1, isHebrewProject = true): void {
   // Freeze the header row
   ws['!freeze'] = { xSplit: 0, ySplit: frozenRows }
+
+  // Apply global RTL only for Hebrew projects
+  if (isHebrewProject) {
+    ws['!views'] = [{ rightToLeft: true }]
+  }
 }
 
 export function exportToExcel(data: ExportData): void {
@@ -32,6 +36,7 @@ export function exportToExcel(data: ExportData): void {
   const coverage = totalCount > 0 ? `${Math.round((foundCount / totalCount) * 100)}%` : '0%'
   const generatedAt = new Date().toLocaleDateString('he-IL')
   const primaryEngine = data.targets[0]?.engine_type || 'google_search'
+  const isHebrewProject = data.project.language === 'he' || data.project.language?.startsWith('he')
 
   // ── Sheet 1: Summary ──────────────────────────────────────────────
   const summaryRows: (string | number)[][] = [
@@ -56,7 +61,7 @@ export function exportToExcel(data: ExportData): void {
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows)
   wsSummary['!cols'] = [{ wch: 22 }, { wch: 45 }]
-  applySheetDefaults(wsSummary, 0)
+  applySheetDefaults(wsSummary, 0, isHebrewProject)
   XLSX.utils.book_append_sheet(wb, wsSummary, 'סיכום')
 
   // ── Sheet 2: Current Rankings ────────────────────────────────────
@@ -73,7 +78,8 @@ export function exportToExcel(data: ExportData): void {
     'הערות',
   ]
 
-  const rankingRows = data.targets.map((target) => {
+  const sortedTargets = sortTargetsByPosition(data.targets, data.latestResults)
+  const rankingRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
 
     let changeDisplay = ''
@@ -102,7 +108,7 @@ export function exportToExcel(data: ExportData): void {
     { wch: 32 }, { wch: 16 }, { wch: 13 }, { wch: 13 }, { wch: 9 },
     { wch: 8 },  { wch: 15 }, { wch: 52 }, { wch: 42 }, { wch: 32 },
   ]
-  applySheetDefaults(wsRankings, 1)
+  applySheetDefaults(wsRankings, 1, isHebrewProject)
   XLSX.utils.book_append_sheet(wb, wsRankings, 'דירוגים נוכחיים')
 
   // ── Sheet 3: Full History ─────────────────────────────────────────
@@ -139,7 +145,7 @@ export function exportToExcel(data: ExportData): void {
     { wch: 32 }, { wch: 16 }, { wch: 10 }, { wch: 13 }, { wch: 9 },
     { wch: 8 },  { wch: 15 }, { wch: 52 }, { wch: 42 },
   ]
-  applySheetDefaults(wsHistory, 1)
+  applySheetDefaults(wsHistory, 1, isHebrewProject)
   XLSX.utils.book_append_sheet(wb, wsHistory, 'היסטוריה מלאה')
 
   // ── Download ──────────────────────────────────────────────────────

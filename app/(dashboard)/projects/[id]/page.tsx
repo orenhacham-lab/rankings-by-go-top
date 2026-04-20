@@ -236,11 +236,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         targets={targets}
         latestResults={latestResults}
         projectId={id}
+        projectCity={project.city}
+        projectCountry={project.country}
         projectDomain={project.target_domain}
         projectBusinessName={project.business_name || undefined}
         onScanTarget={handleScanTarget}
         scanningTargets={scanningTargets}
         projectDevice={project.device_type}
+        onActionComplete={loadData}
       />
 
       {/* Edit Modal */}
@@ -257,6 +260,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       <Modal open={showAddTarget} onClose={() => setShowAddTarget(false)} title="הוספת מילת מפתח" size="md">
         <TrackingTargetForm
           projectId={id}
+          projectCity={project.city || undefined}
+          projectCountry={project.country}
           defaultDomain={project.target_domain}
           defaultBusinessName={project.business_name || undefined}
           onSuccess={() => { setShowAddTarget(false); loadData() }}

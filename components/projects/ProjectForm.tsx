@@ -28,10 +28,32 @@ export default function ProjectForm({
   const [scanFreq, setScanFreq] = useState<'manual' | 'weekly' | 'monthly' | 'monthly_first_day'>(
     project?.scan_frequency || 'manual'
   )
+  const [country, setCountry] = useState(project?.country || 'IL')
+  const [city, setCity] = useState(project?.city || '')
+
+  const validateUSCityFormat = (cityStr: string): boolean => {
+    if (!cityStr.trim()) return false
+    // Format: "City, ST" where ST is 2-letter state code
+    const pattern = /^[A-Za-z\s]+,\s?[A-Z]{2}$/
+    return pattern.test(cityStr.trim())
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError('')
+
+    // Validate US city format
+    if (country === 'US') {
+      if (!city.trim()) {
+        setError(`פרויקט ארה"ב חייב להגדיר עיר בפורמט: "עיר, קוד מדינה" (לדוגמה: "New York, NY")`)
+        return
+      }
+      if (!validateUSCityFormat(city)) {
+        setError(`עיר חייבת להיות בפורמט: "עיר, קוד מדינה" (לדוגמה: "Los Angeles, CA")`)
+        return
+      }
+    }
+
     setLoading(true)
 
     const formData = new FormData(e.currentTarget)
@@ -112,7 +134,8 @@ export default function ProjectForm({
         <Select
           label="מדינה"
           name="country"
-          defaultValue={project?.country || 'IL'}
+          value={country}
+          onChange={(e) => setCountry(e.target.value)}
           options={[
             { value: 'IL', label: 'ישראל' },
             { value: 'US', label: 'ארצות הברית' },
@@ -132,12 +155,17 @@ export default function ProjectForm({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label="עיר / מיקום"
-          name="city"
-          defaultValue={project?.city || ''}
-          placeholder="תל אביב"
-        />
+        <div>
+          <Input
+            label={country === 'US' ? 'עיר, קוד מדינה *' : 'עיר / מיקום'}
+            name="city"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder={country === 'US' ? 'Los Angeles, CA' : 'תל אביב'}
+            hint={country === 'US' ? 'פורמט: "עיר, קוד מדינה" (לדוגמה: "New York, NY")' : ''}
+            required={country === 'US'}
+          />
+        </div>
         <Select
           label="מכשיר"
           name="device_type"

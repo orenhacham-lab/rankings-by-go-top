@@ -13,16 +13,16 @@ export interface PlanLimits {
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
   trial:    { maxProjects: 1,  maxClients: 1,  maxKeywordsPerProject: 30,  maxScansPerPeriod: 1,  price: 0,   label: 'ניסיון' },
-  regular:  { maxProjects: 3,  maxClients: 5,  maxKeywordsPerProject: 50,  maxScansPerPeriod: 1,  price: 29,  label: 'רגיל' },
-  advanced: { maxProjects: 10, maxClients: 20, maxKeywordsPerProject: 50,  maxScansPerPeriod: 2,  price: 69,  label: 'מתקדם' },
-  premium:  { maxProjects: 50, maxClients: 100, maxKeywordsPerProject: 100, maxScansPerPeriod: 4,  price: 129, label: 'פרמיום' },
+  regular:  { maxProjects: 3,  maxClients: 5,  maxKeywordsPerProject: 50,  maxScansPerPeriod: 1,  price: 69,  label: 'רגיל' },
+  advanced: { maxProjects: 10, maxClients: 20, maxKeywordsPerProject: 50,  maxScansPerPeriod: 2,  price: 199, label: 'מתקדם' },
+  premium:  { maxProjects: 25, maxClients: 100, maxKeywordsPerProject: 100, maxScansPerPeriod: 2,  price: 299, label: 'פרמיום' },
 }
 
 export const PLAN_FEATURES: Record<PlanType, string[]> = {
   trial:    ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'סריקה 1 בסה"כ', '7 ימי ניסיון'],
   regular:  ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'סריקה 1 בחודש לכל פרוייקט'],
   advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', '2 סריקות בחודש לכל פרוייקט'],
-  premium:  ['עד 50 פרויקטים', 'עד 100 מילות מפתח לפרויקט', '4 סריקות בחודש לכל פרוייקט'],
+  premium:  ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', '2 סריקות בחודש לכל פרוייקט'],
 }
 
 export interface UserEntitlement {
