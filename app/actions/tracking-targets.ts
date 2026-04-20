@@ -164,9 +164,16 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     custom_city: safeStringFromFormData(formData, 'custom_city'),
     grid_size: safeStringFromFormData(formData, 'grid_size'),
     postal_code: safeStringFromFormData(formData, 'postal_code'),
+  } as Record<string, unknown>
+
+  let { error } = await supabase.from('tracking_targets').update(data).eq('id', id)
+
+  // If postal_code column doesn't exist (migration not applied), retry without it
+  if (error && error.message && error.message.includes('postal_code')) {
+    const { postal_code, ...dataWithoutPostal } = data
+    ;({ error } = await supabase.from('tracking_targets').update(dataWithoutPostal).eq('id', id))
   }
 
-  const { error } = await supabase.from('tracking_targets').update(data).eq('id', id)
   if (error) throw new Error(error.message)
 
   revalidatePath('/keywords')
