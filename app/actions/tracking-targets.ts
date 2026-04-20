@@ -4,6 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getUserEntitlement } from '@/lib/subscription'
 
+function safeStringFromFormData(formData: FormData, key: string): string | null {
+  const value = formData.get(key)
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 export async function createTrackingTargetAction(formData: FormData) {
   const supabase = await createClient()
 
@@ -37,10 +44,10 @@ export async function createTrackingTargetAction(formData: FormData) {
     target_business_name: (formData.get('target_business_name') as string) || null,
     preferred_landing_page: (formData.get('preferred_landing_page') as string) || null,
     notes: (formData.get('notes') as string) || null,
-    location_mode: (formData.get('location_mode') as string) || 'project',
-    custom_city: (formData.get('custom_city') as string) || null,
-    grid_size: (formData.get('grid_size') as string) || null,
-    postal_code: (formData.get('postal_code') as string) || null,
+    location_mode: safeStringFromFormData(formData, 'location_mode') || 'project',
+    custom_city: safeStringFromFormData(formData, 'custom_city'),
+    grid_size: safeStringFromFormData(formData, 'grid_size'),
+    postal_code: safeStringFromFormData(formData, 'postal_code'),
     is_active: true,
   }
 
@@ -87,10 +94,10 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
 
   const existingSet = new Set((existing || []).map((r) => r.keyword.trim().toLowerCase()))
 
-  const locationMode = (formData.get('location_mode') as string) || 'project'
-  const customCity = (formData.get('custom_city') as string) || null
-  const gridSize = (formData.get('grid_size') as string) || null
-  const postalCode = (formData.get('postal_code') as string) || null
+  const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
+  const customCity = safeStringFromFormData(formData, 'custom_city')
+  const gridSize = safeStringFromFormData(formData, 'grid_size')
+  const postalCode = safeStringFromFormData(formData, 'postal_code')
 
   const toInsert = keywords
     .filter((k) => !existingSet.has(k.toLowerCase()))
@@ -153,10 +160,10 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     target_business_name: (formData.get('target_business_name') as string) || null,
     preferred_landing_page: (formData.get('preferred_landing_page') as string) || null,
     notes: (formData.get('notes') as string) || null,
-    location_mode: (formData.get('location_mode') as string) || 'project',
-    custom_city: (formData.get('custom_city') as string) || null,
-    grid_size: (formData.get('grid_size') as string) || null,
-    postal_code: (formData.get('postal_code') as string) || null,
+    location_mode: safeStringFromFormData(formData, 'location_mode') || 'project',
+    custom_city: safeStringFromFormData(formData, 'custom_city'),
+    grid_size: safeStringFromFormData(formData, 'grid_size'),
+    postal_code: safeStringFromFormData(formData, 'postal_code'),
   }
 
   const { error } = await supabase.from('tracking_targets').update(data).eq('id', id)
