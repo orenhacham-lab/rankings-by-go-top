@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       businessName: target.target_business_name || project.business_name,
     })
 
-    const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid'
+    const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip'
     const effectiveCity =
       (locationMode === 'custom' || locationMode === 'grid') && target.custom_city?.trim()
         ? target.custom_city.trim()
