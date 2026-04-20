@@ -601,12 +601,16 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     hasExactPoint: !!input.exactPoint,
     exactPointLat: input.exactPoint?.lat,
     exactPointLng: input.exactPoint?.lng,
+    postalCode: input.postalCode,
     keyword: input.keyword,
   })
 
   // exact_point mode: ll is the ONLY source of truth. No city, no ZIP fallback.
   if (input.locationMode === 'exact_point' && input.exactPoint) {
-    console.log('[Maps:exact_point] BRANCH TAKEN: exact_point with coordinates')
+    console.log('[Maps:exact_point] BRANCH TAKEN: exact_point with coordinates', {
+      lat: input.exactPoint.lat,
+      lng: input.exactPoint.lng,
+    })
     const { lat, lng } = input.exactPoint
     const auditAttempts: ScanAttempt[] = []
     const outgoingLl = `@${lat},${lng},13z`
@@ -844,6 +848,12 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   // Build context attempts — project city is PRIMARY, never replaced by
   // generic country-level context when a city is set.
   // Exact keyword is passed unchanged to every attempt.
+  console.log('[Maps:default] BRANCH TAKEN: project/custom/grid city mode', {
+    locationMode: input.locationMode,
+    effectiveCity,
+    hasCity,
+  })
+
   const contextAttempts: Array<{
     label: string
     location: string | undefined

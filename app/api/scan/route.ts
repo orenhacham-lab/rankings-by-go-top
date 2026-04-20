@@ -192,7 +192,7 @@ export async function POST(request: Request) {
             ? target.custom_city.trim()
             : project.city
 
-        const scanOutput = await runScan(target.engine_type, {
+        const scanPayload = {
           engine: target.engine_type,
           keyword: target.keyword,
           targetDomain: target.target_domain || project.target_domain,
@@ -208,7 +208,18 @@ export async function POST(request: Request) {
             ? ((target.postal_code || null) as string | null)
             : null,
           exactPoint: exactPointInput,
+        }
+
+        console.log('[Scan:route] Payload passed to runScan():', {
+          keyword: scanPayload.keyword,
+          locationMode: scanPayload.locationMode,
+          postalCode: scanPayload.postalCode,
+          exactPointNull: scanPayload.exactPoint === null,
+          exactPointLat: scanPayload.exactPoint?.lat,
+          exactPointLng: scanPayload.exactPoint?.lng,
         })
+
+        const scanOutput = await runScan(target.engine_type, scanPayload)
 
         // change_value: positive = improved (moved up), negative = dropped
         // Only compute when both scans found the keyword at a numeric position
