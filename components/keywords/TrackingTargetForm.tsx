@@ -231,18 +231,13 @@ export default function TrackingTargetForm({
             { value: 'custom', label: 'עיר מותאמת אישית' },
             { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
             ...(projectCountry?.toUpperCase() === 'US'
-              ? [{ value: 'zip', label: 'ZIP centroid — סריקה לפי קוד ZIP בלבד' }]
+              ? [{ value: 'zip', label: 'ZIP Code (US Only)' }]
               : []),
           ]}
         />
         {projectCountry?.toUpperCase() !== 'US' && (
           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
-            ZIP centroid סריקה זמינה לפרויקטי ארה"ב בלבד
-          </div>
-        )}
-        {projectCountry?.toUpperCase() === 'US' && locationMode === 'zip' && (
-          <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
-            ⚠️ ZIP centroid סריקה משתמשת במרכז ZIP בלבד, לא בכל אזור ZIP.
+            ZIP Code סריקה זמינה לפרויקטי ארה"ב בלבד
           </div>
         )}
       </div>
