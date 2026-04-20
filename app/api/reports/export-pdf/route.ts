@@ -92,10 +92,10 @@ export async function POST(req: Request) {
       )
     }
 
-    const pdfShiftResponse = await fetch('https://api.pdfshift.io/v3/convert/html', {
+    const pdfShiftResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
+        'X-API-Key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
