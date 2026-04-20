@@ -15,12 +15,25 @@ function safeFilename(name: string): string {
   return name.replace(/[/\\:*?"<>|]/g, '-').replace(/\s+/g, '_').slice(0, 80)
 }
 
-/** Apply RTL view, freeze header row, and autofit columns to a sheet */
+/** Apply freeze header row, detect text direction per-cell */
 function applySheetDefaults(ws: XLSX.WorkSheet, frozenRows = 1): void {
-  // RTL direction for Hebrew content
-  ws['!views'] = [{ rightToLeft: true }]
-  // Freeze the header row
+  // Freeze the header row (no global RTL - handled per-cell instead)
   ws['!freeze'] = { xSplit: 0, ySplit: frozenRows }
+
+  // Apply per-cell text direction based on content
+  for (const cellRef in ws) {
+    if (cellRef === '!freeze' || cellRef.startsWith('!')) continue
+
+    const cell = ws[cellRef]
+    if (cell && cell.v && typeof cell.v === 'string') {
+      const isHebrew = /[\u0590-\u05FF]/.test(cell.v)
+      // Set RTL only for cells with Hebrew content
+      if (isHebrew) {
+        if (!cell.s) cell.s = {}
+        cell.s.alignment = { ...cell.s?.alignment, horizontal: 'right', vertical: 'center' }
+      }
+    }
+  }
 }
 
 export function exportToExcel(data: ExportData): void {

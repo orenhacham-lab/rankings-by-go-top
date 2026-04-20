@@ -12,9 +12,16 @@ interface ExportData {
 
 let hebrewFontLoaded = false
 const reverseForRtl = (value: string): string => value.split('').reverse().join('')
+const isHebrewContent = (text: string): boolean => /[\u0590-\u05FF]/.test(text)
 const formatKeywordForPdf = (value: string): string => {
-  // Preserve keyword exactly as entered, while forcing RTL embedding for mixed-direction terms.
-  return `\u2067${value}\u2069`
+  // For mixed-language keywords, preserve exactly as-is with directional marks
+  // Hebrew content uses RTL, English uses LTR - jsPDF will respect the actual text direction
+  if (isHebrewContent(value)) {
+    // Hebrew: wrap in RTL directional isolate
+    return `\u2067${value}\u2069`
+  }
+  // English: return as-is (LTR by default)
+  return value
 }
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
@@ -44,8 +51,8 @@ async function ensureHebrewFont(doc: jsPDF): Promise<void> {
 }
 
 export async function exportToPDF(data: ExportData): Promise<void> {
-  // Temporary business rule: omit mixed English/quoted keywords from PDF output.
-  const reportTargets = data.targets.filter((t) => !/[A-Za-z\u05F4\u05F3"']/.test(t.keyword))
+  // Include all targets - handle both Hebrew and English content with proper text direction
+  const reportTargets = data.targets
 
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -154,14 +161,22 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     return {
       resultUrl: result?.result_url ?? null,
       cells: [
-      urlDisplay ? reverseForRtl(urlDisplay) : '—',
-      checkedAt !== '—' ? reverseForRtl(checkedAt) : '—',
-      result ? (result.found ? 'כן' : 'לא') : '—',
-      changeStr !== '—' ? reverseForRtl(changeStr) : '—',
-      previousPosition !== '—' ? reverseForRtl(previousPosition) : '—',
-      currentPosition !== '—' ? reverseForRtl(currentPosition) : '—',
-      getEngineDisplayLabel(target.engine_type, data.project.device_type),
-      formatKeywordForPdf(target.keyword),
+        // URL: keep as-is (LTR), don't reverse
+        urlDisplay ? urlDisplay : '—',
+        // Date: keep Hebrew RTL
+        checkedAt !== '—' ? reverseForRtl(checkedAt) : '—',
+        // Found status: Hebrew
+        result ? (result.found ? 'כן' : 'לא') : '—',
+        // Change: numeric (locale-agnostic)
+        changeStr !== '—' ? changeStr : '—',
+        // Previous position: numeric
+        previousPosition !== '—' ? previousPosition : '—',
+        // Current position: numeric
+        currentPosition !== '—' ? currentPosition : '—',
+        // Engine: Hebrew label
+        getEngineDisplayLabel(target.engine_type, data.project.device_type),
+        // Keyword: formatted with proper direction handling
+        formatKeywordForPdf(target.keyword),
       ],
     }
   })
