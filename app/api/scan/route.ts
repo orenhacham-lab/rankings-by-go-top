@@ -205,6 +205,12 @@ export async function POST(request: Request) {
       resultData.audit_scanner_version = scannerVersion
     }
 
+    // Add location mode audit for US projects
+    if (project.country.toUpperCase() === 'US') {
+      resultData.audit_location_mode = locationMode === 'zip' ? 'zip_centroid' : 'city_state'
+      resultData.audit_resolved_location = locationMode === 'zip' ? target.postal_code : effectiveCity
+    }
+
     const { error: resultError } = await admin.from('scan_results').insert(resultData)
 
     if (resultError) {

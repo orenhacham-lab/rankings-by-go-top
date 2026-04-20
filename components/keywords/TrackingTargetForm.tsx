@@ -43,6 +43,15 @@ export default function TrackingTargetForm({
   const [customCity, setCustomCity] = useState(target?.custom_city || '')
   const [postalCode, setPostalCode] = useState(target?.postal_code || '')
   const [bulkMode, setBulkMode] = useState(false)
+  const [validationError, setValidationError] = useState('')
+
+  // Validate US city format for custom city and project city
+  const validateUSCityFormat = (city: string): boolean => {
+    if (!city.trim()) return false
+    // Format: "City, ST" where ST is 2-letter state code
+    const pattern = /^[A-Za-z\s]+,\s?[A-Z]{2}$/
+    return pattern.test(city.trim())
+  }
 
   const customCityDiffers =
     (locationMode === 'custom' || locationMode === 'grid') &&
@@ -53,9 +62,27 @@ export default function TrackingTargetForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError('')
+    setValidationError('')
     setSuccessMsg('')
-    setLoading(true)
 
+    // Validate US city format if needed
+    if (projectCountry?.toUpperCase() === 'US') {
+      // Project city must be in "City, ST" format
+      if (!projectCity || !validateUSCityFormat(projectCity)) {
+        setError(`פרויקט ארה"ב חייב להגדיר עיר בפורמט: "עיר, קוד מדינה" (לדוגמה: "New York, NY")`)
+        return
+      }
+
+      // Custom city must be in "City, ST" format if specified
+      if ((locationMode === 'custom' || locationMode === 'grid') && customCity.trim()) {
+        if (!validateUSCityFormat(customCity)) {
+          setValidationError(`עיר מותאמת חייבת להיות בפורמט: "עיר, קוד מדינה" (לדוגמה: "Los Angeles, CA")`)
+          return
+        }
+      }
+    }
+
+    setLoading(true)
     const formData = new FormData(e.currentTarget)
 
     try {
@@ -204,13 +231,18 @@ export default function TrackingTargetForm({
             { value: 'custom', label: 'עיר מותאמת אישית' },
             { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
             ...(projectCountry?.toUpperCase() === 'US'
-              ? [{ value: 'zip', label: 'ZIP code (US only)' }]
+              ? [{ value: 'zip', label: 'ZIP centroid — סריקה לפי קוד ZIP בלבד' }]
               : []),
           ]}
         />
         {projectCountry?.toUpperCase() !== 'US' && (
           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
-            ZIP code is supported for US projects only
+            ZIP centroid סריקה זמינה לפרויקטי ארה"ב בלבד
+          </div>
+        )}
+        {projectCountry?.toUpperCase() === 'US' && locationMode === 'zip' && (
+          <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+            ⚠️ ZIP centroid סריקה משתמשת במרכז ZIP בלבד, לא בכל אזור ZIP.
           </div>
         )}
       </div>
@@ -221,10 +253,19 @@ export default function TrackingTargetForm({
             label="עיר מותאמת *"
             name="custom_city"
             value={customCity}
-            onChange={(e) => setCustomCity(e.target.value)}
-            placeholder="תל אביב"
+            onChange={(e) => {
+              setCustomCity(e.target.value)
+              setValidationError('')
+            }}
+            placeholder={projectCountry?.toUpperCase() === 'US' ? 'Los Angeles, CA' : 'תל אביב'}
+            hint={projectCountry?.toUpperCase() === 'US' ? 'פורמט: "עיר, קוד מדינה" (לדוגמה: "New York, NY")' : ''}
             required
           />
+          {validationError && (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+              {validationError}
+            </div>
+          )}
           {customCityDiffers && (
             <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
               הביטוי משתמש בעיר שונה מהעיר המוגדרת בפרויקט
@@ -254,12 +295,21 @@ export default function TrackingTargetForm({
         <div className="space-y-3">
           <div>
             <Input
-              label="עיר לגריד (ברירת מחדל: עיר הפרויקט)"
+              label={`עיר לגריד${projectCity ? ` (ברירת מחדל: ${projectCity})` : ''}`}
               name="custom_city"
               value={customCity}
-              onChange={(e) => setCustomCity(e.target.value)}
-              placeholder={projectCity || 'תל אביב'}
+              onChange={(e) => {
+                setCustomCity(e.target.value)
+                setValidationError('')
+              }}
+              placeholder={projectCity || (projectCountry?.toUpperCase() === 'US' ? 'San Francisco, CA' : 'תל אביב')}
+              hint={projectCountry?.toUpperCase() === 'US' ? 'פורמט: "עיר, קוד מדינה" (לדוגמה: "Miami, FL")' : ''}
             />
+            {validationError && (
+              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                {validationError}
+              </div>
+            )}
             {customCityDiffers && (
               <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
                 הביטוי משתמש בעיר שונה מהעיר המוגדרת בפרויקט
