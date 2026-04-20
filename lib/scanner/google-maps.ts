@@ -10,10 +10,13 @@ async function geocodeUSZIP(zipCode: string): Promise<{ lat: number; lng: number
     return GEOCODING_CACHE.get(cacheKey) || null
   }
 
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zipCode)}&country=us&format=json`,
-      { timeout: 5000 }
+      { signal: controller.signal }
     )
     if (!response.ok) return null
 
@@ -25,6 +28,8 @@ async function geocodeUSZIP(zipCode: string): Promise<{ lat: number; lng: number
     }
   } catch (err) {
     console.error(`[ZIP Geocoding] Failed to geocode ${zipCode}:`, (err as Error).message)
+  } finally {
+    clearTimeout(timer)
   }
 
   GEOCODING_CACHE.set(cacheKey, null)
