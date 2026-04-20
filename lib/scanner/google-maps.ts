@@ -1,4 +1,4 @@
-import { ScanInput, ScanOutput, ScanAudit, ScanAttempt, GridPointResult } from './types'
+import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
 import { US_ZIP_CODES, type USZIPCode } from './us-zip-codes'
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
@@ -417,171 +417,6 @@ function analyzeMatchDebug(places: SerperMapsPlace[], targetName: string): {
   }
 }
 
-// Grid offsets as [dlat, dlng] from city center
-// lat step ~0.009° ≈ 1 km; lng step ~0.011° ≈ 1 km at 32°N
-const GRID_CONFIGS: Record<string, [number, number][]> = {
-  small: [
-    [0, 0],
-    [-0.009, 0], [0.009, 0], [0, -0.011], [0, 0.011],
-  ],
-  medium: [
-    [-0.009, -0.011], [-0.009, 0], [-0.009, 0.011],
-    [0,      -0.011], [0,      0], [0,      0.011],
-    [0.009,  -0.011], [0.009,  0], [0.009,  0.011],
-  ],
-  large: [
-    [-0.009, -0.011], [-0.009, 0], [-0.009, 0.011],
-    [0,      -0.011], [0,      0], [0,      0.011],
-    [0.009,  -0.011], [0.009,  0], [0.009,  0.011],
-    [-0.018, 0],      [0.018,  0], [0,      -0.022], [0,      0.022],
-  ],
-}
-
-function generateGridPoints(
-  center: { lat: number; lng: number },
-  size: 'small' | 'medium' | 'large'
-): Array<{ lat: number; lng: number; label: string }> {
-  const offsets = GRID_CONFIGS[size] || GRID_CONFIGS.small
-  return offsets.map(([dlat, dlng], idx) => ({
-    lat: Math.round((center.lat + dlat) * 1e6) / 1e6,
-    lng: Math.round((center.lng + dlng) * 1e6) / 1e6,
-    label: idx === 0 ? 'center' : `offset_${idx}`,
-  }))
-}
-
-async function runGridScan(
-  input: ScanInput,
-  center: { lat: number; lng: number },
-  gridSize: 'small' | 'medium' | 'large',
-  businessName: string,
-  country: string,
-  language: string,
-  effectiveCity: string | null
-): Promise<ScanOutput> {
-  const gridPoints = generateGridPoints(center, gridSize)
-  const perPointResults: GridPointResult[] = []
-  const foundPositions: number[] = []
-
-  let bestMatch: SerperMapsPlace | null = null
-  let bestMatchPoint: (typeof gridPoints)[0] | null = null
-  let lastSignature: string | null = null
-  let consecutiveMatches = 0
-  let earlyStop = false
-  let earlyStopReason: string | null = null
-
-  for (let i = 0; i < gridPoints.length; i++) {
-    const point = gridPoints[i]
-    const response = await querySerperMaps(input.keyword, country, language, input.city || undefined, point)
-    const places = response?.places ?? []
-    const matched = response ? findBusinessMatch(places, businessName) : null
-    const debug = analyzeMatchDebug(places, businessName)
-
-    perPointResults.push({
-      point_index: i,
-      lat: point.lat,
-      lng: point.lng,
-      label: point.label,
-      found: Boolean(matched),
-      position: matched ? matched.position : null,
-      places_count: places.length,
-      matched_title: matched ? matched.title : null,
-      matched_address: matched ? matched.address || null : null,
-      top_places: debug.top_places,
-      business_returned: debug.business_returned,
-      business_rejected: debug.business_rejected,
-      rejection_reason: debug.rejection_reason,
-      places_checked_count: debug.places_checked_count,
-      target_checked_against_all_places: debug.target_checked_against_all_places,
-      result_signature: debug.result_signature,
-    })
-
-    if (matched) {
-      foundPositions.push(matched.position)
-      if (!bestMatch || matched.position < bestMatch.position) {
-        bestMatch = matched
-        bestMatchPoint = point
-      }
-    }
-
-    // Early-stop: if this point has identical result signature to previous, increment counter
-    if (lastSignature && debug.result_signature === lastSignature) {
-      consecutiveMatches++
-      // If 2 consecutive points are identical, stop early — results have converged
-      if (consecutiveMatches >= 1) {
-        earlyStop = true
-        earlyStopReason = 'consecutive_identical_result_signatures'
-        break
-      }
-    } else {
-      consecutiveMatches = 0
-    }
-    lastSignature = debug.result_signature
-  }
-
-  const found = foundPositions.length > 0
-  const bestPosition = found ? Math.min(...foundPositions) : null
-  const worstPosition = found ? Math.max(...foundPositions) : null
-  const avgPosition = found
-    ? Math.round((foundPositions.reduce((a, b) => a + b, 0) / foundPositions.length) * 10) / 10
-    : null
-  const executedPoints = perPointResults.length
-  const skippedPoints = gridPoints.length - executedPoints
-  const coverage = executedPoints > 0 ? Math.round((foundPositions.length / executedPoints) * 1000) / 1000 : 0
-
-  const centerLl = `@${center.lat},${center.lng},13z`
-
-  const audit: ScanAudit = {
-    request: {
-      keyword: input.keyword,
-      engine: 'google_maps',
-      projectCity: effectiveCity || null,
-      projectCountry: country.toUpperCase(),
-      locationMode: 'grid',
-      locationSent: effectiveCity || 'grid',
-      llSent: centerLl,
-      gl: country,
-      hl: language,
-      scanner_version: '2.0-grid',
-    },
-    response: {
-      placesCount: perPointResults.reduce((s, p) => s + p.places_count, 0),
-      placesSample: [],
-    },
-    decision: {
-      found,
-      matchedPosition: bestPosition,
-      matchedTitle: bestMatch?.title || null,
-      matchedAddress: bestMatch?.address || null,
-      attempts: [],
-      geoValidationPassed: true,
-      grid_enabled: true,
-      grid_size: gridSize,
-      grid_points: gridPoints,
-      per_point_results: perPointResults,
-      best_position: bestPosition,
-      avg_position: avgPosition,
-      avg_position_mode: 'found_only' as const,
-      worst_position: worstPosition,
-      coverage,
-      position_source: 'best_of_grid' as const,
-      early_stopped: earlyStop,
-      early_stop_reason: earlyStopReason || undefined,
-      executed_points: executedPoints,
-      skipped_points: skippedPoints,
-    },
-  }
-
-  return {
-    found,
-    position: bestPosition,
-    resultUrl: bestMatch?.website || null,
-    resultTitle: bestMatch?.title || null,
-    resultAddress: bestMatch?.address || null,
-    error: null,
-    audit,
-  }
-}
-
 export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const apiKey = process.env.SERPER_API_KEY
   if (!apiKey) {
@@ -803,30 +638,11 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     }
   }
 
-  // Resolve effective city: custom/grid override > project city
+  // Resolve effective city: custom override > project city
   const effectiveCity =
-    (input.locationMode === 'custom' || input.locationMode === 'grid') && input.customCity?.trim()
+    input.locationMode === 'custom' && input.customCity?.trim()
       ? input.customCity.trim()
       : input.city?.trim() || null
-
-  // Grid mode: run multi-point scan if city has known coordinates
-  if (input.locationMode === 'grid' && input.gridSize) {
-    const gridCity = effectiveCity || ''
-    const gridCityCoords = ISRAELI_CITIES[gridCity.toLowerCase()]
-    if (gridCityCoords) {
-      return runGridScan(
-        { ...input, city: gridCity },
-        gridCityCoords,
-        input.gridSize,
-        businessName,
-        country,
-        language,
-        effectiveCity
-      )
-    }
-    // Unknown city for grid — fall through to normal scan
-    console.warn(`[Maps:Grid] City "${gridCity}" not in ISRAELI_CITIES, falling back to normal scan`)
-  }
 
   const hasCity = Boolean(effectiveCity)
 
@@ -848,7 +664,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   // Build context attempts — project city is PRIMARY, never replaced by
   // generic country-level context when a city is set.
   // Exact keyword is passed unchanged to every attempt.
-  console.log('[Maps:default] BRANCH TAKEN: project/custom/grid city mode', {
+  console.log('[Maps:default] BRANCH TAKEN: project/custom city mode', {
     locationMode: input.locationMode,
     effectiveCity,
     hasCity,
@@ -1134,7 +950,7 @@ function buildAudit(
     }
   }
 
-  // For non-grid scans, determine what was actually sent
+  // Determine what was actually sent
   const sentLocation = attempts.find(a => a.location)?.location || null
   const sentLl = attempts.find(a => a.ll)?.ll || null
   const postalCodeSent = input.locationMode === 'zip' ? input.postalCode || null : null

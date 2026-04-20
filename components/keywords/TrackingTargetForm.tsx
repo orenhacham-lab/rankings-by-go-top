@@ -66,7 +66,7 @@ export default function TrackingTargetForm({
   }
 
   const customCityDiffers =
-    (locationMode === 'custom' || locationMode === 'grid') &&
+    locationMode === 'custom' &&
     customCity.trim() !== '' &&
     projectCity != null &&
     customCity.trim().toLowerCase() !== projectCity.toLowerCase()
@@ -86,7 +86,7 @@ export default function TrackingTargetForm({
       }
 
       // Custom city must be in "City, ST" format if specified
-      if ((locationMode === 'custom' || locationMode === 'grid') && customCity.trim()) {
+      if (locationMode === 'custom' && customCity.trim()) {
         if (!validateUSCityFormat(customCity)) {
           setValidationError(`עיר מותאמת חייבת להיות בפורמט: "עיר, קוד מדינה" (לדוגמה: "Los Angeles, CA")`)
           return
