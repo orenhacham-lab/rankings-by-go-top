@@ -124,7 +124,7 @@ function ReportsContent() {
       })
     } catch (error) {
       console.error('PDF export error:', error)
-      alert('שגיאה בייצוא PDF')
+      alert('שגיאה ביהורדת דוח')
     } finally {
       setExporting(null)
     }
@@ -237,7 +237,7 @@ function ReportsContent() {
                   loading={exporting === 'pdf'}
                   className="!bg-white !text-blue-700 hover:!bg-blue-50"
                 >
-                  📄 יצוא PDF
+                  📄 הורדת דוח
                 </Button>
               </div>
             </div>
