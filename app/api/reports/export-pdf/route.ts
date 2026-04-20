@@ -92,22 +92,39 @@ export async function POST(req: Request) {
       )
     }
 
+    const requestPayload = {
+      source: html,
+      landscape: false,
+      use_print_media: true,
+    }
+
+    const requestHeaders = {
+      'X-API-Key': apiKey,
+      'Content-Type': 'application/json',
+    }
+
+    console.log('[PDFShift Request]', {
+      url: 'https://api.pdfshift.io/v3/convert/pdf',
+      method: 'POST',
+      headers: requestHeaders,
+      body: { source: `(${html.length} bytes)`, landscape: false, use_print_media: true },
+    })
+
     const pdfShiftResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
       method: 'POST',
-      headers: {
-        'X-API-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        source: html,
-        landscape: false,
-        use_print_media: true,
-      }),
+      headers: requestHeaders,
+      body: JSON.stringify(requestPayload),
     })
+
+    console.log('[PDFShift Response Status]', pdfShiftResponse.status, pdfShiftResponse.statusText)
 
     if (!pdfShiftResponse.ok) {
       const errorText = await pdfShiftResponse.text()
-      console.error('PDFShift error:', pdfShiftResponse.status, errorText)
+      console.log('[PDFShift Error Response]', {
+        status: pdfShiftResponse.status,
+        statusText: pdfShiftResponse.statusText,
+        body: errorText,
+      })
       return new Response(
         JSON.stringify({ error: 'Failed to generate PDF' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
