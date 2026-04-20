@@ -114,14 +114,20 @@ function ReportsContent() {
   async function handleExportPDF() {
     if (!reportData) return
     setExporting('pdf')
-    const { exportToPDF } = await import('@/lib/export/pdf')
-    exportToPDF({
-      client: reportData.project.clients!,
-      project: reportData.project,
-      targets: reportData.targets,
-      latestResults: reportData.latestResults,
-    })
-    setExporting(null)
+    try {
+      const { exportToPDF } = await import('@/lib/export/pdf')
+      await exportToPDF({
+        client: reportData.project.clients!,
+        project: reportData.project,
+        targets: reportData.targets,
+        latestResults: reportData.latestResults,
+      })
+    } catch (error) {
+      console.error('PDF export error:', error)
+      alert('שגיאה בייצוא PDF')
+    } finally {
+      setExporting(null)
+    }
   }
 
   const foundCount = reportData ? Object.values(reportData.latestResults).filter((r) => r.found).length : 0

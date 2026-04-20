@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     })
 
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    // Use 'load' instead of 'networkidle0' to avoid timeout on inline HTML
+    await page.setContent(html, { waitUntil: 'load' })
     await page.emulateMediaType('print')
 
     const pdfBuffer = await page.pdf({
@@ -31,18 +32,25 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    await browser.close()
+    browser = null
+
     return new NextResponse(Buffer.from(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline; filename="report.pdf"',
+        'Content-Disposition': 'attachment; filename="report.pdf"',
       },
     })
   } catch (error) {
     console.error('PDF export error:', error)
-    return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 })
+    return NextResponse.json({ error: 'PDF generation failed', details: String(error) }, { status: 500 })
   } finally {
     if (browser) {
-      await browser.close()
+      try {
+        await browser.close()
+      } catch (e) {
+        console.error('Error closing browser:', e)
+      }
     }
   }
 }
