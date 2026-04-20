@@ -14,14 +14,15 @@ let hebrewFontLoaded = false
 const reverseForRtl = (value: string): string => value.split('').reverse().join('')
 const isHebrewContent = (text: string): boolean => /[\u0590-\u05FF]/.test(text)
 const formatKeywordForPdf = (value: string): string => {
-  // For mixed-language keywords, preserve exactly as-is with directional marks
-  // Hebrew content uses RTL, English uses LTR - jsPDF will respect the actual text direction
+  // Document is in RTL mode (setR2L(true)), so handle per-language properly:
+  // - Hebrew: return as-is, RTL mode handles direction
+  // - English: wrap in LTR isolate to keep text LTR in RTL document
   if (isHebrewContent(value)) {
-    // Hebrew: wrap in RTL directional isolate
-    return `\u2067${value}\u2069`
+    // Hebrew in RTL document: return as-is
+    return value
   }
-  // English: return as-is (LTR by default)
-  return value
+  // English in RTL document: wrap in LTR directional isolate (\u2066) + pop (\u2069)
+  return `\u2066${value}\u2069`
 }
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
