@@ -1129,20 +1129,31 @@ function buildAudit(
   const sentLl = attempts.find(a => a.ll)?.ll || null
   const postalCodeSent = input.locationMode === 'zip' ? input.postalCode || null : null
 
+  const requestObj: Record<string, unknown> = {
+    keyword: input.keyword,
+    engine: 'google_maps',
+    projectCity: effectiveCity || null,
+    projectCountry: country.toUpperCase(),
+    locationMode: input.locationMode,
+    locationSent: sentLocation,
+    llSent: sentLl,
+    postalCodeSent,
+    gl: country,
+    hl: language,
+    scanner_version: '2.0',
+  }
+
+  // Explicit exact_point metadata for auditability
+  if (input.locationMode === 'exact_point' && input.exactPoint) {
+    requestObj.exactPointLat = input.exactPoint.lat
+    requestObj.exactPointLng = input.exactPoint.lng
+    requestObj.exactPointAddressInput = input.exactPoint.addressInput || null
+    requestObj.exactPointResolutionSource = input.exactPoint.resolutionSource || null
+    requestObj.exactPointGeocodingProvider = input.exactPoint.geocodingProvider || null
+  }
+
   return {
-    request: {
-      keyword: input.keyword,
-      engine: 'google_maps',
-      projectCity: effectiveCity || null,
-      projectCountry: country.toUpperCase(),
-      locationMode: input.locationMode,
-      locationSent: sentLocation,
-      llSent: sentLl,
-      postalCodeSent,
-      gl: country,
-      hl: language,
-      scanner_version: '2.0',
-    },
+    request: requestObj,
     response: {
       searchParameters: lastResponse?.searchParameters,
       placesCount: (lastResponse?.places || []).length,
