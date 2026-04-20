@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/types'
 import { getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
+import { sortTargetsByPosition } from '@/lib/sorting'
 
 interface ExportData {
   client: Client
@@ -77,7 +78,8 @@ export function exportToExcel(data: ExportData): void {
     'הערות',
   ]
 
-  const rankingRows = data.targets.map((target) => {
+  const sortedTargets = sortTargetsByPosition(data.targets, data.latestResults)
+  const rankingRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
 
     let changeDisplay = ''

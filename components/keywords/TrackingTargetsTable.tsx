@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal'
 import TrackingTargetForm from './TrackingTargetForm'
 import { toggleTrackingTargetActiveAction, deleteTrackingTargetAction } from '@/app/actions/tracking-targets'
 import { formatDateTime } from '@/lib/utils'
+import { sortTargetsByPosition } from '@/lib/sorting'
 import Link from 'next/link'
 
 interface TrackingTargetsTableProps {
@@ -54,6 +55,11 @@ export default function TrackingTargetsTable({
   }
 
   const sortedTargets = useMemo(() => {
+    if (sortBy === 'position') {
+      const sorted = sortTargetsByPosition(targets, latestResults)
+      return sortDir === 'desc' ? sorted.reverse() : sorted
+    }
+
     const copy = [...targets]
     copy.sort((a, b) => {
       const aResult = latestResults[a.id]
@@ -62,12 +68,6 @@ export default function TrackingTargetsTable({
 
       if (sortBy === 'keyword') {
         return a.keyword.localeCompare(b.keyword, 'he') * dir
-      }
-
-      if (sortBy === 'position') {
-        const aPos = aResult?.found && aResult.position != null ? aResult.position : Number.POSITIVE_INFINITY
-        const bPos = bResult?.found && bResult.position != null ? bResult.position : Number.POSITIVE_INFINITY
-        return (aPos - bPos) * dir
       }
 
       if (sortBy === 'date') {

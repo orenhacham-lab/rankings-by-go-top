@@ -1,5 +1,6 @@
 import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/types'
 import { getEngineDisplayLabel } from '@/lib/utils'
+import { sortTargetsByPosition } from '@/lib/sorting'
 
 interface ExportData {
   client: Client
@@ -17,7 +18,8 @@ function generateReportHTML(data: ExportData): string {
   const total = data.targets.length
   const coverage = total > 0 ? `${Math.round((found / total) * 100)}%` : '0%'
 
-  const tableRows = data.targets.map((target) => {
+  const sortedTargets = sortTargetsByPosition(data.targets, data.latestResults)
+  const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
 
     let changeStr = '—'

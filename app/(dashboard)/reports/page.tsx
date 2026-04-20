@@ -12,6 +12,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
 import { formatDateTime, getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
+import { sortTargetsByPosition } from '@/lib/sorting'
 
 function ReportsContent() {
   const searchParams = useSearchParams()
@@ -27,7 +28,7 @@ function ReportsContent() {
   } | null>(null)
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
-  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortColumn, setSortColumn] = useState<'position' | null>('position')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
@@ -136,23 +137,16 @@ function ReportsContent() {
 
   function getSortedTargets() {
     if (!reportData) return []
-    if (!sortColumn) return reportData.targets
 
-    const sorted = [...reportData.targets].sort((a, b) => {
-      if (sortColumn === 'position') {
-        const resultA = reportData.latestResults[a.id]
-        const resultB = reportData.latestResults[b.id]
-        const posA = resultA?.found && resultA.position ? resultA.position : 999
-        const posB = resultB?.found && resultB.position ? resultB.position : 999
-        return sortOrder === 'asc' ? posA - posB : posB - posA
-      }
-      return 0
-    })
+    if (sortColumn === 'position') {
+      const sorted = sortTargetsByPosition(reportData.targets, reportData.latestResults)
+      return sortOrder === 'desc' ? sorted.reverse() : sorted
+    }
 
-    return sorted
+    return reportData.targets
   }
 
-  function handleSortClick(column: string) {
+  function handleSortClick(column: 'position') {
     if (sortColumn === column) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
     } else {
