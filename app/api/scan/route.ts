@@ -270,7 +270,26 @@ export async function POST(request: Request) {
         const { error: resultError } = await admin.from('scan_results').insert(resultData)
 
         if (resultError) {
-          console.error(`[Scan] Failed to save result for target ${target.id}:`, resultError.message)
+          console.error(`[Scan] Failed to save result for target ${target.id}:`, {
+            message: resultError.message,
+            code: (resultError as any).code,
+            details: (resultError as any).details,
+            hint: (resultError as any).hint,
+          })
+          console.error(`[Scan] scan_results insert payload:`, {
+            scan_id: resultData.scan_id,
+            tracking_target_id: resultData.tracking_target_id,
+            engine_type: resultData.engine_type,
+            keyword: resultData.keyword,
+            found: resultData.found,
+            position: resultData.position,
+            error_message: resultData.error_message,
+            audit_request_keys: resultData.audit_request ? Object.keys(resultData.audit_request) : null,
+            audit_response_keys: resultData.audit_response ? Object.keys(resultData.audit_response) : null,
+            audit_decision_keys: resultData.audit_decision ? Object.keys(resultData.audit_decision) : null,
+            audit_location_mode: resultData.audit_location_mode,
+            audit_resolved_location: resultData.audit_resolved_location,
+          })
           failedTargets++
         } else if (scanOutput.error) {
           // Scan attempted but API returned an error — result saved with error_message
