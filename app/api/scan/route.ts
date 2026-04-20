@@ -158,6 +158,7 @@ export async function POST(request: Request) {
       locationMode,
       customCity: target.custom_city,
       gridSize: (target.grid_size || null) as 'small' | 'medium' | 'large' | null,
+      postalCode: (target.postal_code || null) as string | null,
     })
 
     // change_value: positive = improved (moved up), negative = dropped

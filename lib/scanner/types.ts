@@ -7,9 +7,10 @@ export interface ScanInput {
   language?: string
   city?: string | null
   deviceType?: string | null
-  locationMode?: 'project' | 'custom' | 'grid'
+  locationMode?: 'project' | 'custom' | 'grid' | 'zip'
   customCity?: string | null
   gridSize?: 'small' | 'medium' | 'large' | null
+  postalCode?: string | null
 }
 
 export interface ScanAttempt {
@@ -53,8 +54,10 @@ export interface ScanAudit {
     engine: string
     projectCity?: string | null
     projectCountry: string
+    locationMode?: string
     locationSent?: string | null
     llSent?: string | null
+    postalCodeSent?: string | null
     gl?: string
     hl?: string
     scanner_version?: string

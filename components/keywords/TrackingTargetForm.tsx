@@ -35,10 +35,11 @@ export default function TrackingTargetForm({
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [engine, setEngine] = useState<'google_search' | 'google_maps'>(target?.engine_type || 'google_search')
-  const [locationMode, setLocationMode] = useState<'project' | 'custom' | 'grid'>(
-    target?.location_mode || 'project'
+  const [locationMode, setLocationMode] = useState<'project' | 'custom' | 'grid' | 'zip'>(
+    (target?.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip'
   )
   const [customCity, setCustomCity] = useState(target?.custom_city || '')
+  const [postalCode, setPostalCode] = useState(target?.postal_code || '')
   const [bulkMode, setBulkMode] = useState(false)
 
   const customCityDiffers =
@@ -187,11 +188,12 @@ export default function TrackingTargetForm({
         label="מצב מיקום"
         name="location_mode"
         value={locationMode}
-        onChange={(e) => setLocationMode(e.target.value as 'project' | 'custom' | 'grid')}
+        onChange={(e) => setLocationMode(e.target.value as 'project' | 'custom' | 'grid' | 'zip')}
         options={[
           { value: 'project', label: `עיר הפרויקט${projectCity ? ` (${projectCity})` : ''}` },
           { value: 'custom', label: 'עיר מותאמת אישית' },
           { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
+          { value: 'zip', label: 'ZIP code (US only)' },
         ]}
       />
 
@@ -211,6 +213,23 @@ export default function TrackingTargetForm({
             </div>
           )}
         </div>
+      )}
+
+      {locationMode === 'zip' && (
+        <Input
+          label="ZIP code *"
+          name="postal_code"
+          value={postalCode}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 5)
+            setPostalCode(val)
+          }}
+          required
+          placeholder="12345"
+          maxLength={5}
+          pattern="\d{5}"
+          hint="5-digit US ZIP code"
+        />
       )}
 
       {locationMode === 'grid' && (
@@ -250,6 +269,9 @@ export default function TrackingTargetForm({
       )}
       {locationMode === 'project' && (
         <input type="hidden" name="custom_city" value="" />
+      )}
+      {locationMode !== 'zip' && (
+        <input type="hidden" name="postal_code" value="" />
       )}
 
       <Textarea

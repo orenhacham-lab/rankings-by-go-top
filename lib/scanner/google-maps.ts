@@ -425,6 +425,7 @@ async function runGridScan(
       engine: 'google_maps',
       projectCity: effectiveCity || null,
       projectCountry: country.toUpperCase(),
+      locationMode: 'grid',
       locationSent: effectiveCity || 'grid',
       llSent: centerLl,
       gl: country,
@@ -483,6 +484,67 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
+
+  // ZIP code mode: use postal code as location, no coordinates
+  if (input.locationMode === 'zip' && input.postalCode?.trim()) {
+    const postalCode = input.postalCode.trim()
+    const contextAttempts = [
+      { label: `postal code "${postalCode}"`, location: postalCode, coordinates: undefined },
+    ]
+    const auditAttempts: ScanAttempt[] = []
+    let lastResponse: SerperMapsResponse | null = null
+
+    try {
+      const response = await querySerperMaps(input.keyword, country, language, postalCode, undefined)
+      lastResponse = response
+
+      if (!response) {
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
+      }
+      if (response.error) {
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        return { ...makeError(response.error, input, audit), audit }
+      }
+
+      const places = response.places ?? []
+      const matchedPlace = findBusinessMatch(places, businessName)
+
+      if (matchedPlace) {
+        auditAttempts.push({
+          attemptNumber: 1,
+          context: 'postal code',
+          location: postalCode,
+          found: true,
+          matchedTitle: matchedPlace.title,
+          matchedPosition: matchedPlace.position,
+          matchedAddress: matchedPlace.address || null,
+        })
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
+        return {
+          found: true,
+          position: matchedPlace.position,
+          resultUrl: matchedPlace.website || null,
+          resultTitle: matchedPlace.title,
+          resultAddress: matchedPlace.address || null,
+          error: null,
+          audit,
+        }
+      }
+
+      auditAttempts.push({
+        attemptNumber: 1,
+        context: 'postal code',
+        location: postalCode,
+        found: false,
+      })
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
+    } catch (err) {
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      return { ...makeError((err as Error).message, input, audit), audit }
+    }
+  }
 
   // Resolve effective city: custom/grid override > project city
   const effectiveCity =
@@ -812,6 +874,7 @@ function buildAudit(
   // For non-grid scans, determine what was actually sent
   const sentLocation = attempts.find(a => a.location)?.location || null
   const sentLl = attempts.find(a => a.ll)?.ll || null
+  const postalCodeSent = input.locationMode === 'zip' ? input.postalCode || null : null
 
   return {
     request: {
@@ -819,8 +882,10 @@ function buildAudit(
       engine: 'google_maps',
       projectCity: effectiveCity || null,
       projectCountry: country.toUpperCase(),
+      locationMode: input.locationMode,
       locationSent: sentLocation,
       llSent: sentLl,
+      postalCodeSent,
       gl: country,
       hl: language,
       scanner_version: '2.0',
