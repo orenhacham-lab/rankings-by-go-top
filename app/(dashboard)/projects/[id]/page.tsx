@@ -243,6 +243,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         onScanTarget={handleScanTarget}
         scanningTargets={scanningTargets}
         projectDevice={project.device_type}
+        onActionComplete={loadData}
       />
 
       {/* Edit Modal */}

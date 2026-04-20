@@ -24,6 +24,7 @@ interface TrackingTargetsTableProps {
   onScanTarget?: (targetId: string) => void
   scanningTargets?: Set<string>
   projectDevice?: string | null
+  onActionComplete?: () => void
 }
 
 export default function TrackingTargetsTable({
@@ -37,6 +38,7 @@ export default function TrackingTargetsTable({
   onScanTarget,
   scanningTargets = new Set(),
   projectDevice,
+  onActionComplete,
 }: TrackingTargetsTableProps) {
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -92,6 +94,7 @@ export default function TrackingTargetsTable({
     setTogglingId(target.id)
     try {
       await toggleTrackingTargetActiveAction(target.id, target.is_active, projectId)
+      onActionComplete?.()
     } finally {
       setTogglingId(null)
     }
@@ -101,6 +104,7 @@ export default function TrackingTargetsTable({
     setDeletingId(targetId)
     try {
       await deleteTrackingTargetAction(targetId, projectId)
+      onActionComplete?.()
     } finally {
       setDeletingId(null)
       setConfirmDeleteId(null)
@@ -285,7 +289,7 @@ export default function TrackingTargetsTable({
             projectCountry={projectCountry}
             defaultDomain={projectDomain}
             defaultBusinessName={projectBusinessName}
-            onSuccess={() => setEditingTarget(null)}
+            onSuccess={() => { setEditingTarget(null); onActionComplete?.() }}
             onCancel={() => setEditingTarget(null)}
           />
         </Modal>
