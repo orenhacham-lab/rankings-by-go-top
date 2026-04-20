@@ -2,6 +2,66 @@ import { ScanInput, ScanOutput, ScanAudit, ScanAttempt, GridPointResult } from '
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
 const REQUEST_TIMEOUT_MS = 15_000
+const GEOCODING_CACHE: Map<string, { lat: number; lng: number } | null> = new Map()
+
+async function geocodeUSZIP(zipCode: string): Promise<{ lat: number; lng: number } | null> {
+  const cacheKey = `zip_${zipCode}`
+  if (GEOCODING_CACHE.has(cacheKey)) {
+    return GEOCODING_CACHE.get(cacheKey) || null
+  }
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zipCode)}&country=us&format=json`,
+      { timeout: 5000 }
+    )
+    if (!response.ok) return null
+
+    const data = (await response.json()) as Array<{ lat: string; lon: string }>
+    if (data.length > 0) {
+      const result = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+      GEOCODING_CACHE.set(cacheKey, result)
+      return result
+    }
+  } catch (err) {
+    console.error(`[ZIP Geocoding] Failed to geocode ${zipCode}:`, (err as Error).message)
+  }
+
+  GEOCODING_CACHE.set(cacheKey, null)
+  return null
+}
+
+function validateZIPResults(places: SerperMapsPlace[], zipCoordinates: { lat: number; lng: number }): boolean {
+  // Validate that results are approximately within US bounds and not obviously wrong
+  // Allow 100+ mile radius for results (ZIP areas can be scattered)
+  const VALIDATION_RADIUS_KM = 200
+
+  if (!places.length) return true
+
+  for (const place of places.slice(0, 5)) {
+    if (place.latitude !== undefined && place.longitude !== undefined) {
+      const distance = calculateDistance(zipCoordinates.lat, zipCoordinates.lng, place.latitude, place.longitude)
+      if (distance <= VALIDATION_RADIUS_KM) {
+        return true
+      }
+    }
+  }
+
+  // If no coordinates available in response, assume valid (can't validate)
+  return !places.some((p) => p.latitude !== undefined && p.longitude !== undefined)
+}
+
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  // Haversine formula for distance between two points in km
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
 
 interface SerperMapsPlace {
   title: string
@@ -485,17 +545,21 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
 
-  // ZIP code mode: use postal code as location, force US context (no coordinates)
+  // ZIP code mode: geocode ZIP to coordinates, send both location and ll
   if (input.locationMode === 'zip' && input.postalCode?.trim()) {
     const postalCode = input.postalCode.trim()
-    const contextAttempts = [
-      { label: `postal code "${postalCode}"`, location: postalCode, coordinates: undefined },
-    ]
     const auditAttempts: ScanAttempt[] = []
     let lastResponse: SerperMapsResponse | null = null
 
     try {
-      const response = await querySerperMaps(input.keyword, 'us', 'en', postalCode, undefined)
+      // Geocode ZIP to coordinates
+      const zipCoordinates = await geocodeUSZIP(postalCode)
+      if (!zipCoordinates) {
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, `Failed to geocode ZIP ${postalCode}`, null)
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'ZIP geocoding failed', audit }
+      }
+
+      const response = await querySerperMaps(input.keyword, 'us', 'en', postalCode, zipCoordinates)
       lastResponse = response
 
       if (!response) {
@@ -510,6 +574,12 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       const places = response.places ?? []
       const matchedPlace = findBusinessMatch(places, businessName)
 
+      // Validate: check if results are within expected US bounds for the ZIP
+      const withinUSBounds = validateZIPResults(places, zipCoordinates)
+      if (!withinUSBounds && places.length > 0) {
+        console.warn(`[ZIP Validation] Results for ${postalCode} appear outside expected ZIP area`)
+      }
+
       if (matchedPlace) {
         auditAttempts.push({
           attemptNumber: 1,
@@ -520,7 +590,8 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
           matchedPosition: matchedPlace.position,
           matchedAddress: matchedPlace.address || null,
         })
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
+        const validationWarning = !withinUSBounds && places.length > 0 ? ' (geo validation warning)' : ''
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, validationWarning ? `ZIP area validation: ${validationWarning}` : null)
         return {
           found: true,
           position: matchedPlace.position,
