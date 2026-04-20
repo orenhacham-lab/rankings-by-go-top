@@ -236,10 +236,22 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     if (!response.ok) throw new Error('PDF generation failed')
 
     const blob = await response.blob()
+    const contentType = response.headers.get('content-type') || ''
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     const safeName = data.project.name.replace(/[/\\:*?"<>|]/g, '-').replace(/\s+/g, '_').slice(0, 60)
-    const filename = `דוח_דירוגים_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`
+    const timestamp = new Date().toISOString().slice(0, 10)
+
+    // Branch filename by actual response content-type
+    let filename: string
+    if (contentType.includes('application/pdf')) {
+      filename = `דוח_דירוגים_${safeName}_${timestamp}.pdf`
+    } else if (contentType.includes('text/html')) {
+      filename = `דוח_דירוגים_${safeName}_${timestamp}.html`
+    } else {
+      filename = `דוח_דירוגים_${safeName}_${timestamp}`
+    }
+
     link.href = url
     link.download = filename
     document.body.appendChild(link)

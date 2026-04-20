@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       return new NextResponse(html, {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': 'inline; filename="report.html"',
+          'Content-Disposition': 'attachment; filename="report.html"',
         },
       })
     }
