@@ -11,18 +11,17 @@ interface ExportData {
 }
 
 let hebrewFontLoaded = false
-const reverseForRtl = (value: string): string => value.split('').reverse().join('')
 const isHebrewContent = (text: string): boolean => /[\u0590-\u05FF]/.test(text)
-const formatKeywordForPdf = (value: string): string => {
-  // Document is in RTL mode (setR2L(true)), so handle per-language properly:
-  // - Hebrew: return as-is, RTL mode handles direction
-  // - English: wrap in LTR isolate to keep text LTR in RTL document
+const formatTextForPdf = (value: string): string => {
+  // Use Unicode directional marks instead of document-level RTL.
+  // RLM (U+200F) signals RTL to bidi algorithm; LRM (U+200E) signals LTR.
+  // This lets the PDF viewer's Unicode algorithm handle direction correctly.
   if (isHebrewContent(value)) {
-    // Hebrew in RTL document: return as-is
-    return value
+    // Hebrew: wrap with RLM marks for proper RTL handling
+    return `\u200F${value}\u200F`
   }
-  // English in RTL document: wrap in LTR directional isolate (\u2066) + pop (\u2069)
-  return `\u2066${value}\u2069`
+  // English: use LRM to keep LTR
+  return `\u200E${value}\u200E`
 }
 
 async function ensureHebrewFont(doc: jsPDF): Promise<void> {
@@ -61,7 +60,6 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     format: 'a4',
   })
   await ensureHebrewFont(doc)
-  doc.setR2L(true)
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -79,30 +77,30 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15)
   doc.setFont('NotoSansHebrew', 'normal')
-  doc.text('דוח דירוגים', pageWidth - 14, 14, { align: 'right' })
+  doc.text(formatTextForPdf('דוח דירוגים'), pageWidth - 14, 14, { align: 'right' })
 
   doc.setFontSize(9)
   doc.setFont('NotoSansHebrew', 'normal')
-  doc.text(data.project.name, 14, 14)
+  doc.text(formatTextForPdf(data.project.name), 14, 14)
 
   // ── Project / client info ─────────────────────────────────────────
   doc.setTextColor(15, 23, 42)
   doc.setFontSize(12)
   doc.setFont('NotoSansHebrew', 'normal')
-  doc.text(data.project.name, pageWidth - 14, 33, { align: 'right' })
+  doc.text(formatTextForPdf(data.project.name), pageWidth - 14, 33, { align: 'right' })
 
   doc.setFont('NotoSansHebrew', 'normal')
   doc.setFontSize(8.5)
   doc.setTextColor(100, 116, 139)
-  const subtitle = `${data.client.name}  |  ${data.project.target_domain}  |  ${now}`
+  const subtitle = `${formatTextForPdf(data.client.name)}  |  ${formatTextForPdf(data.project.target_domain)}  |  ${formatTextForPdf(now)}`
   doc.text(subtitle, pageWidth - 14, 40, { align: 'right' })
 
   // ── Summary stat boxes ────────────────────────────────────────────
   const boxes = [
-    { label: 'סה״כ ביטויים', value: String(total) },
-    { label: 'נמצאו', value: String(found) },
-    { label: 'לא נמצאו', value: String(notFound) },
-    { label: 'כיסוי', value: coverage },
+    { label: formatTextForPdf('סה״כ ביטויים'), value: String(total) },
+    { label: formatTextForPdf('נמצאו'), value: String(found) },
+    { label: formatTextForPdf('לא נמצאו'), value: String(notFound) },
+    { label: formatTextForPdf('כיסוי'), value: coverage },
   ]
 
   const boxW = 54
@@ -131,8 +129,16 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   })
 
   // ── Rankings table ────────────────────────────────────────────────
-  // חשוב: אנחנו שומרים סדר עמודות כך ש"ביטוי" יהיה בצד ימין (RTL ויזואלי)
-  const tableHead = [['כתובת תוצאה', 'תאריך', 'נמצא', 'שינוי', 'מיקום קודם', 'מיקום', 'מנוע', 'ביטוי']]
+  const tableHead = [[
+    formatTextForPdf('כתובת תוצאה'),
+    formatTextForPdf('תאריך'),
+    formatTextForPdf('נמצא'),
+    'שינוי',
+    'מיקום קודם',
+    'מיקום',
+    formatTextForPdf('מנוע'),
+    formatTextForPdf('ביטוי'),
+  ]]
 
   const sortedTargets = [...reportTargets].sort((a, b) => {
     const aResult = data.latestResults[a.id]
@@ -162,22 +168,22 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     return {
       resultUrl: result?.result_url ?? null,
       cells: [
-        // URL: keep as-is (LTR), don't reverse
-        urlDisplay ? urlDisplay : '—',
-        // Date: keep Hebrew RTL
-        checkedAt !== '—' ? reverseForRtl(checkedAt) : '—',
+        // URL: LTR
+        formatTextForPdf(urlDisplay),
+        // Date: Hebrew with directional marks
+        checkedAt !== '—' ? formatTextForPdf(checkedAt) : '—',
         // Found status: Hebrew
-        result ? (result.found ? 'כן' : 'לא') : '—',
-        // Change: numeric (locale-agnostic)
+        formatTextForPdf(result ? (result.found ? 'כן' : 'לא') : '—'),
+        // Change: numeric
         changeStr !== '—' ? changeStr : '—',
         // Previous position: numeric
         previousPosition !== '—' ? previousPosition : '—',
         // Current position: numeric
         currentPosition !== '—' ? currentPosition : '—',
-        // Engine: Hebrew label
-        getEngineDisplayLabel(target.engine_type, data.project.device_type),
-        // Keyword: formatted with proper direction handling
-        formatKeywordForPdf(target.keyword),
+        // Engine: Hebrew label with directional marks
+        formatTextForPdf(getEngineDisplayLabel(target.engine_type, data.project.device_type)),
+        // Keyword: with proper direction handling
+        formatTextForPdf(target.keyword),
       ],
     }
   })
@@ -264,7 +270,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     doc.setFont('NotoSansHebrew', 'normal')
     doc.setTextColor(148, 163, 184)
     doc.text(
-      `Go Top | הופק בתאריך ${now} | עמוד ${i} מתוך ${pageCount}`,
+      `Go Top | ${formatTextForPdf(`הופק בתאריך ${now}`)} | ${formatTextForPdf(`עמוד ${i} מתוך ${pageCount}`)}`,
       pageWidth / 2,
       pageHeight - 4,
       { align: 'center' }
