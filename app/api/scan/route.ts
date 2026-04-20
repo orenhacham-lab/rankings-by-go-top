@@ -292,15 +292,32 @@ export async function POST(request: Request) {
 
     const finalStatus = failedTargets === targets.length ? 'failed' : 'completed'
 
+    // Build error summary if scan failed
+    let scanErrorMessage: string | null = null
+    if (finalStatus === 'failed') {
+      const failedKeywords = results
+        .filter(r => r.error)
+        .map(r => `"${r.keyword}" (${r.error})`)
+        .slice(0, 5)
+      scanErrorMessage = failedKeywords.length > 0
+        ? `Failed targets: ${failedKeywords.join('; ')}`
+        : `All ${failedTargets} targets failed`
+    }
+
     // Update scan record with final status
+    const updatePayload: Record<string, unknown> = {
+      status: finalStatus,
+      completed_targets: completedTargets,
+      failed_targets: failedTargets,
+      completed_at: new Date().toISOString(),
+    }
+    if (scanErrorMessage) {
+      updatePayload.error_message = scanErrorMessage
+    }
+
     await admin
       .from('scans')
-      .update({
-        status: finalStatus,
-        completed_targets: completedTargets,
-        failed_targets: failedTargets,
-        completed_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', scan.id)
 
     // Increment scan counter for paid subscriptions
