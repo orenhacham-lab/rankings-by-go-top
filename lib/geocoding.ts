@@ -15,7 +15,7 @@
 
 const GOOGLE_GEOCODING_URL = 'https://maps.googleapis.com/maps/api/geocode/json'
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
-const REQUEST_TIMEOUT_MS = 8_000
+const REQUEST_TIMEOUT_MS = 10_000
 
 export interface GeocodeSuccess {
   ok: true

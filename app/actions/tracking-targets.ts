@@ -26,6 +26,8 @@ interface ResolvedExactPoint {
  * - Either direct valid lat/lng, OR
  * - A non-empty address that geocodes successfully.
  * If neither produces valid coords we throw — no partial state is ever saved.
+ *
+ * SAFETY: wrapped in try-catch at call site to prevent server component crashes.
  */
 async function resolveExactPointFromFormData(
   formData: FormData,
@@ -52,20 +54,26 @@ async function resolveExactPointFromFormData(
 
   // Path 2: address geocoding
   if (addressInput) {
-    const geo = await geocodeAddress(addressInput, projectCountry)
-    if (!geo.ok) {
+    try {
+      const geo = await geocodeAddress(addressInput, projectCountry)
+      if (!geo.ok) {
+        throw new Error(
+          `כתובת לא ניתנת לפתרון — ${geo.reason}. ספקים שנוסו: ${geo.providersTried.join(', ')}`
+        )
+      }
+      const source: ExactPointResolutionSource =
+        geo.provider === 'google' ? 'geocoded_google' : 'geocoded_nominatim'
+      return {
+        exact_address_input: addressInput,
+        exact_resolved_lat: geo.lat,
+        exact_resolved_lng: geo.lng,
+        exact_resolution_source: source,
+        exact_geocoding_provider: geo.provider + (geo.usedFallback ? ' (fallback)' : ''),
+      }
+    } catch (err) {
       throw new Error(
-        `כתובת לא ניתנת לפתרון — ${geo.reason}. ספקים שנוסו: ${geo.providersTried.join(', ')}`
+        `שגיאה בפתרון כתובת: ${(err as Error).message || 'unknown error'}`
       )
-    }
-    const source: ExactPointResolutionSource =
-      geo.provider === 'google' ? 'geocoded_google' : 'geocoded_nominatim'
-    return {
-      exact_address_input: addressInput,
-      exact_resolved_lat: geo.lat,
-      exact_resolved_lng: geo.lng,
-      exact_resolution_source: source,
-      exact_geocoding_provider: geo.provider + (geo.usedFallback ? ' (fallback)' : ''),
     }
   }
 
@@ -129,6 +137,10 @@ export async function createTrackingTargetAction(formData: FormData) {
 
   if (locationMode === 'exact_point') {
     const projectCountry = await fetchProjectCountry(supabase, projectId)
+    // exact_point is US-only
+    if (projectCountry.toUpperCase() !== 'US') {
+      throw new Error('מצב "נקודה מדויקת" זמין רק לפרויקטי ארה"ב')
+    }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry)
     Object.assign(data, resolved)
   } else {
@@ -191,6 +203,10 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   let resolvedExact: ResolvedExactPoint | null = null
   if (locationMode === 'exact_point') {
     const projectCountry = await fetchProjectCountry(supabase, projectId)
+    // exact_point is US-only
+    if (projectCountry.toUpperCase() !== 'US') {
+      throw new Error('מצב "נקודה מדויקת" זמין רק לפרויקטי ארה"ב')
+    }
     resolvedExact = await resolveExactPointFromFormData(formData, projectCountry)
   }
 
@@ -277,6 +293,10 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
       .single<{ project_id: string; projects: { country: string } }>()
     if (lookupErr || !existing) throw new Error('לא ניתן לטעון פרויקט עבור עדכון')
     const projectCountry = existing.projects.country || 'IL'
+    // exact_point is US-only
+    if (projectCountry.toUpperCase() !== 'US') {
+      throw new Error('מצב "נקודה מדויקת" זמין רק לפרויקטי ארה"ב')
+    }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry)
     Object.assign(data, resolved)
   } else {

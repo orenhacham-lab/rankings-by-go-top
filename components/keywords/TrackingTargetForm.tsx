@@ -261,14 +261,16 @@ export default function TrackingTargetForm({
             { value: 'custom', label: 'עיר מותאמת אישית' },
             { value: 'grid', label: 'סריקת רשת — גריד (גוגל מפות בלבד)' },
             ...(projectCountry?.toUpperCase() === 'US'
-              ? [{ value: 'zip', label: 'ZIP Code (US Only)' }]
+              ? [
+                  { value: 'zip', label: 'ZIP Code (US Only)' },
+                  { value: 'exact_point', label: 'נקודה מדויקת — כתובת / lat,lng (מדויק ביותר)' },
+                ]
               : []),
-            { value: 'exact_point', label: 'נקודה מדויקת — כתובת / lat,lng (מדויק ביותר)' },
           ]}
         />
         {projectCountry?.toUpperCase() !== 'US' && (
           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
-            ZIP Code סריקה זמינה לפרויקטי ארה"ב בלבד
+            ZIP Code וגם נקודה מדויקת זמינים לפרויקטי ארה"ב בלבד
           </div>
         )}
       </div>
