@@ -152,7 +152,23 @@ export async function createTrackingTargetAction(formData: FormData) {
   }
 
   const { error } = await supabase.from('tracking_targets').insert(data)
-  if (error) throw new Error(error.message)
+
+  // If exact_point columns don't exist (migration not applied), retry without them
+  if (error && error.message && /exact_(address_input|resolved_|resolution_|geocoding_)/.test(error.message)) {
+    const {
+      exact_address_input: _a,
+      exact_resolved_lat: _b,
+      exact_resolved_lng: _c,
+      exact_resolution_source: _d,
+      exact_geocoding_provider: _e,
+      ...dataWithoutExact
+    } = data
+    void _a; void _b; void _c; void _d; void _e
+    const { error: retryError } = await supabase.from('tracking_targets').insert(dataWithoutExact)
+    if (retryError) throw new Error(retryError.message)
+  } else if (error) {
+    throw new Error(error.message)
+  }
 
   revalidatePath(`/projects/${projectId}`)
   revalidatePath('/keywords')
@@ -258,7 +274,26 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   }
 
   const { error } = await supabase.from('tracking_targets').insert(toInsert)
-  if (error) throw new Error(error.message)
+
+  // If exact_point columns don't exist (migration not applied), retry without them
+  if (error && error.message && /exact_(address_input|resolved_|resolution_|geocoding_)/.test(error.message)) {
+    const reduced = toInsert.map(row => {
+      const {
+        exact_address_input: _a,
+        exact_resolved_lat: _b,
+        exact_resolved_lng: _c,
+        exact_resolution_source: _d,
+        exact_geocoding_provider: _e,
+        ...rest
+      } = row
+      void _a; void _b; void _c; void _d; void _e
+      return rest
+    })
+    const { error: retryError } = await supabase.from('tracking_targets').insert(reduced)
+    if (retryError) throw new Error(retryError.message)
+  } else if (error) {
+    throw new Error(error.message)
+  }
 
   revalidatePath(`/projects/${projectId}`)
   revalidatePath('/keywords')
