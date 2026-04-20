@@ -125,7 +125,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
     doc.setFontSize(13)
     // ספרות ואחוזים מוצגים יציב יותר עם Helvetica
     doc.setFont('helvetica', 'bold')
-    doc.text(reverseForRtl(box.value), x + boxW / 2, boxY + 13, { align: 'center' })
+    doc.text(formatTextForPdf(box.value), x + boxW / 2, boxY + 13, { align: 'center' })
   })
 
   // ── Rankings table ────────────────────────────────────────────────
