@@ -5,7 +5,7 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
-import { TrackingTarget } from '@/lib/supabase/types'
+import { TrackingTarget, LocationMode } from '@/lib/supabase/types'
 import {
   createTrackingTargetAction,
   updateTrackingTargetAction,
@@ -35,8 +35,8 @@ export default function TrackingTargetForm({
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [engine, setEngine] = useState<'google_search' | 'google_maps'>(target?.engine_type || 'google_search')
-  const [locationMode, setLocationMode] = useState<'project' | 'custom' | 'grid' | 'zip'>(
-    (target?.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip'
+  const [locationMode, setLocationMode] = useState<LocationMode>(
+    target?.location_mode || 'project'
   )
   const [customCity, setCustomCity] = useState(target?.custom_city || '')
   const [postalCode, setPostalCode] = useState(target?.postal_code || '')
@@ -188,7 +188,7 @@ export default function TrackingTargetForm({
         label="מצב מיקום"
         name="location_mode"
         value={locationMode}
-        onChange={(e) => setLocationMode(e.target.value as 'project' | 'custom' | 'grid' | 'zip')}
+        onChange={(e) => setLocationMode(e.target.value as LocationMode)}
         options={[
           { value: 'project', label: `עיר הפרויקט${projectCity ? ` (${projectCity})` : ''}` },
           { value: 'custom', label: 'עיר מותאמת אישית' },

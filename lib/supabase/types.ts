@@ -66,7 +66,7 @@ export interface Project {
 }
 
 export type EngineType = 'google_search' | 'google_maps'
-export type LocationMode = 'project' | 'custom' | 'grid'
+export type LocationMode = 'project' | 'custom' | 'grid' | 'zip'
 export type GridSize = 'small' | 'medium' | 'large'
 
 export interface TrackingTarget {
@@ -82,6 +82,7 @@ export interface TrackingTarget {
   location_mode: LocationMode
   custom_city: string | null
   grid_size: GridSize | null
+  postal_code: string | null
   created_at: string
   updated_at: string
   // joins
