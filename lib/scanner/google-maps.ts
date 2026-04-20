@@ -1129,7 +1129,7 @@ function buildAudit(
   const sentLl = attempts.find(a => a.ll)?.ll || null
   const postalCodeSent = input.locationMode === 'zip' ? input.postalCode || null : null
 
-  const requestObj: Record<string, unknown> = {
+  const requestObj: ScanAudit['request'] = {
     keyword: input.keyword,
     engine: 'google_maps',
     projectCity: effectiveCity || null,

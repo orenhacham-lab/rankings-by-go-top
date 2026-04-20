@@ -67,6 +67,11 @@ export interface ScanAudit {
     locationSent?: string | null
     llSent?: string | null
     postalCodeSent?: string | null
+    exactPointLat?: number
+    exactPointLng?: number
+    exactPointAddressInput?: string | null
+    exactPointResolutionSource?: string | null
+    exactPointGeocodingProvider?: string | null
     gl?: string
     hl?: string
     scanner_version?: string
