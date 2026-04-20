@@ -95,7 +95,6 @@ export async function POST(req: Request) {
     const requestPayload = {
       source: html,
       landscape: false,
-      use_print_media: true,
     }
 
     const requestHeaders = {
@@ -107,7 +106,7 @@ export async function POST(req: Request) {
       url: 'https://api.pdfshift.io/v3/convert/pdf',
       method: 'POST',
       headers: requestHeaders,
-      body: { source: `(${html.length} bytes)`, landscape: false, use_print_media: true },
+      body: { source: `(${html.length} bytes)`, landscape: false },
     })
 
     const pdfShiftResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
