@@ -367,6 +367,8 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (m) => map[m])
 }
 
+export { generateReportHTML }
+
 export async function exportToPDF(data: ExportData): Promise<void> {
   const html = generateReportHTML(data)
   const blob = new Blob([html], { type: 'text/html; charset=utf-8' })

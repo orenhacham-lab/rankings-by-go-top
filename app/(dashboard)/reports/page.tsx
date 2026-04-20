@@ -116,13 +116,27 @@ function ReportsContent() {
     if (!reportData) return
     setExporting('pdf')
     try {
-      const { exportToPDF } = await import('@/lib/export/pdf')
-      await exportToPDF({
-        client: reportData.project.clients!,
-        project: reportData.project,
-        targets: reportData.targets,
-        latestResults: reportData.latestResults,
+      const res = await fetch('/api/reports/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: reportData.project.id }),
       })
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      const safeName = reportData.project.name.replace(/[/\\:*?"<>|]/g, '-').replace(/\s+/g, '_').slice(0, 60)
+      const timestamp = new Date().toISOString().slice(0, 10)
+      link.href = url
+      link.download = `דוח_דירוגים_${safeName}_${timestamp}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     } catch (error) {
       console.error('PDF export error:', error)
       alert('שגיאה ביהורדת דוח')
