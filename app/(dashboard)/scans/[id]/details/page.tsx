@@ -243,8 +243,14 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                     {auditDecision?.grid_enabled && (
                       <div>
                         <h4 className="font-semibold text-slate-900 mb-3">
-                          Grid Scan — {auditDecision.grid_size} ({auditDecision.per_point_results?.length || 0} points)
+                          Grid Scan — {auditDecision.grid_size} ({auditDecision.executed_points || auditDecision.per_point_results?.length || 0} executed{auditDecision.early_stopped && `, ${auditDecision.skipped_points} skipped`})
                         </h4>
+
+                        {auditDecision.early_stopped && (
+                          <div className="bg-amber-50 border border-amber-200 rounded p-3 mb-4 text-xs text-amber-800">
+                            <strong>Early stop:</strong> {auditDecision.early_stop_reason}
+                          </div>
+                        )}
 
                         {/* Summary metrics */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -256,7 +262,7 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                             { label: 'Coverage', value: auditDecision.coverage != null
                               ? `${Math.round(auditDecision.coverage * 100)}%`
                               : '—',
-                              sub: `${auditDecision.per_point_results?.filter((p: any) => p.found).length || 0} / ${auditDecision.per_point_results?.length || 0} points` },
+                              sub: `${auditDecision.per_point_results?.filter((p: any) => p.found).length || 0} / ${auditDecision.executed_points || auditDecision.per_point_results?.length || 0} points` },
                           ].map((m, i) => (
                             <div key={i} className="bg-slate-50 p-3 rounded text-sm">
                               <div className="text-slate-500 text-xs mb-1">{m.label}</div>
@@ -292,11 +298,25 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                                       <span className="text-slate-600">business_rejected:</span>
                                       <span className="font-mono ml-1">{pt.business_rejected ? 'yes' : 'no'}</span>
                                     </div>
+                                    <div>
+                                      <span className="text-slate-600">places_checked_count:</span>
+                                      <span className="font-mono ml-1">{pt.places_checked_count || pt.places_count || '—'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-600">checked_all_places:</span>
+                                      <span className="font-mono ml-1">{pt.target_checked_against_all_places ? 'yes' : 'no'}</span>
+                                    </div>
                                   </div>
                                   {pt.rejection_reason && (
                                     <div className="text-red-600">
                                       <span>rejection reason:</span>
                                       <span className="font-mono ml-1">{pt.rejection_reason}</span>
+                                    </div>
+                                  )}
+                                  {pt.result_signature && (
+                                    <div className="text-slate-500 border-t pt-1 mt-1">
+                                      <span className="text-slate-600">signature:</span>
+                                      <div className="font-mono text-slate-700 break-all text-xs mt-0.5">{pt.result_signature}</div>
                                     </div>
                                   )}
                                 </div>

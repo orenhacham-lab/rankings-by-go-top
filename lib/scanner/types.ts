@@ -40,6 +40,11 @@ export interface GridPointResult {
   business_returned: boolean
   business_rejected: boolean
   rejection_reason?: 'title_mismatch' | 'domain_mismatch' | 'phone_mismatch'
+  // Scope tracking
+  places_checked_count: number
+  target_checked_against_all_places: boolean
+  // Dedup signature
+  result_signature: string
 }
 
 export interface ScanAudit {
@@ -81,6 +86,11 @@ export interface ScanAudit {
     worst_position?: number | null
     coverage?: number
     position_source?: 'best_of_grid'
+    // Early-stop tracking
+    early_stopped?: boolean
+    early_stop_reason?: string
+    executed_points?: number
+    skipped_points?: number
   }
 }
 

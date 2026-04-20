@@ -239,14 +239,22 @@ function findBusinessMatch(places: SerperMapsPlace[], targetName: string): Serpe
   return null
 }
 
+function computeResultSignature(places: SerperMapsPlace[]): string {
+  return places.slice(0, 5).map(p => p.cid || p.title).join('|')
+}
+
 function analyzeMatchDebug(places: SerperMapsPlace[], targetName: string): {
   top_places: Array<{ title: string; position: number }>
   business_returned: boolean
   business_rejected: boolean
   rejection_reason?: 'title_mismatch' | 'domain_mismatch' | 'phone_mismatch'
+  places_checked_count: number
+  target_checked_against_all_places: boolean
+  result_signature: string
 } {
   const normalizedTarget = normalizeBusinessName(targetName)
   const topPlaces = places.slice(0, 5).map(p => ({ title: p.title, position: p.position }))
+  const signature = computeResultSignature(places)
 
   // Check if business appears in the returned places
   let foundIndex = -1
@@ -263,6 +271,9 @@ function analyzeMatchDebug(places: SerperMapsPlace[], targetName: string): {
       top_places: topPlaces,
       business_returned: true,
       business_rejected: false,
+      places_checked_count: places.length,
+      target_checked_against_all_places: true,
+      result_signature: signature,
     }
   }
 
@@ -278,6 +289,9 @@ function analyzeMatchDebug(places: SerperMapsPlace[], targetName: string): {
         business_returned: true,
         business_rejected: true,
         rejection_reason: 'title_mismatch',
+        places_checked_count: places.length,
+        target_checked_against_all_places: true,
+        result_signature: signature,
       }
     }
   }
@@ -286,6 +300,9 @@ function analyzeMatchDebug(places: SerperMapsPlace[], targetName: string): {
     top_places: topPlaces,
     business_returned: false,
     business_rejected: false,
+    places_checked_count: places.length,
+    target_checked_against_all_places: true,
+    result_signature: signature,
   }
 }
 
@@ -336,6 +353,10 @@ async function runGridScan(
 
   let bestMatch: SerperMapsPlace | null = null
   let bestMatchPoint: (typeof gridPoints)[0] | null = null
+  let lastSignature: string | null = null
+  let consecutiveMatches = 0
+  let earlyStop = false
+  let earlyStopReason: string | null = null
 
   for (let i = 0; i < gridPoints.length; i++) {
     const point = gridPoints[i]
@@ -358,6 +379,9 @@ async function runGridScan(
       business_returned: debug.business_returned,
       business_rejected: debug.business_rejected,
       rejection_reason: debug.rejection_reason,
+      places_checked_count: debug.places_checked_count,
+      target_checked_against_all_places: debug.target_checked_against_all_places,
+      result_signature: debug.result_signature,
     })
 
     if (matched) {
@@ -367,6 +391,20 @@ async function runGridScan(
         bestMatchPoint = point
       }
     }
+
+    // Early-stop: if this point has identical result signature to previous, increment counter
+    if (lastSignature && debug.result_signature === lastSignature) {
+      consecutiveMatches++
+      // If 2 consecutive points are identical, stop early — results have converged
+      if (consecutiveMatches >= 1) {
+        earlyStop = true
+        earlyStopReason = 'consecutive_identical_result_signatures'
+        break
+      }
+    } else {
+      consecutiveMatches = 0
+    }
+    lastSignature = debug.result_signature
   }
 
   const found = foundPositions.length > 0
@@ -375,7 +413,9 @@ async function runGridScan(
   const avgPosition = found
     ? Math.round((foundPositions.reduce((a, b) => a + b, 0) / foundPositions.length) * 10) / 10
     : null
-  const coverage = Math.round((foundPositions.length / gridPoints.length) * 1000) / 1000
+  const executedPoints = perPointResults.length
+  const skippedPoints = gridPoints.length - executedPoints
+  const coverage = executedPoints > 0 ? Math.round((foundPositions.length / executedPoints) * 1000) / 1000 : 0
 
   const centerLl = `@${center.lat},${center.lng},13z`
 
@@ -412,6 +452,10 @@ async function runGridScan(
       worst_position: worstPosition,
       coverage,
       position_source: 'best_of_grid' as const,
+      early_stopped: earlyStop,
+      early_stop_reason: earlyStopReason || undefined,
+      executed_points: executedPoints,
+      skipped_points: skippedPoints,
     },
   }
 
