@@ -1,3 +1,11 @@
+export interface ExactPointInput {
+  lat: number
+  lng: number
+  addressInput?: string | null
+  resolutionSource?: string | null
+  geocodingProvider?: string | null
+}
+
 export interface ScanInput {
   engine: string
   keyword: string
@@ -7,10 +15,11 @@ export interface ScanInput {
   language?: string
   city?: string | null
   deviceType?: string | null
-  locationMode?: 'project' | 'custom' | 'grid' | 'zip'
+  locationMode?: 'project' | 'custom' | 'grid' | 'zip' | 'exact_point'
   customCity?: string | null
   gridSize?: 'small' | 'medium' | 'large' | null
   postalCode?: string | null
+  exactPoint?: ExactPointInput | null
 }
 
 export interface ScanAttempt {

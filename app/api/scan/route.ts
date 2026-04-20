@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       businessName: target.target_business_name || project.business_name,
     })
 
-    const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip'
+    const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip' | 'exact_point'
 
     // Validate ZIP mode only allowed for US projects
     if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
@@ -148,6 +148,35 @@ export async function POST(request: Request) {
         { error: 'ZIP code mode is only supported for US projects' },
         { status: 400 }
       )
+    }
+
+    // exact_point is the SOURCE OF TRUTH — block scan if coords missing/invalid.
+    // Never silently fall back to project city or ZIP.
+    let exactPointInput: {
+      lat: number
+      lng: number
+      addressInput?: string | null
+      resolutionSource?: string | null
+      geocodingProvider?: string | null
+    } | null = null
+    if (locationMode === 'exact_point') {
+      const lat = typeof target.exact_resolved_lat === 'number' ? target.exact_resolved_lat : null
+      const lng = typeof target.exact_resolved_lng === 'number' ? target.exact_resolved_lng : null
+      if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return Response.json(
+          {
+            error: `exact_point מצב: חסרים קואורדינטות תקינים עבור מילת מפתח "${target.keyword}". אין נפילה לעיר/ZIP — יש לעדכן כתובת או lat/lng.`,
+          },
+          { status: 400 }
+        )
+      }
+      exactPointInput = {
+        lat,
+        lng,
+        addressInput: target.exact_address_input || null,
+        resolutionSource: target.exact_resolution_source || null,
+        geocodingProvider: target.exact_geocoding_provider || null,
+      }
     }
 
     const effectiveCity =
@@ -168,6 +197,7 @@ export async function POST(request: Request) {
       customCity: target.custom_city,
       gridSize: (target.grid_size || null) as 'small' | 'medium' | 'large' | null,
       postalCode: (target.postal_code || null) as string | null,
+      exactPoint: exactPointInput,
     })
 
     // change_value: positive = improved (moved up), negative = dropped
@@ -207,8 +237,13 @@ export async function POST(request: Request) {
 
     // Add location mode audit for US projects
     if (project.country.toUpperCase() === 'US') {
-      resultData.audit_location_mode = locationMode === 'zip' ? 'zip_centroid' : 'city_state'
-      resultData.audit_resolved_location = locationMode === 'zip' ? target.postal_code : effectiveCity
+      if (locationMode === 'exact_point') {
+        resultData.audit_location_mode = 'exact_point'
+        resultData.audit_resolved_location = target.exact_address_input || `${exactPointInput?.lat},${exactPointInput?.lng}`
+      } else {
+        resultData.audit_location_mode = locationMode === 'zip' ? 'zip_centroid' : 'city_state'
+        resultData.audit_resolved_location = locationMode === 'zip' ? target.postal_code : effectiveCity
+      }
     }
 
     const { error: resultError } = await admin.from('scan_results').insert(resultData)

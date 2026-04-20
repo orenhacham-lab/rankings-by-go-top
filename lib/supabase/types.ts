@@ -66,8 +66,12 @@ export interface Project {
 }
 
 export type EngineType = 'google_search' | 'google_maps'
-export type LocationMode = 'project' | 'custom' | 'grid' | 'zip'
+export type LocationMode = 'project' | 'custom' | 'grid' | 'zip' | 'exact_point'
 export type GridSize = 'small' | 'medium' | 'large'
+export type ExactPointResolutionSource =
+  | 'user_provided_coordinates'
+  | 'geocoded_google'
+  | 'geocoded_nominatim'
 
 export interface TrackingTarget {
   id: string
@@ -83,6 +87,11 @@ export interface TrackingTarget {
   custom_city: string | null
   grid_size: GridSize | null
   postal_code: string | null
+  exact_address_input: string | null
+  exact_resolved_lat: number | null
+  exact_resolved_lng: number | null
+  exact_resolution_source: ExactPointResolutionSource | null
+  exact_geocoding_provider: string | null
   created_at: string
   updated_at: string
   // joins

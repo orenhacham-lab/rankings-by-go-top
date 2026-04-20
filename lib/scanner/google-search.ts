@@ -58,7 +58,12 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       body.device = requestParams.device
     }
 
-    if (input.city) {
+    // exact_point is the source of truth — ll alone drives geo targeting.
+    // Do not send location (city/zip) when exact_point is active.
+    if (input.locationMode === 'exact_point' && input.exactPoint) {
+      body.ll = `@${input.exactPoint.lat},${input.exactPoint.lng},13z`
+      console.log(`[GoogleSearch] exact_point: ll=${body.ll} (location suppressed)`)
+    } else if (input.city) {
       body.location = input.city
     }
 

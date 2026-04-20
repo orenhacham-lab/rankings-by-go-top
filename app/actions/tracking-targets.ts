@@ -3,12 +3,86 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getUserEntitlement } from '@/lib/subscription'
+import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
+import type { ExactPointResolutionSource } from '@/lib/supabase/types'
 
 function safeStringFromFormData(formData: FormData, key: string): string | null {
   const value = formData.get(key)
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
+}
+
+interface ResolvedExactPoint {
+  exact_address_input: string | null
+  exact_resolved_lat: number
+  exact_resolved_lng: number
+  exact_resolution_source: ExactPointResolutionSource
+  exact_geocoding_provider: string | null
+}
+
+/**
+ * exact_point resolution is BLOCKING:
+ * - Either direct valid lat/lng, OR
+ * - A non-empty address that geocodes successfully.
+ * If neither produces valid coords we throw — no partial state is ever saved.
+ */
+async function resolveExactPointFromFormData(
+  formData: FormData,
+  projectCountry: string
+): Promise<ResolvedExactPoint> {
+  const addressInput = safeStringFromFormData(formData, 'exact_address_input')
+  const rawLat = safeStringFromFormData(formData, 'exact_resolved_lat')
+  const rawLng = safeStringFromFormData(formData, 'exact_resolved_lng')
+
+  // Path 1: direct coordinates take precedence when both are provided
+  if (rawLat !== null && rawLng !== null) {
+    const validated = validateCoordinatePair(rawLat, rawLng)
+    if (!validated.ok) {
+      throw new Error(`קואורדינטות לא תקינות: ${validated.reason}`)
+    }
+    return {
+      exact_address_input: addressInput,
+      exact_resolved_lat: validated.lat,
+      exact_resolved_lng: validated.lng,
+      exact_resolution_source: 'user_provided_coordinates',
+      exact_geocoding_provider: null,
+    }
+  }
+
+  // Path 2: address geocoding
+  if (addressInput) {
+    const geo = await geocodeAddress(addressInput, projectCountry)
+    if (!geo.ok) {
+      throw new Error(
+        `כתובת לא ניתנת לפתרון — ${geo.reason}. ספקים שנוסו: ${geo.providersTried.join(', ')}`
+      )
+    }
+    const source: ExactPointResolutionSource =
+      geo.provider === 'google' ? 'geocoded_google' : 'geocoded_nominatim'
+    return {
+      exact_address_input: addressInput,
+      exact_resolved_lat: geo.lat,
+      exact_resolved_lng: geo.lng,
+      exact_resolution_source: source,
+      exact_geocoding_provider: geo.provider + (geo.usedFallback ? ' (fallback)' : ''),
+    }
+  }
+
+  throw new Error('דרוש פתרון: ספק כתובת או קואורדינטות (lat/lng) עבור מצב "נקודה מדויקת"')
+}
+
+async function fetchProjectCountry(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('country')
+    .eq('id', projectId)
+    .single()
+  if (error || !data) throw new Error('לא נמצא פרויקט')
+  return (data.country || 'IL').toString()
 }
 
 export async function createTrackingTargetAction(formData: FormData) {
@@ -35,7 +109,9 @@ export async function createTrackingTargetAction(formData: FormData) {
     }
   }
 
-  const data = {
+  const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
+
+  const data: Record<string, unknown> = {
     user_id: user.id,
     project_id: projectId,
     keyword: formData.get('keyword') as string,
@@ -44,11 +120,23 @@ export async function createTrackingTargetAction(formData: FormData) {
     target_business_name: (formData.get('target_business_name') as string) || null,
     preferred_landing_page: (formData.get('preferred_landing_page') as string) || null,
     notes: (formData.get('notes') as string) || null,
-    location_mode: safeStringFromFormData(formData, 'location_mode') || 'project',
+    location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
     grid_size: safeStringFromFormData(formData, 'grid_size'),
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     is_active: true,
+  }
+
+  if (locationMode === 'exact_point') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId)
+    const resolved = await resolveExactPointFromFormData(formData, projectCountry)
+    Object.assign(data, resolved)
+  } else {
+    data.exact_address_input = null
+    data.exact_resolved_lat = null
+    data.exact_resolved_lng = null
+    data.exact_resolution_source = null
+    data.exact_geocoding_provider = null
   }
 
   const { error } = await supabase.from('tracking_targets').insert(data)
@@ -99,6 +187,13 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   const gridSize = safeStringFromFormData(formData, 'grid_size')
   const postalCode = safeStringFromFormData(formData, 'postal_code')
 
+  // Resolve exact_point ONCE for the whole bulk batch (all new rows share the same location)
+  let resolvedExact: ResolvedExactPoint | null = null
+  if (locationMode === 'exact_point') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId)
+    resolvedExact = await resolveExactPointFromFormData(formData, projectCountry)
+  }
+
   const toInsert = keywords
     .filter((k) => !existingSet.has(k.toLowerCase()))
     .map((keyword) => ({
@@ -114,6 +209,11 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
       custom_city: customCity,
       grid_size: gridSize,
       postal_code: postalCode,
+      exact_address_input: resolvedExact?.exact_address_input ?? null,
+      exact_resolved_lat: resolvedExact?.exact_resolved_lat ?? null,
+      exact_resolved_lng: resolvedExact?.exact_resolved_lng ?? null,
+      exact_resolution_source: resolvedExact?.exact_resolution_source ?? null,
+      exact_geocoding_provider: resolvedExact?.exact_geocoding_provider ?? null,
       is_active: true,
     }))
 
@@ -153,24 +253,63 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
 export async function updateTrackingTargetAction(id: string, formData: FormData) {
   const supabase = await createClient()
 
-  const data = {
+  const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
+
+  const data: Record<string, unknown> = {
     keyword: formData.get('keyword') as string,
     engine_type: formData.get('engine_type') as string,
     target_domain: (formData.get('target_domain') as string) || null,
     target_business_name: (formData.get('target_business_name') as string) || null,
     preferred_landing_page: (formData.get('preferred_landing_page') as string) || null,
     notes: (formData.get('notes') as string) || null,
-    location_mode: safeStringFromFormData(formData, 'location_mode') || 'project',
+    location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
     grid_size: safeStringFromFormData(formData, 'grid_size'),
     postal_code: safeStringFromFormData(formData, 'postal_code'),
-  } as Record<string, unknown>
+  }
+
+  if (locationMode === 'exact_point') {
+    // Need project country to geocode — look up via the target row
+    const { data: existing, error: lookupErr } = await supabase
+      .from('tracking_targets')
+      .select('project_id, projects!inner(country)')
+      .eq('id', id)
+      .single<{ project_id: string; projects: { country: string } }>()
+    if (lookupErr || !existing) throw new Error('לא ניתן לטעון פרויקט עבור עדכון')
+    const projectCountry = existing.projects.country || 'IL'
+    const resolved = await resolveExactPointFromFormData(formData, projectCountry)
+    Object.assign(data, resolved)
+  } else {
+    data.exact_address_input = null
+    data.exact_resolved_lat = null
+    data.exact_resolved_lng = null
+    data.exact_resolution_source = null
+    data.exact_geocoding_provider = null
+  }
 
   let { error } = await supabase.from('tracking_targets').update(data).eq('id', id)
 
-  // If postal_code column doesn't exist (migration not applied), retry without it
+  // If exact_point columns don't exist (migration not applied), retry without them
+  if (error && error.message && /exact_(address_input|resolved_|resolution_|geocoding_)/.test(error.message)) {
+    const {
+      exact_address_input: _a,
+      exact_resolved_lat: _b,
+      exact_resolved_lng: _c,
+      exact_resolution_source: _d,
+      exact_geocoding_provider: _e,
+      ...reduced
+    } = data
+    void _a; void _b; void _c; void _d; void _e
+    if (locationMode === 'exact_point') {
+      throw new Error('מצב "נקודה מדויקת" לא זמין — יש להפעיל את מיגרציית DB')
+    }
+    ;({ error } = await supabase.from('tracking_targets').update(reduced).eq('id', id))
+  }
+
+  // Backwards compatible retry for missing postal_code column
   if (error && error.message && error.message.includes('postal_code')) {
-    const { postal_code, ...dataWithoutPostal } = data
+    const { postal_code: _p, ...dataWithoutPostal } = data
+    void _p
     ;({ error } = await supabase.from('tracking_targets').update(dataWithoutPostal).eq('id', id))
   }
 

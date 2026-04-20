@@ -596,6 +596,100 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
 
+  // exact_point mode: ll is the ONLY source of truth. No city, no ZIP fallback.
+  if (input.locationMode === 'exact_point' && input.exactPoint) {
+    const { lat, lng } = input.exactPoint
+    const auditAttempts: ScanAttempt[] = []
+    const outgoingLl = `@${lat},${lng},13z`
+
+    try {
+      // Deliberately pass NO location (only ll + gl + hl). This is what makes
+      // exact_point deterministic: no city string can drift the geo context.
+      const response = await querySerperMaps(input.keyword, country, language, undefined, { lat, lng })
+      const lastResponse = response
+
+      if (!response) {
+        auditAttempts.push({ attemptNumber: 1, context: 'exact_point', location: null, ll: outgoingLl, found: false })
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, 'No response from Serper', null)
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).exact_point_used = true
+          ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+          ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+          ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+          ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+          ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+        }
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
+      }
+      if (response.error) {
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).exact_point_used = true
+          ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+          ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+          ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+          ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+          ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+        }
+        return { ...makeError(response.error, input, audit), audit }
+      }
+
+      const places = response.places ?? []
+      const matchedPlace = findBusinessMatch(places, businessName)
+
+      if (matchedPlace) {
+        auditAttempts.push({
+          attemptNumber: 1,
+          context: 'exact_point',
+          location: null,
+          ll: outgoingLl,
+          found: true,
+          matchedTitle: matchedPlace.title,
+          matchedPosition: matchedPlace.position,
+          matchedAddress: matchedPlace.address || null,
+        })
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).exact_point_used = true
+          ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+          ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+          ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+          ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+          ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+        }
+        return {
+          found: true,
+          position: matchedPlace.position,
+          resultUrl: matchedPlace.website || null,
+          resultTitle: matchedPlace.title,
+          resultAddress: matchedPlace.address || null,
+          error: null,
+          audit,
+        }
+      }
+
+      auditAttempts.push({ attemptNumber: 1, context: 'exact_point', location: null, ll: outgoingLl, found: false })
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).exact_point_used = true
+        ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+        ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+        ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+        ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+        ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+      }
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
+    } catch (err) {
+      const audit = buildAudit(input, country, language, null, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).exact_point_used = true
+        ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+        ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+      }
+      return { ...makeError((err as Error).message, input, audit), audit }
+    }
+  }
+
   // ZIP code mode: geocode ZIP to coordinates, send both location and ll
   if (input.locationMode === 'zip' && input.postalCode?.trim()) {
     const postalCode = input.postalCode.trim()
