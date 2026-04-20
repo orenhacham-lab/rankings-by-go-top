@@ -596,8 +596,17 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
 
+  console.log('[Maps:scanGoogleMaps] Entry point:', {
+    locationMode: input.locationMode,
+    hasExactPoint: !!input.exactPoint,
+    exactPointLat: input.exactPoint?.lat,
+    exactPointLng: input.exactPoint?.lng,
+    keyword: input.keyword,
+  })
+
   // exact_point mode: ll is the ONLY source of truth. No city, no ZIP fallback.
   if (input.locationMode === 'exact_point' && input.exactPoint) {
+    console.log('[Maps:exact_point] BRANCH TAKEN: exact_point with coordinates')
     const { lat, lng } = input.exactPoint
     const auditAttempts: ScanAttempt[] = []
     const outgoingLl = `@${lat},${lng},13z`
@@ -690,8 +699,13 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     }
   }
 
+  if (input.locationMode === 'exact_point' && !input.exactPoint) {
+    console.warn('[Maps:exact_point] WARNING: locationMode=exact_point but no exactPoint coords provided')
+  }
+
   // ZIP code mode: geocode ZIP to coordinates, send both location and ll
   if (input.locationMode === 'zip' && input.postalCode?.trim()) {
+    console.log('[Maps:zip] BRANCH TAKEN: ZIP code mode')
     const postalCode = input.postalCode.trim()
     const auditAttempts: ScanAttempt[] = []
     let lastResponse: SerperMapsResponse | null = null

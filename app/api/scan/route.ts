@@ -142,7 +142,19 @@ export async function POST(request: Request) {
 
     const locationMode = (target.location_mode || 'project') as 'project' | 'custom' | 'grid' | 'zip' | 'exact_point'
 
-    // Validate ZIP mode only allowed for US projects
+    // DEBUG: log what was actually loaded
+    console.log('[Scan] Target loaded from DB:', {
+      id: target.id,
+      keyword: target.keyword,
+      location_mode: target.location_mode,
+      exact_address_input: target.exact_address_input,
+      exact_resolved_lat: target.exact_resolved_lat,
+      exact_resolved_lng: target.exact_resolved_lng,
+      exact_resolution_source: target.exact_resolution_source,
+      exact_geocoding_provider: target.exact_geocoding_provider,
+      custom_city: target.custom_city,
+      postal_code: target.postal_code,
+    })
     if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
       return Response.json(
         { error: 'ZIP code mode is only supported for US projects' },
