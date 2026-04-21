@@ -1,5 +1,6 @@
 import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
 import { US_ZIP_CODES, type USZIPCode } from './us-zip-codes'
+import { generateRadiusPoints, aggregateRadiusResults, type RadiusPointResult } from './radius-scan'
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -542,92 +543,210 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     console.warn('[Maps:exact_point] WARNING: locationMode=exact_point but no exactPoint coords provided')
   }
 
-  // Radius mode: use radiusCenter coordinates, NO city/location fallback
+  // Radius mode: multi-point scan strategy
   if (input.locationMode === 'radius' && input.radiusCenter) {
-    console.log('[Maps:radius] BRANCH TAKEN: radius scan mode', {
+    console.log('[Maps:radius] BRANCH TAKEN: radius scan mode (multi-point strategy)', {
       centerZip: input.radiusCenter.centerZip,
       lat: input.radiusCenter.lat,
       lng: input.radiusCenter.lng,
       radiusMiles: input.radiusCenter.radiusMiles,
     })
     const { lat, lng, centerZip, radiusMiles } = input.radiusCenter
-    const auditAttempts: ScanAttempt[] = []
+
+    // Validate coordinates
+    if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      const errorMsg = `Invalid radius coordinates: lat=${lat}, lng=${lng}`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    // Generate radius points around center
+    const radiusPoints = generateRadiusPoints(lat, lng, radiusMiles, centerZip || 'unknown')
+    console.log(`[Maps:radius] Generated ${radiusPoints.length} radius scan points:`)
+    radiusPoints.forEach(p => {
+      console.log(`  - ${p.label}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)} (${p.distanceMiles.toFixed(1)}mi)`)
+    })
+
+    const radiusResults: RadiusPointResult[] = []
     let lastResponse: SerperMapsResponse | null = null
 
-    try {
-      // Validate coordinates
-      if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        const errorMsg = `Invalid radius coordinates: lat=${lat}, lng=${lng}`
-        console.error('[Maps:radius] ERROR:', errorMsg)
-        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, null)
-        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg, audit }
-      }
+    // Execute scan from each radius point
+    for (const point of radiusPoints) {
+      try {
+        console.log(`[Maps:radius:${point.label}] Querying from ${point.label}...`)
+        const response = await querySerperMaps(input.keyword, country, language, undefined, { lat: point.lat, lng: point.lng })
+        lastResponse = response
 
-      // Query with ONLY ll, NO location string
-      const response = await querySerperMaps(input.keyword, country, language, undefined, { lat, lng })
-      lastResponse = response
+        if (!response) {
+          console.log(`[Maps:radius:${point.label}] No response`)
+          radiusResults.push({
+            point,
+            found: false,
+            error: 'No response from Serper',
+          })
+          continue
+        }
+        if (response.error) {
+          console.log(`[Maps:radius:${point.label}] Serper error: ${response.error}`)
+          radiusResults.push({
+            point,
+            found: false,
+            error: response.error,
+          })
+          continue
+        }
 
-      if (!response) {
-        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
-        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
-      }
-      if (response.error) {
-        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
-        return { ...makeError(response.error, input, audit), audit }
-      }
+        const places = response.places ?? []
+        console.log(`[Maps:radius:${point.label}] Got ${places.length} places`)
 
-      const places = response.places ?? []
-      const matchedPlace = findBusinessMatch(places, businessName)
-
-      if (matchedPlace) {
-        auditAttempts.push({
-          attemptNumber: 1,
-          context: `radius ${radiusMiles}mi around ZIP ${centerZip}`,
-          location: null,
-          ll: `@${lat},${lng},13z`,
-          found: true,
-          matchedTitle: matchedPlace.title,
-          matchedPosition: matchedPlace.position,
-          matchedAddress: matchedPlace.address || null,
+        const matchedPlace = findBusinessMatch(places, businessName)
+        if (matchedPlace) {
+          console.log(`[Maps:radius:${point.label}] MATCH at position ${matchedPlace.position}: ${matchedPlace.title}`)
+          radiusResults.push({
+            point,
+            found: true,
+            position: matchedPlace.position,
+            title: matchedPlace.title,
+            address: matchedPlace.address || null,
+          })
+        } else {
+          radiusResults.push({
+            point,
+            found: false,
+          })
+        }
+      } catch (err) {
+        console.error(`[Maps:radius:${point.label}] Exception:`, (err as Error).message)
+        radiusResults.push({
+          point,
+          found: false,
+          error: (err as Error).message,
         })
-        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
-        if (audit.decision) {
-          ;(audit.decision as Record<string, unknown>).radius_used = true
-          ;(audit.decision as Record<string, unknown>).radius_center_zip = centerZip
-          ;(audit.decision as Record<string, unknown>).radius_center_lat = lat
-          ;(audit.decision as Record<string, unknown>).radius_center_lng = lng
-          ;(audit.decision as Record<string, unknown>).radius_miles = radiusMiles
-        }
-        return {
-          found: true,
-          position: matchedPlace.position,
-          resultUrl: matchedPlace.website || null,
-          resultTitle: matchedPlace.title,
-          resultAddress: matchedPlace.address || null,
-          error: null,
-          audit,
-        }
       }
+    }
 
-      auditAttempts.push({
-        attemptNumber: 1,
-        context: `radius ${radiusMiles}mi around ZIP ${centerZip}`,
+    // Aggregate results
+    const aggregated = aggregateRadiusResults(radiusResults)
+    console.log(`[Maps:radius] AGGREGATED RESULTS:`)
+    console.log(`  - Successful scans: ${aggregated.successCount}/${radiusPoints.length}`)
+    console.log(`  - Best match: ${aggregated.bestMatch ? `position ${aggregated.bestMatch.position} from ${aggregated.bestMatch.point.label}` : 'not found'}`)
+
+    if (aggregated.bestMatch) {
+      const auditAttempts: ScanAttempt[] = radiusResults.map((r, idx) => ({
+        attemptNumber: idx + 1,
+        context: `radius ${radiusMiles}mi: ${r.point.label}`,
         location: null,
-        ll: `@${lat},${lng},13z`,
-        found: false,
-      })
-      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+        ll: `@${r.point.lat},${r.point.lng},13z`,
+        found: r.found,
+        matchedTitle: r.title || null,
+        matchedPosition: r.position,
+        matchedAddress: r.address || null,
+      }))
+
+      const audit = buildAudit(
+        input,
+        country,
+        language,
+        lastResponse,
+        auditAttempts,
+        true,
+        aggregated.bestMatch.position,
+        aggregated.bestMatch.title,
+        aggregated.bestMatch.address || null,
+        0,
+        null,
+        null
+      )
+
       if (audit.decision) {
         ;(audit.decision as Record<string, unknown>).radius_used = true
         ;(audit.decision as Record<string, unknown>).radius_center_zip = centerZip
         ;(audit.decision as Record<string, unknown>).radius_center_lat = lat
         ;(audit.decision as Record<string, unknown>).radius_center_lng = lng
         ;(audit.decision as Record<string, unknown>).radius_miles = radiusMiles
+        ;(audit.decision as Record<string, unknown>).radius_points_scanned = radiusPoints.length
+        ;(audit.decision as Record<string, unknown>).radius_successful_scans = aggregated.successCount
       }
-      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
-    } catch (err) {
-      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
-      return { ...makeError((err as Error).message, input, audit), audit }
+
+      return {
+        found: true,
+        position: aggregated.bestMatch.position,
+        resultUrl: aggregated.bestMatch.address ? null : null, // Maps doesn't provide URLs
+        resultTitle: aggregated.bestMatch.title,
+        resultAddress: aggregated.bestMatch.address,
+        error: null,
+        audit,
+        radiusScanMetadata: {
+          centerZip: centerZip || undefined,
+          centerLat: lat,
+          centerLng: lng,
+          radiusMiles,
+          pointsScanned: radiusPoints.length,
+          successfulScans: aggregated.successCount,
+          radiusAttempts: radiusResults.map(r => ({
+            direction: r.point.direction,
+            label: r.point.label,
+            lat: r.point.lat,
+            lng: r.point.lng,
+            distanceMiles: r.point.distanceMiles,
+            found: r.found,
+            position: r.position,
+          })),
+          bestMatch: aggregated.bestMatch ? {
+            direction: aggregated.bestMatch.point.direction,
+            label: aggregated.bestMatch.point.label,
+            position: aggregated.bestMatch.position,
+          } : null,
+        },
+      }
+    } else {
+      const auditAttempts: ScanAttempt[] = radiusResults.map((r, idx) => ({
+        attemptNumber: idx + 1,
+        context: `radius ${radiusMiles}mi: ${r.point.label}`,
+        location: null,
+        ll: `@${r.point.lat},${r.point.lng},13z`,
+        found: false,
+      }))
+
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).radius_used = true
+        ;(audit.decision as Record<string, unknown>).radius_center_zip = centerZip
+        ;(audit.decision as Record<string, unknown>).radius_center_lat = lat
+        ;(audit.decision as Record<string, unknown>).radius_center_lng = lng
+        ;(audit.decision as Record<string, unknown>).radius_miles = radiusMiles
+        ;(audit.decision as Record<string, unknown>).radius_points_scanned = radiusPoints.length
+        ;(audit.decision as Record<string, unknown>).radius_successful_scans = aggregated.successCount
+      }
+
+      return {
+        found: false,
+        position: null,
+        resultUrl: null,
+        resultTitle: null,
+        resultAddress: null,
+        error: null,
+        audit,
+        radiusScanMetadata: {
+          centerZip: centerZip || undefined,
+          centerLat: lat,
+          centerLng: lng,
+          radiusMiles,
+          pointsScanned: radiusPoints.length,
+          successfulScans: aggregated.successCount,
+          radiusAttempts: radiusResults.map(r => ({
+            direction: r.point.direction,
+            label: r.point.label,
+            lat: r.point.lat,
+            lng: r.point.lng,
+            distanceMiles: r.point.distanceMiles,
+            found: r.found,
+            position: r.position,
+          })),
+          bestMatch: null,
+        },
+      }
     }
   }
 

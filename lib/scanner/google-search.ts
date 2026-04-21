@@ -1,4 +1,5 @@
 import { ScanInput, ScanOutput } from './types'
+import { generateRadiusPoints, aggregateRadiusResults, type RadiusPointResult } from './radius-scan'
 
 const SERPER_API_URL = 'https://google.serper.dev/search'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -14,6 +15,71 @@ interface SerperSearchResponse {
   organic?: SerperSearchResult[]
   error?: string
   statusCode?: number
+}
+
+// Helper function to execute a single search query from a specific coordinate
+async function executeSingleSearch(
+  apiKey: string,
+  keyword: string,
+  requestParams: Record<string, string>,
+  lat: number,
+  lng: number,
+  label: string,
+): Promise<{ response: SerperSearchResponse | null; error: string | null }> {
+  const body: Record<string, unknown> = {
+    q: keyword,
+    gl: requestParams.gl,
+    hl: requestParams.hl,
+    type: 'search',
+    num: 100,
+  }
+
+  if (requestParams.device) {
+    body.device = requestParams.device
+  }
+
+  const ll = `@${lat},${lng},13z`
+  body.ll = ll
+
+  console.log(`[GoogleSearch:radius:${label}] Sending query from ${label}:`, {
+    keyword,
+    ll,
+    gl: requestParams.gl,
+    hl: requestParams.hl,
+  })
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(SERPER_API_URL, {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      return {
+        response: null,
+        error: `Serper API error: ${response.status} ${response.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`,
+      }
+    }
+
+    const data: SerperSearchResponse = await response.json()
+    return { response: data, error: null }
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') {
+      return { response: null, error: 'Serper API request timed out' }
+    }
+    return { response: null, error: (err as Error).message }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
@@ -32,17 +98,173 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     return makeError(`Could not parse target domain: "${rawDomain}"`)
   }
 
-  if (input.locationMode === 'radius') {
-    console.log(`[GoogleSearch] RADIUS INPUT RECEIVED:`)
-    console.log(`  - keyword: ${input.keyword}`)
-    console.log(`  - locationMode: ${input.locationMode}`)
-    console.log(`  - city (from scanPayload): ${input.city || 'null'}`)
-    console.log(`  - radiusCenter: ${input.radiusCenter ? 'SET' : 'NULL'}`)
-    if (input.radiusCenter) {
-      console.log(`    - centerZip: ${input.radiusCenter.centerZip}`)
-      console.log(`    - lat: ${input.radiusCenter.lat}`)
-      console.log(`    - lng: ${input.radiusCenter.lng}`)
-      console.log(`    - miles: ${input.radiusCenter.radiusMiles}`)
+  // Handle radius mode with multiple scan points
+  if (input.locationMode === 'radius' && input.radiusCenter) {
+    console.log(`[GoogleSearch] RADIUS SCAN MODE - Multi-point strategy`)
+    console.log(`  Center ZIP: ${input.radiusCenter.centerZip}`)
+    console.log(`  Center coords: ${input.radiusCenter.lat}, ${input.radiusCenter.lng}`)
+    console.log(`  Radius: ${input.radiusCenter.radiusMiles} miles`)
+
+    // Generate radius points around center
+    const radiusPoints = generateRadiusPoints(
+      input.radiusCenter.lat,
+      input.radiusCenter.lng,
+      input.radiusCenter.radiusMiles,
+      input.radiusCenter.centerZip || 'unknown'
+    )
+
+    console.log(`[GoogleSearch] Generated ${radiusPoints.length} radius scan points:`)
+    radiusPoints.forEach(p => {
+      console.log(`  - ${p.label}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)} (${p.distanceMiles.toFixed(1)}mi)`)
+    })
+
+    const requestParams: Record<string, string> = {
+      engine: input.engine,
+      device: input.deviceType || 'desktop',
+      gl: (input.country || 'IL').toLowerCase(),
+      hl: input.language || 'he',
+      mode: 'organic',
+    }
+
+    const radiusResults: RadiusPointResult[] = []
+
+    // Execute scan from each radius point
+    for (const point of radiusPoints) {
+      const { response, error } = await executeSingleSearch(
+        apiKey,
+        input.keyword,
+        requestParams,
+        point.lat,
+        point.lng,
+        point.label
+      )
+
+      if (error) {
+        console.log(`[GoogleSearch:radius:${point.label}] Error: ${error}`)
+        radiusResults.push({
+          point,
+          found: false,
+          error,
+        })
+        continue
+      }
+
+      if (!response) {
+        console.log(`[GoogleSearch:radius:${point.label}] No response`)
+        radiusResults.push({
+          point,
+          found: false,
+          error: 'No response from Serper',
+        })
+        continue
+      }
+
+      if (response.error) {
+        console.log(`[GoogleSearch:radius:${point.label}] Serper error: ${response.error}`)
+        radiusResults.push({
+          point,
+          found: false,
+          error: response.error,
+        })
+        continue
+      }
+
+      const results = response.organic ?? []
+      console.log(`[GoogleSearch:radius:${point.label}] Got ${results.length} organic results`)
+
+      // Search for domain match in results
+      let found = false
+      let matchedPosition: number | undefined
+      let matchedTitle: string | undefined
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]
+        const resultNormalized = normalizeDomain(result.link)
+        const position = i + 1
+
+        const matched = isDomainMatch(resultNormalized, normalizedTarget)
+        if (matched) {
+          console.log(`[GoogleSearch:radius:${point.label}] MATCH at position ${position}: "${result.link}"`)
+          found = true
+          matchedPosition = position
+          matchedTitle = result.title || undefined
+          break
+        }
+      }
+
+      radiusResults.push({
+        point,
+        found,
+        position: matchedPosition,
+        title: matchedTitle,
+      })
+    }
+
+    // Aggregate results from all radius points
+    const aggregated = aggregateRadiusResults(radiusResults)
+    console.log(`[GoogleSearch:radius] AGGREGATED RESULTS:`)
+    console.log(`  - Successful scans: ${aggregated.successCount}/${radiusPoints.length}`)
+    console.log(`  - Best match: ${aggregated.bestMatch ? `position ${aggregated.bestMatch.position} from ${aggregated.bestMatch.point.label}` : 'not found'}`)
+
+    if (aggregated.bestMatch) {
+      return {
+        found: true,
+        position: aggregated.bestMatch.position,
+        resultUrl: null, // Google Search doesn't provide URLs in results
+        resultTitle: aggregated.bestMatch.title || null,
+        resultAddress: null,
+        error: null,
+        // Store radius scan metadata in audit-like format
+        radiusScanMetadata: {
+          centerZip: input.radiusCenter.centerZip,
+          centerLat: input.radiusCenter.lat,
+          centerLng: input.radiusCenter.lng,
+          radiusMiles: input.radiusCenter.radiusMiles,
+          pointsScanned: radiusPoints.length,
+          successfulScans: aggregated.successCount,
+          radiusAttempts: radiusResults.map(r => ({
+            direction: r.point.direction,
+            label: r.point.label,
+            lat: r.point.lat,
+            lng: r.point.lng,
+            distanceMiles: r.point.distanceMiles,
+            found: r.found,
+            position: r.position,
+          })),
+          bestMatch: aggregated.bestMatch ? {
+            direction: aggregated.bestMatch.point.direction,
+            label: aggregated.bestMatch.point.label,
+            position: aggregated.bestMatch.position,
+          } : null,
+        },
+      }
+    } else {
+      return {
+        found: false,
+        position: null,
+        resultUrl: null,
+        resultTitle: null,
+        resultAddress: null,
+        error: null,
+        radiusScanMetadata: {
+          centerZip: input.radiusCenter.centerZip,
+          centerLat: input.radiusCenter.lat,
+          centerLng: input.radiusCenter.lng,
+          radiusMiles: input.radiusCenter.radiusMiles,
+          pointsScanned: radiusPoints.length,
+          successfulScans: aggregated.successCount,
+          radiusAttempts: radiusResults.map(r => ({
+            direction: r.point.direction,
+            label: r.point.label,
+            lat: r.point.lat,
+            lng: r.point.lng,
+            distanceMiles: r.point.distanceMiles,
+            found: r.found,
+            position: r.position,
+          })),
+          bestMatch: null,
+        },
+      }
     }
   }
 
@@ -60,22 +282,9 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
   )
 
   try {
-    // CRITICAL: Validate location constraints early
+    // Validate location constraints early
     if (input.locationMode === 'exact_point' && !input.exactPoint) {
       return makeError(`exact_point mode requires valid coordinates`)
-    }
-    if (input.locationMode === 'radius' && !input.radiusCenter) {
-      return makeError(`radius mode requires radiusCenter object with lat/lng`)
-    }
-    if (input.locationMode === 'radius' && input.radiusCenter) {
-      // Ensure radiusCenter has valid lat/lng
-      const { lat, lng } = input.radiusCenter
-      if (typeof lat !== 'number' || typeof lng !== 'number') {
-        return makeError(`radiusCenter must have numeric lat/lng. Got: lat=${lat} (${typeof lat}), lng=${lng} (${typeof lng})`)
-      }
-      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        return makeError(`radiusCenter coordinates out of valid range. Got: lat=${lat}, lng=${lng}`)
-      }
     }
 
     const body: Record<string, unknown> = {
@@ -90,28 +299,11 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       body.device = requestParams.device
     }
 
-    // DEBUG: Log all condition branches
-    console.log(`[GoogleSearch] === CONDITION EVALUATION ===`)
-    console.log(`  1. exact_point condition: locationMode=${input.locationMode}, exactPoint=${!!input.exactPoint}`)
-    console.log(`     → Would enter: ${input.locationMode === 'exact_point' && input.exactPoint}`)
-    console.log(`  2. radius condition: locationMode=${input.locationMode}, radiusCenter=${!!input.radiusCenter}`)
-    if (input.radiusCenter) {
-      console.log(`     radiusCenter details: lat=${input.radiusCenter.lat}, lng=${input.radiusCenter.lng}, zip=${input.radiusCenter.centerZip}`)
-    }
-    console.log(`     → Would enter: ${input.locationMode === 'radius' && input.radiusCenter}`)
-    console.log(`  3. city fallback condition: city=${input.city}`)
-    console.log(`     → Would enter: ${!!input.city}`)
-    console.log(`[GoogleSearch] === END CONDITION EVALUATION ===`)
-
     // exact_point is the source of truth — ll alone drives geo targeting.
     // Do not send location (city/zip) when exact_point is active.
     if (input.locationMode === 'exact_point' && input.exactPoint) {
       body.ll = `@${input.exactPoint.lat},${input.exactPoint.lng},13z`
       console.log(`[GoogleSearch] ✓ EXACT_POINT BRANCH TAKEN: ll=${body.ll}`)
-    } else if (input.locationMode === 'radius' && input.radiusCenter) {
-      body.ll = `@${input.radiusCenter.lat},${input.radiusCenter.lng},13z`
-      console.log(`[GoogleSearch] ✓ RADIUS BRANCH TAKEN: ll=${body.ll} (zip=${input.radiusCenter.centerZip})`)
-      console.log(`[GoogleSearch]   NOT setting location (it is: ${body.location})`)
     } else if (input.city) {
       body.location = input.city
       console.log(`[GoogleSearch] ✗ FALLBACK TO CITY BRANCH: location="${input.city}"`)
@@ -120,17 +312,6 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     }
 
     console.log(`[GoogleSearch] FINAL REQUEST BODY:`, JSON.stringify(body))
-    console.log(`[GoogleSearch] === FINAL FIELDS BEING SENT TO SERPER ===`)
-    console.log(`[GoogleSearch] FINAL - location field:`, body.location || 'null')
-    console.log(`[GoogleSearch] FINAL - uule field:`, body.uule || 'null')
-    console.log(`[GoogleSearch] FINAL - ll field:`, body.ll || 'null')
-    if (input.locationMode === 'radius') {
-      console.log(`[GoogleSearch] RADIUS MODE FINAL CHECK:`)
-      console.log(`[GoogleSearch]   - ll is SET?`, !!body.ll, '← MUST BE true')
-      console.log(`[GoogleSearch]   - location is UNSET?`, !body.location, '← MUST BE true')
-      console.log(`[GoogleSearch]   - ll value:`, body.ll, '← should contain Bakersfield coords')
-    }
-    console.log(`[GoogleSearch] === END FINAL FIELDS ===`)
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)

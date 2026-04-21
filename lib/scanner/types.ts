@@ -88,4 +88,26 @@ export interface ScanOutput {
   resultAddress: string | null
   error: string | null
   audit?: ScanAudit
+  radiusScanMetadata?: {
+    centerZip?: string | null
+    centerLat: number
+    centerLng: number
+    radiusMiles: number
+    pointsScanned: number
+    successfulScans: number
+    radiusAttempts: Array<{
+      direction: string
+      label: string
+      lat: number
+      lng: number
+      distanceMiles: number
+      found: boolean
+      position?: number | null
+    }>
+    bestMatch: {
+      direction: string
+      label: string
+      position: number
+    } | null
+  }
 }
