@@ -60,6 +60,14 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
   )
 
   try {
+    // CRITICAL: Validate location constraints early
+    if (input.locationMode === 'exact_point' && !input.exactPoint) {
+      return makeError(`exact_point mode requires valid coordinates`)
+    }
+    if (input.locationMode === 'radius' && !input.radiusCenter) {
+      return makeError(`radius mode requires radiusCenter object with lat/lng`)
+    }
+
     const body: Record<string, unknown> = {
       q: input.keyword,
       gl: requestParams.gl,
@@ -102,9 +110,17 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     }
 
     console.log(`[GoogleSearch] FINAL REQUEST BODY:`, JSON.stringify(body))
+    console.log(`[GoogleSearch] === FINAL FIELDS BEING SENT TO SERPER ===`)
     console.log(`[GoogleSearch] FINAL - location field:`, body.location || 'null')
     console.log(`[GoogleSearch] FINAL - uule field:`, body.uule || 'null')
     console.log(`[GoogleSearch] FINAL - ll field:`, body.ll || 'null')
+    if (input.locationMode === 'radius') {
+      console.log(`[GoogleSearch] RADIUS MODE FINAL CHECK:`)
+      console.log(`[GoogleSearch]   - ll is SET?`, !!body.ll, '← MUST BE true')
+      console.log(`[GoogleSearch]   - location is UNSET?`, !body.location, '← MUST BE true')
+      console.log(`[GoogleSearch]   - ll value:`, body.ll, '← should contain Bakersfield coords')
+    }
+    console.log(`[GoogleSearch] === END FINAL FIELDS ===`)
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)

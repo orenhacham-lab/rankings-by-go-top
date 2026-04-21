@@ -209,39 +209,48 @@ export async function POST(request: Request) {
           radiusMiles?: number | null
         } | null = null
         if (locationMode === 'radius') {
+          const rawZip = target.radius_center_zip
           const centerZip = target.radius_center_zip?.trim() || null
           const radiusMiles = typeof target.radius_miles === 'number' ? target.radius_miles : null
+
+          console.log('[Scan] RADIUS MODE INITIATED', {
+            keyword: target.keyword,
+            rawZipFromDB: rawZip,
+            centerZipAfterTrim: centerZip,
+            radiusMilesFromDB: radiusMiles,
+            radiusMilesType: typeof radiusMiles,
+          })
 
           if (!centerZip) {
             throw new Error(`Radius mode requires a center ZIP code for keyword "${target.keyword}"`)
           }
           if (radiusMiles === null || radiusMiles <= 0) {
-            throw new Error(`Radius mode requires a valid radius distance for keyword "${target.keyword}"`)
+            throw new Error(`Radius mode requires a valid radius distance (must be > 0) for keyword "${target.keyword}". Got: ${radiusMiles}`)
           }
-
-          console.log('[Scan] Radius mode: resolving ZIP code', {
-            keyword: target.keyword,
-            centerZip,
-            radiusMiles,
-          })
 
           console.log('[Scan] Radius mode: attempting to resolve ZIP', {
             centerZip,
             keyword: target.keyword,
           })
           const resolved = resolveUSZipCodeToCoordinates(centerZip)
+
+          console.log('[Scan] Radius mode: ZIP resolution result', {
+            inputZip: centerZip,
+            resolved: resolved ? `lat=${resolved.lat}, lng=${resolved.lng}` : 'null/undefined',
+          })
+
           if (!resolved) {
-            throw new Error(`Could not resolve ZIP code "${centerZip}" for keyword "${target.keyword}". Check if the ZIP is valid.`)
+            throw new Error(`Could not resolve ZIP code "${centerZip}" for keyword "${target.keyword}". Check if the ZIP is valid and exists in US database.`)
           }
 
-          console.log('[Scan] Radius mode: RESOLVED ZIP to coordinates', {
+          console.log('[Scan] ✓ RADIUS ZIP SUCCESSFULLY RESOLVED', {
             enteredZIP: centerZip,
             resolvedLat: resolved.lat,
             resolvedLng: resolved.lng,
             radiusMiles: radiusMiles,
             keyword: target.keyword,
           })
-          console.log(`[Scan] ZIP ${centerZip} resolves to: LAT=${resolved.lat}, LNG=${resolved.lng}`)
+          console.log(`[Scan] PROOF: ZIP "${centerZip}" → LAT=${resolved.lat}, LNG=${resolved.lng} (should be Bakersfield-area for 93313)`)
 
           radiusCenterInput = {
             lat: resolved.lat,
@@ -249,6 +258,13 @@ export async function POST(request: Request) {
             centerZip,
             radiusMiles,
           }
+
+          console.log('[Scan] radiusCenterInput object created:', {
+            lat: radiusCenterInput.lat,
+            lng: radiusCenterInput.lng,
+            centerZip: radiusCenterInput.centerZip,
+            radiusMiles: radiusCenterInput.radiusMiles,
+          })
         }
 
         const effectiveCity =
@@ -277,22 +293,26 @@ export async function POST(request: Request) {
         }
 
         if (locationMode === 'radius') {
-          console.log('[Scan:route] === RADIUS PAYLOAD CHECK ===')
-          console.log('locationMode:', scanPayload.locationMode)
-          console.log('city:', scanPayload.city, '(should be null)')
-          console.log('customCity:', scanPayload.customCity, '(should be null)')
-          console.log('radiusCenter:', scanPayload.radiusCenter)
+          console.log('[Scan:route] === RADIUS MODE: FINAL PAYLOAD VERIFICATION ===')
+          console.log('[Scan:route] locationMode:', scanPayload.locationMode)
+          console.log('[Scan:route] city:', scanPayload.city, '← MUST BE null for radius')
+          console.log('[Scan:route] customCity:', scanPayload.customCity, '← MUST BE null for radius')
+          console.log('[Scan:route] radiusCenter is null?', scanPayload.radiusCenter === null, '← MUST BE false')
           if (scanPayload.radiusCenter) {
-            console.log('  - centerZip:', scanPayload.radiusCenter.centerZip)
-            console.log('  - lat:', scanPayload.radiusCenter.lat)
-            console.log('  - lng:', scanPayload.radiusCenter.lng)
-            console.log('  - radiusMiles:', scanPayload.radiusCenter.radiusMiles)
+            console.log('[Scan:route] ✓ radiusCenter OBJECT EXISTS:')
+            console.log('[Scan:route]   - centerZip:', scanPayload.radiusCenter.centerZip, '← should be 93313 for test')
+            console.log('[Scan:route]   - lat:', scanPayload.radiusCenter.lat, '← should be 35.32 for Bakersfield')
+            console.log('[Scan:route]   - lng:', scanPayload.radiusCenter.lng, '← should be -119.08 for Bakersfield')
+            console.log('[Scan:route]   - radiusMiles:', scanPayload.radiusCenter.radiusMiles, '← should be 5')
+          } else {
+            console.log('[Scan:route] ✗ CRITICAL ERROR: radiusCenter is NULL but locationMode is radius!')
           }
-          console.log('postalCode:', scanPayload.postalCode)
-          console.log('[Scan:route] === END RADIUS PAYLOAD CHECK ===')
+          console.log('[Scan:route] postalCode:', scanPayload.postalCode, '← MUST BE null for radius')
+          console.log('[Scan:route] === END RADIUS MODE PAYLOAD VERIFICATION ===')
         }
 
-        console.log('[Scan:route] Payload passed to runScan():', {
+        console.log('[Scan:route] === ABOUT TO CALL runScan ===')
+        console.log('[Scan:route] Payload summary:', {
           keyword: scanPayload.keyword,
           locationMode: scanPayload.locationMode,
           city: scanPayload.city,
@@ -306,6 +326,7 @@ export async function POST(request: Request) {
           radiusCenterLng: scanPayload.radiusCenter?.lng,
           radiusMiles: scanPayload.radiusCenter?.radiusMiles,
         })
+        console.log('[Scan:route] === END PAYLOAD SUMMARY ===')
 
         const scanOutput = await runScan(target.engine_type, scanPayload)
 

@@ -206,6 +206,18 @@ export async function createTrackingTargetAction(formData: FormData) {
     void _a; void _b; void _c; void _d; void _e
     const { error: retryError } = await supabase.from('tracking_targets').insert(dataWithoutExact)
     if (retryError) throw new Error(retryError.message)
+  } else if (error && error.message && /radius_(center_zip|miles)/.test(error.message)) {
+    const {
+      radius_center_zip: _r,
+      radius_miles: _m,
+      ...dataWithoutRadius
+    } = data
+    void _r; void _m
+    if (locationMode === 'radius') {
+      throw new Error('Radius Scan לא זמין — יש להפעיל את מיגרציית DB')
+    }
+    const { error: retryError } = await supabase.from('tracking_targets').insert(dataWithoutRadius)
+    if (retryError) throw new Error(retryError.message)
   } else if (error) {
     throw new Error(error.message)
   }
@@ -432,6 +444,20 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     void _a; void _b; void _c; void _d; void _e
     if (locationMode === 'exact_point') {
       throw new Error('מצב "נקודה מדויקת" לא זמין — יש להפעיל את מיגרציית DB')
+    }
+    ;({ error } = await supabase.from('tracking_targets').update(reduced).eq('id', id))
+  }
+
+  // If radius columns don't exist (migration not applied), retry without them
+  if (error && error.message && /radius_(center_zip|miles)/.test(error.message)) {
+    const {
+      radius_center_zip: _r,
+      radius_miles: _m,
+      ...reduced
+    } = data
+    void _r; void _m
+    if (locationMode === 'radius') {
+      throw new Error('Radius Scan לא זמין — יש להפעיל את מיגרציית DB')
     }
     ;({ error } = await supabase.from('tracking_targets').update(reduced).eq('id', id))
   }
