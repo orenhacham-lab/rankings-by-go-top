@@ -111,6 +111,9 @@ export async function GET(request: NextRequest) {
 
         // Try to create the user, or use existing one
         console.log('[Google OAuth] Creating or getting user:', googleUser.email)
+        let userEmail = googleUser.email
+        let userCreatedNow = false
+
         const { data: createData, error: createError } = await adminSupabase.auth.admin.createUser({
           email: googleUser.email,
           password: oauthPassword,
@@ -122,25 +125,67 @@ export async function GET(request: NextRequest) {
 
         if (createError) {
           // Check if user already exists
-          if (!createError.message?.includes('already exists')) {
+          if (createError.message?.includes('already exists')) {
+            console.log('[Google OAuth] User already exists with this email')
+            userCreatedNow = false
+          } else {
             console.error('[Google OAuth] User creation error:', {
               message: createError.message,
               status: createError.status,
               code: createError.code,
             })
-            console.error('[Google OAuth] SUPABASE_SERVICE_ROLE_KEY check:', {
-              isSet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-              length: process.env.SUPABASE_SERVICE_ROLE_KEY?.length,
-            })
-            // Instead of failing, try to sign in with existing password
-            console.log('[Google OAuth] Attempting sign-in anyway for existing user')
+            return NextResponse.redirect(`${origin}/login?error=oauth&details=user_creation_failed`)
+          }
+        } else {
+          console.log('[Google OAuth] New user created successfully')
+          userCreatedNow = true
+        }
+
+        // For existing users, generate a magic link to create a session without password
+        if (!userCreatedNow) {
+          console.log('[Google OAuth] Generating magic link for existing user')
+          const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+            type: 'magiclink',
+            email: userEmail,
+          })
+
+          if (linkError || !linkData?.properties?.hashed_token) {
+            console.error('[Google OAuth] Magic link generation failed:', linkError)
+            // Fallback: try to update password and sign in
+            console.log('[Google OAuth] Attempting to update password and sign in')
+            const { error: updateError } = await adminSupabase.auth.admin.updateUserById(
+              linkData?.user?.id || '',
+              { password: oauthPassword }
+            )
+
+            if (updateError) {
+              console.error('[Google OAuth] Password update failed:', updateError)
+              return NextResponse.redirect(`${origin}/login?error=oauth&details=session_creation_failed`)
+            }
           } else {
-            console.log('[Google OAuth] User already exists, using existing account')
+            console.log('[Google OAuth] Magic link generated, using token to create session')
+            // Extract token and use it to sign in
+            const token = linkData.properties.hashed_token
+
+            // Sign in with the magic link token
+            const { error: tokenSignInError } = await supabase.auth.verifyOtp({
+              email: userEmail,
+              token: token,
+              type: 'magiclink',
+            })
+
+            if (!tokenSignInError) {
+              console.log('[Google OAuth] User signed in via magic link')
+              const destination = next.startsWith('/') ? next : '/dashboard'
+              return NextResponse.redirect(`${origin}${destination}`)
+            }
+
+            console.log('[Google OAuth] Magic link sign-in failed, will try password sign-in')
           }
         }
 
-        // Sign in the user with the derived password to establish session
-        console.log('[Google OAuth] Signing in user:', {
+        // For new users, or if magic link failed, try password sign-in
+        console.log('[Google OAuth] Signing in user with password:', {
           email: googleUser.email,
           passwordPrefix: oauthPassword.substring(0, 15),
         })
@@ -155,11 +200,6 @@ export async function GET(request: NextRequest) {
             message: signInError.message,
             status: signInError.status,
             code: signInError.code,
-          })
-          console.error('[Google OAuth] Debug info:', {
-            email: googleUser.email,
-            googleId: googleUser.id,
-            passwordLength: oauthPassword.length,
           })
           return NextResponse.redirect(`${origin}/login?error=oauth&details=signin_failed`)
         }
