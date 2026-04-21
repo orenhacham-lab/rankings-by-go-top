@@ -15,6 +15,9 @@ function AuthForm() {
   const nextPath = searchParams.get('next') || '/dashboard'
   const oauthErrorParam = searchParams.get('error')
 
+  // Use configured app URL or fallback to current origin
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -57,7 +60,7 @@ function AuthForm() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          emailRedirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       })
       if (authError) {
@@ -83,7 +86,7 @@ function AuthForm() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          redirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       })
       if (authError) {
