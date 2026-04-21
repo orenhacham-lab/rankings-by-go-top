@@ -125,10 +125,43 @@ export async function GET(request: NextRequest) {
         })
 
         if (createError) {
-          // Check if user already exists by error code (more reliable than message text)
+          // Check if user already exists by error code
           if (createError.code === 'email_exists') {
             console.log('[Google OAuth] User already exists with this email')
+            console.log('[Google OAuth] Full error object:', JSON.stringify(createError, null, 2))
             userCreatedNow = false
+
+            // Try to update password for existing user using admin API
+            // Since we can't get user ID from error, we'll try updating and catch any errors
+            console.log('[Google OAuth] Attempting to update password for existing user')
+
+            // Try to list users and find the one with this email to get their ID
+            console.log('[Google OAuth] Fetching user ID by listing all users...')
+            const { data: allUsers, error: listError } = await adminSupabase.auth.admin.listUsers()
+
+            if (listError) {
+              console.error('[Google OAuth] Failed to list users:', listError.message)
+            } else if (allUsers && allUsers.users) {
+              const existingUser = allUsers.users.find(u => u.email === googleUser.email)
+              if (existingUser) {
+                console.log('[Google OAuth] Found user ID:', existingUser.id)
+
+                const { error: updateError } = await adminSupabase.auth.admin.updateUserById(
+                  existingUser.id,
+                  { password: oauthPassword }
+                )
+
+                if (updateError) {
+                  console.error('[Google OAuth] Failed to update password:', updateError.message)
+                } else {
+                  console.log('[Google OAuth] ✓ Password updated successfully!')
+                }
+              } else {
+                console.log('[Google OAuth] User not found in list')
+              }
+            } else {
+              console.log('[Google OAuth] No users found')
+            }
           } else {
             console.error('[Google OAuth] User creation error:', {
               message: createError.message,
