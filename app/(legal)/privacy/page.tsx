@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export const metadata = {
   title: 'מדיניות פרטיות | Rankings by Go Top',
   description: 'מדיניות הפרטיות של Rankings by Go Top',
@@ -7,6 +9,11 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 py-12 px-4">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+        <div className="mb-6">
+          <Link href="/" className="text-blue-600 hover:underline font-medium text-sm">
+            ← חזור לעמוד הבית
+          </Link>
+        </div>
         <h1 className="text-4xl font-bold text-slate-900 mb-2">מדיניות פרטיות</h1>
         <p className="text-slate-600 mb-8">מדיניות הפרטיות של Rankings by Go Top</p>
 
@@ -91,7 +98,28 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">עוגיות (Cookies)</h2>
             <p>
-              אנו משתמשים בעוגיות לנתונים סשן (session) בלבד. עוגיות אלו משמשות לתקשורת מאובטחת עם השרת ולא כוללות מעקב אחר משתמשים.
+              אנו משתמשים בעוגיות לצרכים חיוניים:
+            </p>
+            <ul className="list-disc list-inside space-y-2">
+              <li><strong>עוגיות סשן:</strong> לתקשורת מאובטחת עם השרת ולניהול ההתחברות</li>
+              <li><strong>עוגיות Analytics:</strong> לניתוח שימוש באתר דרך Google Analytics ו-Google Tag Manager</li>
+            </ul>
+            <p className="mt-4">
+              בהמשך השימוש באתר, אתה מסכים לשימוש בעוגיות כמפורט לעיל.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שירותי ניתוח וערוץ שיווק</h2>
+            <p>
+              אנו משתמשים בשירותים הבאים לניתוח התנהגות משתמשים וניהול ערוצי שיווק:
+            </p>
+            <ul className="list-disc list-inside space-y-2">
+              <li><strong>Google Analytics:</strong> לניתוח נתוני עברות וערוצי תעבורה לאתר</li>
+              <li><strong>Google Tag Manager:</strong> לניהול תגיות וניתוח הרכב משתמשים</li>
+            </ul>
+            <p className="mt-4">
+              עוגיות אלו אינן מזהות אותך באופן אישי ומשמשות לשיפור חוויית ההשתמש והשירות.
             </p>
           </section>
 

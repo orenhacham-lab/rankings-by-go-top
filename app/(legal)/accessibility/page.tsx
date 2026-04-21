@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export const metadata = {
   title: 'נגישות | Rankings by Go Top',
   description: 'מידע על נגישות באתר Rankings by Go Top',
@@ -7,6 +9,11 @@ export default function AccessibilityPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 py-12 px-4">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+        <div className="mb-6">
+          <Link href="/" className="text-blue-600 hover:underline font-medium text-sm">
+            ← חזור לעמוד הבית
+          </Link>
+        </div>
         <h1 className="text-4xl font-bold text-slate-900 mb-2">נגישות</h1>
         <p className="text-slate-600 mb-8">עמוד נגישות של Rankings by Go Top</p>
 

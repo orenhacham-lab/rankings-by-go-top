@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { CookieConsent } from '@/components/CookieConsent'
 
 export const metadata: Metadata = {
   title: 'מערכת מעקב מיקומים לקידום אתרים - Rankings by Go Top',
@@ -82,16 +83,15 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
-        {/* Google Tag Manager (noscript) */}
-        <noscript>
-          <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-PC29G3NQ"
-            height="0"
-            width="0"
-            style={{ display: 'none', visibility: 'hidden' }}
-          ></iframe>
-        </noscript>
+        {/* Google Tag Manager (noscript) - must be first element in body */}
+        <div
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PC29G3NQ" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`,
+          }}
+        />
         {children}
+        <CookieConsent />
       </body>
     </html>
   )
