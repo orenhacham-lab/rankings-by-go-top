@@ -86,8 +86,15 @@ function AuthForm() {
     // Check if custom Google OAuth Client ID is configured
     const customGoogleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID
 
+    console.log('[Login] Google OAuth button clicked', {
+      hasCustomGoogleClientId: !!customGoogleClientId,
+      clientIdLength: customGoogleClientId?.length || 0,
+      appUrl,
+    })
+
     if (customGoogleClientId && typeof window !== 'undefined') {
       // Use custom Google OAuth app (not Supabase's)
+      console.log('[Login] Using CUSTOM Google OAuth (NOT Supabase)')
       try {
         const state = generateState()
         saveStateToSession(state, nextPath)
@@ -100,13 +107,20 @@ function AuthForm() {
           nextPath
         )
 
+        console.log('[Login] Redirecting to Google:', {
+          redirectUri,
+          stateLength: state.length,
+        })
+
         window.location.href = googleAuthUrl
       } catch (err) {
+        console.error('[Login] Google OAuth error:', err)
         setError('שגיאה בכניסה עם Google. נסה שנית.')
         setOauthLoading(null)
       }
     } else {
       // Fallback to Supabase OAuth
+      console.log('[Login] Using Supabase OAuth (NOT custom Google)')
       const supabase = createClient()
 
       try {
