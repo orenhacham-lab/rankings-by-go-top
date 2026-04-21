@@ -66,7 +66,7 @@ export interface Project {
 }
 
 export type EngineType = 'google_search' | 'google_maps'
-export type LocationMode = 'project' | 'custom' | 'zip' | 'exact_point'
+export type LocationMode = 'project' | 'custom' | 'zip' | 'exact_point' | 'radius'
 export type GridSize = 'small' | 'medium' | 'large'
 export type ExactPointResolutionSource =
   | 'user_provided_coordinates'
@@ -87,6 +87,8 @@ export interface TrackingTarget {
   custom_city: string | null
   grid_size: GridSize | null
   postal_code: string | null
+  radius_center_zip: string | null
+  radius_miles: number | null
   exact_address_input: string | null
   exact_resolved_lat: number | null
   exact_resolved_lng: number | null

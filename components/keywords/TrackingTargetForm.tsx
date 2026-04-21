@@ -42,6 +42,8 @@ export default function TrackingTargetForm({
   )
   const [customCity, setCustomCity] = useState(target?.custom_city || '')
   const [postalCode, setPostalCode] = useState(target?.postal_code || '')
+  const [radiusCenterZip, setRadiusCenterZip] = useState(target?.radius_center_zip || '')
+  const [radiusMiles, setRadiusMiles] = useState<number>(target?.radius_miles || 5)
   const [bulkMode, setBulkMode] = useState(false)
   const [validationError, setValidationError] = useState('')
 
@@ -262,6 +264,7 @@ export default function TrackingTargetForm({
             ...(projectCountry?.toUpperCase() === 'US'
               ? [
                   { value: 'zip', label: 'ZIP Code (US Only)' },
+                  { value: 'radius', label: 'Radius Scan (US Only)' },
                   { value: 'exact_point', label: 'נקודה מדויקת — כתובת / lat,lng (מדויק ביותר)' },
                 ]
               : []),
@@ -316,6 +319,36 @@ export default function TrackingTargetForm({
           pattern="\d{5}"
           hint="5-digit US ZIP code"
         />
+      )}
+
+      {locationMode === 'radius' && (
+        <div className="space-y-3">
+          <Input
+            label="Center ZIP Code *"
+            name="radius_center_zip"
+            value={radiusCenterZip}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 5)
+              setRadiusCenterZip(val)
+            }}
+            required
+            placeholder="12345"
+            maxLength={5}
+            pattern="\d{5}"
+            hint="5-digit US ZIP code for radius center"
+          />
+          <Select
+            label="Radius Distance *"
+            name="radius_miles"
+            value={String(radiusMiles)}
+            onChange={(e) => setRadiusMiles(Number(e.target.value))}
+            options={[
+              { value: '3', label: '3 miles' },
+              { value: '5', label: '5 miles (default)' },
+              { value: '10', label: '10 miles' },
+            ]}
+          />
+        </div>
       )}
 
       {locationMode === 'exact_point' && (
@@ -416,6 +449,12 @@ export default function TrackingTargetForm({
       )}
       {locationMode !== 'zip' && (
         <input type="hidden" name="postal_code" value="" />
+      )}
+      {locationMode !== 'radius' && (
+        <>
+          <input type="hidden" name="radius_center_zip" value="" />
+          <input type="hidden" name="radius_miles" value="" />
+        </>
       )}
       {locationMode !== 'exact_point' && (
         <>
