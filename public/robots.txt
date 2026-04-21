@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /articles
+Allow: /privacy
+Allow: /accessibility
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+Disallow: /setup
+Disallow: /_next
+Disallow: /*.json
+Disallow: /*?*
+
+Crawl-delay: 1
+
+Sitemap: https://www.gotopseo.com/sitemap.xml
