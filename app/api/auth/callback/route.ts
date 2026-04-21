@@ -148,7 +148,10 @@ export async function GET(request: NextRequest) {
 
                 const { error: updateError } = await adminSupabase.auth.admin.updateUserById(
                   existingUser.id,
-                  { password: oauthPassword }
+                  {
+                    password: oauthPassword,
+                    email_confirm: true  // CRITICAL: Also confirm email when updating password
+                  }
                 )
 
                 if (updateError) {
