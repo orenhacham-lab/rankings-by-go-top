@@ -19,6 +19,18 @@ function AuthForm() {
   // Use configured app URL or fallback to current origin
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
 
+  // Debug: Log environment on mount
+  if (typeof window !== 'undefined') {
+    console.group('[AUTH DEBUG] Environment Check')
+    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID:', process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID)
+    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID type:', typeof process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID)
+    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID length:', process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID?.length)
+    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID is truthy:', !!process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID)
+    console.log('NEXT_PUBLIC_APP_URL:', appUrl)
+    console.log('Window location origin:', window.location.origin)
+    console.groupEnd()
+  }
+
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
