@@ -13,9 +13,10 @@ import Link from 'next/link'
 
 interface ClientsTableProps {
   clients: Client[]
+  onClientsChange?: () => Promise<void>
 }
 
-export default function ClientsTable({ clients }: ClientsTableProps) {
+export default function ClientsTable({ clients, onClientsChange }: ClientsTableProps) {
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -31,6 +32,9 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
     setTogglingId(client.id)
     try {
       await toggleClientActiveAction(client.id, client.is_active)
+      if (onClientsChange) {
+        await onClientsChange()
+      }
     } finally {
       setTogglingId(null)
     }

@@ -77,7 +77,7 @@ export default function ClientsPage() {
           טוען...
         </div>
       ) : (
-        <ClientsTable clients={clients} />
+        <ClientsTable clients={clients} onClientsChange={loadClients} />
       )}
 
       <Modal
