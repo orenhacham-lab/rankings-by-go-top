@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { PLAN_LIMITS, PLAN_FEATURES } from '@/lib/subscription'
+import { getGoogleOAuthUrl, generateState, saveStateToSession } from '@/lib/google-oauth'
 
 function AuthForm() {
   const router = useRouter()
@@ -81,33 +82,59 @@ function AuthForm() {
     setError('')
     setSuccess('')
     setOauthLoading(provider)
-    const supabase = createClient()
 
-    try {
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
-        },
-      })
-      if (authError) {
-        const providerName = 'Google'
-        if (
-          authError.message?.toLowerCase().includes('not enabled') ||
-          authError.message?.toLowerCase().includes('provider') ||
-          authError.message?.toLowerCase().includes('unsupported')
-        ) {
-          setError(`כניסה עם ${providerName} אינה מופעלת. אנא השתמש באימייל וסיסמה.`)
-        } else {
-          setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
-        }
+    // Check if custom Google OAuth Client ID is configured
+    const customGoogleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID
+
+    if (customGoogleClientId && typeof window !== 'undefined') {
+      // Use custom Google OAuth app (not Supabase's)
+      try {
+        const state = generateState()
+        saveStateToSession(state, nextPath)
+
+        const redirectUri = `${appUrl}/api/auth/callback`
+        const googleAuthUrl = getGoogleOAuthUrl(
+          customGoogleClientId,
+          redirectUri,
+          state,
+          nextPath
+        )
+
+        window.location.href = googleAuthUrl
+      } catch (err) {
+        setError('שגיאה בכניסה עם Google. נסה שנית.')
         setOauthLoading(null)
       }
-      // If no error, redirect is handled by Supabase SDK
-    } catch {
-      const providerName = 'Google'
-      setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
-      setOauthLoading(null)
+    } else {
+      // Fallback to Supabase OAuth
+      const supabase = createClient()
+
+      try {
+        const { error: authError } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          },
+        })
+        if (authError) {
+          const providerName = 'Google'
+          if (
+            authError.message?.toLowerCase().includes('not enabled') ||
+            authError.message?.toLowerCase().includes('provider') ||
+            authError.message?.toLowerCase().includes('unsupported')
+          ) {
+            setError(`כניסה עם ${providerName} אינה מופעלת. אנא השתמש באימייל וסיסמה.`)
+          } else {
+            setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
+          }
+          setOauthLoading(null)
+        }
+        // If no error, redirect is handled by Supabase SDK
+      } catch {
+        const providerName = 'Google'
+        setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
+        setOauthLoading(null)
+      }
     }
   }
 
