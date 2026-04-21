@@ -88,6 +88,7 @@ export interface TrackingTarget {
   grid_size: GridSize | null
   postal_code: string | null
   radius_miles: number | null
+  radius_center_zip: string | null
   exact_address_input: string | null
   exact_resolved_lat: number | null
   exact_resolved_lng: number | null

@@ -121,6 +121,7 @@ export async function createTrackingTargetAction(formData: FormData) {
 
   const radiusMilesStr = safeStringFromFormData(formData, 'radius_miles')
   const radiusMiles = radiusMilesStr ? parseInt(radiusMilesStr, 10) : null
+  const radiusCenterZip = safeStringFromFormData(formData, 'radius_center_zip')
 
   const data: Record<string, unknown> = {
     user_id: user.id,
@@ -136,6 +137,7 @@ export async function createTrackingTargetAction(formData: FormData) {
     grid_size: null,
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     radius_miles: radiusMiles,
+    radius_center_zip: radiusCenterZip,
     is_active: true,
   }
 
@@ -219,6 +221,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   const postalCode = safeStringFromFormData(formData, 'postal_code')
   const radiusMilesStr = safeStringFromFormData(formData, 'radius_miles')
   const radiusMiles = radiusMilesStr ? parseInt(radiusMilesStr, 10) : null
+  const radiusCenterZip = safeStringFromFormData(formData, 'radius_center_zip')
 
   // Resolve exact_point ONCE for the whole bulk batch (all new rows share the same location)
   let resolvedExact: ResolvedExactPoint | null = null
@@ -247,6 +250,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
       grid_size: null,
       postal_code: postalCode,
       radius_miles: radiusMiles,
+      radius_center_zip: radiusCenterZip,
       exact_address_input: resolvedExact?.exact_address_input ?? null,
       exact_resolved_lat: resolvedExact?.exact_resolved_lat ?? null,
       exact_resolved_lng: resolvedExact?.exact_resolved_lng ?? null,
@@ -313,6 +317,7 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
   const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
   const radiusMilesStr = safeStringFromFormData(formData, 'radius_miles')
   const radiusMiles = radiusMilesStr ? parseInt(radiusMilesStr, 10) : null
+  const radiusCenterZip = safeStringFromFormData(formData, 'radius_center_zip')
 
   const data: Record<string, unknown> = {
     keyword: formData.get('keyword') as string,
@@ -326,6 +331,7 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     grid_size: null,
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     radius_miles: radiusMiles,
+    radius_center_zip: radiusCenterZip,
   }
 
   if (locationMode === 'exact_point') {

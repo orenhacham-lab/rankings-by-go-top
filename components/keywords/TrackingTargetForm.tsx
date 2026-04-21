@@ -45,6 +45,7 @@ export default function TrackingTargetForm({
   const [radiusMiles, setRadiusMiles] = useState<string>(
     target?.radius_miles ? String(target.radius_miles) : '5'
   )
+  const [radiusCenterZip, setRadiusCenterZip] = useState(target?.radius_center_zip || '')
   const [bulkMode, setBulkMode] = useState(false)
   const [validationError, setValidationError] = useState('')
 
@@ -94,6 +95,19 @@ export default function TrackingTargetForm({
           setValidationError(`עיר מותאמת חייבת להיות בפורמט: "עיר, קוד מדינה" (לדוגמה: "Los Angeles, CA")`)
           return
         }
+      }
+    }
+
+    // radius: center ZIP is required
+    if (locationMode === 'radius') {
+      if (!radiusCenterZip.trim()) {
+        setValidationError('דרוש ZIP code מרכזי עבור מצב "Radius Scan"')
+        return
+      }
+      const zipClean = radiusCenterZip.replace(/\D/g, '')
+      if (zipClean.length !== 5) {
+        setValidationError('ZIP code חייב להיות בדיוק 5 ספרות')
+        return
       }
     }
 
@@ -323,18 +337,35 @@ export default function TrackingTargetForm({
       )}
 
       {locationMode === 'radius' && (
-        <Select
-          label="Radius *"
-          name="radius_miles"
-          value={radiusMiles}
-          onChange={(e) => setRadiusMiles(e.target.value)}
-          options={[
-            { value: '3', label: '3 miles' },
-            { value: '5', label: '5 miles' },
-            { value: '10', label: '10 miles' },
-          ]}
-          required
-        />
+        <div className="space-y-3">
+          <Input
+            label="Center ZIP Code *"
+            name="radius_center_zip"
+            value={radiusCenterZip}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 5)
+              setRadiusCenterZip(val)
+              setValidationError('')
+            }}
+            required
+            placeholder="12345"
+            maxLength={5}
+            pattern="\d{5}"
+            hint="5-digit US ZIP code for scan center"
+          />
+          <Select
+            label="Radius *"
+            name="radius_miles"
+            value={radiusMiles}
+            onChange={(e) => setRadiusMiles(e.target.value)}
+            options={[
+              { value: '3', label: '3 miles' },
+              { value: '5', label: '5 miles' },
+              { value: '10', label: '10 miles' },
+            ]}
+            required
+          />
+        </div>
       )}
 
       {locationMode === 'exact_point' && (
