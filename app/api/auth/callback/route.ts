@@ -106,73 +106,45 @@ export async function GET(request: NextRequest) {
           }
         )
 
-        // Get or create the user in Supabase auth
-        const { data: userData, error: getUserError } = await adminSupabase.auth.admin.getUserById(
-          googleUser.id
-        )
+        // Use a derived password from Google ID for this OAuth user
+        const oauthPassword = `google_${googleUser.id.substring(0, 20)}`
 
-        let user = userData?.user
+        // Try to create the user, or use existing one
+        console.log('[Google OAuth] Creating or getting user:', googleUser.email)
+        const { data: createData, error: createError } = await adminSupabase.auth.admin.createUser({
+          email: googleUser.email,
+          password: oauthPassword,
+          user_metadata: {
+            full_name: googleUser.name || '',
+            picture: googleUser.picture || '',
+          },
+        })
 
-        if (getUserError || !user) {
-          // User doesn't exist, create them
-          console.log('[Google OAuth] Creating new user in Supabase')
-          const { data: newUserData, error: createError } = await adminSupabase.auth.admin.createUser({
-            email: googleUser.email,
-            user_metadata: {
-              full_name: googleUser.name || '',
-              picture: googleUser.picture || '',
-            },
-          })
-
-          if (createError) {
-            console.error('[Google OAuth] User creation failed:', createError.message)
+        if (createError) {
+          // Check if user already exists
+          if (createError.message?.includes('already exists')) {
+            console.log('[Google OAuth] User already exists, using existing account')
+          } else {
+            console.error('[Google OAuth] Unexpected error:', createError.message)
             return NextResponse.redirect(`${origin}/login?error=oauth`)
           }
-
-          user = newUserData.user
-          console.log('[Google OAuth] User created successfully:', user?.id)
-        } else {
-          console.log('[Google OAuth] Existing user found:', user.id)
         }
 
-        // Create a session for the user
-        if (user) {
-          const { data: sessionData, error: sessionError } = await adminSupabase.auth.admin.createSession({
-            user_id: user.id,
-            factor_id: undefined,
-          })
+        // Sign in the user with the derived password to establish session
+        console.log('[Google OAuth] Signing in user')
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: googleUser.email,
+          password: oauthPassword,
+        })
 
-          if (sessionError) {
-            console.error('[Google OAuth] Session creation failed:', sessionError.message)
-            return NextResponse.redirect(`${origin}/login?error=oauth`)
-          }
-
-          const session = sessionData.session
-
-          // Set the session cookies
-          if (session) {
-            const cookieStore = await cookies()
-            cookieStore.set('sb-access-token', session.access_token, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'lax',
-              maxAge: session.expires_in,
-            })
-
-            if (session.refresh_token) {
-              cookieStore.set('sb-refresh-token', session.refresh_token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 7 * 24 * 60 * 60, // 7 days
-              })
-            }
-
-            console.log('[Google OAuth] Session created and cookies set')
-            const destination = next.startsWith('/') ? next : '/dashboard'
-            return NextResponse.redirect(`${origin}${destination}`)
-          }
+        if (signInError) {
+          console.error('[Google OAuth] Sign in failed:', signInError.message)
+          return NextResponse.redirect(`${origin}/login?error=oauth`)
         }
+
+        console.log('[Google OAuth] User signed in successfully')
+        const destination = next.startsWith('/') ? next : '/dashboard'
+        return NextResponse.redirect(`${origin}${destination}`)
       } catch (error) {
         console.error('[Google OAuth] Callback error:', {
           message: error instanceof Error ? error.message : String(error),
