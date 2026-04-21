@@ -35,6 +35,13 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl" className="h-full">
       <head>
+        {/* Google Tag Manager */}
+        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || [];`,
+          }}
+        />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         {/* Explicit favicon links to ensure Go Top logo is used */}
         <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -75,6 +82,15 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-PC29G3NQ"
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          ></iframe>
+        </noscript>
         {children}
       </body>
     </html>
