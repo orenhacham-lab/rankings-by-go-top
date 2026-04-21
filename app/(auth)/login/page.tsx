@@ -82,6 +82,7 @@ function AuthForm() {
     setSuccess('')
     setOauthLoading(provider)
     const supabase = createClient()
+
     try {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider,
