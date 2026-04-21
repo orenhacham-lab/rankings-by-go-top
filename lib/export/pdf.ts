@@ -184,7 +184,7 @@ function generateReportHTML(data: ExportData): string {
         th {
           background: #1E4ED8;
           color: white;
-          padding: 10px;
+          padding: 8px;
           text-align: ${isHebrewProject ? 'right' : 'left'};
           font-weight: bold;
           font-size: 9pt;
@@ -192,7 +192,7 @@ function generateReportHTML(data: ExportData): string {
         }
 
         td {
-          padding: 10px;
+          padding: 7px;
           border: 1px solid #e5e7eb;
           font-size: 9pt;
           overflow-wrap: break-word;
@@ -210,7 +210,7 @@ function generateReportHTML(data: ExportData): string {
 
         .keyword-cell {
           font-weight: bold;
-          width: 15%;
+          width: 28%;
         }
 
         .url-cell {
