@@ -122,35 +122,75 @@ export async function GET(request: NextRequest) {
 
         if (createError) {
           // Check if user already exists
-          if (createError.message?.includes('already exists')) {
-            console.log('[Google OAuth] User already exists, using existing account')
+          if (!createError.message?.includes('already exists')) {
+            console.error('[Google OAuth] User creation error:', {
+              message: createError.message,
+              status: createError.status,
+              code: createError.code,
+            })
+            console.error('[Google OAuth] SUPABASE_SERVICE_ROLE_KEY check:', {
+              isSet: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+              length: process.env.SUPABASE_SERVICE_ROLE_KEY?.length,
+            })
+            // Instead of failing, try to sign in with existing password
+            console.log('[Google OAuth] Attempting sign-in anyway for existing user')
           } else {
-            console.error('[Google OAuth] Unexpected error:', createError.message)
-            return NextResponse.redirect(`${origin}/login?error=oauth`)
+            console.log('[Google OAuth] User already exists, using existing account')
           }
         }
 
         // Sign in the user with the derived password to establish session
-        console.log('[Google OAuth] Signing in user')
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        console.log('[Google OAuth] Signing in user:', {
+          email: googleUser.email,
+          passwordPrefix: oauthPassword.substring(0, 15),
+        })
+
+        const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
           email: googleUser.email,
           password: oauthPassword,
         })
 
         if (signInError) {
-          console.error('[Google OAuth] Sign in failed:', signInError.message)
-          return NextResponse.redirect(`${origin}/login?error=oauth`)
+          console.error('[Google OAuth] Sign in failed:', {
+            message: signInError.message,
+            status: signInError.status,
+            code: signInError.code,
+          })
+          console.error('[Google OAuth] Debug info:', {
+            email: googleUser.email,
+            googleId: googleUser.id,
+            passwordLength: oauthPassword.length,
+          })
+          return NextResponse.redirect(`${origin}/login?error=oauth&details=signin_failed`)
+        }
+
+        if (!signInData?.session) {
+          console.error('[Google OAuth] No session returned after sign-in')
+          return NextResponse.redirect(`${origin}/login?error=oauth&details=no_session`)
         }
 
         console.log('[Google OAuth] User signed in successfully')
         const destination = next.startsWith('/') ? next : '/dashboard'
         return NextResponse.redirect(`${origin}${destination}`)
       } catch (error) {
-        console.error('[Google OAuth] Callback error:', {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack?.substring(0, 200) : undefined,
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorStack = error instanceof Error ? error.stack : undefined
+
+        console.error('[Google OAuth] CRITICAL CALLBACK ERROR:', {
+          message: errorMessage,
+          stack: errorStack?.substring(0, 300),
+          type: error?.constructor?.name,
         })
-        return NextResponse.redirect(`${origin}/login?error=oauth`)
+
+        // Log environment check
+        console.error('[Google OAuth] Environment at error:', {
+          hasGoogleClientId: !!process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID,
+          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+          hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        })
+
+        return NextResponse.redirect(`${origin}/login?error=oauth&details=callback_error`)
       }
     } else {
       // Handle Supabase OAuth flow
