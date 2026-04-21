@@ -34,6 +34,13 @@ export async function GET(request: NextRequest) {
       // Handle custom Google OAuth flow
       try {
         const redirectUri = `${origin}/api/auth/callback`
+        console.log('[Google OAuth] Callback received:', {
+          code: code?.substring(0, 20) + '...',
+          state: state?.substring(0, 20) + '...',
+          redirectUri,
+          clientId: process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID?.substring(0, 20) + '...',
+        })
+
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
           headers: {
@@ -48,13 +55,21 @@ export async function GET(request: NextRequest) {
           }).toString(),
         })
 
+        console.log('[Google OAuth] Token response status:', tokenResponse.status)
+
         if (!tokenResponse.ok) {
-          console.error('Google token exchange failed:', await tokenResponse.text())
+          const errorText = await tokenResponse.text()
+          console.error('[Google OAuth] Token exchange failed:', {
+            status: tokenResponse.status,
+            error: errorText.substring(0, 200),
+          })
           return NextResponse.redirect(`${origin}/login?error=oauth`)
         }
 
         const tokens = await tokenResponse.json()
         const accessToken = tokens.access_token
+
+        console.log('[Google OAuth] Token exchange successful')
 
         // Get user info from Google
         const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -63,12 +78,19 @@ export async function GET(request: NextRequest) {
           },
         })
 
+        console.log('[Google OAuth] User info response status:', userResponse.status)
+
         if (!userResponse.ok) {
-          console.error('Google user info failed:', await userResponse.text())
+          const errorText = await userResponse.text()
+          console.error('[Google OAuth] User info failed:', errorText.substring(0, 200))
           return NextResponse.redirect(`${origin}/login?error=oauth`)
         }
 
         const googleUser = await userResponse.json()
+        console.log('[Google OAuth] User info retrieved:', {
+          email: googleUser.email,
+          id: googleUser.id,
+        })
 
         // Sign in or create user in Supabase using the Google identity
         // Use the ID token to authenticate with Supabase
@@ -79,11 +101,17 @@ export async function GET(request: NextRequest) {
           }).toString(),
         })
 
+        console.log('[Google OAuth] ID token validation response:', idTokenResponse.status)
+
         if (idTokenResponse.ok) {
           // Create a Supabase session by signing in with the Google credentials
           const { error: signInError } = await supabase.auth.signInWithPassword({
             email: googleUser.email,
             password: googleUser.id, // Use Google ID as temporary password for OAuth users
+          })
+
+          console.log('[Google OAuth] Supabase sign in result:', {
+            error: signInError?.message || 'success',
           })
 
           // If user doesn't exist, this will fail - that's OK, we'll handle it
@@ -98,7 +126,10 @@ export async function GET(request: NextRequest) {
           return NextResponse.redirect(`${origin}${destination}`)
         }
       } catch (error) {
-        console.error('Custom Google OAuth callback error:', error)
+        console.error('[Google OAuth] Callback error:', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack?.substring(0, 200) : undefined,
+        })
         return NextResponse.redirect(`${origin}/login?error=oauth`)
       }
     } else {
