@@ -137,6 +137,19 @@ export const US_ZIP_CODES: Record<string, USZIPCode> = {
 export function resolveUSZipCodeToCoordinates(zipCode: string): { lat: number; lng: number } | null {
   const normalized = zipCode.trim().replace(/[^\d]/g, '')
   const entry = US_ZIP_CODES[normalized]
+
+  // DEBUG: Log the resolution attempt
+  console.log('[ZIP_RESOLUTION] Attempting to resolve ZIP code:', {
+    inputZip: zipCode,
+    inputType: typeof zipCode,
+    inputLength: zipCode?.length,
+    normalized,
+    normalizedType: typeof normalized,
+    normalizedLength: normalized.length,
+    foundInDatabase: !!entry,
+    result: entry ? `lat=${entry.lat}, lng=${entry.lng}, city=${entry.city}` : 'null',
+  })
+
   if (!entry) {
     return null
   }
