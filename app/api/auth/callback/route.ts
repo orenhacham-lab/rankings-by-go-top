@@ -117,6 +117,7 @@ export async function GET(request: NextRequest) {
         const { data: createData, error: createError } = await adminSupabase.auth.admin.createUser({
           email: googleUser.email,
           password: oauthPassword,
+          email_confirm: true, // CRITICAL: Mark email as confirmed so user can sign in immediately
           user_metadata: {
             full_name: googleUser.name || '',
             picture: googleUser.picture || '',
