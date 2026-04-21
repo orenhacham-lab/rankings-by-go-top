@@ -553,13 +553,32 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     })
     const { lat, lng, centerZip, radiusMiles } = input.radiusCenter
 
-    // Validate coordinates
-    if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    // Validate all required values before using them
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      const errorMsg = `Radius mode requires valid numeric coordinates. Got: lat=${lat} (${typeof lat}), lng=${lng} (${typeof lng})`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
       const errorMsg = `Invalid radius coordinates: lat=${lat}, lng=${lng}`
       console.error('[Maps:radius] ERROR:', errorMsg)
       return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
     }
 
+    if (radiusMiles === null || radiusMiles === undefined || typeof radiusMiles !== 'number') {
+      const errorMsg = `Radius mode requires valid numeric radiusMiles. Got: ${radiusMiles} (${typeof radiusMiles})`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    if (radiusMiles <= 0) {
+      const errorMsg = `Radius mode requires positive radiusMiles. Got: ${radiusMiles}`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    // Now all values are validated as numbers, safe to use
     // Generate radius points around center
     const radiusPoints = generateRadiusPoints(lat, lng, radiusMiles, centerZip || 'unknown')
     console.log(`[Maps:radius] Generated ${radiusPoints.length} radius scan points:`)
@@ -650,8 +669,8 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         lastResponse,
         auditAttempts,
         true,
-        aggregated.bestMatch.position,
-        aggregated.bestMatch.title,
+        aggregated.bestMatch.position ?? null,
+        aggregated.bestMatch.title || null,
         aggregated.bestMatch.address || null,
         0,
         null,
@@ -670,10 +689,10 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
       return {
         found: true,
-        position: aggregated.bestMatch.position,
+        position: aggregated.bestMatch.position ?? null,
         resultUrl: aggregated.bestMatch.address ? null : null, // Maps doesn't provide URLs
-        resultTitle: aggregated.bestMatch.title,
-        resultAddress: aggregated.bestMatch.address,
+        resultTitle: aggregated.bestMatch.title || null,
+        resultAddress: aggregated.bestMatch.address || null,
         error: null,
         audit,
         radiusScanMetadata: {
@@ -690,9 +709,9 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
             lng: r.point.lng,
             distanceMiles: r.point.distanceMiles,
             found: r.found,
-            position: r.position,
+            position: r.position ?? null,
           })),
-          bestMatch: aggregated.bestMatch ? {
+          bestMatch: aggregated.bestMatch && typeof aggregated.bestMatch.position === 'number' ? {
             direction: aggregated.bestMatch.point.direction,
             label: aggregated.bestMatch.point.label,
             position: aggregated.bestMatch.position,

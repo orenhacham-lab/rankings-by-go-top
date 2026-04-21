@@ -105,13 +105,23 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     console.log(`  Center coords: ${input.radiusCenter.lat}, ${input.radiusCenter.lng}`)
     console.log(`  Radius: ${input.radiusCenter.radiusMiles} miles`)
 
+    // Validate all required values before calling generateRadiusPoints
+    const { lat, lng, radiusMiles, centerZip } = input.radiusCenter
+
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return makeError(`Radius mode requires valid numeric coordinates. Got: lat=${lat} (${typeof lat}), lng=${lng} (${typeof lng})`)
+    }
+
+    if (radiusMiles === null || radiusMiles === undefined || typeof radiusMiles !== 'number') {
+      return makeError(`Radius mode requires valid numeric radiusMiles. Got: ${radiusMiles} (${typeof radiusMiles})`)
+    }
+
+    if (radiusMiles <= 0) {
+      return makeError(`Radius mode requires positive radiusMiles. Got: ${radiusMiles}`)
+    }
+
     // Generate radius points around center
-    const radiusPoints = generateRadiusPoints(
-      input.radiusCenter.lat,
-      input.radiusCenter.lng,
-      input.radiusCenter.radiusMiles,
-      input.radiusCenter.centerZip || 'unknown'
-    )
+    const radiusPoints = generateRadiusPoints(lat, lng, radiusMiles, centerZip || 'unknown')
 
     console.log(`[GoogleSearch] Generated ${radiusPoints.length} radius scan points:`)
     radiusPoints.forEach(p => {
@@ -206,7 +216,7 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     console.log(`  - Successful scans: ${aggregated.successCount}/${radiusPoints.length}`)
     console.log(`  - Best match: ${aggregated.bestMatch ? `position ${aggregated.bestMatch.position} from ${aggregated.bestMatch.point.label}` : 'not found'}`)
 
-    if (aggregated.bestMatch) {
+    if (aggregated.bestMatch && typeof aggregated.bestMatch.position === 'number') {
       return {
         found: true,
         position: aggregated.bestMatch.position,
@@ -219,7 +229,7 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
           centerZip: input.radiusCenter.centerZip,
           centerLat: input.radiusCenter.lat,
           centerLng: input.radiusCenter.lng,
-          radiusMiles: input.radiusCenter.radiusMiles,
+          radiusMiles: radiusMiles as number,
           pointsScanned: radiusPoints.length,
           successfulScans: aggregated.successCount,
           radiusAttempts: radiusResults.map(r => ({
@@ -229,13 +239,13 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
             lng: r.point.lng,
             distanceMiles: r.point.distanceMiles,
             found: r.found,
-            position: r.position,
+            position: r.position ?? null,
           })),
-          bestMatch: aggregated.bestMatch ? {
+          bestMatch: {
             direction: aggregated.bestMatch.point.direction,
             label: aggregated.bestMatch.point.label,
             position: aggregated.bestMatch.position,
-          } : null,
+          },
         },
       }
     } else {
@@ -250,7 +260,7 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
           centerZip: input.radiusCenter.centerZip,
           centerLat: input.radiusCenter.lat,
           centerLng: input.radiusCenter.lng,
-          radiusMiles: input.radiusCenter.radiusMiles,
+          radiusMiles: radiusMiles as number,
           pointsScanned: radiusPoints.length,
           successfulScans: aggregated.successCount,
           radiusAttempts: radiusResults.map(r => ({
@@ -260,7 +270,7 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
             lng: r.point.lng,
             distanceMiles: r.point.distanceMiles,
             found: r.found,
-            position: r.position,
+            position: r.position ?? null,
           })),
           bestMatch: null,
         },
