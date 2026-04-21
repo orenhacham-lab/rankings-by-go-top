@@ -247,6 +247,8 @@ export async function POST(request: Request) {
         const effectiveCity =
           locationMode === 'custom' && target.custom_city?.trim()
             ? target.custom_city.trim()
+            : locationMode === 'radius' || locationMode === 'exact_point'
+            ? null
             : project.city
 
         const scanPayload = {
@@ -259,7 +261,7 @@ export async function POST(request: Request) {
           city: effectiveCity,
           deviceType: project.device_type,
           locationMode,
-          customCity: target.custom_city,
+          customCity: locationMode === 'radius' ? null : target.custom_city,
           postalCode: locationMode === 'zip'
             ? ((target.postal_code || null) as string | null)
             : null,
@@ -267,9 +269,23 @@ export async function POST(request: Request) {
           radiusCenter: radiusCenterInput,
         }
 
+        if (locationMode === 'radius') {
+          console.log('[Scan:route] RADIUS PAYLOAD CHECK:')
+          console.log('  locationMode:', scanPayload.locationMode)
+          console.log('  city:', scanPayload.city)
+          console.log('  customCity:', scanPayload.customCity)
+          console.log('  radiusCenterNull:', scanPayload.radiusCenter === null)
+          console.log('  radiusCenterZip:', scanPayload.radiusCenter?.centerZip)
+          console.log('  radiusCenterLat:', scanPayload.radiusCenter?.lat)
+          console.log('  radiusCenterLng:', scanPayload.radiusCenter?.lng)
+          console.log('  radiusMiles:', scanPayload.radiusCenter?.radiusMiles)
+          console.log('  postalCode:', scanPayload.postalCode)
+        }
+
         console.log('[Scan:route] Payload passed to runScan():', {
           keyword: scanPayload.keyword,
           locationMode: scanPayload.locationMode,
+          city: scanPayload.city,
           postalCode: scanPayload.postalCode,
           exactPointNull: scanPayload.exactPoint === null,
           exactPointLat: scanPayload.exactPoint?.lat,

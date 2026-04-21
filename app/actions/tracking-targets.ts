@@ -137,6 +137,17 @@ export async function createTrackingTargetAction(formData: FormData) {
     is_active: true,
   }
 
+  if (locationMode === 'radius') {
+    console.log('[CreateTarget] RADIUS MODE DATA:', {
+      keyword: data.keyword,
+      location_mode: data.location_mode,
+      radius_center_zip: data.radius_center_zip,
+      radius_miles: data.radius_miles,
+      custom_city: data.custom_city,
+      postal_code: data.postal_code,
+    })
+  }
+
   if (locationMode === 'exact_point') {
     const projectCountry = await fetchProjectCountry(supabase, projectId)
     // exact_point is US-only

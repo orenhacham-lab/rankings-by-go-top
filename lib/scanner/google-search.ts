@@ -32,7 +32,19 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     return makeError(`Could not parse target domain: "${rawDomain}"`)
   }
 
-  console.log(`[GoogleSearch] Input locationMode="${input.locationMode}" radiusCenter=${input.radiusCenter ? `{lat:${input.radiusCenter.lat}, lng:${input.radiusCenter.lng}, zip:${input.radiusCenter.centerZip}, miles:${input.radiusCenter.radiusMiles}}` : 'null'} city="${input.city || 'null'}"`)
+  if (input.locationMode === 'radius') {
+    console.log(`[GoogleSearch] RADIUS INPUT RECEIVED:`)
+    console.log(`  - keyword: ${input.keyword}`)
+    console.log(`  - locationMode: ${input.locationMode}`)
+    console.log(`  - city (from scanPayload): ${input.city || 'null'}`)
+    console.log(`  - radiusCenter: ${input.radiusCenter ? 'SET' : 'NULL'}`)
+    if (input.radiusCenter) {
+      console.log(`    - centerZip: ${input.radiusCenter.centerZip}`)
+      console.log(`    - lat: ${input.radiusCenter.lat}`)
+      console.log(`    - lng: ${input.radiusCenter.lng}`)
+      console.log(`    - miles: ${input.radiusCenter.radiusMiles}`)
+    }
+  }
 
   const requestParams: Record<string, string> = {
     engine: input.engine,
@@ -60,6 +72,13 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       body.device = requestParams.device
     }
 
+    if (input.locationMode === 'radius') {
+      console.log(`[GoogleSearch] RADIUS MODE: Checking conditions...`)
+      console.log(`  - locationMode === 'radius': ${input.locationMode === 'radius'}`)
+      console.log(`  - radiusCenter exists: ${!!input.radiusCenter}`)
+      console.log(`  - Will enter radius branch: ${input.locationMode === 'radius' && input.radiusCenter}`)
+    }
+
     // exact_point is the source of truth — ll alone drives geo targeting.
     // Do not send location (city/zip) when exact_point is active.
     if (input.locationMode === 'exact_point' && input.exactPoint) {
@@ -67,22 +86,20 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       console.log(`[GoogleSearch] exact_point: ll=${body.ll} (location suppressed)`)
     } else if (input.locationMode === 'radius' && input.radiusCenter) {
       body.ll = `@${input.radiusCenter.lat},${input.radiusCenter.lng},13z`
-      console.log(`[GoogleSearch] radius mode activated:`)
-      console.log(`  - center_zip: ${input.radiusCenter.centerZip}`)
-      console.log(`  - resolved_lat: ${input.radiusCenter.lat}`)
-      console.log(`  - resolved_lng: ${input.radiusCenter.lng}`)
-      console.log(`  - radius_miles: ${input.radiusCenter.radiusMiles}`)
-      console.log(`  - ll parameter: ${body.ll}`)
-      console.log(`  - location field: null (suppressed)`)
-      console.log(`  - uule field: null (suppressed)`)
+      console.log(`[GoogleSearch] RADIUS BRANCH ACTIVATED - setting ll only`)
+      console.log(`  - ll: ${body.ll}`)
+      console.log(`  - NOT setting location (city suppressed)`)
     } else if (input.city) {
       body.location = input.city
-      console.log(`[GoogleSearch] using city mode: location="${input.city}"`)
+      console.log(`[GoogleSearch] FALLBACK TO CITY: location="${input.city}"`)
+    } else {
+      console.log(`[GoogleSearch] NO LOCATION SET (no city, no ll)`)
     }
 
-    console.log(`[GoogleSearch] Serper request body:`, JSON.stringify(body))
-    console.log(`[GoogleSearch] location in body:`, body.location || 'null')
-    console.log(`[GoogleSearch] uule in body:`, body.uule || 'null')
+    console.log(`[GoogleSearch] FINAL REQUEST BODY:`, JSON.stringify(body))
+    console.log(`[GoogleSearch] FINAL - location field:`, body.location || 'null')
+    console.log(`[GoogleSearch] FINAL - uule field:`, body.uule || 'null')
+    console.log(`[GoogleSearch] FINAL - ll field:`, body.ll || 'null')
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
