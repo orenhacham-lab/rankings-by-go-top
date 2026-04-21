@@ -19,18 +19,6 @@ function AuthForm() {
   // Use configured app URL or fallback to current origin
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
 
-  // Debug: Log environment on mount
-  if (typeof window !== 'undefined') {
-    console.group('[AUTH DEBUG] Environment Check')
-    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID:', process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID)
-    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID type:', typeof process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID)
-    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID length:', process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID?.length)
-    console.log('NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID is truthy:', !!process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID)
-    console.log('NEXT_PUBLIC_APP_URL:', appUrl)
-    console.log('Window location origin:', window.location.origin)
-    console.groupEnd()
-  }
-
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -95,72 +83,82 @@ function AuthForm() {
     setSuccess('')
     setOauthLoading(provider)
 
-    // Check if custom Google OAuth Client ID is configured
-    const customGoogleClientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID
+    try {
+      // Check with server if custom Google OAuth is configured
+      const configResponse = await fetch('/api/get-oauth-config', {
+        cache: 'no-store',
+      })
+      const config = await configResponse.json()
 
-    console.log('[Login] Google OAuth button clicked', {
-      hasCustomGoogleClientId: !!customGoogleClientId,
-      clientIdLength: customGoogleClientId?.length || 0,
-      appUrl,
-    })
+      console.log('[Login] OAuth config:', {
+        useCustomGoogleOAuth: config.useCustomGoogleOAuth,
+        hasClientId: !!config.googleClientId,
+      })
 
-    if (customGoogleClientId && typeof window !== 'undefined') {
-      // Use custom Google OAuth app (not Supabase's)
-      console.log('[Login] Using CUSTOM Google OAuth (NOT Supabase)')
-      try {
-        const state = generateState()
-        saveStateToSession(state, nextPath)
+      if (config.useCustomGoogleOAuth && config.googleClientId && typeof window !== 'undefined') {
+        // Use custom Google OAuth app (not Supabase's)
+        console.log('[Login] Using CUSTOM Google OAuth (NOT Supabase)')
+        try {
+          const state = generateState()
+          saveStateToSession(state, nextPath)
 
-        const redirectUri = `${appUrl}/api/auth/callback`
-        const googleAuthUrl = getGoogleOAuthUrl(
-          customGoogleClientId,
-          redirectUri,
-          state,
-          nextPath
-        )
+          const redirectUri = `${appUrl}/api/auth/callback`
+          const googleAuthUrl = getGoogleOAuthUrl(
+            config.googleClientId,
+            redirectUri,
+            state,
+            nextPath
+          )
 
-        console.log('[Login] Redirecting to Google:', {
-          redirectUri,
-          stateLength: state.length,
-        })
+          console.log('[Login] Redirecting to Google:', {
+            redirectUri,
+            stateLength: state.length,
+          })
 
-        window.location.href = googleAuthUrl
-      } catch (err) {
-        console.error('[Login] Google OAuth error:', err)
-        setError('שגיאה בכניסה עם Google. נסה שנית.')
-        setOauthLoading(null)
-      }
-    } else {
-      // Fallback to Supabase OAuth
-      console.log('[Login] Using Supabase OAuth (NOT custom Google)')
-      const supabase = createClient()
-
-      try {
-        const { error: authError } = await supabase.auth.signInWithOAuth({
-          provider,
-          options: {
-            redirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
-          },
-        })
-        if (authError) {
-          const providerName = 'Google'
-          if (
-            authError.message?.toLowerCase().includes('not enabled') ||
-            authError.message?.toLowerCase().includes('provider') ||
-            authError.message?.toLowerCase().includes('unsupported')
-          ) {
-            setError(`כניסה עם ${providerName} אינה מופעלת. אנא השתמש באימייל וסיסמה.`)
-          } else {
-            setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
-          }
+          window.location.href = googleAuthUrl
+        } catch (err) {
+          console.error('[Login] Google OAuth error:', err)
+          setError('שגיאה בכניסה עם Google. נסה שנית.')
           setOauthLoading(null)
         }
-        // If no error, redirect is handled by Supabase SDK
-      } catch {
-        const providerName = 'Google'
-        setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
-        setOauthLoading(null)
+      } else {
+        // Fallback to Supabase OAuth
+        console.log('[Login] Using Supabase OAuth (NOT custom Google)', {
+          reason: !config.useCustomGoogleOAuth ? 'config.useCustomGoogleOAuth is false' : 'no clientId',
+        })
+        const supabase = createClient()
+
+        try {
+          const { error: authError } = await supabase.auth.signInWithOAuth({
+            provider,
+            options: {
+              redirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
+            },
+          })
+          if (authError) {
+            const providerName = 'Google'
+            if (
+              authError.message?.toLowerCase().includes('not enabled') ||
+              authError.message?.toLowerCase().includes('provider') ||
+              authError.message?.toLowerCase().includes('unsupported')
+            ) {
+              setError(`כניסה עם ${providerName} אינה מופעלת. אנא השתמש באימייל וסיסמה.`)
+            } else {
+              setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
+            }
+            setOauthLoading(null)
+          }
+          // If no error, redirect is handled by Supabase SDK
+        } catch {
+          const providerName = 'Google'
+          setError(`שגיאה בכניסה עם ${providerName}. נסה שנית.`)
+          setOauthLoading(null)
+        }
       }
+    } catch (err) {
+      console.error('[Login] OAuth config error:', err)
+      setError('שגיאה בטעינת הגדרות OAuth. נסה שנית.')
+      setOauthLoading(null)
     }
   }
 
