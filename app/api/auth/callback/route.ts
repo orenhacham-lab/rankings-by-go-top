@@ -125,8 +125,8 @@ export async function GET(request: NextRequest) {
         })
 
         if (createError) {
-          // Check if user already exists
-          if (createError.message?.includes('already exists')) {
+          // Check if user already exists by error code (more reliable than message text)
+          if (createError.code === 'email_exists') {
             console.log('[Google OAuth] User already exists with this email')
             userCreatedNow = false
           } else {
