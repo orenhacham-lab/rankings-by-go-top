@@ -36,17 +36,16 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl" className="h-full">
       <head>
-        {/* Google Tag Manager */}
-        <script
-          async
-          src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"
-        ></script>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        {/* Google Tag Manager - Script tag (must be in head) */}
+        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
+        {/* Google Tag Manager - Data Layer */}
         <script
           dangerouslySetInnerHTML={{
             __html: `window.dataLayer = window.dataLayer || [];`,
           }}
         />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         {/* Explicit favicon links to ensure Go Top logo is used */}
         <link rel="icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon.png" />
