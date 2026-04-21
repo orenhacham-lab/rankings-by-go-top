@@ -432,6 +432,23 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const country = (input.country || 'IL').toLowerCase()
   const language = input.language || 'he'
 
+  console.log('\n' + '='.repeat(100))
+  console.log('[Maps:CRITICAL] ========== SCANNER ENTRY POINT ==========')
+  console.log('[Maps:CRITICAL] Input received:')
+  console.log('[Maps:CRITICAL]   - locationMode:', input.locationMode, `(${typeof input.locationMode})`)
+  console.log('[Maps:CRITICAL]   - exactPoint:', input.exactPoint ? `{lat: ${input.exactPoint.lat}, lng: ${input.exactPoint.lng}}` : 'null/undefined')
+  console.log('[Maps:CRITICAL]   - radiusCenter:', input.radiusCenter ? `{lat: ${input.radiusCenter.lat}, lng: ${input.radiusCenter.lng}, zip: ${input.radiusCenter.centerZip}, miles: ${input.radiusCenter.radiusMiles}}` : 'null/undefined')
+  console.log('[Maps:CRITICAL]   - keyword:', input.keyword)
+  console.log('[Maps:CRITICAL]   - postalCode:', input.postalCode)
+  console.log('[Maps:CRITICAL]   - city:', input.city)
+  console.log('[Maps:CRITICAL] BRANCH DECISION LOGIC:')
+  console.log('[Maps:CRITICAL]   - Will exact_point branch trigger?', input.locationMode === 'exact_point' && input.exactPoint ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL]   - Will radius branch trigger?', input.locationMode === 'radius' && input.radiusCenter ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL]   - Will zip branch trigger?', input.locationMode === 'zip' && input.postalCode?.trim() ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL]   - Will city/default branch trigger?', !((input.locationMode === 'exact_point' && input.exactPoint) || (input.locationMode === 'radius' && input.radiusCenter) || (input.locationMode === 'zip' && input.postalCode?.trim())) ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL] =====================================')
+  console.log('='.repeat(100) + '\n')
+
   console.log('[Maps:scanGoogleMaps] Entry point:', {
     locationMode: input.locationMode,
     hasExactPoint: !!input.exactPoint,
@@ -545,12 +562,14 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
   // Radius mode: multi-point scan strategy
   if (input.locationMode === 'radius' && input.radiusCenter) {
-    console.log('[Maps:radius] BRANCH TAKEN: radius scan mode (multi-point strategy)', {
-      centerZip: input.radiusCenter.centerZip,
-      lat: input.radiusCenter.lat,
-      lng: input.radiusCenter.lng,
-      radiusMiles: input.radiusCenter.radiusMiles,
-    })
+    console.log('\n' + '='.repeat(100))
+    console.log('[Maps:radius] ✓✓✓ RADIUS BRANCH TAKEN ✓✓✓ (multi-point strategy)')
+    console.log('[Maps:radius] Center coordinates and radius:')
+    console.log('[Maps:radius]   - centerZip:', input.radiusCenter.centerZip)
+    console.log('[Maps:radius]   - lat:', input.radiusCenter.lat)
+    console.log('[Maps:radius]   - lng:', input.radiusCenter.lng)
+    console.log('[Maps:radius]   - radiusMiles:', input.radiusCenter.radiusMiles)
+    console.log('='.repeat(100) + '\n')
     const { lat, lng, centerZip, radiusMiles } = input.radiusCenter
 
     // Validate all required values before using them

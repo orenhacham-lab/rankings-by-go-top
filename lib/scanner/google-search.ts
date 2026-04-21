@@ -98,12 +98,29 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     return makeError(`Could not parse target domain: "${rawDomain}"`)
   }
 
+  console.log('\n' + '='.repeat(100))
+  console.log('[GoogleSearch:CRITICAL] ========== SCANNER ENTRY POINT ==========')
+  console.log('[GoogleSearch:CRITICAL] Input received:')
+  console.log('[GoogleSearch:CRITICAL]   - locationMode:', input.locationMode, `(${typeof input.locationMode})`)
+  console.log('[GoogleSearch:CRITICAL]   - exactPoint:', input.exactPoint ? `{lat: ${input.exactPoint.lat}, lng: ${input.exactPoint.lng}}` : 'null/undefined')
+  console.log('[GoogleSearch:CRITICAL]   - radiusCenter:', input.radiusCenter ? `{lat: ${input.radiusCenter.lat}, lng: ${input.radiusCenter.lng}, zip: ${input.radiusCenter.centerZip}, miles: ${input.radiusCenter.radiusMiles}}` : 'null/undefined')
+  console.log('[GoogleSearch:CRITICAL]   - keyword:', input.keyword)
+  console.log('[GoogleSearch:CRITICAL]   - city:', input.city)
+  console.log('[GoogleSearch:CRITICAL] BRANCH DECISION LOGIC:')
+  console.log('[GoogleSearch:CRITICAL]   - Will radius branch trigger?', input.locationMode === 'radius' && input.radiusCenter ? '✓ YES' : '✗ NO')
+  console.log('[GoogleSearch:CRITICAL]   - Will exact_point branch trigger?', input.locationMode === 'exact_point' && input.exactPoint ? '✓ YES' : '✗ NO')
+  console.log('[GoogleSearch:CRITICAL] =====================================')
+  console.log('='.repeat(100) + '\n')
+
   // Handle radius mode with multiple scan points
   if (input.locationMode === 'radius' && input.radiusCenter) {
-    console.log(`[GoogleSearch] RADIUS SCAN MODE - Multi-point strategy`)
-    console.log(`  Center ZIP: ${input.radiusCenter.centerZip}`)
-    console.log(`  Center coords: ${input.radiusCenter.lat}, ${input.radiusCenter.lng}`)
-    console.log(`  Radius: ${input.radiusCenter.radiusMiles} miles`)
+    console.log('\n' + '='.repeat(100))
+    console.log('[GoogleSearch:radius] ✓✓✓ RADIUS BRANCH TAKEN ✓✓✓ (multi-point strategy)')
+    console.log('[GoogleSearch:radius] Center coordinates and radius:')
+    console.log(`[GoogleSearch:radius]   - Center ZIP: ${input.radiusCenter.centerZip}`)
+    console.log(`[GoogleSearch:radius]   - Center coords: ${input.radiusCenter.lat}, ${input.radiusCenter.lng}`)
+    console.log(`[GoogleSearch:radius]   - Radius: ${input.radiusCenter.radiusMiles} miles`)
+    console.log('='.repeat(100) + '\n')
 
     // Validate all required values before calling generateRadiusPoints
     const { lat, lng, radiusMiles, centerZip } = input.radiusCenter
