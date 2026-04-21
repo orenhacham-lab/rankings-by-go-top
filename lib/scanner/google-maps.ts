@@ -542,6 +542,99 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     console.warn('[Maps:exact_point] WARNING: locationMode=exact_point but no exactPoint coords provided')
   }
 
+  // Radius mode: use radiusCenter coordinates, NO city/location fallback
+  if (input.locationMode === 'radius' && input.radiusCenter) {
+    console.log('[Maps:radius] BRANCH TAKEN: radius scan mode', {
+      centerZip: input.radiusCenter.centerZip,
+      lat: input.radiusCenter.lat,
+      lng: input.radiusCenter.lng,
+      radiusMiles: input.radiusCenter.radiusMiles,
+    })
+    const { lat, lng, centerZip, radiusMiles } = input.radiusCenter
+    const auditAttempts: ScanAttempt[] = []
+    let lastResponse: SerperMapsResponse | null = null
+
+    try {
+      // Validate coordinates
+      if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        const errorMsg = `Invalid radius coordinates: lat=${lat}, lng=${lng}`
+        console.error('[Maps:radius] ERROR:', errorMsg)
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, null)
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg, audit }
+      }
+
+      // Query with ONLY ll, NO location string
+      const response = await querySerperMaps(input.keyword, country, language, undefined, { lat, lng })
+      lastResponse = response
+
+      if (!response) {
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
+      }
+      if (response.error) {
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        return { ...makeError(response.error, input, audit), audit }
+      }
+
+      const places = response.places ?? []
+      const matchedPlace = findBusinessMatch(places, businessName)
+
+      if (matchedPlace) {
+        auditAttempts.push({
+          attemptNumber: 1,
+          context: `radius ${radiusMiles}mi around ZIP ${centerZip}`,
+          location: null,
+          ll: `@${lat},${lng},13z`,
+          found: true,
+          matchedTitle: matchedPlace.title,
+          matchedPosition: matchedPlace.position,
+          matchedAddress: matchedPlace.address || null,
+        })
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).radius_used = true
+          ;(audit.decision as Record<string, unknown>).radius_center_zip = centerZip
+          ;(audit.decision as Record<string, unknown>).radius_center_lat = lat
+          ;(audit.decision as Record<string, unknown>).radius_center_lng = lng
+          ;(audit.decision as Record<string, unknown>).radius_miles = radiusMiles
+        }
+        return {
+          found: true,
+          position: matchedPlace.position,
+          resultUrl: matchedPlace.website || null,
+          resultTitle: matchedPlace.title,
+          resultAddress: matchedPlace.address || null,
+          error: null,
+          audit,
+        }
+      }
+
+      auditAttempts.push({
+        attemptNumber: 1,
+        context: `radius ${radiusMiles}mi around ZIP ${centerZip}`,
+        location: null,
+        ll: `@${lat},${lng},13z`,
+        found: false,
+      })
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).radius_used = true
+        ;(audit.decision as Record<string, unknown>).radius_center_zip = centerZip
+        ;(audit.decision as Record<string, unknown>).radius_center_lat = lat
+        ;(audit.decision as Record<string, unknown>).radius_center_lng = lng
+        ;(audit.decision as Record<string, unknown>).radius_miles = radiusMiles
+      }
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
+    } catch (err) {
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      return { ...makeError((err as Error).message, input, audit), audit }
+    }
+  }
+
+  if (input.locationMode === 'radius' && !input.radiusCenter) {
+    console.warn('[Maps:radius] WARNING: locationMode=radius but no radiusCenter coords provided')
+  }
+
   // ZIP code mode: geocode ZIP to coordinates, send both location and ll
   if (input.locationMode === 'zip' && input.postalCode?.trim()) {
     console.log('[Maps:zip] BRANCH TAKEN: ZIP code mode')
