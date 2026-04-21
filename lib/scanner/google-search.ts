@@ -32,6 +32,8 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     return makeError(`Could not parse target domain: "${rawDomain}"`)
   }
 
+  console.log(`[GoogleSearch] Input locationMode="${input.locationMode}" radiusCenter=${input.radiusCenter ? `{lat:${input.radiusCenter.lat}, lng:${input.radiusCenter.lng}, zip:${input.radiusCenter.centerZip}, miles:${input.radiusCenter.radiusMiles}}` : 'null'} city="${input.city || 'null'}"`)
+
   const requestParams: Record<string, string> = {
     engine: input.engine,
     device: input.deviceType || 'desktop',
@@ -65,12 +67,22 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       console.log(`[GoogleSearch] exact_point: ll=${body.ll} (location suppressed)`)
     } else if (input.locationMode === 'radius' && input.radiusCenter) {
       body.ll = `@${input.radiusCenter.lat},${input.radiusCenter.lng},13z`
-      console.log(`[GoogleSearch] radius: ll=${body.ll} (zip=${input.radiusCenter.centerZip}, radius=${input.radiusCenter.radiusMiles}mi, location suppressed)`)
+      console.log(`[GoogleSearch] radius mode activated:`)
+      console.log(`  - center_zip: ${input.radiusCenter.centerZip}`)
+      console.log(`  - resolved_lat: ${input.radiusCenter.lat}`)
+      console.log(`  - resolved_lng: ${input.radiusCenter.lng}`)
+      console.log(`  - radius_miles: ${input.radiusCenter.radiusMiles}`)
+      console.log(`  - ll parameter: ${body.ll}`)
+      console.log(`  - location field: null (suppressed)`)
+      console.log(`  - uule field: null (suppressed)`)
     } else if (input.city) {
       body.location = input.city
+      console.log(`[GoogleSearch] using city mode: location="${input.city}"`)
     }
 
-    console.log(`[GoogleSearch] Serper request body: ${JSON.stringify(body)}`)
+    console.log(`[GoogleSearch] Serper request body:`, JSON.stringify(body))
+    console.log(`[GoogleSearch] location in body:`, body.location || 'null')
+    console.log(`[GoogleSearch] uule in body:`, body.uule || 'null')
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)

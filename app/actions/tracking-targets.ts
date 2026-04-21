@@ -132,6 +132,8 @@ export async function createTrackingTargetAction(formData: FormData) {
     custom_city: safeStringFromFormData(formData, 'custom_city'),
     grid_size: null,
     postal_code: safeStringFromFormData(formData, 'postal_code'),
+    radius_center_zip: safeStringFromFormData(formData, 'radius_center_zip'),
+    radius_miles: formData.get('radius_miles') ? Number(formData.get('radius_miles')) : null,
     is_active: true,
   }
 
@@ -143,12 +145,32 @@ export async function createTrackingTargetAction(formData: FormData) {
     }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry)
     Object.assign(data, resolved)
+  } else if (locationMode === 'radius') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId)
+    // radius is US-only
+    if (projectCountry.toUpperCase() !== 'US') {
+      throw new Error('Radius Scan זמין רק לפרויקטי ארה"ב')
+    }
+    if (!data.radius_center_zip) {
+      throw new Error('Radius Scan דורש ZIP code למרכז הסריקה')
+    }
+    if (!data.radius_miles || typeof data.radius_miles !== 'number' || data.radius_miles <= 0) {
+      throw new Error('Radius Scan דורש מרחק תקין (מיילים)')
+    }
+    // Clear exact_point fields
+    data.exact_address_input = null
+    data.exact_resolved_lat = null
+    data.exact_resolved_lng = null
+    data.exact_resolution_source = null
+    data.exact_geocoding_provider = null
   } else {
     data.exact_address_input = null
     data.exact_resolved_lat = null
     data.exact_resolved_lng = null
     data.exact_resolution_source = null
     data.exact_geocoding_provider = null
+    data.radius_center_zip = null
+    data.radius_miles = null
   }
 
   const { error } = await supabase.from('tracking_targets').insert(data)
@@ -316,6 +338,8 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     custom_city: safeStringFromFormData(formData, 'custom_city'),
     grid_size: null,
     postal_code: safeStringFromFormData(formData, 'postal_code'),
+    radius_center_zip: safeStringFromFormData(formData, 'radius_center_zip'),
+    radius_miles: formData.get('radius_miles') ? Number(formData.get('radius_miles')) : null,
   }
 
   if (locationMode === 'exact_point') {
@@ -333,12 +357,39 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry)
     Object.assign(data, resolved)
+  } else if (locationMode === 'radius') {
+    // Need project country to validate — look up via the target row
+    const { data: existing, error: lookupErr } = await supabase
+      .from('tracking_targets')
+      .select('project_id, projects!inner(country)')
+      .eq('id', id)
+      .single<{ project_id: string; projects: { country: string } }>()
+    if (lookupErr || !existing) throw new Error('לא ניתן לטעון פרויקט עבור עדכון')
+    const projectCountry = existing.projects.country || 'IL'
+    // radius is US-only
+    if (projectCountry.toUpperCase() !== 'US') {
+      throw new Error('Radius Scan זמין רק לפרויקטי ארה"ב')
+    }
+    if (!data.radius_center_zip) {
+      throw new Error('Radius Scan דורש ZIP code למרכז הסריקה')
+    }
+    if (!data.radius_miles || typeof data.radius_miles !== 'number' || data.radius_miles <= 0) {
+      throw new Error('Radius Scan דורש מרחק תקין (מיילים)')
+    }
+    // Clear exact_point fields
+    data.exact_address_input = null
+    data.exact_resolved_lat = null
+    data.exact_resolved_lng = null
+    data.exact_resolution_source = null
+    data.exact_geocoding_provider = null
   } else {
     data.exact_address_input = null
     data.exact_resolved_lat = null
     data.exact_resolved_lng = null
     data.exact_resolution_source = null
     data.exact_geocoding_provider = null
+    data.radius_center_zip = null
+    data.radius_miles = null
   }
 
   let { error } = await supabase.from('tracking_targets').update(data).eq('id', id)
