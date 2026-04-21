@@ -153,21 +153,23 @@ export async function POST(request: Request) {
         }
 
         // DEBUG: log what was actually loaded
-        console.log('[Scan] Target loaded from DB:', {
-          id: target.id,
-          keyword: target.keyword,
-          location_mode: target.location_mode,
-          effective_location_mode: locationMode,
-          exact_address_input: target.exact_address_input,
-          exact_resolved_lat: target.exact_resolved_lat,
-          exact_resolved_lng: target.exact_resolved_lng,
-          exact_resolution_source: target.exact_resolution_source,
-          exact_geocoding_provider: target.exact_geocoding_provider,
-          custom_city: target.custom_city,
-          postal_code: target.postal_code,
-          radius_center_zip: target.radius_center_zip,
-          radius_miles: target.radius_miles,
-        })
+        console.log('[Scan] === TARGET LOADED FROM DB ===')
+        console.log('[Scan] Target ID:', target.id)
+        console.log('[Scan] Keyword:', target.keyword)
+        console.log('[Scan] location_mode from DB:', target.location_mode)
+        console.log('[Scan] effective_location_mode:', locationMode)
+        if (target.location_mode === 'radius') {
+          console.log('[Scan] RADIUS TARGET DETAILS:')
+          console.log('  - radius_center_zip from DB:', target.radius_center_zip, `(type: ${typeof target.radius_center_zip})`)
+          console.log('  - radius_miles from DB:', target.radius_miles, `(type: ${typeof target.radius_miles})`)
+        }
+        console.log('[Scan] exact_address_input:', target.exact_address_input)
+        console.log('[Scan] exact_resolved_lat:', target.exact_resolved_lat)
+        console.log('[Scan] exact_resolved_lng:', target.exact_resolved_lng)
+        console.log('[Scan] custom_city:', target.custom_city)
+        console.log('[Scan] postal_code:', target.postal_code)
+        console.log('[Scan] === END TARGET LOAD ===')
+
         if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
           throw new Error('ZIP code mode is only supported for US projects')
         }
@@ -275,16 +277,19 @@ export async function POST(request: Request) {
         }
 
         if (locationMode === 'radius') {
-          console.log('[Scan:route] RADIUS PAYLOAD CHECK:')
-          console.log('  locationMode:', scanPayload.locationMode)
-          console.log('  city:', scanPayload.city)
-          console.log('  customCity:', scanPayload.customCity)
-          console.log('  radiusCenterNull:', scanPayload.radiusCenter === null)
-          console.log('  radiusCenterZip:', scanPayload.radiusCenter?.centerZip)
-          console.log('  radiusCenterLat:', scanPayload.radiusCenter?.lat)
-          console.log('  radiusCenterLng:', scanPayload.radiusCenter?.lng)
-          console.log('  radiusMiles:', scanPayload.radiusCenter?.radiusMiles)
-          console.log('  postalCode:', scanPayload.postalCode)
+          console.log('[Scan:route] === RADIUS PAYLOAD CHECK ===')
+          console.log('locationMode:', scanPayload.locationMode)
+          console.log('city:', scanPayload.city, '(should be null)')
+          console.log('customCity:', scanPayload.customCity, '(should be null)')
+          console.log('radiusCenter:', scanPayload.radiusCenter)
+          if (scanPayload.radiusCenter) {
+            console.log('  - centerZip:', scanPayload.radiusCenter.centerZip)
+            console.log('  - lat:', scanPayload.radiusCenter.lat)
+            console.log('  - lng:', scanPayload.radiusCenter.lng)
+            console.log('  - radiusMiles:', scanPayload.radiusCenter.radiusMiles)
+          }
+          console.log('postalCode:', scanPayload.postalCode)
+          console.log('[Scan:route] === END RADIUS PAYLOAD CHECK ===')
         }
 
         console.log('[Scan:route] Payload passed to runScan():', {
