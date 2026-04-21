@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -8,8 +9,9 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state')
   const next = searchParams.get('next') || '/dashboard'
 
-  // Check if this is a custom Google OAuth flow or Supabase OAuth flow
-  const isCustomGoogleOAuth = state !== null
+  // Check if this is a custom Google OAuth flow (state starts with 'custom-google_')
+  // or Supabase OAuth flow (state is from Supabase)
+  const isCustomGoogleOAuth = state?.startsWith('custom-google_') ?? false
 
   if (code) {
     const cookieStore = await cookies()
@@ -92,38 +94,84 @@ export async function GET(request: NextRequest) {
           id: googleUser.id,
         })
 
-        // Sign in or create user in Supabase using the Google identity
-        // Use the ID token to authenticate with Supabase
-        const idTokenResponse = await fetch('https://oauth2.googleapis.com/tokeninfo', {
-          method: 'POST',
-          body: new URLSearchParams({
-            id_token: tokens.id_token,
-          }).toString(),
-        })
+        // Use admin client to upsert the user in Supabase
+        const adminSupabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false,
+            },
+          }
+        )
 
-        console.log('[Google OAuth] ID token validation response:', idTokenResponse.status)
+        // Get or create the user in Supabase auth
+        const { data: userData, error: getUserError } = await adminSupabase.auth.admin.getUserById(
+          googleUser.id
+        )
 
-        if (idTokenResponse.ok) {
-          // Create a Supabase session by signing in with the Google credentials
-          const { error: signInError } = await supabase.auth.signInWithPassword({
+        let user = userData?.user
+
+        if (getUserError || !user) {
+          // User doesn't exist, create them
+          console.log('[Google OAuth] Creating new user in Supabase')
+          const { data: newUserData, error: createError } = await adminSupabase.auth.admin.createUser({
             email: googleUser.email,
-            password: googleUser.id, // Use Google ID as temporary password for OAuth users
+            user_metadata: {
+              full_name: googleUser.name || '',
+              picture: googleUser.picture || '',
+            },
           })
 
-          console.log('[Google OAuth] Supabase sign in result:', {
-            error: signInError?.message || 'success',
+          if (createError) {
+            console.error('[Google OAuth] User creation failed:', createError.message)
+            return NextResponse.redirect(`${origin}/login?error=oauth`)
+          }
+
+          user = newUserData.user
+          console.log('[Google OAuth] User created successfully:', user?.id)
+        } else {
+          console.log('[Google OAuth] Existing user found:', user.id)
+        }
+
+        // Create a session for the user
+        if (user) {
+          const { data: sessionData, error: sessionError } = await adminSupabase.auth.admin.createSession({
+            user_id: user.id,
+            factor_id: undefined,
           })
 
-          // If user doesn't exist, this will fail - that's OK, we'll handle it
-          if (!signInError) {
+          if (sessionError) {
+            console.error('[Google OAuth] Session creation failed:', sessionError.message)
+            return NextResponse.redirect(`${origin}/login?error=oauth`)
+          }
+
+          const session = sessionData.session
+
+          // Set the session cookies
+          if (session) {
+            const cookieStore = await cookies()
+            cookieStore.set('sb-access-token', session.access_token, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: session.expires_in,
+            })
+
+            if (session.refresh_token) {
+              cookieStore.set('sb-refresh-token', session.refresh_token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60, // 7 days
+              })
+            }
+
+            console.log('[Google OAuth] Session created and cookies set')
             const destination = next.startsWith('/') ? next : '/dashboard'
             return NextResponse.redirect(`${origin}${destination}`)
           }
-
-          // Try to get or create the session another way
-          // For now, redirect to dashboard (Supabase session should be set by cookie if it worked)
-          const destination = next.startsWith('/') ? next : '/dashboard'
-          return NextResponse.redirect(`${origin}${destination}`)
         }
       } catch (error) {
         console.error('[Google OAuth] Callback error:', {

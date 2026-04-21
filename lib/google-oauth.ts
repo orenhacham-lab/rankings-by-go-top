@@ -23,7 +23,8 @@ export function getGoogleOAuthUrl(
 }
 
 export function generateState(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  const randomState = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  return `custom-google_${randomState}`
 }
 
 export function saveStateToSession(state: string, nextPath: string): void {
