@@ -38,12 +38,12 @@ function generateReportHTML(data: ExportData): string {
     return `
       <tr>
         <td class="keyword-cell"><span dir="ltr">${escapeHtml(target.keyword)}</span></td>
-        <td>${escapeHtml(engine)}</td>
-        <td>${escapeHtml(currentPosition)}</td>
-        <td>${escapeHtml(previousPosition)}</td>
-        <td style="color: ${changeColor}; font-weight: ${changeStr !== '—' ? 'bold' : 'normal'}">${escapeHtml(changeStr)}</td>
-        <td>${escapeHtml(foundText)}</td>
-        <td>${escapeHtml(checkedAt)}</td>
+        <td class="engine-cell">${escapeHtml(engine)}</td>
+        <td class="position-cell">${escapeHtml(currentPosition)}</td>
+        <td class="previous-position-cell">${escapeHtml(previousPosition)}</td>
+        <td class="change-cell" style="color: ${changeColor}; font-weight: ${changeStr !== '—' ? 'bold' : 'normal'}">${escapeHtml(changeStr)}</td>
+        <td class="found-cell">${escapeHtml(foundText)}</td>
+        <td class="date-cell">${escapeHtml(checkedAt)}</td>
         <td class="url-cell"><a href="${escapeHtml(result?.result_url || '#')}" target="_blank">${escapeHtml(urlDisplay)}</a></td>
       </tr>
     `
@@ -184,7 +184,7 @@ function generateReportHTML(data: ExportData): string {
         th {
           background: #1E4ED8;
           color: white;
-          padding: 8px;
+          padding: 10px;
           text-align: ${isHebrewProject ? 'right' : 'left'};
           font-weight: bold;
           font-size: 9pt;
@@ -192,7 +192,7 @@ function generateReportHTML(data: ExportData): string {
         }
 
         td {
-          padding: 7px;
+          padding: 10px;
           border: 1px solid #e5e7eb;
           font-size: 9pt;
           overflow-wrap: break-word;
@@ -210,11 +210,35 @@ function generateReportHTML(data: ExportData): string {
 
         .keyword-cell {
           font-weight: bold;
-          width: 28%;
+          width: 32%;
+        }
+
+        .engine-cell {
+          width: 10%;
+        }
+
+        .position-cell {
+          width: 8%;
+        }
+
+        .previous-position-cell {
+          width: 8%;
+        }
+
+        .change-cell {
+          width: 8%;
+        }
+
+        .found-cell {
+          width: 8%;
+        }
+
+        .date-cell {
+          width: 12%;
         }
 
         .url-cell {
-          width: 25%;
+          width: 14%;
         }
 
         .url-cell a {
