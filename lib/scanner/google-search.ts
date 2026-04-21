@@ -67,6 +67,16 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     if (input.locationMode === 'radius' && !input.radiusCenter) {
       return makeError(`radius mode requires radiusCenter object with lat/lng`)
     }
+    if (input.locationMode === 'radius' && input.radiusCenter) {
+      // Ensure radiusCenter has valid lat/lng
+      const { lat, lng } = input.radiusCenter
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        return makeError(`radiusCenter must have numeric lat/lng. Got: lat=${lat} (${typeof lat}), lng=${lng} (${typeof lng})`)
+      }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return makeError(`radiusCenter coordinates out of valid range. Got: lat=${lat}, lng=${lng}`)
+      }
+    }
 
     const body: Record<string, unknown> = {
       q: input.keyword,
