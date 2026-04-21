@@ -142,53 +142,11 @@ export async function GET(request: NextRequest) {
           userCreatedNow = true
         }
 
-        // For existing users, generate a magic link to create a session without password
-        if (!userCreatedNow) {
-          console.log('[Google OAuth] Generating magic link for existing user')
-          const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-            type: 'magiclink',
-            email: userEmail,
-          })
-
-          if (linkError || !linkData?.properties?.hashed_token) {
-            console.error('[Google OAuth] Magic link generation failed:', linkError)
-            // Fallback: try to update password and sign in
-            console.log('[Google OAuth] Attempting to update password and sign in')
-            const { error: updateError } = await adminSupabase.auth.admin.updateUserById(
-              linkData?.user?.id || '',
-              { password: oauthPassword }
-            )
-
-            if (updateError) {
-              console.error('[Google OAuth] Password update failed:', updateError)
-              return NextResponse.redirect(`${origin}/login?error=oauth&details=session_creation_failed`)
-            }
-          } else {
-            console.log('[Google OAuth] Magic link generated, using token to create session')
-            // Extract token and use it to sign in
-            const token = linkData.properties.hashed_token
-
-            // Sign in with the magic link token
-            const { error: tokenSignInError } = await supabase.auth.verifyOtp({
-              email: userEmail,
-              token: token,
-              type: 'magiclink',
-            })
-
-            if (!tokenSignInError) {
-              console.log('[Google OAuth] User signed in via magic link')
-              const destination = next.startsWith('/') ? next : '/dashboard'
-              return NextResponse.redirect(`${origin}${destination}`)
-            }
-
-            console.log('[Google OAuth] Magic link sign-in failed, will try password sign-in')
-          }
-        }
-
         // For new users, or if magic link failed, try password sign-in
-        console.log('[Google OAuth] Signing in user with password:', {
+        // For existing users, they must have the Google-derived password set
+        console.log('[Google OAuth] Attempting sign-in:', {
           email: googleUser.email,
-          passwordPrefix: oauthPassword.substring(0, 15),
+          isNewUser: userCreatedNow,
         })
 
         const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
@@ -199,9 +157,17 @@ export async function GET(request: NextRequest) {
         if (signInError) {
           console.error('[Google OAuth] Sign in failed:', {
             message: signInError.message,
-            status: signInError.status,
             code: signInError.code,
+            isNewUser: userCreatedNow,
+            email: googleUser.email,
           })
+
+          // For existing users with password mismatch, ask them to use password reset
+          if (!userCreatedNow && signInError.code === 'invalid_credentials') {
+            console.log('[Google OAuth] Existing user with different password, suggesting password reset')
+            return NextResponse.redirect(`${origin}/login?error=oauth&details=existing_user_different_password`)
+          }
+
           return NextResponse.redirect(`${origin}/login?error=oauth&details=signin_failed`)
         }
 
