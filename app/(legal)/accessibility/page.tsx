@@ -69,14 +69,17 @@ export default function AccessibilityPage() {
               </a>
             </p>
             <p>
-              אנו מברים להשיב בתוך 48 שעות ולעבוד על פתרון הבעיה.
+              <strong>טלפון:</strong> 054-9489377
+            </p>
+            <p className="mt-2">
+              אנחנו נשתדל להשיב בתוך 48 שעות ולעבוד על פתרון הבעיה.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">עדכונים ושיפורים</h2>
             <p>
-              אנו מוסיפים ושומים עדכונים ושיפורים לנגישות באופן ממשיך. אם יש לך הצעות, אנא שלח לנו דואר אלקטרוני.
+              אנחנו מעדכנים את האתר באופן קבוע על מנת לעדכן ולשפר את הנגישות. אם יש לך הצעות לשיפור, אנא שלח/י לנו דואר אלקטרוני.
             </p>
           </section>
 
@@ -98,7 +101,7 @@ export default function AccessibilityPage() {
 
           <section>
             <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
-              עמוד זה עודכן לאחרונה ביוני 2026
+              עמוד זה עודכן לאחרונה באפריל 2026
             </p>
           </section>
         </div>

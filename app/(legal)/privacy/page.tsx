@@ -89,9 +89,15 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-4">
               כדי להפעיל את הזכויות הללו, צור קשר עם:
-              <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline mr-1 ml-1">
+            </p>
+            <p className="mt-2">
+              <strong>דואר אלקטרוני:</strong>{' '}
+              <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
                 oren@gotop.co.il
               </a>
+            </p>
+            <p>
+              <strong>טלפון:</strong> 054-9489377
             </p>
           </section>
 
@@ -141,11 +147,14 @@ export default function PrivacyPage() {
                 oren@gotop.co.il
               </a>
             </p>
+            <p>
+              <strong>טלפון:</strong> 054-9489377
+            </p>
           </section>
 
           <section>
             <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
-              מדיניות זו עודכנה לאחרונה ביוני 2026
+              מדיניות זו עודכנה לאחרונה באפריל 2026
             </p>
           </section>
         </div>

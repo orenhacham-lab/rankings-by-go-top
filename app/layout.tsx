@@ -37,7 +37,10 @@ export default function RootLayout({
     <html lang="he" dir="rtl" className="h-full">
       <head>
         {/* Google Tag Manager */}
-        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
+        <script
+          async
+          src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"
+        ></script>
         <script
           dangerouslySetInnerHTML={{
             __html: `window.dataLayer = window.dataLayer || [];`,

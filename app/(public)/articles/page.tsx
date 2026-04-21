@@ -54,11 +54,7 @@ export default function ArticlesPage() {
           <p className="text-slate-600">עצות ומאמרים על קידום אתרים ו-SEO</p>
         </div>
 
-        {articles.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-            <p className="text-slate-500">אין מאמרים פורסומים כרגע</p>
-          </div>
-        ) : (
+        {articles.length === 0 ? null : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {articles.map((article) => (
               <Link key={article.id} href={`/articles/${article.slug}`}>
