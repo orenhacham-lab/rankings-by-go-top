@@ -72,28 +72,33 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       body.device = requestParams.device
     }
 
-    if (input.locationMode === 'radius') {
-      console.log(`[GoogleSearch] RADIUS MODE: Checking conditions...`)
-      console.log(`  - locationMode === 'radius': ${input.locationMode === 'radius'}`)
-      console.log(`  - radiusCenter exists: ${!!input.radiusCenter}`)
-      console.log(`  - Will enter radius branch: ${input.locationMode === 'radius' && input.radiusCenter}`)
+    // DEBUG: Log all condition branches
+    console.log(`[GoogleSearch] === CONDITION EVALUATION ===`)
+    console.log(`  1. exact_point condition: locationMode=${input.locationMode}, exactPoint=${!!input.exactPoint}`)
+    console.log(`     → Would enter: ${input.locationMode === 'exact_point' && input.exactPoint}`)
+    console.log(`  2. radius condition: locationMode=${input.locationMode}, radiusCenter=${!!input.radiusCenter}`)
+    if (input.radiusCenter) {
+      console.log(`     radiusCenter details: lat=${input.radiusCenter.lat}, lng=${input.radiusCenter.lng}, zip=${input.radiusCenter.centerZip}`)
     }
+    console.log(`     → Would enter: ${input.locationMode === 'radius' && input.radiusCenter}`)
+    console.log(`  3. city fallback condition: city=${input.city}`)
+    console.log(`     → Would enter: ${!!input.city}`)
+    console.log(`[GoogleSearch] === END CONDITION EVALUATION ===`)
 
     // exact_point is the source of truth — ll alone drives geo targeting.
     // Do not send location (city/zip) when exact_point is active.
     if (input.locationMode === 'exact_point' && input.exactPoint) {
       body.ll = `@${input.exactPoint.lat},${input.exactPoint.lng},13z`
-      console.log(`[GoogleSearch] exact_point: ll=${body.ll} (location suppressed)`)
+      console.log(`[GoogleSearch] ✓ EXACT_POINT BRANCH TAKEN: ll=${body.ll}`)
     } else if (input.locationMode === 'radius' && input.radiusCenter) {
       body.ll = `@${input.radiusCenter.lat},${input.radiusCenter.lng},13z`
-      console.log(`[GoogleSearch] RADIUS BRANCH ACTIVATED - setting ll only`)
-      console.log(`  - ll: ${body.ll}`)
-      console.log(`  - NOT setting location (city suppressed)`)
+      console.log(`[GoogleSearch] ✓ RADIUS BRANCH TAKEN: ll=${body.ll} (zip=${input.radiusCenter.centerZip})`)
+      console.log(`[GoogleSearch]   NOT setting location (it is: ${body.location})`)
     } else if (input.city) {
       body.location = input.city
-      console.log(`[GoogleSearch] FALLBACK TO CITY: location="${input.city}"`)
+      console.log(`[GoogleSearch] ✗ FALLBACK TO CITY BRANCH: location="${input.city}"`)
     } else {
-      console.log(`[GoogleSearch] NO LOCATION SET (no city, no ll)`)
+      console.log(`[GoogleSearch] ✗ NO LOCATION SET - neither city nor ll`)
     }
 
     console.log(`[GoogleSearch] FINAL REQUEST BODY:`, JSON.stringify(body))
@@ -106,6 +111,11 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
 
     let response: Response
     try {
+      console.log(`[GoogleSearch] SENDING TO SERPER - Full request body:`, body)
+      console.log(`[GoogleSearch] SENDING - All fields in body:`, Object.keys(body))
+      for (const key of Object.keys(body)) {
+        console.log(`  ${key}: ${JSON.stringify(body[key])}`)
+      }
       response = await fetch(SERPER_API_URL, {
         method: 'POST',
         headers: {
@@ -115,6 +125,7 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
         body: JSON.stringify(body),
         signal: controller.signal,
       })
+      console.log(`[GoogleSearch] RESPONSE STATUS: ${response.status}`)
     } finally {
       clearTimeout(timer)
     }
@@ -130,6 +141,13 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     } catch {
       return makeError('Serper API returned invalid JSON')
     }
+
+    console.log(`[GoogleSearch] SERPER RESPONSE:`, {
+      searchParameters: (data as any).searchParameters,
+      resultsCount: data.organic?.length || 0,
+      error: data.error,
+    })
+    console.log(`[GoogleSearch] SERPER searchParameters details:`, (data as any).searchParameters)
 
     if (data.error) {
       return makeError(`Serper: ${data.error}`)

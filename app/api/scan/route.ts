@@ -223,18 +223,23 @@ export async function POST(request: Request) {
             radiusMiles,
           })
 
+          console.log('[Scan] Radius mode: attempting to resolve ZIP', {
+            centerZip,
+            keyword: target.keyword,
+          })
           const resolved = resolveUSZipCodeToCoordinates(centerZip)
           if (!resolved) {
             throw new Error(`Could not resolve ZIP code "${centerZip}" for keyword "${target.keyword}". Check if the ZIP is valid.`)
           }
 
-          console.log('[Scan] Radius mode: resolved ZIP to coordinates', {
-            keyword: target.keyword,
-            centerZip,
+          console.log('[Scan] Radius mode: RESOLVED ZIP to coordinates', {
+            enteredZIP: centerZip,
             resolvedLat: resolved.lat,
             resolvedLng: resolved.lng,
-            radiusMiles,
+            radiusMiles: radiusMiles,
+            keyword: target.keyword,
           })
+          console.log(`[Scan] ZIP ${centerZip} resolves to: LAT=${resolved.lat}, LNG=${resolved.lng}`)
 
           radiusCenterInput = {
             lat: resolved.lat,
