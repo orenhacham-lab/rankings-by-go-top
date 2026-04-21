@@ -133,3 +133,12 @@ export const US_ZIP_CODES: Record<string, USZIPCode> = {
   '02109': { zip: '02109', city: 'Boston', state: 'MA', lat: 42.3581, lng: -71.0636 },
   '02110': { zip: '02110', city: 'Boston', state: 'MA', lat: 42.3581, lng: -71.0636 },
 }
+
+export function resolveUSZipCodeToCoordinates(zipCode: string): { lat: number; lng: number } | null {
+  const normalized = zipCode.trim().replace(/[^\d]/g, '')
+  const entry = US_ZIP_CODES[normalized]
+  if (!entry) {
+    return null
+  }
+  return { lat: entry.lat, lng: entry.lng }
+}

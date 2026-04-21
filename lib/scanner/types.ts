@@ -6,6 +6,13 @@ export interface ExactPointInput {
   geocodingProvider?: string | null
 }
 
+export interface RadiusCenter {
+  lat: number
+  lng: number
+  centerZip?: string | null
+  radiusMiles?: number | null
+}
+
 export interface ScanInput {
   engine: string
   keyword: string
@@ -15,10 +22,11 @@ export interface ScanInput {
   language?: string
   city?: string | null
   deviceType?: string | null
-  locationMode?: 'project' | 'custom' | 'zip' | 'exact_point'
+  locationMode?: 'project' | 'custom' | 'zip' | 'exact_point' | 'radius'
   customCity?: string | null
   postalCode?: string | null
   exactPoint?: ExactPointInput | null
+  radiusCenter?: RadiusCenter | null
 }
 
 export interface ScanAttempt {

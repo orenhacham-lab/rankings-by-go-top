@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { runScan } from '@/lib/scanner'
 import { getUserEntitlement } from '@/lib/subscription'
+import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
 
 export async function POST(request: Request) {
   // Auth check
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
           businessName: target.target_business_name || project.business_name,
         })
 
-        let locationMode: 'project' | 'custom' | 'zip' | 'exact_point' = target.location_mode || 'project'
+        let locationMode: 'project' | 'custom' | 'zip' | 'exact_point' | 'radius' = target.location_mode || 'project'
 
         // Backward compatibility: convert removed 'grid' mode to custom or project
         if (locationMode === 'grid' as any) {
@@ -164,9 +165,14 @@ export async function POST(request: Request) {
           exact_geocoding_provider: target.exact_geocoding_provider,
           custom_city: target.custom_city,
           postal_code: target.postal_code,
+          radius_center_zip: target.radius_center_zip,
+          radius_miles: target.radius_miles,
         })
         if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
           throw new Error('ZIP code mode is only supported for US projects')
+        }
+        if (locationMode === 'radius' && project.country.toUpperCase() !== 'US') {
+          throw new Error('Radius mode is only supported for US projects')
         }
 
         // exact_point is the SOURCE OF TRUTH — block scan if coords missing/invalid.
@@ -193,6 +199,51 @@ export async function POST(request: Request) {
           }
         }
 
+        // radius mode — resolve ZIP to coordinates
+        let radiusCenterInput: {
+          lat: number
+          lng: number
+          centerZip?: string | null
+          radiusMiles?: number | null
+        } | null = null
+        if (locationMode === 'radius') {
+          const centerZip = target.radius_center_zip?.trim() || null
+          const radiusMiles = typeof target.radius_miles === 'number' ? target.radius_miles : null
+
+          if (!centerZip) {
+            throw new Error(`Radius mode requires a center ZIP code for keyword "${target.keyword}"`)
+          }
+          if (radiusMiles === null || radiusMiles <= 0) {
+            throw new Error(`Radius mode requires a valid radius distance for keyword "${target.keyword}"`)
+          }
+
+          console.log('[Scan] Radius mode: resolving ZIP code', {
+            keyword: target.keyword,
+            centerZip,
+            radiusMiles,
+          })
+
+          const resolved = resolveUSZipCodeToCoordinates(centerZip)
+          if (!resolved) {
+            throw new Error(`Could not resolve ZIP code "${centerZip}" for keyword "${target.keyword}". Check if the ZIP is valid.`)
+          }
+
+          console.log('[Scan] Radius mode: resolved ZIP to coordinates', {
+            keyword: target.keyword,
+            centerZip,
+            resolvedLat: resolved.lat,
+            resolvedLng: resolved.lng,
+            radiusMiles,
+          })
+
+          radiusCenterInput = {
+            lat: resolved.lat,
+            lng: resolved.lng,
+            centerZip,
+            radiusMiles,
+          }
+        }
+
         const effectiveCity =
           locationMode === 'custom' && target.custom_city?.trim()
             ? target.custom_city.trim()
@@ -213,6 +264,7 @@ export async function POST(request: Request) {
             ? ((target.postal_code || null) as string | null)
             : null,
           exactPoint: exactPointInput,
+          radiusCenter: radiusCenterInput,
         }
 
         console.log('[Scan:route] Payload passed to runScan():', {
@@ -222,6 +274,11 @@ export async function POST(request: Request) {
           exactPointNull: scanPayload.exactPoint === null,
           exactPointLat: scanPayload.exactPoint?.lat,
           exactPointLng: scanPayload.exactPoint?.lng,
+          radiusCenterNull: scanPayload.radiusCenter === null,
+          radiusCenterZip: scanPayload.radiusCenter?.centerZip,
+          radiusCenterLat: scanPayload.radiusCenter?.lat,
+          radiusCenterLng: scanPayload.radiusCenter?.lng,
+          radiusMiles: scanPayload.radiusCenter?.radiusMiles,
         })
 
         const scanOutput = await runScan(target.engine_type, scanPayload)
@@ -266,6 +323,9 @@ export async function POST(request: Request) {
           if (locationMode === 'exact_point') {
             resultData.audit_location_mode = 'exact_point'
             resultData.audit_resolved_location = target.exact_address_input || `${exactPointInput?.lat},${exactPointInput?.lng}`
+          } else if (locationMode === 'radius') {
+            resultData.audit_location_mode = 'radius'
+            resultData.audit_resolved_location = `${target.radius_center_zip} (center: ${radiusCenterInput?.lat},${radiusCenterInput?.lng}, radius: ${target.radius_miles}mi)`
           } else {
             resultData.audit_location_mode = locationMode === 'zip' ? 'zip_centroid' : 'city_state'
             resultData.audit_resolved_location = locationMode === 'zip' ? target.postal_code : effectiveCity

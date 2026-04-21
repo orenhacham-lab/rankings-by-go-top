@@ -63,6 +63,9 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     if (input.locationMode === 'exact_point' && input.exactPoint) {
       body.ll = `@${input.exactPoint.lat},${input.exactPoint.lng},13z`
       console.log(`[GoogleSearch] exact_point: ll=${body.ll} (location suppressed)`)
+    } else if (input.locationMode === 'radius' && input.radiusCenter) {
+      body.ll = `@${input.radiusCenter.lat},${input.radiusCenter.lng},13z`
+      console.log(`[GoogleSearch] radius: ll=${body.ll} (zip=${input.radiusCenter.centerZip}, radius=${input.radiusCenter.radiusMiles}mi, location suppressed)`)
     } else if (input.city) {
       body.location = input.city
     }
