@@ -210,35 +210,39 @@ function generateReportHTML(data: ExportData): string {
 
         .keyword-cell {
           font-weight: bold;
-          width: 32%;
+          width: 35%;
         }
 
         .engine-cell {
-          width: 10%;
+          width: 16%;
         }
 
         .position-cell {
-          width: 8%;
+          width: 5%;
+          white-space: nowrap;
         }
 
         .previous-position-cell {
-          width: 8%;
+          width: 5%;
+          white-space: nowrap;
         }
 
         .change-cell {
-          width: 8%;
+          width: 5%;
+          white-space: nowrap;
         }
 
         .found-cell {
-          width: 8%;
+          width: 5%;
+          white-space: nowrap;
         }
 
         .date-cell {
-          width: 12%;
+          width: 10%;
         }
 
         .url-cell {
-          width: 14%;
+          width: 19%;
         }
 
         .url-cell a {
@@ -350,6 +354,16 @@ function generateReportHTML(data: ExportData): string {
         </div>
 
         <table>
+          <colgroup>
+            <col style="width: 35%;">
+            <col style="width: 16%;">
+            <col style="width: 5%;">
+            <col style="width: 5%;">
+            <col style="width: 5%;">
+            <col style="width: 5%;">
+            <col style="width: 10%;">
+            <col style="width: 19%;">
+          </colgroup>
           <thead>
             <tr>
               <th>ביטוי</th>
