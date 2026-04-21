@@ -118,6 +118,13 @@ export async function createTrackingTargetAction(formData: FormData) {
   }
 
   const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
+  console.log('[CreateTarget] Form submission - locationMode:', {
+    extracted: safeStringFromFormData(formData, 'location_mode'),
+    final: locationMode,
+    radius_center_zip: safeStringFromFormData(formData, 'radius_center_zip'),
+    radius_miles: formData.get('radius_miles'),
+    location_mode_from_form: formData.get('location_mode'),
+  })
 
   const data: Record<string, unknown> = {
     user_id: user.id,
@@ -337,6 +344,13 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
   const supabase = await createClient()
 
   const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
+  console.log('[CreateTarget] Form submission - locationMode:', {
+    extracted: safeStringFromFormData(formData, 'location_mode'),
+    final: locationMode,
+    radius_center_zip: safeStringFromFormData(formData, 'radius_center_zip'),
+    radius_miles: formData.get('radius_miles'),
+    location_mode_from_form: formData.get('location_mode'),
+  })
 
   const data: Record<string, unknown> = {
     keyword: formData.get('keyword') as string,
