@@ -1,17 +1,40 @@
+# robots.txt for Rankings by Go Top
+# https://www.robotstxt.org/
+
 User-agent: *
 Allow: /
-Allow: /login
-Allow: /articles
-Allow: /privacy
-Allow: /accessibility
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /api
+Disallow: /login
 Disallow: /setup
-Disallow: /_next
-Disallow: /*.json
-Disallow: /*?*
 
-Crawl-delay: 1
+# Google-specific rules
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
 
+# Allow AI crawlers to index public content
+User-agent: GPTBot
+Allow: /
+Allow: /articles
+Allow: /about
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+
+User-agent: CCBot
+Allow: /
+Allow: /articles
+Allow: /about
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+
+# Sitemap location
 Sitemap: https://www.gotopseo.com/sitemap.xml
+
+# Crawl delay (optional - helps prevent server overload)
+Crawl-delay: 1
