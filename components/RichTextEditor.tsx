@@ -8,6 +8,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { Image } from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extension-placeholder'
+import { Link } from '@tiptap/extension-link'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -33,6 +34,16 @@ export function RichTextEditor({ value, onChange, placeholder = 'כתוב את �
         allowBase64: true,
         HTMLAttributes: {
           class: 'max-w-full h-auto rounded-lg my-4',
+        },
+      }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
+        HTMLAttributes: {
+          class: 'text-blue-600 underline hover:text-blue-700',
+          rel: 'noopener noreferrer',
+          target: '_blank',
         },
       }),
       Placeholder.configure({
@@ -190,6 +201,40 @@ export function RichTextEditor({ value, onChange, placeholder = 'כתוב את �
             className="hidden"
           />
         </label>
+
+        <button
+          onClick={() => {
+            const previousUrl = editor.getAttributes('link').href
+            const url = window.prompt('הכנס כתובת URL:', previousUrl || 'https://')
+
+            if (url === null) return
+
+            if (url === '') {
+              editor.chain().focus().extendMarkRange('link').unsetLink().run()
+              return
+            }
+
+            editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+          }}
+          className={`px-3 py-2 rounded border text-sm font-medium transition-colors ${
+            editor.isActive('link')
+              ? 'bg-blue-500 text-white border-blue-600'
+              : 'bg-white border-slate-300 hover:bg-slate-100'
+          }`}
+          title="הוסף לינק"
+        >
+          🔗 לינק
+        </button>
+
+        {editor.isActive('link') && (
+          <button
+            onClick={() => editor.chain().focus().unsetLink().run()}
+            className="px-3 py-2 rounded border border-red-300 bg-white hover:bg-red-50 text-sm font-medium text-red-600 transition-colors"
+            title="הסר לינק"
+          >
+            ❌ הסר לינק
+          </button>
+        )}
 
         <button
           onClick={() => editor.chain().focus().undo().run()}
