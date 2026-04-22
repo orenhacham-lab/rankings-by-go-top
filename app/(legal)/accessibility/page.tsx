@@ -1,19 +1,21 @@
 import Link from 'next/link'
 
+import Link from 'next/link'
+import { Footer } from '@/components/Footer'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+
 export const metadata = {
   title: 'נגישות | Rankings by Go Top',
   description: 'מידע על נגישות באתר Rankings by Go Top',
+  robots: 'noindex, nofollow',
 }
 
 export default function AccessibilityPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 py-12 px-4">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-        <div className="mb-6">
-          <Link href="/" className="text-blue-600 hover:underline font-medium text-sm">
-            ← חזור לעמוד הבית
-          </Link>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      <div className="flex-1 py-12 px-4">
+        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+          <Breadcrumbs items={[{ label: 'נגישות', href: '/accessibility' }]} />
         <h1 className="text-4xl font-bold text-slate-900 mb-2">נגישות</h1>
         <p className="text-slate-600 mb-8">עמוד נגישות של Rankings by Go Top</p>
 
@@ -69,7 +71,10 @@ export default function AccessibilityPage() {
               </a>
             </p>
             <p>
-              <strong>טלפון:</strong> 054-9489377
+              <strong>טלפון:</strong>{' '}
+              <a href="tel:0549489377" className="text-blue-600 hover:underline">
+                054-9489377
+              </a>
             </p>
             <p className="mt-2">
               אנחנו נשתדל להשיב בתוך 48 שעות ולעבוד על פתרון הבעיה.
@@ -106,6 +111,8 @@ export default function AccessibilityPage() {
           </section>
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   )
 }

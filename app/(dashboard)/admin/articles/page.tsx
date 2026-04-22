@@ -18,6 +18,7 @@ export default function AdminArticlesPage() {
     content: '',
     meta_description: '',
     author: '',
+    image_url: '',
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const router = useRouter()
@@ -104,6 +105,7 @@ export default function AdminArticlesPage() {
         content: '',
         meta_description: '',
         author: '',
+        image_url: '',
       })
       setEditingId(null)
       setShowForm(false)
@@ -257,6 +259,26 @@ export default function AdminArticlesPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  URL תמונה
+                </label>
+                <input
+                  type="url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com/image.jpg"
+                />
+                {formData.image_url && (
+                  <img
+                    src={formData.image_url}
+                    alt="Preview"
+                    className="mt-2 w-32 h-32 object-cover rounded-lg"
+                  />
+                )}
+              </div>
+
               <button
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
@@ -305,6 +327,7 @@ export default function AdminArticlesPage() {
                             content: article.content,
                             meta_description: article.meta_description || '',
                             author: article.author || '',
+                            image_url: article.image_url || '',
                           })
                           setEditingId(article.id)
                           setShowForm(true)

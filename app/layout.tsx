@@ -7,7 +7,11 @@ export const metadata: Metadata = {
   description: 'Rankings by Go Top - מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות. להרשמה בחינם כנסו עכשיו',
   keywords: 'מעקב מיקומים, קידום אתרים, SEO, גוגל, דירוג, מפות גוגל',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/favicon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
     shortcut: '/favicon.ico',
     apple: '/apple-touch-icon.png',
   },
@@ -37,6 +41,7 @@ export default function RootLayout({
     <html lang="he" dir="rtl" className="h-full">
       <head>
         <meta charSet="utf-8" />
+        <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         {/* Google Tag Manager - Script tag (must be in head) */}
         <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>

@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { Footer } from '@/components/Footer'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
 
 interface Article {
   id: string
@@ -47,46 +50,71 @@ export default function ArticlesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
-      <div className="max-w-4xl mx-auto py-12 px-4">
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">מאמרים</h1>
-          <p className="text-slate-600">עצות ומאמרים על קידום אתרים ו-SEO</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      <div className="flex-1">
+        <div className="max-w-6xl mx-auto py-12 px-4">
+          <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }]} />
+          <div className="mb-12">
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">מאמרים</h1>
+            <p className="text-slate-600">עצות ומאמרים על קידום אתרים ו-SEO</p>
+          </div>
 
         {articles.length === 0 ? null : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {articles.map((article) => (
               <Link key={article.id} href={`/articles/${article.slug}`}>
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col">
-                  <h2 className="text-xl font-bold text-slate-900 mb-2 line-clamp-2">
-                    {article.title}
-                  </h2>
-
-                  {article.excerpt && (
-                    <p className="text-slate-600 text-sm mb-4 line-clamp-3 flex-1">
-                      {article.excerpt}
-                    </p>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col">
+                  {article.image_url ? (
+                    <div className="relative w-full h-48 bg-slate-200">
+                      <Image
+                        src={article.image_url}
+                        alt={article.title}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-48 bg-gradient-to-br from-blue-200 to-blue-100 flex items-center justify-center">
+                      <span className="text-slate-400">אין תמונה</span>
+                    </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                    {article.author && (
-                      <span className="text-xs text-slate-500">
-                        {article.author}
-                      </span>
+                  <div className="p-6 flex flex-col flex-1">
+                    <h2 className="text-xl font-bold text-slate-900 mb-2 line-clamp-2">
+                      {article.title}
+                    </h2>
+
+                    {article.excerpt && (
+                      <p className="text-slate-600 text-sm mb-4 line-clamp-3 flex-1">
+                        {article.excerpt}
+                      </p>
                     )}
-                    {article.published_at && (
-                      <span className="text-xs text-slate-400">
-                        {new Date(article.published_at).toLocaleDateString('he-IL')}
-                      </span>
-                    )}
+
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100 mb-4">
+                      {article.author && (
+                        <span className="text-xs text-slate-500">
+                          {article.author}
+                        </span>
+                      )}
+                      {article.published_at && (
+                        <span className="text-xs text-slate-400">
+                          {new Date(article.published_at).toLocaleDateString('he-IL')}
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="text-blue-600 hover:text-blue-700 font-medium text-sm">
+                      לקריאה &lt;&lt;
+                    </span>
                   </div>
                 </div>
               </Link>
             ))}
           </div>
         )}
+        </div>
       </div>
+      <Footer />
     </div>
   )
 }
