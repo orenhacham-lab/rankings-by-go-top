@@ -105,16 +105,28 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
     )
   }
 
-  // Extract headings for table of contents
+  // Extract headings for table of contents and add IDs to them
   let headings: Array<{ text: string; id: string; level: number }> = []
+  let contentWithIds = article.content
+
   if (typeof document !== 'undefined') {
     const tempDiv = document.createElement('div')
     tempDiv.innerHTML = article.content
-    headings = Array.from(tempDiv.querySelectorAll('h2, h3')).map((h) => ({
-      text: h.textContent || '',
-      id: h.textContent?.toLowerCase().replace(/\s+/g, '-') || '',
-      level: parseInt(h.tagName[1]),
-    }))
+
+    // Add IDs to all h2 and h3 elements
+    Array.from(tempDiv.querySelectorAll('h2, h3')).forEach((heading) => {
+      const text = heading.textContent || ''
+      const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]/g, '')
+      heading.id = id
+
+      headings.push({
+        text,
+        id,
+        level: parseInt(heading.tagName[1]),
+      })
+    })
+
+    contentWithIds = tempDiv.innerHTML
   }
 
   return (
@@ -176,7 +188,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
             <div className="px-8 py-8">
               <div
                 className="max-w-none text-slate-700 article-content [&_h2]:scroll-mt-4 [&_h3]:scroll-mt-4"
-                dangerouslySetInnerHTML={{ __html: article.content }}
+                dangerouslySetInnerHTML={{ __html: contentWithIds }}
               />
             </div>
 

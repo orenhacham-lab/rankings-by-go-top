@@ -88,6 +88,7 @@ export default function AdminArticlesPage() {
         .getPublicUrl(sanitizedName)
 
       setFormData({ ...formData, featured_image_url: publicUrl })
+      alert('תמונה עלויה בהצלחה!')
     } catch (error) {
       console.error('Error:', error)
       alert('שגיאה בהעלאת התמונה')
