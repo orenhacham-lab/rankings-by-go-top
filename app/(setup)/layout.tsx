@@ -11,10 +11,11 @@ export default function SetupLayout({ children }: { children: React.ReactNode })
           width={120}
           height={120}
           className="h-auto w-24"
+          sizes="96px"
           priority
         />
         <span className="text-slate-300 mx-2">|</span>
-        <span className="text-slate-500 text-sm">אשף ההגדרה</span>
+        <span className="text-slate-600 text-sm">אשף ההגדרה</span>
       </header>
 
       <div className="flex-1 flex flex-col">

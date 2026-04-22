@@ -53,7 +53,7 @@ export default function SitemapPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <div className="flex-1 py-12 px-4">
+      <main className="flex-1 py-12 px-4">
         <div className="max-w-3xl mx-auto">
           <Breadcrumbs items={[{ label: 'מפת אתר', href: '/sitemap' }]} />
 
@@ -107,7 +107,7 @@ export default function SitemapPage() {
             </div>
 
             <div className="mt-8 pt-8 border-t border-slate-200">
-              <p className="text-slate-500 text-sm">
+              <p className="text-slate-600 text-sm">
                 לקבלת מידע נוסף, בקר ב
                 <Link href="/about" className="text-blue-600 hover:underline mx-1">
                   עמוד אודות
@@ -120,7 +120,7 @@ export default function SitemapPage() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
       <Footer />
     </div>
   )

@@ -40,6 +40,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               width={140}
               height={56}
               className="w-[60px] md:w-[110px] h-auto object-contain"
+              sizes="(max-width: 768px) 60px, 110px"
               priority
             />
           </div>

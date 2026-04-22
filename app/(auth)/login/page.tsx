@@ -174,11 +174,12 @@ function AuthForm() {
               width={160}
               height={64}
               className="h-16 w-auto object-contain"
+              sizes="(max-width: 768px) 128px, 160px"
               priority
             />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Rankings by Go Top</h1>
-          <p className="text-slate-500 mt-1 text-sm">מערכת מעקב דירוגים לקידום אתרים</p>
+          <p className="text-slate-600 mt-1 text-sm">מערכת מעקב דירוגים לקידום אתרים</p>
         </div>
 
         {/* Card */}
@@ -191,7 +192,7 @@ function AuthForm() {
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
                 mode === 'login'
                   ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  : 'text-slate-600 hover:text-slate-700'
               }`}
             >
               כניסה
@@ -202,7 +203,7 @@ function AuthForm() {
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
                 mode === 'signup'
                   ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  : 'text-slate-600 hover:text-slate-700'
               }`}
             >
               רישום
@@ -248,7 +249,7 @@ function AuthForm() {
               <div className="w-full border-t border-slate-200" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-3 text-slate-400">או עם אימייל וסיסמה</span>
+              <span className="bg-white px-3 text-slate-600">או עם אימייל וסיסמה</span>
             </div>
           </div>
 

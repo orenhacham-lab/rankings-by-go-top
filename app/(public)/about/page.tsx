@@ -5,7 +5,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs'
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <div className="flex-1 py-12 px-4">
+      <main className="flex-1 py-12 px-4">
         <div className="max-w-3xl mx-auto">
           <Breadcrumbs items={[{ label: 'אודות', href: '/about' }]} />
 
@@ -95,14 +95,14 @@ export default function AboutPage() {
               </section>
 
               <section>
-                <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
+                <p className="text-slate-600 text-sm mt-8 pt-8 border-t border-slate-200">
                   עמוד זה עודכן לאחרונה באפריל 2026
                 </p>
               </section>
             </div>
           </div>
         </div>
-      </div>
+      </main>
       <Footer />
     </div>
   )
