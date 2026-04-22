@@ -62,5 +62,38 @@ export async function generateMetadata(
 }
 
 export default function ArticleLayout({ children }: { children: React.ReactNode }) {
-  return children
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: 'דף הבית',
+                item: 'https://www.gotopseo.com',
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: 'מאמרים',
+                item: 'https://www.gotopseo.com/articles',
+              },
+              {
+                '@type': 'ListItem',
+                position: 3,
+                name: 'מאמר',
+                item: 'https://www.gotopseo.com/articles/[slug]',
+              },
+            ],
+          }),
+        }}
+      />
+      {children}
+    </>
+  )
 }

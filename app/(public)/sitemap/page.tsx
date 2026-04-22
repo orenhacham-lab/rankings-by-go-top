@@ -1,10 +1,15 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { createClient } from '@/lib/supabase/client'
 
-export const metadata = {
-  title: 'מפת אתר | Rankings by Go Top',
-  description: 'מפת האתר - כל העמודים וקטגוריות ב-Rankings by Go Top',
+interface Article {
+  id: string
+  slug: string
+  title: string
 }
 
 interface SitemapSection {
@@ -14,32 +19,34 @@ interface SitemapSection {
 }
 
 export default function SitemapPage() {
+  const [articles, setArticles] = useState<Article[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadArticles() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('articles')
+        .select('id, slug, title')
+        .eq('is_published', true)
+        .order('title', { ascending: true })
+
+      if (data) {
+        setArticles(data)
+      }
+      setLoading(false)
+    }
+
+    loadArticles()
+  }, [])
+
   const sections: SitemapSection[] = [
     {
-      title: 'עמודים ראשיים',
+      title: 'עמודים באתר',
       links: [
         { label: 'עמוד הבית', href: '/' },
-        { label: 'התחברות/הרשמה', href: '/login' },
-      ],
-    },
-    {
-      title: 'תוכן וחינוך',
-      links: [
-        { label: 'מאמרים', href: '/articles' },
-        { label: 'אודות', href: '/about' },
-      ],
-    },
-    {
-      title: 'בדיקה',
-      description: 'לאחר התחברות למערכת',
-      links: [
-        { label: 'לוח בקרה', href: '/dashboard' },
-        { label: 'פרויקטים', href: '/projects' },
-        { label: 'מילות מפתח', href: '/keywords' },
-        { label: 'לקוחות', href: '/clients' },
-        { label: 'דוחות', href: '/reports' },
-        { label: 'סריקות', href: '/scans' },
-        { label: 'חיוב', href: '/billing' },
+        { label: 'עמוד אודות', href: '/about' },
+        { label: 'עמוד מאמרים', href: '/articles' },
       ],
     },
   ]
@@ -78,13 +85,25 @@ export default function SitemapPage() {
                   </ul>
                 </section>
               ))}
-            </div>
 
-            <div className="mt-12 p-6 bg-slate-50 rounded-lg border border-slate-200">
-              <h3 className="font-bold text-slate-900 mb-3">הערה</h3>
-              <p className="text-sm text-slate-600">
-                עמודים המשויכים להרשמה (לוח בקרה, פרויקטים וכו') זמינים רק לאחר התחברות למערכת.
-              </p>
+              {!loading && articles.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold text-slate-900 mb-4">מאמרים באתר</h2>
+                  <ul className="space-y-3">
+                    {articles.map((article) => (
+                      <li key={article.id}>
+                        <Link
+                          href={`/articles/${article.slug}`}
+                          className="text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-2"
+                        >
+                          <span>→</span>
+                          <span>{article.title}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
             </div>
 
             <div className="mt-8 pt-8 border-t border-slate-200">

@@ -105,32 +105,54 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
     )
   }
 
-  // Extract headings for table of contents and add IDs to them
-  let headings: Array<{ text: string; id: string; level: number }> = []
-  let contentWithIds = article.content
-
+  // Extract FAQ section if exists
+  let faqSchema: any[] = []
   if (typeof document !== 'undefined') {
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = article.content
+    const faqSection = document.createElement('div')
+    faqSection.innerHTML = article.content
+    const faqHeading = Array.from(faqSection.querySelectorAll('h2')).find(h => h.textContent?.includes('שאלות נפוצות'))
 
-    // Add IDs to all h2 and h3 elements
-    Array.from(tempDiv.querySelectorAll('h2, h3')).forEach((heading) => {
-      const text = heading.textContent || ''
-      const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]/g, '')
-      heading.id = id
+    if (faqHeading) {
+      let currentElement = faqHeading.nextElementSibling
+      while (currentElement && currentElement.tagName !== 'H2') {
+        if (currentElement.tagName === 'P') {
+          const text = currentElement.textContent || ''
+          if (text.includes('**')) {
+            const parts = text.split('\n')
+            const question = parts[0]?.replace(/\*\*/g, '') || ''
+            const answer = parts.slice(1).join('\n')
 
-      headings.push({
-        text,
-        id,
-        level: parseInt(heading.tagName[1]),
-      })
-    })
-
-    contentWithIds = tempDiv.innerHTML
+            if (question && answer) {
+              faqSchema.push({
+                '@type': 'Question',
+                name: question.trim(),
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: answer.trim(),
+                },
+              })
+            }
+          }
+        }
+        currentElement = currentElement.nextElementSibling
+      }
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      {faqSchema.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: faqSchema,
+            }),
+          }}
+        />
+      )}
       <div className="flex-1">
         <div className="max-w-4xl mx-auto py-12 px-4">
           <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: article.title, href: '#' }]} />

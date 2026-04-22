@@ -85,7 +85,7 @@ export default function AboutPage() {
                 <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">רוצה להתחיל?</h2>
                 <p>
                   <Link href="/login" className="text-blue-600 hover:underline font-medium">
-                    הירשם לחינם כאן
+                    הרשמה בחינם
                   </Link>
                   {' '}או{' '}
                   <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline font-medium">
