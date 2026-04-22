@@ -28,7 +28,8 @@ interface Article {
   content: string
   author: string | null
   published_at: string | null
-  image_url: string | null
+  featured_image_url: string | null
+  featured_image_alt: string | null
 }
 
 export default function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -51,7 +52,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
       // This prevents unauthorized access to unpublished articles
       const { data, error } = await supabase
         .from('articles')
-        .select('id, slug, title, content, author, published_at, image_url')
+        .select('id, slug, title, content, author, published_at, featured_image_url, featured_image_alt')
         .eq('slug', slug)
         .eq('is_published', true)
         .single()
@@ -158,11 +159,11 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
               </div>
 
               {/* Article Image */}
-              {article.image_url && (
+              {article.featured_image_url && (
                 <div className="lg:w-64 lg:h-64 relative flex-shrink-0">
                   <Image
-                    src={article.image_url}
-                    alt={article.title}
+                    src={article.featured_image_url}
+                    alt={article.featured_image_alt || article.title}
                     width={256}
                     height={256}
                     className="w-full h-full object-cover rounded-lg"
@@ -171,29 +172,36 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
               )}
             </div>
 
-            {/* Table of Contents */}
-            {headings && headings.length > 0 && (
-              <div className="px-8 py-6 border-t border-slate-200 bg-slate-50">
-                <h2 className="font-bold text-slate-900 mb-4">תוכן עניינים</h2>
-                <ul className="space-y-2">
-                  {headings.map((heading, index) => (
-                    <li key={index} style={{ marginRight: (heading.level - 2) * 20 }}>
-                      <a href={`#${heading.id}`} className="text-blue-600 hover:underline text-sm">
-                        {heading.text}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {/* Article Content */}
             <div className="px-8 py-8">
               <div
-                className="prose prose-sm max-w-none text-slate-700 article-content [&_h2]:scroll-mt-4 [&_h3]:scroll-mt-4"
+                className="max-w-none text-slate-700 article-content [&_h2]:scroll-mt-4 [&_h3]:scroll-mt-4"
                 dangerouslySetInnerHTML={{ __html: article.content }}
               />
             </div>
+
+            {/* Table of Contents at the end */}
+            {headings && headings.length > 0 && (
+              <div className="px-8 py-8 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+                <div className="bg-white border border-slate-200 rounded-lg p-6">
+                  <h3 className="text-lg font-bold text-slate-900 mb-4 pb-3 border-b border-slate-200">
+                    📑 תוכן עניינים
+                  </h3>
+                  <ul className="space-y-2">
+                    {headings.map((heading, index) => (
+                      <li key={index} style={{ paddingRight: (heading.level - 2) * 16 }}>
+                        <a
+                          href={`#${heading.id}`}
+                          className="text-blue-600 hover:text-blue-700 hover:underline text-sm transition-colors"
+                        >
+                          {heading.text}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
           </article>
         </div>
       </div>

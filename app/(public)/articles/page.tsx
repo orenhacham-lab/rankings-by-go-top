@@ -14,7 +14,8 @@ interface Article {
   excerpt: string | null
   author: string | null
   published_at: string | null
-  image_url: string | null
+  featured_image_url: string | null
+  featured_image_alt: string | null
 }
 
 export default function ArticlesPage() {
@@ -26,7 +27,7 @@ export default function ArticlesPage() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('articles')
-        .select('id, slug, title, excerpt, author, published_at, image_url')
+        .select('id, slug, title, excerpt, author, published_at, featured_image_url, featured_image_alt')
         .eq('is_published', true)
         .order('published_at', { ascending: false })
 
@@ -65,11 +66,11 @@ export default function ArticlesPage() {
             {articles.map((article) => (
               <Link key={article.id} href={`/articles/${article.slug}`}>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col">
-                  {article.image_url ? (
+                  {article.featured_image_url ? (
                     <div className="relative w-full h-48 bg-slate-200">
                       <Image
-                        src={article.image_url}
-                        alt={article.title}
+                        src={article.featured_image_url}
+                        alt={article.featured_image_alt || article.title}
                         fill
                         className="object-cover"
                       />
