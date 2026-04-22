@@ -376,7 +376,8 @@ function AuthForm() {
             &copy; {new Date().getFullYear()}
           </p>
         </div>
-      </main>
+      </div>
+    </main>
   )
 }
 
