@@ -254,9 +254,33 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(`${origin}/login?error=oauth&details=callback_error`)
       }
     } else {
-      // Handle Supabase OAuth flow
-      const { error } = await supabase.auth.exchangeCodeForSession(code)
+      // Handle Supabase OAuth flow (includes email confirmation from email/password signups)
+      const { error, data } = await supabase.auth.exchangeCodeForSession(code)
       if (!error) {
+        // Check if this is a new user by comparing created_at and last_sign_in_at
+        // For new users (just confirmed email), these are very close together
+        if (data?.user) {
+          const createdAt = new Date(data.user.created_at).getTime()
+          const now = Date.now()
+          const isNewUser = (now - createdAt) < 5 * 60 * 1000 // Within 5 minutes of creation
+
+          if (isNewUser) {
+            try {
+              await fetch(`${origin}/api/send-notification-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: data.user.email,
+                  userName: data.user.user_metadata?.full_name || data.user.email,
+                }),
+              })
+            } catch (emailError) {
+              console.error('[Signup] Failed to send notification email:', emailError)
+              // Don't fail the signup if email fails
+            }
+          }
+        }
+
         const destination = next.startsWith('/') ? next : '/dashboard'
         return NextResponse.redirect(`${origin}${destination}`)
       }
