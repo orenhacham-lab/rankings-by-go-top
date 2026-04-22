@@ -58,7 +58,7 @@ export default function ArticlesPage() {
           <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }]} />
           <div className="mb-12">
             <h1 className="text-4xl font-bold text-slate-900 mb-2">מאמרים</h1>
-            <p className="text-slate-600">עצות ומאמרים על קידום אתרים ו-SEO</p>
+            <p className="text-slate-600">מאמרים וטיפים בנושאי קידום אתרים, שיווק דיגיטלי וטכנולוגיה</p>
           </div>
 
         {articles.length === 0 ? null : (
@@ -106,7 +106,7 @@ export default function ArticlesPage() {
                     </div>
 
                     <span className="text-blue-600 hover:text-blue-700 font-medium text-sm">
-                      לקריאה &lt;&lt;
+                      לקריאה &gt;&gt;
                     </span>
                   </div>
                 </div>
