@@ -43,11 +43,11 @@ export default function RootLayout({
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
         {/* Favicon - Go Top logo */}
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
-        <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png?v=2" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png?v=2" />
+        <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=2" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
         <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
         {/* Google Tag Manager - Data Layer */}
         <script
