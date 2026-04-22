@@ -14,6 +14,7 @@ interface Article {
   excerpt: string | null
   author: string | null
   published_at: string | null
+  image_url: string | null
 }
 
 export default function ArticlesPage() {
@@ -25,7 +26,7 @@ export default function ArticlesPage() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('articles')
-        .select('id, slug, title, excerpt, author, published_at')
+        .select('id, slug, title, excerpt, author, published_at, image_url')
         .eq('is_published', true)
         .order('published_at', { ascending: false })
 

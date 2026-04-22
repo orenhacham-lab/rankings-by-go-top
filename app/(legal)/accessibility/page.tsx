@@ -1,6 +1,4 @@
 import Link from 'next/link'
-
-import Link from 'next/link'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 

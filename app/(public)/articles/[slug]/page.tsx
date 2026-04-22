@@ -105,10 +105,11 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
   }
 
   // Extract headings for table of contents
-  const tempDiv = typeof document !== 'undefined' ? document.createElement('div') : null
-  if (tempDiv) {
+  let headings: Array<{ text: string; id: string; level: number }> = []
+  if (typeof document !== 'undefined') {
+    const tempDiv = document.createElement('div')
     tempDiv.innerHTML = article.content
-    var headings = Array.from(tempDiv.querySelectorAll('h2, h3')).map((h) => ({
+    headings = Array.from(tempDiv.querySelectorAll('h2, h3')).map((h) => ({
       text: h.textContent || '',
       id: h.textContent?.toLowerCase().replace(/\s+/g, '-') || '',
       level: parseInt(h.tagName[1]),
