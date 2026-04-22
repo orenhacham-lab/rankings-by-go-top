@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
 import { Image } from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { useState } from 'react'
@@ -26,6 +27,7 @@ export function RichTextEditor({ value, onChange, placeholder = 'כתוב את �
         resizable: true,
       }),
       TableRow,
+      TableHeader,
       TableCell,
       Image.configure({
         allowBase64: true,
