@@ -105,30 +105,49 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
     )
   }
 
-  // Extract FAQ section if exists
-  let faqSchema: any[] = []
+  // Extract headings for TOC, add IDs, and extract FAQ schema
+  let headings: Array<{ text: string; id: string; level: number }> = []
+  let contentWithIds = article.content
+  let faqSchema: Array<{ '@type': string; name: string; acceptedAnswer: { '@type': string; text: string } }> = []
+
   if (typeof document !== 'undefined') {
-    const faqSection = document.createElement('div')
-    faqSection.innerHTML = article.content
-    const faqHeading = Array.from(faqSection.querySelectorAll('h2')).find(h => h.textContent?.includes('שאלות נפוצות'))
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = article.content
+
+    // Add IDs to all h2 and h3 elements for TOC
+    Array.from(tempDiv.querySelectorAll('h2, h3')).forEach((heading, index) => {
+      const text = heading.textContent || ''
+      const baseId = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-֐-׿]/g, '')
+      const id = baseId || `heading-${index}`
+      heading.id = id
+
+      headings.push({
+        text,
+        id,
+        level: parseInt(heading.tagName[1]),
+      })
+    })
+
+    // Extract FAQ section if exists
+    const faqHeading = Array.from(tempDiv.querySelectorAll('h2')).find(h => h.textContent?.includes('שאלות נפוצות'))
 
     if (faqHeading) {
       let currentElement = faqHeading.nextElementSibling
       while (currentElement && currentElement.tagName !== 'H2') {
         if (currentElement.tagName === 'P') {
-          const text = currentElement.textContent || ''
-          if (text.includes('**')) {
-            const parts = text.split('\n')
-            const question = parts[0]?.replace(/\*\*/g, '') || ''
-            const answer = parts.slice(1).join('\n')
+          const strongEl = currentElement.querySelector('strong')
+          if (strongEl) {
+            const question = strongEl.textContent?.trim() || ''
+            const fullText = currentElement.textContent?.trim() || ''
+            const answer = fullText.replace(question, '').trim()
 
             if (question && answer) {
               faqSchema.push({
                 '@type': 'Question',
-                name: question.trim(),
+                name: question,
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: answer.trim(),
+                  text: answer,
                 },
               })
             }
@@ -137,6 +156,8 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
         currentElement = currentElement.nextElementSibling
       }
     }
+
+    contentWithIds = tempDiv.innerHTML
   }
 
   return (
