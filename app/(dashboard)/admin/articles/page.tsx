@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { RichTextEditor } from '@/components/RichTextEditor'
 
 export default function AdminArticlesPage() {
   const [user, setUser] = useState<any>(null)
@@ -18,7 +19,6 @@ export default function AdminArticlesPage() {
     content: '',
     meta_description: '',
     author: '',
-    image_url: '',
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const router = useRouter()
@@ -105,7 +105,6 @@ export default function AdminArticlesPage() {
         content: '',
         meta_description: '',
         author: '',
-        image_url: '',
       })
       setEditingId(null)
       setShowForm(false)
@@ -238,12 +237,10 @@ export default function AdminArticlesPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   תוכן *
                 </label>
-                <textarea
-                  required
+                <RichTextEditor
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={10}
+                  onChange={(value) => setFormData({ ...formData, content: value })}
+                  placeholder="כתוב את המאמר כאן... תוכל להוסיף כותרות, טבלאות, תמונות, וציון עיצוב"
                 />
               </div>
 
@@ -257,26 +254,6 @@ export default function AdminArticlesPage() {
                   onChange={(e) => setFormData({ ...formData, author: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  URL תמונה
-                </label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://example.com/image.jpg"
-                />
-                {formData.image_url && (
-                  <img
-                    src={formData.image_url}
-                    alt="Preview"
-                    className="mt-2 w-32 h-32 object-cover rounded-lg"
-                  />
-                )}
               </div>
 
               <button
@@ -327,7 +304,6 @@ export default function AdminArticlesPage() {
                             content: article.content,
                             meta_description: article.meta_description || '',
                             author: article.author || '',
-                            image_url: article.image_url || '',
                           })
                           setEditingId(article.id)
                           setShowForm(true)
