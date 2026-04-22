@@ -19,8 +19,11 @@ export default function AdminArticlesPage() {
     content: '',
     meta_description: '',
     author: '',
+    featured_image_url: '',
+    featured_image_alt: '',
   })
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [uploadingFeatured, setUploadingFeatured] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -58,6 +61,38 @@ export default function AdminArticlesPage() {
       setArticles(data)
     }
     setLoading(false)
+  }
+
+  async function handleFeaturedImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingFeatured(true)
+    try {
+      const supabase = createClient()
+      const fileName = `featured-${Date.now()}-${file.name}`
+
+      const { data, error } = await supabase.storage
+        .from('article-images')
+        .upload(fileName, file)
+
+      if (error) {
+        console.error('Upload error:', error)
+        alert('שגיאה בהעלאת התמונה')
+        return
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('article-images')
+        .getPublicUrl(fileName)
+
+      setFormData({ ...formData, featured_image_url: publicUrl })
+    } catch (error) {
+      console.error('Error:', error)
+      alert('שגיאה בהעלאת התמונה')
+    } finally {
+      setUploadingFeatured(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -105,6 +140,8 @@ export default function AdminArticlesPage() {
         content: '',
         meta_description: '',
         author: '',
+        featured_image_url: '',
+        featured_image_alt: '',
       })
       setEditingId(null)
       setShowForm(false)
@@ -256,6 +293,60 @@ export default function AdminArticlesPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  תמונה ראשית
+                </label>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block px-4 py-2 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer text-center text-sm text-slate-600">
+                      {uploadingFeatured ? 'מעלה תמונה...' : 'לחץ להעלאת תמונה'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFeaturedImageUpload}
+                        disabled={uploadingFeatured}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {formData.featured_image_url && (
+                    <div>
+                      <div className="relative w-full h-48 bg-slate-200 rounded-lg overflow-hidden">
+                        <img
+                          src={formData.featured_image_url}
+                          alt="תמונה ראשית"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, featured_image_url: '', featured_image_alt: '' })}
+                        className="mt-2 text-red-600 hover:text-red-700 text-sm"
+                      >
+                        הסר תמונה
+                      </button>
+                    </div>
+                  )}
+
+                  {formData.featured_image_url && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        טקסט חלופי (Alt Text)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.featured_image_alt}
+                        onChange={(e) => setFormData({ ...formData, featured_image_alt: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="תיאור קצר של התמונה"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
@@ -304,6 +395,8 @@ export default function AdminArticlesPage() {
                             content: article.content,
                             meta_description: article.meta_description || '',
                             author: article.author || '',
+                            featured_image_url: article.featured_image_url || '',
+                            featured_image_alt: article.featured_image_alt || '',
                           })
                           setEditingId(article.id)
                           setShowForm(true)
