@@ -213,6 +213,24 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('[Google OAuth] User signed in successfully')
+
+        // Send email notification for new signups
+        if (userCreatedNow) {
+          try {
+            await fetch(`${origin}/api/send-notification-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: googleUser.email,
+                userName: googleUser.name || 'Google User',
+              }),
+            })
+          } catch (emailError) {
+            console.error('[Google OAuth] Failed to send notification email:', emailError)
+            // Don't fail the signup if email fails
+          }
+        }
+
         const destination = next.startsWith('/') ? next : '/dashboard'
         return NextResponse.redirect(`${origin}${destination}`)
       } catch (error) {

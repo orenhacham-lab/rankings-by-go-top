@@ -48,13 +48,22 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png?v=2" />
         <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=2" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
-        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
-        {/* Google Tag Manager - Data Layer */}
+
+        {/* Google Tag Manager - Initialize data layer BEFORE GTM script */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `window.dataLayer = window.dataLayer || [];`,
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'GTM-PC29G3NQ');
+            `,
           }}
         />
+
+        {/* Google Tag Manager Script */}
+        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
+
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
