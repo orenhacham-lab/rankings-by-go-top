@@ -43,7 +43,11 @@ export default function RootLayout({
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        {/* Google Tag Manager - Script tag (must be in head) */}
+        {/* Favicon - Explicit links */}
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
         {/* Google Tag Manager - Data Layer */}
         <script

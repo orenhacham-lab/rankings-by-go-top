@@ -9,13 +9,45 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Company Info */}
           <div>
-            <h3 className="font-bold text-lg mb-4">Rankings by Go Top</h3>
+            <h3 className="font-bold text-lg mb-4">
+              <span>Rankings by </span>
+              <Link href="https://www.gotop.co.il" className="text-blue-400 hover:text-blue-300 transition-colors">
+                Go Top
+              </Link>
+            </h3>
             <p className="text-slate-400 text-sm">
               מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות.
             </p>
           </div>
 
           {/* Legal Links */}
+          <div>
+            <h4 className="font-bold mb-4">עמודים</h4>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link href="/" className="text-slate-400 hover:text-white transition-colors">
+                  עמוד הבית
+                </Link>
+              </li>
+              <li>
+                <Link href="/articles" className="text-slate-400 hover:text-white transition-colors">
+                  מאמרים
+                </Link>
+              </li>
+              <li>
+                <Link href="/about" className="text-slate-400 hover:text-white transition-colors">
+                  אודות
+                </Link>
+              </li>
+              <li>
+                <Link href="/sitemap" className="text-slate-400 hover:text-white transition-colors">
+                  מפת אתר
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Legal */}
           <div>
             <h4 className="font-bold mb-4">משפטי</h4>
             <ul className="space-y-2 text-sm">
@@ -28,28 +60,6 @@ export function Footer() {
                 <Link href="/accessibility" className="text-slate-400 hover:text-white transition-colors">
                   נגישות
                 </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Resources */}
-          <div>
-            <h4 className="font-bold mb-4">משאבים</h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/articles" className="text-slate-400 hover:text-white transition-colors">
-                  מאמרים
-                </Link>
-              </li>
-              <li>
-                <a href="/robots.txt" className="text-slate-400 hover:text-white transition-colors">
-                  Robots.txt
-                </a>
-              </li>
-              <li>
-                <a href="/sitemap.xml" className="text-slate-400 hover:text-white transition-colors">
-                  Sitemap
-                </a>
               </li>
             </ul>
           </div>
@@ -79,17 +89,13 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-slate-400 text-sm">
+        <div className="border-t border-slate-800 pt-8">
+          <p className="text-slate-400 text-sm text-center">
             © 2026 Rankings by Go Top. כל הזכויות שמורות.
           </p>
-          <div className="mt-4 md:mt-0 flex gap-6">
-            <a href="https://www.gotop.co.il" className="text-slate-400 hover:text-white text-sm transition-colors">
-              Go Top
-            </a>
-          </div>
         </div>
       </div>
     </footer>
   )
 }
+
