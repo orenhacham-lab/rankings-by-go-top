@@ -2,39 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
 
 export function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false)
   const [isClient, setIsClient] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
 
-    // Check if user is authenticated
-    const checkAuth = async () => {
-      try {
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
-        const { data: { session } } = await supabase.auth.getSession()
-        setIsAuthenticated(!!session)
-
-        // Only show cookie consent if user is NOT authenticated and hasn't accepted yet
-        if (!session) {
-          const hasAccepted = localStorage.getItem('cookie-consent-accepted')
-          if (!hasAccepted) {
-            setIsVisible(true)
-          }
-        }
-      } catch (error) {
-        console.error('Error checking auth:', error)
-      }
+    // Check if consent was already accepted without blocking API call
+    const hasAccepted = localStorage.getItem('cookie-consent-accepted')
+    if (!hasAccepted) {
+      setIsVisible(true)
     }
-
-    checkAuth()
   }, [])
 
   const handleAccept = () => {
