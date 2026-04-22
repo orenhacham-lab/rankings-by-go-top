@@ -6,11 +6,30 @@ Allow: /
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /api
-Disallow: /login
-Disallow: /setup
 
 # Google-specific rules
 User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+
+# DuckDuckGo
+User-agent: DuckDuckBot
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+
+# Archive.org
+User-agent: archive.org_bot
 Allow: /
 Disallow: /admin
 Disallow: /dashboard
