@@ -105,16 +105,14 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
     )
   }
 
-  // Extract headings for TOC, add IDs, and extract FAQ schema
+  // Extract headings for TOC and add IDs
   let headings: Array<{ text: string; id: string; level: number }> = []
   let contentWithIds = article.content
-  let faqSchema: Array<{ '@type': string; name: string; acceptedAnswer: { '@type': string; text: string } }> = []
 
   if (typeof document !== 'undefined') {
     const tempDiv = document.createElement('div')
     tempDiv.innerHTML = article.content
 
-    // Add IDs to all h2 and h3 elements for TOC
     Array.from(tempDiv.querySelectorAll('h2, h3')).forEach((heading, index) => {
       const text = heading.textContent || ''
       const baseId = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-֐-׿]/g, '')
@@ -128,52 +126,11 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
       })
     })
 
-    // Extract FAQ section if exists
-    const faqHeading = Array.from(tempDiv.querySelectorAll('h2')).find(h => h.textContent?.includes('שאלות נפוצות'))
-
-    if (faqHeading) {
-      let currentElement = faqHeading.nextElementSibling
-      while (currentElement && currentElement.tagName !== 'H2') {
-        if (currentElement.tagName === 'P') {
-          const strongEl = currentElement.querySelector('strong')
-          if (strongEl) {
-            const question = strongEl.textContent?.trim() || ''
-            const fullText = currentElement.textContent?.trim() || ''
-            const answer = fullText.replace(question, '').trim()
-
-            if (question && answer) {
-              faqSchema.push({
-                '@type': 'Question',
-                name: question,
-                acceptedAnswer: {
-                  '@type': 'Answer',
-                  text: answer,
-                },
-              })
-            }
-          }
-        }
-        currentElement = currentElement.nextElementSibling
-      }
-    }
-
     contentWithIds = tempDiv.innerHTML
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      {faqSchema.length > 0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'FAQPage',
-              mainEntity: faqSchema,
-            }),
-          }}
-        />
-      )}
       <div className="flex-1">
         <div className="max-w-4xl mx-auto py-12 px-4">
           <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: article.title, href: '#' }]} />
