@@ -52,11 +52,12 @@ export function RichTextEditor({ value, onChange, placeholder = 'כתוב את �
     setUploading(true)
     try {
       const supabase = createClient()
-      const fileName = `article-${Date.now()}-${file.name}`
+      const ext = file.name.split('.').pop()
+      const sanitizedName = `article-${Date.now()}.${ext}`
 
       const { data, error } = await supabase.storage
         .from('article-images')
-        .upload(fileName, file)
+        .upload(sanitizedName, file)
 
       if (error) {
         console.error('Upload error:', error)
@@ -66,7 +67,7 @@ export function RichTextEditor({ value, onChange, placeholder = 'כתוב את �
 
       const { data: { publicUrl } } = supabase.storage
         .from('article-images')
-        .getPublicUrl(fileName)
+        .getPublicUrl(sanitizedName)
 
       // Insert image with alt text
       const altText = prompt('הכנס alt text לתמונה:') || 'תמונה'

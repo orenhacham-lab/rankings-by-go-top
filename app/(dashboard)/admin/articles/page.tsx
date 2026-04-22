@@ -70,11 +70,12 @@ export default function AdminArticlesPage() {
     setUploadingFeatured(true)
     try {
       const supabase = createClient()
-      const fileName = `featured-${Date.now()}-${file.name}`
+      const ext = file.name.split('.').pop()
+      const sanitizedName = `featured-${Date.now()}.${ext}`
 
       const { data, error } = await supabase.storage
         .from('article-images')
-        .upload(fileName, file)
+        .upload(sanitizedName, file)
 
       if (error) {
         console.error('Upload error:', error)
@@ -84,7 +85,7 @@ export default function AdminArticlesPage() {
 
       const { data: { publicUrl } } = supabase.storage
         .from('article-images')
-        .getPublicUrl(fileName)
+        .getPublicUrl(sanitizedName)
 
       setFormData({ ...formData, featured_image_url: publicUrl })
     } catch (error) {
