@@ -2,11 +2,6 @@ import Link from 'next/link'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 
-export const metadata = {
-  title: 'אודות Rankings by Go Top | סיפור החברה',
-  description: 'סיפור חברת Go Top ופיתוח מערכת Rankings by Go Top לעקיבה אחרי מיקומים בחיפוש',
-}
-
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">

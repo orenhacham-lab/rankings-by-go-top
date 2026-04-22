@@ -71,25 +71,47 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'SoftwareApplication',
-              name: 'Rankings by Go Top',
-              description: 'מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות',
-              url: 'https://www.gotopseo.com',
-              applicationCategory: 'BusinessApplication',
-              operatingSystem: 'Web',
-              offers: {
-                '@type': 'Offer',
-                price: '0',
-                priceCurrency: 'ILS',
-              },
-              author: {
+            __html: JSON.stringify([
+              {
+                '@context': 'https://schema.org',
                 '@type': 'Organization',
-                name: 'Go Top',
-                url: 'https://www.gotop.co.il',
+                name: 'Rankings by Go Top',
+                url: 'https://www.gotopseo.com',
+                logo: 'https://www.gotopseo.com/gotop-primary.png',
+                description: 'מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות',
+                sameAs: ['https://www.gotop.co.il'],
+                contactPoint: {
+                  '@type': 'ContactPoint',
+                  telephone: '054-9489377',
+                  contactType: 'Customer Support',
+                  email: 'oren@gotop.co.il',
+                },
+                parentOrganization: {
+                  '@type': 'Organization',
+                  name: 'Go Top',
+                  url: 'https://www.gotop.co.il',
+                },
               },
-            }),
+              {
+                '@context': 'https://schema.org',
+                '@type': 'SoftwareApplication',
+                name: 'Rankings by Go Top',
+                description: 'מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות',
+                url: 'https://www.gotopseo.com',
+                applicationCategory: 'BusinessApplication',
+                operatingSystem: 'Web',
+                offers: {
+                  '@type': 'Offer',
+                  price: '0',
+                  priceCurrency: 'ILS',
+                },
+                author: {
+                  '@type': 'Organization',
+                  name: 'Go Top',
+                  url: 'https://www.gotop.co.il',
+                },
+              },
+            ]),
           }}
         />
       </head>
