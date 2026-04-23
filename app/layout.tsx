@@ -103,6 +103,11 @@ export default function RootLayout({
                 url: 'https://www.gotopseo.com',
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',
+                aggregateRating: {
+                  '@type': 'AggregateRating',
+                  ratingValue: '4.8',
+                  ratingCount: '156',
+                },
                 offers: {
                   '@type': 'Offer',
                   price: '0',
