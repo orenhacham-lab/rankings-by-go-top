@@ -149,6 +149,7 @@ export default async function ArticleLayout({
           author: {
             '@type': 'Person',
             name: article.author,
+            url: 'https://www.gotopseo.com',
           },
         }),
         ...(article.published_at && {

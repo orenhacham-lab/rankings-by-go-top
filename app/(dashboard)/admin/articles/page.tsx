@@ -128,12 +128,6 @@ export default function AdminArticlesPage() {
         if (error) throw error
       }
 
-      // Reload articles
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        loadArticles(supabase)
-      }
-
       // Reset form
       setFormData({
         title: '',
@@ -147,6 +141,10 @@ export default function AdminArticlesPage() {
       })
       setEditingId(null)
       setShowForm(false)
+
+      // Reload articles
+      await loadArticles(supabase)
+      alert('המאמר נשמר בהצלחה!')
     } catch (error) {
       console.error('Error saving article:', error)
       alert('שגיאה בשמירת המאמר')
