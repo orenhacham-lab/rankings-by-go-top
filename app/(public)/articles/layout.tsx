@@ -9,6 +9,33 @@ export const metadata = {
   },
 }
 
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'דף הבית',
+      item: 'https://www.gotopseo.com',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'מאמרים',
+      item: 'https://www.gotopseo.com/articles',
+    },
+  ],
+}
+
 export default function ArticlesLayout({ children }: { children: React.ReactNode }) {
-  return children
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+      {children}
+    </>
+  )
 }
