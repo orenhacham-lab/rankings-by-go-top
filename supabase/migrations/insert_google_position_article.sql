@@ -209,4 +209,4 @@ INSERT INTO articles (
   true,
   now(),
   now()
-) ON CONFLICT DO NOTHING;
+) ON CONFLICT (slug) DO NOTHING;
