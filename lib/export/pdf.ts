@@ -17,7 +17,7 @@ function generateReportHTML(data: ExportData): string {
   // Exclude rows where found !== true OR position is null.
   const foundTargets = data.targets.filter((t) => {
     const r = data.latestResults[t.id]
-    return r?.found === true && r.position != null
+    return r && r.found === true && r.position != null
   })
 
   const found = foundTargets.length
@@ -28,6 +28,7 @@ function generateReportHTML(data: ExportData): string {
   const sortedTargets = sortTargetsByPosition(foundTargets, data.latestResults)
   const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
+    if (!result) return ''
 
     let changeStr = '—'
     if (result?.change_value != null) {
