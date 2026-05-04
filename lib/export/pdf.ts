@@ -131,52 +131,30 @@ function generateReportHTML(data: ExportData): string {
           color: #6b7280;
         }
 
-        .toolbar {
-          display: flex;
-          gap: 10px;
-          margin-bottom: 20px;
-          flex-wrap: wrap;
-        }
-
-        .toolbar button {
-          padding: 8px 16px;
-          background: #1E4ED8;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 10pt;
-          font-weight: bold;
-        }
-
-        .toolbar button:hover {
-          background: #1a3da8;
-        }
-
         .summary-stats {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          gap: 15px;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
           margin-bottom: 25px;
         }
 
         .stat-box {
           border: 1px solid #d1d5db;
-          padding: 15px;
+          padding: 10px;
           text-align: center;
           border-radius: 4px;
           background: #f9fafb;
         }
 
         .stat-label {
-          font-size: 9pt;
+          font-size: 8pt;
           color: #6b7280;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
           font-weight: bold;
         }
 
         .stat-value {
-          font-size: 20pt;
+          font-size: 16pt;
           font-weight: bold;
           color: #1E4ED8;
         }
@@ -272,10 +250,6 @@ function generateReportHTML(data: ExportData): string {
             border-radius: 0;
           }
 
-          .toolbar {
-            display: none;
-          }
-
           .no-print {
             display: none;
           }
@@ -292,13 +266,6 @@ function generateReportHTML(data: ExportData): string {
             border: 1px solid #d1d5db;
           }
         }
-
-        /* Hide print button in normal view */
-        @media screen {
-          .print-button {
-            display: block;
-          }
-        }
       </style>
     </head>
     <body>
@@ -312,10 +279,6 @@ function generateReportHTML(data: ExportData): string {
             <div class="project-name">${escapeHtml(data.project.name)}</div>
             <div class="project-meta">${escapeHtml(data.client.name)} | ${escapeHtml(data.project.target_domain)} | ${escapeHtml(now)}</div>
           </div>
-        </div>
-
-        <div class="toolbar no-print">
-          <button class="print-button" onclick="window.print()" title="Save as PDF using browser print">💾 Save as PDF</button>
         </div>
 
         <div class="summary-stats">
