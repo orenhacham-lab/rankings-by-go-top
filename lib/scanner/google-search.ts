@@ -314,105 +314,131 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       return makeError(`exact_point mode requires valid coordinates`)
     }
 
-    const body: Record<string, unknown> = {
+    // Build the base body shared between page 1 and page 2 requests
+    const baseBody: Record<string, unknown> = {
       q: input.keyword,
       gl: requestParams.gl,
       hl: requestParams.hl,
       type: 'search',
-      num: 100,
     }
 
     if (requestParams.device) {
-      body.device = requestParams.device
+      baseBody.device = requestParams.device
     }
 
     // exact_point is the source of truth — ll alone drives geo targeting.
     // Do not send location (city/zip) when exact_point is active.
     if (input.locationMode === 'exact_point' && input.exactPoint) {
-      body.ll = `@${input.exactPoint.lat},${input.exactPoint.lng},13z`
-      console.log(`[GoogleSearch] ✓ EXACT_POINT BRANCH TAKEN: ll=${body.ll}`)
+      baseBody.ll = `@${input.exactPoint.lat},${input.exactPoint.lng},13z`
+      console.log(`[GoogleSearch] ✓ EXACT_POINT BRANCH TAKEN: ll=${baseBody.ll}`)
     } else if (input.city) {
-      body.location = input.city
+      baseBody.location = input.city
       console.log(`[GoogleSearch] ✗ FALLBACK TO CITY BRANCH: location="${input.city}"`)
     } else {
       console.log(`[GoogleSearch] ✗ NO LOCATION SET - neither city nor ll`)
     }
 
-    console.log(`[GoogleSearch] FINAL REQUEST BODY:`, JSON.stringify(body))
+    // Build paginated request bodies — Serper uses { page, num } for pagination.
+    // Page 1 returns positions 1-10, page 2 returns positions 11-20.
+    const page1Body = { ...baseBody, num: 10, page: 1 }
+    const page2Body = { ...baseBody, num: 10, page: 2 }
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    console.log(`[GoogleSearch] PAGINATION ENABLED — requesting 2 pages (positions 1-20)`)
+    console.log(`[GoogleSearch] PAGE 1 REQUEST BODY:`, JSON.stringify(page1Body))
+    console.log(`[GoogleSearch] PAGE 2 REQUEST BODY:`, JSON.stringify(page2Body))
 
-    let response: Response
-    try {
-      console.log(`[GoogleSearch] SENDING TO SERPER - Full request body:`, body)
-      console.log(`[GoogleSearch] SENDING - All fields in body:`, Object.keys(body))
-      for (const key of Object.keys(body)) {
-        console.log(`  ${key}: ${JSON.stringify(body[key])}`)
+    const fetchPage = async (body: Record<string, unknown>, label: string): Promise<{ data: SerperSearchResponse | null; error: string | null }> => {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+      try {
+        const resp = await fetch(SERPER_API_URL, {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': apiKey!,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        })
+        console.log(`[GoogleSearch] ${label} RESPONSE STATUS: ${resp.status}`)
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => '')
+          return { data: null, error: `Serper API error: ${resp.status} ${resp.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}` }
+        }
+        try {
+          const json: SerperSearchResponse = await resp.json()
+          return { data: json, error: null }
+        } catch {
+          return { data: null, error: 'Serper API returned invalid JSON' }
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          return { data: null, error: 'Serper API request timed out' }
+        }
+        return { data: null, error: (err as Error).message }
+      } finally {
+        clearTimeout(timer)
       }
-      response = await fetch(SERPER_API_URL, {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-      console.log(`[GoogleSearch] RESPONSE STATUS: ${response.status}`)
-    } finally {
-      clearTimeout(timer)
     }
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => '')
-      return makeError(`Serper API error: ${response.status} ${response.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`)
+    // Fetch page 1 and page 2 in parallel — same keyword scan, single billable unit.
+    const [page1Result, page2Result] = await Promise.all([
+      fetchPage(page1Body, 'PAGE 1'),
+      fetchPage(page2Body, 'PAGE 2'),
+    ])
+
+    // Page 1 is required; if it fails, abort. Page 2 is best-effort.
+    if (page1Result.error || !page1Result.data) {
+      return makeError(page1Result.error || 'Page 1 returned no data')
+    }
+    if (page1Result.data.error) {
+      return makeError(`Serper: ${page1Result.data.error}`)
     }
 
-    let data: SerperSearchResponse
-    try {
-      data = await response.json()
-    } catch {
-      return makeError('Serper API returned invalid JSON')
+    const page1Raw = page1Result.data.organic ?? []
+    const page2Raw = (page2Result.data && !page2Result.data.error) ? (page2Result.data.organic ?? []) : []
+
+    if (page2Result.error) {
+      console.log(`[GoogleSearch] PAGE 2 fetch failed (continuing with page 1 only): ${page2Result.error}`)
+    } else if (page2Result.data?.error) {
+      console.log(`[GoogleSearch] PAGE 2 returned Serper error (continuing with page 1 only): ${page2Result.data.error}`)
     }
 
-    console.log(`[GoogleSearch] SERPER RESPONSE:`, {
-      searchParameters: (data as any).searchParameters,
-      resultsCount: data.organic?.length || 0,
-      error: data.error,
-    })
-    console.log(`[GoogleSearch] SERPER searchParameters details:`, (data as any).searchParameters)
+    // Normalize positions: page 1 = 1-10, page 2 = 11-20.
+    // Cap each page at 10 results so combined positions never exceed 20.
+    const page1Results = page1Raw.slice(0, 10).map((r, idx) => ({ ...r, position: idx + 1 }))
+    const page2Results = page2Raw.slice(0, 10).map((r, idx) => ({ ...r, position: idx + 11 }))
+    const combinedResults = [...page1Results, ...page2Results]
 
-    if (data.error) {
-      return makeError(`Serper: ${data.error}`)
+    console.log(`[GoogleSearch] AUDIT — pages requested: 2`)
+    console.log(`[GoogleSearch] AUDIT — page 1 returned ${page1Results.length} results (positions 1-${page1Results.length})`)
+    console.log(`[GoogleSearch] AUDIT — page 2 returned ${page2Results.length} results (positions 11-${10 + page2Results.length})`)
+    console.log(`[GoogleSearch] AUDIT — total organic results collected: ${combinedResults.length}`)
+    console.log(`[GoogleSearch] AUDIT — page 1 searchParameters:`, (page1Result.data as any).searchParameters)
+    if (page2Result.data) {
+      console.log(`[GoogleSearch] AUDIT — page 2 searchParameters:`, (page2Result.data as any).searchParameters)
     }
 
-    const results = data.organic ?? []
-
-    console.log(`[GoogleSearch] Got ${results.length} organic results from Serper`)
-
-    if (results.length === 0) {
-      console.log('[GoogleSearch] No organic results returned')
+    if (combinedResults.length === 0) {
+      console.log('[GoogleSearch] No organic results returned across both pages')
       return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
     }
 
     // Log all URLs for debugging
-    results.forEach((r, idx) => {
+    combinedResults.forEach((r) => {
       const norm = normalizeDomain(r.link)
-      console.log(`[GoogleSearch] #${idx + 1} url="${r.link}" normalized="${norm}"`)
+      console.log(`[GoogleSearch] #${r.position} url="${r.link}" normalized="${norm}"`)
     })
 
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i]
+    for (const result of combinedResults) {
       const resultNormalized = normalizeDomain(result.link)
-      const position = i + 1 // use loop index as reliable 1-based position
-
       const matched = isDomainMatch(resultNormalized, normalizedTarget)
       if (matched) {
-        console.log(`[GoogleSearch] MATCH at position ${position}: "${result.link}" (normalized="${resultNormalized}")`)
+        console.log(`[GoogleSearch] MATCH at position ${result.position}: "${result.link}" (normalized="${resultNormalized}")`)
+        console.log(`[GoogleSearch] AUDIT — final matched position: ${result.position}`)
         return {
           found: true,
-          position,
+          position: result.position,
           resultUrl: result.link,
           resultTitle: result.title || null,
           resultAddress: null,
@@ -421,7 +447,8 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       }
     }
 
-    console.log(`[GoogleSearch] No match found for "${normalizedTarget}" in ${results.length} results`)
+    console.log(`[GoogleSearch] No match found for "${normalizedTarget}" in ${combinedResults.length} results across 2 pages`)
+    console.log(`[GoogleSearch] AUDIT — final matched position: null`)
     return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
