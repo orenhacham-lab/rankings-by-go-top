@@ -424,10 +424,21 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
     }
 
-    // Log all URLs for debugging
+    // Log all URLs through the full normalization pipeline for debugging.
+    // Shows: raw URL → decoded → unwrapped (if Google redirect) → hostname → normalized
+    console.log(`[GoogleSearch] AUDIT — target raw="${rawDomain}" decoded="${safeDecodeURL(rawDomain)}" unwrapped="${unwrapRedirect(safeDecodeURL(rawDomain))}" normalized="${normalizedTarget}"`)
     combinedResults.forEach((r) => {
+      const decoded = safeDecodeURL(r.link)
+      const unwrapped = unwrapRedirect(decoded)
+      const hostname = extractHostname(r.link)
       const norm = normalizeDomain(r.link)
-      console.log(`[GoogleSearch] #${r.position} url="${r.link}" normalized="${norm}"`)
+      const wasRedirect = unwrapped !== decoded
+      console.log(
+        `[GoogleSearch] #${r.position} raw="${r.link}"` +
+        (decoded !== r.link ? ` decoded="${decoded}"` : '') +
+        (wasRedirect ? ` unwrapped="${unwrapped}" [GOOGLE_REDIRECT]` : '') +
+        ` hostname="${hostname}" normalized="${norm}"`
+      )
     })
 
     for (const result of combinedResults) {
@@ -456,13 +467,19 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     console.log(`[GoogleSearch] Total results scanned: ${combinedResults.length}`)
     console.log(`${'='.repeat(100)}`)
 
-    combinedResults.forEach((result, idx) => {
-      const resultNormalized = normalizeDomain(result.link)
+    combinedResults.forEach((result) => {
+      const decoded = safeDecodeURL(result.link)
+      const unwrapped = unwrapRedirect(decoded)
       const hostMatch = extractHostname(result.link)
+      const resultNormalized = normalizeDomain(result.link)
       const targetHost = extractHostname(rawDomain)
+      const wasDecoded = decoded !== result.link
+      const wasRedirect = unwrapped !== decoded
 
       console.log(`\n[GoogleSearch] RESULT #${result.position}:`)
-      console.log(`  URL: ${result.link}`)
+      console.log(`  Raw URL: ${result.link}`)
+      if (wasDecoded) console.log(`  Decoded URL: ${decoded}`)
+      if (wasRedirect) console.log(`  Unwrapped (Google redirect): ${unwrapped}`)
       console.log(`  Extracted hostname: "${hostMatch}"`)
       console.log(`  Normalized domain: "${resultNormalized}"`)
       console.log(`  Target hostname: "${targetHost}"`)
@@ -494,23 +511,88 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
 }
 
 /**
+ * Safely decode a URL string. Handles malformed encodings gracefully by
+ * falling back to the original input. Catches multi-pass encodings (e.g.
+ * %2520 → %20 → space) by decoding up to 3 times.
+ */
+function safeDecodeURL(input: string): string {
+  let current = input
+  for (let i = 0; i < 3; i++) {
+    try {
+      const decoded = decodeURIComponent(current)
+      if (decoded === current) return decoded
+      current = decoded
+    } catch {
+      return current
+    }
+  }
+  return current
+}
+
+/**
+ * Detect Google redirect URLs and extract the real destination URL.
+ * Handles formats like:
+ * - https://www.google.com/url?q=https://destination.com&sa=...
+ * - https://google.com/url?url=https://destination.com
+ * - http://www.google.com/aclk?...&adurl=https://destination.com
+ * Returns the destination URL if found, otherwise the original input.
+ */
+function unwrapRedirect(input: string): string {
+  if (!input) return input
+  try {
+    const url = input.startsWith('http') ? input : `https://${input}`
+    const parsed = new URL(url)
+    const host = parsed.hostname.toLowerCase()
+
+    // Only treat as redirect if hostname is a Google domain
+    const isGoogleHost =
+      host === 'google.com' ||
+      host.endsWith('.google.com') ||
+      /\.google\.[a-z.]+$/.test(host) ||
+      host === 'googleadservices.com' ||
+      host.endsWith('.googleadservices.com')
+
+    if (!isGoogleHost) return input
+
+    // Common destination params used by Google
+    const destinationParams = ['q', 'url', 'adurl', 'dest', 'u']
+    for (const param of destinationParams) {
+      const value = parsed.searchParams.get(param)
+      if (value && /^https?:\/\//i.test(value)) {
+        return safeDecodeURL(value)
+      }
+    }
+    return input
+  } catch {
+    return input
+  }
+}
+
+/**
  * Extract hostname from URL or domain string.
  * Handles:
  * - http/https protocols
  * - www and subdomains
  * - paths, query params, fragments
  * - trailing slashes
+ * - encoded URLs (decodeURIComponent)
+ * - Google redirect URLs (unwraps to destination)
  * Returns just the hostname part, lowercase.
  */
 function extractHostname(input: string): string {
+  if (!input) return ''
+  // First, decode any URL-encoded characters
+  const decoded = safeDecodeURL(input)
+  // Then unwrap Google redirect URLs to reveal the real destination
+  const unwrapped = unwrapRedirect(decoded)
   try {
     // Try URL constructor approach first — most reliable
-    const url = input.startsWith('http') ? input : `https://${input}`
+    const url = unwrapped.startsWith('http') ? unwrapped : `https://${unwrapped}`
     const hostname = new URL(url).hostname || ''
     return hostname.toLowerCase()
   } catch {
     // Fallback: manual parsing
-    return input
+    return unwrapped
       .replace(/^https?:\/\//, '')
       .split('/')[0]
       .split('?')[0]
@@ -527,6 +609,7 @@ function extractHostname(input: string): string {
  * - "example.com" → "example.com"
  * - "blog.example.com" → "blog.example.com"
  * - "www.example.com" → "example.com"
+ * - "https://www.google.com/url?q=https%3A%2F%2Fexample.com" → "example.com"
  */
 function normalizeDomain(input: string): string {
   const hostname = extractHostname(input)
