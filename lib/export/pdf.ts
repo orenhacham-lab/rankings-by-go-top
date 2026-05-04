@@ -13,12 +13,19 @@ function generateReportHTML(data: ExportData): string {
   const isHebrewProject = data.project.language?.startsWith('he') || data.project.country === 'IL'
   const now = new Date().toLocaleDateString('he-IL')
 
-  const found = data.targets.filter((t) => data.latestResults[t.id]?.found).length
+  // Report shows ONLY found keywords (presentation-layer filter).
+  // Exclude rows where found !== true OR position is null.
+  const foundTargets = data.targets.filter((t) => {
+    const r = data.latestResults[t.id]
+    return r?.found === true && r.position != null
+  })
+
+  const found = foundTargets.length
   const notFound = data.targets.length - found
   const total = data.targets.length
   const coverage = total > 0 ? `${Math.round((found / total) * 100)}%` : '0%'
 
-  const sortedTargets = sortTargetsByPosition(data.targets, data.latestResults)
+  const sortedTargets = sortTargetsByPosition(foundTargets, data.latestResults)
   const tableRows = sortedTargets.map((target) => {
     const result = data.latestResults[target.id]
 
