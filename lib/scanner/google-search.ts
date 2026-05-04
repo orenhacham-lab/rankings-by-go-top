@@ -9,6 +9,17 @@ interface SerperSearchResult {
   link: string
   snippet?: string
   position: number
+  displayedLink?: string
+  sitelinks?: Array<{
+    title?: string
+    link: string
+  }>
+  richSnippet?: {
+    rating?: number
+    ratingCount?: number
+    type?: string
+  }
+  [key: string]: unknown
 }
 
 interface SerperSearchResponse {
@@ -424,37 +435,46 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
       return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
     }
 
-    // Log all URLs through the full normalization pipeline for debugging.
-    // Shows: raw URL → decoded → unwrapped (if Google redirect) → hostname → normalized
-    console.log(`[GoogleSearch] AUDIT — target raw="${rawDomain}" decoded="${safeDecodeURL(rawDomain)}" unwrapped="${unwrapRedirect(safeDecodeURL(rawDomain))}" normalized="${normalizedTarget}"`)
+    // Log target with full pipeline
+    console.log(`[GoogleSearch] AUDIT — target raw="${rawDomain}" normalized="${normalizedTarget}"`)
+
+    // Log all results and their URLs before matching
+    console.log(`[GoogleSearch] AUDIT — checking ${combinedResults.length} results for all URL fields (link, displayedLink, sitelinks)`)
     combinedResults.forEach((r) => {
-      const decoded = safeDecodeURL(r.link)
-      const unwrapped = unwrapRedirect(decoded)
-      const hostname = extractHostname(r.link)
-      const norm = normalizeDomain(r.link)
-      const wasRedirect = unwrapped !== decoded
-      console.log(
-        `[GoogleSearch] #${r.position} raw="${r.link}"` +
-        (decoded !== r.link ? ` decoded="${decoded}"` : '') +
-        (wasRedirect ? ` unwrapped="${unwrapped}" [GOOGLE_REDIRECT]` : '') +
-        ` hostname="${hostname}" normalized="${norm}"`
-      )
+      console.log(`\n[GoogleSearch] RESULT #${r.position}: "${r.title}"`)
+      console.log(`  link: ${r.link}`)
+      if (r.displayedLink) console.log(`  displayedLink: ${r.displayedLink}`)
+      if (r.snippet) console.log(`  snippet: ${r.snippet}`)
+      if (r.sitelinks?.length) {
+        console.log(`  sitelinks (${r.sitelinks.length}):`)
+        r.sitelinks.forEach((sl, idx) => {
+          console.log(`    [${idx}] ${sl.title || '(no title)'} — ${sl.link}`)
+        })
+      }
     })
 
+    // Now check all URL fields for matches
     for (const result of combinedResults) {
-      const resultNormalized = normalizeDomain(result.link)
-      const matched = isDomainMatch(resultNormalized, normalizedTarget)
+      const allURLs = extractAllURLsFromResult(result)
 
-      if (matched) {
-        console.log(`[GoogleSearch] MATCH at position ${result.position}: "${result.link}" (normalized="${resultNormalized}")`)
-        console.log(`[GoogleSearch] AUDIT — final matched position: ${result.position}`)
-        return {
-          found: true,
-          position: result.position,
-          resultUrl: result.link,
-          resultTitle: result.title || null,
-          resultAddress: null,
-          error: null,
+      for (const { url, source } of allURLs) {
+        const resultNormalized = normalizeDomain(url)
+        const matched = isDomainMatch(resultNormalized, normalizedTarget)
+
+        if (matched) {
+          console.log(`\n[GoogleSearch] ✓ MATCH at position ${result.position}:`)
+          console.log(`  Found in: ${source}`)
+          console.log(`  URL: ${url}`)
+          console.log(`  Normalized: ${resultNormalized}`)
+          console.log(`[GoogleSearch] AUDIT — final matched position: ${result.position}`)
+          return {
+            found: true,
+            position: result.position,
+            resultUrl: result.link,
+            resultTitle: result.title || null,
+            resultAddress: null,
+            error: null,
+          }
         }
       }
     }
@@ -468,34 +488,41 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
     console.log(`${'='.repeat(100)}`)
 
     combinedResults.forEach((result) => {
-      const decoded = safeDecodeURL(result.link)
-      const unwrapped = unwrapRedirect(decoded)
-      const hostMatch = extractHostname(result.link)
-      const resultNormalized = normalizeDomain(result.link)
-      const targetHost = extractHostname(rawDomain)
-      const wasDecoded = decoded !== result.link
-      const wasRedirect = unwrapped !== decoded
+      const allURLs = extractAllURLsFromResult(result)
 
-      console.log(`\n[GoogleSearch] RESULT #${result.position}:`)
-      console.log(`  Raw URL: ${result.link}`)
-      if (wasDecoded) console.log(`  Decoded URL: ${decoded}`)
-      if (wasRedirect) console.log(`  Unwrapped (Google redirect): ${unwrapped}`)
-      console.log(`  Extracted hostname: "${hostMatch}"`)
-      console.log(`  Normalized domain: "${resultNormalized}"`)
-      console.log(`  Target hostname: "${targetHost}"`)
-      console.log(`  Target normalized: "${normalizedTarget}"`)
+      console.log(`\n${'='.repeat(100)}`)
+      console.log(`[GoogleSearch] RESULT #${result.position}: "${result.title}"`)
+      console.log(`  Position: ${result.position}`)
+      if (result.snippet) console.log(`  Snippet: ${result.snippet.substring(0, 100)}...`)
+      console.log(`${'='.repeat(100)}`)
 
-      // Check exact match
-      if (resultNormalized === normalizedTarget) {
-        console.log(`  ✓ WOULD MATCH: exact domain match`)
-      } else if (resultNormalized.endsWith('.' + normalizedTarget)) {
-        console.log(`  ✓ WOULD MATCH: subdomain of target`)
-      } else {
-        console.log(`  ✗ REJECTED:`)
-        console.log(`    - Exact match? ${resultNormalized === normalizedTarget} (${resultNormalized} vs ${normalizedTarget})`)
-        console.log(`    - Is subdomain? ${resultNormalized.endsWith('.' + normalizedTarget)} (ends with .${normalizedTarget}?)`)
-        console.log(`    - Contains target? ${resultNormalized.includes(normalizedTarget)}`)
-      }
+      allURLs.forEach(({ url, source }) => {
+        const decoded = safeDecodeURL(url)
+        const unwrapped = unwrapRedirect(decoded)
+        const hostMatch = extractHostname(url)
+        const resultNormalized = normalizeDomain(url)
+        const wasDecoded = decoded !== url
+        const wasRedirect = unwrapped !== decoded
+
+        console.log(`\n  URL Source: ${source}`)
+        console.log(`    Raw URL: ${url}`)
+        if (wasDecoded) console.log(`    Decoded URL: ${decoded}`)
+        if (wasRedirect) console.log(`    Unwrapped (Google redirect): ${unwrapped}`)
+        console.log(`    Extracted hostname: "${hostMatch}"`)
+        console.log(`    Normalized domain: "${resultNormalized}"`)
+        console.log(`    Target normalized: "${normalizedTarget}"`)
+
+        // Check if this URL matches
+        if (resultNormalized === normalizedTarget) {
+          console.log(`    ✓ WOULD MATCH: exact domain match`)
+        } else if (resultNormalized.endsWith('.' + normalizedTarget)) {
+          console.log(`    ✓ WOULD MATCH: subdomain of target`)
+        } else {
+          console.log(`    ✗ REJECTED:`)
+          console.log(`      - Exact match? ${resultNormalized === normalizedTarget}`)
+          console.log(`      - Is subdomain? ${resultNormalized.endsWith('.' + normalizedTarget)}`)
+        }
+      })
     })
 
     console.log(`\n${'='.repeat(100)}\n`)
@@ -615,6 +642,33 @@ function normalizeDomain(input: string): string {
   const hostname = extractHostname(input)
   // Remove www. prefix if present (but keep other subdomains like m., blog., etc.)
   return hostname.replace(/^www\./, '')
+}
+
+/**
+ * Extract all URLs from a Serper search result.
+ * Checks: link, displayedLink, sitelinks.
+ * Returns array of { url, source } tuples to track where each URL came from.
+ */
+function extractAllURLsFromResult(
+  result: SerperSearchResult
+): Array<{ url: string; source: string }> {
+  const urls: Array<{ url: string; source: string }> = []
+
+  if (result.link) {
+    urls.push({ url: result.link, source: 'link' })
+  }
+  if (result.displayedLink && result.displayedLink !== result.link) {
+    urls.push({ url: result.displayedLink, source: 'displayedLink' })
+  }
+  if (Array.isArray(result.sitelinks)) {
+    result.sitelinks.forEach((sitelink, idx) => {
+      if (sitelink.link) {
+        urls.push({ url: sitelink.link, source: `sitelinks[${idx}]` })
+      }
+    })
+  }
+
+  return urls
 }
 
 /**
