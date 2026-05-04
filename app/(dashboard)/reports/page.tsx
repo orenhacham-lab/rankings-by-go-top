@@ -160,19 +160,12 @@ function ReportsContent() {
   function getSortedTargets() {
     if (!reportData) return []
 
-    // Report table shows ONLY found keywords (presentation-layer filter).
-    // Exclude rows where found !== true OR position is null.
-    const foundTargets = reportData.targets.filter((t) => {
-      const r = reportData.latestResults[t.id]
-      return r?.found === true && r.position != null
-    })
-
     if (sortColumn === 'position') {
-      const sorted = sortTargetsByPosition(foundTargets, reportData.latestResults)
+      const sorted = sortTargetsByPosition(reportData.targets, reportData.latestResults)
       return sortOrder === 'desc' ? sorted.reverse() : sorted
     }
 
-    return foundTargets
+    return reportData.targets
   }
 
   function handleSortClick(column: 'position') {
@@ -290,7 +283,7 @@ function ReportsContent() {
 
           {/* Rankings Table */}
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800">דירוגים נוכחיים ({foundCount})</h3>
+            <h3 className="font-semibold text-slate-800">דירוגים נוכחיים ({total})</h3>
           </div>
 
           <Table>
