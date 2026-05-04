@@ -927,23 +927,34 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   }> = []
 
   if (hasCity) {
-    // Effective city (custom or project) — primary and only context attempts
-    contextAttempts.push({
-      label: `city "${effectiveCity}"`,
-      location: effectiveCity!,
-      coordinates: cityCoordinates,
-    })
-    contextAttempts.push({
-      label: `city+country "${effectiveCity}, ${country.toUpperCase()}"`,
-      location: `${effectiveCity}, ${country.toUpperCase()}`,
-      coordinates: cityCoordinates,
-    })
-    if (cityCoordinates) {
+    if (country === 'il') {
+      // Israel: EXACTLY ONE attempt — city + resolved coordinates. No fallbacks.
+      console.log('[IL] Single city scan mode active - no fallback attempts')
       contextAttempts.push({
-        label: `city via explicit coordinates only`,
+        label: `city "${effectiveCity}" (IL single-attempt)`,
         location: effectiveCity!,
         coordinates: cityCoordinates,
       })
+    } else {
+      // Non-IL (US): preserve existing multi-attempt logic.
+      // Effective city (custom or project) — primary and only context attempts
+      contextAttempts.push({
+        label: `city "${effectiveCity}"`,
+        location: effectiveCity!,
+        coordinates: cityCoordinates,
+      })
+      contextAttempts.push({
+        label: `city+country "${effectiveCity}, ${country.toUpperCase()}"`,
+        location: `${effectiveCity}, ${country.toUpperCase()}`,
+        coordinates: cityCoordinates,
+      })
+      if (cityCoordinates) {
+        contextAttempts.push({
+          label: `city via explicit coordinates only`,
+          location: effectiveCity!,
+          coordinates: cityCoordinates,
+        })
+      }
     }
   } else {
     // No project city — fall back to country-level only (generic)
