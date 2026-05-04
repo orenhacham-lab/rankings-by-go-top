@@ -118,7 +118,6 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         source: html,
         landscape: false,
-        use_print_media: true,
       }),
     })
 
