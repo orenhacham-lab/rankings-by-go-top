@@ -30,6 +30,11 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/pricing" className="text-slate-400 hover:text-white transition-colors">
+                  מחירים
+                </Link>
+              </li>
+              <li>
                 <Link href="/articles" className="text-slate-400 hover:text-white transition-colors">
                   מאמרים
                 </Link>

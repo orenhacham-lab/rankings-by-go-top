@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { PublicNav } from '@/components/PublicNav'
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <main className="flex-1 py-12 px-4">
+      <PublicNav />
+      <main className="flex-1 pt-28 pb-12 px-4">
         <div className="max-w-3xl mx-auto">
           <Breadcrumbs items={[{ label: 'אודות', href: '/about' }]} />
 

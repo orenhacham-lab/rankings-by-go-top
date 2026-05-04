@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { PublicNav } from '@/components/PublicNav'
 
 interface Article {
   id: string
@@ -43,7 +44,8 @@ export default function ArticlesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
-        <div className="flex items-center justify-center py-20 text-slate-400">
+        <PublicNav />
+        <div className="flex items-center justify-center pt-32 pb-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
           טוען...
         </div>
@@ -53,8 +55,9 @@ export default function ArticlesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      <PublicNav />
       <div className="flex-1">
-        <div className="max-w-6xl mx-auto py-12 px-4">
+        <div className="max-w-6xl mx-auto pt-28 pb-12 px-4">
           <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }]} />
           <div className="mb-12">
             <h1 className="text-4xl font-bold text-slate-900 mb-2">מאמרים</h1>

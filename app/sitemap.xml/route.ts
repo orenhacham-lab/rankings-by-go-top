@@ -27,6 +27,12 @@ export async function GET() {
       priority: '1.0',
     },
     {
+      url: `${baseUrl}/pricing`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.9',
+    },
+    {
       url: `${baseUrl}/about`,
       lastmod: today,
       changefreq: 'monthly',

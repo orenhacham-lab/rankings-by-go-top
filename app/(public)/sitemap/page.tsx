@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { PublicNav } from '@/components/PublicNav'
 import { createClient } from '@/lib/supabase/client'
 
 interface Article {
@@ -45,6 +46,7 @@ export default function SitemapPage() {
       title: 'עמודים באתר',
       links: [
         { label: 'עמוד הבית', href: '/' },
+        { label: 'עמוד מחירים', href: '/pricing' },
         { label: 'עמוד אודות', href: '/about' },
         { label: 'עמוד מאמרים', href: '/articles' },
       ],
@@ -53,7 +55,8 @@ export default function SitemapPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <main className="flex-1 py-12 px-4">
+      <PublicNav />
+      <main className="flex-1 pt-28 pb-12 px-4">
         <div className="max-w-3xl mx-auto">
           <Breadcrumbs items={[{ label: 'מפת אתר', href: '/sitemap' }]} />
 

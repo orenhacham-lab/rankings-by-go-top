@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { PublicNav } from '@/components/PublicNav'
 
 // ============================================================
 // ARTICLE ACCESS CONTROL NOTE
@@ -72,7 +73,8 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
-        <div className="flex items-center justify-center py-20 text-slate-400">
+        <PublicNav />
+        <div className="flex items-center justify-center pt-32 pb-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
           טוען...
         </div>
@@ -83,8 +85,9 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
   if (notFound || !article) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+        <PublicNav />
         <div className="flex-1">
-          <div className="max-w-3xl mx-auto py-12 px-4">
+          <div className="max-w-3xl mx-auto pt-28 pb-12 px-4">
             <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: 'מאמר לא נמצא', href: '#' }]} />
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
               <h1 className="text-2xl font-bold text-slate-900 mb-4">מאמר לא נמצא</h1>
@@ -131,8 +134,9 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      <PublicNav />
       <div className="flex-1">
-        <div className="max-w-4xl mx-auto py-12 px-4">
+        <div className="max-w-4xl mx-auto pt-28 pb-12 px-4">
           <Breadcrumbs items={[{ label: 'מאמרים', href: '/articles' }, { label: article.title, href: '#' }]} />
 
           <div className="flex gap-4 mb-8">
