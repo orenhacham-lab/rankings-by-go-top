@@ -123,7 +123,15 @@ function ReportsContent() {
       })
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
+        let errorDetails = ''
+        try {
+          const errorJson = await res.json()
+          errorDetails = JSON.stringify(errorJson, null, 2)
+          console.error('PDF export server error:', errorJson)
+        } catch {
+          errorDetails = `HTTP ${res.status}`
+        }
+        throw new Error(`HTTP ${res.status}\n${errorDetails}`)
       }
 
       const blob = await res.blob()

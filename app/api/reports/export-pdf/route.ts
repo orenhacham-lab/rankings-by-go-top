@@ -76,16 +76,33 @@ export async function POST(req: Request) {
     }
 
     // Generate HTML
-    const html = generateReportHTML({
-      client: projectData.clients as Client,
-      project: projectData as Project,
-      targets: targetsData as TrackingTarget[],
-      latestResults,
-    })
+    let html: string
+    try {
+      html = generateReportHTML({
+        client: projectData.clients as Client,
+        project: projectData as Project,
+        targets: targetsData as TrackingTarget[],
+        latestResults,
+      })
+    } catch (htmlError) {
+      console.error('[export-pdf] HTML generation failed:', htmlError)
+      return new Response(
+        JSON.stringify({
+          error: 'HTML generation failed',
+          message: (htmlError as Error).message,
+          stack: (htmlError as Error).stack,
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`[export-pdf] HTML generated successfully, length=${html.length}`)
+    console.log(`[export-pdf] targets=${targetsData.length}, results=${Object.keys(latestResults).length}`)
 
     // Send to PDFShift
     const apiKey = process.env.PDFSHIFT_API_KEY
     if (!apiKey) {
+      console.error('[export-pdf] PDFSHIFT_API_KEY is not set in env')
       return new Response(
         JSON.stringify({ error: 'PDF service not configured' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -107,9 +124,13 @@ export async function POST(req: Request) {
 
     if (!pdfShiftResponse.ok) {
       const errorText = await pdfShiftResponse.text()
-      console.error('PDFShift error:', pdfShiftResponse.status, errorText)
+      console.error('[export-pdf] PDFShift error:', pdfShiftResponse.status, errorText)
       return new Response(
-        JSON.stringify({ error: 'Failed to generate PDF' }),
+        JSON.stringify({
+          error: 'Failed to generate PDF',
+          pdfShiftStatus: pdfShiftResponse.status,
+          pdfShiftBody: errorText.slice(0, 500),
+        }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -126,9 +147,13 @@ export async function POST(req: Request) {
       },
     })
   } catch (error) {
-    console.error('PDF export error:', error)
+    console.error('[export-pdf] Unhandled error:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({
+        error: 'Internal server error',
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
