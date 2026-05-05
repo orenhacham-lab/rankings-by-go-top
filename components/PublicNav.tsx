@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -59,40 +60,53 @@ export function PublicNav() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
+                className="text-base font-medium text-slate-700 hover:text-blue-600 transition-colors"
               >
                 {link.label}
               </Link>
             ))}
           </nav>
 
-          {/* CTA Buttons */}
-          <div className="hidden lg:flex items-center gap-3">
-            {!authChecked ? (
-              <div className="w-32 h-10" />
-            ) : isAuthed ? (
-              <Link
-                href="/dashboard"
-                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
-              >
-                לדאשבורד
-              </Link>
-            ) : (
-              <>
+          {/* CTA Buttons and Logo */}
+          <div className="hidden lg:flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              {!authChecked ? (
+                <div className="w-32 h-10" />
+              ) : isAuthed ? (
                 <Link
-                  href="/login"
-                  className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
+                  href="/dashboard"
+                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
                 >
-                  התחברות
+                  לדאשבורד
                 </Link>
-                <Link
-                  href="/login"
-                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
-                >
-                  התחל חינם
-                </Link>
-              </>
-            )}
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="px-4 py-2 text-base font-medium text-slate-700 hover:text-blue-600 transition-colors"
+                  >
+                    התחברות
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
+                  >
+                    התחל חינם
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Go Top Logo */}
+            <div className="pl-6 border-l border-slate-200">
+              <Image
+                src="/gotop-primary.png"
+                alt="Go Top"
+                width={80}
+                height={40}
+                className="h-auto"
+              />
+            </div>
           </div>
 
           {/* Mobile Hamburger */}

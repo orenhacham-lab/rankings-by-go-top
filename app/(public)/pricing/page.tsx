@@ -19,21 +19,20 @@ interface Plan {
 const plans: Plan[] = [
   {
     name: 'ניסיון',
-    price: '₪69',
-    priceSuffix: '/ חודש',
+    price: '₪0',
+    priceSuffix: 'חינם לנצח',
     description: 'מושלם להתנסות במערכת לפני קבלת החלטה',
     features: [
-      '7 ימי ניסיון חינם',
       'פרויקט אחד',
       'עד 30 מילות מפתח',
-      'סריקה אחת בסה"כ',
+      'סריקה אחת בחודש',
       'תמיכה בסיסית',
     ],
     cta: 'התחל ניסיון חינם',
   },
   {
     name: 'רגיל',
-    price: '₪199',
+    price: '₪69',
     priceSuffix: '/ חודש',
     description: 'לעסקים קטנים שרוצים לעקוב אחרי מספר פרויקטים',
     features: [
@@ -48,7 +47,7 @@ const plans: Plan[] = [
   },
   {
     name: 'מתקדם',
-    price: '₪299',
+    price: '₪199',
     priceSuffix: '/ חודש',
     description: 'התוכנית הפופולרית ביותר לעסקים בצמיחה',
     features: [
@@ -66,7 +65,7 @@ const plans: Plan[] = [
   },
   {
     name: 'פרמיום',
-    price: '₪499',
+    price: '₪299',
     priceSuffix: '/ חודש',
     description: 'לסוכנויות ועסקים גדולים עם דרישות מתקדמות',
     features: [
@@ -128,7 +127,7 @@ export default async function PricingPage() {
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
             תוכניות שמתאימות לכל
             <br />
-            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
               גודל של עסק
             </span>
           </h1>
@@ -264,7 +263,7 @@ export default async function PricingPage() {
       {/* CTA Section */}
       <section className="py-20 lg:py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 px-8 py-12 lg:px-16 lg:py-16 text-center shadow-2xl">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 px-8 py-12 lg:px-16 lg:py-16 text-center shadow-2xl">
             <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
             <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
 
