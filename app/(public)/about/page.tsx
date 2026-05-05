@@ -92,10 +92,26 @@ export default function AboutPage() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-12 flex items-center justify-center min-h-96">
-                <div className="text-center">
-                  <div className="text-8xl mb-4">📖</div>
-                  <p className="text-slate-600 font-medium">11+ שנים של ניסיון</p>
+              <div className="relative bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 rounded-3xl p-12 flex items-center justify-center min-h-96 overflow-hidden shadow-xl">
+                <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-white/10 blur-3xl" />
+                <div className="absolute -bottom-20 -left-20 w-60 h-60 rounded-full bg-white/10 blur-3xl" />
+                <div
+                  className="absolute inset-0 opacity-20"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px)',
+                    backgroundSize: '32px 32px',
+                  }}
+                />
+                <div className="relative text-center">
+                  <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-white/20 backdrop-blur-md border border-white/30 mb-6 shadow-lg">
+                    <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <div className="text-6xl font-extrabold text-white mb-2 tracking-tight">11+</div>
+                  <p className="text-white text-xl font-semibold">שנים של ניסיון</p>
+                  <p className="text-blue-100 text-sm mt-2">בעולם הדיגיטל</p>
                 </div>
               </div>
             </div>
@@ -106,10 +122,35 @@ export default function AboutPage() {
         <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-12 flex items-center justify-center min-h-96 order-2 lg:order-1">
-                <div className="text-center">
-                  <div className="text-8xl mb-4">✨</div>
-                  <p className="text-slate-600 font-medium">איכות על כמות</p>
+              <div className="relative bg-white rounded-3xl p-12 flex items-center justify-center min-h-96 overflow-hidden shadow-xl border border-slate-200 order-2 lg:order-1">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-[100px]" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-50 rounded-tr-[100px]" />
+
+                <div className="relative grid grid-cols-2 gap-4 w-full max-w-xs">
+                  <div className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  </div>
+                  <div className="aspect-square bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-200">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className="aspect-square bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-200">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </div>
+                  <div className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-md border border-slate-200">
+                  <p className="text-sm font-bold text-slate-900">איכות על כמות</p>
                 </div>
               </div>
 

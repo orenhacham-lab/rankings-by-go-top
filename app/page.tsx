@@ -33,13 +33,17 @@ export default async function HomePage() {
             מערכת מעקב מיקומים מתקדמת בעברית
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 mb-3 tracking-tight">
+            Rankings by Go Top
+          </h1>
+
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
             עקוב אחר הדירוגים שלך
             <br />
-            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
               בגוגל בזמן אמת
             </span>
-          </h1>
+          </h2>
 
           <p className="text-lg lg:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed mb-10">
             מערכת מעקב מקצועית לקידום אתרים. בדוק את המיקום של האתר שלך בגוגל אורגני וגוגל מפות,
@@ -281,7 +285,7 @@ export default async function HomePage() {
       {/* CTA Section */}
       <section className="py-20 lg:py-28 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 px-8 py-14 lg:px-16 lg:py-20 text-center shadow-2xl">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 px-8 py-14 lg:px-16 lg:py-20 text-center shadow-2xl">
             {/* Decorative circles */}
             <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
             <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-white/10 blur-3xl" />

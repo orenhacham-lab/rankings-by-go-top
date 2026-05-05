@@ -44,14 +44,15 @@ export function PublicNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0 group">
-            <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-bold text-lg shadow-md group-hover:shadow-lg transition-shadow">
-              GT
-            </div>
-            <div className="leading-tight">
-              <div className="font-bold text-slate-900 text-base lg:text-lg">Rankings</div>
-              <div className="text-[11px] lg:text-xs text-slate-500 -mt-0.5">by Go Top</div>
-            </div>
+          <Link href="/" className="flex items-center shrink-0 group">
+            <Image
+              src="/gotop-primary.png"
+              alt="Go Top"
+              width={120}
+              height={48}
+              className="h-10 lg:h-12 w-auto group-hover:opacity-80 transition-opacity"
+              priority
+            />
           </Link>
 
           {/* Desktop Menu */}
@@ -67,46 +68,33 @@ export function PublicNav() {
             ))}
           </nav>
 
-          {/* CTA Buttons and Logo */}
-          <div className="hidden lg:flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              {!authChecked ? (
-                <div className="w-32 h-10" />
-              ) : isAuthed ? (
+          {/* CTA Buttons */}
+          <div className="hidden lg:flex items-center gap-3">
+            {!authChecked ? (
+              <div className="w-32 h-10" />
+            ) : isAuthed ? (
+              <Link
+                href="/dashboard"
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
+              >
+                לדאשבורד
+              </Link>
+            ) : (
+              <>
                 <Link
-                  href="/dashboard"
+                  href="/login"
+                  className="px-4 py-2 text-base font-medium text-slate-700 hover:text-blue-600 transition-colors"
+                >
+                  התחברות
+                </Link>
+                <Link
+                  href="/login"
                   className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
                 >
-                  לדאשבורד
+                  התחל חינם
                 </Link>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    className="px-4 py-2 text-base font-medium text-slate-700 hover:text-blue-600 transition-colors"
-                  >
-                    התחברות
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
-                  >
-                    התחל חינם
-                  </Link>
-                </>
-              )}
-            </div>
-
-            {/* Go Top Logo */}
-            <div className="pl-6 border-l border-slate-200">
-              <Image
-                src="/gotop-primary.png"
-                alt="Go Top"
-                width={80}
-                height={40}
-                className="h-auto"
-              />
-            </div>
+              </>
+            )}
           </div>
 
           {/* Mobile Hamburger */}
