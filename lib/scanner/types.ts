@@ -64,7 +64,7 @@ export interface ScanAudit {
   response: {
     searchParameters?: Record<string, unknown>
     placesCount?: number
-    placesSample?: Array<{ title?: string }>
+    placesSample?: Array<{ title?: string; position?: number; website?: string | null; address?: string | null }>
     rawResponse?: unknown
     rawResponseTruncated?: boolean
   }
@@ -77,6 +77,9 @@ export interface ScanAudit {
     successfulAttemptIndex?: number
     geoValidationPassed?: boolean
     rejectionReason?: string | null
+    targetBusinessName?: string | null
+    targetDomain?: string | null
+    matchingStrategy?: 'domain_verification' | 'strict_name_match' | 'no_match'
   }
 }
 
