@@ -48,9 +48,9 @@ export function PublicNav() {
             <Image
               src="/gotop-primary.png"
               alt="Go Top"
-              width={120}
-              height={48}
-              className="h-10 lg:h-12 w-auto group-hover:opacity-80 transition-opacity"
+              width={180}
+              height={72}
+              className="h-12 lg:h-16 w-auto group-hover:opacity-80 transition-opacity"
               priority
             />
           </Link>
@@ -61,7 +61,7 @@ export function PublicNav() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-base font-medium text-slate-700 hover:text-blue-600 transition-colors"
+                className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
               >
                 {link.label}
               </Link>
@@ -75,7 +75,7 @@ export function PublicNav() {
             ) : isAuthed ? (
               <Link
                 href="/dashboard"
-                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
               >
                 לדאשבורד
               </Link>
@@ -83,13 +83,13 @@ export function PublicNav() {
               <>
                 <Link
                   href="/login"
-                  className="px-4 py-2 text-base font-medium text-slate-700 hover:text-blue-600 transition-colors"
+                  className="px-4 py-2 text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
                 >
                   התחברות
                 </Link>
                 <Link
                   href="/login"
-                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-base font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
+                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
                 >
                   התחל חינם
                 </Link>

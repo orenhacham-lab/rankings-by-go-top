@@ -40,7 +40,7 @@ export default async function HomePage() {
           <h2 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
             עקוב אחר הדירוגים שלך
             <br />
-            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-purple-500 bg-clip-text text-transparent">
               בגוגל בזמן אמת
             </span>
           </h2>
