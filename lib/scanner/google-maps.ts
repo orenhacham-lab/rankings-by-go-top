@@ -338,16 +338,55 @@ async function querySerperMaps(
   }
 }
 
-function findBusinessMatch(places: SerperMapsPlace[], targetName: string): SerperMapsPlace | null {
+function findBusinessMatch(places: SerperMapsPlace[], targetName: string, targetDomain?: string | null): SerperMapsPlace | null {
   const normalizedTarget = normalizeBusinessName(targetName)
+  console.log('[Maps:matching] findBusinessMatch looking for:', { targetName, normalizedTarget, targetDomain: targetDomain || '(not provided)' })
 
   for (const place of places) {
     const normalizedPlace = normalizeBusinessName(place.title)
-    if (isBusinessMatch(normalizedPlace, normalizedTarget)) {
+
+    // Log each place being checked
+    console.log(`[Maps:matching]   checking place: "${place.title}" (normalized: "${normalizedPlace}", position: ${place.position}, website: ${place.website || 'none'})`)
+
+    // PRIORITY 1: Exact normalized match
+    if (normalizedPlace === normalizedTarget) {
+      console.log(`[Maps:matching]     ✓ EXACT MATCH (normalized names identical)`)
       return place
+    }
+
+    // PRIORITY 2: Business name + domain verification
+    // If we have a target domain, check if this place's domain matches
+    if (targetDomain && place.website) {
+      const placeUrlNormalized = place.website.toLowerCase()
+      const targetDomainNormalized = targetDomain.toLowerCase()
+
+      // Check if place website contains target domain
+      if (placeUrlNormalized.includes(targetDomainNormalized) || targetDomainNormalized.includes(placeUrlNormalized.split('/')[2]?.split('?')[0] || '')) {
+        // ALSO verify business name is similar enough (at least 0.85 similarity or prefix match)
+        const similarity = diceSimilarity(normalizedPlace, normalizedTarget)
+        if (similarity >= 0.85 || normalizedPlace.startsWith(normalizedTarget.substring(0, Math.min(4, normalizedTarget.length)))) {
+          console.log(`[Maps:matching]     ✓ DOMAIN MATCH: place website "${place.website}" contains target domain "${targetDomain}" (similarity: ${similarity.toFixed(2)})`)
+          return place
+        } else {
+          console.log(`[Maps:matching]     ✗ Domain matched but name similarity too low (${similarity.toFixed(2)}) - REJECTED`)
+        }
+      }
+    }
+
+    // PRIORITY 3: Very strict name matching only (no fuzzy fallback)
+    // For strict matching: require either exact match (already checked) or very high similarity (0.90+)
+    if (normalizedPlace.length >= 6 && normalizedTarget.length >= 6) {
+      const similarity = diceSimilarity(normalizedPlace, normalizedTarget)
+      if (similarity >= 0.90) {
+        console.log(`[Maps:matching]     ✓ STRICT MATCH: similarity ${similarity.toFixed(2)} >= 0.90`)
+        return place
+      } else {
+        console.log(`[Maps:matching]     ✗ Similarity ${similarity.toFixed(2)} < 0.90 - REJECTED`)
+      }
     }
   }
 
+  console.log(`[Maps:matching]   NO MATCH FOUND in ${places.length} places`)
   return null
 }
 
@@ -501,7 +540,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       }
 
       const places = response.places ?? []
-      const matchedPlace = findBusinessMatch(places, businessName)
+      const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
 
       if (matchedPlace) {
         auditAttempts.push({
@@ -637,7 +676,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         const places = response.places ?? []
         console.log(`[Maps:radius:${point.label}] Got ${places.length} places`)
 
-        const matchedPlace = findBusinessMatch(places, businessName)
+        const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
         if (matchedPlace) {
           console.log(`[Maps:radius:${point.label}] MATCH at position ${matchedPlace.position}: ${matchedPlace.title}`)
           radiusResults.push({
@@ -827,7 +866,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       }
 
       const places = response.places ?? []
-      const matchedPlace = findBusinessMatch(places, businessName)
+      const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
 
       // Validate: check if results are within expected US bounds for the ZIP
       const withinUSBounds = validateZIPResults(places, zipResolution)
@@ -1051,7 +1090,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
       console.log(`[Maps] Attempt "${attempt.label}": ${places.length} places returned (geo OK)`)
 
-      const matchedPlace = findBusinessMatch(places, businessName)
+      const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
       if (matchedPlace) {
         successfulAttemptIndex = attemptIndex
         auditAttempts.push({
@@ -1105,37 +1144,21 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 }
 
 /**
- * Determine if a Maps result title matches the target business name.
+ * STRICT business name matching for Google Maps results.
  *
- * Strategy (in order):
- * 1. Exact match after normalization
- * 2. One is a prefix of the other (handles "Foo Bar" vs "Foo Bar Restaurant")
- *    — only if the shorter string is >= 4 chars to avoid false positives
- * 3. For Maps results, check if all major words in target appear in place
- *    (handles business names with descriptions)
- * 4. Dice-coefficient similarity >= 0.75 for strings >= 6 chars
+ * This is now a STRICT validator used only for backup checks.
+ * Main matching logic is in findBusinessMatch() which handles:
+ * 1. Exact normalization match (highest priority)
+ * 2. Domain-based matching with name verification
+ * 3. Very strict similarity matching (0.90+)
  */
 function isBusinessMatch(place: string, target: string): boolean {
+  // STRICT: Only exact match or very high similarity
   if (place === target) return true
 
-  const shorter = place.length <= target.length ? place : target
-  const longer = place.length > target.length ? place : target
-
-  // Prefix match — more lenient (>= 4 chars instead of 5)
-  if (shorter.length >= 4 && longer.startsWith(shorter)) return true
-
-  // Word-based matching: check if all main words from target are in place
-  // Handles "Go Top - שיווק דיגיטלי..." where Maps shows just the name
-  const targetWords = target.split(' ').filter(w => w.length > 2)
-  const placeWords = place.split(' ')
-  if (targetWords.length > 0 && targetWords.every(word => placeWords.some(pw => pw.includes(word) || word.includes(pw)))) {
-    return true
-  }
-
-  // Fuzzy match — more lenient (0.75 instead of 0.82)
-  if (shorter.length >= 6) {
+  if (place.length >= 6 && target.length >= 6) {
     const similarity = diceSimilarity(place, target)
-    if (similarity >= 0.75) return true
+    if (similarity >= 0.90) return true
   }
 
   return false
@@ -1145,6 +1168,8 @@ function normalizeBusinessName(name: string): string {
   return name
     .trim()
     .toLowerCase()
+    // Normalize Hebrew cleaning variations: ניקיון and נקיון are DIFFERENT and must stay distinct
+    // DO NOT replace one with the other - keep them as-is to prevent cross-project false matches
     // Strip common legal suffixes and punctuation that don't affect identity
     .replace(/[,.'"""''()\-–—]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -1244,7 +1269,12 @@ function buildAudit(
     response: {
       searchParameters: lastResponse?.searchParameters,
       placesCount: (lastResponse?.places || []).length,
-      placesSample: (lastResponse?.places || []).slice(0, 10).map(p => ({ title: p.title })),
+      placesSample: (lastResponse?.places || []).slice(0, 10).map(p => ({
+        title: p.title,
+        position: p.position,
+        website: p.website || null,
+        address: p.address || null,
+      })),
       rawResponse,
       rawResponseTruncated,
     },
@@ -1257,6 +1287,9 @@ function buildAudit(
       successfulAttemptIndex,
       geoValidationPassed: attempts.length > 0 ? attempts.some(a => a.geoValidationPassed !== false) : undefined,
       rejectionReason,
+      targetBusinessName: input.targetBusinessName || null,
+      targetDomain: input.targetDomain || null,
+      matchingStrategy: found ? (input.targetDomain ? 'domain_verification' : 'strict_name_match') : 'no_match',
     },
   }
 }
