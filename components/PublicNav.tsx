@@ -42,15 +42,15 @@ export function PublicNav() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 lg:h-20">
+        <div className="flex items-center justify-between h-20 lg:h-28">
           {/* Logo */}
           <Link href="/" className="flex items-center shrink-0 group">
             <Image
               src="/gotop-primary.png"
               alt="Go Top"
-              width={180}
-              height={72}
-              className="h-12 lg:h-16 w-auto group-hover:opacity-80 transition-opacity"
+              width={270}
+              height={108}
+              className="h-[72px] lg:h-24 w-auto group-hover:opacity-80 transition-opacity"
               priority
             />
           </Link>
