@@ -28,6 +28,26 @@ export interface Database {
         Insert: Omit<ScanResult, 'id' | 'created_at'>
         Update: Partial<Omit<ScanResult, 'id' | 'created_at'>>
       }
+      ai_prompts: {
+        Row: AIPrompt
+        Insert: Omit<AIPrompt, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<AIPrompt, 'id' | 'created_at'>>
+      }
+      ai_scan_runs: {
+        Row: AIScanRun
+        Insert: Omit<AIScanRun, 'id' | 'created_at'>
+        Update: Partial<Omit<AIScanRun, 'id' | 'created_at'>>
+      }
+      ai_scan_results: {
+        Row: AIScanResult
+        Insert: Omit<AIScanResult, 'id' | 'created_at'>
+        Update: Partial<Omit<AIScanResult, 'id' | 'created_at'>>
+      }
+      ai_citations: {
+        Row: AICitation
+        Insert: Omit<AICitation, 'id' | 'created_at'>
+        Update: Partial<Omit<AICitation, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -179,4 +199,104 @@ export interface RankingSummary {
   worst_position: number | null
   last_checked_at: string | null
   found: boolean
+}
+
+// =============================================================================
+// AI Visibility Module
+// =============================================================================
+
+export type AIEngine =
+  | 'google_ai_overview'
+  | 'chatgpt'
+  | 'perplexity'
+  | 'gemini'
+  | 'copilot'
+  | 'claude'
+  | 'grok'
+
+export type AIProvider = 'scrapellm'
+
+export type AIScanRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'partial'
+
+export type AIScanResultStatus = 'pending' | 'success' | 'error'
+
+export interface AIPrompt {
+  id: string
+  project_id: string
+  prompt: string
+  target_domain: string | null
+  target_brand_name: string | null
+  country: string | null
+  language: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // joins
+  projects?: Project
+}
+
+export interface AIScanRun {
+  id: string
+  project_id: string
+  user_id: string | null
+  provider: AIProvider
+  status: AIScanRunStatus
+  triggered_by: string | null
+  total_prompts: number | null
+  total_engines: number | null
+  total_tasks: number | null
+  completed_tasks: number
+  failed_tasks: number
+  total_credits_used: number
+  started_at: string | null
+  completed_at: string | null
+  error_message: string | null
+  created_at: string
+  // joins
+  projects?: Project
+}
+
+export interface AIScanResult {
+  id: string
+  run_id: string
+  project_id: string
+  prompt_id: string | null
+  engine: AIEngine
+  provider: AIProvider
+  mentioned: boolean
+  target_cited: boolean
+  mention_positions: Json | null
+  citation_count: number
+  source_count: number
+  competitors_mentioned: Json | null
+  response_text: string | null
+  response_summary: string | null
+  raw_response: Json | null
+  visibility_score: number | null
+  credits_used: number
+  status: AIScanResultStatus | null
+  error_message: string | null
+  scanned_at: string | null
+  created_at: string
+  // joins
+  ai_scan_runs?: AIScanRun
+  ai_prompts?: AIPrompt
+}
+
+export interface AICitation {
+  id: string
+  result_id: string
+  project_id: string
+  prompt_id: string | null
+  engine: AIEngine
+  provider: AIProvider
+  url: string
+  domain: string
+  title: string | null
+  snippet: string | null
+  citation_position: number | null
+  is_target_domain: boolean
+  created_at: string
+  // joins
+  ai_scan_results?: AIScanResult
 }
