@@ -2,54 +2,80 @@
  * ScrapeLLM provider adapter for AI Visibility
  * Server-side only; never exposes SCRAPELLM_API_KEY to client
  *
- * ╔══════════════════════════════════════════════════════════════════════╗
- * ║ ⚠️  UNVERIFIED — DO NOT USE IN PRODUCTION YET ⚠️                       ║
- * ╠══════════════════════════════════════════════════════════════════════╣
- * ║ The ScrapeLLM API was NOT successfully verified during Phase 2-B:    ║
- * ║   - scrapellm.com returns HTTP 403 (gated or non-existent)           ║
- * ║   - docs.scrapellm.com does not resolve (ECONNREFUSED)               ║
- * ║   - No public documentation found via web search                     ║
- * ║   - No SCRAPELLM_API_KEY available locally to test                   ║
- * ║                                                                      ║
- * ║ EVERYTHING BELOW IS A PLACEHOLDER MARKED WITH "TODO(verify)":        ║
- * ║   - Base URL (currently a guess)                                     ║
- * ║   - Endpoint path (currently a guess)                                ║
- * ║   - Auth header format (Bearer; common but not confirmed)            ║
- * ║   - Request body shape (engine + prompt; not confirmed)              ║
- * ║   - Response field names (multiple fallbacks tried)                  ║
- * ║   - Engine ID strings (chatgpt, perplexity, etc.; not confirmed)     ║
- * ║                                                                      ║
- * ║ BEFORE PROCEEDING TO PHASE 2-C:                                      ║
- * ║   1. User must provide the real ScrapeLLM API docs OR API key        ║
- * ║   2. Test script must be run successfully against the real API       ║
- * ║   3. All TODO(verify) comments must be resolved                      ║
- * ╚══════════════════════════════════════════════════════════════════════╝
+ * Real API docs (verified):
+ *   Base URL: https://api.scrapellm.com
+ *   Endpoint: GET /scrapers/{scraper}?prompt=...&country=...&timeout=...
+ *   Auth header: X-API-Key: ${SCRAPELLM_API_KEY}
+ *   Response timeout: up to 300 seconds
+ *
+ * Supported engines (real scraper names):
+ *   chatgpt, perplexity, gemini, copilot, grok, google_ai_mode
+ *   (claude is NOT supported by ScrapeLLM)
+ *   (google_ai_overview is aliased to google_ai_mode)
+ *
+ * Country limitations:
+ *   JP and TW are not supported on: grok, gemini, copilot, google_ai_mode
  */
 
-import { AIProvider, AIProviderInput, AIProviderResult } from './types'
-import { parseCitations, extractCitationsFromNested } from '../matching/citation-parser'
+import { AIProvider, AIProviderInput, AIProviderResult, AICitation } from './types'
+import { parseScrapeLLMCitations } from '../matching/citation-parser'
 import { detectMention } from '../matching/mention-detector'
 import { detectTargetCited } from '../matching/target-citation-detector'
 
-// TODO(verify): Real base URL + endpoint path is not yet known
-const SCRAPELLM_API_URL = 'https://api.scrapellm.com/v1/ai'
-const SCRAPELLM_TIMEOUT_MS = 45_000
+const SCRAPELLM_BASE_URL = 'https://api.scrapellm.com'
+const SCRAPELLM_TIMEOUT_MS = 300_000 // 300s per docs
 
-export interface ScrapeLLMResponse {
-  engine?: string
-  answer_text?: string
-  answer?: string
-  response?: string
-  text?: string
-  citations?: unknown[]
-  sources?: unknown[]
-  references?: unknown[]
-  metadata?: Record<string, unknown>
-  usage?: {
-    credits?: number
-    cost?: number
-  }
+// Maps our internal engine IDs to ScrapeLLM scraper path segments
+const ENGINE_TO_SCRAPER: Record<string, string> = {
+  chatgpt: 'chatgpt',
+  perplexity: 'perplexity',
+  gemini: 'gemini',
+  copilot: 'copilot',
+  grok: 'grok',
+  google_ai_mode: 'google_ai_mode',
+  google_ai_overview: 'google_ai_mode', // alias: AI Overview → AI Mode
+}
+
+// Countries unsupported per engine (uppercase ISO codes)
+const UNSUPPORTED_COUNTRIES_BY_ENGINE: Record<string, Set<string>> = {
+  grok: new Set(['JP', 'TW']),
+  gemini: new Set(['JP', 'TW']),
+  copilot: new Set(['JP', 'TW']),
+  google_ai_mode: new Set(['JP', 'TW']),
+}
+
+const SUPPORTED_ENGINES = new Set(Object.keys(ENGINE_TO_SCRAPER))
+
+export interface ScrapeLLMRawResponse {
+  scraper?: string
+  status?: string
+  job_id?: string
+  prompt?: string
+  country?: string
+  result?: string
+  result_markdown?: string
+  url?: string
+  created_at?: string
+  credits_used?: number
+  elapsed_ms?: number
+  cached?: boolean
+  cached_at?: string
+  // engine-specific citation fields:
+  links?: Array<{ text?: string; url: string }> | string[]
+  sources?: Array<{ title?: string; url: string; snippet?: string }>
+  citations?: Array<{
+    title?: string
+    url: string
+    snippet?: string
+    website_name?: string
+    favicon?: string
+    highlights?: string[]
+  }>
+  web_sources?: Array<{ title?: string; url: string; preview?: string }>
+  x_results?: Array<{ title?: string; url: string; preview?: string }>
+  search_results?: Array<{ title?: string; url: string; snippet?: string; website_name?: string }>
   error?: string
+  message?: string
 }
 
 export class ScrapeLLMProvider implements AIProvider {
@@ -65,83 +91,100 @@ export class ScrapeLLMProvider implements AIProvider {
   }
 
   supportsEngine(engine: string): boolean {
-    // TODO(verify): Confirm exact engine ID strings used by ScrapeLLM.
-    // These names are GUESSES until real API docs are available.
-    const supported = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'google_ai_overview', 'claude', 'grok']
-    return supported.includes(engine.toLowerCase())
+    return SUPPORTED_ENGINES.has(engine.toLowerCase())
+  }
+
+  /**
+   * Validate engine + country combination. Returns null if valid, error string otherwise.
+   */
+  private validateEngineCountry(engine: string, country: string | undefined): string | null {
+    const scraper = ENGINE_TO_SCRAPER[engine.toLowerCase()]
+    if (!scraper) {
+      return `Engine "${engine}" is not supported by ScrapeLLM`
+    }
+
+    if (country) {
+      const upperCountry = country.toUpperCase()
+      const blocked = UNSUPPORTED_COUNTRIES_BY_ENGINE[scraper]
+      if (blocked && blocked.has(upperCountry)) {
+        return `Country "${upperCountry}" is not supported by ScrapeLLM for engine "${engine}"`
+      }
+    }
+
+    return null
   }
 
   async run(input: AIProviderInput): Promise<AIProviderResult> {
+    // Validate engine + country
+    const validationError = this.validateEngineCountry(input.engine, input.country)
+    if (validationError) {
+      return this.errorResult(input.engine, validationError)
+    }
+
     try {
       return await this.runWithTimeout(input, input.timeout ?? SCRAPELLM_TIMEOUT_MS)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
+      return this.errorResult(input.engine, errorMessage)
+    }
+  }
 
-      return {
-        provider: this.id,
-        engine: input.engine,
-        responseText: '',
-        rawResponse: null,
-        citations: [],
-        mentionedInText: false,
-        targetCitedInSources: false,
-        citationCount: 0,
-        sourceCount: 0,
-        error: errorMessage,
-      }
+  private errorResult(engine: string, errorMessage: string): AIProviderResult {
+    return {
+      provider: this.id,
+      engine,
+      responseText: '',
+      rawResponse: null,
+      citations: [],
+      mentionedInText: false,
+      targetCitedInSources: false,
+      citationCount: 0,
+      sourceCount: 0,
+      error: errorMessage,
     }
   }
 
   private async runWithTimeout(input: AIProviderInput, timeoutMs: number): Promise<AIProviderResult> {
+    const scraper = ENGINE_TO_SCRAPER[input.engine.toLowerCase()]
+    const url = this.buildRequestUrl(scraper, input)
+
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
-      // TODO(verify): Confirm real auth header format (Bearer is a guess).
-      // TODO(verify): Confirm real request body shape (field names may differ:
-      //   could be { model, query, q, ... } instead of { engine, prompt }).
-      const response = await fetch(SCRAPELLM_API_URL, {
-        method: 'POST',
+      const response = await fetch(url, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
+          'X-API-Key': this.apiKey,
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          engine: input.engine,
-          prompt: input.prompt,
-          country: input.country,
-          language: input.language,
-        }),
         signal: controller.signal,
       })
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => `HTTP ${response.status}`)
-        throw new Error(`ScrapeLLM API error: ${errorText}`)
+        throw new Error(`ScrapeLLM API error (HTTP ${response.status}): ${errorText.substring(0, 300)}`)
       }
 
-      const rawResponse = (await response.json()) as ScrapeLLMResponse
+      const rawResponse = (await response.json()) as ScrapeLLMRawResponse
 
-      // TODO(verify): Confirm real response shape. Currently tries multiple
-      // common field names as fallbacks; only one will actually match the real API.
-      const answerText = rawResponse.answer_text || rawResponse.answer || rawResponse.response || rawResponse.text || ''
+      // Check for provider-level error in response body
+      if (rawResponse.error) {
+        throw new Error(`ScrapeLLM error: ${rawResponse.error}`)
+      }
 
+      // Prefer result_markdown when available; fall back to result
+      const answerText = rawResponse.result_markdown || rawResponse.result || ''
       if (!answerText) {
-        throw new Error('ScrapeLLM returned no answer text')
+        throw new Error('ScrapeLLM returned no result text')
       }
 
-      // Parse citations from nested structure
-      const citationsList = extractCitationsFromNested(rawResponse)
-      const citations = parseCitations(citationsList)
+      // Parse citations using engine-specific normalizer
+      const citations: AICitation[] = parseScrapeLLMCitations(input.engine, rawResponse)
 
-      // Detect if target is mentioned in the text
+      // Detect target signals (independent)
       const mentionResult = detectMention(answerText, input.targetBrandName || null, input.targetDomain || null)
-
-      // Detect if target is cited in sources
       const citationResult = detectTargetCited(citations, input.targetDomain || null)
-
-      // Extract credits used if available
-      const creditsUsed = rawResponse.usage?.credits ?? undefined
 
       return {
         provider: this.id,
@@ -155,11 +198,22 @@ export class ScrapeLLMProvider implements AIProvider {
         targetCitedInSources: citationResult.targetCited,
         citationCount: citations.length,
         sourceCount: citations.length,
-        creditsUsed,
+        creditsUsed: typeof rawResponse.credits_used === 'number' ? rawResponse.credits_used : undefined,
       }
     } finally {
       clearTimeout(timeoutHandle)
     }
+  }
+
+  private buildRequestUrl(scraper: string, input: AIProviderInput): string {
+    const params = new URLSearchParams()
+    params.set('prompt', input.prompt)
+    if (input.country) params.set('country', input.country.toUpperCase())
+    // Use a slightly shorter server-side timeout so we have local buffer
+    const serverTimeoutSec = Math.floor((input.timeout ?? SCRAPELLM_TIMEOUT_MS) / 1000)
+    if (serverTimeoutSec > 0) params.set('timeout', String(serverTimeoutSec))
+
+    return `${SCRAPELLM_BASE_URL}/scrapers/${scraper}?${params.toString()}`
   }
 }
 

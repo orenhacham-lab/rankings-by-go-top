@@ -64,8 +64,9 @@ export function isProviderAvailable(): boolean {
 }
 
 /**
- * Get list of supported engines for the current provider
+ * Get list of supported engines for the current ScrapeLLM provider.
+ * Note: claude is NOT supported by ScrapeLLM. google_ai_overview is an alias for google_ai_mode.
  */
 export function getSupportedEngines(): string[] {
-  return ['google_ai_overview', 'chatgpt', 'perplexity', 'gemini', 'copilot', 'claude', 'grok']
+  return ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode']
 }

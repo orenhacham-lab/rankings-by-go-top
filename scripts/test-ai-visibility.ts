@@ -1,104 +1,82 @@
 /**
- * Local test script for AI Visibility provider
- * Tests the ScrapeLLM adapter with one engine (Perplexity)
+ * Local test script for AI Visibility provider (real ScrapeLLM API)
+ * Tests the ScrapeLLM adapter with one engine: Perplexity
  *
- * Usage: npx tsx scripts/test-ai-visibility.ts
- * Requires: SCRAPELLM_API_KEY environment variable set
+ * Usage:
+ *   export SCRAPELLM_API_KEY=<your_key>
+ *   npx tsx scripts/test-ai-visibility.ts
  *
  * This script does NOT write to the database.
- * It only tests the provider adapter in isolation.
+ * It does NOT print the API key.
+ * It does NOT print the full raw response.
  */
 
 import { runAIVisibilityScan } from '../lib/ai-visibility'
-import { createScrapeLLMProvider } from '../lib/ai-visibility/providers/scrapellm'
 
-const testPrompt = 'What are the best SEO practices for e-commerce websites?'
-const testDomain = 'example.com'
-const testBrand = 'Example Store'
+const TEST_PROMPT = 'Best SEO agency in Israel?'
+const TEST_COUNTRY = 'IL'
+const TEST_ENGINE = 'perplexity'
+const TEST_TIMEOUT_MS = 300_000
 
-async function testProvider() {
-  console.log('🧪 AI Visibility Provider Test')
+// Optional: set these to test mention/citation detection
+const TEST_TARGET_DOMAIN = process.env.TEST_TARGET_DOMAIN || null
+const TEST_TARGET_BRAND = process.env.TEST_TARGET_BRAND || null
+
+async function main() {
+  console.log('AI Visibility Provider Test (ScrapeLLM real API)')
   console.log('='.repeat(60))
 
-  // Check if API key is set
   if (!process.env.SCRAPELLM_API_KEY) {
-    console.error('❌ SCRAPELLM_API_KEY is not set')
-    console.log('Set it before running: export SCRAPELLM_API_KEY=<your_key>')
+    console.error('SCRAPELLM_API_KEY is not set in env.')
+    console.log('Run: export SCRAPELLM_API_KEY=<your_key>')
     process.exit(1)
   }
 
-  try {
-    console.log('\n📋 Test Configuration:')
-    console.log(`  Engine: perplexity`)
-    console.log(`  Prompt: "${testPrompt}"`)
-    console.log(`  Target Domain: ${testDomain}`)
-    console.log(`  Target Brand: ${testBrand}`)
+  console.log(`Engine: ${TEST_ENGINE}`)
+  console.log(`Prompt: "${TEST_PROMPT}"`)
+  console.log(`Country: ${TEST_COUNTRY}`)
+  console.log(`Timeout: ${TEST_TIMEOUT_MS / 1000}s`)
+  if (TEST_TARGET_DOMAIN) console.log(`Target domain: ${TEST_TARGET_DOMAIN}`)
+  if (TEST_TARGET_BRAND) console.log(`Target brand: ${TEST_TARGET_BRAND}`)
+  console.log('-'.repeat(60))
+  console.log('Running...')
 
-    console.log('\n🚀 Running scan via dispatcher...')
-    const result = await runAIVisibilityScan({
-      engine: 'perplexity',
-      prompt: testPrompt,
-      targetDomain: testDomain,
-      targetBrandName: testBrand,
-      country: 'US',
-      language: 'en',
-      timeout: 45000,
-    })
+  const start = Date.now()
+  const result = await runAIVisibilityScan({
+    engine: TEST_ENGINE,
+    prompt: TEST_PROMPT,
+    country: TEST_COUNTRY,
+    targetDomain: TEST_TARGET_DOMAIN,
+    targetBrandName: TEST_TARGET_BRAND,
+    timeout: TEST_TIMEOUT_MS,
+  })
+  const elapsedMs = Date.now() - start
 
-    console.log('\n✅ Scan completed!')
-    console.log('\n📊 Result Structure:')
-    console.log(JSON.stringify(
-      {
-        provider: result.provider,
-        engine: result.engine,
-        responseText: `[${result.responseText.length} chars]`,
-        responseSummary: result.responseSummary ? result.responseSummary.substring(0, 80) + '...' : undefined,
-        citationCount: result.citationCount,
-        sourceCount: result.sourceCount,
-        mentionedInText: result.mentionedInText,
-        mentionedPositions: result.mentionedPositions,
-        targetCitedInSources: result.targetCitedInSources,
-        creditsUsed: result.creditsUsed,
-        error: result.error,
-        rawResponseType: typeof result.rawResponse,
-      },
-      null,
-      2
-    ))
-
-    console.log('\n📌 Sample Citations (first 3):')
-    result.citations.slice(0, 3).forEach((c, i) => {
-      console.log(`  ${i + 1}. ${c.title || c.url}`)
-      console.log(`     URL: ${c.url}`)
-      console.log(`     Domain: ${c.domain}`)
-      if (c.snippet) console.log(`     Snippet: ${c.snippet.substring(0, 60)}...`)
-    })
-
-    console.log('\n✨ Key Findings:')
-    console.log(`  ✓ Mentioned in text: ${result.mentionedInText}`)
-    console.log(`  ✓ Target cited in sources: ${result.targetCitedInSources}`)
-    console.log(`  ✓ Total citations parsed: ${result.citationCount}`)
-    console.log(`  ✓ Response length: ${result.responseText.length} characters`)
-    if (result.creditsUsed !== undefined) {
-      console.log(`  ✓ Credits used: ${result.creditsUsed}`)
-    }
-
-    console.log('\n✅ Test passed! Provider adapter is working correctly.')
-    console.log('\nNotes:')
-    console.log('  - Response was normalized correctly')
-    console.log('  - Mention detection separated from citation detection')
-    console.log('  - Citations were parsed and domain-normalized')
-    console.log('  - Ready for Phase 2-C: API routes')
-  } catch (err) {
-    console.error('\n❌ Test failed!')
-    console.error(err instanceof Error ? err.message : String(err))
-    console.log('\nDebugging tips:')
-    console.log('  1. Check SCRAPELLM_API_KEY is correct')
-    console.log('  2. Verify network connectivity to ScrapeLLM')
-    console.log('  3. Check if the selected engine is supported')
+  if (result.error) {
+    console.error('-'.repeat(60))
+    console.error('Scan failed:', result.error)
     process.exit(1)
   }
+
+  console.log('-'.repeat(60))
+  console.log('Normalized output:')
+  console.log(`  engine:                ${result.engine}`)
+  console.log(`  responseText length:   ${result.responseText.length}`)
+  console.log(`  citationCount:        ${result.citationCount}`)
+  console.log(`  targetCitedInSources:  ${result.targetCitedInSources}`)
+  console.log(`  mentionedInText:       ${result.mentionedInText}`)
+  console.log(`  creditsUsed:           ${result.creditsUsed ?? '(not provided)'}`)
+  console.log(`  elapsedMs (local):     ${elapsedMs}`)
+
+  console.log('\nFirst 3 citation domains:')
+  result.citations.slice(0, 3).forEach((c, i) => {
+    console.log(`  ${i + 1}. ${c.domain}`)
+  })
+
+  console.log('\nTest passed.')
 }
 
-// Run the test
-testProvider()
+main().catch((err) => {
+  console.error('Unhandled error:', err instanceof Error ? err.message : String(err))
+  process.exit(1)
+})
