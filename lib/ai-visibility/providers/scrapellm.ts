@@ -2,10 +2,28 @@
  * ScrapeLLM provider adapter for AI Visibility
  * Server-side only; never exposes SCRAPELLM_API_KEY to client
  *
- * ASSUMPTIONS about ScrapeLLM API (to be validated in Phase 2-B testing):
- * - POST to ScrapeLLM endpoint with { engine, prompt, ... }
- * - Returns { answer_text, citations[], metadata... }
- * - Supports engines: chatgpt, perplexity, gemini, copilot, google_ai_overview, claude, grok
+ * ╔══════════════════════════════════════════════════════════════════════╗
+ * ║ ⚠️  UNVERIFIED — DO NOT USE IN PRODUCTION YET ⚠️                       ║
+ * ╠══════════════════════════════════════════════════════════════════════╣
+ * ║ The ScrapeLLM API was NOT successfully verified during Phase 2-B:    ║
+ * ║   - scrapellm.com returns HTTP 403 (gated or non-existent)           ║
+ * ║   - docs.scrapellm.com does not resolve (ECONNREFUSED)               ║
+ * ║   - No public documentation found via web search                     ║
+ * ║   - No SCRAPELLM_API_KEY available locally to test                   ║
+ * ║                                                                      ║
+ * ║ EVERYTHING BELOW IS A PLACEHOLDER MARKED WITH "TODO(verify)":        ║
+ * ║   - Base URL (currently a guess)                                     ║
+ * ║   - Endpoint path (currently a guess)                                ║
+ * ║   - Auth header format (Bearer; common but not confirmed)            ║
+ * ║   - Request body shape (engine + prompt; not confirmed)              ║
+ * ║   - Response field names (multiple fallbacks tried)                  ║
+ * ║   - Engine ID strings (chatgpt, perplexity, etc.; not confirmed)     ║
+ * ║                                                                      ║
+ * ║ BEFORE PROCEEDING TO PHASE 2-C:                                      ║
+ * ║   1. User must provide the real ScrapeLLM API docs OR API key        ║
+ * ║   2. Test script must be run successfully against the real API       ║
+ * ║   3. All TODO(verify) comments must be resolved                      ║
+ * ╚══════════════════════════════════════════════════════════════════════╝
  */
 
 import { AIProvider, AIProviderInput, AIProviderResult } from './types'
@@ -13,6 +31,7 @@ import { parseCitations, extractCitationsFromNested } from '../matching/citation
 import { detectMention } from '../matching/mention-detector'
 import { detectTargetCited } from '../matching/target-citation-detector'
 
+// TODO(verify): Real base URL + endpoint path is not yet known
 const SCRAPELLM_API_URL = 'https://api.scrapellm.com/v1/ai'
 const SCRAPELLM_TIMEOUT_MS = 45_000
 
@@ -46,7 +65,8 @@ export class ScrapeLLMProvider implements AIProvider {
   }
 
   supportsEngine(engine: string): boolean {
-    // List of engines we support (others will be marked "Not configured")
+    // TODO(verify): Confirm exact engine ID strings used by ScrapeLLM.
+    // These names are GUESSES until real API docs are available.
     const supported = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'google_ai_overview', 'claude', 'grok']
     return supported.includes(engine.toLowerCase())
   }
@@ -77,6 +97,9 @@ export class ScrapeLLMProvider implements AIProvider {
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
+      // TODO(verify): Confirm real auth header format (Bearer is a guess).
+      // TODO(verify): Confirm real request body shape (field names may differ:
+      //   could be { model, query, q, ... } instead of { engine, prompt }).
       const response = await fetch(SCRAPELLM_API_URL, {
         method: 'POST',
         headers: {
@@ -99,7 +122,8 @@ export class ScrapeLLMProvider implements AIProvider {
 
       const rawResponse = (await response.json()) as ScrapeLLMResponse
 
-      // Extract the answer text from various possible field names
+      // TODO(verify): Confirm real response shape. Currently tries multiple
+      // common field names as fallbacks; only one will actually match the real API.
       const answerText = rawResponse.answer_text || rawResponse.answer || rawResponse.response || rawResponse.text || ''
 
       if (!answerText) {
