@@ -11,6 +11,7 @@ import Modal from '@/components/ui/Modal'
 import ProjectForm from '@/components/projects/ProjectForm'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
+import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
 import Link from 'next/link'
 import { formatDate, formatDateTime, getDeviceLabel, getFrequencyLabel, getSearchTypeLabel } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
@@ -245,6 +246,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         projectDevice={project.device_type}
         onActionComplete={loadData}
       />
+
+      {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
+        <AIVisibilitySection
+          projectId={id}
+          projectCountry={project.country}
+          projectLanguage={project.language}
+          projectDomain={project.target_domain}
+          projectBrandName={project.business_name}
+        />
+      )}
 
       {/* Edit Modal */}
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="עריכת פרויקט" size="lg">
