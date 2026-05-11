@@ -1,14 +1,14 @@
 'use client'
 
 /**
- * AI Visibility premium dashboard section.
+ * AI Visibility premium dashboard — workspace layout optimized for AI insights.
  * Mounted inside the project page only when NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'.
  *
- * Visual goals: premium AI SaaS feel (Perplexity / Profound / Linear-style).
- * Inline SVG engine icons (no emojis, no copyrighted logos).
- * Smart prompt suggestions (local templates) + manual create.
- * Scan history as activity feed with click-to-view past results.
- * Presentation-only response text cleanup (artifacts hidden, raw_response unchanged).
+ * 3-panel design:
+ * - TOP: Big KPI overview (visibility, mentioned, cited, citations, credits)
+ * - MIDDLE: Prompt + premium engine grid
+ * - BOTTOM: Result workspace (answer + citations sidebar on desktop, stacked mobile)
+ * - Activity feed with delete capability
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -21,6 +21,7 @@ import {
   ENGINE_META,
   ExternalLinkIcon,
   SparkleIcon,
+  TrashIcon,
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
 import ScanHistory from './ScanHistory'
@@ -135,11 +136,12 @@ export default function AIVisibilitySection({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [creating, setCreating] = useState(false)
 
-  const [runningKey, setRunningKey] = useState<string | null>(null) // `${promptId}:${engine}`
+  const [runningKey, setRunningKey] = useState<string | null>(null)
   const [latestRun, setLatestRun] = useState<RunResults | null>(null)
   const [historyRefresh, setHistoryRefresh] = useState(0)
+  const [deleteConfirmRunId, setDeleteConfirmRunId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
-  // New-prompt form state
   const [newPrompt, setNewPrompt] = useState('')
   const [newCountry, setNewCountry] = useState(projectCountry || 'IL')
   const [newLanguage, setNewLanguage] = useState(projectLanguage || 'he')
@@ -238,13 +240,35 @@ export default function AIVisibilitySection({
       }
       const data: RunResults = await res.json()
       setLatestRun(data)
-      // Scroll the viewer into view
       if (typeof window !== 'undefined') {
-        const el = document.getElementById('ai-result-viewer')
+        const el = document.getElementById('ai-result-workspace')
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load run')
+    }
+  }
+
+  async function handleDeleteRun(runId: string) {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/ai-visibility/runs/${runId}/delete`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to delete')
+      }
+      // If deleted run was selected, clear it
+      if (latestRun?.run.id === runId) {
+        setLatestRun(null)
+      }
+      setDeleteConfirmRunId(null)
+      setHistoryRefresh((v) => v + 1)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -253,7 +277,6 @@ export default function AIVisibilitySection({
     ? /[֐-׿؀-ۿ]/.test(result.responseText || '')
     : (projectLanguage || '').toLowerCase() === 'he'
 
-  // KPIs derived from latest result
   const kpis = result
     ? {
         score:
@@ -266,31 +289,25 @@ export default function AIVisibilitySection({
         targetCited: result.targetCited,
         citationCount: result.citationCount,
         credits: String(result.creditsUsed),
+        scannedAt: result.scannedAt,
       }
     : null
 
   return (
-    <section id="ai-visibility" className="mb-8">
-      {/* Header — tightened spacing */}
-      <div className="flex items-start justify-between gap-4 mb-4">
+    <section id="ai-visibility" className="space-y-6 mb-10">
+      {/* HEADER */}
+      <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 text-white shadow-md shadow-indigo-500/25">
+          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-500/30">
             <SparkleIcon size={20} className="text-white" />
             <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-br from-violet-400/40 to-blue-400/40 blur-md -z-10" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">AI Visibility</h2>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-700 bg-violet-100 rounded-full px-1.5 py-0.5">
-                Beta
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Track your brand across ChatGPT, Perplexity, Gemini, Copilot, Grok & Google AI.
-            </p>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">AI Visibility</h2>
+            <p className="text-xs text-slate-500 mt-0">Monitor across 6 AI engines</p>
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)}>
             ✨ Suggest
           </Button>
@@ -301,69 +318,24 @@ export default function AIVisibilitySection({
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-2">
-          <span className="shrink-0">✗</span>
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-2">
+          <span className="shrink-0 text-lg">✕</span>
           <span>{error}</span>
         </div>
       )}
 
-      {/* KPI strip — unified gradient system */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-4">
-        <KpiCard
-          label="Visibility"
-          value={kpis ? `${kpis.score}` : '—'}
-          suffix={kpis ? '%' : undefined}
-          tone={kpis ? (kpis.score >= 60 ? 'good' : kpis.score >= 20 ? 'warn' : 'flat') : 'flat'}
-          hint={kpis ? null : 'Run a scan'}
-          accent="indigo"
-        />
-        <KpiCard
-          label="Mentioned"
-          value={kpis ? (kpis.mentioned ? 'Yes' : 'No') : '—'}
-          tone={kpis && kpis.mentioned ? 'good' : 'flat'}
-          accent="emerald"
-        />
-        <KpiCard
-          label="Target cited"
-          value={kpis ? (kpis.targetCited ? 'Yes' : 'No') : '—'}
-          tone={kpis && kpis.targetCited ? 'good' : 'flat'}
-          accent="emerald"
-        />
-        <KpiCard
-          label="Citations"
-          value={kpis ? String(kpis.citationCount) : '—'}
-          tone={kpis && kpis.citationCount > 0 ? 'good' : 'flat'}
-          accent="blue"
-        />
-        <KpiCard
-          label="Credits"
-          value={kpis ? kpis.credits : '—'}
-          tone="flat"
-          accent="slate"
-        />
-      </div>
+      {/* TOP PANEL — BIG KPI OVERVIEW */}
+      {kpis && (
+        <BigKpiPanel kpis={kpis} />
+      )}
 
-      {/* Prompts + engine grid */}
+      {/* MIDDLE PANEL — PROMPT + ENGINE CARDS */}
       {loading ? (
         <PromptListSkeleton />
       ) : prompts.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-gradient-to-br from-slate-50/60 to-white p-10 text-center mb-4">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center mb-3 shadow-sm">
-            <SparkleIcon size={22} className="text-indigo-600" />
-          </div>
-          <div className="text-base font-semibold text-slate-900 mb-1">No prompts yet</div>
-          <div className="text-sm text-slate-500 mb-5 max-w-md mx-auto">
-            Generate smart prompt suggestions tailored to your business, or create one manually.
-          </div>
-          <div className="flex gap-2 justify-center">
-            <Button variant="outline" onClick={() => setShowSuggestions(true)}>
-              ✨ Suggest prompts
-            </Button>
-            <Button onClick={() => setShowNewPrompt(true)}>+ New prompt</Button>
-          </div>
-        </div>
+        <EmptyPromptState onSuggest={() => setShowSuggestions(true)} onNew={() => setShowNewPrompt(true)} />
       ) : (
-        <div className="space-y-2.5 mb-5">
+        <div className="space-y-3">
           {prompts.map((p) => (
             <PromptCard
               key={p.id}
@@ -376,15 +348,15 @@ export default function AIVisibilitySection({
         </div>
       )}
 
-      {/* Latest result viewer */}
+      {/* BOTTOM PANEL — RESULT WORKSPACE */}
       {runningKey && !latestRun && (
-        <div id="ai-result-viewer" className="mb-5">
+        <div id="ai-result-workspace">
           <ResultSkeleton />
         </div>
       )}
       {latestRun && result && (
-        <div id="ai-result-viewer" className="mb-5">
-          <ResultViewer
+        <div id="ai-result-workspace">
+          <ResultWorkspace
             result={result}
             responseIsRTL={responseIsRTL}
             runStatus={latestRun.run.status}
@@ -393,15 +365,47 @@ export default function AIVisibilitySection({
         </div>
       )}
 
-      {/* Scan history */}
+      {/* SCAN HISTORY + DELETE */}
       <ScanHistory
         projectId={projectId}
         refreshKey={historyRefresh}
         selectedRunId={latestRun?.run.id || null}
         onSelectRun={handleSelectHistoryRun}
+        onDeleteRun={setDeleteConfirmRunId}
       />
 
-      {/* New Prompt Modal */}
+      {/* DELETE CONFIRMATION MODAL */}
+      <Modal
+        open={deleteConfirmRunId !== null}
+        onClose={() => setDeleteConfirmRunId(null)}
+        title="Delete scan result?"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            This will permanently delete the AI scan result, response, and all associated citations.
+            This action cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmRunId(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => deleteConfirmRunId && handleDeleteRun(deleteConfirmRunId)}
+              loading={deleting}
+            >
+              Delete permanently
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODALS */}
       <Modal
         open={showNewPrompt}
         onClose={() => setShowNewPrompt(false)}
@@ -455,7 +459,6 @@ export default function AIVisibilitySection({
         </form>
       </Modal>
 
-      {/* Prompt suggestions modal */}
       <PromptSuggestions
         open={showSuggestions}
         onClose={() => setShowSuggestions(false)}
@@ -473,65 +476,105 @@ export default function AIVisibilitySection({
 
 /* --- Subcomponents --- */
 
-function KpiCard({
-  label,
-  value,
-  suffix,
-  tone,
-  hint,
-  accent,
-}: {
-  label: string
-  value: string
-  suffix?: string
-  tone: 'good' | 'warn' | 'flat'
-  hint?: string | null
-  accent: 'indigo' | 'emerald' | 'blue' | 'slate'
-}) {
-  const accentBar =
-    tone === 'good'
-      ? accent === 'indigo'
-        ? 'from-indigo-400 to-violet-500'
-        : accent === 'emerald'
-        ? 'from-emerald-400 to-teal-500'
-        : accent === 'blue'
-        ? 'from-blue-400 to-cyan-500'
-        : 'from-slate-300 to-slate-400'
-      : tone === 'warn'
-      ? 'from-amber-400 to-orange-500'
-      : 'from-slate-200 to-slate-300'
-
-  const valueColor =
-    tone === 'good' ? 'text-slate-900' : tone === 'warn' ? 'text-slate-900' : 'text-slate-500'
-
+function BigKpiPanel({ kpis }: { kpis: { score: number; mentioned: boolean; targetCited: boolean; citationCount: number; credits: string; scannedAt?: string | null } }) {
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200">
-      <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${accentBar}`} />
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-        {label}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 rounded-2xl border border-slate-200/70 bg-gradient-to-br from-white to-slate-50/40 p-5 shadow-md">
+      {/* Visibility Score — dominant card */}
+      <div className="lg:col-span-2 relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50 via-white to-indigo-50/40 border-2 border-indigo-200/60 p-5 shadow-sm">
+        <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-200/20 rounded-full -mr-10 -mt-10" />
+        <div className="relative z-10">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700 mb-1">
+            Visibility Score
+          </div>
+          <div className="text-5xl font-black text-indigo-900 leading-tight">
+            {kpis.score}<span className="text-2xl text-indigo-600">%</span>
+          </div>
+          <div className="text-xs text-indigo-600 font-medium mt-2">
+            {kpis.score >= 60 ? '🔥 High visibility' : kpis.score >= 20 ? '⚠️ Moderate visibility' : '📌 Low visibility'}
+          </div>
+        </div>
       </div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <div className={`text-2xl font-bold leading-tight tracking-tight ${valueColor}`}>{value}</div>
-        {suffix && <div className="text-sm text-slate-400 font-medium">{suffix}</div>}
+
+      {/* Mentioned */}
+      <div className="relative overflow-hidden rounded-xl bg-white border border-slate-200/80 p-4 shadow-sm hover:shadow-md transition">
+        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100/30 rounded-full -mr-8 -mt-8" />
+        <div className="relative z-10">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+            Mentioned
+          </div>
+          <div className="text-3xl font-bold text-slate-900">
+            {kpis.mentioned ? '✓' : '✕'}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${kpis.mentioned ? 'text-blue-600' : 'text-slate-400'}`}>
+            {kpis.mentioned ? 'In AI response' : 'Not found'}
+          </div>
+        </div>
       </div>
-      {hint && <div className="text-[10px] text-slate-400 mt-0.5">{hint}</div>}
+
+      {/* Target Cited */}
+      <div className="relative overflow-hidden rounded-xl bg-white border border-slate-200/80 p-4 shadow-sm hover:shadow-md transition">
+        <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-100/30 rounded-full -mr-8 -mt-8" />
+        <div className="relative z-10">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+            Target Cited
+          </div>
+          <div className="text-3xl font-bold text-slate-900">
+            {kpis.targetCited ? '✓' : '✕'}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${kpis.targetCited ? 'text-emerald-600' : 'text-slate-400'}`}>
+            {kpis.targetCited ? 'As source' : 'Not cited'}
+          </div>
+        </div>
+      </div>
+
+      {/* Total Citations */}
+      <div className="relative overflow-hidden rounded-xl bg-white border border-slate-200/80 p-4 shadow-sm hover:shadow-md transition">
+        <div className="absolute top-0 right-0 w-16 h-16 bg-amber-100/30 rounded-full -mr-8 -mt-8" />
+        <div className="relative z-10">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+            Citations
+          </div>
+          <div className="text-3xl font-bold text-slate-900">
+            {kpis.citationCount}
+          </div>
+          <div className="text-xs text-slate-500 font-medium mt-1">
+            Sources cited
+          </div>
+        </div>
+      </div>
+
+      {/* Credits Used */}
+      <div className="relative overflow-hidden rounded-xl bg-white border border-slate-200/80 p-4 shadow-sm hover:shadow-md transition">
+        <div className="absolute top-0 right-0 w-16 h-16 bg-violet-100/30 rounded-full -mr-8 -mt-8" />
+        <div className="relative z-10">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+            Credits used
+          </div>
+          <div className="text-3xl font-bold text-slate-900">
+            {kpis.credits}
+          </div>
+          <div className="text-xs text-slate-500 font-medium mt-1">
+            This scan
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 function PromptListSkeleton() {
   return (
-    <div className="space-y-2.5 mb-5">
+    <div className="space-y-3">
       {[0, 1].map((i) => (
         <div
           key={i}
           className="rounded-2xl border border-slate-200/70 bg-white p-4 animate-pulse"
         >
-          <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
-          <div className="h-4 w-3/4 bg-slate-200 rounded mb-3" />
+          <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
+          <div className="h-5 w-2/3 bg-slate-200 rounded mb-4" />
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
             {[0, 1, 2, 3, 4, 5].map((j) => (
-              <div key={j} className="h-16 bg-slate-100 rounded-xl" />
+              <div key={j} className="h-20 bg-slate-100 rounded-xl" />
             ))}
           </div>
         </div>
@@ -540,32 +583,54 @@ function PromptListSkeleton() {
   )
 }
 
+function EmptyPromptState({ onSuggest, onNew }: { onSuggest: () => void; onNew: () => void }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-gradient-to-br from-slate-50 to-white p-10 text-center">
+      <div className="mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center mb-3 shadow-sm">
+        <SparkleIcon size={22} className="text-indigo-600" />
+      </div>
+      <h3 className="text-base font-semibold text-slate-900 mb-1">No prompts yet</h3>
+      <p className="text-sm text-slate-500 mb-5 max-w-sm mx-auto">
+        Generate smart suggestions tailored to your business, or create one manually.
+      </p>
+      <div className="flex gap-2 justify-center">
+        <Button variant="outline" onClick={onSuggest}>
+          ✨ Suggest prompts
+        </Button>
+        <Button onClick={onNew}>+ New prompt</Button>
+      </div>
+    </div>
+  )
+}
+
 function ResultSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm overflow-hidden animate-pulse">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50/40">
-        <div className="flex items-center gap-2">
+    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-md overflow-hidden animate-pulse">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/40">
+        <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-slate-200" />
           <div>
-            <div className="h-3 w-20 bg-slate-200 rounded mb-1.5" />
-            <div className="h-2 w-14 bg-slate-100 rounded" />
+            <div className="h-4 w-24 bg-slate-200 rounded mb-1.5" />
+            <div className="h-3 w-20 bg-slate-100 rounded" />
           </div>
         </div>
         <div className="flex gap-2">
-          <div className="h-5 w-16 bg-slate-200 rounded-full" />
-          <div className="h-5 w-16 bg-slate-200 rounded-full" />
+          <div className="h-6 w-20 bg-slate-200 rounded-full" />
+          <div className="h-6 w-20 bg-slate-200 rounded-full" />
         </div>
       </div>
-      <div className="px-6 py-6 space-y-2.5">
-        <div className="h-3 bg-slate-200 rounded w-full" />
-        <div className="h-3 bg-slate-200 rounded w-[92%]" />
-        <div className="h-3 bg-slate-200 rounded w-[85%]" />
-        <div className="h-3 bg-slate-200 rounded w-[78%]" />
-        <div className="h-3 bg-slate-200 rounded w-[88%]" />
-      </div>
-      <div className="border-t border-slate-100 px-5 py-3 flex items-center gap-2">
-        <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-blue-700 font-medium">Scanning AI engine…</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+        <div className="lg:col-span-2 space-y-3">
+          <div className="h-4 bg-slate-200 rounded w-full" />
+          <div className="h-4 bg-slate-200 rounded w-[92%]" />
+          <div className="h-4 bg-slate-200 rounded w-[85%]" />
+          <div className="h-4 bg-slate-100 rounded w-[70%]" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 bg-slate-200 rounded" />
+          <div className="h-4 bg-slate-200 rounded" />
+          <div className="h-4 bg-slate-100 rounded" />
+        </div>
       </div>
     </div>
   )
@@ -583,31 +648,23 @@ function PromptCard({
   onRun: (engine: string) => void
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition-all duration-200 overflow-hidden">
-      {/* Prompt header */}
-      <div className="px-4 pt-3.5 pb-3 border-b border-slate-100">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Prompt
-              </span>
-              {prompt.country && (
-                <Badge variant="neutral" className="!text-[10px] !px-1.5 !py-0">{prompt.country}</Badge>
-              )}
-              {prompt.language && (
-                <Badge variant="neutral" className="!text-[10px] !px-1.5 !py-0">{prompt.language}</Badge>
-              )}
-            </div>
-            <div className="text-[14px] font-semibold text-slate-900 leading-snug">
-              {prompt.prompt}
-            </div>
-          </div>
+    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
+      <div className="px-5 pt-4 pb-3 border-b border-slate-100">
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            Prompt
+          </span>
+          {prompt.country && (
+            <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{prompt.country}</Badge>
+          )}
+          {prompt.language && (
+            <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{prompt.language}</Badge>
+          )}
         </div>
+        <h3 className="text-[15px] font-semibold text-slate-900">{prompt.prompt}</h3>
       </div>
 
-      {/* Engine grid — premium hover/active animations */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-2.5 bg-slate-50/40">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 bg-slate-50/40">
         {ENGINE_LIST.map((engineId) => {
           const meta = ENGINE_META[engineId]
           const Icon = meta.Icon
@@ -623,36 +680,33 @@ function PromptCard({
               onClick={() => onRun(engineId)}
               disabled={isDisabled}
               type="button"
-              className={`group relative flex flex-col items-stretch gap-1.5 p-2.5 rounded-xl border text-start transition-all duration-200 ${
+              className={`group relative flex flex-col gap-2 p-3 rounded-xl border transition-all duration-200 text-start ${
                 isRunning
-                  ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50/60 shadow-[0_0_0_3px_rgba(99,102,241,0.12)]'
+                  ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50/60 shadow-[0_0_0_3px_rgba(99,102,241,0.1)]'
                   : success
-                  ? 'border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white shadow-sm'
+                  ? 'border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white'
                   : failed
                   ? 'border-red-200 bg-gradient-to-br from-red-50/80 to-white'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-gradient-to-br hover:from-slate-50/60 hover:to-white hover:shadow-md hover:-translate-y-0.5'
+                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60 hover:shadow-md hover:-translate-y-0.5'
               } ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Icon size={18} className={`${meta.accent} transition-transform group-hover:scale-110`} />
-                  <span className="text-[13px] font-semibold text-slate-800">{meta.name}</span>
+                  <span className="text-sm font-semibold text-slate-800">{meta.name}</span>
                 </div>
                 {isRunning ? (
                   <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 ) : success ? (
-                  <span className="relative flex items-center">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-30" />
-                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-400/50" />
                 ) : failed ? (
                   <span className="w-2 h-2 rounded-full bg-red-500" />
                 ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-slate-400 transition" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                 )}
               </div>
 
-              <div className="flex items-center justify-between text-[10.5px] text-slate-500">
+              <div className="flex items-center justify-between text-[10px] text-slate-500">
                 {hasResult && success ? (
                   <span>
                     <b className="text-slate-900 font-semibold">{activeResult!.citationCount}</b> citations
@@ -662,13 +716,7 @@ function PromptCard({
                 ) : isRunning ? (
                   <span className="text-blue-600 font-medium">Scanning…</span>
                 ) : (
-                  <span className="text-slate-400">Click to run</span>
-                )}
-                {hasResult && success && activeResult?.targetCited && (
-                  <Badge variant="success" className="!text-[9px] !px-1.5 !py-0">cited</Badge>
-                )}
-                {hasResult && success && activeResult?.mentioned && !activeResult.targetCited && (
-                  <Badge variant="info" className="!text-[9px] !px-1.5 !py-0">mention</Badge>
+                  <span className="text-slate-400">Run</span>
                 )}
               </div>
             </button>
@@ -679,7 +727,7 @@ function PromptCard({
   )
 }
 
-function ResultViewer({
+function ResultWorkspace({
   result,
   responseIsRTL,
   runStatus,
@@ -693,7 +741,6 @@ function ResultViewer({
   const engineMeta = ENGINE_META[result.engine] || null
   const Icon = engineMeta?.Icon
   const isError = result.status === 'error' || runStatus === 'failed'
-  const [responseExpanded, setResponseExpanded] = useState(true)
 
   const paragraphs = useMemo(
     () => toParagraphs(result.responseText || result.responseSummary || ''),
@@ -702,8 +749,8 @@ function ResultViewer({
 
   const previewParagraphs = paragraphs.slice(0, 1)
   const hasMore = paragraphs.length > 1
+  const [expanded, setExpanded] = useState(false)
 
-  // Split citations: target domain first, then primary, then rest
   const sortedCitations = useMemo(() => {
     const list = [...result.citations]
     list.sort((a, b) => {
@@ -717,205 +764,160 @@ function ResultViewer({
   }, [result.citations])
 
   return (
-    <article className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white via-white to-slate-50/30 shadow-[0_4px_24px_rgba(15,23,42,0.06)] overflow-hidden">
-      {/* Header — engine, status, timestamp */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white/60 backdrop-blur-sm">
+    <article className="rounded-2xl border border-slate-200/70 bg-white shadow-md overflow-hidden">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/40">
         <div className="flex items-center gap-3">
           {engineMeta && Icon ? (
             <>
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-white to-slate-50 border border-slate-200/80 flex items-center justify-center shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-white to-slate-50 border border-slate-200/80 flex items-center justify-center shadow-sm">
                 <Icon size={20} className={engineMeta.accent} />
               </div>
               <div>
-                <div className="text-sm font-semibold text-slate-900 leading-tight">
-                  {engineMeta.name}
-                </div>
-                <div className="text-[11px] text-slate-500 leading-tight">
-                  AI answer · {formatRelativeTime(completedAt || result.scannedAt)}
+                <div className="font-semibold text-slate-900">{engineMeta.name}</div>
+                <div className="text-xs text-slate-500">
+                  {formatRelativeTime(completedAt || result.scannedAt)}
                 </div>
               </div>
             </>
           ) : (
-            <div className="text-sm font-semibold text-slate-700">{result.engine}</div>
+            <div className="font-semibold text-slate-900">{result.engine}</div>
           )}
         </div>
         <div className="flex items-center gap-1.5">
           {result.mentioned && (
-            <Badge variant="info" className="!text-[10px]">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 me-1" />
-              Mentioned
-            </Badge>
+            <Badge variant="info" className="!text-xs"><span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 me-1" />Mentioned</Badge>
           )}
           {result.targetCited && (
-            <Badge variant="success" className="!text-[10px]">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 me-1" />
-              Target cited
-            </Badge>
+            <Badge variant="success" className="!text-xs"><span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 me-1" />Target cited</Badge>
           )}
-          {isError ? (
-            <Badge variant="danger" className="!text-[10px]">Error</Badge>
-          ) : (
-            <Badge variant="success" className="!text-[10px]">Success</Badge>
-          )}
+          {isError ? <Badge variant="danger">Error</Badge> : <Badge variant="success">Success</Badge>}
         </div>
       </header>
 
       {isError ? (
-        <div className="px-5 py-4 text-sm text-red-700 bg-red-50/60 border-t border-red-100">
+        <div className="px-6 py-4 text-sm text-red-700 bg-red-50/60">
           {result.errorMessage || 'Scan failed.'}
         </div>
       ) : (
-        <>
-          {/* AI answer body — Perplexity/ChatGPT-like reading layout */}
-          <div className="px-5 sm:px-8 py-6 sm:py-7 bg-gradient-to-b from-white to-slate-50/40">
-            {paragraphs.length === 0 ? (
-              <div className="text-sm text-slate-400 italic text-center py-6">
-                No response text returned.
-              </div>
-            ) : (
-              <div
-                dir={responseIsRTL ? 'rtl' : 'ltr'}
-                className={`mx-auto max-w-[68ch] ${
-                  responseIsRTL ? 'text-right' : 'text-left'
-                }`}
-              >
-                {/* Preview — always visible (first paragraph) */}
-                <div className="space-y-4">
-                  {previewParagraphs.map((p, i) => (
-                    <p
-                      key={i}
-                      className="whitespace-pre-wrap text-[15.5px] leading-[1.85] text-slate-700 font-normal tracking-[0.005em]"
-                    >
-                      {p}
-                    </p>
-                  ))}
-                </div>
-
-                {/* Expanded — rest of paragraphs */}
-                {hasMore && responseExpanded && (
-                  <div className="space-y-4 mt-4">
-                    {paragraphs.slice(1).map((p, i) => (
-                      <p
-                        key={i}
-                        className="whitespace-pre-wrap text-[15.5px] leading-[1.85] text-slate-700 font-normal tracking-[0.005em]"
-                      >
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+          {/* Main: AI Answer Viewer */}
+          <div className="lg:col-span-2">
+            <div className="prose prose-slate prose-sm max-w-2xl">
+              {paragraphs.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">No response text returned.</p>
+              ) : (
+                <div dir={responseIsRTL ? 'rtl' : 'ltr'} className={responseIsRTL ? 'text-right' : 'text-left'}>
+                  {/* Preview */}
+                  <div className="space-y-4 mb-5">
+                    {previewParagraphs.map((p, i) => (
+                      <p key={i} className="whitespace-pre-wrap text-[15px] leading-[1.8] text-slate-700">
                         {p}
                       </p>
                     ))}
                   </div>
-                )}
 
-                {/* Toggle */}
-                {hasMore && (
-                  <button
-                    type="button"
-                    onClick={() => setResponseExpanded((v) => !v)}
-                    className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition"
-                  >
-                    {responseExpanded ? (
-                      <>
-                        <span>Show less</span>
-                        <span className="text-xs">▲</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Show full answer · {paragraphs.length - 1} more paragraph{paragraphs.length - 1 === 1 ? '' : 's'}</span>
-                        <span className="text-xs">▼</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
+                  {/* Full response */}
+                  {hasMore && expanded && (
+                    <div className="space-y-4 mb-5 p-4 rounded-lg bg-slate-50/40 border border-slate-100">
+                      {paragraphs.slice(1).map((p, i) => (
+                        <p key={i} className="whitespace-pre-wrap text-[15px] leading-[1.8] text-slate-700">
+                          {p}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Toggle */}
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded((v) => !v)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline transition"
+                    >
+                      {expanded ? (
+                        <>Show less <span>▲</span></>
+                      ) : (
+                        <>Show full answer ({paragraphs.length - 1} more para{paragraphs.length - 1 === 1 ? '' : 's'}) <span>▼</span></>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Citations section — modern grid of cards */}
-          {sortedCitations.length > 0 ? (
-            <section className="border-t border-slate-100 bg-slate-50/30 px-5 sm:px-8 py-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Sources
-                  </span>
-                  <span className="text-[11px] text-slate-400">·</span>
-                  <span className="text-[11px] text-slate-500">{sortedCitations.length}</span>
+          {/* Sidebar: Citations Grid */}
+          <aside className="lg:col-span-1">
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+                Sources ({sortedCitations.length})
+              </h4>
+              {sortedCitations.length === 0 ? (
+                <div className="text-xs text-slate-400 italic py-4">No sources cited.</div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedCitations.map((c) => (
+                    <CitationCardSmall key={c.id} citation={c} />
+                  ))}
                 </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {sortedCitations.map((c) => (
-                  <CitationCard key={c.id} citation={c} />
-                ))}
-              </div>
-            </section>
-          ) : (
-            <div className="border-t border-slate-100 px-5 py-4 text-xs text-slate-400 text-center bg-slate-50/30">
-              No sources cited in this response.
+              )}
             </div>
-          )}
-        </>
+          </aside>
+        </div>
       )}
     </article>
   )
 }
 
-function CitationCard({ citation }: { citation: Citation }) {
+function CitationCardSmall({ citation }: { citation: Citation }) {
   const [imgError, setImgError] = useState(false)
   const displayTitle = citation.title?.trim() || citation.domain
-  const initials = citation.domain.slice(0, 2).toUpperCase()
 
   return (
     <a
       href={citation.url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`group relative flex flex-col gap-2 p-3 rounded-xl border bg-white transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
+      className={`group block p-2.5 rounded-lg border transition-all duration-200 ${
         citation.is_target_domain
-          ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/40 to-white shadow-[0_0_0_1px_rgba(16,185,129,0.15)]'
-          : 'border-slate-200/80 hover:border-slate-300'
+          ? 'border-emerald-300 bg-emerald-50/60 hover:shadow-md hover:-translate-y-0.5'
+          : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5'
       }`}
     >
-      {/* Top row — favicon + domain + ext icon */}
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="shrink-0 w-7 h-7 rounded-lg bg-slate-50 border border-slate-200/80 overflow-hidden flex items-center justify-center">
+      <div className="flex items-start gap-1.5 min-w-0">
+        <div className="shrink-0 w-5 h-5 rounded-md bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center mt-0.5">
           {!imgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={faviconUrl(citation.domain)}
               alt=""
-              width={20}
-              height={20}
+              width={14}
+              height={14}
               loading="lazy"
               onError={() => setImgError(true)}
-              className="w-5 h-5"
+              className="w-4 h-4"
             />
           ) : (
-            <span className="text-[9px] font-bold text-slate-400">{initials}</span>
-          )}
-        </div>
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          <span className="text-[11.5px] text-slate-500 truncate font-medium">
-            {citation.domain}
-          </span>
-          {citation.is_target_domain && (
-            <span className="shrink-0 text-[9.5px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-1.5 py-0.5">
-              YOUR DOMAIN
+            <span className="text-[7px] font-bold text-slate-400">
+              {citation.domain.slice(0, 2).toUpperCase()}
             </span>
           )}
         </div>
-        <ExternalLinkIcon size={12} className="text-slate-300 group-hover:text-slate-500 shrink-0 transition" />
-      </div>
-
-      {/* Title */}
-      <div className="text-[13.5px] font-semibold text-slate-900 leading-snug line-clamp-2 group-hover:text-indigo-700 transition">
-        {displayTitle}
-      </div>
-
-      {/* Snippet */}
-      {citation.snippet && (
-        <div className="text-[11.5px] text-slate-500 leading-relaxed line-clamp-2">
-          {citation.snippet}
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] font-semibold text-slate-900 line-clamp-2 group-hover:text-indigo-700 transition">
+            {displayTitle}
+          </div>
+          <div className="text-[10px] text-slate-500 truncate mt-0.5">
+            {citation.domain}
+          </div>
+          {citation.is_target_domain && (
+            <div className="text-[9px] font-semibold text-emerald-700 mt-1">
+              ✓ Your domain
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </a>
   )
 }

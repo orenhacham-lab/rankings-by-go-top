@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Badge from '@/components/ui/Badge'
-import { ENGINE_META } from './EngineIcon'
+import { ENGINE_META, TrashIcon } from './EngineIcon'
 
 export type HistoryRun = {
   id: string
@@ -58,11 +58,13 @@ export default function ScanHistory({
   refreshKey,
   selectedRunId,
   onSelectRun,
+  onDeleteRun,
 }: {
   projectId: string
   refreshKey: number
   selectedRunId: string | null
   onSelectRun: (runId: string) => void
+  onDeleteRun?: (runId: string) => void
 }) {
   const [runs, setRuns] = useState<HistoryRun[]>([])
   const [loading, setLoading] = useState(true)
@@ -259,11 +261,24 @@ export default function ScanHistory({
                         </div>
                       </div>
 
-                      {/* Arrow / open chevron */}
-                      <div className="shrink-0 self-center opacity-0 group-hover:opacity-100 transition">
+                      {/* Actions: open + delete */}
+                      <div className="shrink-0 self-center flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                         <span className="text-[11px] font-medium text-indigo-600">
                           Open →
                         </span>
+                        {onDeleteRun && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onDeleteRun(run.id)
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-600 transition"
+                            title="Delete scan"
+                          >
+                            <TrashIcon size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </li>
