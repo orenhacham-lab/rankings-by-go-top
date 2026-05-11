@@ -247,6 +247,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         onActionComplete={loadData}
       />
 
+      {/* AI Visibility module — gated by client-side NEXT_PUBLIC_ENABLE_AI_VISIBILITY flag */}
+      {/* If UI is not visible, ensure Vercel env vars include NEXT_PUBLIC_ENABLE_AI_VISIBILITY=true */}
+      {/* AND redeploy (the flag is baked at build time). */}
       {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
         <AIVisibilitySection
           projectId={id}
