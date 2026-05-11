@@ -2,23 +2,19 @@
 
 /**
  * PromptSuggestions modal — smart suggested prompts with multi-select,
- * edit-before-save, and one-click add. Uses local templates (no LLM API).
+ * edit-before-save, one-click add, and working regenerate.
+ *
+ * Suggestions are project-aware: uses business/domain/keywords/locale to
+ * generate intent-varied prompts. Regenerate creates fresh shuffled set
+ * with keyword-derived variants.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import { generatePromptSuggestions, PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
-
-const INTENT_LABELS: Record<string, string> = {
-  brand: 'Brand',
-  comparison: 'Comparison',
-  local: 'Local',
-  transactional: 'Transactional',
-  recommendation: 'Recommendation',
-  informational: 'Informational',
-}
+import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
 
 const INTENT_TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
   brand: 'info',
@@ -38,6 +34,7 @@ export default function PromptSuggestions({
   city,
   country,
   language,
+  keywords,
   onAdded,
 }: {
   open: boolean
@@ -48,25 +45,69 @@ export default function PromptSuggestions({
   city: string | null
   country: string | null
   language: string | null
+  keywords?: string[]
   onAdded: () => void
 }) {
-  const [suggestions, setSuggestions] = useState<PromptSuggestion[]>(() =>
-    generatePromptSuggestions({ businessName, domain, city, country, language })
-  )
+  const t = useMemo(() => createI18n(language, country), [language, country])
+  const isHebrew = detectHebrew(language, country)
+
+  const intentLabel = (intent: string): string => {
+    switch (intent) {
+      case 'brand': return t('intent_brand')
+      case 'comparison': return t('intent_comparison')
+      case 'local': return t('intent_local')
+      case 'transactional': return t('intent_transactional')
+      case 'recommendation': return t('intent_recommendation')
+      case 'informational': return t('intent_informational')
+      default: return intent
+    }
+  }
+
+  const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [saving, setSaving] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const selectedCount = selectedIds.size
+  // Generate fresh suggestions when modal opens
+  useEffect(() => {
+    if (open) {
+      setSuggestions(
+        generatePromptSuggestions({
+          businessName,
+          domain,
+          city,
+          country,
+          language,
+          keywords,
+          shuffle: false,
+        })
+      )
+      setSelectedIds(new Set())
+      setError(null)
+    }
+  }, [open, businessName, domain, city, country, language, keywords])
 
-  const isHebrew = useMemo(() => (language || 'en').toLowerCase() === 'he', [language])
-
-  function regenerate() {
-    setSuggestions(generatePromptSuggestions({ businessName, domain, city, country, language }))
-    setSelectedIds(new Set())
+  async function regenerate() {
+    setRegenerating(true)
     setError(null)
+    // Small artificial delay for visual feedback
+    await new Promise((r) => setTimeout(r, 250))
+    setSuggestions(
+      generatePromptSuggestions({
+        businessName,
+        domain,
+        city,
+        country,
+        language,
+        keywords,
+        shuffle: true,
+      })
+    )
+    setSelectedIds(new Set())
+    setRegenerating(false)
   }
 
   function toggleSelect(id: string) {
@@ -112,7 +153,6 @@ export default function PromptSuggestions({
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || `HTTP ${res.status}`)
       }
-      // remove from list after add
       setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id))
       setSelectedIds((prev) => {
         const next = new Set(prev)
@@ -150,11 +190,9 @@ export default function PromptSuggestions({
           throw new Error(body.error || `HTTP ${res.status}`)
         }
       }
-      // remove added ones
       setSuggestions((prev) => prev.filter((s) => !selectedIds.has(s.id)))
       setSelectedIds(new Set())
       onAdded()
-      // close if all added
       if (suggestions.length === targets.length) onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add selected prompts')
@@ -163,19 +201,21 @@ export default function PromptSuggestions({
     }
   }
 
+  const selectedCount = selectedIds.size
+
   return (
-    <Modal open={open} onClose={onClose} title="AI Prompt Suggestions" size="lg">
+    <Modal open={open} onClose={onClose} title={t('suggestions_title')} size="lg">
       <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-        <div className="flex items-center justify-between text-sm">
-          <p className="text-slate-600">
-            Smart suggestions tailored to your business. Select multiple, edit, or add one-by-one.
-          </p>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <p className="text-slate-600 flex-1">{t('suggestions_help')}</p>
           <button
             onClick={regenerate}
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+            disabled={regenerating}
+            className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed transition"
             type="button"
           >
-            ↻ Regenerate
+            <span className={`inline-block transition-transform ${regenerating ? 'animate-spin' : ''}`}>↻</span>
+            {t('regenerate')}
           </button>
         </div>
 
@@ -185,32 +225,45 @@ export default function PromptSuggestions({
           </div>
         )}
 
-        {suggestions.length === 0 ? (
-          <div className="text-center py-12 text-slate-500">
-            <div className="mb-3">All suggestions added.</div>
+        {regenerating ? (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white animate-pulse">
+                <div className="w-4 h-4 rounded bg-slate-200 mt-1" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 bg-slate-200 rounded" />
+                  <div className="h-3 w-20 bg-slate-100 rounded-full" />
+                </div>
+                <div className="w-12 h-7 bg-slate-100 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : suggestions.length === 0 ? (
+          <div className="text-center py-10 text-slate-500">
+            <div className="text-sm mb-3">{t('all_added')}</div>
             <Button size="sm" variant="outline" onClick={regenerate}>
-              Generate again
+              {t('generate_again')}
             </Button>
           </div>
         ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
             {suggestions.map((s) => {
               const checked = selectedIds.has(s.id)
               const isEditing = editingId === s.id
               return (
                 <div
                   key={s.id}
-                  className={`flex items-start gap-3 p-3 rounded-xl border transition ${
+                  className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-200 ${
                     checked
-                      ? 'border-blue-300 bg-blue-50/60'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
+                      ? 'border-indigo-300 bg-indigo-50/60 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleSelect(s.id)}
-                    className="mt-1.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="mt-1.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   <div className="flex-1 min-w-0">
                     {isEditing ? (
@@ -227,7 +280,8 @@ export default function PromptSuggestions({
                           }
                         }}
                         autoFocus
-                        className="w-full px-2 py-1 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        dir={isHebrew ? 'rtl' : 'ltr'}
+                        className="w-full px-2 py-1 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     ) : (
                       <div className="text-sm font-medium text-slate-900 leading-snug">
@@ -236,14 +290,14 @@ export default function PromptSuggestions({
                     )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <Badge variant={INTENT_TONE[s.intent] || 'neutral'}>
-                        {INTENT_LABELS[s.intent] || s.intent}
+                        {intentLabel(s.intent)}
                       </Badge>
                       <button
                         onClick={() => startEdit(s.id, s.prompt)}
                         className="text-xs text-slate-500 hover:text-slate-700"
                         type="button"
                       >
-                        Edit
+                        {t('edit')}
                       </button>
                     </div>
                   </div>
@@ -253,7 +307,7 @@ export default function PromptSuggestions({
                     onClick={() => addOne(s)}
                     disabled={saving}
                   >
-                    Add
+                    {t('add')}
                   </Button>
                 </div>
               )
@@ -263,18 +317,22 @@ export default function PromptSuggestions({
 
         <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-3">
           <div className="text-xs text-slate-500">
-            {selectedCount} selected{selectedCount > 0 ? ` of ${suggestions.length}` : ''}
+            {selectedCount > 0
+              ? `${selectedCount} ${t('selected')} ${t('of')} ${suggestions.length}`
+              : `${suggestions.length}`}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={saving}>
-              Close
+              {t('close')}
             </Button>
             <Button
               disabled={selectedCount === 0 || saving}
               loading={saving}
               onClick={addSelected}
             >
-              Add {selectedCount > 0 ? `${selectedCount} selected` : 'selected'}
+              {selectedCount > 0
+                ? `${t('add_selected')} (${selectedCount})`
+                : t('add_selected')}
             </Button>
           </div>
         </div>

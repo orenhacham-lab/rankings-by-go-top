@@ -1,15 +1,18 @@
 'use client'
 
 /**
- * ScanHistory — activity feed of previous AI scan runs for a project.
- * Click a row to load its full result+citations into the parent viewer.
+ * ScanHistory — activity timeline of previous AI scan runs.
+ * Lightweight metadata only (no full response_text); full result is fetched
+ * on demand when a row is opened.
  *
- * Visual style: AI observability / event timeline (Linear-like), not a database table.
+ * Features: localized labels, hover delete with smooth fade-out animation,
+ * relative timestamps, status pills, click-to-open.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Badge from '@/components/ui/Badge'
 import { ENGINE_META, TrashIcon } from './EngineIcon'
+import { createI18n } from '@/lib/ai-visibility/i18n'
 
 export type HistoryRun = {
   id: string
@@ -33,15 +36,15 @@ export type HistoryRun = {
   } | null
 }
 
-function formatRelative(iso: string | null | undefined): string {
+function formatRelative(iso: string | null | undefined, justNow: string): string {
   if (!iso) return '—'
   try {
     const d = new Date(iso)
     const diffSec = Math.floor((Date.now() - d.getTime()) / 1000)
-    if (diffSec < 60) return 'just now'
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`
-    if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`
+    if (diffSec < 60) return justNow
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m`
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h`
+    if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d`
     return d.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
@@ -59,17 +62,27 @@ export default function ScanHistory({
   selectedRunId,
   onSelectRun,
   onDeleteRun,
+  language,
+  country,
+  removedRunIds,
 }: {
   projectId: string
   refreshKey: number
   selectedRunId: string | null
   onSelectRun: (runId: string) => void
   onDeleteRun?: (runId: string) => void
+  language?: string | null
+  country?: string | null
+  removedRunIds?: Set<string>
 }) {
+  const t = useMemo(() => createI18n(language, country), [language, country])
+  const isHebrew = (language || '').toLowerCase() === 'he' || (country || '').toUpperCase() === 'IL'
+
   const [runs, setRuns] = useState<HistoryRun[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(true)
+  const [fadingOutIds, setFadingOutIds] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -93,9 +106,21 @@ export default function ScanHistory({
     load()
   }, [load, refreshKey])
 
+  // Sync optimistic removals from parent: trigger fade-out, then drop
+  useEffect(() => {
+    if (!removedRunIds || removedRunIds.size === 0) return
+    setFadingOutIds(new Set(removedRunIds))
+    const timer = setTimeout(() => {
+      setRuns((prev) => prev.filter((r) => !removedRunIds.has(r.id)))
+      setFadingOutIds(new Set())
+    }, 240)
+    return () => clearTimeout(timer)
+  }, [removedRunIds])
+
+  const visibleRuns = runs
+
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
-      {/* Header */}
+    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden" dir={isHebrew ? 'rtl' : 'ltr'}>
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50/60 transition border-b border-slate-100"
@@ -109,9 +134,11 @@ export default function ScanHistory({
             </svg>
           </div>
           <div className="text-start">
-            <div className="text-[13px] font-semibold text-slate-800 leading-tight">Scan activity</div>
+            <div className="text-[13px] font-semibold text-slate-800 leading-tight">{t('scan_activity')}</div>
             <div className="text-[11px] text-slate-500 leading-tight">
-              {loading ? 'Loading…' : `${runs.length} ${runs.length === 1 ? 'event' : 'events'}`}
+              {loading
+                ? t('loading')
+                : `${visibleRuns.length} ${visibleRuns.length === 1 ? t('event') : t('events')}`}
             </div>
           </div>
         </div>
@@ -128,7 +155,7 @@ export default function ScanHistory({
 
           {loading ? (
             <ActivityFeedSkeleton />
-          ) : runs.length === 0 ? (
+          ) : visibleRuns.length === 0 ? (
             <div className="px-5 py-10 text-center">
               <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-2.5">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -136,37 +163,38 @@ export default function ScanHistory({
                   <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-slate-400" />
                 </svg>
               </div>
-              <div className="text-sm text-slate-600 font-medium">No scans yet</div>
-              <div className="text-xs text-slate-400 mt-1">
-                Run a prompt against an engine to start tracking activity.
-              </div>
+              <div className="text-sm text-slate-600 font-medium">{t('no_scans')}</div>
+              <div className="text-xs text-slate-400 mt-1">{t('no_scans_help')}</div>
             </div>
           ) : (
             <ol className="relative">
-              {runs.map((run, idx) => {
+              {visibleRuns.map((run, idx) => {
                 const r = run.result
                 const engineMeta = r ? ENGINE_META[r.engine] : null
                 const Icon = engineMeta?.Icon
                 const isSelected = selectedRunId === run.id
-                const isLast = idx === runs.length - 1
+                const isLast = idx === visibleRuns.length - 1
                 const isSuccess = run.status === 'completed'
                 const isFailed = run.status === 'failed'
+                const isFading = fadingOutIds.has(run.id)
 
                 return (
                   <li
                     key={run.id}
-                    className={`relative group cursor-pointer transition-colors ${
+                    className={`relative group cursor-pointer transition-all duration-200 ${
+                      isFading
+                        ? 'opacity-0 max-h-0 overflow-hidden'
+                        : 'opacity-100 max-h-32'
+                    } ${
                       isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/60'
                     }`}
-                    onClick={() => onSelectRun(run.id)}
+                    onClick={() => !isFading && onSelectRun(run.id)}
                   >
-                    {/* vertical timeline line */}
                     {!isLast && (
                       <span className="absolute start-[34px] top-12 bottom-0 w-px bg-slate-100" />
                     )}
 
                     <div className="flex items-start gap-3 px-5 py-3.5">
-                      {/* Engine bullet (timeline node) */}
                       <div className="relative shrink-0 mt-0.5">
                         <div
                           className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
@@ -183,19 +211,13 @@ export default function ScanHistory({
                             <span className="w-2 h-2 rounded-full bg-slate-300" />
                           )}
                         </div>
-                        {/* status dot at corner */}
                         <span
                           className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                            isSuccess
-                              ? 'bg-emerald-500'
-                              : isFailed
-                              ? 'bg-red-500'
-                              : 'bg-slate-300'
+                            isSuccess ? 'bg-emerald-500' : isFailed ? 'bg-red-500' : 'bg-slate-300'
                           }`}
                         />
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <span className="text-[13px] font-semibold text-slate-800">
@@ -203,68 +225,53 @@ export default function ScanHistory({
                           </span>
                           <span className="text-[11px] text-slate-400">·</span>
                           <span className="text-[11px] text-slate-500">
-                            {formatRelative(run.completedAt || run.createdAt)}
+                            {formatRelative(run.completedAt || run.createdAt, t('just_now'))}
                           </span>
                           {isSelected && (
                             <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-700 bg-indigo-100 rounded-full px-1.5 py-0.5">
-                              Viewing
+                              {t('viewing')}
                             </span>
                           )}
                         </div>
 
-                        {/* Prompt text */}
                         <div className="text-[13px] text-slate-700 line-clamp-1 leading-snug mb-1.5">
-                          {r?.promptText || (
-                            <span className="italic text-slate-400">No prompt text</span>
-                          )}
+                          {r?.promptText || <span className="italic text-slate-400">—</span>}
                         </div>
 
-                        {/* Metrics row */}
                         <div className="flex items-center gap-2 flex-wrap">
                           {r && isSuccess && (
                             <>
                               {r.mentioned && (
                                 <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                  mention
+                                  {t('mention')}
                                 </span>
                               )}
                               {r.targetCited && (
                                 <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  cited
+                                  {t('cited')}
                                 </span>
                               )}
                               {!r.mentioned && !r.targetCited && (
-                                <span className="text-[10.5px] text-slate-400">no mention</span>
+                                <span className="text-[10.5px] text-slate-400">{t('no_mention')}</span>
                               )}
                               <span className="text-[10.5px] text-slate-400">·</span>
                               <span className="text-[10.5px] text-slate-500">
-                                <b className="text-slate-700 font-semibold">{r.citationCount}</b> citations
+                                <b className="text-slate-700 font-semibold">{r.citationCount}</b> {t('citations').toLowerCase()}
                               </span>
-                              {r.creditsUsed != null && (
-                                <>
-                                  <span className="text-[10.5px] text-slate-400">·</span>
-                                  <span className="text-[10.5px] text-slate-500">
-                                    {String(r.creditsUsed)} credits
-                                  </span>
-                                </>
-                              )}
                             </>
                           )}
-                          {isFailed && (
-                            <Badge variant="danger" className="!text-[10px]">Failed</Badge>
-                          )}
+                          {isFailed && <Badge variant="danger" className="!text-[10px]">{t('failed')}</Badge>}
                           {!isSuccess && !isFailed && (
                             <Badge variant="neutral" className="!text-[10px]">{run.status}</Badge>
                           )}
                         </div>
                       </div>
 
-                      {/* Actions: open + delete */}
-                      <div className="shrink-0 self-center flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                      <div className="shrink-0 self-center flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
                         <span className="text-[11px] font-medium text-indigo-600">
-                          Open →
+                          {t('open')} →
                         </span>
                         {onDeleteRun && (
                           <button
@@ -273,8 +280,8 @@ export default function ScanHistory({
                               e.stopPropagation()
                               onDeleteRun(run.id)
                             }}
-                            className="p-1 text-slate-400 hover:text-red-600 transition"
-                            title="Delete scan"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition"
+                            title={t('delete')}
                           >
                             <TrashIcon size={14} />
                           </button>
