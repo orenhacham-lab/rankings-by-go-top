@@ -247,3 +247,120 @@ export async function POST(request: Request) {
     creditsUsed,
   })
 }
+
+/**
+ * GET /api/ai-visibility/runs?projectId=...&limit=20
+ *
+ * Returns scan run history for a project, including a joined summary
+ * of the single result per run (engine, mentioned, target_cited,
+ * citation_count, credits_used) and the prompt text.
+ *
+ * Gated by ENABLE_AI_VISIBILITY=true. Auth + project ownership required.
+ */
+export async function GET(request: Request) {
+  if (process.env.ENABLE_AI_VISIBILITY !== 'true') {
+    return Response.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const url = new URL(request.url)
+  const projectId = url.searchParams.get('projectId')
+  const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') || 20)))
+
+  if (!projectId) {
+    return Response.json({ error: 'projectId is required' }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+
+  // Verify ownership
+  const { data: project } = await admin
+    .from('projects')
+    .select('id, user_id')
+    .eq('id', projectId)
+    .single()
+
+  if (!project || (project as { user_id?: string }).user_id !== user.id) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Fetch recent runs
+  const { data: runs, error: runsError } = await admin
+    .from('ai_scan_runs')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (runsError) {
+    return Response.json({ error: `Failed to load runs: ${runsError.message}` }, { status: 500 })
+  }
+
+  const runIds = (runs ?? []).map((r) => r.id)
+  let results: Array<Record<string, unknown>> = []
+  if (runIds.length > 0) {
+    const { data: resultRows } = await admin
+      .from('ai_scan_results')
+      .select('id, run_id, engine, prompt_id, mentioned, target_cited, citation_count, credits_used, status, error_message, scanned_at')
+      .in('run_id', runIds)
+    results = resultRows ?? []
+  }
+
+  // Build prompt text lookup
+  const promptIds = Array.from(
+    new Set(results.map((r) => r.prompt_id).filter((v): v is string => !!v))
+  )
+  let promptMap = new Map<string, string>()
+  if (promptIds.length > 0) {
+    const { data: promptRows } = await admin
+      .from('ai_prompts')
+      .select('id, prompt')
+      .in('id', promptIds)
+    for (const p of promptRows ?? []) {
+      promptMap.set(p.id as string, p.prompt as string)
+    }
+  }
+
+  const resultsByRun = new Map<string, (typeof results)[number]>()
+  for (const r of results) {
+    if (!resultsByRun.has(r.run_id as string)) {
+      resultsByRun.set(r.run_id as string, r)
+    }
+  }
+
+  return Response.json({
+    runs: (runs ?? []).map((run) => {
+      const r = resultsByRun.get(run.id)
+      const promptText = r?.prompt_id ? promptMap.get(r.prompt_id as string) || null : null
+      return {
+        id: run.id,
+        createdAt: run.created_at,
+        startedAt: run.started_at,
+        completedAt: run.completed_at,
+        status: run.status,
+        provider: run.provider,
+        totalCreditsUsed: run.total_credits_used,
+        errorMessage: run.error_message,
+        result: r
+          ? {
+              id: r.id,
+              engine: r.engine,
+              promptText,
+              mentioned: r.mentioned,
+              targetCited: r.target_cited,
+              citationCount: r.citation_count,
+              creditsUsed: r.credits_used,
+              status: r.status,
+              errorMessage: r.error_message,
+              scannedAt: r.scanned_at,
+            }
+          : null,
+      }
+    }),
+  })
+}

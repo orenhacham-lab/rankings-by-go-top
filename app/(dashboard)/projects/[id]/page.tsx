@@ -228,6 +228,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           projectLanguage={project.language}
           projectDomain={project.target_domain}
           projectBrandName={project.business_name}
+          projectCity={project.city}
         />
       )}
 
