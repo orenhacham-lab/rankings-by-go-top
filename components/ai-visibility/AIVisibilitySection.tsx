@@ -197,15 +197,20 @@ export default function AIVisibilitySection({
   const result = latestRun?.results?.[0] ?? null
 
   return (
-    <div className="mt-8">
+    <section id="ai-visibility" className="mb-8 rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-800">AI Visibility</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Run a single prompt against an AI search engine and view mentions + citations.
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white text-lg">
+            ✨
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">AI Visibility</h2>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Run a single prompt against an AI search engine and view mentions + citations.
+            </p>
+          </div>
         </div>
-        <Button size="sm" onClick={() => setShowNewPrompt(true)}>
+        <Button size="md" onClick={() => setShowNewPrompt(true)}>
           + New AI Prompt
         </Button>
       </div>
@@ -439,6 +444,6 @@ export default function AIVisibilitySection({
           </div>
         </form>
       </Modal>
-    </div>
+    </section>
   )
 }

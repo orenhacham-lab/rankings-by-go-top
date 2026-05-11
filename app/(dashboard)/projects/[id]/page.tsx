@@ -218,6 +218,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </Card>
       </div>
 
+      {/* AI Visibility module — placed prominently above the keyword table */}
+      {/* Gated by client-side NEXT_PUBLIC_ENABLE_AI_VISIBILITY flag (build-time). */}
+      {/* If not visible, set NEXT_PUBLIC_ENABLE_AI_VISIBILITY=true in Vercel and redeploy. */}
+      {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
+        <AIVisibilitySection
+          projectId={id}
+          projectCountry={project.country}
+          projectLanguage={project.language}
+          projectDomain={project.target_domain}
+          projectBrandName={project.business_name}
+        />
+      )}
+
       {/* Tracking Targets */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-slate-800">
@@ -246,19 +259,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         projectDevice={project.device_type}
         onActionComplete={loadData}
       />
-
-      {/* AI Visibility module — gated by client-side NEXT_PUBLIC_ENABLE_AI_VISIBILITY flag */}
-      {/* If UI is not visible, ensure Vercel env vars include NEXT_PUBLIC_ENABLE_AI_VISIBILITY=true */}
-      {/* AND redeploy (the flag is baked at build time). */}
-      {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
-        <AIVisibilitySection
-          projectId={id}
-          projectCountry={project.country}
-          projectLanguage={project.language}
-          projectDomain={project.target_domain}
-          projectBrandName={project.business_name}
-        />
-      )}
 
       {/* Edit Modal */}
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="עריכת פרויקט" size="lg">
