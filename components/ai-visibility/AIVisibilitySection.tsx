@@ -35,6 +35,7 @@ import PromptSuggestions from './PromptSuggestions'
 import ScanHistory from './ScanHistory'
 import { parseBlocks, toParagraphs } from '@/lib/ai-visibility/clean-response-text'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
+import AIInsightCards from './AIInsightCards'
 
 type Prompt = {
   id: string
@@ -842,9 +843,15 @@ function ResultWorkspace({
     [result.responseText, result.responseSummary]
   )
 
-  const previewBlocks = blocks.slice(0, Math.min(3, Math.max(1, blocks.findIndex((b) => b.type === 'text') + 1)))
-  const hasMore = blocks.length > previewBlocks.length
+  // Raw response collapsed by default — insights are the primary view
   const [expanded, setExpanded] = useState(false)
+
+  // Extract concise summary: first 1-2 text blocks for preview
+  const summaryBlock = useMemo(() => {
+    const firstText = blocks.find((b) => b.type === 'text')
+    if (firstText) return firstText
+    return blocks[0] ?? null
+  }, [blocks])
 
   const sortedCitations = useMemo(() => {
     const list = [...result.citations]
@@ -857,6 +864,9 @@ function ResultWorkspace({
     })
     return list
   }, [result.citations])
+
+  // Detect Hebrew once for AIInsightCards
+  const isHebrewResp = responseIsRTL
 
   return (
     <article className="rounded-2xl border border-slate-200/70 bg-white shadow-md overflow-hidden">
@@ -901,56 +911,93 @@ function ResultWorkspace({
           {result.errorMessage || t('error')}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
-          {/* Main: AI Answer */}
-          <div className="lg:col-span-2 lg:border-e border-slate-100 px-6 sm:px-8 py-6">
-            {blocks.length === 0 && paragraphs.length === 0 ? (
-              <p className="text-sm text-slate-400 italic">{t('no_response')}</p>
-            ) : (
-              <div dir={responseIsRTL ? 'rtl' : 'ltr'} className={`max-w-[68ch] ${responseIsRTL ? 'text-right' : 'text-left'}`}>
-                <MarkdownBlocks blocks={previewBlocks} />
+        <div className="p-6 space-y-6">
+          {/* AI INSIGHTS — primary view */}
+          <AIInsightCards
+            input={{
+              responseText: result.responseText,
+              mentioned: result.mentioned,
+              targetCited: result.targetCited,
+              citations: result.citations,
+              engine: result.engine,
+              targetDomain: null,
+              targetBrand: null,
+            }}
+            isHebrew={isHebrewResp}
+          />
 
-                {hasMore && expanded && (
-                  <div className="pt-2">
-                    <MarkdownBlocks blocks={blocks.slice(previewBlocks.length)} />
-                  </div>
-                )}
-
-                {hasMore && (
-                  <button
-                    type="button"
-                    onClick={() => setExpanded((v) => !v)}
-                    className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline transition"
-                  >
-                    {expanded ? (
-                      <>{t('show_less')} ▲</>
-                    ) : (
-                      <>{t('show_full_answer')} ({blocks.length - previewBlocks.length} {t('more_paragraphs')}) ▼</>
-                    )}
-                  </button>
+          {/* Executive Summary — short preview of AI answer */}
+          {summaryBlock && (
+            <div className="rounded-xl border border-slate-200/70 bg-gradient-to-br from-indigo-50/30 to-white p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">
+                  {isHebrewResp ? '💡 תקציר תשובת AI' : '💡 AI Answer Summary'}
+                </span>
+              </div>
+              <div
+                dir={responseIsRTL ? 'rtl' : 'ltr'}
+                className={`text-[15px] leading-[1.7] text-slate-700 ${responseIsRTL ? 'text-right' : 'text-left'} max-w-[72ch]`}
+              >
+                {summaryBlock.type === 'heading' || summaryBlock.type === 'text' ? (
+                  <p className="line-clamp-4">{summaryBlock.text}</p>
+                ) : (
+                  <p className="line-clamp-4">{summaryBlock.text}</p>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* Sidebar: Sources */}
-          <aside className="lg:col-span-1 bg-slate-50/30 px-5 py-6">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                {t('sources')}
-              </h4>
-              <span className="text-[11px] text-slate-400">{sortedCitations.length}</span>
             </div>
-            {sortedCitations.length === 0 ? (
-              <div className="text-xs text-slate-400 italic py-4">{t('no_sources_cited')}</div>
-            ) : (
-              <div className="space-y-2">
+          )}
+
+          {/* Full Response — COLLAPSED BY DEFAULT */}
+          {(blocks.length > 0 || paragraphs.length > 0) && (
+            <div className="rounded-xl border border-slate-200/70 bg-white overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="w-full flex items-center justify-between gap-3 px-5 py-3 bg-slate-50/60 hover:bg-slate-100/60 transition text-start"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    {isHebrewResp ? '📄 תשובת AI מלאה' : '📄 Full AI Response'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    ({blocks.length || paragraphs.length} {isHebrewResp ? 'בלוקים' : 'blocks'})
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-indigo-600">
+                  {expanded ? (isHebrewResp ? 'הסתר ▲' : 'Hide ▲') : (isHebrewResp ? 'הצג ▼' : 'Show ▼')}
+                </span>
+              </button>
+              {expanded && (
+                <div
+                  dir={responseIsRTL ? 'rtl' : 'ltr'}
+                  className={`px-6 py-5 border-t border-slate-100 max-w-[68ch] ${responseIsRTL ? 'text-right' : 'text-left'}`}
+                >
+                  <MarkdownBlocks blocks={blocks} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sources (compact, full-width below) */}
+          {sortedCitations.length > 0 && (
+            <div className="rounded-xl border border-slate-200/70 bg-white p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  {isHebrewResp ? '🔗 ' : '🔗 '}{t('sources')}
+                </h4>
+                <span className="text-[11px] text-slate-400">{sortedCitations.length}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {sortedCitations.map((c) => (
                   <CitationCardSmall key={c.id} citation={c} yourDomainLabel={t('your_domain')} />
                 ))}
               </div>
-            )}
-          </aside>
+            </div>
+          )}
+
+          {(blocks.length === 0 && paragraphs.length === 0) && (
+            <p className="text-sm text-slate-400 italic">{t('no_response')}</p>
+          )}
         </div>
       )}
     </article>

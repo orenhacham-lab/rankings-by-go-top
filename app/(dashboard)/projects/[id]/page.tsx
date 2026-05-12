@@ -182,6 +182,43 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
+      {/* Project Module Navigation */}
+      <nav className="mb-6 -mx-1 overflow-x-auto" aria-label="Project modules">
+        <div className="flex items-center gap-1 px-1 py-1.5 bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-xl border border-slate-200/70 shadow-sm">
+          <a
+            href="#rankings"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-900 bg-white border border-slate-200 shadow-sm hover:shadow transition whitespace-nowrap"
+          >
+            <span className="text-base">📊</span>
+            <span>דירוגי Google</span>
+          </a>
+          <a
+            href="#rankings"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white/70 hover:text-slate-900 transition whitespace-nowrap"
+          >
+            <span className="text-base">🗺️</span>
+            <span>Google Maps</span>
+          </a>
+          {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
+            <a
+              href="#ai-visibility"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 shadow-sm hover:shadow-md transition whitespace-nowrap"
+            >
+              <span className="text-base">✨</span>
+              <span>נראות AI</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/25 font-bold tracking-wider">חדש</span>
+            </a>
+          )}
+          <Link
+            href={`/reports?project_id=${id}`}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white/70 hover:text-slate-900 transition whitespace-nowrap"
+          >
+            <span className="text-base">📄</span>
+            <span>דוחות</span>
+          </Link>
+        </div>
+      </nav>
+
       {/* Project Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card>
@@ -234,7 +271,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Tracking Targets */}
-      <div className="flex items-center justify-between mb-4">
+      <div id="rankings" className="flex items-center justify-between mb-4 scroll-mt-6">
         <h2 className="text-lg font-semibold text-slate-800">
           מילות מפתח ({targets.length})
         </h2>

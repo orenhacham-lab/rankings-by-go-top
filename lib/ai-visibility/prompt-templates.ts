@@ -1,17 +1,16 @@
 /**
- * Smart prompt suggestion generator (deterministic, template-based).
- * No external LLM calls — pure local logic.
+ * Smart AI Query generator — deterministic, niche-aware, intent-driven.
  *
- * Inputs:
- *   - business name, target domain (for category detection + filling)
- *   - country, language (for templates + country name lookup)
- *   - city (for local intent)
- *   - tracked keywords (for theme extraction → keyword-derived prompts)
+ * Generates realistic AI-search questions specific to:
+ *   - business category (SEO agency, cleaning company, restaurant, etc.)
+ *   - location (city/country)
+ *   - tracked keywords (theme extraction)
+ *   - business name (brand-specific questions)
  *
- * Output: array of PromptSuggestion typed by intent + category.
+ * Quality goal: each question should be the kind a real customer would ask
+ * ChatGPT/Perplexity/Gemini when researching what to hire/buy/visit.
  *
- * Multi-language: returns Hebrew prompts when language='he', English otherwise.
- * Intent variety: brand, comparison, local, transactional, recommendation, informational.
+ * NOT generic spam. Intent-based, commercially useful, locally relevant.
  */
 
 export type PromptIntent =
@@ -21,12 +20,15 @@ export type PromptIntent =
   | 'transactional'
   | 'recommendation'
   | 'informational'
+  | 'commercial'
+  | 'alternatives'
 
 export type BusinessCategory =
   | 'agency'
   | 'ecommerce'
   | 'saas'
   | 'local_service'
+  | 'cleaning'
   | 'florist'
   | 'restaurant'
   | 'healthcare'
@@ -43,6 +45,7 @@ export type PromptSuggestion = {
   intent: PromptIntent
   category: BusinessCategory
   language: string
+  qualityScore: number
 }
 
 type TemplateContext = {
@@ -54,7 +57,8 @@ type TemplateContext = {
 }
 
 /**
- * Heuristic category detection from business name + domain + keywords.
+ * Niche detection from business name + domain + keywords.
+ * Order matters — more specific categories first.
  */
 export function detectCategory(
   business: string,
@@ -63,379 +67,462 @@ export function detectCategory(
 ): BusinessCategory {
   const text = `${business} ${domain} ${keywords.join(' ')}`.toLowerCase()
 
-  if (/(seo|ppc|sem|google ads|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text)) return 'agency'
-  if (/(shop|store|ecommerce|חנות|קניות|אונליין)/.test(text)) return 'ecommerce'
+  if (/(ניקיון|cleaner|cleaning|פוליש|פוליסה|טיטוח|nettoyage)/.test(text)) return 'cleaning'
+  if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל|פרסום ממומן|אנליסט)/.test(text))
+    return 'agency'
+  if (/(shop|store|ecommerce|חנות|קניות|אונליין|retail)/.test(text)) return 'ecommerce'
   if (/(saas|app|software|cloud|platform|api|\.io|\.ai)/.test(text)) return 'saas'
   if (/(flower|florist|פרחים|זרים|זר)/.test(text)) return 'florist'
   if (/(restaurant|cafe|food|bistro|מסעדה|קפה|אוכל|פיצה)/.test(text)) return 'restaurant'
   if (/(clinic|hospital|medical|doctor|dental|מרפאה|רופא|רפואה|שיניים)/.test(text)) return 'healthcare'
   if (/(law|legal|attorney|lawyer|עורך דין|עורכי דין|משפט)/.test(text)) return 'legal'
-  if (/(realty|real.estate|properties|נדל"ן|נדלן|דירות)/.test(text)) return 'real_estate'
+  if (/(realty|real.estate|properties|נדל"ן|נדלן|דירות|תיווך)/.test(text)) return 'real_estate'
   if (/(gym|fitness|yoga|crossfit|כושר|יוגה)/.test(text)) return 'fitness'
   if (/(salon|spa|beauty|hair|nails|מספרה|ספא|יופי)/.test(text)) return 'beauty'
   if (/(school|academy|course|education|מכללה|בית ספר|קורס)/.test(text)) return 'education'
-  if (/(electrician|plumber|cleaner|hvac|חשמלאי|אינסטלטור|ניקיון)/.test(text)) return 'local_service'
+  if (/(electrician|plumber|hvac|חשמלאי|אינסטלטור)/.test(text)) return 'local_service'
 
   return 'generic'
 }
 
 /**
- * Hebrew templates — expanded for each category (8-12 templates each for variety).
+ * Hebrew query bank — niche-specific, intent-driven, real customer questions.
+ * Each [intent, query, qualityScore] tuple. qualityScore 0-100 influences ranking.
  */
-const TEMPLATES_HE: Record<BusinessCategory, [PromptIntent, string][]> = {
+const QUERIES_HE: Record<BusinessCategory, Array<[PromptIntent, string, number]>> = {
   agency: [
-    ['recommendation', 'מי הן חברות קידום האתרים המובילות בישראל?'],
-    ['recommendation', 'איזו חברת SEO מומלצת לעסק קטן?'],
-    ['recommendation', 'חברות פרסום ממומן מומלצות בישראל'],
-    ['recommendation', 'מומחי Google Ads מומלצים בישראל'],
-    ['comparison', 'מה ההבדל בין סוכנויות SEO גדולות לקטנות?'],
-    ['comparison', 'השוואה בין חברות שיווק דיגיטלי בישראל'],
-    ['comparison', 'מה עדיף - SEO או Google Ads?'],
-    ['brand', 'מה אפשר לספר על {{business}}?'],
-    ['brand', 'חוות דעת על {{business}}'],
-    ['local', 'סוכנות SEO מומלצת ב{{city}}'],
-    ['local', 'חברת קידום אתרים ב{{city}}'],
-    ['transactional', 'איך לבחור חברת קידום אתרים'],
-    ['transactional', 'איך לבחור סוכנות שיווק דיגיטלי'],
-    ['informational', 'כמה עולה קידום אתרים בישראל?'],
-    ['informational', 'מה זה SEO וכמה הוא עולה?'],
-    ['informational', 'מהן השיטות העדכניות לקידום אתרים ב-2026?'],
+    ['recommendation', 'מי חברת SEO מומלצת לעסקים קטנים?', 95],
+    ['recommendation', 'איזו סוכנות SEO הכי טובה בישראל?', 95],
+    ['recommendation', 'מי מומלץ לקידום אורגני בישראל?', 93],
+    ['recommendation', 'מי החברות המובילות בקידום אתרים בישראל?', 92],
+    ['recommendation', 'מומחי Google Ads מומלצים בישראל', 90],
+    ['recommendation', 'מי מומלץ לניהול קמפיינים ממומנים?', 90],
+    ['transactional', 'איך לבחור משרד פרסום דיגיטלי?', 88],
+    ['transactional', 'איך לבחור חברת קידום אתרים?', 88],
+    ['transactional', 'מה צריך לבדוק לפני שכירת חברת SEO?', 87],
+    ['comparison', 'מה עדיף - קידום אורגני או ממומן?', 85],
+    ['comparison', 'השוואה בין חברות שיווק דיגיטלי בישראל', 85],
+    ['comparison', 'מה ההבדל בין חברת SEO לחברת ממומן?', 84],
+    ['commercial', 'כמה עולה קידום אתרים בישראל?', 90],
+    ['commercial', 'כמה עולה ניהול Google Ads?', 88],
+    ['commercial', 'מחיר חודשי לחברת SEO', 85],
+    ['local', 'חברת קידום אתרים מומלצת ב{{city}}', 88],
+    ['local', 'סוכנות שיווק דיגיטלי ב{{city}}', 86],
+    ['brand', 'מה הניסיון של {{business}}?', 75],
+    ['brand', 'חוות דעת על {{business}}', 70],
+    ['informational', 'מה זה SEO וכמה זה לוקח להראות תוצאות?', 80],
+    ['alternatives', 'אלטרנטיבות לחברת {{business}}', 78],
   ],
+
+  cleaning: [
+    ['recommendation', 'חברת ניקיון משרדים מומלצת ב{{city}}', 95],
+    ['recommendation', 'מי מומלץ לניקיון משרדים ב{{city}}?', 94],
+    ['recommendation', 'חברת ניקיון מומלצת לעסקים קטנים', 92],
+    ['recommendation', 'מי חברת הניקיון הטובה ביותר ב{{city}}?', 92],
+    ['recommendation', 'חברות ניקיון משרדים עם המלצות טובות', 90],
+    ['recommendation', 'חברת פוליש וניקיון מומלצת ב{{city}}', 88],
+    ['transactional', 'איך לבחור חברת ניקיון אמינה?', 85],
+    ['commercial', 'כמה עולה ניקיון משרדים?', 90],
+    ['commercial', 'מחיר לניקיון משרד חודשי', 86],
+    ['commercial', 'תעריפים לחברת ניקיון מקצועית', 84],
+    ['local', 'שירותי ניקיון לעסקים ב{{city}}', 90],
+    ['local', 'ניקיון משרדים באזור {{city}}', 88],
+    ['comparison', 'מה ההבדל בין חברת ניקיון פרטית למקצועית?', 80],
+    ['brand', 'חוות דעת על חברת {{business}}', 70],
+    ['informational', 'באיזו תדירות צריך לנקות משרד?', 75],
+  ],
+
   ecommerce: [
-    ['recommendation', 'אילו חנויות אונליין מומלצות בישראל?'],
-    ['comparison', 'איפה הכי משתלם לקנות אונליין בישראל?'],
-    ['comparison', 'השוואה בין חנויות אונליין מובילות'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['brand', 'חוות דעת על {{business}}'],
-    ['transactional', 'איפה לקנות מ-{{business}} אונליין?'],
-    ['transactional', 'איך להזמין מ-{{business}}'],
-    ['informational', 'איך לבחור חנות אונליין אמינה'],
-    ['informational', 'איך לקנות בבטחה אונליין'],
+    ['recommendation', 'אילו חנויות אונליין מומלצות בישראל?', 88],
+    ['recommendation', 'איפה הכי משתלם לקנות {{business}}?', 85],
+    ['comparison', 'איפה לקנות הכי זול אונליין בישראל?', 88],
+    ['comparison', 'השוואה בין חנויות אונליין מובילות', 84],
+    ['commercial', 'מה המחירים של {{business}}?', 80],
+    ['commercial', 'כמה עולה משלוח מ-{{business}}?', 78],
+    ['transactional', 'איך להזמין מ-{{business}}?', 75],
+    ['transactional', 'מה זמני האספקה של {{business}}?', 73],
+    ['brand', 'חוות דעת על {{business}}', 70],
+    ['informational', 'איך לבחור חנות אונליין אמינה?', 78],
+    ['informational', 'מה הזכויות שלי אם המוצר פגום?', 70],
+    ['alternatives', 'אלטרנטיבות ל-{{business}}', 75],
   ],
+
   saas: [
-    ['recommendation', 'אילו פלטפורמות SaaS מומלצות לעסקים בישראל?'],
-    ['recommendation', 'כלי AI מומלצים לעסקים'],
-    ['comparison', 'השוואה בין כלי SaaS פופולריים'],
-    ['comparison', 'אלטרנטיבות ל-{{business}}'],
-    ['brand', 'מה אפשר לספר על {{business}}?'],
-    ['brand', 'חוות דעת על {{business}}'],
-    ['transactional', 'איך לבחור כלי SaaS לעסק שלי'],
-    ['informational', 'מה הוא {{business}} ולמה צריך אותו?'],
+    ['recommendation', 'אילו כלי SaaS מומלצים לעסקים בישראל?', 90],
+    ['recommendation', 'כלי AI מומלצים לעסקים', 88],
+    ['recommendation', 'איזה CRM מומלץ לסטארטאפים?', 85],
+    ['comparison', 'מה ההבדל בין {{business}} למתחרים?', 85],
+    ['comparison', 'השוואה בין כלי SaaS פופולריים', 80],
+    ['alternatives', 'אלטרנטיבות ל-{{business}}', 88],
+    ['alternatives', 'מה דומה ל-{{business}} אבל זול יותר?', 86],
+    ['commercial', 'כמה עולה {{business}}?', 80],
+    ['commercial', 'מה המודל התמחורי של {{business}}?', 78],
+    ['transactional', 'איך להתחיל עם {{business}}?', 75],
+    ['brand', 'חוות דעת על {{business}}', 70],
+    ['informational', 'מה זה {{business}} ולמה צריך אותו?', 75],
   ],
+
   florist: [
-    ['recommendation', 'חנות פרחים מומלצת ב{{city}}'],
-    ['recommendation', 'איפה לקנות פרחים איכותיים ב{{city}}?'],
-    ['local', 'משלוח פרחים ב{{city}}'],
-    ['local', 'חנות פרחים פתוחה כעת ב{{city}}'],
-    ['transactional', 'משלוח פרחים היום ב{{city}}'],
-    ['transactional', 'הזמנת זר פרחים אונליין'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['informational', 'איך לבחור חנות פרחים אמינה'],
+    ['recommendation', 'חנות פרחים מומלצת ב{{city}}', 92],
+    ['recommendation', 'איפה הכי טוב לקנות פרחים ב{{city}}?', 90],
+    ['local', 'משלוח פרחים מהיר ב{{city}}', 88],
+    ['local', 'חנות פרחים פתוחה עכשיו ב{{city}}', 86],
+    ['commercial', 'מחירים לזרי פרחים ב{{city}}', 85],
+    ['transactional', 'איך להזמין משלוח פרחים מהר?', 80],
+    ['transactional', 'הזמנת זר פרחים אונליין', 78],
+    ['brand', 'חוות דעת על {{business}}', 70],
+    ['informational', 'איך לבחור פרחים לאירוע?', 70],
   ],
+
   restaurant: [
-    ['recommendation', 'מסעדות מומלצות ב{{city}}'],
-    ['recommendation', 'מסעדות חדשות ושוות ב{{city}}'],
-    ['local', 'איפה לאכול ב{{city}}?'],
-    ['local', 'מסעדה רומנטית ב{{city}}'],
-    ['comparison', 'המסעדות הכי טובות ב{{city}}'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['informational', 'איפה לחגוג יום הולדת ב{{city}}'],
+    ['recommendation', 'המסעדות הכי טובות ב{{city}}', 95],
+    ['recommendation', 'מסעדות חדשות ומומלצות ב{{city}}', 92],
+    ['recommendation', 'איפה הכי כדאי לאכול ב{{city}}?', 90],
+    ['local', 'מסעדה רומנטית ב{{city}}', 88],
+    ['local', 'מסעדה כשרה מומלצת ב{{city}}', 85],
+    ['local', 'מסעדה פתוחה לארוחת ערב ב{{city}}', 80],
+    ['comparison', 'אילו מסעדות הכי מומלצות ל{{city}}?', 84],
+    ['commercial', 'מסעדה במחיר סביר ב{{city}}', 82],
+    ['brand', 'חוות דעת על {{business}}', 70],
+    ['informational', 'איפה לחגוג יום הולדת ב{{city}}?', 80],
   ],
+
   healthcare: [
-    ['recommendation', 'מרפאות פרטיות מומלצות בישראל'],
-    ['recommendation', 'הרופאים הטובים בישראל בתחום שלך'],
-    ['local', 'רופא מומחה ב{{city}}'],
-    ['local', 'מרפאת שיניים מומלצת ב{{city}}'],
-    ['brand', 'חוות דעת על {{business}}'],
-    ['informational', 'איך לבחור רופא פרטי'],
+    ['recommendation', 'מרפאות פרטיות מומלצות ב{{city}}', 92],
+    ['recommendation', 'מי הרופאים המומלצים ב{{city}}?', 90],
+    ['recommendation', 'מרפאת שיניים מומלצת ב{{city}}', 88],
+    ['local', 'רופא מומחה ב{{city}}', 85],
+    ['local', 'מרפאה פתוחה הערב ב{{city}}', 80],
+    ['transactional', 'איך לבחור רופא פרטי טוב?', 78],
+    ['commercial', 'מחירי טיפולים ב{{business}}', 75],
+    ['brand', 'חוות דעת על {{business}}', 70],
   ],
+
   legal: [
-    ['recommendation', 'משרדי עורכי דין מובילים בישראל'],
-    ['recommendation', 'עורכי דין מומלצים לדיני משפחה'],
-    ['local', 'עורך דין ב{{city}}'],
-    ['comparison', 'איך לבחור עורך דין נכון'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['informational', 'מתי כדאי לפנות לעורך דין'],
+    ['recommendation', 'משרדי עורכי דין מובילים בישראל', 92],
+    ['recommendation', 'עורכי דין מומלצים לדיני משפחה', 90],
+    ['recommendation', 'עורך דין פלילי מומלץ ב{{city}}', 88],
+    ['recommendation', 'עורך דין מסחרי מומלץ בישראל', 86],
+    ['local', 'עורך דין ב{{city}}', 84],
+    ['transactional', 'איך לבחור עורך דין מקצועי?', 85],
+    ['commercial', 'כמה עולה ייעוץ משפטי?', 88],
+    ['brand', 'חוות דעת על {{business}}', 72],
+    ['informational', 'מתי כדאי לפנות לעורך דין?', 75],
   ],
+
   real_estate: [
-    ['recommendation', 'חברות נדל"ן מומלצות בישראל'],
-    ['recommendation', 'מתווכים מומלצים ב{{city}}'],
-    ['local', 'דירות למכירה ב{{city}}'],
-    ['local', 'משרד תיווך ב{{city}}'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['informational', 'איך לבחור מתווך אמין'],
+    ['recommendation', 'חברות נדל"ן מומלצות בישראל', 90],
+    ['recommendation', 'מתווכים מומלצים ב{{city}}', 88],
+    ['local', 'משרד תיווך אמין ב{{city}}', 85],
+    ['local', 'דירות למכירה ב{{city}}', 82],
+    ['commercial', 'כמה גובה מתווך נדל"ן?', 85],
+    ['transactional', 'איך לבחור מתווך נדל"ן אמין?', 82],
+    ['brand', 'חוות דעת על {{business}}', 70],
+    ['informational', 'מה צריך לבדוק לפני קניית דירה?', 78],
   ],
+
   fitness: [
-    ['recommendation', 'חדרי כושר מומלצים ב{{city}}'],
-    ['local', 'מאמן כושר אישי ב{{city}}'],
-    ['local', 'סטודיו לכושר ב{{city}}'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['informational', 'איך לבחור חדר כושר'],
+    ['recommendation', 'חדרי כושר מומלצים ב{{city}}', 90],
+    ['recommendation', 'מאמן כושר אישי מומלץ ב{{city}}', 88],
+    ['local', 'סטודיו לכושר ב{{city}}', 84],
+    ['local', 'קלאסי יוגה ב{{city}}', 80],
+    ['commercial', 'כמה עולה מנוי לחדר כושר?', 85],
+    ['transactional', 'איך לבחור חדר כושר נכון?', 80],
+    ['brand', 'חוות דעת על {{business}}', 70],
   ],
+
   beauty: [
-    ['recommendation', 'מספרות מומלצות ב{{city}}'],
-    ['recommendation', 'סלון יופי מומלץ ב{{city}}'],
-    ['local', 'מניקור ב{{city}}'],
-    ['local', 'טיפולי פנים ב{{city}}'],
-    ['brand', 'חוות דעת על {{business}}'],
+    ['recommendation', 'מספרות מומלצות ב{{city}}', 92],
+    ['recommendation', 'סלון יופי מומלץ ב{{city}}', 90],
+    ['recommendation', 'איפה לעשות מניקור מקצועי ב{{city}}?', 85],
+    ['local', 'טיפולי פנים ב{{city}}', 82],
+    ['commercial', 'מחירים לטיפולי יופי ב{{city}}', 80],
+    ['brand', 'חוות דעת על {{business}}', 72],
   ],
+
   education: [
-    ['recommendation', 'בתי ספר ומכללות מומלצים בישראל'],
-    ['recommendation', 'קורסי הייטק מומלצים בישראל'],
-    ['local', 'קורסים מקצועיים ב{{city}}'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['informational', 'איך לבחור קורס מקצועי'],
+    ['recommendation', 'קורסי הייטק מומלצים בישראל', 90],
+    ['recommendation', 'בתי ספר ומכללות מומלצים', 88],
+    ['recommendation', 'איזה קורס פיתוח Web מומלץ ב-2026?', 86],
+    ['commercial', 'כמה עולה קורס מקצועי בהייטק?', 85],
+    ['comparison', 'השוואה בין מכללות פרטיות בישראל', 80],
+    ['transactional', 'איך לבחור קורס מקצועי?', 78],
+    ['brand', 'חוות דעת על {{business}}', 70],
   ],
+
   local_service: [
-    ['recommendation', 'בעלי מקצוע מומלצים ב{{city}}'],
-    ['local', 'שירות מקצועי באזור {{city}}'],
-    ['local', 'תיקון דחוף ב{{city}}'],
-    ['brand', 'מה דעתכם על {{business}}?'],
-    ['transactional', 'איך לקבל הצעת מחיר מ-{{business}}'],
+    ['recommendation', 'בעלי מקצוע מומלצים ב{{city}}', 90],
+    ['recommendation', 'חשמלאי מומלץ ב{{city}}', 88],
+    ['recommendation', 'אינסטלטור מומלץ ב{{city}}', 88],
+    ['local', 'שירות מקצועי מהיר באזור {{city}}', 85],
+    ['local', 'תיקון דחוף ב{{city}}', 80],
+    ['commercial', 'מחירים לשירות מקצועי ב{{city}}', 82],
+    ['transactional', 'איך לקבל הצעת מחיר מ-{{business}}?', 75],
+    ['brand', 'חוות דעת על {{business}}', 70],
   ],
+
   generic: [
-    ['recommendation', 'עסקים מומלצים בישראל'],
-    ['brand', 'מה אפשר לספר על {{business}}?'],
-    ['brand', 'חוות דעת על {{business}}'],
-    ['local', 'שירות איכותי ב{{city}}'],
-    ['informational', 'איך לבחור עסק אמין'],
+    ['recommendation', 'עסקים מומלצים בתחום של {{business}}', 75],
+    ['brand', 'מה אפשר לספר על {{business}}?', 70],
+    ['brand', 'חוות דעת על {{business}}', 68],
+    ['informational', 'מה התחום של {{business}}?', 65],
+    ['alternatives', 'אלטרנטיבות ל-{{business}}', 70],
   ],
 }
 
 /**
- * English templates.
+ * English query bank — niche-specific, intent-driven, real customer questions.
  */
-const TEMPLATES_EN: Record<BusinessCategory, [PromptIntent, string][]> = {
+const QUERIES_EN: Record<BusinessCategory, Array<[PromptIntent, string, number]>> = {
   agency: [
-    ['recommendation', 'Best SEO agencies in {{country_full}}'],
-    ['recommendation', 'Recommended SEO agency in {{country_full}}'],
-    ['recommendation', 'Best PPC company in {{country_full}}'],
-    ['recommendation', 'Top Google Ads experts in {{country_full}}'],
-    ['recommendation', 'Top digital marketing agencies in {{country_full}}'],
-    ['comparison', 'SEO vs Google Ads — which is better for small business?'],
-    ['comparison', 'Compare top digital marketing agencies in {{country_full}}'],
-    ['brand', 'What can you tell me about {{business}}?'],
-    ['brand', 'Reviews of {{business}}'],
-    ['local', 'SEO agency in {{city}}'],
-    ['local', 'Digital marketing agency in {{city}}'],
-    ['transactional', 'How to choose a digital marketing agency'],
-    ['transactional', 'How to choose an SEO agency'],
-    ['informational', 'SEO services pricing in {{country_full}}'],
-    ['informational', 'What is SEO and how much does it cost?'],
-    ['informational', 'Latest SEO trends for 2026'],
+    ['recommendation', 'Best SEO agency in {{country}}', 95],
+    ['recommendation', 'Top digital marketing agencies in {{country}}', 93],
+    ['recommendation', 'Who should manage Google Ads campaigns?', 90],
+    ['recommendation', 'Recommended SEO companies for small businesses', 92],
+    ['recommendation', 'Best PPC agencies in {{country}}', 88],
+    ['transactional', 'How to choose a digital marketing agency', 88],
+    ['transactional', 'How to vet an SEO company', 86],
+    ['comparison', 'SEO agency vs in-house SEO team', 85],
+    ['comparison', 'SEO vs PPC: which is better?', 84],
+    ['commercial', 'How much does SEO cost in {{country}}?', 90],
+    ['commercial', 'Average monthly retainer for SEO services', 85],
+    ['local', 'Top SEO agency in {{city}}', 86],
+    ['brand', 'Reviews of {{business}}', 70],
+    ['alternatives', 'Alternatives to {{business}}', 75],
+    ['informational', 'How long does SEO take to show results?', 78],
   ],
+
+  cleaning: [
+    ['recommendation', 'Best office cleaning company in {{city}}', 95],
+    ['recommendation', 'Recommended cleaning services in {{city}}', 92],
+    ['recommendation', 'Top-rated commercial cleaners in {{country}}', 88],
+    ['transactional', 'How to choose a reliable cleaning company', 85],
+    ['commercial', 'Office cleaning cost per month', 90],
+    ['commercial', 'Average rate for commercial cleaning', 85],
+    ['local', 'Office cleaning service near {{city}}', 88],
+    ['brand', 'Reviews of {{business}}', 70],
+  ],
+
   ecommerce: [
-    ['recommendation', 'Best online stores in {{country_full}}'],
-    ['comparison', 'Top ecommerce sites in {{country_full}}'],
-    ['comparison', 'Compare online stores in {{country_full}}'],
-    ['brand', 'Reviews of {{business}}'],
-    ['transactional', 'Where to buy from {{business}} online'],
-    ['informational', 'How to choose a reliable online store'],
+    ['recommendation', 'Best online stores in {{country}}', 85],
+    ['recommendation', 'Top e-commerce retailers for {{business}}', 80],
+    ['comparison', 'Cheapest place to buy online in {{country}}', 86],
+    ['commercial', 'How much does {{business}} cost?', 78],
+    ['transactional', 'How to order from {{business}}', 75],
+    ['brand', 'Reviews of {{business}}', 70],
+    ['alternatives', 'Alternatives to {{business}}', 75],
   ],
+
   saas: [
-    ['recommendation', 'Best SaaS platforms for businesses'],
-    ['recommendation', 'Top AI tools for businesses'],
-    ['comparison', 'Compare {{business}} with alternatives'],
-    ['comparison', 'Best alternatives to {{business}}'],
-    ['brand', 'What is {{business}}?'],
-    ['transactional', 'How to choose a SaaS tool for my business'],
+    ['recommendation', 'Best SaaS tools for businesses in {{country}}', 88],
+    ['recommendation', 'Top AI tools for business in 2026', 85],
+    ['comparison', 'How does {{business}} compare to competitors?', 85],
+    ['alternatives', 'Alternatives to {{business}}', 90],
+    ['alternatives', 'Best alternative to {{business}}', 88],
+    ['commercial', 'How much does {{business}} cost?', 82],
+    ['commercial', 'Pricing comparison for {{business}}', 80],
+    ['brand', 'Is {{business}} worth it?', 75],
   ],
+
   florist: [
-    ['recommendation', 'Best flower shop in {{city}}'],
-    ['local', 'Flower delivery in {{city}}'],
-    ['transactional', 'Same-day flower delivery {{city}}'],
-    ['transactional', 'Order flowers online {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Best florist in {{city}}', 90],
+    ['local', 'Same-day flower delivery in {{city}}', 88],
+    ['commercial', 'Flower bouquet prices in {{city}}', 80],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   restaurant: [
-    ['recommendation', 'Best restaurants in {{city}}'],
-    ['recommendation', 'New restaurants in {{city}}'],
-    ['local', 'Where to eat in {{city}}'],
-    ['local', 'Romantic restaurant in {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Best restaurants in {{city}}', 92],
+    ['recommendation', 'New and recommended restaurants in {{city}}', 88],
+    ['local', 'Romantic dinner in {{city}}', 85],
+    ['comparison', 'Top-rated dining in {{city}}', 84],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   healthcare: [
-    ['recommendation', 'Top private clinics in {{country_full}}'],
-    ['local', 'Specialist doctor in {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
-    ['informational', 'How to choose a private doctor'],
+    ['recommendation', 'Top private clinics in {{city}}', 90],
+    ['recommendation', 'Best specialists in {{city}}', 88],
+    ['local', 'Dental clinic near {{city}}', 85],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   legal: [
-    ['recommendation', 'Top law firms in {{country_full}}'],
-    ['local', 'Lawyer in {{city}}'],
-    ['comparison', 'How to choose the right lawyer'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Top law firms in {{country}}', 90],
+    ['recommendation', 'Best family law attorneys in {{country}}', 88],
+    ['local', 'Lawyer in {{city}}', 84],
+    ['commercial', 'Legal consultation fees', 85],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   real_estate: [
-    ['recommendation', 'Top real estate agencies in {{country_full}}'],
-    ['local', 'Properties for sale in {{city}}'],
-    ['local', 'Real estate agent in {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Best real estate agents in {{city}}', 90],
+    ['local', 'Real estate office in {{city}}', 85],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   fitness: [
-    ['recommendation', 'Best gyms in {{city}}'],
-    ['local', 'Personal trainer in {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Best gyms in {{city}}', 90],
+    ['recommendation', 'Top personal trainers in {{city}}', 86],
+    ['commercial', 'Gym membership prices in {{city}}', 85],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   beauty: [
-    ['recommendation', 'Top salons in {{city}}'],
-    ['local', 'Beauty salon in {{city}}'],
-    ['local', 'Nail salon in {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Best salons in {{city}}', 90],
+    ['recommendation', 'Top beauty spa in {{city}}', 88],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   education: [
-    ['recommendation', 'Top schools/academies in {{country_full}}'],
-    ['local', 'Professional courses in {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Best tech courses in {{country}}', 88],
+    ['commercial', 'How much does a coding bootcamp cost?', 85],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   local_service: [
-    ['recommendation', 'Recommended professionals in {{city}}'],
-    ['local', 'Local services in {{city}}'],
-    ['brand', 'Reviews of {{business}}'],
+    ['recommendation', 'Recommended professionals in {{city}}', 88],
+    ['local', 'Emergency service near {{city}}', 80],
+    ['brand', 'Reviews of {{business}}', 70],
   ],
+
   generic: [
-    ['recommendation', 'Best businesses in {{country_full}}'],
-    ['brand', 'What can you tell me about {{business}}?'],
-    ['brand', 'Reviews of {{business}}'],
-    ['local', 'Recommended services in {{city}}'],
-    ['informational', 'How to find a reliable business'],
+    ['recommendation', 'Recommended businesses for {{business}}', 75],
+    ['brand', 'Reviews of {{business}}', 70],
+    ['alternatives', 'Alternatives to {{business}}', 70],
   ],
 }
 
-const COUNTRY_NAMES: Record<string, { he: string; en: string }> = {
-  IL: { he: 'ישראל', en: 'Israel' },
-  US: { he: 'ארה"ב', en: 'the US' },
-  GB: { he: 'בריטניה', en: 'the UK' },
-  DE: { he: 'גרמניה', en: 'Germany' },
-  FR: { he: 'צרפת', en: 'France' },
+const COUNTRY_NAMES_HE: Record<string, string> = {
+  IL: 'ישראל',
+  US: 'ארה"ב',
+  GB: 'בריטניה',
+  DE: 'גרמניה',
+  FR: 'צרפת',
+}
+
+const COUNTRY_NAMES_EN: Record<string, string> = {
+  IL: 'Israel',
+  US: 'USA',
+  GB: 'UK',
+  DE: 'Germany',
+  FR: 'France',
 }
 
 function fillTemplate(template: string, ctx: TemplateContext): string {
-  const countryFull =
-    ctx.country && COUNTRY_NAMES[ctx.country.toUpperCase()]
-      ? ctx.language === 'he'
-        ? COUNTRY_NAMES[ctx.country.toUpperCase()].he
-        : COUNTRY_NAMES[ctx.country.toUpperCase()].en
-      : ctx.country || ''
-
+  const isHe = ctx.language === 'he'
+  const countryName = isHe
+    ? COUNTRY_NAMES_HE[ctx.country || ''] || ctx.country || ''
+    : COUNTRY_NAMES_EN[ctx.country || ''] || ctx.country || ''
   return template
-    .replace(/\{\{business\}\}/g, ctx.business || (ctx.language === 'he' ? 'העסק שלי' : 'this business'))
+    .replace(/\{\{business\}\}/g, ctx.business || (isHe ? 'העסק' : 'the business'))
     .replace(/\{\{domain\}\}/g, ctx.domain || '')
-    .replace(/\{\{city\}\}/g, ctx.city || (ctx.language === 'he' ? 'אזורי' : 'my area'))
-    .replace(/\{\{country\}\}/g, ctx.country || '')
-    .replace(/\{\{country_full\}\}/g, countryFull)
-    .trim()
+    .replace(/\{\{city\}\}/g, ctx.city || (isHe ? 'אזורך' : 'your area'))
+    .replace(/\{\{country\}\}/g, countryName)
 }
 
 /**
- * Generate keyword-derived prompts from tracked keywords.
- * Picks 2-3 representative keywords and builds variant prompts.
+ * Generate keyword-derived queries from tracked SEO keywords.
+ * Transforms each keyword into a recommendation question.
  */
-function keywordDerivedPrompts(
+function keywordDerivedQueries(
   keywords: string[],
   ctx: TemplateContext,
-  existing: Set<string>
-): PromptSuggestion[] {
-  if (keywords.length === 0) return []
-  const out: PromptSuggestion[] = []
-  // Pick up to 3 distinct keywords (random shuffle)
-  const sample = [...keywords].sort(() => Math.random() - 0.5).slice(0, 3)
-  for (const kw of sample) {
-    const clean = kw.trim()
-    if (!clean) continue
-    const tpls = ctx.language === 'he'
-      ? [
-          ['informational', `${clean} - מי המובילים בתחום בישראל?`],
-          ['recommendation', `${clean} - חברות מומלצות`],
-          ['comparison', `איך לבחור שירות ${clean}`],
-        ] as [PromptIntent, string][]
-      : [
-          ['informational', `Who are the leaders in ${clean}?`],
-          ['recommendation', `Best ${clean} services`],
-          ['comparison', `How to choose ${clean} service`],
-        ] as [PromptIntent, string][]
-    for (const [intent, tpl] of tpls) {
-      const filled = fillTemplate(tpl, ctx)
-      if (filled && !existing.has(filled)) {
-        existing.add(filled)
-        out.push({
-          id: `kw-${intent}-${out.length}-${Date.now().toString(36).slice(-4)}`,
-          prompt: filled,
-          intent,
-          category: 'generic',
-          language: ctx.language,
-        })
+  category: BusinessCategory
+): Array<[PromptIntent, string, number]> {
+  if (!keywords || keywords.length === 0) return []
+  const isHe = ctx.language === 'he'
+  const results: Array<[PromptIntent, string, number]> = []
+
+  for (const kw of keywords.slice(0, 5)) {
+    const k = kw.trim()
+    if (!k) continue
+    if (isHe) {
+      results.push(['recommendation', `מי מומלץ ל${k}?`, 84])
+      if (ctx.city) {
+        results.push(['local', `${k} מומלץ ב${ctx.city}`, 82])
       }
+      results.push(['commercial', `כמה עולה ${k}?`, 80])
+    } else {
+      results.push(['recommendation', `Best ${k} recommendations`, 84])
+      if (ctx.city) {
+        results.push(['local', `${k} in ${ctx.city}`, 82])
+      }
+      results.push(['commercial', `How much does ${k} cost?`, 78])
     }
   }
-  return out
+  return results
 }
 
 /**
- * Generate prompt suggestions for a project.
+ * Generate smart AI query suggestions.
  *
- * @param input.businessName - Business / brand name
- * @param input.domain - Target domain
- * @param input.city - City (for local intent)
- * @param input.country - Country ISO code
- * @param input.language - Language code (he/en)
- * @param input.keywords - Tracked keywords for theme extraction
- * @param input.shuffle - If true, randomizes order + selects subset (regenerate behavior)
- * @param input.limit - Max suggestions to return (default 12)
+ * @param ctx Project context: business, domain, city, country, language
+ * @param keywords Optional tracked keywords for theme-derived queries
+ * @param shuffle If true, randomize order then return subset
+ * @param limit Maximum number of suggestions to return (default 12)
  */
-export function generatePromptSuggestions(input: {
+export function generatePromptSuggestions({
+  businessName,
+  domain,
+  city = null,
+  country = null,
+  language = 'he',
+  keywords = [],
+  shuffle = false,
+  limit = 12,
+}: {
   businessName: string | null
   domain: string | null
-  city: string | null
-  country: string | null
-  language: string | null
+  city?: string | null
+  country?: string | null
+  language?: string | null
   keywords?: string[]
   shuffle?: boolean
   limit?: number
 }): PromptSuggestion[] {
-  const business = input.businessName?.trim() || ''
-  const domain = input.domain?.trim() || ''
-  const city = input.city?.trim() || null
-  const country = input.country?.trim() || null
-  const language = (input.language || 'en').toLowerCase()
-  const keywords = (input.keywords || []).filter((k) => k && k.trim().length > 0)
-  const shuffle = input.shuffle ?? false
-  const limit = input.limit ?? 12
+  const business = businessName || ''
+  const dom = domain || ''
+  const lang = language || 'he'
+  const ctx: TemplateContext = { business, domain: dom, city, country, language: lang }
+  const category = detectCategory(business, dom, keywords)
+  const bank = lang === 'he' ? QUERIES_HE : QUERIES_EN
+  const templates = bank[category] || bank.generic
+  const keywordTemplates = keywordDerivedQueries(keywords, ctx, category)
 
-  const category = detectCategory(business, domain, keywords)
-  const templates = language === 'he' ? TEMPLATES_HE : TEMPLATES_EN
-  const familyTemplates = templates[category] || templates.generic
-
-  const ctx: TemplateContext = { business, domain, city, country, language }
+  // Combine + deduplicate
   const seen = new Set<string>()
-  const suggestions: PromptSuggestion[] = []
+  const combined: PromptSuggestion[] = []
 
-  // Category templates first
-  let entries = [...familyTemplates]
+  const processTemplates = (list: Array<[PromptIntent, string, number]>) => {
+    for (const [intent, raw, score] of list) {
+      const text = fillTemplate(raw, ctx).trim()
+      const key = text.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      combined.push({
+        id: `q-${combined.length}-${Math.random().toString(36).slice(2, 8)}`,
+        prompt: text,
+        intent,
+        category,
+        language: lang,
+        qualityScore: score,
+      })
+    }
+  }
+
+  processTemplates(templates)
+  processTemplates(keywordTemplates)
+
+  // Sort by quality score descending
+  combined.sort((a, b) => b.qualityScore - a.qualityScore)
+
+  // Shuffle if requested (for regenerate button)
   if (shuffle) {
-    entries = entries.sort(() => Math.random() - 0.5)
+    for (let i = combined.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[combined[i], combined[j]] = [combined[j], combined[i]]
+    }
   }
 
-  for (const [intent, tpl] of entries) {
-    const filled = fillTemplate(tpl, ctx)
-    if (!filled || seen.has(filled)) continue
-    seen.add(filled)
-    suggestions.push({
-      id: `${category}-${intent}-${suggestions.length}-${shuffle ? Date.now().toString(36).slice(-4) : 'a'}`,
-      prompt: filled,
-      intent,
-      category,
-      language,
-    })
-    if (suggestions.length >= limit - 2) break
-  }
-
-  // Add keyword-derived prompts
-  const kwPrompts = keywordDerivedPrompts(keywords, ctx, seen)
-  for (const kw of kwPrompts) {
-    suggestions.push(kw)
-    if (suggestions.length >= limit) break
-  }
-
-  return suggestions
+  return combined.slice(0, limit)
 }
