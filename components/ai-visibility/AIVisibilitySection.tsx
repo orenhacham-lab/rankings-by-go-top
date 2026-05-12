@@ -34,6 +34,7 @@ import ScanHistory from './ScanHistory'
 import { parseBlocks, toParagraphs } from '@/lib/ai-visibility/clean-response-text'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
 import AIInsightCards from './AIInsightCards'
+import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
 
 type Prompt = {
   id: string
@@ -150,6 +151,7 @@ export default function AIVisibilitySection({
   const [creating, setCreating] = useState(false)
 
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null)
+  const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   const [runningKey, setRunningKey] = useState<string | null>(null)
   const [latestRun, setLatestRun] = useState<RunResults | null>(null)
   const [historyRefresh, setHistoryRefresh] = useState(0)
@@ -183,6 +185,20 @@ export default function AIVisibilitySection({
   useEffect(() => {
     loadPrompts()
   }, [loadPrompts])
+
+  // Generate smart question suggestions
+  useEffect(() => {
+    const suggestions = generatePromptSuggestions({
+      businessName: projectBrandName,
+      domain: projectDomain,
+      city: projectCity || null,
+      country: projectCountry,
+      language: projectLanguage,
+      keywords: projectKeywords,
+      shuffle: false,
+    })
+    setSuggestedQuestions(suggestions.slice(0, 4))
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords])
 
   async function handleCreatePrompt(e: React.FormEvent) {
     e.preventDefault()
@@ -356,6 +372,20 @@ export default function AIVisibilitySection({
 
       {/* INSIGHTS STRIP */}
       {kpis && <InsightsStrip kpis={kpis} t={t} />}
+
+      {/* SMART QUESTIONS — Recommended questions section */}
+      {suggestedQuestions.length > 0 && (
+        <SmartQuestionsStrip
+          questions={suggestedQuestions}
+          projectId={projectId}
+          country={projectCountry}
+          language={projectLanguage}
+          domain={projectDomain}
+          businessName={projectBrandName}
+          onAdded={loadPrompts}
+          t={t}
+        />
+      )}
 
       {/* WORKSPACE: 2-Column Layout */}
       {loading ? (
@@ -1127,5 +1157,124 @@ function CitationCardSmall({
         </div>
       </div>
     </a>
+  )
+}
+
+function SmartQuestionsStrip({
+  questions,
+  projectId,
+  country,
+  language,
+  domain,
+  businessName,
+  onAdded,
+  t,
+}: {
+  questions: PromptSuggestion[]
+  projectId: string
+  country: string | null
+  language: string | null
+  domain: string | null
+  businessName: string | null
+  onAdded: () => void
+  t: T
+}) {
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  const intentLabel = (intent: string): string => {
+    switch (intent) {
+      case 'brand': return t('intent_brand')
+      case 'comparison': return t('intent_comparison')
+      case 'local': return t('intent_local')
+      case 'transactional': return t('intent_transactional')
+      case 'recommendation': return t('intent_recommendation')
+      case 'informational': return t('intent_informational')
+      default: return intent
+    }
+  }
+
+  const intentTone: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
+    brand: 'info',
+    comparison: 'warning',
+    local: 'success',
+    transactional: 'warning',
+    recommendation: 'info',
+    informational: 'neutral',
+  }
+
+  async function addQuestion(question: PromptSuggestion) {
+    setSavingId(question.id)
+    try {
+      const res = await fetch('/api/ai-visibility/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          prompt: question.prompt,
+          country,
+          language,
+          targetDomain: domain,
+          targetBrandName: businessName,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${res.status}`)
+      }
+      onAdded()
+    } catch (e) {
+      console.error(e instanceof Error ? e.message : 'Failed to add question')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200/70 bg-gradient-to-br from-indigo-50/40 to-white p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold uppercase tracking-wider text-indigo-700">
+            💡 {t('smart_questions_title')}
+          </span>
+          <span className="text-xs text-slate-500">({questions.length})</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {questions.map((q) => (
+          <div
+            key={q.id}
+            className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm transition"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-slate-900 font-medium line-clamp-2 mb-2">{q.prompt}</p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge
+                  variant={intentTone[q.intent] || 'neutral'}
+                  className="!text-[9px] !px-1.5 !py-0"
+                >
+                  {intentLabel(q.intent)}
+                </Badge>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {q.qualityScore}% quality
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => addQuestion(q)}
+              disabled={savingId === q.id}
+              className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              title={t('add')}
+            >
+              {savingId === q.id ? (
+                <span className="w-3.5 h-3.5 border-2 border-indigo-700 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                '+'
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
