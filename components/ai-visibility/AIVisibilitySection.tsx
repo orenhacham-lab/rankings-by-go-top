@@ -26,6 +26,9 @@ import PromptSuggestions from './PromptSuggestions'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
 import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
 
+// Fixed list of supported AI engines — always shown, regardless of results
+const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode', 'claude'] as const
+
 type ResultRow = {
   id: string
   runId: string
@@ -127,34 +130,46 @@ export default function AIVisibilitySection({
       setAllResults(results)
 
       // Aggregate metrics
-      if (results.length > 0) {
-        const engines = new Set<string>()
-        const engineMap = new Map<string, EngineMetrics>()
-        let totalMentions = 0
-        let totalCitations = 0
+      const engines = new Set<string>()
+      const engineMap = new Map<string, EngineMetrics>()
+      let totalMentions = 0
+      let totalCitations = 0
 
-        results.forEach((r) => {
-          if (r.status === 'success') {
-            engines.add(r.engine)
-            if (r.mentioned) totalMentions++
-            if (r.targetCited) totalCitations++
-
-            const existing = engineMap.get(r.engine) || {
-              engine: r.engine,
-              scans: 0,
-              mentions: 0,
-              citations: 0,
-              rate: 0,
-            }
-            existing.scans++
-            if (r.mentioned) existing.mentions++
-            existing.citations += r.citationCount
-            existing.rate = Math.round((existing.mentions / existing.scans) * 100)
-            engineMap.set(r.engine, existing)
-          }
+      // Initialize all supported engines with 0 metrics
+      SUPPORTED_ENGINES.forEach((engine) => {
+        engineMap.set(engine, {
+          engine,
+          scans: 0,
+          mentions: 0,
+          citations: 0,
+          rate: 0,
         })
+      })
 
-        const successfulScans = results.filter((r) => r.status === 'success').length
+      // Aggregate from results
+      results.forEach((r) => {
+        if (r.status === 'success') {
+          engines.add(r.engine)
+          if (r.mentioned) totalMentions++
+          if (r.targetCited) totalCitations++
+
+          const existing = engineMap.get(r.engine) || {
+            engine: r.engine,
+            scans: 0,
+            mentions: 0,
+            citations: 0,
+            rate: 0,
+          }
+          existing.scans++
+          if (r.mentioned) existing.mentions++
+          existing.citations += r.citationCount
+          existing.rate = existing.scans > 0 ? Math.round((existing.mentions / existing.scans) * 100) : 0
+          engineMap.set(r.engine, existing)
+        }
+      })
+
+      const successfulScans = results.filter((r) => r.status === 'success').length
+      if (successfulScans > 0 || results.length > 0) {
         setGlobalMetrics({
           totalScans: successfulScans,
           totalMentions,
@@ -163,12 +178,18 @@ export default function AIVisibilitySection({
           citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
           enginesCovered: engines.size,
         })
-
-        setEngineMetrics(engineMap)
       } else {
-        setGlobalMetrics(null)
-        setEngineMetrics(new Map())
+        setGlobalMetrics({
+          totalScans: 0,
+          totalMentions: 0,
+          totalCitations: 0,
+          mentionRate: 0,
+          citationRate: 0,
+          enginesCovered: 0,
+        })
       }
+
+      setEngineMetrics(engineMap)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load results')
     } finally {
@@ -255,14 +276,12 @@ export default function AIVisibilitySection({
             <GlobalOverviewPanel metrics={globalMetrics} t={t} />
           )}
 
-          {/* ENGINE SUMMARY CARDS */}
-          {engineMetrics.size > 0 && (
-            <EngineSummaryCards metrics={engineMetrics} t={t} />
-          )}
+          {/* ENGINE SUMMARY CARDS — always show all supported engines */}
+          <EngineSummaryCards metrics={engineMetrics} t={t} />
 
-          {/* FILTER BAR */}
+          {/* FILTER BAR — show all supported engines */}
           <FilterBar
-            engines={Array.from(engineMetrics.keys())}
+            engines={SUPPORTED_ENGINES as unknown as string[]}
             filterEngine={filterEngine}
             filterMentioned={filterMentioned}
             filterCited={filterCited}
@@ -349,8 +368,47 @@ export default function AIVisibilitySection({
         keywords={projectKeywords}
         onAdded={loadAllResults}
       />
+
+      {/* Manual AI Query Creation Modal */}
+      <NewAIQueryModal
+        open={showNewPrompt}
+        onClose={() => setShowNewPrompt(false)}
+        projectId={projectId}
+        domain={projectDomain}
+        businessName={projectBrandName}
+        country={projectCountry}
+        language={projectLanguage}
+        onAdded={loadAllResults}
+        t={t}
+      />
     </section>
   )
+}
+
+/* --- UTILITIES --- */
+
+function cleanResponseText(text: string): string {
+  if (!text) return ''
+
+  let cleaned = text
+    // Remove markdown bold/italic markers
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    // Remove markdown headings but keep text
+    .replace(/^#+\s+/gm, '')
+    // Remove citation syntax variations: [1], [[1]], ([domain][1]), ([Google])
+    .replace(/\[\[\d+\]\]/g, '')
+    .replace(/\[\d+\]/g, '')
+    .replace(/\(\[[^\]]+\]\[[^\]]+\]\)/g, '')
+    .replace(/\(\[[^\]]+\]\)/g, '')
+    // Remove markdown link syntax [text](url) but keep text
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    // Remove trailing markdown list markers
+    .replace(/^[\s]*[-*+]\s+/gm, '• ')
+
+  return cleaned.trim()
 }
 
 /* --- COMPONENTS --- */
@@ -677,8 +735,12 @@ function ResultDetailDrawer({
           {result.responseText && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900">{t('ai_answer')}</h3>
-              <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-4 line-clamp-6">
-                {result.responseText}
+              <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
+                {cleanResponseText(result.responseText).split('\n').map((line, i) => (
+                  <p key={i} className="leading-relaxed">
+                    {line || <br />}
+                  </p>
+                ))}
               </div>
             </div>
           )}
@@ -787,5 +849,129 @@ function SmartQuestionsSection({
         ))}
       </div>
     </div>
+  )
+}
+
+function NewAIQueryModal({
+  open,
+  onClose,
+  projectId,
+  domain,
+  businessName,
+  country,
+  language,
+  onAdded,
+  t,
+}: {
+  open: boolean
+  onClose: () => void
+  projectId: string
+  domain: string | null
+  businessName: string | null
+  country: string | null
+  language: string | null
+  onAdded: () => void
+  t: T
+}) {
+  const [prompt, setPrompt] = useState('')
+  const [targetDomain, setTargetDomain] = useState(domain || '')
+  const [targetBrand, setTargetBrand] = useState(businessName || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async () => {
+    if (!prompt.trim()) {
+      setError('Query is required')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/ai-visibility/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          prompt: prompt.trim(),
+          country,
+          language,
+          targetDomain: targetDomain || null,
+          targetBrandName: targetBrand || null,
+        }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${res.status}`)
+      }
+
+      setPrompt('')
+      setTargetDomain(domain || '')
+      setTargetBrand(businessName || '')
+      onAdded()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create query')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) return null
+
+  const isHebrew = detectHebrew(language, country)
+
+  return (
+    <Modal open={open} onClose={onClose} title={t('new_ai_query_title')} size="md">
+      <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
+        {error && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-slate-900 mb-2">{t('query_label')}</label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder={t('query_label')}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
+            rows={3}
+            disabled={saving}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-900 mb-2">{t('target_domain_label')}</label>
+          <Input
+            type="text"
+            value={targetDomain}
+            onChange={(e) => setTargetDomain(e.target.value)}
+            placeholder={domain || t('target_domain_label')}
+            disabled={saving}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-900 mb-2">{t('target_brand_label')}</label>
+          <Input
+            type="text"
+            value={targetBrand}
+            onChange={(e) => setTargetBrand(e.target.value)}
+            placeholder={businessName || t('target_brand_label')}
+            disabled={saving}
+          />
+        </div>
+
+        <div className="flex gap-2 border-t border-slate-200 pt-3">
+          <Button variant="outline" onClick={onClose} disabled={saving} className="flex-1">
+            {t('cancel')}
+          </Button>
+          <Button onClick={handleSubmit} loading={saving} className="flex-1">
+            {t('create_query')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
