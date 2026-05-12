@@ -1,12 +1,21 @@
 'use client'
 
 /**
- * AI Visibility — Professional dashboard with tab-based structure.
+ * AI Visibility dashboard — two-tab structure.
  *
- * Tabs:
- * 1. Overview — global summary + engine mention cards
- * 2. Results — scan results table with filters and detail drawer
- * 3. AI Queries — question management + recommended questions
+ *   Tab 1: תוצאות (Results)
+ *     - Global summary strip
+ *     - Engine mention cards
+ *     - Filter/search bar
+ *     - Result row cards (premium design) → detail drawer on click
+ *
+ *   Tab 2: שאילתות AI (AI Queries)
+ *     - Existing questions list with per-engine scan chips
+ *     - Add / delete actions
+ *     - Recommended questions section
+ *
+ * Default tab is Results.  Scan completion auto-switches to Results and opens
+ * the drawer for the just-completed scan.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -18,12 +27,14 @@ import {
   ENGINE_META,
   ExternalLinkIcon,
   SparkleIcon,
+  TrashIcon,
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
 import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
+import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
+import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 
-// Fixed list of supported AI engines (6 total — Claude NOT supported in ScrapeLLM)
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
 type ResultRow = {
@@ -68,7 +79,7 @@ type EngineMetrics = {
   rate: number
 }
 
-type TabType = 'overview' | 'results' | 'queries'
+type TabType = 'results' | 'queries'
 
 export default function AIVisibilitySection({
   projectId,
@@ -90,8 +101,7 @@ export default function AIVisibilitySection({
   const t = useMemo(() => createI18n(projectLanguage, projectCountry), [projectLanguage, projectCountry])
   const isHebrew = detectHebrew(projectLanguage, projectCountry)
 
-  // Tabs and core state
-  const [currentTab, setCurrentTab] = useState<TabType>('overview')
+  const [currentTab, setCurrentTab] = useState<TabType>('results')
   const [allResults, setAllResults] = useState<ResultRow[]>([])
   const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
@@ -103,6 +113,9 @@ export default function AIVisibilitySection({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedResult, setSelectedResult] = useState<ResultRow | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [deletePromptId, setDeletePromptId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [highlightResultId, setHighlightResultId] = useState<string | null>(null)
 
   const [filterEngine, setFilterEngine] = useState<string | null>(null)
   const [filterMentioned, setFilterMentioned] = useState<boolean | null>(null)
@@ -111,6 +124,16 @@ export default function AIVisibilitySection({
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   const [scanningKey, setScanningKey] = useState<string | null>(null)
+
+  // Build brand variants once for reuse in result rows (mention chips)
+  const brandVariants = useMemo(
+    () => getBrandVariants(projectBrandName, projectDomain),
+    [projectBrandName, projectDomain]
+  )
+  const normalizedTargetDomain = useMemo(
+    () => (projectDomain ? normalizeDomain(projectDomain) : null),
+    [projectDomain]
+  )
 
   // Load both scan results AND prompts in parallel
   const loadAllResults = useCallback(async () => {
@@ -161,24 +184,15 @@ export default function AIVisibilitySection({
       setAllResults(resultsWithText)
       setAllPrompts(promptsArr)
 
-      // Aggregate metrics
       const engines = new Set<string>()
       const engineMap = new Map<string, EngineMetrics>()
       let totalMentions = 0
       let totalCitations = 0
 
-      // Initialize all supported engines with 0 metrics
       SUPPORTED_ENGINES.forEach((engine) => {
-        engineMap.set(engine, {
-          engine,
-          scans: 0,
-          mentions: 0,
-          citations: 0,
-          rate: 0,
-        })
+        engineMap.set(engine, { engine, scans: 0, mentions: 0, citations: 0, rate: 0 })
       })
 
-      // Aggregate from results
       resultsWithText.forEach((r) => {
         if (r.status === 'success' && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) {
           engines.add(r.engine)
@@ -201,25 +215,14 @@ export default function AIVisibilitySection({
       })
 
       const successfulScans = resultsWithText.filter((r) => r.status === 'success').length
-      if (successfulScans > 0 || resultsWithText.length > 0) {
-        setGlobalMetrics({
-          totalScans: successfulScans,
-          totalMentions,
-          totalCitations,
-          mentionRate: successfulScans > 0 ? Math.round((totalMentions / successfulScans) * 100) : 0,
-          citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
-          enginesCovered: engines.size,
-        })
-      } else {
-        setGlobalMetrics({
-          totalScans: 0,
-          totalMentions: 0,
-          totalCitations: 0,
-          mentionRate: 0,
-          citationRate: 0,
-          enginesCovered: 0,
-        })
-      }
+      setGlobalMetrics({
+        totalScans: successfulScans,
+        totalMentions,
+        totalCitations,
+        mentionRate: successfulScans > 0 ? Math.round((totalMentions / successfulScans) * 100) : 0,
+        citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
+        enginesCovered: engines.size,
+      })
 
       setEngineMetrics(engineMap)
     } catch (e) {
@@ -229,7 +232,6 @@ export default function AIVisibilitySection({
     }
   }, [projectId])
 
-  // Generate smart question suggestions
   useEffect(() => {
     const suggestions = generatePromptSuggestions({
       businessName: projectBrandName,
@@ -247,7 +249,6 @@ export default function AIVisibilitySection({
     loadAllResults()
   }, [loadAllResults])
 
-  // Build a set of "scanned" prompt × engine combinations
   const scannedSet = useMemo(() => {
     const s = new Set<string>()
     allResults.forEach((r) => {
@@ -258,7 +259,29 @@ export default function AIVisibilitySection({
     return s
   }, [allResults])
 
-  // Scan trigger for a specific prompt × engine
+  // Open the drawer for a specific result, fetching full details on demand.
+  const openResultDrawer = useCallback(async (result: ResultRow) => {
+    setSelectedResult(result)
+    setDrawerOpen(true)
+    try {
+      const res = await fetch(`/api/ai-visibility/runs/${result.runId}/results`)
+      if (res.ok) {
+        const data = await res.json()
+        const fullResult = data.results?.[0]
+        if (fullResult) {
+          setSelectedResult({
+            ...result,
+            citations: fullResult.citations || [],
+            responseText: fullResult.responseText || null,
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load full result:', e)
+    }
+  }, [])
+
+  // Scan trigger — after success, switch to Results tab and open drawer for the new result.
   const scanEngine = useCallback(
     async (promptId: string, engine: string) => {
       const key = `${promptId}:${engine}`
@@ -274,29 +297,61 @@ export default function AIVisibilitySection({
           const body = await res.json().catch(() => ({}))
           throw new Error(body.error || `HTTP ${res.status}`)
         }
+        const body = await res.json()
         await loadAllResults()
-        // Switch to Results tab and auto-open the drawer for the completed scan
         setCurrentTab('results')
-        // Find the newly completed result
+        // After loadAllResults the new result is in state. Use its id to highlight + open.
+        if (body.resultId) setHighlightResultId(body.resultId)
         setTimeout(() => {
-          const latestResult = allResults.find(
-            (r) => r.promptId === promptId && r.engine === engine && r.status === 'success'
-          )
-          if (latestResult) {
-            setSelectedResult(latestResult)
-            setDrawerOpen(true)
+          // Re-fetch latest results state by inspecting via the runId match
+          const newest = (allResults || []).find((r) => r.id === body.resultId)
+          if (newest) {
+            openResultDrawer(newest)
           }
-        }, 100)
+        }, 250)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Scan failed')
       } finally {
         setScanningKey(null)
       }
     },
-    [projectId, loadAllResults, allResults]
+    [projectId, loadAllResults, allResults, openResultDrawer]
   )
 
-  // Filter results — exclude any unsupported engines
+  // When allResults updates after a scan, if there's a highlighted id we haven't
+  // opened yet, open it now.
+  useEffect(() => {
+    if (!highlightResultId) return
+    const found = allResults.find((r) => r.id === highlightResultId)
+    if (found && !drawerOpen) {
+      openResultDrawer(found)
+      setHighlightResultId(null)
+    }
+  }, [allResults, highlightResultId, drawerOpen, openResultDrawer])
+
+  const deletePrompt = useCallback(async (promptId: string) => {
+    setDeleting(true)
+    setError(null)
+    // Optimistic removal
+    const prev = allPrompts
+    setAllPrompts((p) => p.filter((q) => q.id !== promptId))
+    try {
+      const res = await fetch(`/api/ai-visibility/prompts/${promptId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${res.status}`)
+      }
+      // Reload to pick up unlinked results (prompt_id is set to null on cascade)
+      await loadAllResults()
+    } catch (e) {
+      setAllPrompts(prev)
+      setError(e instanceof Error ? e.message : 'Failed to delete question')
+    } finally {
+      setDeleting(false)
+      setDeletePromptId(null)
+    }
+  }, [allPrompts, loadAllResults])
+
   const filteredResults = useMemo(() => {
     return allResults.filter((r) => {
       if (!(SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) return false
@@ -349,9 +404,9 @@ export default function AIVisibilitySection({
         </div>
       )}
 
-      {/* TAB BAR */}
+      {/* TAB BAR — only two tabs */}
       <div className="flex gap-2 border-b border-slate-200">
-        {(['overview', 'results', 'queries'] as const).map((tab) => (
+        {(['results', 'queries'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setCurrentTab(tab)}
@@ -361,24 +416,20 @@ export default function AIVisibilitySection({
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            {tab === 'overview' && t('tab_overview')}
             {tab === 'results' && t('tab_results')}
             {tab === 'queries' && t('tab_queries')}
           </button>
         ))}
       </div>
 
-      {/* TAB 1: OVERVIEW */}
-      {currentTab === 'overview' && globalMetrics && (
-        <>
-          <OverviewSummaryStrip metrics={globalMetrics} totalResults={allResults.length} t={t} />
-          <EngineMentionCards metrics={engineMetrics} t={t} />
-        </>
-      )}
-
-      {/* TAB 2: RESULTS */}
+      {/* TAB 1: RESULTS (includes overview) */}
       {currentTab === 'results' && (
         <>
+          {globalMetrics && (
+            <OverviewSummaryStrip metrics={globalMetrics} totalResults={allResults.length} t={t} />
+          )}
+          <EngineMentionCards metrics={engineMetrics} t={t} />
+
           {/* FILTER BAR */}
           <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 bg-white p-3">
             <Input
@@ -401,7 +452,9 @@ export default function AIVisibilitySection({
             </select>
             <select
               value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
-              onChange={(e) => setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')}
+              onChange={(e) =>
+                setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')
+              }
               className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
             >
               <option value="">{t('all_mention')}</option>
@@ -410,7 +463,9 @@ export default function AIVisibilitySection({
             </select>
             <select
               value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
-              onChange={(e) => setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')}
+              onChange={(e) =>
+                setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')
+              }
               className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
             >
               <option value="">{t('all_citations')}</option>
@@ -419,39 +474,21 @@ export default function AIVisibilitySection({
             </select>
           </div>
 
-          {/* RESULTS COUNT */}
           <div className="text-sm text-slate-600">
             {t('showing_results').replace('{count}', String(filteredResults.length))}
           </div>
 
-          {/* RESULTS TABLE */}
           {filteredResults.length > 0 ? (
             <div className="space-y-2">
               {filteredResults.map((r) => (
                 <ResultRowCard
                   key={r.id}
                   result={r}
-                  onRowClick={async (result) => {
-                    setSelectedResult(result)
-                    setDrawerOpen(true)
-                    // Fetch full result details on demand
-                    try {
-                      const res = await fetch(`/api/ai-visibility/runs/${result.runId}/results`)
-                      if (res.ok) {
-                        const data = await res.json()
-                        const fullResult = data.results?.[0]
-                        if (fullResult) {
-                          setSelectedResult({
-                            ...result,
-                            citations: fullResult.citations || [],
-                            responseText: fullResult.responseText || null,
-                          })
-                        }
-                      }
-                    } catch (e) {
-                      console.error('Failed to load full result:', e)
-                    }
-                  }}
+                  highlighted={highlightResultId === r.id}
+                  brandVariants={brandVariants}
+                  targetDomain={normalizedTargetDomain}
+                  isHebrew={isHebrew}
+                  onRowClick={openResultDrawer}
                   t={t}
                 />
               ))}
@@ -464,7 +501,7 @@ export default function AIVisibilitySection({
         </>
       )}
 
-      {/* TAB 3: AI QUERIES */}
+      {/* TAB 2: AI QUERIES */}
       {currentTab === 'queries' && (
         <>
           <div className="flex items-center justify-between gap-4 mb-4">
@@ -481,12 +518,24 @@ export default function AIVisibilitySection({
             </div>
           </div>
 
-          {/* QUESTIONS LIST */}
           {allPrompts.length > 0 ? (
             <div className="space-y-2">
               {allPrompts.map((p) => (
-                <div key={p.id} className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition">
-                  <p className="text-sm font-medium text-slate-900 mb-2 line-clamp-2">{p.prompt}</p>
+                <div
+                  key={p.id}
+                  className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <p className="text-sm font-medium text-slate-900 flex-1 line-clamp-2">{p.prompt}</p>
+                    <button
+                      onClick={() => setDeletePromptId(p.id)}
+                      className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                      title={t('delete')}
+                      aria-label={t('delete')}
+                    >
+                      <TrashIcon size={16} />
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {SUPPORTED_ENGINES.map((engine) => {
                       const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
@@ -523,7 +572,6 @@ export default function AIVisibilitySection({
             </div>
           )}
 
-          {/* RECOMMENDED QUESTIONS */}
           {suggestedQuestions.length > 0 && (
             <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50/40 to-white p-5 mt-6">
               <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 mb-4">
@@ -568,12 +616,45 @@ export default function AIVisibilitySection({
         <ResultDetailDrawer
           open={drawerOpen}
           result={selectedResult}
+          brandVariants={brandVariants}
+          targetDomain={normalizedTargetDomain}
           onClose={() => {
             setDrawerOpen(false)
             setTimeout(() => setSelectedResult(null), 300)
           }}
           t={t}
         />
+      )}
+
+      {/* DELETE PROMPT CONFIRMATION MODAL */}
+      {deletePromptId && (
+        <Modal
+          open={!!deletePromptId}
+          onClose={() => !deleting && setDeletePromptId(null)}
+          title={t('delete_question_title')}
+          size="md"
+        >
+          <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
+            <p className="text-sm text-slate-700">{t('delete_question_body')}</p>
+            <div className="flex gap-2 border-t border-slate-200 pt-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeletePromptId(null)}
+                disabled={deleting}
+                className="flex-1"
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                onClick={() => deletePrompt(deletePromptId)}
+                loading={deleting}
+                className="flex-1 !bg-red-600 hover:!bg-red-700 !text-white"
+              >
+                {t('delete_permanently')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* MODALS */}
@@ -598,6 +679,7 @@ export default function AIVisibilitySection({
         businessName={projectBrandName}
         country={projectCountry}
         language={projectLanguage}
+        existingPrompts={allPrompts}
         onAdded={loadAllResults}
         t={t}
       />
@@ -609,7 +691,15 @@ export default function AIVisibilitySection({
 
 type T = (key: any) => string
 
-function OverviewSummaryStrip({ metrics, totalResults, t }: { metrics: GlobalMetrics; totalResults: number; t: T }) {
+function OverviewSummaryStrip({
+  metrics,
+  totalResults,
+  t,
+}: {
+  metrics: GlobalMetrics
+  totalResults: number
+  t: T
+}) {
   return (
     <div className="rounded-lg border border-slate-200 bg-gradient-to-r from-indigo-50 to-white p-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -642,8 +732,8 @@ function OverviewSummaryStrip({ metrics, totalResults, t }: { metrics: GlobalMet
 }
 
 function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics>; t: T }) {
-  const engineList = SUPPORTED_ENGINES.map((engine) =>
-    metrics.get(engine) || { engine, scans: 0, mentions: 0, citations: 0, rate: 0 }
+  const engineList = SUPPORTED_ENGINES.map(
+    (engine) => metrics.get(engine) || { engine, scans: 0, mentions: 0, citations: 0, rate: 0 }
   ).sort((a, b) => b.mentions - a.mentions)
 
   return (
@@ -675,26 +765,120 @@ function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics
   )
 }
 
-function ResultRowCard({ result, onRowClick, t }: { result: ResultRow; onRowClick: (r: ResultRow) => void; t: T }) {
+/**
+ * Find which brand variant (or domain) actually appears in the response text,
+ * for display as a chip on the result row. Falls back to first variant if
+ * the response text isn't loaded yet but the row is marked mentioned.
+ */
+function findMatchedLabels(
+  responseText: string | null,
+  brandVariants: string[],
+  targetDomain: string | null,
+  mentioned: boolean,
+  cited: boolean
+): { brandLabels: string[]; domainLabel: string | null } {
+  const labels: string[] = []
+  let domainLabel: string | null = null
+  if (responseText) {
+    const lower = responseText.toLowerCase()
+    for (const v of brandVariants) {
+      if (lower.includes(v.toLowerCase())) labels.push(v)
+    }
+    if (targetDomain && lower.includes(targetDomain.toLowerCase())) {
+      domainLabel = targetDomain
+    }
+  } else {
+    // Row preview without responseText loaded: show first brand variant as a hint.
+    if (mentioned && brandVariants[0]) labels.push(brandVariants[0])
+  }
+  if (cited && targetDomain && !domainLabel) domainLabel = targetDomain
+  return { brandLabels: Array.from(new Set(labels)), domainLabel }
+}
+
+function ResultRowCard({
+  result,
+  highlighted,
+  brandVariants,
+  targetDomain,
+  isHebrew,
+  onRowClick,
+  t,
+}: {
+  result: ResultRow
+  highlighted: boolean
+  brandVariants: string[]
+  targetDomain: string | null
+  isHebrew: boolean
+  onRowClick: (r: ResultRow) => void
+  t: T
+}) {
   const meta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
+  const { brandLabels, domainLabel } = findMatchedLabels(
+    result.responseText,
+    brandVariants,
+    targetDomain,
+    result.mentioned,
+    result.targetCited
+  )
+
+  const scannedAtStr = result.scannedAt ? formatShortDateTime(result.scannedAt, isHebrew) : null
 
   return (
     <div
       onClick={() => onRowClick(result)}
-      className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-md hover:border-slate-300 transition cursor-pointer"
+      className={`rounded-lg border bg-white p-4 hover:shadow-md hover:border-slate-300 transition cursor-pointer ${
+        highlighted ? 'border-indigo-300 ring-2 ring-indigo-200' : 'border-slate-200'
+      }`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
+          {/* Row 1: query text */}
           <p className="text-sm font-medium text-slate-900 line-clamp-2">{result.promptText}</p>
+
+          {/* Row 2: engine + status badges + scan time */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {meta && <meta.Icon size={16} className={meta.accent} />}
             <span className="text-xs text-slate-600 font-medium">{meta?.name || result.engine}</span>
-            {result.mentioned && <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>}
-            {!result.mentioned && <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>}
-            {result.targetCited && <Badge variant="success" className="!text-xs">{t('target_cited')}</Badge>}
-            {!result.targetCited && <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>}
+
+            {result.mentioned ? (
+              <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>
+            ) : (
+              <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>
+            )}
+            {result.targetCited ? (
+              <Badge variant="success" className="!text-xs">{t('target_cited')}</Badge>
+            ) : (
+              <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>
+            )}
+
+            {scannedAtStr && (
+              <span className="text-[11px] text-slate-500">
+                · {t('scanned_at')} {scannedAtStr}
+              </span>
+            )}
           </div>
+
+          {/* Row 3: matched variants — only when something was matched */}
+          {(brandLabels.length > 0 || domainLabel) && (
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span className="text-[11px] text-slate-500 font-medium">{t('what_was_mentioned')}:</span>
+              {brandLabels.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                >
+                  {label}
+                </span>
+              ))}
+              {domainLabel && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                  {domainLabel}
+                </span>
+              )}
+            </div>
+          )}
         </div>
+
         <div className="flex items-center gap-3 shrink-0">
           {result.citationCount > 0 && (
             <Badge variant="info" className="!text-xs">
@@ -762,17 +946,28 @@ function SmartQuestionCard({
 function ResultDetailDrawer({
   open,
   result,
+  brandVariants,
+  targetDomain,
   onClose,
   t,
 }: {
   open: boolean
   result: ResultRow
+  brandVariants: string[]
+  targetDomain: string | null
   onClose: () => void
   t: T
 }) {
   if (!open) return null
 
   const engineMeta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
+  const { brandLabels, domainLabel } = findMatchedLabels(
+    result.responseText,
+    brandVariants,
+    targetDomain,
+    result.mentioned,
+    result.targetCited
+  )
 
   function cleanResponseText(text: string): string {
     if (!text) return ''
@@ -797,7 +992,6 @@ function ResultDetailDrawer({
         className="bg-white w-full max-w-2xl h-full overflow-y-auto shadow-xl animate-in slide-in-from-right"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drawer Header */}
         <div className="sticky top-0 border-b border-slate-200 bg-white p-6 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900 mb-1">{result.promptText}</h2>
@@ -808,9 +1002,7 @@ function ResultDetailDrawer({
           </button>
         </div>
 
-        {/* Drawer Content */}
         <div className="space-y-6 p-6">
-          {/* Scan Info */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-sm font-semibold text-slate-900 mb-3">{t('scan_activity')}</h3>
             <div className="grid grid-cols-2 gap-3">
@@ -827,9 +1019,26 @@ function ResultDetailDrawer({
                 </div>
               </div>
             </div>
+            {(brandLabels.length > 0 || domainLabel) && (
+              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                <span className="text-[11px] text-slate-500 font-medium">{t('what_was_mentioned')}:</span>
+                {brandLabels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  >
+                    {label}
+                  </span>
+                ))}
+                {domainLabel && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                    {domainLabel}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Citations */}
           {result.citations.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900">
@@ -848,7 +1057,9 @@ function ResultDetailDrawer({
                       <span className={`font-medium ${c.is_target_domain ? 'text-emerald-700' : 'text-slate-900'}`}>
                         {c.domain}
                       </span>
-                      {c.is_target_domain && <Badge variant="success" className="!text-xs">{t('your_domain')}</Badge>}
+                      {c.is_target_domain && (
+                        <Badge variant="success" className="!text-xs">{t('your_domain')}</Badge>
+                      )}
                     </div>
                   </a>
                 ))}
@@ -856,7 +1067,6 @@ function ResultDetailDrawer({
             </div>
           )}
 
-          {/* Response Preview */}
           {result.responseText && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900">{t('ai_answer')}</h3>
@@ -873,7 +1083,6 @@ function ResultDetailDrawer({
           )}
         </div>
 
-        {/* Drawer Footer */}
         <div className="sticky bottom-0 border-t border-slate-200 bg-white p-6">
           <Button variant="outline" onClick={onClose} className="w-full">
             {t('close')}
@@ -884,6 +1093,11 @@ function ResultDetailDrawer({
   )
 }
 
+/**
+ * Manual "+ שאלת AI חדשה" modal. Supports both single and multi-question entry:
+ * each non-empty line is sent as a separate query. Duplicates (within the input
+ * or against existing prompts) are skipped client-side; the API also dedups.
+ */
 function NewAIQueryModal({
   open,
   onClose,
@@ -892,6 +1106,7 @@ function NewAIQueryModal({
   businessName,
   country,
   language,
+  existingPrompts,
   onAdded,
   t,
 }: {
@@ -902,6 +1117,7 @@ function NewAIQueryModal({
   businessName: string | null
   country: string | null
   language: string | null
+  existingPrompts: PromptRow[]
   onAdded: () => void
   t: T
 }) {
@@ -911,40 +1127,69 @@ function NewAIQueryModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const existingSet = useMemo(
+    () => new Set(existingPrompts.map((p) => p.prompt.trim().toLowerCase())),
+    [existingPrompts]
+  )
+
+  // Parse the textarea into deduplicated, trimmed lines.
+  const parsedQueries = useMemo(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const raw of prompt.split('\n')) {
+      const line = raw.trim()
+      if (!line) continue
+      const key = line.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(line)
+    }
+    return out
+  }, [prompt])
+
+  const newQueries = useMemo(
+    () => parsedQueries.filter((q) => !existingSet.has(q.toLowerCase())),
+    [parsedQueries, existingSet]
+  )
+  const skippedDuplicates = parsedQueries.length - newQueries.length
+
   const handleSubmit = async () => {
-    if (!prompt.trim()) {
-      setError('Query is required')
+    if (parsedQueries.length === 0) {
+      setError(t('multi_query_help'))
       return
     }
 
     setSaving(true)
     setError(null)
+    let failures = 0
     try {
-      const res = await fetch('/api/ai-visibility/prompts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          prompt: prompt.trim(),
-          country,
-          language,
-          targetDomain: targetDomain || null,
-          targetBrandName: targetBrand || null,
-        }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
+      for (const q of parsedQueries) {
+        try {
+          const res = await fetch('/api/ai-visibility/prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId,
+              prompt: q,
+              country,
+              language,
+              targetDomain: targetDomain || null,
+              targetBrandName: targetBrand || null,
+            }),
+          })
+          if (!res.ok) failures++
+        } catch {
+          failures++
+        }
       }
-
       setPrompt('')
       setTargetDomain(domain || '')
       setTargetBrand(businessName || '')
       onAdded()
       onClose()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create query')
+      if (failures > 0) {
+        setError(`${failures} ${t('error')}`)
+      }
     } finally {
       setSaving(false)
     }
@@ -953,6 +1198,13 @@ function NewAIQueryModal({
   if (!open) return null
 
   const isHebrew = detectHebrew(language, country)
+
+  const countText =
+    parsedQueries.length === 0
+      ? ''
+      : parsedQueries.length === 1
+      ? t('will_create_one_query')
+      : t('will_create_n_queries').replace('{count}', String(newQueries.length))
 
   return (
     <Modal open={open} onClose={onClose} title={t('new_ai_query_title')} size="md">
@@ -966,11 +1218,23 @@ function NewAIQueryModal({
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={t('query_label')}
+            placeholder={t('multi_query_placeholder')}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
-            rows={3}
+            rows={6}
             disabled={saving}
           />
+          <p className="text-xs text-slate-500 mt-1">{t('multi_query_help')}</p>
+          {countText && (
+            <p className="text-xs text-indigo-600 mt-1 font-medium">
+              {countText}
+              {skippedDuplicates > 0 && (
+                <span className="text-slate-500 font-normal">
+                  {' '}
+                  ({skippedDuplicates} {t('query_already_exists')})
+                </span>
+              )}
+            </p>
+          )}
         </div>
 
         <div>
@@ -999,11 +1263,33 @@ function NewAIQueryModal({
           <Button variant="outline" onClick={onClose} disabled={saving} className="flex-1">
             {t('cancel')}
           </Button>
-          <Button onClick={handleSubmit} loading={saving} className="flex-1">
+          <Button
+            onClick={handleSubmit}
+            loading={saving}
+            disabled={parsedQueries.length === 0 || saving}
+            className="flex-1"
+          >
             {t('create_query')}
           </Button>
         </div>
       </div>
     </Modal>
   )
+}
+
+/* --- Helpers --- */
+
+function formatShortDateTime(iso: string, isHebrew: boolean): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleString(isHebrew ? 'he-IL' : 'en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return ''
+  }
 }

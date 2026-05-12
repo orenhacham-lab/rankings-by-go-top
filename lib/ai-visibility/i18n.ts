@@ -145,7 +145,7 @@ const STRINGS = {
   // New dashboard structure
   engine: { he: 'מנוע', en: 'Engine' },
   all_engines: { he: 'כל המנועים', en: 'All engines' },
-  all_mention: { he: 'כל ההזכרות', en: 'All mentions' },
+  all_mention: { he: 'כל האזכורים', en: 'All mentions' },
   all_citations: { he: 'כל הציטוטים', en: 'All citations' },
   overall: { he: 'כולל', en: 'Overall' },
   search: { he: 'חיפוש', en: 'Search' },
@@ -170,6 +170,36 @@ const STRINGS = {
   total_mentions: { he: 'סה״כ אזכורים', en: 'Total mentions' },
   visibility_percent: { he: 'אחוז נראות', en: 'Visibility' },
   out_of_results: { he: 'מתוך {count} תוצאות', en: 'out of {count} results' },
+
+  // Delete AI question
+  delete_question_title: { he: 'למחוק שאלה?', en: 'Delete question?' },
+  delete_question_body: {
+    he: 'פעולה זו תמחק את השאלה. תוצאות סריקה קיימות יישארו בארכיון אך לא יוצגו כאן.',
+    en: 'This will delete the question. Existing scan results stay archived but will no longer appear here.',
+  },
+
+  // Multi-question input
+  multi_query_placeholder: {
+    he: 'שאלה אחת בכל שורה',
+    en: 'One question per line',
+  },
+  multi_query_help: {
+    he: 'הפרד כל שאלה בשורה חדשה',
+    en: 'Separate each question with a new line',
+  },
+  will_create_n_queries: {
+    he: 'ייווצרו {count} שאלות AI',
+    en: '{count} AI queries will be created',
+  },
+  will_create_one_query: {
+    he: 'תיווצר שאלת AI אחת',
+    en: '1 AI query will be created',
+  },
+
+  // Result row enrichments
+  what_was_mentioned: { he: 'מה הוזכר', en: 'What was mentioned' },
+  view_details: { he: 'פרטים', en: 'Details' },
+  scanned_at: { he: 'נסרק', en: 'Scanned' },
 } as const
 
 type StringKey = keyof typeof STRINGS

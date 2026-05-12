@@ -10,22 +10,12 @@
  */
 
 import { AICitation } from '../providers/types'
+import { normalizeDomain, stripMarkdownLink } from './domain-normalize'
 
 /**
- * Extract domain from URL (handles malformed URLs gracefully)
- */
-function extractDomainFromUrl(url: string): string {
-  try {
-    const urlObj = new URL(url)
-    return urlObj.hostname || url
-  } catch {
-    const match = url.match(/^https?:\/\/([^/?#]+)/)
-    return match ? match[1] : url
-  }
-}
-
-/**
- * Build a single AICitation from common fields
+ * Build a single AICitation from common fields.
+ * URL is stripped of markdown wrappers, domain is fully normalized
+ * (no scheme, no www, lower-case).
  */
 function buildCitation(opts: {
   url: string
@@ -34,9 +24,11 @@ function buildCitation(opts: {
   position: number
 }): AICitation | null {
   if (!opts.url || typeof opts.url !== 'string') return null
-  const domain = extractDomainFromUrl(opts.url)
+  const cleanedUrl = stripMarkdownLink(opts.url)
+  const domain = normalizeDomain(cleanedUrl)
+  if (!domain) return null
   return {
-    url: opts.url,
+    url: cleanedUrl,
     domain,
     title: opts.title || undefined,
     snippet: opts.snippet || undefined,

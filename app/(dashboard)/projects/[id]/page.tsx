@@ -190,14 +190,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-900 bg-white border border-slate-200 shadow-sm hover:shadow transition whitespace-nowrap"
           >
             <span className="text-base">📊</span>
-            <span>דירוגי Google</span>
-          </a>
-          <a
-            href="#rankings"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white/70 hover:text-slate-900 transition whitespace-nowrap"
-          >
-            <span className="text-base">🗺️</span>
-            <span>Google Maps</span>
+            <span>דירוגי Google Organic / Google Maps</span>
           </a>
           {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
             <a
@@ -219,23 +212,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </nav>
 
-      {/* Project Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Card>
+      {/* Project Summary — 5 compact cards in one row on desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+        <Card className="p-3">
           <div className="text-xs text-slate-500 mb-1">דומיין</div>
           <div className="font-mono text-sm font-semibold text-slate-800 truncate">{project.target_domain}</div>
         </Card>
-        <Card>
+        <Card className="p-3">
           <div className="text-xs text-slate-500 mb-1">מילות מפתח</div>
           <div className="text-2xl font-bold text-slate-800">{targets.length}</div>
         </Card>
-        <Card>
+        <Card className="p-3">
           <div className="text-xs text-slate-500 mb-1">סריקה אחרונה</div>
-          <div className="text-sm font-medium text-slate-800">
+          <div className="text-sm font-medium text-slate-800 truncate">
             {project.last_scan_at ? formatDateTime(project.last_scan_at) : '—'}
           </div>
         </Card>
-        <Card>
+        <Card className="p-3">
           <div className="text-xs text-slate-500 mb-1">תדירות</div>
           <div className="flex items-center gap-2">
             <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
@@ -243,14 +236,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </Badge>
           </div>
         </Card>
-        <Card>
+        <Card className="p-3">
           <div className="text-xs text-slate-500 mb-1">פרמטרים לסריקה</div>
-          <div className="text-xs text-slate-700 space-y-1">
-            <div><b>engine:</b> {scanParams.engine}</div>
-            <div><b>device:</b> {scanParams.device}</div>
-            <div><b>gl:</b> {scanParams.gl}</div>
-            <div><b>hl:</b> {scanParams.hl}</div>
-            <div><b>location:</b> {scanParams.location}</div>
+          <div className="text-[11px] text-slate-700 leading-tight">
+            {scanParams.engine} · {scanParams.device} · gl={scanParams.gl} · hl={scanParams.hl}
+            {scanParams.location !== '—' && <> · {scanParams.location}</>}
           </div>
         </Card>
       </div>

@@ -421,36 +421,113 @@ function fillTemplate(template: string, ctx: TemplateContext): string {
 }
 
 /**
+ * Decide whether a keyword is good enough to be turned into an AI Query.
+ *
+ * Rejects:
+ *   - very short fragments (< 3 chars)
+ *   - pure product names / SKU-like fragments (mixed digits/letters with no spaces)
+ *   - keywords that contain only digits or only one non-Hebrew/Latin word
+ *   - awkward product-fragment phrases ("בריח", "טלק" alone, "X לנערות") when no
+ *     anchor word exists
+ *   - keywords with brand/business term only (length under 4 with no descriptor)
+ *   - keywords with quotes, hashes, or other URL-like characters
+ *
+ * The goal is to keep keywords that read like a *category* or *service* —
+ * not isolated product attributes.
+ */
+function isQualityKeyword(keyword: string): boolean {
+  const k = keyword.trim()
+  if (!k) return false
+  if (k.length < 3) return false
+  if (/[#"'`<>]/.test(k)) return false
+  if (/^\d+$/.test(k)) return false
+  // Reject when keyword is mostly digits (likely SKUs)
+  const digitRatio = (k.match(/\d/g)?.length || 0) / k.length
+  if (digitRatio > 0.5) return false
+  // Reject single-word fragments that look like a property (e.g., "טלק", "בריח")
+  const words = k.split(/\s+/).filter(Boolean)
+  if (words.length === 1 && k.length < 5) return false
+  return true
+}
+
+/**
+ * Hebrew preposition helper — picks the natural form before a keyword.
+ *
+ * For Hebrew, `ל` (to/for) combines with the following word: "ל" + "בשמים" → "לבשמים".
+ * We don't need to do morphological inflection — just prepend the prefix.
+ *
+ * However, when the keyword *itself* already starts with a definite article ("ה")
+ * or with "ב" / "ל" / "מ", we keep the keyword as-is and rely on the surrounding
+ * template wording instead.
+ */
+function hePrefix(keyword: string, prefix: 'ל' | 'ב' | 'מ'): string {
+  const trimmed = keyword.trim()
+  if (!trimmed) return trimmed
+  // If keyword already begins with that prefix, don't double-prepend
+  const first = trimmed.charAt(0)
+  if (first === prefix) return trimmed
+  return `${prefix}${trimmed}`
+}
+
+/**
  * Generate keyword-derived queries from tracked SEO keywords.
- * Transforms each keyword into a recommendation question.
+ * Uses templates that read more naturally than "מי מומלץ ל{keyword}?".
  */
 function keywordDerivedQueries(
   keywords: string[],
   ctx: TemplateContext,
-  category: BusinessCategory
+  _category: BusinessCategory
 ): Array<[PromptIntent, string, number]> {
   if (!keywords || keywords.length === 0) return []
   const isHe = ctx.language === 'he'
   const results: Array<[PromptIntent, string, number]> = []
+  const filtered = keywords.filter(isQualityKeyword).slice(0, 5)
 
-  for (const kw of keywords.slice(0, 5)) {
-    const k = kw.trim()
+  for (const raw of filtered) {
+    const k = raw.trim()
     if (!k) continue
+
     if (isHe) {
-      results.push(['recommendation', `מי מומלץ ל${k}?`, 84])
-      if (ctx.city) {
-        results.push(['local', `${k} מומלץ ב${ctx.city}`, 82])
-      }
+      // Recommendation: "איפה מומלץ לקנות {k}?" — purchase-intent
+      results.push(['recommendation', `איפה מומלץ לקנות ${k}?`, 86])
+      // Recommendation: "איזה {k} מומלץ?" — selection-intent
+      results.push(['recommendation', `איזה ${k} מומלץ?`, 84])
+      // Commercial: more natural "כמה עולה X" — strip awkward "ל" prefix
       results.push(['commercial', `כמה עולה ${k}?`, 80])
-    } else {
-      results.push(['recommendation', `Best ${k} recommendations`, 84])
+      // Local — only if city is known
       if (ctx.city) {
-        results.push(['local', `${k} in ${ctx.city}`, 82])
+        results.push(['local', `איפה לקנות ${k} ב${ctx.city}?`, 82])
       }
+    } else {
+      results.push(['recommendation', `Where to buy ${k}?`, 84])
+      results.push(['recommendation', `Best ${k} options`, 82])
       results.push(['commercial', `How much does ${k} cost?`, 78])
+      if (ctx.city) {
+        results.push(['local', `${k} in ${ctx.city}`, 80])
+      }
     }
   }
   return results
+}
+
+/**
+ * Lightweight Hebrew quality check.
+ *
+ * Detects obvious grammar fails like:
+ *   - "מי מומלץ ל{noun-phrase}?" where the noun-phrase starts with a Hebrew
+ *     plural marker that doesn't combine well with "ל".
+ *   - Two consecutive identical Hebrew prefixes ("לל", "בב").
+ *   - Trailing connectives without a noun.
+ */
+function isReadableHebrew(text: string): boolean {
+  if (!text) return false
+  // No double prefixes
+  if (/(לל|בב|מה ל|של של)/.test(text)) return false
+  // No empty templates
+  if (/\{\{[^}]+\}\}/.test(text)) return false
+  // Minimum length 6 characters for a real question
+  if (text.length < 6) return false
+  return true
 }
 
 /**
@@ -489,14 +566,24 @@ export function generatePromptSuggestions({
   const templates = bank[category] || bank.generic
   const keywordTemplates = keywordDerivedQueries(keywords, ctx, category)
 
-  // Combine + deduplicate
+  // Minimum quality threshold; templates below this are filtered out.
+  const MIN_QUALITY_SCORE = 68
+
+  // Combine + deduplicate (semantic dedup: drop near-identical lowercased prompts)
   const seen = new Set<string>()
   const combined: PromptSuggestion[] = []
 
   const processTemplates = (list: Array<[PromptIntent, string, number]>) => {
     for (const [intent, raw, score] of list) {
+      if (score < MIN_QUALITY_SCORE) continue
       const text = fillTemplate(raw, ctx).trim()
-      const key = text.toLowerCase()
+      if (lang === 'he' && !isReadableHebrew(text)) continue
+      // Dedup key: lowercased + collapsed whitespace + stripped final punctuation
+      const key = text
+        .toLowerCase()
+        .replace(/[?!.,]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
       if (seen.has(key)) continue
       seen.add(key)
       combined.push({
