@@ -1,14 +1,16 @@
 'use client'
 
 /**
- * AI Visibility premium workspace — true 2-column layout optimized for AI insights.
+ * AI Visibility premium dashboard — workspace layout optimized for AI insights.
  * Mounted inside the project page only when NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'.
  *
  * Layout:
- *   - HEADER (title + suggest/new query)
- *   - KPI OVERVIEW (Visibility Score, Mentioned, Cited, Citations)
- *   - WORKSPACE (left: query list | right: selected query details)
- *   - SCAN HISTORY (compact footer)
+ *   - HEADER (title + suggest/new prompt)
+ *   - KPI OVERVIEW (Visibility Score, Mentioned, Cited, Citations, Credits)
+ *   - INSIGHTS STRIP (Brand mentioned, Domain cited, Best engine, Top source)
+ *   - PROMPTS + ENGINE CARDS (run any prompt × engine)
+ *   - RESULT WORKSPACE (answer + sources sidebar)
+ *   - ACTIVITY FEED (history with delete)
  *
  * Performance:
  *   - History endpoint returns metadata only; full response fetched on demand
@@ -150,7 +152,6 @@ export default function AIVisibilitySection({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [creating, setCreating] = useState(false)
 
-  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null)
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   const [runningKey, setRunningKey] = useState<string | null>(null)
   const [latestRun, setLatestRun] = useState<RunResults | null>(null)
@@ -373,7 +374,49 @@ export default function AIVisibilitySection({
       {/* INSIGHTS STRIP */}
       {kpis && <InsightsStrip kpis={kpis} t={t} />}
 
-      {/* SMART QUESTIONS — Recommended questions section */}
+      {/* AI QUERIES + ENGINE CARDS */}
+      {loading ? (
+        <PromptListSkeleton />
+      ) : prompts.length === 0 ? (
+        <EmptyPromptState
+          onSuggest={() => setShowSuggestions(true)}
+          onNew={() => setShowNewPrompt(true)}
+          t={t}
+        />
+      ) : (
+        <div className="space-y-3">
+          {prompts.map((p) => (
+            <PromptCard
+              key={p.id}
+              prompt={p}
+              runningKey={runningKey}
+              activeResult={result?.promptId === p.id ? result : null}
+              onRun={(engine) => handleRun(p.id, engine)}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* RESULT WORKSPACE */}
+      {runningKey && !latestRun && (
+        <div id="ai-result-workspace">
+          <ResultSkeleton t={t} />
+        </div>
+      )}
+      {latestRun && result && (
+        <div id="ai-result-workspace">
+          <ResultWorkspace
+            result={result}
+            responseIsRTL={responseIsRTL}
+            runStatus={latestRun.run.status}
+            completedAt={latestRun.run.completedAt}
+            t={t}
+          />
+        </div>
+      )}
+
+      {/* SMART QUESTIONS — Recommended (secondary) */}
       {suggestedQuestions.length > 0 && (
         <SmartQuestionsStrip
           questions={suggestedQuestions}
@@ -385,121 +428,6 @@ export default function AIVisibilitySection({
           onAdded={loadPrompts}
           t={t}
         />
-      )}
-
-      {/* WORKSPACE: 2-Column Layout */}
-      {loading ? (
-        <QueryListSkeleton />
-      ) : prompts.length === 0 ? (
-        <EmptyPromptState
-          onSuggest={() => setShowSuggestions(true)}
-          onNew={() => setShowNewPrompt(true)}
-          t={t}
-        />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* LEFT: Query List */}
-          <div className="lg:col-span-1">
-            <div className="space-y-2">
-              {prompts.map((p) => {
-                const selected = selectedPromptId === p.id
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setSelectedPromptId(p.id)}
-                    className={`w-full text-start p-4 rounded-xl border transition-all ${
-                      selected
-                        ? 'border-indigo-300 bg-gradient-to-br from-indigo-50 to-white shadow-md'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold text-slate-900 line-clamp-2">{p.prompt}</h3>
-                      </div>
-                    </div>
-                    {(p.country || p.language) && (
-                      <div className="flex gap-2 mb-3">
-                        {p.country && <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{p.country}</Badge>}
-                        {p.language && <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{p.language}</Badge>}
-                      </div>
-                    )}
-                    {/* Compact Engine Status Chips */}
-                    <div className="flex flex-wrap gap-1.5">
-                      {ENGINE_LIST.map((engineId) => {
-                        const isRunning = runningKey === `${p.id}:${engineId}`
-                        const statusIcon =
-                          isRunning ? '⟳' :
-                          result?.promptId === p.id && result?.engine === engineId
-                            ? result.status === 'success'
-                              ? '✓'
-                              : '✕'
-                            : '—'
-                        const statusColor =
-                          isRunning ? 'bg-blue-100 text-blue-700' :
-                          result?.promptId === p.id && result?.engine === engineId
-                            ? result.status === 'success'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-700'
-                            : 'bg-slate-100 text-slate-500'
-
-                        const meta = ENGINE_META[engineId]
-                        return (
-                          <button
-                            key={engineId}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedPromptId(p.id)
-                              handleRun(p.id, engineId)
-                            }}
-                            disabled={runningKey !== null && !isRunning}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition ${statusColor} ${
-                              runningKey !== null && !isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-sm'
-                            }`}
-                            title={meta?.name}
-                          >
-                            <span>{statusIcon}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* RIGHT: Query Details */}
-          <div className="lg:col-span-2">
-            {selectedPromptId && prompts.find((p) => p.id === selectedPromptId) ? (
-              <>
-                {runningKey?.startsWith(selectedPromptId + ':') && !latestRun && (
-                  <ResultSkeleton t={t} />
-                )}
-                {latestRun && result && result.promptId === selectedPromptId && (
-                  <ResultWorkspace
-                    result={result}
-                    responseIsRTL={responseIsRTL}
-                    runStatus={latestRun.run.status}
-                    completedAt={latestRun.run.completedAt}
-                    t={t}
-                  />
-                )}
-                {!latestRun || result?.promptId !== selectedPromptId ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                    <p className="text-sm text-slate-600">{t('select_and_run_query')}</p>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <p className="text-sm text-slate-600">{t('select_query_to_view')}</p>
-              </div>
-            )}
-          </div>
-        </div>
       )}
 
       {/* SCAN HISTORY */}
@@ -754,31 +682,20 @@ function InsightsStrip({
   )
 }
 
-function QueryListSkeleton() {
+function PromptListSkeleton() {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="lg:col-span-1 space-y-2">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
-            <div className="h-4 w-3/4 bg-slate-200 rounded mb-2" />
-            <div className="h-3 w-1/2 bg-slate-100 rounded mb-3" />
-            <div className="flex gap-1.5">
-              {[0, 1, 2, 3].map((j) => (
-                <div key={j} className="w-6 h-6 bg-slate-100 rounded" />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="lg:col-span-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 animate-pulse">
-          <div className="h-4 w-1/3 bg-slate-200 rounded mb-4" />
-          <div className="space-y-2">
-            <div className="h-3 w-full bg-slate-100 rounded" />
-            <div className="h-3 w-5/6 bg-slate-100 rounded" />
+    <div className="space-y-3">
+      {[0, 1].map((i) => (
+        <div key={i} className="rounded-2xl border border-slate-200/70 bg-white p-4 animate-pulse">
+          <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
+          <div className="h-5 w-2/3 bg-slate-200 rounded mb-4" />
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+            {[0, 1, 2, 3, 4, 5].map((j) => (
+              <div key={j} className="h-20 bg-slate-100 rounded-xl" />
+            ))}
           </div>
         </div>
-      </div>
+      ))}
     </div>
   )
 }
@@ -830,6 +747,99 @@ function ResultSkeleton({ t }: { t: T }) {
       <div className="border-t border-slate-100 px-6 py-3 flex items-center gap-2">
         <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         <span className="text-sm text-blue-700 font-medium">{t('scanning_engine')}</span>
+      </div>
+    </div>
+  )
+}
+
+function PromptCard({
+  prompt,
+  runningKey,
+  activeResult,
+  onRun,
+  t,
+}: {
+  prompt: Prompt
+  runningKey: string | null
+  activeResult: ResultRow | null
+  onRun: (engine: string) => void
+  t: T
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
+      <div className="px-5 pt-4 pb-3 border-b border-slate-100">
+        <div className="mb-2 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            {t('query_label')}
+          </span>
+          {prompt.country && (
+            <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{prompt.country}</Badge>
+          )}
+          {prompt.language && (
+            <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{prompt.language}</Badge>
+          )}
+        </div>
+        <h3 className="text-[15px] font-semibold text-slate-900 leading-snug">{prompt.prompt}</h3>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 bg-slate-50/40">
+        {ENGINE_LIST.map((engineId) => {
+          const meta = ENGINE_META[engineId]
+          const Icon = meta.Icon
+          const isRunning = runningKey === `${prompt.id}:${engineId}`
+          const isDisabled = runningKey !== null && !isRunning
+          const hasResult = activeResult?.engine === engineId
+          const success = hasResult && activeResult?.status === 'success'
+          const failed = hasResult && activeResult?.status === 'error'
+
+          return (
+            <button
+              key={engineId}
+              onClick={() => onRun(engineId)}
+              disabled={isDisabled}
+              type="button"
+              className={`group relative flex flex-col gap-2 p-3 rounded-xl border transition-all duration-200 text-start overflow-hidden ${
+                isRunning
+                  ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50/60 shadow-[0_0_0_3px_rgba(99,102,241,0.1)]'
+                  : success
+                  ? `border-emerald-200 bg-gradient-to-br ${meta.bg}`
+                  : failed
+                  ? 'border-red-200 bg-gradient-to-br from-red-50/80 to-white'
+                  : `border-slate-200 bg-white hover:border-slate-300 hover:bg-gradient-to-br hover:${meta.bg} hover:shadow-md hover:-translate-y-0.5`
+              } ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Icon size={20} className={`${meta.accent} transition-transform group-hover:scale-110`} />
+                  <span className="text-sm font-semibold text-slate-800">{meta.name}</span>
+                </div>
+                {isRunning ? (
+                  <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                ) : success ? (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-400/50" />
+                ) : failed ? (
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-slate-500">
+                {hasResult && success ? (
+                  <span>
+                    <b className="text-slate-900 font-semibold">{activeResult!.citationCount}</b> {t('citations').toLowerCase()}
+                  </span>
+                ) : hasResult && failed ? (
+                  <span className="text-red-600 font-medium">{t('failed')}</span>
+                ) : isRunning ? (
+                  <span className="text-blue-600 font-medium">{t('scanning')}</span>
+                ) : (
+                  <span className="text-slate-400">{t('scan_btn')}</span>
+                )}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
