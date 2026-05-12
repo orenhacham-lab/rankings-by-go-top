@@ -160,6 +160,16 @@ const STRINGS = {
   scan_engine: { he: 'סרוק', en: 'Scan' },
   query_already_exists: { he: 'השאלה כבר קיימת', en: 'Query already exists' },
   of_engines: { he: 'מתוך 6 מנועים', en: 'of 6 engines' },
+
+  // Tabs
+  tab_overview: { he: 'סקירה', en: 'Overview' },
+  tab_results: { he: 'תוצאות', en: 'Results' },
+  tab_queries: { he: 'שאלות AI', en: 'AI Queries' },
+  showing_results: { he: 'מציג {count} תוצאות', en: 'Showing {count} results' },
+  mentions_by_engine: { he: 'אזכורים לפי מנוע AI', en: 'Mentions by AI Engine' },
+  total_mentions: { he: 'סה״כ אזכורים', en: 'Total mentions' },
+  visibility_percent: { he: 'אחוז נראות', en: 'Visibility' },
+  out_of_results: { he: 'מתוך {count} תוצאות', en: 'out of {count} results' },
 } as const
 
 type StringKey = keyof typeof STRINGS

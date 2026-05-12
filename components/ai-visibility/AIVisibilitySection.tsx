@@ -1,15 +1,12 @@
 'use client'
 
 /**
- * AI Visibility — Premium dashboard matching competitor structure.
+ * AI Visibility — Professional dashboard with tab-based structure.
  *
- * Layout:
- * 1. Global overview (aggregated stats across all scans)
- * 2. Engine summary cards (one per engine)
- * 3. Filter bar (search, engine, mention/citation status)
- * 4. Compact results table (flat list of scan results)
- * 5. Detail drawer (click row to open)
- * 6. Smart Questions section (separate)
+ * Tabs:
+ * 1. Overview — global summary + engine mention cards
+ * 2. Results — scan results table with filters and detail drawer
+ * 3. AI Queries — question management + recommended questions
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -26,8 +23,7 @@ import PromptSuggestions from './PromptSuggestions'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
 import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
 
-// Fixed list of supported AI engines — always shown, regardless of results.
-// Claude is NOT supported in our ScrapeLLM implementation.
+// Fixed list of supported AI engines (6 total — Claude NOT supported in ScrapeLLM)
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
 type ResultRow = {
@@ -72,6 +68,8 @@ type EngineMetrics = {
   rate: number
 }
 
+type TabType = 'overview' | 'results' | 'queries'
+
 export default function AIVisibilitySection({
   projectId,
   projectCountry,
@@ -92,13 +90,14 @@ export default function AIVisibilitySection({
   const t = useMemo(() => createI18n(projectLanguage, projectCountry), [projectLanguage, projectCountry])
   const isHebrew = detectHebrew(projectLanguage, projectCountry)
 
+  // Tabs and core state
+  const [currentTab, setCurrentTab] = useState<TabType>('overview')
   const [allResults, setAllResults] = useState<ResultRow[]>([])
   const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [scanningKey, setScanningKey] = useState<string | null>(null)
 
   const [showNewPrompt, setShowNewPrompt] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -111,13 +110,13 @@ export default function AIVisibilitySection({
   const [searchQuery, setSearchQuery] = useState('')
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
+  const [scanningKey, setScanningKey] = useState<string | null>(null)
 
-  // Load both scan results AND prompts (so newly-added prompts appear before scanning)
+  // Load both scan results AND prompts in parallel
   const loadAllResults = useCallback(async () => {
     setError(null)
     setLoading(true)
     try {
-      // Fetch runs and prompts in parallel
       const [runsRes, promptsRes] = await Promise.all([
         fetch(`/api/ai-visibility/runs?projectId=${projectId}&limit=200`),
         fetch(`/api/ai-visibility/prompts?projectId=${projectId}`),
@@ -152,7 +151,6 @@ export default function AIVisibilitySection({
           runId: run.id,
         }))
 
-      // Backfill promptText from prompts API when missing
       const promptsArr: PromptRow[] = (promptsData.prompts || []) as PromptRow[]
       const promptTextById = new Map(promptsArr.map((p) => [p.id, p.prompt]))
       const resultsWithText = results.map((r) => ({
@@ -181,8 +179,8 @@ export default function AIVisibilitySection({
       })
 
       // Aggregate from results
-      results.forEach((r) => {
-        if (r.status === 'success') {
+      resultsWithText.forEach((r) => {
+        if (r.status === 'success' && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) {
           engines.add(r.engine)
           if (r.mentioned) totalMentions++
           if (r.targetCited) totalCitations++
@@ -202,8 +200,8 @@ export default function AIVisibilitySection({
         }
       })
 
-      const successfulScans = results.filter((r) => r.status === 'success').length
-      if (successfulScans > 0 || results.length > 0) {
+      const successfulScans = resultsWithText.filter((r) => r.status === 'success').length
+      if (successfulScans > 0 || resultsWithText.length > 0) {
         setGlobalMetrics({
           totalScans: successfulScans,
           totalMentions,
@@ -231,10 +229,6 @@ export default function AIVisibilitySection({
     }
   }, [projectId])
 
-  useEffect(() => {
-    loadAllResults()
-  }, [loadAllResults])
-
   // Generate smart question suggestions
   useEffect(() => {
     const suggestions = generatePromptSuggestions({
@@ -249,7 +243,22 @@ export default function AIVisibilitySection({
     setSuggestedQuestions(suggestions.slice(0, 4))
   }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords])
 
-  // Add scan trigger for a specific prompt × engine
+  useEffect(() => {
+    loadAllResults()
+  }, [loadAllResults])
+
+  // Build a set of "scanned" prompt × engine combinations
+  const scannedSet = useMemo(() => {
+    const s = new Set<string>()
+    allResults.forEach((r) => {
+      if (r.promptId && r.status === 'success') {
+        s.add(`${r.promptId}:${r.engine}`)
+      }
+    })
+    return s
+  }, [allResults])
+
+  // Scan trigger for a specific prompt × engine
   const scanEngine = useCallback(
     async (promptId: string, engine: string) => {
       const key = `${promptId}:${engine}`
@@ -266,27 +275,28 @@ export default function AIVisibilitySection({
           throw new Error(body.error || `HTTP ${res.status}`)
         }
         await loadAllResults()
+        // Switch to Results tab and auto-open the drawer for the completed scan
+        setCurrentTab('results')
+        // Find the newly completed result
+        setTimeout(() => {
+          const latestResult = allResults.find(
+            (r) => r.promptId === promptId && r.engine === engine && r.status === 'success'
+          )
+          if (latestResult) {
+            setSelectedResult(latestResult)
+            setDrawerOpen(true)
+          }
+        }, 100)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Scan failed')
       } finally {
         setScanningKey(null)
       }
     },
-    [projectId, loadAllResults]
+    [projectId, loadAllResults, allResults]
   )
 
-  // Build a set of "scanned" prompt × engine combinations
-  const scannedSet = useMemo(() => {
-    const s = new Set<string>()
-    allResults.forEach((r) => {
-      if (r.promptId && r.status === 'success') {
-        s.add(`${r.promptId}:${r.engine}`)
-      }
-    })
-    return s
-  }, [allResults])
-
-  // Filter results — exclude any unsupported engines (e.g. legacy Claude rows)
+  // Filter results — exclude any unsupported engines
   const filteredResults = useMemo(() => {
     return allResults.filter((r) => {
       if (!(SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) return false
@@ -297,6 +307,25 @@ export default function AIVisibilitySection({
       return true
     })
   }, [allResults, filterEngine, filterMentioned, filterCited, searchQuery])
+
+  if (loading) {
+    return (
+      <section id="ai-visibility" className="space-y-6 mb-10">
+        <div className="space-y-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
+              <div className="h-4 w-2/3 bg-slate-200 rounded mb-3" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {[0, 1, 2, 3].map((j) => (
+                  <div key={j} className="h-12 bg-slate-100 rounded" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section id="ai-visibility" className="space-y-6 mb-10" dir={isHebrew ? 'rtl' : 'ltr'}>
@@ -311,14 +340,6 @@ export default function AIVisibilitySection({
             <p className="text-xs text-slate-500 mt-0">{t('monitor_engines')}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)}>
-            {t('recommend_questions')}
-          </Button>
-          <Button size="sm" onClick={() => setShowNewPrompt(true)}>
-            {t('new_query')}
-          </Button>
-        </div>
       </div>
 
       {error && (
@@ -328,99 +349,216 @@ export default function AIVisibilitySection({
         </div>
       )}
 
-      {loading ? (
-        <div className="space-y-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
-              <div className="h-4 w-2/3 bg-slate-200 rounded mb-3" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {[0, 1, 2, 3].map((j) => (
-                  <div key={j} className="h-12 bg-slate-100 rounded" />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
+      {/* TAB BAR */}
+      <div className="flex gap-2 border-b border-slate-200">
+        {(['overview', 'results', 'queries'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setCurrentTab(tab)}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+              currentTab === tab
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            {tab === 'overview' && t('tab_overview')}
+            {tab === 'results' && t('tab_results')}
+            {tab === 'queries' && t('tab_queries')}
+          </button>
+        ))}
+      </div>
+
+      {/* TAB 1: OVERVIEW */}
+      {currentTab === 'overview' && globalMetrics && (
         <>
-          {/* GLOBAL OVERVIEW */}
-          {globalMetrics && (
-            <GlobalOverviewPanel metrics={globalMetrics} t={t} />
-          )}
+          <OverviewSummaryStrip metrics={globalMetrics} totalResults={allResults.length} t={t} />
+          <EngineMentionCards metrics={engineMetrics} t={t} />
+        </>
+      )}
 
-          {/* ENGINE SUMMARY CARDS — always show all supported engines */}
-          <EngineSummaryCards metrics={engineMetrics} t={t} />
-
-          {/* AI QUERIES PANEL — all prompts with engine scan chips */}
-          {allPrompts.length > 0 && (
-            <AIQueriesPanel
-              prompts={allPrompts}
-              scannedSet={scannedSet}
-              scanningKey={scanningKey}
-              onScan={scanEngine}
-              t={t}
+      {/* TAB 2: RESULTS */}
+      {currentTab === 'results' && (
+        <>
+          {/* FILTER BAR */}
+          <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 bg-white p-3">
+            <Input
+              placeholder={t('search')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 min-w-[200px]"
             />
-          )}
+            <select
+              value={filterEngine || ''}
+              onChange={(e) => setFilterEngine(e.target.value || null)}
+              className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+            >
+              <option value="">{t('all_engines')}</option>
+              {SUPPORTED_ENGINES.map((e) => (
+                <option key={e} value={e}>
+                  {ENGINE_META[e as keyof typeof ENGINE_META]?.name || e}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
+              onChange={(e) => setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')}
+              className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+            >
+              <option value="">{t('all_mention')}</option>
+              <option value="yes">{t('mentioned')}</option>
+              <option value="no">{t('not_mentioned')}</option>
+            </select>
+            <select
+              value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
+              onChange={(e) => setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')}
+              className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+            >
+              <option value="">{t('all_citations')}</option>
+              <option value="yes">{t('target_cited')}</option>
+              <option value="no">{t('not_cited')}</option>
+            </select>
+          </div>
 
-          {/* FILTER BAR — show all supported engines */}
-          <FilterBar
-            engines={SUPPORTED_ENGINES as unknown as string[]}
-            filterEngine={filterEngine}
-            filterMentioned={filterMentioned}
-            filterCited={filterCited}
-            searchQuery={searchQuery}
-            onEngineChange={setFilterEngine}
-            onMentionedChange={setFilterMentioned}
-            onCitedChange={setFilterCited}
-            onSearchChange={setSearchQuery}
-            t={t}
-          />
+          {/* RESULTS COUNT */}
+          <div className="text-sm text-slate-600">
+            {t('showing_results').replace('{count}', String(filteredResults.length))}
+          </div>
 
           {/* RESULTS TABLE */}
           {filteredResults.length > 0 ? (
-            <ResultsTable
-              results={filteredResults}
-              onRowClick={async (result) => {
-                setSelectedResult(result)
-                setDrawerOpen(true)
-                // Fetch full result details on demand
-                try {
-                  const res = await fetch(`/api/ai-visibility/runs/${result.runId}/results`)
-                  if (res.ok) {
-                    const data = await res.json()
-                    const fullResult = data.results?.[0]
-                    if (fullResult) {
-                      setSelectedResult({
-                        ...result,
-                        citations: fullResult.citations || [],
-                        responseText: fullResult.responseText || null,
-                      })
+            <div className="space-y-2">
+              {filteredResults.map((r) => (
+                <ResultRowCard
+                  key={r.id}
+                  result={r}
+                  onRowClick={async (result) => {
+                    setSelectedResult(result)
+                    setDrawerOpen(true)
+                    // Fetch full result details on demand
+                    try {
+                      const res = await fetch(`/api/ai-visibility/runs/${result.runId}/results`)
+                      if (res.ok) {
+                        const data = await res.json()
+                        const fullResult = data.results?.[0]
+                        if (fullResult) {
+                          setSelectedResult({
+                            ...result,
+                            citations: fullResult.citations || [],
+                            responseText: fullResult.responseText || null,
+                          })
+                        }
+                      }
+                    } catch (e) {
+                      console.error('Failed to load full result:', e)
                     }
-                  }
-                } catch (e) {
-                  console.error('Failed to load full result:', e)
-                }
-              }}
-              t={t}
-            />
+                  }}
+                  t={t}
+                />
+              ))}
+            </div>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
               <p className="text-sm text-slate-600">{t('no_scans')}</p>
             </div>
           )}
+        </>
+      )}
 
-          {/* SMART QUESTIONS */}
+      {/* TAB 3: AI QUERIES */}
+      {currentTab === 'queries' && (
+        <>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">
+              {t('ai_queries')} ({allPrompts.length})
+            </h3>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)}>
+                {t('recommend_questions')}
+              </Button>
+              <Button size="sm" onClick={() => setShowNewPrompt(true)}>
+                {t('new_query')}
+              </Button>
+            </div>
+          </div>
+
+          {/* QUESTIONS LIST */}
+          {allPrompts.length > 0 ? (
+            <div className="space-y-2">
+              {allPrompts.map((p) => (
+                <div key={p.id} className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition">
+                  <p className="text-sm font-medium text-slate-900 mb-2 line-clamp-2">{p.prompt}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUPPORTED_ENGINES.map((engine) => {
+                      const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
+                      const key = `${p.id}:${engine}`
+                      const scanned = scannedSet.has(key)
+                      const scanning = scanningKey === key
+                      return (
+                        <button
+                          key={engine}
+                          onClick={() => !scanning && !scanned && scanEngine(p.id, engine)}
+                          disabled={scanning || scanned}
+                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition ${
+                            scanned
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
+                              : scanning
+                              ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-wait'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer'
+                          }`}
+                        >
+                          {meta && <meta.Icon size={14} className={meta.accent} />}
+                          <span>{meta?.name || engine}</span>
+                          {scanned && <span className="text-emerald-600">✓</span>}
+                          {scanning && <span className="text-slate-400 animate-pulse">…</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+              <p className="text-sm text-slate-600">{t('no_queries')}</p>
+            </div>
+          )}
+
+          {/* RECOMMENDED QUESTIONS */}
           {suggestedQuestions.length > 0 && (
-            <SmartQuestionsSection
-              questions={suggestedQuestions}
-              projectId={projectId}
-              country={projectCountry}
-              language={projectLanguage}
-              domain={projectDomain}
-              businessName={projectBrandName}
-              onAdded={loadAllResults}
-              t={t}
-            />
+            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50/40 to-white p-5 mt-6">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 mb-4">
+                {t('smart_questions_title')}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {suggestedQuestions.map((q) => (
+                  <SmartQuestionCard
+                    key={q.id}
+                    question={q}
+                    onAdd={async () => {
+                      try {
+                        const res = await fetch('/api/ai-visibility/prompts', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            projectId,
+                            prompt: q.prompt,
+                            country: projectCountry,
+                            language: projectLanguage,
+                            targetDomain: projectDomain,
+                            targetBrandName: projectBrandName,
+                          }),
+                        })
+                        if (!res.ok) throw new Error('Failed to add')
+                        loadAllResults()
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Failed to add question')
+                      }
+                    }}
+                    t={t}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </>
       )}
@@ -452,7 +590,6 @@ export default function AIVisibilitySection({
         onAdded={loadAllResults}
       />
 
-      {/* Manual AI Query Creation Modal */}
       <NewAIQueryModal
         open={showNewPrompt}
         onClose={() => setShowNewPrompt(false)}
@@ -468,146 +605,68 @@ export default function AIVisibilitySection({
   )
 }
 
-/* --- UTILITIES --- */
-
-function cleanResponseText(text: string): string {
-  if (!text) return ''
-
-  let cleaned = text
-    // Remove markdown bold/italic markers
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    // Remove markdown headings but keep text
-    .replace(/^#+\s+/gm, '')
-    // Remove citation syntax variations: [1], [[1]], ([domain][1]), ([Google])
-    .replace(/\[\[\d+\]\]/g, '')
-    .replace(/\[\d+\]/g, '')
-    .replace(/\(\[[^\]]+\]\[[^\]]+\]\)/g, '')
-    .replace(/\(\[[^\]]+\]\)/g, '')
-    // Remove markdown link syntax [text](url) but keep text
-    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-    // Remove trailing markdown list markers
-    .replace(/^[\s]*[-*+]\s+/gm, '• ')
-
-  return cleaned.trim()
-}
-
 /* --- COMPONENTS --- */
 
 type T = (key: any) => string
 
-function GlobalOverviewPanel({
-  metrics,
-  t,
-}: {
-  metrics: GlobalMetrics
-  t: T
-}) {
+function OverviewSummaryStrip({ metrics, totalResults, t }: { metrics: GlobalMetrics; totalResults: number; t: T }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-xl border border-slate-200/70 bg-gradient-to-br from-white to-slate-50/40 p-4">
-      <OverviewTile
-        label={t('visibility_score')}
-        value={`${Math.round((metrics.mentionRate + metrics.citationRate) / 2)}%`}
-        sub={t('overall')}
-        tone="indigo"
-      />
-      <OverviewTile
-        label={t('mentioned')}
-        value={String(metrics.totalMentions)}
-        sub={`${metrics.mentionRate}%`}
-        tone="blue"
-      />
-      <OverviewTile
-        label={t('target_cited')}
-        value={String(metrics.totalCitations)}
-        sub={`${metrics.citationRate}%`}
-        tone="emerald"
-      />
-      <OverviewTile
-        label={t('engine_coverage')}
-        value={String(metrics.enginesCovered)}
-        sub={t('of_engines')}
-        tone="amber"
-      />
+    <div className="rounded-lg border border-slate-200 bg-gradient-to-r from-indigo-50 to-white p-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+            {t('total_mentions')}
+          </div>
+          <div className="text-4xl font-bold text-emerald-700">{metrics.totalMentions}</div>
+          <div className="text-sm text-slate-600 mt-2">
+            {t('out_of_results').replace('{count}', String(totalResults))}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+            {t('visibility_percent')}
+          </div>
+          <div className="text-4xl font-bold text-indigo-700">{metrics.mentionRate}%</div>
+          <div className="text-sm text-slate-600 mt-2">{t('overall')}</div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+            {t('target_cited')}
+          </div>
+          <div className="text-4xl font-bold text-emerald-700">{metrics.totalCitations}</div>
+          <div className="text-sm text-slate-600 mt-2">{t('citations')}</div>
+        </div>
+      </div>
     </div>
   )
 }
 
-function OverviewTile({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string
-  value: string
-  sub: string
-  tone: 'indigo' | 'blue' | 'emerald' | 'amber'
-}) {
-  const bgClass =
-    tone === 'indigo'
-      ? 'from-indigo-50 to-white border-indigo-100'
-      : tone === 'blue'
-      ? 'from-blue-50 to-white border-blue-100'
-      : tone === 'emerald'
-      ? 'from-emerald-50 to-white border-emerald-100'
-      : 'from-amber-50 to-white border-amber-100'
-
-  const textColor =
-    tone === 'indigo'
-      ? 'text-indigo-700'
-      : tone === 'blue'
-      ? 'text-blue-700'
-      : tone === 'emerald'
-      ? 'text-emerald-700'
-      : 'text-amber-700'
-
-  return (
-    <div className={`rounded-lg border bg-gradient-to-br ${bgClass} p-3`}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{label}</div>
-      <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
-      <div className="text-xs text-slate-500 mt-1">{sub}</div>
-    </div>
-  )
-}
-
-function EngineSummaryCards({
-  metrics,
-  t,
-}: {
-  metrics: Map<string, EngineMetrics>
-  t: T
-}) {
-  // Only render supported engines (filter out any legacy entries like Claude)
+function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics>; t: T }) {
   const engineList = SUPPORTED_ENGINES.map((engine) =>
     metrics.get(engine) || { engine, scans: 0, mentions: 0, citations: 0, rate: 0 }
-  )
+  ).sort((a, b) => b.mentions - a.mentions)
 
   return (
     <div>
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-3">{t('engine_coverage')}</h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-4">
+        {t('mentions_by_engine')}
+      </h3>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {engineList.map((em) => {
           const meta = ENGINE_META[em.engine as keyof typeof ENGINE_META]
+          const percent = em.scans > 0 ? Math.round((em.mentions / em.scans) * 100) : 0
           return (
-            <div key={em.engine} className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-md transition">
-              <div className="flex items-center gap-2 mb-2">
-                {meta && <meta.Icon size={20} className={meta.accent} />}
-                <span className="text-xs font-semibold text-slate-900">{meta?.name || em.engine}</span>
+            <div
+              key={em.engine}
+              className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-md transition flex flex-col items-center text-center"
+            >
+              {meta && <meta.Icon size={32} className={meta.accent} />}
+              <div className="font-semibold text-slate-900 mt-3 text-sm">{meta?.name || em.engine}</div>
+              <div className="text-3xl font-bold text-emerald-600 mt-2">{em.mentions}</div>
+              <div className="text-xs text-slate-600 mt-2">
+                {t('out_of_results').replace('{count}', String(em.scans))}
               </div>
-              <div className="space-y-1">
-                <div className="text-[10px] text-slate-600">
-                  <span className="font-medium text-slate-900">{em.mentions}</span> {t('mentions')}
-                </div>
-                <div className="text-[10px] text-slate-600">
-                  <span className="font-medium text-slate-900">{em.citations}</span> {t('citations')}
-                </div>
-                <div className="text-[10px] text-slate-600">
-                  <span className="font-medium text-slate-900">{em.scans}</span> {t('scans')}
-                </div>
-              </div>
+              {em.scans > 0 && <div className="text-xs text-slate-500 mt-1">({percent}%)</div>}
             </div>
           )
         })}
@@ -616,179 +675,86 @@ function EngineSummaryCards({
   )
 }
 
-function AIQueriesPanel({
-  prompts,
-  scannedSet,
-  scanningKey,
-  onScan,
-  t,
-}: {
-  prompts: PromptRow[]
-  scannedSet: Set<string>
-  scanningKey: string | null
-  onScan: (promptId: string, engine: string) => void
-  t: T
-}) {
+function ResultRowCard({ result, onRowClick, t }: { result: ResultRow; onRowClick: (r: ResultRow) => void; t: T }) {
+  const meta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
+
   return (
-    <div>
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-3">
-        {t('ai_queries')} ({prompts.length})
-      </h3>
-      <div className="space-y-2">
-        {prompts.map((p) => (
-          <div key={p.id} className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition">
-            <p className="text-sm font-medium text-slate-900 mb-2 line-clamp-2">{p.prompt}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {SUPPORTED_ENGINES.map((engine) => {
-                const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
-                const key = `${p.id}:${engine}`
-                const scanned = scannedSet.has(key)
-                const scanning = scanningKey === key
-                return (
-                  <button
-                    key={engine}
-                    onClick={() => !scanning && !scanned && onScan(p.id, engine)}
-                    disabled={scanning || scanned}
-                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition ${
-                      scanned
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
-                        : scanning
-                        ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-wait'
-                        : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer'
-                    }`}
-                    title={scanned ? t('scan_activity') : t('scan_engine')}
-                  >
-                    {meta && <meta.Icon size={14} className={meta.accent} />}
-                    <span>{meta?.name || engine}</span>
-                    {scanned && <span className="text-emerald-600">✓</span>}
-                    {scanning && <span className="text-slate-400 animate-pulse">…</span>}
-                  </button>
-                )
-              })}
-            </div>
+    <div
+      onClick={() => onRowClick(result)}
+      className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-md hover:border-slate-300 transition cursor-pointer"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-900 line-clamp-2">{result.promptText}</p>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {meta && <meta.Icon size={16} className={meta.accent} />}
+            <span className="text-xs text-slate-600 font-medium">{meta?.name || result.engine}</span>
+            {result.mentioned && <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>}
+            {!result.mentioned && <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>}
+            {result.targetCited && <Badge variant="success" className="!text-xs">{t('target_cited')}</Badge>}
+            {!result.targetCited && <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>}
           </div>
-        ))}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {result.citationCount > 0 && (
+            <Badge variant="info" className="!text-xs">
+              {result.citationCount} {t('citations')}
+            </Badge>
+          )}
+          <ExternalLinkIcon size={16} className="text-slate-400" />
+        </div>
       </div>
     </div>
   )
 }
 
-function FilterBar({
-  engines,
-  filterEngine,
-  filterMentioned,
-  filterCited,
-  searchQuery,
-  onEngineChange,
-  onMentionedChange,
-  onCitedChange,
-  onSearchChange,
+function SmartQuestionCard({
+  question,
+  onAdd,
   t,
 }: {
-  engines: string[]
-  filterEngine: string | null
-  filterMentioned: boolean | null
-  filterCited: boolean | null
-  searchQuery: string
-  onEngineChange: (engine: string | null) => void
-  onMentionedChange: (mentioned: boolean | null) => void
-  onCitedChange: (cited: boolean | null) => void
-  onSearchChange: (query: string) => void
+  question: PromptSuggestion
+  onAdd: () => void
   t: T
 }) {
-  return (
-    <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 bg-white p-3">
-      <Input
-        placeholder={t('search')}
-        value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
-        className="flex-1 min-w-[200px]"
-      />
-      <select
-        value={filterEngine || ''}
-        onChange={(e) => onEngineChange(e.target.value || null)}
-        className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
-      >
-        <option value="">{t('all_engines')}</option>
-        {engines.map((e) => (
-          <option key={e} value={e}>
-            {ENGINE_META[e as keyof typeof ENGINE_META]?.name || e}
-          </option>
-        ))}
-      </select>
-      <select
-        value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
-        onChange={(e) => onMentionedChange(e.target.value === '' ? null : e.target.value === 'yes')}
-        className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
-      >
-        <option value="">{t('all_mention')}</option>
-        <option value="yes">{t('mentioned')}</option>
-        <option value="no">{t('not_mentioned')}</option>
-      </select>
-      <select
-        value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
-        onChange={(e) => onCitedChange(e.target.value === '' ? null : e.target.value === 'yes')}
-        className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
-      >
-        <option value="">{t('all_citations')}</option>
-        <option value="yes">{t('target_cited')}</option>
-        <option value="no">{t('not_cited')}</option>
-      </select>
-    </div>
-  )
-}
+  const intentTone: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
+    brand: 'info',
+    comparison: 'warning',
+    local: 'success',
+    transactional: 'warning',
+    recommendation: 'info',
+    informational: 'neutral',
+  }
 
-function ResultsTable({
-  results,
-  onRowClick,
-  t,
-}: {
-  results: ResultRow[]
-  onRowClick: (result: ResultRow) => void
-  t: T
-}) {
+  const intentLabel = (intent: string): string => {
+    const labels: Record<string, string> = {
+      brand: t('intent_brand'),
+      comparison: t('intent_comparison'),
+      local: t('intent_local'),
+      transactional: t('intent_transactional'),
+      recommendation: t('intent_recommendation'),
+      informational: t('intent_informational'),
+    }
+    return labels[intent] || intent
+  }
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="text-left px-4 py-2 font-semibold text-slate-700">{t('query_label')}</th>
-              <th className="text-left px-4 py-2 font-semibold text-slate-700">{t('engine')}</th>
-              <th className="text-center px-4 py-2 font-semibold text-slate-700">{t('mentioned')}</th>
-              <th className="text-center px-4 py-2 font-semibold text-slate-700">{t('target_cited')}</th>
-              <th className="text-right px-4 py-2 font-semibold text-slate-700">{t('citations')}</th>
-              <th className="text-center px-4 py-2 font-semibold text-slate-700"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, i) => (
-              <tr
-                key={r.id}
-                onClick={() => onRowClick(r)}
-                className={`border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition ${
-                  i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
-                }`}
-              >
-                <td className="px-4 py-3 font-medium text-slate-900 line-clamp-1">{r.promptText}</td>
-                <td className="px-4 py-3 text-slate-600">
-                  {ENGINE_META[r.engine as keyof typeof ENGINE_META]?.name || r.engine}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {r.mentioned ? <span className="text-emerald-600 font-semibold">✓</span> : <span className="text-slate-400">—</span>}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {r.targetCited ? <span className="text-emerald-600 font-semibold">✓</span> : <span className="text-slate-400">—</span>}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600 font-medium">{r.citationCount}</td>
-                <td className="px-4 py-3 text-center">
-                  <ExternalLinkIcon size={16} className="text-slate-400" />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200 hover:shadow-sm transition">
+      <div className="flex-1">
+        <p className="text-sm text-slate-900 font-medium line-clamp-2 mb-2">{question.prompt}</p>
+        <div className="flex items-center gap-1.5">
+          <Badge variant={intentTone[question.intent] || 'neutral'} className="!text-[9px]">
+            {intentLabel(question.intent)}
+          </Badge>
+          <span className="text-[10px] text-slate-500">{question.qualityScore}%</span>
+        </div>
       </div>
+      <button
+        onClick={onAdd}
+        className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition flex items-center justify-center"
+      >
+        +
+      </button>
     </div>
   )
 }
@@ -808,6 +774,23 @@ function ResultDetailDrawer({
 
   const engineMeta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
 
+  function cleanResponseText(text: string): string {
+    if (!text) return ''
+    return text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/^#+\s+/gm, '')
+      .replace(/\[\[\d+\]\]/g, '')
+      .replace(/\[\d+\]/g, '')
+      .replace(/\(\[[^\]]+\]\[[^\]]+\]\)/g, '')
+      .replace(/\(\[[^\]]+\]\)/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/^[\s]*[-*+]\s+/gm, '• ')
+      .trim()
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-end" onClick={onClose}>
       <div
@@ -820,10 +803,7 @@ function ResultDetailDrawer({
             <h2 className="text-lg font-bold text-slate-900 mb-1">{result.promptText}</h2>
             <p className="text-sm text-slate-500">{engineMeta?.name || result.engine}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-2xl leading-none"
-          >
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">
             ×
           </button>
         </div>
@@ -852,7 +832,9 @@ function ResultDetailDrawer({
           {/* Citations */}
           {result.citations.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">{t('sources')} ({result.citations.length})</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                {t('sources')} ({result.citations.length})
+              </h3>
               <div className="space-y-2">
                 {result.citations.map((c, i) => (
                   <a
@@ -879,117 +861,24 @@ function ResultDetailDrawer({
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900">{t('ai_answer')}</h3>
               <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
-                {cleanResponseText(result.responseText).split('\n').map((line, i) => (
-                  <p key={i} className="leading-relaxed">
-                    {line || <br />}
-                  </p>
-                ))}
+                {cleanResponseText(result.responseText)
+                  .split('\n')
+                  .map((line, i) => (
+                    <p key={i} className="leading-relaxed">
+                      {line || <br />}
+                    </p>
+                  ))}
               </div>
             </div>
           )}
         </div>
 
         {/* Drawer Footer */}
-        <div className="sticky bottom-0 border-t border-slate-200 bg-white p-6 flex gap-2">
-          <Button variant="outline" onClick={onClose} className="flex-1">
+        <div className="sticky bottom-0 border-t border-slate-200 bg-white p-6">
+          <Button variant="outline" onClick={onClose} className="w-full">
             {t('close')}
           </Button>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function SmartQuestionsSection({
-  questions,
-  projectId,
-  country,
-  language,
-  domain,
-  businessName,
-  onAdded,
-  t,
-}: {
-  questions: PromptSuggestion[]
-  projectId: string
-  country: string | null
-  language: string | null
-  domain: string | null
-  businessName: string | null
-  onAdded: () => void
-  t: T
-}) {
-  const [savingId, setSavingId] = useState<string | null>(null)
-
-  const intentLabel = (intent: string): string => {
-    switch (intent) {
-      case 'brand': return t('intent_brand')
-      case 'comparison': return t('intent_comparison')
-      case 'local': return t('intent_local')
-      case 'transactional': return t('intent_transactional')
-      case 'recommendation': return t('intent_recommendation')
-      case 'informational': return t('intent_informational')
-      default: return intent
-    }
-  }
-
-  const intentTone: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
-    brand: 'info',
-    comparison: 'warning',
-    local: 'success',
-    transactional: 'warning',
-    recommendation: 'info',
-    informational: 'neutral',
-  }
-
-  async function addQuestion(question: PromptSuggestion) {
-    setSavingId(question.id)
-    try {
-      const res = await fetch('/api/ai-visibility/prompts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          prompt: question.prompt,
-          country,
-          language,
-          targetDomain: domain,
-          targetBrandName: businessName,
-        }),
-      })
-      if (!res.ok) throw new Error('Failed to add')
-      onAdded()
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSavingId(null)
-    }
-  }
-
-  return (
-    <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50/40 to-white p-5">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 mb-4">{t('smart_questions_title')}</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {questions.map((q) => (
-          <div key={q.id} className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200 hover:shadow-sm transition">
-            <div className="flex-1">
-              <p className="text-sm text-slate-900 font-medium line-clamp-2 mb-2">{q.prompt}</p>
-              <div className="flex items-center gap-1.5">
-                <Badge variant={intentTone[q.intent] || 'neutral'} className="!text-[9px]">
-                  {intentLabel(q.intent)}
-                </Badge>
-                <span className="text-[10px] text-slate-500">{q.qualityScore}%</span>
-              </div>
-            </div>
-            <button
-              onClick={() => addQuestion(q)}
-              disabled={savingId === q.id}
-              className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition disabled:opacity-50"
-            >
-              {savingId === q.id ? '…' : '+'}
-            </button>
-          </div>
-        ))}
       </div>
     </div>
   )
