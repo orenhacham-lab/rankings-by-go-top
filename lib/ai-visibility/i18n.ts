@@ -141,6 +141,14 @@ const STRINGS = {
   // Workspace layout
   select_query_to_view: { he: 'בחר שאלה כדי להציג את פרטיה', en: 'Select a query to view details' },
   select_and_run_query: { he: 'בחר שאלה והרץ לתוך מנוע כדי לראות את התוצאות', en: 'Select a query and run it against an engine to see results' },
+
+  // New dashboard structure
+  engine: { he: 'מנוע', en: 'Engine' },
+  all_engines: { he: 'כל המנועים', en: 'All engines' },
+  all_mention: { he: 'כל ההזכרות', en: 'All mentions' },
+  all_citations: { he: 'כל הציטוטים', en: 'All citations' },
+  overall: { he: 'כולל', en: 'Overall' },
+  search: { he: 'חיפוש', en: 'Search' },
 } as const
 
 type StringKey = keyof typeof STRINGS

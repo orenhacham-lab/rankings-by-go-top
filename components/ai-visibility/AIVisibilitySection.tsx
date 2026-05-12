@@ -1,30 +1,21 @@
 'use client'
 
 /**
- * AI Visibility premium dashboard — workspace layout optimized for AI insights.
- * Mounted inside the project page only when NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true'.
+ * AI Visibility — Premium dashboard matching competitor structure.
  *
  * Layout:
- *   - HEADER (title + suggest/new prompt)
- *   - KPI OVERVIEW (Visibility Score, Mentioned, Cited, Citations, Credits)
- *   - INSIGHTS STRIP (Brand mentioned, Domain cited, Best engine, Top source)
- *   - PROMPTS + ENGINE CARDS (run any prompt × engine)
- *   - RESULT WORKSPACE (answer + sources sidebar)
- *   - ACTIVITY FEED (history with delete)
- *
- * Performance:
- *   - History endpoint returns metadata only; full response fetched on demand
- *   - Memoized derived values (kpis, paragraphs, sortedCitations)
- *   - Optimistic delete with fade-out
- *
- * Localization: Hebrew when project language='he' or country='IL'.
+ * 1. Global overview (aggregated stats across all scans)
+ * 2. Engine summary cards (one per engine)
+ * 3. Filter bar (search, engine, mention/citation status)
+ * 4. Compact results table (flat list of scan results)
+ * 5. Detail drawer (click row to open)
+ * 6. Smart Questions section (separate)
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
-import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
 import {
   ENGINE_META,
@@ -32,96 +23,38 @@ import {
   SparkleIcon,
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
-import ScanHistory from './ScanHistory'
-import { parseBlocks, toParagraphs } from '@/lib/ai-visibility/clean-response-text'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
-import AIInsightCards from './AIInsightCards'
 import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
-
-type Prompt = {
-  id: string
-  project_id: string
-  prompt: string
-  target_domain: string | null
-  target_brand_name: string | null
-  country: string | null
-  language: string | null
-  is_active: boolean
-  created_at: string
-}
-
-type Citation = {
-  id: string
-  url: string
-  domain: string
-  title: string | null
-  snippet: string | null
-  citation_position: number | null
-  is_target_domain: boolean
-}
 
 type ResultRow = {
   id: string
   promptId: string | null
   engine: string
-  provider: string
+  promptText: string
   mentioned: boolean
   targetCited: boolean
   citationCount: number
-  sourceCount: number
-  responseText: string | null
-  responseSummary: string | null
-  creditsUsed: number | string
   status: string | null
-  errorMessage: string | null
   scannedAt: string | null
-  citations: Citation[]
+  citations: Array<{ domain: string; is_target_domain: boolean; url: string }>
+  responseText: string | null
 }
 
-type RunResults = {
-  run: {
-    id: string
-    status: string
-    totalCreditsUsed: number | string
-    startedAt: string | null
-    completedAt: string | null
-    errorMessage: string | null
-  }
-  results: ResultRow[]
+type GlobalMetrics = {
+  totalScans: number
+  totalMentions: number
+  totalCitations: number
+  mentionRate: number
+  citationRate: number
+  enginesCovered: number
 }
 
-const ENGINE_LIST: Array<keyof typeof ENGINE_META> = [
-  'chatgpt',
-  'perplexity',
-  'gemini',
-  'copilot',
-  'grok',
-  'google_ai_mode',
-]
-
-function faviconUrl(domain: string): string {
-  return `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}`
-}
-
-function formatRelativeTime(iso: string | null | undefined, justNow = 'just now'): string {
-  if (!iso) return ''
-  try {
-    const d = new Date(iso)
-    const now = Date.now()
-    const diffSec = Math.floor((now - d.getTime()) / 1000)
-    if (diffSec < 60) return justNow
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m`
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h`
-    if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d`
-    return d.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return ''
-  }
+type EngineMetrics = {
+  engine: string
+  scans: number
+  mentions: number
+  citations: number
+  rate: number
 }
 
 export default function AIVisibilitySection({
@@ -144,48 +77,103 @@ export default function AIVisibilitySection({
   const t = useMemo(() => createI18n(projectLanguage, projectCountry), [projectLanguage, projectCountry])
   const isHebrew = detectHebrew(projectLanguage, projectCountry)
 
-  const [prompts, setPrompts] = useState<Prompt[]>([])
+  const [allResults, setAllResults] = useState<ResultRow[]>([])
+  const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
+  const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [showNewPrompt, setShowNewPrompt] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [selectedResult, setSelectedResult] = useState<ResultRow | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const [filterEngine, setFilterEngine] = useState<string | null>(null)
+  const [filterMentioned, setFilterMentioned] = useState<boolean | null>(null)
+  const [filterCited, setFilterCited] = useState<boolean | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
-  const [runningKey, setRunningKey] = useState<string | null>(null)
-  const [latestRun, setLatestRun] = useState<RunResults | null>(null)
-  const [historyRefresh, setHistoryRefresh] = useState(0)
-  const [deleteConfirmRunId, setDeleteConfirmRunId] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [removedRunIds, setRemovedRunIds] = useState<Set<string>>(new Set())
 
-  const [newPrompt, setNewPrompt] = useState('')
-  const [newCountry, setNewCountry] = useState(projectCountry || 'IL')
-  const [newLanguage, setNewLanguage] = useState(projectLanguage || 'he')
-  const [newTargetDomain, setNewTargetDomain] = useState(projectDomain || '')
-  const [newTargetBrand, setNewTargetBrand] = useState(projectBrandName || '')
-
-  const loadPrompts = useCallback(async () => {
+  // Load all scan results
+  const loadAllResults = useCallback(async () => {
     setError(null)
+    setLoading(true)
     try {
-      const res = await fetch(`/api/ai-visibility/prompts?projectId=${projectId}`)
+      const res = await fetch(`/api/ai-visibility/scan-history?projectId=${projectId}&limit=1000`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || `HTTP ${res.status}`)
       }
       const data = await res.json()
-      setPrompts(data.prompts || [])
+      const results: ResultRow[] = (data.runs || [])
+        .filter((run: any) => run.result)
+        .map((run: any) => ({
+          id: run.result.id,
+          promptId: run.result.promptId || null,
+          engine: run.result.engine,
+          promptText: run.result.promptText || '',
+          mentioned: run.result.mentioned || false,
+          targetCited: run.result.targetCited || false,
+          citationCount: run.result.citationCount || 0,
+          status: run.result.status,
+          scannedAt: run.completedAt || run.result.scannedAt,
+          citations: run.result.citations || [],
+          responseText: run.result.responseText || null,
+        }))
+
+      setAllResults(results)
+
+      // Aggregate metrics
+      if (results.length > 0) {
+        const engines = new Set<string>()
+        const engineMap = new Map<string, EngineMetrics>()
+        let totalMentions = 0
+        let totalCitations = 0
+
+        results.forEach((r) => {
+          if (r.status === 'success') {
+            engines.add(r.engine)
+            if (r.mentioned) totalMentions++
+            if (r.targetCited) totalCitations++
+            totalCitations += r.citationCount
+
+            const existing = engineMap.get(r.engine) || {
+              engine: r.engine,
+              scans: 0,
+              mentions: 0,
+              citations: 0,
+              rate: 0,
+            }
+            existing.scans++
+            if (r.mentioned) existing.mentions++
+            existing.citations += r.citationCount
+            existing.rate = Math.round((existing.mentions / existing.scans) * 100)
+            engineMap.set(r.engine, existing)
+          }
+        })
+
+        setGlobalMetrics({
+          totalScans: results.filter((r) => r.status === 'success').length,
+          totalMentions,
+          totalCitations,
+          mentionRate: results.length > 0 ? Math.round((totalMentions / results.length) * 100) : 0,
+          citationRate: results.length > 0 ? Math.round((totalCitations / (results.length * 2)) * 100) : 0,
+          enginesCovered: engines.size,
+        })
+
+        setEngineMetrics(engineMap)
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load prompts')
+      setError(e instanceof Error ? e.message : 'Failed to load results')
     } finally {
       setLoading(false)
     }
   }, [projectId])
 
   useEffect(() => {
-    loadPrompts()
-  }, [loadPrompts])
+    loadAllResults()
+  }, [loadAllResults])
 
   // Generate smart question suggestions
   useEffect(() => {
@@ -201,150 +189,24 @@ export default function AIVisibilitySection({
     setSuggestedQuestions(suggestions.slice(0, 4))
   }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords])
 
-  async function handleCreatePrompt(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newPrompt.trim()) return
-    setCreating(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/ai-visibility/prompts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          prompt: newPrompt,
-          country: newCountry || null,
-          language: newLanguage || null,
-          targetDomain: newTargetDomain || null,
-          targetBrandName: newTargetBrand || null,
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
-      }
-      setNewPrompt('')
-      setShowNewPrompt(false)
-      await loadPrompts()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create prompt')
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  async function handleRun(promptId: string, engine: string) {
-    const key = `${promptId}:${engine}`
-    setRunningKey(key)
-    setError(null)
-    setLatestRun(null)
-    try {
-      const res = await fetch('/api/ai-visibility/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, promptId, engine }),
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
-      const runId = body.runId
-      const resultsRes = await fetch(`/api/ai-visibility/runs/${runId}/results`)
-      if (!resultsRes.ok) {
-        const errBody = await resultsRes.json().catch(() => ({}))
-        throw new Error(errBody.error || `Failed to load results: HTTP ${resultsRes.status}`)
-      }
-      const resultsBody: RunResults = await resultsRes.json()
-      setLatestRun(resultsBody)
-      setHistoryRefresh((v) => v + 1)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Run failed')
-    } finally {
-      setRunningKey(null)
-    }
-  }
-
-  async function handleSelectHistoryRun(runId: string) {
-    setError(null)
-    try {
-      const res = await fetch(`/api/ai-visibility/runs/${runId}/results`)
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
-      }
-      const data: RunResults = await res.json()
-      setLatestRun(data)
-      if (typeof window !== 'undefined') {
-        const el = document.getElementById('ai-result-workspace')
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load run')
-    }
-  }
-
-  async function handleDeleteRun(runId: string) {
-    setDeleting(true)
-    // Optimistic UI: mark for fade-out immediately
-    setRemovedRunIds(new Set([runId]))
-    try {
-      const res = await fetch(`/api/ai-visibility/runs/${runId}/delete`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Failed to delete')
-      }
-      if (latestRun?.run.id === runId) {
-        setLatestRun(null)
-      }
-      setDeleteConfirmRunId(null)
-      // Trigger a fresh history fetch after fade animation completes
-      setTimeout(() => {
-        setRemovedRunIds(new Set())
-        setHistoryRefresh((v) => v + 1)
-      }, 260)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
-      // Undo optimistic removal on failure
-      setRemovedRunIds(new Set())
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  const result = latestRun?.results?.[0] ?? null
-  const responseIsRTL = useMemo(
-    () =>
-      result ? /[֐-׿؀-ۿ]/.test(result.responseText || '') : isHebrew,
-    [result, isHebrew]
-  )
-
-  const kpis = useMemo(
-    () =>
-      result
-        ? {
-            score:
-              result.status === 'success'
-                ? Math.round(((result.mentioned ? 40 : 0) + (result.targetCited ? 60 : 0)))
-                : 0,
-            mentioned: result.mentioned,
-            targetCited: result.targetCited,
-            citationCount: result.citationCount,
-            scannedAt: result.scannedAt,
-            engine: result.engine,
-            topSource: result.citations.find((c) => c.is_target_domain) || result.citations[0] || null,
-          }
-        : null,
-    [result]
-  )
+  // Filter results
+  const filteredResults = useMemo(() => {
+    return allResults.filter((r) => {
+      if (filterEngine && r.engine !== filterEngine) return false
+      if (filterMentioned !== null && r.mentioned !== filterMentioned) return false
+      if (filterCited !== null && r.targetCited !== filterCited) return false
+      if (searchQuery && !r.promptText.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      return true
+    })
+  }, [allResults, filterEngine, filterMentioned, filterCited, searchQuery])
 
   return (
-    <section id="ai-visibility" className="space-y-5 mb-10" dir={isHebrew ? 'rtl' : 'ltr'}>
+    <section id="ai-visibility" className="space-y-6 mb-10" dir={isHebrew ? 'rtl' : 'ltr'}>
       {/* HEADER */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-500/30">
             <SparkleIcon size={20} className="text-white" />
-            <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-br from-violet-400/40 to-blue-400/40 blur-md -z-10" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">{t('ai_visibility')}</h2>
@@ -363,163 +225,96 @@ export default function AIVisibilitySection({
 
       {error && (
         <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-2">
-          <span className="shrink-0 text-lg">✕</span>
+          <span className="shrink-0">✕</span>
           <span>{error}</span>
         </div>
       )}
 
-      {/* KPI OVERVIEW */}
-      {kpis && <BigKpiPanel kpis={kpis} t={t} />}
-
-      {/* INSIGHTS STRIP */}
-      {kpis && <InsightsStrip kpis={kpis} t={t} />}
-
-      {/* AI QUERIES + ENGINE CARDS */}
       {loading ? (
-        <PromptListSkeleton />
-      ) : prompts.length === 0 ? (
-        <EmptyPromptState
-          onSuggest={() => setShowSuggestions(true)}
-          onNew={() => setShowNewPrompt(true)}
-          t={t}
-        />
-      ) : (
-        <div className="space-y-3">
-          {prompts.map((p) => (
-            <PromptCard
-              key={p.id}
-              prompt={p}
-              runningKey={runningKey}
-              activeResult={result?.promptId === p.id ? result : null}
-              onRun={(engine) => handleRun(p.id, engine)}
-              t={t}
-            />
+        <div className="space-y-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
+              <div className="h-4 w-2/3 bg-slate-200 rounded mb-3" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {[0, 1, 2, 3].map((j) => (
+                  <div key={j} className="h-12 bg-slate-100 rounded" />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
-      )}
+      ) : (
+        <>
+          {/* GLOBAL OVERVIEW */}
+          {globalMetrics && (
+            <GlobalOverviewPanel metrics={globalMetrics} t={t} />
+          )}
 
-      {/* RESULT WORKSPACE */}
-      {runningKey && !latestRun && (
-        <div id="ai-result-workspace">
-          <ResultSkeleton t={t} />
-        </div>
-      )}
-      {latestRun && result && (
-        <div id="ai-result-workspace">
-          <ResultWorkspace
-            result={result}
-            responseIsRTL={responseIsRTL}
-            runStatus={latestRun.run.status}
-            completedAt={latestRun.run.completedAt}
+          {/* ENGINE SUMMARY CARDS */}
+          {engineMetrics.size > 0 && (
+            <EngineSummaryCards metrics={engineMetrics} t={t} />
+          )}
+
+          {/* FILTER BAR */}
+          <FilterBar
+            engines={Array.from(engineMetrics.keys())}
+            filterEngine={filterEngine}
+            filterMentioned={filterMentioned}
+            filterCited={filterCited}
+            searchQuery={searchQuery}
+            onEngineChange={setFilterEngine}
+            onMentionedChange={setFilterMentioned}
+            onCitedChange={setFilterCited}
+            onSearchChange={setSearchQuery}
             t={t}
           />
-        </div>
+
+          {/* RESULTS TABLE */}
+          {filteredResults.length > 0 ? (
+            <ResultsTable
+              results={filteredResults}
+              onRowClick={(result) => {
+                setSelectedResult(result)
+                setDrawerOpen(true)
+              }}
+              t={t}
+            />
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+              <p className="text-sm text-slate-600">{t('no_scans')}</p>
+            </div>
+          )}
+
+          {/* SMART QUESTIONS */}
+          {suggestedQuestions.length > 0 && (
+            <SmartQuestionsSection
+              questions={suggestedQuestions}
+              projectId={projectId}
+              country={projectCountry}
+              language={projectLanguage}
+              domain={projectDomain}
+              businessName={projectBrandName}
+              onAdded={loadAllResults}
+              t={t}
+            />
+          )}
+        </>
       )}
 
-      {/* SMART QUESTIONS — Recommended (secondary) */}
-      {suggestedQuestions.length > 0 && (
-        <SmartQuestionsStrip
-          questions={suggestedQuestions}
-          projectId={projectId}
-          country={projectCountry}
-          language={projectLanguage}
-          domain={projectDomain}
-          businessName={projectBrandName}
-          onAdded={loadPrompts}
+      {/* RESULT DETAIL DRAWER */}
+      {selectedResult && (
+        <ResultDetailDrawer
+          open={drawerOpen}
+          result={selectedResult}
+          onClose={() => {
+            setDrawerOpen(false)
+            setTimeout(() => setSelectedResult(null), 300)
+          }}
           t={t}
         />
       )}
 
-      {/* SCAN HISTORY */}
-      <ScanHistory
-        projectId={projectId}
-        refreshKey={historyRefresh}
-        selectedRunId={latestRun?.run.id || null}
-        onSelectRun={handleSelectHistoryRun}
-        onDeleteRun={setDeleteConfirmRunId}
-        language={projectLanguage}
-        country={projectCountry}
-        removedRunIds={removedRunIds}
-      />
-
-      {/* DELETE CONFIRMATION */}
-      <Modal
-        open={deleteConfirmRunId !== null}
-        onClose={() => setDeleteConfirmRunId(null)}
-        title={t('delete_scan_title')}
-        size="sm"
-      >
-        <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-          <p className="text-sm text-slate-600">{t('delete_scan_body')}</p>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setDeleteConfirmRunId(null)} disabled={deleting}>
-              {t('cancel')}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => deleteConfirmRunId && handleDeleteRun(deleteConfirmRunId)}
-              loading={deleting}
-            >
-              {t('delete_permanently')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* NEW AI QUERY MODAL */}
-      <Modal
-        open={showNewPrompt}
-        onClose={() => setShowNewPrompt(false)}
-        title={t('new_ai_query_title')}
-        size="md"
-      >
-        <form onSubmit={handleCreatePrompt} className="space-y-3" dir={isHebrew ? 'rtl' : 'ltr'}>
-          <Textarea
-            label={t('query_label')}
-            value={newPrompt}
-            onChange={(e) => setNewPrompt(e.target.value)}
-            placeholder={isHebrew ? 'למשל: חברת SEO מומלצת בישראל?' : 'e.g., Best SEO agency in Israel?'}
-            required
-            rows={3}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label={t('country_label')}
-              value={newCountry}
-              onChange={(e) => setNewCountry(e.target.value)}
-              placeholder="IL"
-            />
-            <Input
-              label={t('language_label')}
-              value={newLanguage}
-              onChange={(e) => setNewLanguage(e.target.value)}
-              placeholder="he"
-            />
-          </div>
-          <Input
-            label={t('target_domain_label')}
-            type="url"
-            value={newTargetDomain}
-            onChange={(e) => setNewTargetDomain(e.target.value)}
-            placeholder={projectDomain || 'example.com'}
-          />
-          <Input
-            label={t('target_brand_label')}
-            value={newTargetBrand}
-            onChange={(e) => setNewTargetBrand(e.target.value)}
-            placeholder={projectBrandName || (isHebrew ? 'שם המותג' : 'Brand name')}
-          />
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowNewPrompt(false)}>
-              {t('cancel')}
-            </Button>
-            <Button type="submit" loading={creating} disabled={!newPrompt.trim()}>
-              {t('create_query')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
+      {/* MODALS */}
       <PromptSuggestions
         open={showSuggestions}
         onClose={() => setShowSuggestions(false)}
@@ -530,64 +325,54 @@ export default function AIVisibilitySection({
         country={projectCountry}
         language={projectLanguage}
         keywords={projectKeywords}
-        onAdded={loadPrompts}
+        onAdded={loadAllResults}
       />
     </section>
   )
 }
 
-/* --- Subcomponents --- */
+/* --- COMPONENTS --- */
 
-type T = (key: Parameters<ReturnType<typeof createI18n>>[0]) => string
+type T = (key: any) => string
 
-function BigKpiPanel({
-  kpis,
+function GlobalOverviewPanel({
+  metrics,
   t,
 }: {
-  kpis: { score: number; mentioned: boolean; targetCited: boolean; citationCount: number }
+  metrics: GlobalMetrics
   t: T
 }) {
-  const scoreLabel =
-    kpis.score >= 60 ? t('high_visibility') : kpis.score >= 20 ? t('moderate_visibility') : t('low_visibility')
-
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 rounded-2xl border border-slate-200/70 bg-gradient-to-br from-white to-slate-50/40 p-4 shadow-sm">
-      <div className="col-span-2 lg:col-span-2 relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50 via-white to-violet-50/40 border-2 border-indigo-200/60 p-5 shadow-sm">
-        <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-200/20 rounded-full -mr-10 -mt-10" />
-        <div className="relative z-10">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700 mb-1">
-            {t('visibility_score')}
-          </div>
-          <div className="text-5xl font-black text-indigo-900 leading-tight">
-            {kpis.score}<span className="text-2xl text-indigo-600">%</span>
-          </div>
-          <div className="text-xs text-indigo-600 font-medium mt-2">{scoreLabel}</div>
-        </div>
-      </div>
-
-      <KpiTile
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-xl border border-slate-200/70 bg-gradient-to-br from-white to-slate-50/40 p-4">
+      <OverviewTile
+        label={t('visibility_score')}
+        value={`${Math.round((metrics.mentionRate + metrics.citationRate) / 2)}%`}
+        sub={t('overall')}
+        tone="indigo"
+      />
+      <OverviewTile
         label={t('mentioned')}
-        value={kpis.mentioned ? '✓' : '✕'}
-        sub={kpis.mentioned ? t('in_ai_response') : t('not_found')}
-        tone={kpis.mentioned ? 'blue' : 'flat'}
+        value={String(metrics.totalMentions)}
+        sub={`${metrics.mentionRate}%`}
+        tone="blue"
       />
-      <KpiTile
+      <OverviewTile
         label={t('target_cited')}
-        value={kpis.targetCited ? '✓' : '✕'}
-        sub={kpis.targetCited ? t('as_source') : t('not_cited')}
-        tone={kpis.targetCited ? 'emerald' : 'flat'}
+        value={String(metrics.totalCitations)}
+        sub={`${metrics.citationRate}%`}
+        tone="emerald"
       />
-      <KpiTile
-        label={t('citations')}
-        value={String(kpis.citationCount)}
-        sub={t('sources_cited')}
-        tone={kpis.citationCount > 0 ? 'amber' : 'flat'}
+      <OverviewTile
+        label={t('engine_coverage')}
+        value={String(metrics.enginesCovered)}
+        sub={`of 6 engines`}
+        tone="amber"
       />
     </div>
   )
 }
 
-function KpiTile({
+function OverviewTile({
   label,
   value,
   sub,
@@ -596,248 +381,68 @@ function KpiTile({
   label: string
   value: string
   sub: string
-  tone: 'blue' | 'emerald' | 'amber' | 'flat'
+  tone: 'indigo' | 'blue' | 'emerald' | 'amber'
 }) {
   const bgClass =
-    tone === 'blue'
-      ? 'from-blue-50/60 to-white border-blue-100'
+    tone === 'indigo'
+      ? 'from-indigo-50 to-white border-indigo-100'
+      : tone === 'blue'
+      ? 'from-blue-50 to-white border-blue-100'
       : tone === 'emerald'
-      ? 'from-emerald-50/60 to-white border-emerald-100'
-      : tone === 'amber'
-      ? 'from-amber-50/40 to-white border-amber-100'
-      : 'from-slate-50/40 to-white border-slate-200'
+      ? 'from-emerald-50 to-white border-emerald-100'
+      : 'from-amber-50 to-white border-amber-100'
 
-  const valueColor =
-    tone === 'blue'
+  const textColor =
+    tone === 'indigo'
+      ? 'text-indigo-700'
+      : tone === 'blue'
       ? 'text-blue-700'
       : tone === 'emerald'
       ? 'text-emerald-700'
-      : tone === 'amber'
-      ? 'text-amber-700'
-      : 'text-slate-500'
+      : 'text-amber-700'
 
   return (
-    <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${bgClass} border p-4 shadow-sm hover:shadow-md transition`}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
-        {label}
-      </div>
-      <div className={`text-3xl font-bold ${valueColor}`}>{value}</div>
-      <div className="text-xs text-slate-500 font-medium mt-1">{sub}</div>
+    <div className={`rounded-lg border bg-gradient-to-br ${bgClass} p-3`}>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{label}</div>
+      <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
+      <div className="text-xs text-slate-500 mt-1">{sub}</div>
     </div>
   )
 }
 
-function InsightsStrip({
-  kpis,
+function EngineSummaryCards({
+  metrics,
   t,
 }: {
-  kpis: { mentioned: boolean; targetCited: boolean; engine: string; topSource: Citation | null }
+  metrics: Map<string, EngineMetrics>
   t: T
 }) {
-  const engineMeta = ENGINE_META[kpis.engine] || null
-  const Icon = engineMeta?.Icon
+  const engineList = Array.from(metrics.values()).sort((a, b) => b.scans - a.scans)
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-      {/* Brand insight */}
-      <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${kpis.mentioned ? 'border-blue-200 bg-blue-50/40' : 'border-amber-200 bg-amber-50/40'}`}>
-        <div className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center ${kpis.mentioned ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-          {kpis.mentioned ? '✓' : '!'}
-        </div>
-        <div className="min-w-0">
-          <div className={`text-[12px] font-semibold ${kpis.mentioned ? 'text-blue-900' : 'text-amber-900'}`}>
-            {kpis.mentioned ? t('brand_mentioned_yes') : t('brand_mentioned_no')}
-          </div>
-        </div>
-      </div>
-
-      {/* Domain citation insight */}
-      <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${kpis.targetCited ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-slate-50/40'}`}>
-        <div className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center ${kpis.targetCited ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-          {kpis.targetCited ? '✓' : '·'}
-        </div>
-        <div className="min-w-0">
-          <div className={`text-[12px] font-semibold ${kpis.targetCited ? 'text-emerald-900' : 'text-slate-700'}`}>
-            {kpis.targetCited ? t('domain_cited_yes') : t('domain_cited_no')}
-          </div>
-        </div>
-      </div>
-
-      {/* Best engine + top source */}
-      <div className="rounded-xl border border-slate-200 bg-white p-3 flex items-start gap-2.5">
-        <div className="shrink-0 w-7 h-7 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 flex items-center justify-center">
-          {engineMeta && Icon ? <Icon size={14} className={engineMeta.accent} /> : null}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{t('best_engine')}</div>
-          <div className="text-[12px] font-semibold text-slate-900 truncate">{engineMeta?.name || kpis.engine}</div>
-          {kpis.topSource && (
-            <div className="text-[10px] text-slate-500 truncate mt-0.5">
-              {t('top_source')}: <span className="font-medium text-slate-700">{kpis.topSource.domain}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PromptListSkeleton() {
-  return (
-    <div className="space-y-3">
-      {[0, 1].map((i) => (
-        <div key={i} className="rounded-2xl border border-slate-200/70 bg-white p-4 animate-pulse">
-          <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
-          <div className="h-5 w-2/3 bg-slate-200 rounded mb-4" />
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-            {[0, 1, 2, 3, 4, 5].map((j) => (
-              <div key={j} className="h-20 bg-slate-100 rounded-xl" />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function EmptyPromptState({ onSuggest, onNew, t }: { onSuggest: () => void; onNew: () => void; t: T }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-gradient-to-br from-slate-50 to-white p-10 text-center">
-      <div className="mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center mb-3 shadow-sm">
-        <SparkleIcon size={22} className="text-indigo-600" />
-      </div>
-      <h3 className="text-base font-semibold text-slate-900 mb-1">{t('no_queries')}</h3>
-      <p className="text-sm text-slate-500 mb-5 max-w-sm mx-auto">{t('no_queries_help')}</p>
-      <div className="flex gap-2 justify-center">
-        <Button variant="outline" onClick={onSuggest}>{t('recommend_questions')}</Button>
-        <Button onClick={onNew}>{t('new_query')}</Button>
-      </div>
-    </div>
-  )
-}
-
-function ResultSkeleton({ t }: { t: T }) {
-  return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-md overflow-hidden animate-pulse">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/40">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-200" />
-          <div>
-            <div className="h-4 w-24 bg-slate-200 rounded mb-1.5" />
-            <div className="h-3 w-20 bg-slate-100 rounded" />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <div className="h-6 w-20 bg-slate-200 rounded-full" />
-          <div className="h-6 w-20 bg-slate-200 rounded-full" />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-        <div className="lg:col-span-2 space-y-3">
-          <div className="h-4 bg-slate-200 rounded w-full" />
-          <div className="h-4 bg-slate-200 rounded w-[92%]" />
-          <div className="h-4 bg-slate-200 rounded w-[85%]" />
-          <div className="h-4 bg-slate-100 rounded w-[70%]" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-12 bg-slate-100 rounded-xl" />
-          <div className="h-12 bg-slate-100 rounded-xl" />
-        </div>
-      </div>
-      <div className="border-t border-slate-100 px-6 py-3 flex items-center gap-2">
-        <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-blue-700 font-medium">{t('scanning_engine')}</span>
-      </div>
-    </div>
-  )
-}
-
-function PromptCard({
-  prompt,
-  runningKey,
-  activeResult,
-  onRun,
-  t,
-}: {
-  prompt: Prompt
-  runningKey: string | null
-  activeResult: ResultRow | null
-  onRun: (engine: string) => void
-  t: T
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
-      <div className="px-5 pt-4 pb-3 border-b border-slate-100">
-        <div className="mb-2 flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            {t('query_label')}
-          </span>
-          {prompt.country && (
-            <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{prompt.country}</Badge>
-          )}
-          {prompt.language && (
-            <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{prompt.language}</Badge>
-          )}
-        </div>
-        <h3 className="text-[15px] font-semibold text-slate-900 leading-snug">{prompt.prompt}</h3>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 bg-slate-50/40">
-        {ENGINE_LIST.map((engineId) => {
-          const meta = ENGINE_META[engineId]
-          const Icon = meta.Icon
-          const isRunning = runningKey === `${prompt.id}:${engineId}`
-          const isDisabled = runningKey !== null && !isRunning
-          const hasResult = activeResult?.engine === engineId
-          const success = hasResult && activeResult?.status === 'success'
-          const failed = hasResult && activeResult?.status === 'error'
-
+    <div>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-3">{t('engine_coverage')}</h3>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {engineList.map((em) => {
+          const meta = ENGINE_META[em.engine as keyof typeof ENGINE_META]
           return (
-            <button
-              key={engineId}
-              onClick={() => onRun(engineId)}
-              disabled={isDisabled}
-              type="button"
-              className={`group relative flex flex-col gap-2 p-3 rounded-xl border transition-all duration-200 text-start overflow-hidden ${
-                isRunning
-                  ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50/60 shadow-[0_0_0_3px_rgba(99,102,241,0.1)]'
-                  : success
-                  ? `border-emerald-200 bg-gradient-to-br ${meta.bg}`
-                  : failed
-                  ? 'border-red-200 bg-gradient-to-br from-red-50/80 to-white'
-                  : `border-slate-200 bg-white hover:border-slate-300 hover:bg-gradient-to-br hover:${meta.bg} hover:shadow-md hover:-translate-y-0.5`
-              } ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Icon size={20} className={`${meta.accent} transition-transform group-hover:scale-110`} />
-                  <span className="text-sm font-semibold text-slate-800">{meta.name}</span>
+            <div key={em.engine} className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-md transition">
+              <div className="flex items-center gap-2 mb-2">
+                {meta && <meta.Icon size={20} className={meta.accent} />}
+                <span className="text-xs font-semibold text-slate-900">{meta?.name || em.engine}</span>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[10px] text-slate-600">
+                  <span className="font-medium text-slate-900">{em.mentions}</span> mentions
                 </div>
-                {isRunning ? (
-                  <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                ) : success ? (
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-400/50" />
-                ) : failed ? (
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                )}
+                <div className="text-[10px] text-slate-600">
+                  <span className="font-medium text-slate-900">{em.citations}</span> citations
+                </div>
+                <div className="text-[10px] text-slate-600">
+                  <span className="font-medium text-slate-900">{em.scans}</span> scans
+                </div>
               </div>
-
-              <div className="flex items-center justify-between text-[10px] text-slate-500">
-                {hasResult && success ? (
-                  <span>
-                    <b className="text-slate-900 font-semibold">{activeResult!.citationCount}</b> {t('citations').toLowerCase()}
-                  </span>
-                ) : hasResult && failed ? (
-                  <span className="text-red-600 font-medium">{t('failed')}</span>
-                ) : isRunning ? (
-                  <span className="text-blue-600 font-medium">{t('scanning')}</span>
-                ) : (
-                  <span className="text-slate-400">{t('scan_btn')}</span>
-                )}
-              </div>
-            </button>
+            </div>
           )
         })}
       </div>
@@ -845,332 +450,230 @@ function PromptCard({
   )
 }
 
-function ResultWorkspace({
-  result,
-  responseIsRTL,
-  runStatus,
-  completedAt,
+function FilterBar({
+  engines,
+  filterEngine,
+  filterMentioned,
+  filterCited,
+  searchQuery,
+  onEngineChange,
+  onMentionedChange,
+  onCitedChange,
+  onSearchChange,
   t,
 }: {
-  result: ResultRow
-  responseIsRTL: boolean
-  runStatus: string
-  completedAt: string | null
+  engines: string[]
+  filterEngine: string | null
+  filterMentioned: boolean | null
+  filterCited: boolean | null
+  searchQuery: string
+  onEngineChange: (engine: string | null) => void
+  onMentionedChange: (mentioned: boolean | null) => void
+  onCitedChange: (cited: boolean | null) => void
+  onSearchChange: (query: string) => void
   t: T
 }) {
-  const engineMeta = ENGINE_META[result.engine] || null
-  const Icon = engineMeta?.Icon
-  const isError = result.status === 'error' || runStatus === 'failed'
-
-  // Parse into typed blocks for proper markdown rendering
-  const blocks = useMemo(
-    () => parseBlocks(result.responseText || result.responseSummary || ''),
-    [result.responseText, result.responseSummary]
+  return (
+    <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 bg-white p-3">
+      <Input
+        placeholder={t('search')}
+        value={searchQuery}
+        onChange={(e) => onSearchChange(e.target.value)}
+        className="flex-1 min-w-[200px]"
+      />
+      <select
+        value={filterEngine || ''}
+        onChange={(e) => onEngineChange(e.target.value || null)}
+        className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+      >
+        <option value="">{t('all_engines')}</option>
+        {engines.map((e) => (
+          <option key={e} value={e}>
+            {ENGINE_META[e as keyof typeof ENGINE_META]?.name || e}
+          </option>
+        ))}
+      </select>
+      <select
+        value={filterMentioned === null ? '' : filterMentioned ? 'yes' : 'no'}
+        onChange={(e) => onMentionedChange(e.target.value === '' ? null : e.target.value === 'yes')}
+        className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+      >
+        <option value="">{t('all_mention')}</option>
+        <option value="yes">{t('mentioned')}</option>
+        <option value="no">{t('not_mentioned')}</option>
+      </select>
+      <select
+        value={filterCited === null ? '' : filterCited ? 'yes' : 'no'}
+        onChange={(e) => onCitedChange(e.target.value === '' ? null : e.target.value === 'yes')}
+        className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+      >
+        <option value="">{t('all_citations')}</option>
+        <option value="yes">{t('target_cited')}</option>
+        <option value="no">{t('not_cited')}</option>
+      </select>
+    </div>
   )
+}
 
-  const paragraphs = useMemo(
-    () => toParagraphs(result.responseText || result.responseSummary || ''),
-    [result.responseText, result.responseSummary]
+function ResultsTable({
+  results,
+  onRowClick,
+  t,
+}: {
+  results: ResultRow[]
+  onRowClick: (result: ResultRow) => void
+  t: T
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50">
+              <th className="text-left px-4 py-2 font-semibold text-slate-700">{t('query_label')}</th>
+              <th className="text-left px-4 py-2 font-semibold text-slate-700">{t('engine')}</th>
+              <th className="text-center px-4 py-2 font-semibold text-slate-700">{t('mentioned')}</th>
+              <th className="text-center px-4 py-2 font-semibold text-slate-700">{t('target_cited')}</th>
+              <th className="text-right px-4 py-2 font-semibold text-slate-700">{t('citations')}</th>
+              <th className="text-center px-4 py-2 font-semibold text-slate-700"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((r, i) => (
+              <tr
+                key={r.id}
+                onClick={() => onRowClick(r)}
+                className={`border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition ${
+                  i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
+                }`}
+              >
+                <td className="px-4 py-3 font-medium text-slate-900 line-clamp-1">{r.promptText}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {ENGINE_META[r.engine as keyof typeof ENGINE_META]?.name || r.engine}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {r.mentioned ? <span className="text-emerald-600 font-semibold">✓</span> : <span className="text-slate-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {r.targetCited ? <span className="text-emerald-600 font-semibold">✓</span> : <span className="text-slate-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600 font-medium">{r.citationCount}</td>
+                <td className="px-4 py-3 text-center">
+                  <ExternalLinkIcon size={16} className="text-slate-400" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
+}
 
-  // Raw response collapsed by default — insights are the primary view
-  const [expanded, setExpanded] = useState(false)
+function ResultDetailDrawer({
+  open,
+  result,
+  onClose,
+  t,
+}: {
+  open: boolean
+  result: ResultRow
+  onClose: () => void
+  t: T
+}) {
+  if (!open) return null
 
-  // Extract concise summary: first 1-2 text blocks for preview
-  const summaryBlock = useMemo(() => {
-    const firstText = blocks.find((b) => b.type === 'text')
-    if (firstText) return firstText
-    return blocks[0] ?? null
-  }, [blocks])
-
-  const sortedCitations = useMemo(() => {
-    const list = [...result.citations]
-    list.sort((a, b) => {
-      if (a.is_target_domain && !b.is_target_domain) return -1
-      if (!a.is_target_domain && b.is_target_domain) return 1
-      const ap = a.citation_position ?? 9999
-      const bp = b.citation_position ?? 9999
-      return ap - bp
-    })
-    return list
-  }, [result.citations])
-
-  // Detect Hebrew once for AIInsightCards
-  const isHebrewResp = responseIsRTL
+  const engineMeta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
 
   return (
-    <article className="rounded-2xl border border-slate-200/70 bg-white shadow-md overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/40">
-        <div className="flex items-center gap-3">
-          {engineMeta && Icon ? (
-            <>
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${engineMeta.bg} border border-slate-200/80 flex items-center justify-center shadow-sm`}>
-                <Icon size={20} className={engineMeta.accent} />
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-end" onClick={onClose}>
+      <div
+        className="bg-white w-full max-w-2xl h-full overflow-y-auto shadow-xl animate-in slide-in-from-right"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drawer Header */}
+        <div className="sticky top-0 border-b border-slate-200 bg-white p-6 flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">{result.promptText}</h2>
+            <p className="text-sm text-slate-500">{engineMeta?.name || result.engine}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 text-2xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Drawer Content */}
+        <div className="space-y-6 p-6">
+          {/* Scan Info */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold text-slate-900 mb-3">{t('scan_activity')}</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-slate-600">{t('mentioned')}</div>
+                <div className={`text-lg font-bold ${result.mentioned ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {result.mentioned ? '✓' : '—'}
+                </div>
               </div>
               <div>
-                <div className="font-semibold text-slate-900">{engineMeta.name}</div>
-                <div className="text-xs text-slate-500">
-                  {formatRelativeTime(completedAt || result.scannedAt, t('just_now'))}
+                <div className="text-xs text-slate-600">{t('target_cited')}</div>
+                <div className={`text-lg font-bold ${result.targetCited ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {result.targetCited ? '✓' : '—'}
                 </div>
-              </div>
-            </>
-          ) : (
-            <div className="font-semibold text-slate-900">{result.engine}</div>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {result.mentioned && (
-            <Badge variant="info" className="!text-xs">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 me-1" />
-              {t('mentioned')}
-            </Badge>
-          )}
-          {result.targetCited && (
-            <Badge variant="success" className="!text-xs">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 me-1" />
-              {t('target_cited')}
-            </Badge>
-          )}
-          {isError ? <Badge variant="danger">{t('error')}</Badge> : <Badge variant="success">{t('success')}</Badge>}
-        </div>
-      </header>
-
-      {isError ? (
-        <div className="px-6 py-4 text-sm text-red-700 bg-red-50/60">
-          {result.errorMessage || t('error')}
-        </div>
-      ) : (
-        <div className="p-6 space-y-6">
-          {/* AI INSIGHTS — primary view */}
-          <AIInsightCards
-            input={{
-              responseText: result.responseText,
-              mentioned: result.mentioned,
-              targetCited: result.targetCited,
-              citations: result.citations,
-              engine: result.engine,
-              targetDomain: null,
-              targetBrand: null,
-            }}
-            isHebrew={isHebrewResp}
-          />
-
-          {/* Executive Summary — short preview of AI answer */}
-          {summaryBlock && (
-            <div className="rounded-xl border border-slate-200/70 bg-gradient-to-br from-indigo-50/30 to-white p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">
-                  {isHebrewResp ? '💡 תקציר תשובת AI' : '💡 AI Answer Summary'}
-                </span>
-              </div>
-              <div
-                dir={responseIsRTL ? 'rtl' : 'ltr'}
-                className={`text-[15px] leading-[1.7] text-slate-700 ${responseIsRTL ? 'text-right' : 'text-left'} max-w-[72ch]`}
-              >
-                {summaryBlock.type === 'heading' || summaryBlock.type === 'text' ? (
-                  <p className="line-clamp-4">{summaryBlock.text}</p>
-                ) : (
-                  <p className="line-clamp-4">{summaryBlock.text}</p>
-                )}
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Full Response — COLLAPSED BY DEFAULT */}
-          {(blocks.length > 0 || paragraphs.length > 0) && (
-            <div className="rounded-xl border border-slate-200/70 bg-white overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="w-full flex items-center justify-between gap-3 px-5 py-3 bg-slate-50/60 hover:bg-slate-100/60 transition text-start"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                    {isHebrewResp ? '📄 תשובת AI מלאה' : '📄 Full AI Response'}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    ({blocks.length || paragraphs.length} {isHebrewResp ? 'בלוקים' : 'blocks'})
-                  </span>
-                </div>
-                <span className="text-xs font-semibold text-indigo-600">
-                  {expanded ? (isHebrewResp ? 'הסתר ▲' : 'Hide ▲') : (isHebrewResp ? 'הצג ▼' : 'Show ▼')}
-                </span>
-              </button>
-              {expanded && (
-                <div
-                  dir={responseIsRTL ? 'rtl' : 'ltr'}
-                  className={`px-6 py-5 border-t border-slate-100 max-w-[68ch] ${responseIsRTL ? 'text-right' : 'text-left'}`}
-                >
-                  <MarkdownBlocks blocks={blocks} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Sources (compact, full-width below) */}
-          {sortedCitations.length > 0 && (
-            <div className="rounded-xl border border-slate-200/70 bg-white p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                  {isHebrewResp ? '🔗 ' : '🔗 '}{t('sources')}
-                </h4>
-                <span className="text-[11px] text-slate-400">{sortedCitations.length}</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {sortedCitations.map((c) => (
-                  <CitationCardSmall key={c.id} citation={c} yourDomainLabel={t('your_domain')} />
+          {/* Citations */}
+          {result.citations.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">{t('sources')} ({result.citations.length})</h3>
+              <div className="space-y-2">
+                {result.citations.map((c, i) => (
+                  <a
+                    key={i}
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-2 rounded-lg border border-slate-200 hover:border-slate-300 hover:shadow-sm transition"
+                  >
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className={`font-medium ${c.is_target_domain ? 'text-emerald-700' : 'text-slate-900'}`}>
+                        {c.domain}
+                      </span>
+                      {c.is_target_domain && <Badge variant="success" className="!text-xs">{t('your_domain')}</Badge>}
+                    </div>
+                  </a>
                 ))}
               </div>
             </div>
           )}
 
-          {(blocks.length === 0 && paragraphs.length === 0) && (
-            <p className="text-sm text-slate-400 italic">{t('no_response')}</p>
+          {/* Response Preview */}
+          {result.responseText && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">{t('ai_answer')}</h3>
+              <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-4 line-clamp-6">
+                {result.responseText}
+              </div>
+            </div>
           )}
         </div>
-      )}
-    </article>
-  )
-}
 
-function MarkdownBlocks({ blocks }: { blocks: ReturnType<typeof parseBlocks> }) {
-  const grouped: Array<
-    | { kind: 'block'; block: ReturnType<typeof parseBlocks>[number] }
-    | { kind: 'list-bullet'; items: string[] }
-    | { kind: 'list-numbered'; items: Array<{ index: number; text: string }> }
-  > = []
-
-  for (const b of blocks) {
-    const last = grouped[grouped.length - 1]
-    if (b.type === 'bullet') {
-      if (last && last.kind === 'list-bullet') {
-        last.items.push(b.text)
-      } else {
-        grouped.push({ kind: 'list-bullet', items: [b.text] })
-      }
-    } else if (b.type === 'numbered') {
-      if (last && last.kind === 'list-numbered') {
-        last.items.push({ index: b.index, text: b.text })
-      } else {
-        grouped.push({ kind: 'list-numbered', items: [{ index: b.index, text: b.text }] })
-      }
-    } else {
-      grouped.push({ kind: 'block', block: b })
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      {grouped.map((g, i) => {
-        if (g.kind === 'list-bullet') {
-          return (
-            <ul key={i} className="list-disc ms-5 space-y-1.5">
-              {g.items.map((item, j) => (
-                <li key={j} className="text-[15px] leading-[1.7] text-slate-700">
-                  {item}
-                </li>
-              ))}
-            </ul>
-          )
-        }
-        if (g.kind === 'list-numbered') {
-          return (
-            <ol key={i} className="list-decimal ms-5 space-y-1.5">
-              {g.items.map((item, j) => (
-                <li key={j} className="text-[15px] leading-[1.7] text-slate-700">
-                  {item.text}
-                </li>
-              ))}
-            </ol>
-          )
-        }
-        const b = g.block
-        if (b.type === 'heading') {
-          const headingClasses =
-            b.level === 1
-              ? 'text-xl font-bold text-slate-900 mt-2'
-              : b.level === 2
-              ? 'text-lg font-semibold text-slate-900 mt-2'
-              : 'text-[15px] font-semibold text-slate-900 mt-1'
-          return (
-            <div key={i} className={headingClasses}>
-              {b.text}
-            </div>
-          )
-        }
-        return (
-          <p key={i} className="whitespace-pre-wrap text-[15px] leading-[1.8] text-slate-700">
-            {b.text}
-          </p>
-        )
-      })}
+        {/* Drawer Footer */}
+        <div className="sticky bottom-0 border-t border-slate-200 bg-white p-6 flex gap-2">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            {t('close')}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
 
-function CitationCardSmall({
-  citation,
-  yourDomainLabel,
-}: {
-  citation: Citation
-  yourDomainLabel: string
-}) {
-  const [imgError, setImgError] = useState(false)
-  const displayTitle = citation.title?.trim() || citation.domain
-
-  return (
-    <a
-      href={citation.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`group block p-2.5 rounded-lg border transition-all duration-200 ${
-        citation.is_target_domain
-          ? 'border-emerald-300 bg-emerald-50/60 hover:shadow-md hover:-translate-y-0.5'
-          : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5'
-      }`}
-    >
-      <div className="flex items-start gap-2 min-w-0">
-        <div className="shrink-0 w-6 h-6 rounded-md bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center mt-0.5">
-          {!imgError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={faviconUrl(citation.domain)}
-              alt=""
-              width={16}
-              height={16}
-              loading="lazy"
-              onError={() => setImgError(true)}
-              className="w-4 h-4"
-            />
-          ) : (
-            <span className="text-[8px] font-bold text-slate-400">
-              {citation.domain.slice(0, 2).toUpperCase()}
-            </span>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-semibold text-slate-900 line-clamp-2 group-hover:text-indigo-700 transition leading-snug">
-            {displayTitle}
-          </div>
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[10px] text-slate-500 truncate flex-1">
-              {citation.domain}
-            </span>
-            <ExternalLinkIcon size={10} className="text-slate-300 group-hover:text-slate-500 shrink-0 transition" />
-          </div>
-          {citation.is_target_domain && (
-            <div className="text-[9px] font-semibold text-emerald-700 mt-1">
-              ✓ {yourDomainLabel}
-            </div>
-          )}
-        </div>
-      </div>
-    </a>
-  )
-}
-
-function SmartQuestionsStrip({
+function SmartQuestionsSection({
   questions,
   projectId,
   country,
@@ -1227,60 +730,36 @@ function SmartQuestionsStrip({
           targetBrandName: businessName,
         }),
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
-      }
+      if (!res.ok) throw new Error('Failed to add')
       onAdded()
     } catch (e) {
-      console.error(e instanceof Error ? e.message : 'Failed to add question')
+      console.error(e)
     } finally {
       setSavingId(null)
     }
   }
 
   return (
-    <div className="rounded-xl border border-slate-200/70 bg-gradient-to-br from-indigo-50/40 to-white p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold uppercase tracking-wider text-indigo-700">
-            💡 {t('smart_questions_title')}
-          </span>
-          <span className="text-xs text-slate-500">({questions.length})</span>
-        </div>
-      </div>
+    <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50/40 to-white p-5">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 mb-4">{t('smart_questions_title')}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {questions.map((q) => (
-          <div
-            key={q.id}
-            className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm transition"
-          >
-            <div className="flex-1 min-w-0">
+          <div key={q.id} className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200 hover:shadow-sm transition">
+            <div className="flex-1">
               <p className="text-sm text-slate-900 font-medium line-clamp-2 mb-2">{q.prompt}</p>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <Badge
-                  variant={intentTone[q.intent] || 'neutral'}
-                  className="!text-[9px] !px-1.5 !py-0"
-                >
+              <div className="flex items-center gap-1.5">
+                <Badge variant={intentTone[q.intent] || 'neutral'} className="!text-[9px]">
                   {intentLabel(q.intent)}
                 </Badge>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {q.qualityScore}% quality
-                </span>
+                <span className="text-[10px] text-slate-500">{q.qualityScore}%</span>
               </div>
             </div>
             <button
-              type="button"
               onClick={() => addQuestion(q)}
               disabled={savingId === q.id}
-              className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              title={t('add')}
+              className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition disabled:opacity-50"
             >
-              {savingId === q.id ? (
-                <span className="w-3.5 h-3.5 border-2 border-indigo-700 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                '+'
-              )}
+              {savingId === q.id ? '…' : '+'}
             </button>
           </div>
         ))}
