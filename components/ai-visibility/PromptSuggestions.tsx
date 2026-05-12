@@ -204,10 +204,10 @@ export default function PromptSuggestions({
   const selectedCount = selectedIds.size
 
   return (
-    <Modal open={open} onClose={onClose} title={t('suggestions_title')} size="lg">
+    <Modal open={open} onClose={onClose} title={t('smart_questions_title')} size="lg">
       <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between gap-3 text-sm">
-          <p className="text-slate-600 flex-1">{t('suggestions_help')}</p>
+          <p className="text-slate-600 flex-1">{t('smart_questions_help')}</p>
           <button
             onClick={regenerate}
             disabled={regenerating}

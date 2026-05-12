@@ -739,7 +739,7 @@ function PromptCard({
       <div className="px-5 pt-4 pb-3 border-b border-slate-100">
         <div className="mb-2 flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            {t('prompt_label')}
+            {t('query_label')}
           </span>
           {prompt.country && (
             <Badge variant="neutral" className="!text-[9px] !px-1.5 !py-0">{prompt.country}</Badge>
