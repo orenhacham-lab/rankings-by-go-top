@@ -149,6 +149,17 @@ const STRINGS = {
   all_citations: { he: 'כל הציטוטים', en: 'All citations' },
   overall: { he: 'כולל', en: 'Overall' },
   search: { he: 'חיפוש', en: 'Search' },
+
+  // Engine summary card labels (lowercase metric units)
+  mentions: { he: 'אזכורים', en: 'mentions' },
+  scans: { he: 'סריקות', en: 'scans' },
+
+  // AI Queries panel
+  ai_queries: { he: 'שאלות AI', en: 'AI Queries' },
+  not_scanned_yet: { he: 'לא נסרק', en: 'Not scanned yet' },
+  scan_engine: { he: 'סרוק', en: 'Scan' },
+  query_already_exists: { he: 'השאלה כבר קיימת', en: 'Query already exists' },
+  of_engines: { he: 'מתוך 6 מנועים', en: 'of 6 engines' },
 } as const
 
 type StringKey = keyof typeof STRINGS

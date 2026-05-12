@@ -87,11 +87,25 @@ export async function POST(request: Request) {
     return Response.json({ error: result.error }, { status: result.status })
   }
 
+  const trimmedPrompt = prompt.trim()
+
+  // Idempotent: if same prompt already exists for this project, return existing (don't error out)
+  const { data: existing } = await result.admin
+    .from('ai_prompts')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('prompt', trimmedPrompt)
+    .maybeSingle()
+
+  if (existing) {
+    return Response.json({ prompt: existing, duplicate: true })
+  }
+
   const { data: row, error } = await result.admin
     .from('ai_prompts')
     .insert({
       project_id: projectId,
-      prompt: prompt.trim(),
+      prompt: trimmedPrompt,
       target_domain: targetDomain || null,
       target_brand_name: targetBrandName || null,
       country: country || null,

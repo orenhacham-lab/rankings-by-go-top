@@ -26,8 +26,9 @@ import PromptSuggestions from './PromptSuggestions'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
 import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
 
-// Fixed list of supported AI engines — always shown, regardless of results
-const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode', 'claude'] as const
+// Fixed list of supported AI engines — always shown, regardless of results.
+// Claude is NOT supported in our ScrapeLLM implementation.
+const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
 type ResultRow = {
   id: string
@@ -42,6 +43,16 @@ type ResultRow = {
   scannedAt: string | null
   citations: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }>
   responseText: string | null
+}
+
+type PromptRow = {
+  id: string
+  prompt: string
+  country: string | null
+  language: string | null
+  target_domain: string | null
+  target_brand_name: string | null
+  created_at: string
 }
 
 type GlobalMetrics = {
@@ -82,10 +93,12 @@ export default function AIVisibilitySection({
   const isHebrew = detectHebrew(projectLanguage, projectCountry)
 
   const [allResults, setAllResults] = useState<ResultRow[]>([])
+  const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [scanningKey, setScanningKey] = useState<string | null>(null)
 
   const [showNewPrompt, setShowNewPrompt] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -99,18 +112,30 @@ export default function AIVisibilitySection({
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
 
-  // Load all scan results
+  // Load both scan results AND prompts (so newly-added prompts appear before scanning)
   const loadAllResults = useCallback(async () => {
     setError(null)
     setLoading(true)
     try {
-      const res = await fetch(`/api/ai-visibility/runs?projectId=${projectId}&limit=200`)
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
+      // Fetch runs and prompts in parallel
+      const [runsRes, promptsRes] = await Promise.all([
+        fetch(`/api/ai-visibility/runs?projectId=${projectId}&limit=200`),
+        fetch(`/api/ai-visibility/prompts?projectId=${projectId}`),
+      ])
+
+      if (!runsRes.ok) {
+        const body = await runsRes.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${runsRes.status}`)
       }
-      const data = await res.json()
-      const results: ResultRow[] = (data.runs || [])
+      if (!promptsRes.ok) {
+        const body = await promptsRes.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${promptsRes.status}`)
+      }
+
+      const runsData = await runsRes.json()
+      const promptsData = await promptsRes.json()
+
+      const results: ResultRow[] = (runsData.runs || [])
         .filter((run: any) => run.result)
         .map((run: any) => ({
           id: run.result.id,
@@ -127,7 +152,16 @@ export default function AIVisibilitySection({
           runId: run.id,
         }))
 
-      setAllResults(results)
+      // Backfill promptText from prompts API when missing
+      const promptsArr: PromptRow[] = (promptsData.prompts || []) as PromptRow[]
+      const promptTextById = new Map(promptsArr.map((p) => [p.id, p.prompt]))
+      const resultsWithText = results.map((r) => ({
+        ...r,
+        promptText: r.promptText || (r.promptId ? promptTextById.get(r.promptId) || '' : ''),
+      }))
+
+      setAllResults(resultsWithText)
+      setAllPrompts(promptsArr)
 
       // Aggregate metrics
       const engines = new Set<string>()
@@ -215,9 +249,47 @@ export default function AIVisibilitySection({
     setSuggestedQuestions(suggestions.slice(0, 4))
   }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords])
 
-  // Filter results
+  // Add scan trigger for a specific prompt × engine
+  const scanEngine = useCallback(
+    async (promptId: string, engine: string) => {
+      const key = `${promptId}:${engine}`
+      setScanningKey(key)
+      setError(null)
+      try {
+        const res = await fetch('/api/ai-visibility/runs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, promptId, engine }),
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || `HTTP ${res.status}`)
+        }
+        await loadAllResults()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Scan failed')
+      } finally {
+        setScanningKey(null)
+      }
+    },
+    [projectId, loadAllResults]
+  )
+
+  // Build a set of "scanned" prompt × engine combinations
+  const scannedSet = useMemo(() => {
+    const s = new Set<string>()
+    allResults.forEach((r) => {
+      if (r.promptId && r.status === 'success') {
+        s.add(`${r.promptId}:${r.engine}`)
+      }
+    })
+    return s
+  }, [allResults])
+
+  // Filter results — exclude any unsupported engines (e.g. legacy Claude rows)
   const filteredResults = useMemo(() => {
     return allResults.filter((r) => {
+      if (!(SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) return false
       if (filterEngine && r.engine !== filterEngine) return false
       if (filterMentioned !== null && r.mentioned !== filterMentioned) return false
       if (filterCited !== null && r.targetCited !== filterCited) return false
@@ -278,6 +350,17 @@ export default function AIVisibilitySection({
 
           {/* ENGINE SUMMARY CARDS — always show all supported engines */}
           <EngineSummaryCards metrics={engineMetrics} t={t} />
+
+          {/* AI QUERIES PANEL — all prompts with engine scan chips */}
+          {allPrompts.length > 0 && (
+            <AIQueriesPanel
+              prompts={allPrompts}
+              scannedSet={scannedSet}
+              scanningKey={scanningKey}
+              onScan={scanEngine}
+              t={t}
+            />
+          )}
 
           {/* FILTER BAR — show all supported engines */}
           <FilterBar
@@ -445,7 +528,7 @@ function GlobalOverviewPanel({
       <OverviewTile
         label={t('engine_coverage')}
         value={String(metrics.enginesCovered)}
-        sub={`of 6 engines`}
+        sub={t('of_engines')}
         tone="amber"
       />
     </div>
@@ -497,7 +580,10 @@ function EngineSummaryCards({
   metrics: Map<string, EngineMetrics>
   t: T
 }) {
-  const engineList = Array.from(metrics.values()).sort((a, b) => b.scans - a.scans)
+  // Only render supported engines (filter out any legacy entries like Claude)
+  const engineList = SUPPORTED_ENGINES.map((engine) =>
+    metrics.get(engine) || { engine, scans: 0, mentions: 0, citations: 0, rate: 0 }
+  )
 
   return (
     <div>
@@ -513,18 +599,75 @@ function EngineSummaryCards({
               </div>
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-600">
-                  <span className="font-medium text-slate-900">{em.mentions}</span> mentions
+                  <span className="font-medium text-slate-900">{em.mentions}</span> {t('mentions')}
                 </div>
                 <div className="text-[10px] text-slate-600">
-                  <span className="font-medium text-slate-900">{em.citations}</span> citations
+                  <span className="font-medium text-slate-900">{em.citations}</span> {t('citations')}
                 </div>
                 <div className="text-[10px] text-slate-600">
-                  <span className="font-medium text-slate-900">{em.scans}</span> scans
+                  <span className="font-medium text-slate-900">{em.scans}</span> {t('scans')}
                 </div>
               </div>
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+function AIQueriesPanel({
+  prompts,
+  scannedSet,
+  scanningKey,
+  onScan,
+  t,
+}: {
+  prompts: PromptRow[]
+  scannedSet: Set<string>
+  scanningKey: string | null
+  onScan: (promptId: string, engine: string) => void
+  t: T
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-3">
+        {t('ai_queries')} ({prompts.length})
+      </h3>
+      <div className="space-y-2">
+        {prompts.map((p) => (
+          <div key={p.id} className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition">
+            <p className="text-sm font-medium text-slate-900 mb-2 line-clamp-2">{p.prompt}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {SUPPORTED_ENGINES.map((engine) => {
+                const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
+                const key = `${p.id}:${engine}`
+                const scanned = scannedSet.has(key)
+                const scanning = scanningKey === key
+                return (
+                  <button
+                    key={engine}
+                    onClick={() => !scanning && !scanned && onScan(p.id, engine)}
+                    disabled={scanning || scanned}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition ${
+                      scanned
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
+                        : scanning
+                        ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-wait'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer'
+                    }`}
+                    title={scanned ? t('scan_activity') : t('scan_engine')}
+                  >
+                    {meta && <meta.Icon size={14} className={meta.accent} />}
+                    <span>{meta?.name || engine}</span>
+                    {scanned && <span className="text-emerald-600">✓</span>}
+                    {scanning && <span className="text-slate-400 animate-pulse">…</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
