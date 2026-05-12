@@ -137,6 +137,10 @@ const STRINGS = {
   intent_informational: { he: 'מידע', en: 'Informational' },
   intent_alternatives: { he: 'חלופות', en: 'Alternatives' },
   intent_best_of: { he: 'הטובים ביותר', en: 'Best of' },
+
+  // Workspace layout
+  select_query_to_view: { he: 'בחר שאלה כדי להציג את פרטיה', en: 'Select a query to view details' },
+  select_and_run_query: { he: 'בחר שאלה והרץ לתוך מנוע כדי לראות את התוצאות', en: 'Select a query and run it against an engine to see results' },
 } as const
 
 type StringKey = keyof typeof STRINGS
