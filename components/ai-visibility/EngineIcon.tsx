@@ -46,31 +46,31 @@ function EngineImageIcon({
 }
 
 export function ChatGPTIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/chatgpt.svg" alt="ChatGPT" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/chatgpt.png" alt="ChatGPT" size={size} className={className} />
 }
 
 export function ClaudeIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/claude.svg" alt="Claude" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/claude.png" alt="Claude" size={size} className={className} />
 }
 
 export function GeminiIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/gemini.svg" alt="Gemini" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/gemini.png" alt="Gemini" size={size} className={className} />
 }
 
 export function PerplexityIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/perplexity.svg" alt="Perplexity" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/perplexity.png" alt="Perplexity" size={size} className={className} />
 }
 
 export function CopilotIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/copilot.svg" alt="Copilot" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/copilot.png" alt="Copilot" size={size} className={className} />
 }
 
 export function GrokIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/grok.svg" alt="Grok" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/grok.png" alt="Grok" size={size} className={className} />
 }
 
 export function GoogleAIIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/google-ai.svg" alt="Google AI" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/google-ai.png" alt="Google AI" size={size} className={className} />
 }
 
 /** External link icon for citation cards */
