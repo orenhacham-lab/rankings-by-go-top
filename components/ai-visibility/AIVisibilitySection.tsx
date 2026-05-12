@@ -28,6 +28,7 @@ import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visib
 
 type ResultRow = {
   id: string
+  runId: string
   promptId: string | null
   engine: string
   promptText: string
@@ -36,7 +37,7 @@ type ResultRow = {
   citationCount: number
   status: string | null
   scannedAt: string | null
-  citations: Array<{ domain: string; is_target_domain: boolean; url: string }>
+  citations: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }>
   responseText: string | null
 }
 
@@ -100,7 +101,7 @@ export default function AIVisibilitySection({
     setError(null)
     setLoading(true)
     try {
-      const res = await fetch(`/api/ai-visibility/scan-history?projectId=${projectId}&limit=1000`)
+      const res = await fetch(`/api/ai-visibility/runs?projectId=${projectId}&limit=200`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || `HTTP ${res.status}`)
@@ -118,8 +119,9 @@ export default function AIVisibilitySection({
           citationCount: run.result.citationCount || 0,
           status: run.result.status,
           scannedAt: run.completedAt || run.result.scannedAt,
-          citations: run.result.citations || [],
-          responseText: run.result.responseText || null,
+          citations: [],
+          responseText: null,
+          runId: run.id,
         }))
 
       setAllResults(results)
@@ -136,7 +138,6 @@ export default function AIVisibilitySection({
             engines.add(r.engine)
             if (r.mentioned) totalMentions++
             if (r.targetCited) totalCitations++
-            totalCitations += r.citationCount
 
             const existing = engineMap.get(r.engine) || {
               engine: r.engine,
@@ -153,16 +154,20 @@ export default function AIVisibilitySection({
           }
         })
 
+        const successfulScans = results.filter((r) => r.status === 'success').length
         setGlobalMetrics({
-          totalScans: results.filter((r) => r.status === 'success').length,
+          totalScans: successfulScans,
           totalMentions,
           totalCitations,
-          mentionRate: results.length > 0 ? Math.round((totalMentions / results.length) * 100) : 0,
-          citationRate: results.length > 0 ? Math.round((totalCitations / (results.length * 2)) * 100) : 0,
+          mentionRate: successfulScans > 0 ? Math.round((totalMentions / successfulScans) * 100) : 0,
+          citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
           enginesCovered: engines.size,
         })
 
         setEngineMetrics(engineMap)
+      } else {
+        setGlobalMetrics(null)
+        setEngineMetrics(new Map())
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load results')
@@ -273,9 +278,26 @@ export default function AIVisibilitySection({
           {filteredResults.length > 0 ? (
             <ResultsTable
               results={filteredResults}
-              onRowClick={(result) => {
+              onRowClick={async (result) => {
                 setSelectedResult(result)
                 setDrawerOpen(true)
+                // Fetch full result details on demand
+                try {
+                  const res = await fetch(`/api/ai-visibility/runs/${result.runId}/results`)
+                  if (res.ok) {
+                    const data = await res.json()
+                    const fullResult = data.results?.[0]
+                    if (fullResult) {
+                      setSelectedResult({
+                        ...result,
+                        citations: fullResult.citations || [],
+                        responseText: fullResult.responseText || null,
+                      })
+                    }
+                  }
+                } catch (e) {
+                  console.error('Failed to load full result:', e)
+                }
               }}
               t={t}
             />
