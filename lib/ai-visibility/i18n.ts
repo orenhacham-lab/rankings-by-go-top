@@ -20,22 +20,28 @@ const STRINGS = {
   delete_permanently: { he: 'מחק לצמיתות', en: 'Delete permanently' },
 
   // Header
-  ai_visibility: { he: 'נראות ב-AI', en: 'AI Visibility' },
+  ai_visibility: { he: 'AI Search Visibility', en: 'AI Search Visibility' },
+  ai_visibility_platform: { he: 'AI Search Visibility Platform', en: 'AI Search Visibility Platform' },
   monitor_engines: { he: 'מעקב אחר 6 מנועי AI', en: 'Monitor across 6 AI engines' },
   beta: { he: 'בטא', en: 'Beta' },
   suggest: { he: '✨ הצע', en: '✨ Suggest' },
-  new_prompt: { he: '+ פרומפט חדש', en: '+ New prompt' },
+  new_query: { he: '+ שאלת AI חדשה', en: '+ New AI Query' },
+  recommend_questions: { he: '💡 שאלות מומלצות', en: '💡 Recommended Questions' },
 
   // KPI labels
   visibility_score: { he: 'ציון נראות', en: 'Visibility Score' },
+  ai_visibility_percent: { he: '% נראות AI', en: 'AI Visibility %' },
+  mention_frequency: { he: 'תדירות הזכרה', en: 'Mention Frequency' },
+  citation_share: { he: '% נתח ציטוט', en: 'Citation Share' },
+  engine_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage' },
+  share_of_voice: { he: 'Share of Voice', en: 'Share of Voice' },
+  recommendation_present: { he: 'המלצה נוכחת', en: 'Recommendation Present' },
   mentioned: { he: 'הוזכר', en: 'Mentioned' },
   not_mentioned: { he: 'לא הוזכר', en: 'Not mentioned' },
   target_cited: { he: 'דומיין צוטט', en: 'Target Cited' },
   not_cited: { he: 'לא צוטט', en: 'Not cited' },
   citations: { he: 'ציטוטים', en: 'Citations' },
   sources_cited: { he: 'מקורות צוטטו', en: 'Sources cited' },
-  credits_used: { he: 'קרדיטים בשימוש', en: 'Credits used' },
-  this_scan: { he: 'בסריקה זו', en: 'This scan' },
   in_ai_response: { he: 'בתשובת AI', en: 'In AI response' },
   not_found: { he: 'לא נמצא', en: 'Not found' },
   as_source: { he: 'כמקור', en: 'As source' },
@@ -53,7 +59,8 @@ const STRINGS = {
   sources_influencing: { he: 'מקורות שמשפיעים על התשובה', en: 'Sources influencing AI answer' },
 
   // Workspace
-  prompt: { he: 'פרומפט', en: 'Prompt' },
+  query: { he: 'שאלת AI', en: 'AI Query' },
+  ai_query: { he: 'שאלת AI', en: 'AI Query' },
   ai_answer: { he: 'תשובת AI', en: 'AI Answer' },
   sources: { he: 'מקורות', en: 'Sources' },
   show_full_answer: { he: 'הצג תשובה מלאה', en: 'Show full answer' },
@@ -63,9 +70,11 @@ const STRINGS = {
   no_sources_cited: { he: 'לא צוטטו מקורות בתשובה זו', en: 'No sources cited' },
   your_domain: { he: 'הדומיין שלך', en: 'Your domain' },
   scanning_engine: { he: 'סורק מנוע AI...', en: 'Scanning AI engine…' },
+  scan: { he: 'סרוק', en: 'Scan' },
+  scan_query: { he: 'סרוק שאלה', en: 'Scan query' },
 
   // Engine card states
-  run: { he: 'הפעל', en: 'Run' },
+  scan_btn: { he: 'סרוק', en: 'Scan' },
   scanning: { he: 'סורק...', en: 'Scanning…' },
   failed: { he: 'נכשל', en: 'Failed' },
   success: { he: 'הצליח', en: 'Success' },
@@ -75,19 +84,20 @@ const STRINGS = {
   no_mention: { he: 'ללא הזכרה', en: 'no mention' },
 
   // Empty states
-  no_prompts: { he: 'אין פרומפטים עדיין', en: 'No prompts yet' },
-  no_prompts_help: {
-    he: 'צור הצעות חכמות מותאמות לעסק שלך, או צור פרומפט באופן ידני.',
-    en: 'Generate smart suggestions tailored to your business, or create one manually.',
+  no_queries: { he: 'אין שאלות עדיין', en: 'No AI queries yet' },
+  no_queries_help: {
+    he: 'צור שאלות חכמות מותאמות לעסק שלך, או צור שאלה באופן ידני.',
+    en: 'Generate smart AI questions tailored to your business, or create one manually.',
   },
   no_scans: { he: 'אין סריקות עדיין', en: 'No scans yet' },
   no_scans_help: {
-    he: 'הפעל פרומפט מול מנוע AI כדי להתחיל לעקוב.',
-    en: 'Run a prompt against an engine to start tracking activity.',
+    he: 'סרוק שאלה מול מנוע AI כדי להתחיל לעקוב.',
+    en: 'Scan an AI query against an engine to start tracking activity.',
   },
 
   // Scan history
   scan_activity: { he: 'פעילות סריקה', en: 'Scan activity' },
+  scan_history: { he: 'היסטוריית סריקה', en: 'Scan history' },
   events: { he: 'אירועים', en: 'events' },
   event: { he: 'אירוע', en: 'event' },
   viewing: { he: 'מוצג', en: 'Viewing' },
@@ -102,28 +112,31 @@ const STRINGS = {
     en: 'This will permanently delete the AI scan result, response, and all associated citations. This action cannot be undone.',
   },
 
-  // Prompt suggestions modal
-  suggestions_title: { he: 'הצעות פרומפט חכמות', en: 'AI Prompt Suggestions' },
-  suggestions_help: {
-    he: 'הצעות חכמות מותאמות לעסק שלך. בחר מרובה, ערוך, או הוסף בודד.',
-    en: 'Smart suggestions tailored to your business. Select multiple, edit, or add one-by-one.',
+  // Smart AI questions modal
+  smart_questions_title: { he: 'שאלות AI מומלצות', en: 'Recommended AI Questions' },
+  smart_questions_help: {
+    he: 'שאלות מוכנות מותאמות לעסק שלך. בחר מרובה, ערוך, או הוסף בודד.',
+    en: 'Smart AI questions tailored to your business. Select multiple, edit, or add one-by-one.',
   },
-  all_added: { he: 'כל ההצעות נוספו.', en: 'All suggestions added.' },
-  prompt_label: { he: 'פרומפט', en: 'Prompt' },
+  all_added: { he: 'כל השאלות נוספו.', en: 'All questions added.' },
+  query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
   language_label: { he: 'שפה', en: 'Language' },
   target_domain_label: { he: 'דומיין יעד (לא חובה)', en: 'Target domain (optional)' },
   target_brand_label: { he: 'מותג יעד (לא חובה)', en: 'Target brand (optional)' },
-  new_ai_prompt_title: { he: 'פרומפט AI חדש', en: 'New AI Prompt' },
-  create_prompt: { he: 'צור פרומפט', en: 'Create prompt' },
+  new_ai_query_title: { he: 'שאלת AI חדשה', en: 'New AI Query' },
+  create_query: { he: 'צור שאלה', en: 'Create query' },
 
   // Intent labels
   intent_brand: { he: 'מותג', en: 'Brand' },
   intent_comparison: { he: 'השוואה', en: 'Comparison' },
+  intent_commercial: { he: 'מסחרי', en: 'Commercial' },
   intent_local: { he: 'מקומי', en: 'Local' },
   intent_transactional: { he: 'מסחרי', en: 'Transactional' },
   intent_recommendation: { he: 'המלצה', en: 'Recommendation' },
   intent_informational: { he: 'מידע', en: 'Informational' },
+  intent_alternatives: { he: 'חלופות', en: 'Alternatives' },
+  intent_best_of: { he: 'הטובים ביותר', en: 'Best of' },
 } as const
 
 type StringKey = keyof typeof STRINGS

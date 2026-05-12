@@ -312,7 +312,6 @@ export default function AIVisibilitySection({
             mentioned: result.mentioned,
             targetCited: result.targetCited,
             citationCount: result.citationCount,
-            credits: String(result.creditsUsed),
             scannedAt: result.scannedAt,
             engine: result.engine,
             topSource: result.citations.find((c) => c.is_target_domain) || result.citations[0] || null,
@@ -337,10 +336,10 @@ export default function AIVisibilitySection({
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)}>
-            {t('suggest')}
+            {t('recommend_questions')}
           </Button>
           <Button size="sm" onClick={() => setShowNewPrompt(true)}>
-            {t('new_prompt')}
+            {t('new_query')}
           </Button>
         </div>
       </div>
@@ -358,7 +357,7 @@ export default function AIVisibilitySection({
       {/* INSIGHTS STRIP */}
       {kpis && <InsightsStrip kpis={kpis} t={t} />}
 
-      {/* PROMPTS + ENGINE CARDS */}
+      {/* AI QUERIES + ENGINE CARDS */}
       {loading ? (
         <PromptListSkeleton />
       ) : prompts.length === 0 ? (
@@ -436,16 +435,16 @@ export default function AIVisibilitySection({
         </div>
       </Modal>
 
-      {/* NEW PROMPT MODAL */}
+      {/* NEW AI QUERY MODAL */}
       <Modal
         open={showNewPrompt}
         onClose={() => setShowNewPrompt(false)}
-        title={t('new_ai_prompt_title')}
+        title={t('new_ai_query_title')}
         size="md"
       >
         <form onSubmit={handleCreatePrompt} className="space-y-3" dir={isHebrew ? 'rtl' : 'ltr'}>
           <Textarea
-            label={t('prompt_label')}
+            label={t('query_label')}
             value={newPrompt}
             onChange={(e) => setNewPrompt(e.target.value)}
             placeholder={isHebrew ? 'למשל: חברת SEO מומלצת בישראל?' : 'e.g., Best SEO agency in Israel?'}
@@ -484,7 +483,7 @@ export default function AIVisibilitySection({
               {t('cancel')}
             </Button>
             <Button type="submit" loading={creating} disabled={!newPrompt.trim()}>
-              {t('create_prompt')}
+              {t('create_query')}
             </Button>
           </div>
         </form>
@@ -514,7 +513,7 @@ function BigKpiPanel({
   kpis,
   t,
 }: {
-  kpis: { score: number; mentioned: boolean; targetCited: boolean; citationCount: number; credits: string }
+  kpis: { score: number; mentioned: boolean; targetCited: boolean; citationCount: number }
   t: T
 }) {
   const scoreLabel =
@@ -552,12 +551,6 @@ function BigKpiPanel({
         value={String(kpis.citationCount)}
         sub={t('sources_cited')}
         tone={kpis.citationCount > 0 ? 'amber' : 'flat'}
-      />
-      <KpiTile
-        label={t('credits_used')}
-        value={kpis.credits}
-        sub={t('this_scan')}
-        tone="flat"
       />
     </div>
   )
@@ -682,11 +675,11 @@ function EmptyPromptState({ onSuggest, onNew, t }: { onSuggest: () => void; onNe
       <div className="mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center mb-3 shadow-sm">
         <SparkleIcon size={22} className="text-indigo-600" />
       </div>
-      <h3 className="text-base font-semibold text-slate-900 mb-1">{t('no_prompts')}</h3>
-      <p className="text-sm text-slate-500 mb-5 max-w-sm mx-auto">{t('no_prompts_help')}</p>
+      <h3 className="text-base font-semibold text-slate-900 mb-1">{t('no_queries')}</h3>
+      <p className="text-sm text-slate-500 mb-5 max-w-sm mx-auto">{t('no_queries_help')}</p>
       <div className="flex gap-2 justify-center">
-        <Button variant="outline" onClick={onSuggest}>{t('suggest')}</Button>
-        <Button onClick={onNew}>{t('new_prompt')}</Button>
+        <Button variant="outline" onClick={onSuggest}>{t('recommend_questions')}</Button>
+        <Button onClick={onNew}>{t('new_query')}</Button>
       </div>
     </div>
   )
@@ -810,7 +803,7 @@ function PromptCard({
                 ) : isRunning ? (
                   <span className="text-blue-600 font-medium">{t('scanning')}</span>
                 ) : (
-                  <span className="text-slate-400">{t('run')}</span>
+                  <span className="text-slate-400">{t('scan_btn')}</span>
                 )}
               </div>
             </button>
