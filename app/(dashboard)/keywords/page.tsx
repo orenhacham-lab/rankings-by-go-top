@@ -112,11 +112,20 @@ export default function KeywordsPage() {
     })
   }
 
+  const selectedProject = projects.find((p) => p.id === selectedProjectId)
+
   return (
     <div>
       <Header
         title="מילות מפתח"
         subtitle={selectedProjectId ? `סה"כ ${targets.length} מילות מפתח` : 'בחר פרויקט לצפייה במילות המפתח'}
+        actions={
+          selectedProjectId ? (
+            <Link href={`/projects/${selectedProjectId}?section=rankings`}>
+              <Button size="sm">פתח פרויקט ←</Button>
+            </Link>
+          ) : null
+        }
       />
 
       <div className="flex gap-3 mb-4">
@@ -198,7 +207,10 @@ export default function KeywordsPage() {
                   </Td>
                   <Td>
                     {target.projects ? (
-                      <Link href={`/projects/${target.projects.id}`} className="text-blue-600 hover:underline text-sm">
+                      <Link
+                        href={`/projects/${target.projects.id}?section=rankings`}
+                        className="text-blue-600 hover:underline text-sm"
+                      >
                         {target.projects.name}
                       </Link>
                     ) : '—'}
@@ -235,9 +247,16 @@ export default function KeywordsPage() {
                     <ActiveBadge active={target.is_active} />
                   </Td>
                   <Td>
-                    <Link href={`/keywords/${target.id}/history`}>
-                      <Button size="sm" variant="ghost">היסטוריה</Button>
-                    </Link>
+                    <div className="flex gap-1">
+                      <Link href={`/keywords/${target.id}/history`}>
+                        <Button size="sm" variant="ghost">היסטוריה</Button>
+                      </Link>
+                      {target.projects && (
+                        <Link href={`/projects/${target.projects.id}?section=rankings`}>
+                          <Button size="sm" variant="outline">פתח</Button>
+                        </Link>
+                      )}
+                    </div>
                   </Td>
                 </TableRow>
               )

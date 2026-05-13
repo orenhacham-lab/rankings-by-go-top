@@ -6,92 +6,79 @@ import { Project, Client } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
 import Link from 'next/link'
 
-interface AIVisibilityMetrics {
+type Summary = {
+  projectId: string
+  totalQueries: number
   totalScans: number
   totalMentions: number
   totalCitations: number
-  totalQueries: number
+  visibilityScore: number
   lastScanAt: string | null
 }
 
+type ProjectRow = Project & { clients?: Client | null }
+
 export default function AIVisibilityPage() {
-  const [projects, setProjects] = useState<(Project & { clients?: Client; metricsLoading?: boolean; metrics?: AIVisibilityMetrics })[]>([])
+  const [projects, setProjects] = useState<ProjectRow[]>([])
+  const [summaries, setSummaries] = useState<Map<string, Summary>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function loadProjects() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setLoading(false)
-        return
-      }
-
-      const { data: projectsData } = await supabase
-        .from('projects')
-        .select('*, clients(*)')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('name')
-
-      const withMetrics = (projectsData || []).map((p) => ({ ...p, metricsLoading: true }))
-      setProjects(withMetrics)
-
-      // Load metrics for each project in parallel
-      for (const project of withMetrics) {
-        loadMetrics(project.id, supabase)
-      }
-
-      setLoading(false)
-    }
-
-    async function loadMetrics(projectId: string, supabase: any) {
+    async function load() {
       try {
-        const [runs, prompts] = await Promise.all([
-          supabase.from('ai_runs').select('*').eq('project_id', projectId),
-          supabase.from('ai_prompts').select('id').eq('project_id', projectId),
-        ])
-
-        const successfulScans = (runs.data || []).filter((r: any) => r.status === 'success').length
-        let totalMentions = 0
-        let totalCitations = 0
-
-        for (const run of runs.data || []) {
-          if (run.mentioned) totalMentions++
-          totalCitations += run.citationCount || 0
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setLoading(false)
+          return
         }
 
-        const lastScan = (runs.data || [])
-          .filter((r: any) => r.status === 'success')
-          .sort((a: any, b: any) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime())
-          [0]
+        const projectsPromise = supabase
+          .from('projects')
+          .select('*, clients(*)')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .order('name')
 
-        setProjects((prev) =>
-          prev.map((p) =>
-            p.id === projectId
-              ? {
-                  ...p,
-                  metricsLoading: false,
-                  metrics: {
-                    totalScans: successfulScans,
-                    totalMentions,
-                    totalCitations,
-                    totalQueries: (prompts.data || []).length,
-                    lastScanAt: lastScan ? lastScan.completedAt || lastScan.createdAt : null,
-                  },
-                }
-              : p
-          )
-        )
+        const summaryPromise = fetch('/api/ai-visibility/summary')
+
+        const [projectsRes, summaryRes] = await Promise.all([projectsPromise, summaryPromise])
+        const projectsData = (projectsRes.data ?? []) as ProjectRow[]
+        setProjects(projectsData)
+
+        if (summaryRes.ok) {
+          const json = await summaryRes.json()
+          const map = new Map<string, Summary>()
+          for (const s of json.summaries ?? []) {
+            map.set(s.projectId, s)
+          }
+          setSummaries(map)
+        }
       } catch (e) {
-        console.error('Failed to load metrics for project', projectId, e)
+        setError(e instanceof Error ? e.message : 'Failed to load')
+      } finally {
+        setLoading(false)
       }
     }
-
-    loadProjects()
+    load()
   }, [])
+
+  const formatDate = (iso: string | null): string => {
+    if (!iso) return '—'
+    try {
+      return new Date(iso).toLocaleDateString('he-IL', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    } catch {
+      return '—'
+    }
+  }
 
   if (loading) {
     return (
@@ -102,77 +89,88 @@ export default function AIVisibilityPage() {
     )
   }
 
-  if (projects.length === 0) {
-    return (
-      <div>
-        <Header title="נראות ב-AI" subtitle="עקוב אחר הופעות האתר שלך בתוצאות AI" />
+  return (
+    <div>
+      <Header title="נראות ב-AI" subtitle="ההופעות של האתר שלך בתוצאות AI לפי פרויקט" />
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {projects.length === 0 ? (
         <div className="text-center py-20 text-slate-500">
           <p className="mb-4">אין פרויקטים זמינים</p>
           <Link href="/projects/new">
             <Button>+ הוסף פרויקט</Button>
           </Link>
         </div>
-      </div>
-    )
-  }
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {projects.map((project) => {
+            const summary = summaries.get(project.id)
+            const score = summary?.visibilityScore ?? 0
+            const scoreTone: 'success' | 'warning' | 'danger' | 'neutral' =
+              !summary || summary.totalScans === 0
+                ? 'neutral'
+                : score >= 60
+                ? 'success'
+                : score >= 30
+                ? 'warning'
+                : 'danger'
 
-  return (
-    <div>
-      <Header title="נראות ב-AI" subtitle="עקוב אחר הופעות האתר שלך בתוצאות AI" />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map((project) => (
-          <Card key={project.id} className="p-4 hover:shadow-md transition">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-slate-900 truncate">{project.name}</h3>
-                <p className="text-xs text-slate-500 truncate">{project.target_domain}</p>
-              </div>
-            </div>
-
-            <div className="space-y-2 mb-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-600">סריקות:</span>
-                <span className="font-medium text-slate-900">
-                  {project.metricsLoading ? '...' : project.metrics?.totalScans || 0}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">הזכרות:</span>
-                <span className="font-medium text-slate-900">
-                  {project.metricsLoading ? '...' : project.metrics?.totalMentions || 0}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">ציטוטים:</span>
-                <span className="font-medium text-slate-900">
-                  {project.metricsLoading ? '...' : project.metrics?.totalCitations || 0}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">שאילתות:</span>
-                <span className="font-medium text-slate-900">
-                  {project.metricsLoading ? '...' : project.metrics?.totalQueries || 0}
-                </span>
-              </div>
-              {project.metrics?.lastScanAt && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">סריקה אחרונה:</span>
-                  <span className="text-slate-700">
-                    {new Date(project.metrics.lastScanAt).toLocaleDateString('he-IL')}
-                  </span>
+            return (
+              <Card key={project.id} className="p-4 hover:shadow-md transition flex flex-col">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 truncate">{project.name}</h3>
+                    <p className="text-xs text-slate-500 truncate font-mono">{project.target_domain}</p>
+                    {project.clients?.name && (
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{project.clients.name}</p>
+                    )}
+                  </div>
+                  <Badge variant={scoreTone}>
+                    {summary && summary.totalScans > 0 ? `${score}%` : 'אין נתונים'}
+                  </Badge>
                 </div>
-              )}
-            </div>
 
-            <Link href={`/projects/${project.id}#ai-visibility`} className="block">
-              <Button variant="secondary" size="sm" className="w-full">
-                פתח
-              </Button>
-            </Link>
-          </Card>
-        ))}
-      </div>
+                <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+                  <div className="bg-slate-50 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 mb-0.5">שאילתות</div>
+                    <div className="text-lg font-semibold text-slate-900">{summary?.totalQueries ?? 0}</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 mb-0.5">סריקות</div>
+                    <div className="text-lg font-semibold text-slate-900">{summary?.totalScans ?? 0}</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 mb-0.5">הזכרות</div>
+                    <div className="text-lg font-semibold text-slate-900">{summary?.totalMentions ?? 0}</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 mb-0.5">ציטוטים</div>
+                    <div className="text-lg font-semibold text-slate-900">{summary?.totalCitations ?? 0}</div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500 mb-3">
+                  סריקה אחרונה: {formatDate(summary?.lastScanAt ?? null)}
+                </div>
+
+                <Link
+                  href={`/projects/${project.id}?section=ai-visibility`}
+                  className="mt-auto block"
+                >
+                  <Button variant="secondary" size="sm" className="w-full">
+                    פתח נראות ב-AI ←
+                  </Button>
+                </Link>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

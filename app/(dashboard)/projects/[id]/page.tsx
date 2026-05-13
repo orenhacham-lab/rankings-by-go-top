@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, use } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
@@ -18,6 +19,7 @@ import Badge from '@/components/ui/Badge'
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const searchParams = useSearchParams()
   const [project, setProject] = useState<Project & { clients?: Client } | null>(null)
   const [targets, setTargets] = useState<TrackingTarget[]>([])
   const [latestResults, setLatestResults] = useState<Record<string, ScanResult>>({})
@@ -71,6 +73,24 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Deep-link support: ?section=ai-visibility | rankings scrolls to that area.
+  useEffect(() => {
+    if (loading) return
+    const section = searchParams.get('section')
+    if (!section) return
+    const sectionMap: Record<string, string> = {
+      'ai-visibility': 'ai-visibility',
+      rankings: 'rankings',
+      reports: 'rankings',
+    }
+    const elementId = sectionMap[section]
+    if (!elementId) return
+    requestAnimationFrame(() => {
+      const el = document.getElementById(elementId)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [loading, searchParams])
 
   function showScanResult(message: string, isError: boolean) {
     setScanMessage(message)
@@ -247,17 +267,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
       {/* AI Visibility module — placed prominently above the keyword table */}
       {/* Gated by client-side NEXT_PUBLIC_ENABLE_AI_VISIBILITY flag (build-time). */}
-      {/* If not visible, set NEXT_PUBLIC_ENABLE_AI_VISIBILITY=true in Vercel and redeploy. */}
       {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
-        <AIVisibilitySection
-          projectId={id}
-          projectCountry={project.country}
-          projectLanguage={project.language}
-          projectDomain={project.target_domain}
-          projectBrandName={project.business_name}
-          projectCity={project.city}
-          projectKeywords={targets.map((t) => t.keyword).filter(Boolean)}
-        />
+        <div id="ai-visibility" className="scroll-mt-6">
+          <AIVisibilitySection
+            projectId={id}
+            projectCountry={project.country}
+            projectLanguage={project.language}
+            projectDomain={project.target_domain}
+            projectBrandName={project.business_name}
+            projectCity={project.city}
+            projectKeywords={targets.map((t) => t.keyword).filter(Boolean)}
+          />
+        </div>
       )}
 
       {/* Tracking Targets */}
