@@ -219,7 +219,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div className="font-mono text-sm font-semibold text-slate-800 truncate">{project.target_domain}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-slate-500 mb-1">מעקב מיקומים</div>
+          <div className="text-xs text-slate-500 mb-1">מילות מפתח</div>
           <div className="text-2xl font-bold text-slate-800">{targets.length}</div>
         </Card>
         <Card className="p-3">
@@ -263,7 +263,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Tracking Targets */}
       <div id="rankings" className="flex items-center justify-between mb-4 scroll-mt-6">
         <h2 className="text-lg font-semibold text-slate-800">
-          מעקב מיקומים ({targets.length})
+          מילות מפתח ({targets.length})
         </h2>
         <div className="flex gap-2">
           <Link href={`/reports?project_id=${id}`}>
