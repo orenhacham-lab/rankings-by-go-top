@@ -1,16 +1,22 @@
 /**
- * Smart AI Query generator — deterministic, niche-aware, intent-driven.
+ * Business-context AI question generator.
  *
- * Generates realistic AI-search questions specific to:
- *   - business category (SEO agency, cleaning company, restaurant, etc.)
- *   - location (city/country)
- *   - tracked keywords (theme extraction)
- *   - business name (brand-specific questions)
+ * Generates realistic AI-search questions based on the project's business
+ * context (category, location, audience, intent) rather than mapping each
+ * tracked keyword 1-to-1 into a question.
  *
- * Quality goal: each question should be the kind a real customer would ask
- * ChatGPT/Perplexity/Gemini when researching what to hire/buy/visit.
+ * Pipeline:
+ *   1. Detect business category from name + domain + keywords
+ *   2. Pull a curated question bank for that category (real customer questions)
+ *   3. Extract THEMES from tracked keywords — audience, online-intent, gift,
+ *      price, location — and use them only to BOOST or include relevant
+ *      curated questions, never as direct source strings
+ *   4. Fill {{business}} / {{city}} / {{country}} placeholders
+ *   5. Filter: readable Hebrew, min quality score, semantic dedup
+ *   6. Sort by quality
  *
- * NOT generic spam. Intent-based, commercially useful, locally relevant.
+ * Each suggestion carries: intent, intentLabel (localized), reason
+ * (why it was suggested), and a quality score.
  */
 
 export type PromptIntent =
@@ -22,10 +28,16 @@ export type PromptIntent =
   | 'informational'
   | 'commercial'
   | 'alternatives'
+  | 'pre_purchase'
+  | 'gift'
 
 export type BusinessCategory =
   | 'agency'
   | 'ecommerce'
+  | 'perfume'
+  | 'sports_store'
+  | 'gifts'
+  | 'appliance_store'
   | 'saas'
   | 'local_service'
   | 'cleaning'
@@ -43,9 +55,11 @@ export type PromptSuggestion = {
   id: string
   prompt: string
   intent: PromptIntent
+  intentLabel: string
   category: BusinessCategory
   language: string
   qualityScore: number
+  reason: string
 }
 
 type TemplateContext = {
@@ -54,6 +68,98 @@ type TemplateContext = {
   city: string | null
   country: string | null
   language: string
+  themes: KeywordThemes
+}
+
+type QueryDef = {
+  intent: PromptIntent
+  text: string
+  score: number
+  /** Boost added when a matching theme is present in tracked keywords. */
+  themeBoost?: Partial<Record<keyof KeywordThemes, number>>
+  /** When true, this query is dropped if no city is configured. */
+  requiresCity?: boolean
+}
+
+type KeywordThemes = {
+  online: boolean
+  gift: boolean
+  audienceMen: boolean
+  audienceWomen: boolean
+  audienceKids: boolean
+  price: boolean
+  niche: boolean
+  comparison: boolean
+  /** Free-form category words extracted as fallback context. */
+  topics: string[]
+}
+
+const HE_INTENT_LABEL: Record<PromptIntent, string> = {
+  recommendation: 'המלצה',
+  comparison: 'השוואה',
+  commercial: 'מחיר',
+  pre_purchase: 'מידע לפני רכישה',
+  transactional: 'בחירה',
+  local: 'מקומי',
+  brand: 'מותג',
+  informational: 'מידע',
+  alternatives: 'אלטרנטיבות',
+  gift: 'מתנה',
+}
+
+const EN_INTENT_LABEL: Record<PromptIntent, string> = {
+  recommendation: 'Recommendation',
+  comparison: 'Comparison',
+  commercial: 'Price',
+  pre_purchase: 'Pre-purchase',
+  transactional: 'Selection',
+  local: 'Local',
+  brand: 'Brand',
+  informational: 'Info',
+  alternatives: 'Alternatives',
+  gift: 'Gift',
+}
+
+const HE_CATEGORY_LABEL: Record<BusinessCategory, string> = {
+  agency: 'סוכנות שיווק/SEO',
+  ecommerce: 'חנות אונליין',
+  perfume: 'חנות בשמים',
+  sports_store: 'חנות ספורט',
+  gifts: 'חנות מתנות',
+  appliance_store: 'חנות מוצרי חשמל',
+  saas: 'מוצר SaaS',
+  local_service: 'שירות מקומי',
+  cleaning: 'חברת ניקיון',
+  florist: 'חנות פרחים',
+  restaurant: 'מסעדה',
+  healthcare: 'שירותי בריאות',
+  legal: 'משרד עורכי דין',
+  real_estate: 'נדל"ן',
+  fitness: 'כושר',
+  beauty: 'יופי וטיפוח',
+  education: 'הכשרה והוראה',
+  generic: 'עסק',
+}
+
+const EN_CATEGORY_LABEL: Record<BusinessCategory, string> = {
+  agency: 'marketing/SEO agency',
+  ecommerce: 'online store',
+  perfume: 'perfume store',
+  sports_store: 'sports store',
+  gifts: 'gift store',
+  appliance_store: 'home appliance store',
+  saas: 'SaaS product',
+  local_service: 'local service',
+  cleaning: 'cleaning company',
+  florist: 'florist',
+  restaurant: 'restaurant',
+  healthcare: 'healthcare provider',
+  legal: 'law firm',
+  real_estate: 'real-estate',
+  fitness: 'fitness',
+  beauty: 'beauty & wellness',
+  education: 'education',
+  generic: 'business',
 }
 
 /**
@@ -67,10 +173,13 @@ export function detectCategory(
 ): BusinessCategory {
   const text = `${business} ${domain} ${keywords.join(' ')}`.toLowerCase()
 
-  if (/(ניקיון|cleaner|cleaning|פוליש|פוליסה|טיטוח|nettoyage)/.test(text)) return 'cleaning'
-  if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל|פרסום ממומן|אנליסט)/.test(text))
+  if (/(perfume|fragrance|cologne|פרפיום|בושם|בשמים|או דה פרפיום|או דה טואלט)/.test(text)) return 'perfume'
+  if (/(ניקיון|cleaner|cleaning|פוליש|נקיון|פוליסה|nettoyage)/.test(text)) return 'cleaning'
+  if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text))
     return 'agency'
-  if (/(shop|store|ecommerce|חנות|קניות|אונליין|retail)/.test(text)) return 'ecommerce'
+  if (/(sportwear|sportswear|sports|ספורט|נעלי ריצה|טייץ|adidas|nike|אדידס|נייקי|פומה|puma)/.test(text)) return 'sports_store'
+  if (/(matnot|מתנ|gift shop|gifts|presents|מתנות)/.test(text)) return 'gifts'
+  if (/(appliance|מקרר|מכונת כביסה|תנור|מוצרי חשמל|חשמל ביתי|electrolux|whirlpool)/.test(text)) return 'appliance_store'
   if (/(saas|app|software|cloud|platform|api|\.io|\.ai)/.test(text)) return 'saas'
   if (/(flower|florist|פרחים|זרים|זר)/.test(text)) return 'florist'
   if (/(restaurant|cafe|food|bistro|מסעדה|קפה|אוכל|פיצה)/.test(text)) return 'restaurant'
@@ -78,317 +187,357 @@ export function detectCategory(
   if (/(law|legal|attorney|lawyer|עורך דין|עורכי דין|משפט)/.test(text)) return 'legal'
   if (/(realty|real.estate|properties|נדל"ן|נדלן|דירות|תיווך)/.test(text)) return 'real_estate'
   if (/(gym|fitness|yoga|crossfit|כושר|יוגה)/.test(text)) return 'fitness'
-  if (/(salon|spa|beauty|hair|nails|מספרה|ספא|יופי)/.test(text)) return 'beauty'
+  if (/(salon|spa|beauty|hair|nails|מספרה|ספא|איפור)/.test(text)) return 'beauty'
   if (/(school|academy|course|education|מכללה|בית ספר|קורס)/.test(text)) return 'education'
   if (/(electrician|plumber|hvac|חשמלאי|אינסטלטור)/.test(text)) return 'local_service'
+  if (/(shop|store|ecommerce|חנות|קניות|אונליין|retail)/.test(text)) return 'ecommerce'
 
   return 'generic'
 }
 
 /**
- * Hebrew query bank — niche-specific, intent-driven, real customer questions.
- * Each [intent, query, qualityScore] tuple. qualityScore 0-100 influences ranking.
+ * Hebrew curated question banks per business category.
+ * Each entry is a realistic AI-search question a customer would actually ask
+ * ChatGPT / Perplexity / Gemini. Keywords are NOT used as direct source strings.
  */
-const QUERIES_HE: Record<BusinessCategory, Array<[PromptIntent, string, number]>> = {
+const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
+  perfume: [
+    { intent: 'recommendation', text: 'איזה בושם מומלץ לאישה?', score: 94, themeBoost: { audienceWomen: 6 } },
+    { intent: 'recommendation', text: 'איזה בושם מומלץ לגבר?', score: 94, themeBoost: { audienceMen: 6 } },
+    { intent: 'pre_purchase', text: 'איפה כדאי לקנות בשמים מקוריים אונליין?', score: 93, themeBoost: { online: 5 } },
+    { intent: 'recommendation', text: 'אילו חנויות בשמים מומלצות בישראל?', score: 92 },
+    { intent: 'pre_purchase', text: 'איך לבחור בושם שמתאים לי?', score: 90 },
+    { intent: 'pre_purchase', text: 'איך יודעים אם בושם מקורי?', score: 89 },
+    { intent: 'informational', text: 'אילו בשמים מחזיקים הרבה זמן?', score: 87 },
+    { intent: 'comparison', text: 'מה ההבדל בין או דה פרפיום לאו דה טואלט?', score: 87 },
+    { intent: 'gift', text: 'איזה בושם מתאים כמתנה?', score: 86, themeBoost: { gift: 8 } },
+    { intent: 'local', text: 'איפה קונים בשמי נישה בישראל?', score: 85, themeBoost: { niche: 6 } },
+    { intent: 'recommendation', text: 'אילו מותגי בושם נחשבים יוקרתיים?', score: 84 },
+    { intent: 'commercial', text: 'איפה לקנות בשמים בהנחה?', score: 83, themeBoost: { price: 5 } },
+    { intent: 'pre_purchase', text: 'איזה בושם מומלץ לעור רגיש?', score: 80 },
+    { intent: 'informational', text: 'איך לבחור בושם לעונת הקיץ?', score: 78 },
+    { intent: 'gift', text: 'איזה בושם מתאים לחתונה כמתנה?', score: 77, themeBoost: { gift: 4 } },
+    { intent: 'local', text: 'חנויות בשמים מומלצות ב{{city}}', score: 82, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70 },
+  ],
+
+  sports_store: [
+    { intent: 'recommendation', text: 'אילו חנויות ספורט מומלצות בישראל?', score: 93 },
+    { intent: 'pre_purchase', text: 'איך לבחור נעלי ריצה מתאימות?', score: 90 },
+    { intent: 'recommendation', text: 'אילו מותגי ספורט מומלצים לאימון יומיומי?', score: 89 },
+    { intent: 'recommendation', text: 'איפה כדאי לקנות נעלי ספורט בישראל?', score: 88 },
+    { intent: 'pre_purchase', text: 'איפה לקנות ציוד ספורט אונליין?', score: 86, themeBoost: { online: 5 } },
+    { intent: 'comparison', text: 'מה ההבדל בין נעלי ריצה לנעלי הליכה?', score: 85 },
+    { intent: 'commercial', text: 'איזו חנות ספורט הכי משתלמת בישראל?', score: 84, themeBoost: { price: 4 } },
+    { intent: 'recommendation', text: 'בגדי ספורט מומלצים לכושר', score: 82 },
+    { intent: 'pre_purchase', text: 'איפה למצוא נעלי ספורט במידות גדולות?', score: 80 },
+    { intent: 'recommendation', text: 'אילו חנויות ספורט עושות משלוחים מהירים?', score: 78, themeBoost: { online: 3 } },
+    { intent: 'gift', text: 'מתנה לרץ מתחיל — מה כדאי לקנות?', score: 76, themeBoost: { gift: 6 } },
+    { intent: 'local', text: 'חנות ספורט מומלצת ב{{city}}', score: 82, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70 },
+  ],
+
+  gifts: [
+    { intent: 'gift', text: 'איזו מתנה מומלצת לחתן וכלה?', score: 92 },
+    { intent: 'gift', text: 'איזו מתנה לקנות לחבר טוב?', score: 90 },
+    { intent: 'gift', text: 'מתנה לבר/בת מצווה — רעיונות מקוריים', score: 89 },
+    { intent: 'recommendation', text: 'איפה כדאי לקנות מתנות מקוריות בישראל?', score: 88 },
+    { intent: 'pre_purchase', text: 'איך לבחור מתנה ליום הולדת?', score: 87 },
+    { intent: 'gift', text: 'מתנות מקוריות לעובדים', score: 85 },
+    { intent: 'gift', text: 'איזו מתנה מתאימה לבני 30?', score: 84 },
+    { intent: 'recommendation', text: 'אילו חנויות מתנות מומלצות לאונליין?', score: 83, themeBoost: { online: 4 } },
+    { intent: 'gift', text: 'מתנות לאמא ליום הולדת', score: 80, themeBoost: { audienceWomen: 3 } },
+    { intent: 'gift', text: 'מתנות לאבא ליום הולדת', score: 80, themeBoost: { audienceMen: 3 } },
+    { intent: 'commercial', text: 'איפה לקנות מתנות במחירים זולים?', score: 78, themeBoost: { price: 4 } },
+    { intent: 'local', text: 'חנות מתנות מומלצת ב{{city}}', score: 80, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70 },
+  ],
+
+  appliance_store: [
+    { intent: 'recommendation', text: 'אילו חנויות מוצרי חשמל מומלצות בישראל?', score: 92 },
+    { intent: 'pre_purchase', text: 'איך לבחור מכונת כביסה?', score: 88 },
+    { intent: 'pre_purchase', text: 'איך לבחור מקרר למשפחה?', score: 87 },
+    { intent: 'commercial', text: 'איפה הכי משתלם לקנות מוצרי חשמל?', score: 86, themeBoost: { price: 5 } },
+    { intent: 'recommendation', text: 'איפה לקנות מקרר אונליין?', score: 85, themeBoost: { online: 5 } },
+    { intent: 'pre_purchase', text: 'איזה תנור מומלץ למטבח קטן?', score: 82 },
+    { intent: 'comparison', text: 'מה ההבדל בין מקרר רגיל למקרר נו-פרוסט?', score: 80 },
+    { intent: 'commercial', text: 'באיזו תקופה משתלם לקנות מוצרי חשמל?', score: 78, themeBoost: { price: 3 } },
+    { intent: 'local', text: 'חנות מוצרי חשמל מומלצת ב{{city}}', score: 80, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70 },
+  ],
+
   agency: [
-    ['recommendation', 'מי חברת SEO מומלצת לעסקים קטנים?', 95],
-    ['recommendation', 'איזו סוכנות SEO הכי טובה בישראל?', 95],
-    ['recommendation', 'מי מומלץ לקידום אורגני בישראל?', 93],
-    ['recommendation', 'מי החברות המובילות בקידום אתרים בישראל?', 92],
-    ['recommendation', 'מומחי Google Ads מומלצים בישראל', 90],
-    ['recommendation', 'מי מומלץ לניהול קמפיינים ממומנים?', 90],
-    ['transactional', 'איך לבחור משרד פרסום דיגיטלי?', 88],
-    ['transactional', 'איך לבחור חברת קידום אתרים?', 88],
-    ['transactional', 'מה צריך לבדוק לפני שכירת חברת SEO?', 87],
-    ['comparison', 'מה עדיף - קידום אורגני או ממומן?', 85],
-    ['comparison', 'השוואה בין חברות שיווק דיגיטלי בישראל', 85],
-    ['comparison', 'מה ההבדל בין חברת SEO לחברת ממומן?', 84],
-    ['commercial', 'כמה עולה קידום אתרים בישראל?', 90],
-    ['commercial', 'כמה עולה ניהול Google Ads?', 88],
-    ['commercial', 'מחיר חודשי לחברת SEO', 85],
-    ['local', 'חברת קידום אתרים מומלצת ב{{city}}', 88],
-    ['local', 'סוכנות שיווק דיגיטלי ב{{city}}', 86],
-    ['brand', 'מה הניסיון של {{business}}?', 75],
-    ['brand', 'חוות דעת על {{business}}', 70],
-    ['informational', 'מה זה SEO וכמה זה לוקח להראות תוצאות?', 80],
-    ['alternatives', 'אלטרנטיבות לחברת {{business}}', 78],
+    { intent: 'recommendation', text: 'אילו סוכנויות SEO מומלצות בישראל?', score: 94 },
+    { intent: 'recommendation', text: 'מי מומלץ לקידום אורגני בישראל?', score: 92 },
+    { intent: 'recommendation', text: 'מי החברות המובילות בקידום אתרים?', score: 90 },
+    { intent: 'pre_purchase', text: 'איך לבחור חברת קידום אתרים?', score: 89 },
+    { intent: 'pre_purchase', text: 'מה צריך לבדוק לפני שכירת חברת SEO?', score: 88 },
+    { intent: 'comparison', text: 'מה עדיף — קידום אורגני או ממומן?', score: 87 },
+    { intent: 'comparison', text: 'השוואה בין חברות שיווק דיגיטלי בישראל', score: 85 },
+    { intent: 'commercial', text: 'כמה עולה קידום אתרים בישראל?', score: 89, themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'כמה עולה ניהול Google Ads?', score: 87, themeBoost: { price: 3 } },
+    { intent: 'recommendation', text: 'מומחי Google Ads מומלצים לעסקים קטנים', score: 84 },
+    { intent: 'informational', text: 'כמה זמן לוקח לראות תוצאות מ-SEO?', score: 82 },
+    { intent: 'local', text: 'חברת קידום אתרים מומלצת ב{{city}}', score: 82, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 72 },
   ],
 
   cleaning: [
-    ['recommendation', 'חברת ניקיון משרדים מומלצת ב{{city}}', 95],
-    ['recommendation', 'מי מומלץ לניקיון משרדים ב{{city}}?', 94],
-    ['recommendation', 'חברת ניקיון מומלצת לעסקים קטנים', 92],
-    ['recommendation', 'מי חברת הניקיון הטובה ביותר ב{{city}}?', 92],
-    ['recommendation', 'חברות ניקיון משרדים עם המלצות טובות', 90],
-    ['recommendation', 'חברת פוליש וניקיון מומלצת ב{{city}}', 88],
-    ['transactional', 'איך לבחור חברת ניקיון אמינה?', 85],
-    ['commercial', 'כמה עולה ניקיון משרדים?', 90],
-    ['commercial', 'מחיר לניקיון משרד חודשי', 86],
-    ['commercial', 'תעריפים לחברת ניקיון מקצועית', 84],
-    ['local', 'שירותי ניקיון לעסקים ב{{city}}', 90],
-    ['local', 'ניקיון משרדים באזור {{city}}', 88],
-    ['comparison', 'מה ההבדל בין חברת ניקיון פרטית למקצועית?', 80],
-    ['brand', 'חוות דעת על חברת {{business}}', 70],
-    ['informational', 'באיזו תדירות צריך לנקות משרד?', 75],
+    { intent: 'recommendation', text: 'מי חברות הניקיון המומלצות לעסקים?', score: 92 },
+    { intent: 'recommendation', text: 'אילו חברות ניקיון מומלצות לבית פרטי?', score: 90 },
+    { intent: 'pre_purchase', text: 'איך לבחור חברת ניקיון אמינה?', score: 88 },
+    { intent: 'commercial', text: 'כמה עולה ניקיון משרדים?', score: 88, themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'מחיר לניקיון בית חודשי', score: 85, themeBoost: { price: 3 } },
+    { intent: 'informational', text: 'באיזו תדירות צריך לנקות משרד?', score: 80 },
+    { intent: 'comparison', text: 'מה ההבדל בין חברת ניקיון פרטית למקצועית?', score: 78 },
+    { intent: 'local', text: 'חברת ניקיון משרדים מומלצת ב{{city}}', score: 90, requiresCity: true },
+    { intent: 'local', text: 'שירותי ניקיון לעסקים ב{{city}}', score: 86, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70 },
   ],
 
   ecommerce: [
-    ['recommendation', 'אילו חנויות אונליין מומלצות בישראל?', 88],
-    ['recommendation', 'איפה הכי משתלם לקנות {{business}}?', 85],
-    ['comparison', 'איפה לקנות הכי זול אונליין בישראל?', 88],
-    ['comparison', 'השוואה בין חנויות אונליין מובילות', 84],
-    ['commercial', 'מה המחירים של {{business}}?', 80],
-    ['commercial', 'כמה עולה משלוח מ-{{business}}?', 78],
-    ['transactional', 'איך להזמין מ-{{business}}?', 75],
-    ['transactional', 'מה זמני האספקה של {{business}}?', 73],
-    ['brand', 'חוות דעת על {{business}}', 70],
-    ['informational', 'איך לבחור חנות אונליין אמינה?', 78],
-    ['informational', 'מה הזכויות שלי אם המוצר פגום?', 70],
-    ['alternatives', 'אלטרנטיבות ל-{{business}}', 75],
+    { intent: 'recommendation', text: 'אילו חנויות אונליין מומלצות בישראל?', score: 88 },
+    { intent: 'commercial', text: 'איפה לקנות הכי זול אונליין בישראל?', score: 86, themeBoost: { price: 4 } },
+    { intent: 'comparison', text: 'השוואה בין חנויות אונליין מובילות בישראל', score: 84 },
+    { intent: 'pre_purchase', text: 'איך לבחור חנות אונליין אמינה?', score: 84 },
+    { intent: 'informational', text: 'מה הזכויות שלי אם המוצר פגום?', score: 80 },
+    { intent: 'pre_purchase', text: 'איך בודקים אמינות של חנות אונליין?', score: 78 },
+    { intent: 'commercial', text: 'אילו חנויות מציעות משלוח חינם בישראל?', score: 76 },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70 },
   ],
 
   saas: [
-    ['recommendation', 'אילו כלי SaaS מומלצים לעסקים בישראל?', 90],
-    ['recommendation', 'כלי AI מומלצים לעסקים', 88],
-    ['recommendation', 'איזה CRM מומלץ לסטארטאפים?', 85],
-    ['comparison', 'מה ההבדל בין {{business}} למתחרים?', 85],
-    ['comparison', 'השוואה בין כלי SaaS פופולריים', 80],
-    ['alternatives', 'אלטרנטיבות ל-{{business}}', 88],
-    ['alternatives', 'מה דומה ל-{{business}} אבל זול יותר?', 86],
-    ['commercial', 'כמה עולה {{business}}?', 80],
-    ['commercial', 'מה המודל התמחורי של {{business}}?', 78],
-    ['transactional', 'איך להתחיל עם {{business}}?', 75],
-    ['brand', 'חוות דעת על {{business}}', 70],
-    ['informational', 'מה זה {{business}} ולמה צריך אותו?', 75],
+    { intent: 'recommendation', text: 'אילו כלי SaaS מומלצים לעסקים בישראל?', score: 90 },
+    { intent: 'recommendation', text: 'אילו כלי AI מומלצים לעסקים?', score: 88 },
+    { intent: 'comparison', text: 'מה ההבדל בין {{business}} למתחרים?', score: 85 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 88 },
+    { intent: 'alternatives', text: 'מה דומה ל-{{business}} אבל זול יותר?', score: 84, themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 80, themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'איך מתחילים להשתמש ב-{{business}}?', score: 75 },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   florist: [
-    ['recommendation', 'חנות פרחים מומלצת ב{{city}}', 92],
-    ['recommendation', 'איפה הכי טוב לקנות פרחים ב{{city}}?', 90],
-    ['local', 'משלוח פרחים מהיר ב{{city}}', 88],
-    ['local', 'חנות פרחים פתוחה עכשיו ב{{city}}', 86],
-    ['commercial', 'מחירים לזרי פרחים ב{{city}}', 85],
-    ['transactional', 'איך להזמין משלוח פרחים מהר?', 80],
-    ['transactional', 'הזמנת זר פרחים אונליין', 78],
-    ['brand', 'חוות דעת על {{business}}', 70],
-    ['informational', 'איך לבחור פרחים לאירוע?', 70],
+    { intent: 'recommendation', text: 'אילו חנויות פרחים מומלצות בישראל?', score: 90 },
+    { intent: 'pre_purchase', text: 'איך לבחור זר פרחים לאירוע?', score: 84 },
+    { intent: 'commercial', text: 'מחירים לזרי פרחים לאירועים', score: 82, themeBoost: { price: 3 } },
+    { intent: 'local', text: 'משלוח פרחים מהיר ב{{city}}', score: 88, requiresCity: true },
+    { intent: 'local', text: 'חנות פרחים פתוחה עכשיו ב{{city}}', score: 84, requiresCity: true },
+    { intent: 'gift', text: 'אילו פרחים מתאימים כמתנה לאישה?', score: 80, themeBoost: { gift: 4 } },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   restaurant: [
-    ['recommendation', 'המסעדות הכי טובות ב{{city}}', 95],
-    ['recommendation', 'מסעדות חדשות ומומלצות ב{{city}}', 92],
-    ['recommendation', 'איפה הכי כדאי לאכול ב{{city}}?', 90],
-    ['local', 'מסעדה רומנטית ב{{city}}', 88],
-    ['local', 'מסעדה כשרה מומלצת ב{{city}}', 85],
-    ['local', 'מסעדה פתוחה לארוחת ערב ב{{city}}', 80],
-    ['comparison', 'אילו מסעדות הכי מומלצות ל{{city}}?', 84],
-    ['commercial', 'מסעדה במחיר סביר ב{{city}}', 82],
-    ['brand', 'חוות דעת על {{business}}', 70],
-    ['informational', 'איפה לחגוג יום הולדת ב{{city}}?', 80],
+    { intent: 'recommendation', text: 'מהן המסעדות הכי מומלצות ב{{city}}?', score: 92, requiresCity: true },
+    { intent: 'recommendation', text: 'מסעדות חדשות ומומלצות ב{{city}}', score: 88, requiresCity: true },
+    { intent: 'local', text: 'מסעדה רומנטית ב{{city}}', score: 86, requiresCity: true },
+    { intent: 'local', text: 'מסעדה כשרה מומלצת ב{{city}}', score: 82, requiresCity: true },
+    { intent: 'commercial', text: 'מסעדה במחיר סביר ב{{city}}', score: 80, requiresCity: true, themeBoost: { price: 3 } },
+    { intent: 'informational', text: 'איפה לחגוג יום הולדת ב{{city}}?', score: 80, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   healthcare: [
-    ['recommendation', 'מרפאות פרטיות מומלצות ב{{city}}', 92],
-    ['recommendation', 'מי הרופאים המומלצים ב{{city}}?', 90],
-    ['recommendation', 'מרפאת שיניים מומלצת ב{{city}}', 88],
-    ['local', 'רופא מומחה ב{{city}}', 85],
-    ['local', 'מרפאה פתוחה הערב ב{{city}}', 80],
-    ['transactional', 'איך לבחור רופא פרטי טוב?', 78],
-    ['commercial', 'מחירי טיפולים ב{{business}}', 75],
-    ['brand', 'חוות דעת על {{business}}', 70],
+    { intent: 'recommendation', text: 'מרפאות פרטיות מומלצות בישראל', score: 90 },
+    { intent: 'recommendation', text: 'אילו רופאים מומלצים לטיפול פרטי?', score: 86 },
+    { intent: 'recommendation', text: 'מרפאת שיניים מומלצת ב{{city}}', score: 88, requiresCity: true },
+    { intent: 'local', text: 'רופא מומחה מומלץ ב{{city}}', score: 84, requiresCity: true },
+    { intent: 'pre_purchase', text: 'איך לבחור רופא פרטי טוב?', score: 80 },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   legal: [
-    ['recommendation', 'משרדי עורכי דין מובילים בישראל', 92],
-    ['recommendation', 'עורכי דין מומלצים לדיני משפחה', 90],
-    ['recommendation', 'עורך דין פלילי מומלץ ב{{city}}', 88],
-    ['recommendation', 'עורך דין מסחרי מומלץ בישראל', 86],
-    ['local', 'עורך דין ב{{city}}', 84],
-    ['transactional', 'איך לבחור עורך דין מקצועי?', 85],
-    ['commercial', 'כמה עולה ייעוץ משפטי?', 88],
-    ['brand', 'חוות דעת על {{business}}', 72],
-    ['informational', 'מתי כדאי לפנות לעורך דין?', 75],
+    { intent: 'recommendation', text: 'משרדי עורכי דין מובילים בישראל', score: 92 },
+    { intent: 'recommendation', text: 'אילו עורכי דין מומלצים לדיני משפחה?', score: 88 },
+    { intent: 'recommendation', text: 'עורך דין פלילי מומלץ בישראל', score: 86 },
+    { intent: 'pre_purchase', text: 'איך לבחור עורך דין מקצועי?', score: 84 },
+    { intent: 'commercial', text: 'כמה עולה ייעוץ משפטי?', score: 86, themeBoost: { price: 3 } },
+    { intent: 'informational', text: 'מתי כדאי לפנות לעורך דין?', score: 78 },
+    { intent: 'local', text: 'עורך דין מומלץ ב{{city}}', score: 82, requiresCity: true },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   real_estate: [
-    ['recommendation', 'חברות נדל"ן מומלצות בישראל', 90],
-    ['recommendation', 'מתווכים מומלצים ב{{city}}', 88],
-    ['local', 'משרד תיווך אמין ב{{city}}', 85],
-    ['local', 'דירות למכירה ב{{city}}', 82],
-    ['commercial', 'כמה גובה מתווך נדל"ן?', 85],
-    ['transactional', 'איך לבחור מתווך נדל"ן אמין?', 82],
-    ['brand', 'חוות דעת על {{business}}', 70],
-    ['informational', 'מה צריך לבדוק לפני קניית דירה?', 78],
+    { intent: 'recommendation', text: 'אילו חברות נדל"ן מומלצות בישראל?', score: 90 },
+    { intent: 'recommendation', text: 'מתווכים מומלצים ב{{city}}', score: 86, requiresCity: true },
+    { intent: 'pre_purchase', text: 'איך לבחור מתווך נדל"ן אמין?', score: 84 },
+    { intent: 'commercial', text: 'כמה גובה מתווך נדל"ן?', score: 84, themeBoost: { price: 3 } },
+    { intent: 'informational', text: 'מה צריך לבדוק לפני קניית דירה?', score: 80 },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   fitness: [
-    ['recommendation', 'חדרי כושר מומלצים ב{{city}}', 90],
-    ['recommendation', 'מאמן כושר אישי מומלץ ב{{city}}', 88],
-    ['local', 'סטודיו לכושר ב{{city}}', 84],
-    ['local', 'קלאסי יוגה ב{{city}}', 80],
-    ['commercial', 'כמה עולה מנוי לחדר כושר?', 85],
-    ['transactional', 'איך לבחור חדר כושר נכון?', 80],
-    ['brand', 'חוות דעת על {{business}}', 70],
+    { intent: 'recommendation', text: 'אילו חדרי כושר מומלצים ב{{city}}?', score: 88, requiresCity: true },
+    { intent: 'recommendation', text: 'מאמן כושר אישי מומלץ ב{{city}}', score: 84, requiresCity: true },
+    { intent: 'commercial', text: 'כמה עולה מנוי לחדר כושר?', score: 84, themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'איך לבחור חדר כושר נכון?', score: 80 },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   beauty: [
-    ['recommendation', 'מספרות מומלצות ב{{city}}', 92],
-    ['recommendation', 'סלון יופי מומלץ ב{{city}}', 90],
-    ['recommendation', 'איפה לעשות מניקור מקצועי ב{{city}}?', 85],
-    ['local', 'טיפולי פנים ב{{city}}', 82],
-    ['commercial', 'מחירים לטיפולי יופי ב{{city}}', 80],
-    ['brand', 'חוות דעת על {{business}}', 72],
+    { intent: 'recommendation', text: 'מספרות מומלצות ב{{city}}', score: 88, requiresCity: true },
+    { intent: 'recommendation', text: 'סלון יופי מומלץ ב{{city}}', score: 86, requiresCity: true },
+    { intent: 'pre_purchase', text: 'איפה לעשות מניקור מקצועי ב{{city}}?', score: 82, requiresCity: true },
+    { intent: 'commercial', text: 'מחירים לטיפולי יופי ב{{city}}', score: 80, requiresCity: true, themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   education: [
-    ['recommendation', 'קורסי הייטק מומלצים בישראל', 90],
-    ['recommendation', 'בתי ספר ומכללות מומלצים', 88],
-    ['recommendation', 'איזה קורס פיתוח Web מומלץ ב-2026?', 86],
-    ['commercial', 'כמה עולה קורס מקצועי בהייטק?', 85],
-    ['comparison', 'השוואה בין מכללות פרטיות בישראל', 80],
-    ['transactional', 'איך לבחור קורס מקצועי?', 78],
-    ['brand', 'חוות דעת על {{business}}', 70],
+    { intent: 'recommendation', text: 'אילו קורסי הייטק מומלצים בישראל?', score: 88 },
+    { intent: 'recommendation', text: 'בתי ספר ומכללות מומלצים', score: 84 },
+    { intent: 'commercial', text: 'כמה עולה קורס מקצועי בהייטק?', score: 84, themeBoost: { price: 3 } },
+    { intent: 'comparison', text: 'השוואה בין מכללות פרטיות בישראל', score: 80 },
+    { intent: 'pre_purchase', text: 'איך לבחור קורס מקצועי?', score: 78 },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   local_service: [
-    ['recommendation', 'בעלי מקצוע מומלצים ב{{city}}', 90],
-    ['recommendation', 'חשמלאי מומלץ ב{{city}}', 88],
-    ['recommendation', 'אינסטלטור מומלץ ב{{city}}', 88],
-    ['local', 'שירות מקצועי מהיר באזור {{city}}', 85],
-    ['local', 'תיקון דחוף ב{{city}}', 80],
-    ['commercial', 'מחירים לשירות מקצועי ב{{city}}', 82],
-    ['transactional', 'איך לקבל הצעת מחיר מ-{{business}}?', 75],
-    ['brand', 'חוות דעת על {{business}}', 70],
+    { intent: 'recommendation', text: 'אילו בעלי מקצוע מומלצים ב{{city}}?', score: 88, requiresCity: true },
+    { intent: 'recommendation', text: 'חשמלאי מומלץ ב{{city}}', score: 86, requiresCity: true },
+    { intent: 'recommendation', text: 'אינסטלטור מומלץ ב{{city}}', score: 86, requiresCity: true },
+    { intent: 'commercial', text: 'מחירים לשירות מקצועי ב{{city}}', score: 80, requiresCity: true, themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
   ],
 
   generic: [
-    ['recommendation', 'עסקים מומלצים בתחום של {{business}}', 75],
-    ['brand', 'מה אפשר לספר על {{business}}?', 70],
-    ['brand', 'חוות דעת על {{business}}', 68],
-    ['informational', 'מה התחום של {{business}}?', 65],
-    ['alternatives', 'אלטרנטיבות ל-{{business}}', 70],
+    { intent: 'recommendation', text: 'אילו עסקים מומלצים בתחום של {{business}}?', score: 78 },
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70 },
+    { intent: 'informational', text: 'מה התחום של {{business}}?', score: 68 },
   ],
 }
 
 /**
- * English query bank — niche-specific, intent-driven, real customer questions.
+ * English curated banks. Smaller — Hebrew is the main supported language.
  */
-const QUERIES_EN: Record<BusinessCategory, Array<[PromptIntent, string, number]>> = {
+const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
+  perfume: [
+    { intent: 'recommendation', text: 'Best perfume for women', score: 92, themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'Best perfume for men', score: 92, themeBoost: { audienceMen: 5 } },
+    { intent: 'pre_purchase', text: 'Where to buy authentic perfumes online', score: 90, themeBoost: { online: 5 } },
+    { intent: 'recommendation', text: 'Top recommended perfume stores in {{country}}', score: 88 },
+    { intent: 'pre_purchase', text: 'How to choose a perfume that suits you', score: 86 },
+    { intent: 'comparison', text: 'Difference between Eau de Parfum and Eau de Toilette', score: 85 },
+    { intent: 'gift', text: 'Best perfumes as a gift', score: 84, themeBoost: { gift: 5 } },
+    { intent: 'recommendation', text: 'Niche perfume brands worth trying', score: 82, themeBoost: { niche: 4 } },
+    { intent: 'commercial', text: 'Where to buy perfumes with discounts', score: 80, themeBoost: { price: 4 } },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
+  ],
+
+  sports_store: [
+    { intent: 'recommendation', text: 'Best sports stores in {{country}}', score: 90 },
+    { intent: 'pre_purchase', text: 'How to choose running shoes that fit', score: 88 },
+    { intent: 'recommendation', text: 'Best sportswear brands for daily training', score: 86 },
+    { intent: 'comparison', text: 'Running vs walking shoes — what is the difference?', score: 82 },
+    { intent: 'commercial', text: 'Cheapest sports store in {{country}}', score: 82, themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
+  ],
+
+  gifts: [
+    { intent: 'gift', text: 'Best wedding gift ideas', score: 88 },
+    { intent: 'gift', text: 'Original birthday gift ideas', score: 86 },
+    { intent: 'gift', text: 'Corporate gift ideas for employees', score: 84 },
+    { intent: 'recommendation', text: 'Best places to buy original gifts in {{country}}', score: 84 },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
+  ],
+
+  appliance_store: [
+    { intent: 'recommendation', text: 'Best home appliance stores in {{country}}', score: 88 },
+    { intent: 'pre_purchase', text: 'How to choose a washing machine', score: 84 },
+    { intent: 'commercial', text: 'Cheapest place to buy appliances online', score: 82, themeBoost: { online: 3, price: 3 } },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
+  ],
+
   agency: [
-    ['recommendation', 'Best SEO agency in {{country}}', 95],
-    ['recommendation', 'Top digital marketing agencies in {{country}}', 93],
-    ['recommendation', 'Who should manage Google Ads campaigns?', 90],
-    ['recommendation', 'Recommended SEO companies for small businesses', 92],
-    ['recommendation', 'Best PPC agencies in {{country}}', 88],
-    ['transactional', 'How to choose a digital marketing agency', 88],
-    ['transactional', 'How to vet an SEO company', 86],
-    ['comparison', 'SEO agency vs in-house SEO team', 85],
-    ['comparison', 'SEO vs PPC: which is better?', 84],
-    ['commercial', 'How much does SEO cost in {{country}}?', 90],
-    ['commercial', 'Average monthly retainer for SEO services', 85],
-    ['local', 'Top SEO agency in {{city}}', 86],
-    ['brand', 'Reviews of {{business}}', 70],
-    ['alternatives', 'Alternatives to {{business}}', 75],
-    ['informational', 'How long does SEO take to show results?', 78],
+    { intent: 'recommendation', text: 'Best SEO agencies in {{country}}', score: 92 },
+    { intent: 'recommendation', text: 'Top digital marketing agencies in {{country}}', score: 90 },
+    { intent: 'pre_purchase', text: 'How to choose a digital marketing agency', score: 86 },
+    { intent: 'comparison', text: 'SEO vs PPC — which is better?', score: 84 },
+    { intent: 'commercial', text: 'How much does SEO cost in {{country}}?', score: 88, themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   cleaning: [
-    ['recommendation', 'Best office cleaning company in {{city}}', 95],
-    ['recommendation', 'Recommended cleaning services in {{city}}', 92],
-    ['recommendation', 'Top-rated commercial cleaners in {{country}}', 88],
-    ['transactional', 'How to choose a reliable cleaning company', 85],
-    ['commercial', 'Office cleaning cost per month', 90],
-    ['commercial', 'Average rate for commercial cleaning', 85],
-    ['local', 'Office cleaning service near {{city}}', 88],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Best office cleaning companies in {{city}}', score: 92, requiresCity: true },
+    { intent: 'pre_purchase', text: 'How to choose a reliable cleaning company', score: 84 },
+    { intent: 'commercial', text: 'Office cleaning cost per month', score: 84, themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   ecommerce: [
-    ['recommendation', 'Best online stores in {{country}}', 85],
-    ['recommendation', 'Top e-commerce retailers for {{business}}', 80],
-    ['comparison', 'Cheapest place to buy online in {{country}}', 86],
-    ['commercial', 'How much does {{business}} cost?', 78],
-    ['transactional', 'How to order from {{business}}', 75],
-    ['brand', 'Reviews of {{business}}', 70],
-    ['alternatives', 'Alternatives to {{business}}', 75],
+    { intent: 'recommendation', text: 'Best online stores in {{country}}', score: 86 },
+    { intent: 'comparison', text: 'Cheapest place to buy online in {{country}}', score: 84, themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'How to verify if an online store is reliable', score: 82 },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   saas: [
-    ['recommendation', 'Best SaaS tools for businesses in {{country}}', 88],
-    ['recommendation', 'Top AI tools for business in 2026', 85],
-    ['comparison', 'How does {{business}} compare to competitors?', 85],
-    ['alternatives', 'Alternatives to {{business}}', 90],
-    ['alternatives', 'Best alternative to {{business}}', 88],
-    ['commercial', 'How much does {{business}} cost?', 82],
-    ['commercial', 'Pricing comparison for {{business}}', 80],
-    ['brand', 'Is {{business}} worth it?', 75],
+    { intent: 'recommendation', text: 'Best SaaS tools for businesses in {{country}}', score: 88 },
+    { intent: 'comparison', text: 'How does {{business}} compare to competitors?', score: 84 },
+    { intent: 'alternatives', text: 'Alternatives to {{business}}', score: 88 },
+    { intent: 'commercial', text: 'How much does {{business}} cost?', score: 80, themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   florist: [
-    ['recommendation', 'Best florist in {{city}}', 90],
-    ['local', 'Same-day flower delivery in {{city}}', 88],
-    ['commercial', 'Flower bouquet prices in {{city}}', 80],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Best florist in {{city}}', score: 88, requiresCity: true },
+    { intent: 'local', text: 'Same-day flower delivery in {{city}}', score: 84, requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   restaurant: [
-    ['recommendation', 'Best restaurants in {{city}}', 92],
-    ['recommendation', 'New and recommended restaurants in {{city}}', 88],
-    ['local', 'Romantic dinner in {{city}}', 85],
-    ['comparison', 'Top-rated dining in {{city}}', 84],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Best restaurants in {{city}}', score: 90, requiresCity: true },
+    { intent: 'local', text: 'Romantic dinner places in {{city}}', score: 84, requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   healthcare: [
-    ['recommendation', 'Top private clinics in {{city}}', 90],
-    ['recommendation', 'Best specialists in {{city}}', 88],
-    ['local', 'Dental clinic near {{city}}', 85],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Top private clinics in {{city}}', score: 88, requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   legal: [
-    ['recommendation', 'Top law firms in {{country}}', 90],
-    ['recommendation', 'Best family law attorneys in {{country}}', 88],
-    ['local', 'Lawyer in {{city}}', 84],
-    ['commercial', 'Legal consultation fees', 85],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Top law firms in {{country}}', score: 88 },
+    { intent: 'commercial', text: 'Legal consultation fees in {{country}}', score: 82, themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   real_estate: [
-    ['recommendation', 'Best real estate agents in {{city}}', 90],
-    ['local', 'Real estate office in {{city}}', 85],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Best real estate agents in {{city}}', score: 88, requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   fitness: [
-    ['recommendation', 'Best gyms in {{city}}', 90],
-    ['recommendation', 'Top personal trainers in {{city}}', 86],
-    ['commercial', 'Gym membership prices in {{city}}', 85],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Best gyms in {{city}}', score: 88, requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   beauty: [
-    ['recommendation', 'Best salons in {{city}}', 90],
-    ['recommendation', 'Top beauty spa in {{city}}', 88],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Best salons in {{city}}', score: 88, requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   education: [
-    ['recommendation', 'Best tech courses in {{country}}', 88],
-    ['commercial', 'How much does a coding bootcamp cost?', 85],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Best tech courses in {{country}}', score: 86 },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   local_service: [
-    ['recommendation', 'Recommended professionals in {{city}}', 88],
-    ['local', 'Emergency service near {{city}}', 80],
-    ['brand', 'Reviews of {{business}}', 70],
+    { intent: 'recommendation', text: 'Recommended professionals in {{city}}', score: 86, requiresCity: true },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
   ],
 
   generic: [
-    ['recommendation', 'Recommended businesses for {{business}}', 75],
-    ['brand', 'Reviews of {{business}}', 70],
-    ['alternatives', 'Alternatives to {{business}}', 70],
+    { intent: 'recommendation', text: 'Recommended businesses similar to {{business}}', score: 76 },
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 72 },
+    { intent: 'alternatives', text: 'Alternatives to {{business}}', score: 70 },
   ],
 }
 
@@ -421,121 +570,113 @@ function fillTemplate(template: string, ctx: TemplateContext): string {
 }
 
 /**
- * Decide whether a keyword is good enough to be turned into an AI Query.
+ * Extract themes from tracked keywords (used only as signals).
  *
- * Rejects:
- *   - very short fragments (< 3 chars)
- *   - pure product names / SKU-like fragments (mixed digits/letters with no spaces)
- *   - keywords that contain only digits or only one non-Hebrew/Latin word
- *   - awkward product-fragment phrases ("בריח", "טלק" alone, "X לנערות") when no
- *     anchor word exists
- *   - keywords with brand/business term only (length under 4 with no descriptor)
- *   - keywords with quotes, hashes, or other URL-like characters
- *
- * The goal is to keep keywords that read like a *category* or *service* —
- * not isolated product attributes.
+ * Themes are higher-level intent markers that BOOST relevant curated questions.
+ * They are NEVER turned into raw question text — that was the old failure mode.
  */
-function isQualityKeyword(keyword: string): boolean {
-  const k = keyword.trim()
-  if (!k) return false
-  if (k.length < 3) return false
-  if (/[#"'`<>]/.test(k)) return false
-  if (/^\d+$/.test(k)) return false
-  // Reject when keyword is mostly digits (likely SKUs)
-  const digitRatio = (k.match(/\d/g)?.length || 0) / k.length
-  if (digitRatio > 0.5) return false
-  // Reject single-word fragments that look like a property (e.g., "טלק", "בריח")
-  const words = k.split(/\s+/).filter(Boolean)
-  if (words.length === 1 && k.length < 5) return false
-  return true
-}
-
-/**
- * Hebrew preposition helper — picks the natural form before a keyword.
- *
- * For Hebrew, `ל` (to/for) combines with the following word: "ל" + "בשמים" → "לבשמים".
- * We don't need to do morphological inflection — just prepend the prefix.
- *
- * However, when the keyword *itself* already starts with a definite article ("ה")
- * or with "ב" / "ל" / "מ", we keep the keyword as-is and rely on the surrounding
- * template wording instead.
- */
-function hePrefix(keyword: string, prefix: 'ל' | 'ב' | 'מ'): string {
-  const trimmed = keyword.trim()
-  if (!trimmed) return trimmed
-  // If keyword already begins with that prefix, don't double-prepend
-  const first = trimmed.charAt(0)
-  if (first === prefix) return trimmed
-  return `${prefix}${trimmed}`
-}
-
-/**
- * Generate keyword-derived queries from tracked SEO keywords.
- * Uses templates that read more naturally than "מי מומלץ ל{keyword}?".
- */
-function keywordDerivedQueries(
-  keywords: string[],
-  ctx: TemplateContext,
-  _category: BusinessCategory
-): Array<[PromptIntent, string, number]> {
-  if (!keywords || keywords.length === 0) return []
-  const isHe = ctx.language === 'he'
-  const results: Array<[PromptIntent, string, number]> = []
-  const filtered = keywords.filter(isQualityKeyword).slice(0, 5)
-
-  for (const raw of filtered) {
-    const k = raw.trim()
-    if (!k) continue
-
-    if (isHe) {
-      // Recommendation: "איפה מומלץ לקנות {k}?" — purchase-intent
-      results.push(['recommendation', `איפה מומלץ לקנות ${k}?`, 86])
-      // Recommendation: "איזה {k} מומלץ?" — selection-intent
-      results.push(['recommendation', `איזה ${k} מומלץ?`, 84])
-      // Commercial: more natural "כמה עולה X" — strip awkward "ל" prefix
-      results.push(['commercial', `כמה עולה ${k}?`, 80])
-      // Local — only if city is known
-      if (ctx.city) {
-        results.push(['local', `איפה לקנות ${k} ב${ctx.city}?`, 82])
-      }
-    } else {
-      results.push(['recommendation', `Where to buy ${k}?`, 84])
-      results.push(['recommendation', `Best ${k} options`, 82])
-      results.push(['commercial', `How much does ${k} cost?`, 78])
-      if (ctx.city) {
-        results.push(['local', `${k} in ${ctx.city}`, 80])
-      }
-    }
+function extractThemes(keywords: string[]): KeywordThemes {
+  const lowered = keywords.map((k) => k.toLowerCase()).join(' ')
+  return {
+    online: /(אונליין|online|הזמנה|משלוח|ברשת)/.test(lowered),
+    gift: /(מתנ|מתנה|gift|present)/.test(lowered),
+    audienceMen: /(לגבר|לגברים|גברים|for men|מנס|men's)/.test(lowered),
+    audienceWomen: /(לאישה|לנשים|לאשה|נשים|לנערות|for women|נשי)/.test(lowered),
+    audienceKids: /(לילד|לילדים|לתינוק|kids|baby|children)/.test(lowered),
+    price: /(זול|הנחה|מבצע|כמה עולה|מחיר|cheap|discount|sale|price)/.test(lowered),
+    niche: /(נישה|מותג יוקרה|יוקרת|niche|luxury|premium)/.test(lowered),
+    comparison: /(השוואה|מה ההבדל|compare|vs|versus)/.test(lowered),
+    topics: keywords.slice(0, 5).map((k) => k.trim()).filter(Boolean),
   }
-  return results
 }
 
 /**
  * Lightweight Hebrew quality check.
- *
- * Detects obvious grammar fails like:
- *   - "מי מומלץ ל{noun-phrase}?" where the noun-phrase starts with a Hebrew
- *     plural marker that doesn't combine well with "ל".
- *   - Two consecutive identical Hebrew prefixes ("לל", "בב").
- *   - Trailing connectives without a noun.
  */
 function isReadableHebrew(text: string): boolean {
   if (!text) return false
-  // No double prefixes
   if (/(לל|בב|מה ל|של של)/.test(text)) return false
-  // No empty templates
   if (/\{\{[^}]+\}\}/.test(text)) return false
-  // Minimum length 6 characters for a real question
   if (text.length < 6) return false
   return true
 }
 
 /**
- * Generate smart AI query suggestions.
+ * Canonical form for semantic deduplication.
+ * Lowercases, strips punctuation, collapses whitespace.
+ */
+function canonical(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[?!.,'"״׳`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Token-set similarity for near-duplicate detection.
+ *
+ * Two questions are considered duplicates if their token sets differ by at
+ * most 1 short word. This catches cases like:
+ *   "איזה בושם מומלץ לאישה?" vs "איזה בושם מומלץ לאשה?"
+ *   "בושם לנערות מומלץ" vs "בושם לבנות מומלץ"
+ */
+function isNearDuplicate(a: string, b: string): boolean {
+  const tokensA = canonical(a).split(' ').filter(Boolean)
+  const tokensB = canonical(b).split(' ').filter(Boolean)
+  const setA = new Set(tokensA)
+  const setB = new Set(tokensB)
+  let intersection = 0
+  for (const t of setA) if (setB.has(t)) intersection++
+  const minLen = Math.min(tokensA.length, tokensB.length)
+  const maxLen = Math.max(tokensA.length, tokensB.length)
+  if (minLen === 0) return false
+  // If 80% or more tokens overlap and total length is comparable, treat as dup
+  return intersection / minLen >= 0.8 && Math.abs(maxLen - minLen) <= 1
+}
+
+/**
+ * Build a reason string explaining why a suggestion was included.
+ */
+function buildReason(
+  def: QueryDef,
+  category: BusinessCategory,
+  ctx: TemplateContext,
+  themeMatched: Array<keyof KeywordThemes>
+): string {
+  const isHe = ctx.language === 'he'
+  const catLabel = (isHe ? HE_CATEGORY_LABEL : EN_CATEGORY_LABEL)[category]
+  const intentLabel = (isHe ? HE_INTENT_LABEL : EN_INTENT_LABEL)[def.intent]
+
+  const parts: string[] = []
+  if (isHe) {
+    parts.push(`מבוסס על קטגוריית העסק: ${catLabel}`)
+    parts.push(`כוונת חיפוש: ${intentLabel}`)
+    if (def.requiresCity && ctx.city) parts.push(`מיקום: ${ctx.city}`)
+    if (themeMatched.includes('gift')) parts.push('זוהתה כוונת מתנה במילות המפתח')
+    if (themeMatched.includes('online')) parts.push('זוהתה כוונת קנייה אונליין במילות המפתח')
+    if (themeMatched.includes('price')) parts.push('זוהתה רגישות למחיר במילות המפתח')
+    if (themeMatched.includes('audienceMen')) parts.push('זוהה קהל יעד: גברים')
+    if (themeMatched.includes('audienceWomen')) parts.push('זוהה קהל יעד: נשים')
+    if (themeMatched.includes('audienceKids')) parts.push('זוהה קהל יעד: ילדים')
+    if (themeMatched.includes('niche')) parts.push('זוהתה התעניינות במותגי יוקרה/נישה')
+  } else {
+    parts.push(`Based on business category: ${catLabel}`)
+    parts.push(`Search intent: ${intentLabel}`)
+    if (def.requiresCity && ctx.city) parts.push(`Location: ${ctx.city}`)
+    if (themeMatched.includes('gift')) parts.push('Gift intent detected in keywords')
+    if (themeMatched.includes('online')) parts.push('Online-purchase intent detected')
+    if (themeMatched.includes('price')) parts.push('Price-sensitivity detected')
+  }
+  return parts.join(' · ')
+}
+
+/**
+ * Generate smart AI query suggestions, business-context driven.
  *
  * @param ctx Project context: business, domain, city, country, language
- * @param keywords Optional tracked keywords for theme-derived queries
- * @param shuffle If true, randomize order then return subset
+ * @param keywords Tracked keywords used ONLY as theme signals
+ * @param shuffle If true, randomize order before slicing
  * @param limit Maximum number of suggestions to return (default 12)
  */
 export function generatePromptSuggestions({
@@ -559,57 +700,82 @@ export function generatePromptSuggestions({
 }): PromptSuggestion[] {
   const business = businessName || ''
   const dom = domain || ''
-  const lang = language || 'he'
-  const ctx: TemplateContext = { business, domain: dom, city, country, language: lang }
+  const lang = language === 'en' ? 'en' : 'he'
+  const themes = extractThemes(keywords)
+  const ctx: TemplateContext = { business, domain: dom, city, country, language: lang, themes }
   const category = detectCategory(business, dom, keywords)
-  const bank = lang === 'he' ? QUERIES_HE : QUERIES_EN
-  const templates = bank[category] || bank.generic
-  const keywordTemplates = keywordDerivedQueries(keywords, ctx, category)
+  const bank = lang === 'he' ? HE_BANK : EN_BANK
+  const defs = bank[category] || bank.generic
+  const intentLabels = lang === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
 
-  // Minimum quality threshold; templates below this are filtered out.
-  const MIN_QUALITY_SCORE = 68
+  const MIN_QUALITY_SCORE = 70
 
-  // Combine + deduplicate (semantic dedup: drop near-identical lowercased prompts)
-  const seen = new Set<string>()
-  const combined: PromptSuggestion[] = []
+  // Filter: drop entries that require a city when none is configured
+  const eligible = defs.filter((d) => !d.requiresCity || !!ctx.city)
 
-  const processTemplates = (list: Array<[PromptIntent, string, number]>) => {
-    for (const [intent, raw, score] of list) {
-      if (score < MIN_QUALITY_SCORE) continue
-      const text = fillTemplate(raw, ctx).trim()
-      if (lang === 'he' && !isReadableHebrew(text)) continue
-      // Dedup key: lowercased + collapsed whitespace + stripped final punctuation
-      const key = text
-        .toLowerCase()
-        .replace(/[?!.,]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-      if (seen.has(key)) continue
-      seen.add(key)
-      combined.push({
-        id: `q-${combined.length}-${Math.random().toString(36).slice(2, 8)}`,
-        prompt: text,
-        intent,
-        category,
-        language: lang,
-        qualityScore: score,
-      })
+  // Apply theme boosts, fill placeholders, build suggestions
+  type Built = {
+    def: QueryDef
+    prompt: string
+    score: number
+    themeMatched: Array<keyof KeywordThemes>
+  }
+  const built: Built[] = []
+  for (const def of eligible) {
+    const filled = fillTemplate(def.text, ctx).trim()
+    if (lang === 'he' && !isReadableHebrew(filled)) continue
+    let score = def.score
+    const matched: Array<keyof KeywordThemes> = []
+    if (def.themeBoost) {
+      for (const [key, boost] of Object.entries(def.themeBoost)) {
+        const themeKey = key as keyof KeywordThemes
+        if (themeKey === 'topics') continue
+        if (themes[themeKey] && typeof boost === 'number') {
+          score += boost
+          matched.push(themeKey)
+        }
+      }
     }
+    if (score < MIN_QUALITY_SCORE) continue
+    built.push({ def, prompt: filled, score, themeMatched: matched })
   }
 
-  processTemplates(templates)
-  processTemplates(keywordTemplates)
+  // Semantic deduplication — drop near-duplicates, keep higher-scoring one
+  built.sort((a, b) => b.score - a.score)
+  const keptCanonicals: string[] = []
+  const kept: Built[] = []
+  for (const item of built) {
+    const c = canonical(item.prompt)
+    let isDup = false
+    for (const existing of keptCanonicals) {
+      if (existing === c || isNearDuplicate(existing, c)) {
+        isDup = true
+        break
+      }
+    }
+    if (isDup) continue
+    keptCanonicals.push(c)
+    kept.push(item)
+  }
 
-  // Sort by quality score descending
-  combined.sort((a, b) => b.qualityScore - a.qualityScore)
+  // Build final suggestions
+  const suggestions: PromptSuggestion[] = kept.map((item, idx) => ({
+    id: `q-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+    prompt: item.prompt,
+    intent: item.def.intent,
+    intentLabel: intentLabels[item.def.intent],
+    category,
+    language: lang,
+    qualityScore: item.score,
+    reason: buildReason(item.def, category, ctx, item.themeMatched),
+  }))
 
-  // Shuffle if requested (for regenerate button)
   if (shuffle) {
-    for (let i = combined.length - 1; i > 0; i--) {
+    for (let i = suggestions.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
-      ;[combined[i], combined[j]] = [combined[j], combined[i]]
+      ;[suggestions[i], suggestions[j]] = [suggestions[j], suggestions[i]]
     }
   }
 
-  return combined.slice(0, limit)
+  return suggestions.slice(0, limit)
 }

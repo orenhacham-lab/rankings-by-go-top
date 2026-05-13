@@ -908,34 +908,48 @@ function SmartQuestionCard({
     transactional: 'warning',
     recommendation: 'info',
     informational: 'neutral',
+    commercial: 'warning',
+    alternatives: 'neutral',
+    pre_purchase: 'info',
+    gift: 'success',
   }
 
-  const intentLabel = (intent: string): string => {
-    const labels: Record<string, string> = {
-      brand: t('intent_brand'),
-      comparison: t('intent_comparison'),
-      local: t('intent_local'),
-      transactional: t('intent_transactional'),
-      recommendation: t('intent_recommendation'),
-      informational: t('intent_informational'),
-    }
-    return labels[intent] || intent
-  }
+  // Prefer the precomputed intentLabel (localized in the generator) and fall
+  // back to legacy i18n keys for backwards compatibility.
+  const label =
+    question.intentLabel ||
+    (
+      {
+        brand: t('intent_brand'),
+        comparison: t('intent_comparison'),
+        local: t('intent_local'),
+        transactional: t('intent_transactional'),
+        recommendation: t('intent_recommendation'),
+        informational: t('intent_informational'),
+      } as Record<string, string>
+    )[question.intent] ||
+    question.intent
 
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200 hover:shadow-sm transition">
-      <div className="flex-1">
-        <p className="text-sm text-slate-900 font-medium line-clamp-2 mb-2">{question.prompt}</p>
-        <div className="flex items-center gap-1.5">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-slate-900 font-medium line-clamp-2 mb-1.5">{question.prompt}</p>
+        <div className="flex items-center gap-1.5 mb-1">
           <Badge variant={intentTone[question.intent] || 'neutral'} className="!text-[9px]">
-            {intentLabel(question.intent)}
+            {label}
           </Badge>
           <span className="text-[10px] text-slate-500">{question.qualityScore}%</span>
         </div>
+        {question.reason && (
+          <p className="text-[11px] text-slate-500 line-clamp-2" title={question.reason}>
+            {question.reason}
+          </p>
+        )}
       </div>
       <button
         onClick={onAdd}
         className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition flex items-center justify-center"
+        aria-label="הוסף לרשימת השאילתות"
       >
         +
       </button>

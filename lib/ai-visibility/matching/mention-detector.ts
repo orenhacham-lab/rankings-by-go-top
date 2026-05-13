@@ -70,6 +70,39 @@ function findWordBoundaryMatches(text: string, searchTerm: string): number[] {
 }
 
 /**
+ * Strip Hebrew quotation styles and surrounding parens from a brand string.
+ * Also extracts an English alias if the name has the form "Hebrew (English)"
+ * or "English (Hebrew)" — the inner alias is returned as a separate candidate.
+ */
+function extractAliases(input: string): string[] {
+  const aliases: string[] = []
+  const trimmed = input.trim()
+  if (!trimmed) return aliases
+
+  // Strip leading/trailing quotes of various styles
+  const cleaned = trimmed
+    .replace(/^["'״׳`]+|["'״׳`]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (cleaned) aliases.push(cleaned)
+
+  // Pull out parenthesized aliases: "פרפיום קלאב (Perfume Club)" → also "Perfume Club"
+  const parenMatch = cleaned.match(/^(.+?)\s*[\(\[]([^()\[\]]+)[\)\]]\s*$/)
+  if (parenMatch) {
+    const outer = parenMatch[1].trim()
+    const inner = parenMatch[2].trim()
+    if (outer) aliases.push(outer)
+    if (inner) aliases.push(inner)
+  }
+
+  // Remove punctuation noise (dashes, em-dashes, slashes used as separators)
+  const segments = cleaned.split(/\s*[\-–—\/|]\s*/).map((s) => s.trim()).filter(Boolean)
+  if (segments.length > 1) aliases.push(...segments)
+
+  return aliases
+}
+
+/**
  * Derive brand-name variants from raw inputs.
  *
  * Given a business name and/or domain, returns a deduplicated list of
@@ -77,8 +110,11 @@ function findWordBoundaryMatches(text: string, searchTerm: string): number[] {
  *
  * Variants include:
  *   - business name (as-is, trimmed)
+ *   - parenthesized aliases inside the name
+ *   - dash/slash-separated segments
  *   - domain "brand" (hostname without TLD or www, e.g. perfumeclub.co.il → "perfumeclub")
  *   - spaced form of the brand if it contains capitals or compound words
+ *   - tightly-joined form of multi-word names ("Perfume Club" → "perfumeclub")
  */
 export function getBrandVariants(
   brandName: string | null | undefined,
@@ -91,8 +127,13 @@ export function getBrandVariants(
     if (trimmed.length >= 2) variants.add(trimmed)
   }
 
-  // 1. Business name as-is
-  push(brandName ?? null)
+  // 1. Business name as-is, aliases, and segments
+  if (brandName) {
+    for (const a of extractAliases(brandName)) push(a)
+    // Tight-join multi-word names — "Perfume Club" → "perfumeclub"
+    const noSpaces = brandName.replace(/\s+/g, '').toLowerCase()
+    if (noSpaces.length >= 4 && noSpaces !== brandName.toLowerCase()) push(noSpaces)
+  }
 
   // 2. Extract brand-part from domain (perfumeclub.co.il → perfumeclub)
   if (domain) {
@@ -130,6 +171,9 @@ function splitCompound(input: string): string {
     'food', 'drink', 'tech', 'media', 'group', 'global', 'online',
     'fashion', 'style', 'design', 'studio', 'agency', 'web', 'digital',
     'central', 'plus', 'pro', 'express', 'direct', 'market',
+    'go', 'top', 'best', 'super', 'mega', 'mini', 'smart', 'quick',
+    'gift', 'gifts', 'flower', 'flowers', 'cosmetics', 'auto', 'cars',
+    'finance', 'law', 'health', 'fit', 'club', 'zone', 'point', 'spot',
   ]
 
   for (const word of KNOWN) {

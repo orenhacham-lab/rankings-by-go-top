@@ -23,6 +23,10 @@ const INTENT_TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral' | '
   transactional: 'warning',
   recommendation: 'info',
   informational: 'neutral',
+  commercial: 'warning',
+  alternatives: 'neutral',
+  pre_purchase: 'info',
+  gift: 'success',
 }
 
 export default function PromptSuggestions({
@@ -290,7 +294,7 @@ export default function PromptSuggestions({
                     )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <Badge variant={INTENT_TONE[s.intent] || 'neutral'}>
-                        {intentLabel(s.intent)}
+                        {s.intentLabel || intentLabel(s.intent)}
                       </Badge>
                       <button
                         onClick={() => startEdit(s.id, s.prompt)}
@@ -300,6 +304,11 @@ export default function PromptSuggestions({
                         {t('edit')}
                       </button>
                     </div>
+                    {s.reason && (
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2" title={s.reason}>
+                        {s.reason}
+                      </p>
+                    )}
                   </div>
                   <Button
                     size="sm"

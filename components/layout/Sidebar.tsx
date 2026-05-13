@@ -9,7 +9,7 @@ const navItems = [
   { href: '/dashboard', label: 'לוח בקרה', icon: '📊' },
   { href: '/clients', label: 'לקוחות', icon: '👥' },
   { href: '/projects', label: 'פרויקטים', icon: '📁' },
-  { href: '/keywords', label: 'מילות מפתח', icon: '🔑' },
+  { href: '/keywords', label: 'מעקב מיקומים', icon: '🔑' },
   { href: '/scans', label: 'סריקות', icon: '🔍' },
   { href: '/reports', label: 'דוחות', icon: '📄' },
   { href: '/billing', label: 'מנוי ותשלום', icon: '💳' },
