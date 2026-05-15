@@ -218,8 +218,24 @@ const STRINGS = {
   save_profile: { he: 'שמור פרופיל AI', en: 'Save AI Profile' },
   reset_to_auto: { he: 'איפוס לזיהוי אוטומטי', en: 'Reset to auto-detect' },
   add_tag_placeholder: { he: 'הוסף ולחץ Enter', en: 'Add and press Enter' },
-  profile_saved: { he: 'הפרופיל נשמר', en: 'Profile saved' },
-  profile_reset: { he: 'הפרופיל אופס', en: 'Profile reset' },
+  add_secondary_placeholder: {
+    he: 'הוסף קטגוריה משנית ולחץ Enter',
+    en: 'Add secondary category and press Enter',
+  },
+  add_excluded_placeholder: {
+    he: 'הוסף נושא לא רצוי ולחץ Enter',
+    en: 'Add excluded topic and press Enter',
+  },
+  primary_category_placeholder: {
+    he: 'כתוב קטגוריה (לדוגמה: משלוחי פרחים) או בחר מהרשימה',
+    en: 'Type a category (e.g. flower delivery) or pick one',
+  },
+  profile_saved: { he: 'פרופיל AI נשמר בהצלחה', en: 'AI profile saved' },
+  profile_reset: { he: 'הפרופיל אופס לזיהוי אוטומטי', en: 'Profile reset to auto-detect' },
+  edit_ai_profile: { he: 'ערוך פרופיל AI', en: 'Edit AI profile' },
+  open_ai_profile: { he: 'פתח הגדרות פרופיל', en: 'Open profile settings' },
+  close_panel: { he: 'סגור', en: 'Close' },
+  category_suggestions: { he: 'הצעות', en: 'Suggestions' },
 
   // Category labels for the dropdown (BusinessCategory → display name)
   cat_florist: { he: 'חנות פרחים', en: 'Flower shop' },

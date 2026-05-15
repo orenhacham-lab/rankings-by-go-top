@@ -1161,11 +1161,87 @@ function buildReason(
  * When `mode` is 'manual', the generator uses these values directly.
  * When `mode` is 'auto' (or the profile is null), auto-detection is used.
  */
+/**
+ * `primaryCategory` is a freeform string (not the BusinessCategory enum) so
+ * the user can type custom Hebrew labels like "משלוחי פרחים", "בשמי נישה",
+ * "ניקיון משרדים". `resolveManualPrimaryCategory` maps known aliases back to
+ * an internal BusinessCategory; unknown strings fall back to auto-detection
+ * but are still passed through as `secondaryOfferings` context.
+ */
 export type ManualAIProfile = {
   mode: 'auto' | 'manual'
-  primaryCategory: BusinessCategory | null
+  primaryCategory: string | null
   secondaryCategories: string[]
   excludedTopics: string[]
+}
+
+const BUSINESS_CATEGORY_SET: ReadonlySet<BusinessCategory> = new Set<BusinessCategory>([
+  'agency', 'ecommerce', 'perfume', 'sports_store', 'gifts', 'appliance_store',
+  'saas', 'local_service', 'cleaning', 'florist', 'restaurant', 'healthcare',
+  'legal', 'real_estate', 'fitness', 'beauty', 'education', 'generic',
+])
+
+function isBusinessCategory(value: string): value is BusinessCategory {
+  return BUSINESS_CATEGORY_SET.has(value as BusinessCategory)
+}
+
+/**
+ * Map a user-typed freeform category string to an internal BusinessCategory.
+ * Returns null if no known alias matches — in that case the generator falls
+ * back to the auto-detected category but still uses the custom text as a
+ * secondary-offering signal (so the user's intent isn't lost).
+ *
+ * NOTE: Order doesn't matter for the substring checks because each branch is
+ * mutually exclusive — but flower/perfume/agency aliases are listed first
+ * because they're the most common user inputs.
+ */
+export function resolveManualPrimaryCategory(raw: string | null | undefined): BusinessCategory | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  // Exact enum match wins.
+  if (isBusinessCategory(trimmed)) return trimmed
+  const t = trimmed.toLowerCase()
+
+  // Florist / flower delivery
+  if (/(פרח|זר פרחים|זרי פרחים|משלוח פרחים|משלוחי פרחים|חנות פרחים|flower|florist|bouquet)/.test(t))
+    return 'florist'
+  // Perfume / fragrance
+  if (/(בושם|בשמ|בשמי נישה|פרפיום|או דה פרפיום|או דה טואלט|perfume|fragrance|cologne)/.test(t))
+    return 'perfume'
+  // Agency / paid ads / SEO
+  if (/(פרסום ממומן|ממומן בגוגל|google ads|adwords|פרסום|שיווק|סוכנות|דיגיטל|seo|ppc|sem|קידום אתרים|agency|marketing)/.test(t))
+    return 'agency'
+  // Cleaning services (offices, home, etc.)
+  if (/(ניקיון|נקיון|cleaning|cleaner|מנקה)/.test(t)) return 'cleaning'
+  // Gifts
+  if (/(מתנ|gift|present)/.test(t)) return 'gifts'
+  // Sports store
+  if (/(ספורט|sport|נעלי ריצה|adidas|nike|פומה)/.test(t)) return 'sports_store'
+  // Appliances
+  if (/(מקרר|תנור|מוצרי חשמל|מכונת כביסה|appliance|חשמל ביתי)/.test(t)) return 'appliance_store'
+  // SaaS
+  if (/(saas|software|cloud|platform|api|אפליקציה)/.test(t)) return 'saas'
+  // Restaurant
+  if (/(מסעדה|קפה|פיצה|food|restaurant|bistro|cafe)/.test(t)) return 'restaurant'
+  // Healthcare
+  if (/(מרפאה|רופא|רפואה|שיניים|clinic|hospital|medical|dental|doctor)/.test(t)) return 'healthcare'
+  // Legal
+  if (/(עורך דין|עורכי דין|משפט|law|legal|attorney|lawyer)/.test(t)) return 'legal'
+  // Real estate
+  if (/(נדל|דירות|תיווך|real estate|realty|properties)/.test(t)) return 'real_estate'
+  // Fitness
+  if (/(כושר|יוגה|gym|fitness|yoga|crossfit)/.test(t)) return 'fitness'
+  // Beauty
+  if (/(מספרה|ספא|איפור|טיפוח|salon|spa|beauty|hair|nails)/.test(t)) return 'beauty'
+  // Education
+  if (/(מכללה|בית ספר|קורס|school|academy|course|education)/.test(t)) return 'education'
+  // Local service (electrician, plumber, cleaning of offices, dog products etc.)
+  if (/(חשמלאי|אינסטלטור|electrician|plumber|hvac|מוצרים לכלבים|pet|dog)/.test(t)) return 'local_service'
+  // Generic e-commerce
+  if (/(חנות|store|shop|ecommerce|retail|אונליין)/.test(t)) return 'ecommerce'
+
+  return null
 }
 
 /**
@@ -1230,19 +1306,33 @@ export function generatePromptSuggestions({
 
   // If a manual profile is active, its primaryCategory overrides auto-detection
   // and its excludedTopics/secondaryCategories augment the auto-inferred profile.
+  // primaryCategory is a freeform string (user may have typed "משלוחי פרחים");
+  // resolveManualPrimaryCategory maps known aliases to internal BusinessCategory.
   const hasManual = manualProfile && manualProfile.mode === 'manual'
-  const category: BusinessCategory = hasManual && manualProfile.primaryCategory
-    ? manualProfile.primaryCategory
-    : (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+  let category: BusinessCategory
+  let customCategoryContext: string[] = []
+
+  if (hasManual && manualProfile.primaryCategory) {
+    const resolved = resolveManualPrimaryCategory(manualProfile.primaryCategory)
+    category = resolved || (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+    // If custom text didn't map to a known category, include it as a secondary
+    // signal so it still influences question scoring even though we fell back to auto.
+    if (!resolved) {
+      customCategoryContext = [manualProfile.primaryCategory.trim()]
+    }
+  } else {
+    category = (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+  }
 
   // Build the effective profile: keep auto-inferred offerings, but layer manual
   // secondary categories + excluded topics on top so user choices win.
   const effectiveProfile: BusinessProfile = hasManual
     ? {
         primaryOfferings: autoProfile.primaryOfferings || [],
-        // Manual secondary categories take precedence; auto values appended after.
+        // Manual secondary categories + custom category text take precedence; auto values appended after.
         secondaryOfferings: [
           ...(manualProfile.secondaryCategories || []),
+          ...customCategoryContext,
           ...(autoProfile.secondaryOfferings || []),
         ],
         serviceLocations: autoProfile.serviceLocations || [],

@@ -544,7 +544,22 @@ export default function AIVisibilitySection({
             domain={projectDomain}
             keywords={projectKeywords || []}
             initialProfile={manualProfile}
-            onChange={setManualProfile}
+            onChange={(profile) => {
+              setManualProfile(profile)
+              // Immediately refresh inline recommended questions with the
+              // new profile — no page reload needed.
+              const refreshed = generatePromptSuggestions({
+                businessName: projectBrandName,
+                domain: projectDomain,
+                city: projectCity || null,
+                country: projectCountry,
+                language: projectLanguage,
+                keywords: projectKeywords,
+                manualProfile: profile,
+                shuffle: false,
+              })
+              setSuggestedQuestions(refreshed.slice(0, 4))
+            }}
           />
           <div className="flex items-center justify-between gap-4 mb-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">
