@@ -388,37 +388,61 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
   ],
 
   florist: [
-    // Primary: flower delivery & bouquets (70% weight)
-    { intent: 'local', text: 'משלוח פרחים מהיר ב{{city}}', score: 95, offering: 'primary', requiresCity: true },
-    { intent: 'local', text: 'משלוח פרחים ביום ביום ב{{city}}', score: 94, offering: 'primary', requiresCity: true },
-    { intent: 'recommendation', text: 'אילו חנויות פרחים מומלצות בישראל?', score: 92, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'איך בוחרים זר פרחים יפה ומעוצב?', score: 88, offering: 'primary' },
-    { intent: 'informational', text: 'מה הזרים הטבעיים החזקים והעמידים?', score: 85, offering: 'primary' },
-    { intent: 'informational', text: 'איך לשמור על פרחים ताזים יותר זמן?', score: 84, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'מה ההבדל בין הזרים השונים לחגים?', score: 83, offering: 'primary' },
-    { intent: 'transactional', text: 'קנייה של זרי פרחים באינטרנט — איך זה עובד?', score: 82, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'איזה סוג פרחים מתאימים ליום הולדת?', score: 85, offering: 'primary' },
-    { intent: 'informational', text: 'פרחים רומנטיים — אילו הם טובים ביותר?', score: 84, offering: 'primary' },
-    { intent: 'informational', text: 'פרחים לשבת — אילו סוגים מתאימים?', score: 83, offering: 'primary' },
-    { intent: 'informational', text: 'פרחים לחגים יהודיים — אילו מתאימים?', score: 82, offering: 'primary' },
-    { intent: 'local', text: 'זר פרחים לקבלת חברים ב{{city}}', score: 80, offering: 'primary', requiresCity: true },
-    { intent: 'pre_purchase', text: 'כמה כדאי להוציא על זר פרחים?', score: 78, offering: 'primary', themeBoost: { price: 3 } },
+    // PRIMARY: Local shop recommendations (20%)
+    { intent: 'local', text: 'איזו חנות פרחים מומלצת בירושלים?', score: 96, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'איפה כדאי להזמין זר פרחים בירושלים?', score: 95, offering: 'primary', requiresCity: true },
+    { intent: 'recommendation', text: 'מי מומלץ למשלוחי פרחים בירושלים?', score: 94, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'חנות פרחים מומלצת בעיר שלי', score: 88, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'איפה אפשר להזמין פרחים טריים בירושלים?', score: 87, offering: 'primary', requiresCity: true },
 
-    // Local: location-based (20% weight)
-    { intent: 'local', text: 'חנות פרחים מומלצת ב{{city}}', score: 88, offering: 'local', requiresCity: true },
-    { intent: 'local', text: 'חנות פרחים פתוחה עכשיו ב{{city}}', score: 86, offering: 'local', requiresCity: true },
-    { intent: 'local', text: 'משלוח פרחים באותו יום ב{{city}}', score: 87, offering: 'local', requiresCity: true },
-    { intent: 'local', text: 'מקום לרכישת פרחים בדחיפות ב{{city}}', score: 82, offering: 'local', requiresCity: true },
+    // PRIMARY: Same-day / Urgency (20%)
+    { intent: 'local', text: 'איפה אפשר להזמין משלוח פרחים מהיום להיום בירושלים?', score: 97, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'מי עושה משלוח פרחים מהיר בירושלים?', score: 96, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'איפה אפשר להזמין זר פרחים ברגע האחרון?', score: 95, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'האם יש משלוחי פרחים באותו יום בירושלים?', score: 94, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'מי משלח פרחים בדחיפות בירושלים?', score: 93, offering: 'primary', requiresCity: true },
 
-    // Secondary: gift flowers (10% weight)
-    { intent: 'gift', text: 'אילו פרחים מתאימים כמתנה לאישה?', score: 80, offering: 'secondary', themeBoost: { gift: 4 } },
-    { intent: 'gift', text: 'זר פרחים כמתנה לאם ביום הולדת', score: 79, offering: 'secondary', themeBoost: { gift: 3 } },
-    { intent: 'gift', text: 'מתנה של פרחים לחברה טובה', score: 77, offering: 'secondary', themeBoost: { gift: 3 } },
+    // PRIMARY: Price / Commercial (15%)
+    { intent: 'commercial', text: 'כמה עולה משלוח פרחים בירושלים?', score: 92, offering: 'primary', requiresCity: true, themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'כמה עולה זר פרחים ליום הולדת?', score: 91, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'מה המחיר הממוצע של זר פרחים מעוצב?', score: 90, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'כמה עולה זר פרחים רומנטי?', score: 89, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'האם יש משלוח פרחים במחיר משתלם בירושלים?', score: 88, offering: 'primary', requiresCity: true, themeBoost: { price: 3 } },
 
-    // Generic: brand & comparison (fallback)
-    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
-    { intent: 'comparison', text: 'השוואה בין חנויות פרחים בישראל', score: 72, offering: 'generic' },
-    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 70, offering: 'generic' },
+    // PRIMARY: Occasion-based (20%)
+    { intent: 'pre_purchase', text: 'איזה זר פרחים מתאים ליום הולדת?', score: 93, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה זר פרחים מתאים לשבת?', score: 92, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה פרחים מתאימים ליולדת?', score: 91, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה זר מתאים למתנה רומנטית?', score: 90, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה פרחים מתאימים לחג?', score: 89, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה זר פרחים מתאים ליום נישואין?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: 'איזה פרחים מתאימים לאנשים בגילאים שונים?', score: 87, offering: 'primary' },
+    { intent: 'informational', text: 'פרחים לשבת — אילו סוגים מתאימים?', score: 86, offering: 'primary' },
+
+    // PRIMARY: Trust / Pre-purchase (15%)
+    { intent: 'pre_purchase', text: 'איך לבחור חנות פרחים אמינה?', score: 90, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'מה חשוב לבדוק לפני שמזמינים פרחים אונליין?', score: 89, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איך יודעים שהפרחים יגיעו טריים?', score: 88, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איך לבחור זר פרחים איכותי?', score: 87, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'מה חשוב לבדוק במשלוח פרחים?', score: 86, offering: 'primary' },
+    { intent: 'informational', text: 'איך לשמור על פרחים ताזים יותר זמן?', score: 85, offering: 'primary' },
+    { intent: 'informational', text: 'מה הזרים הטבעיים החזקים והעמידים?', score: 84, offering: 'primary' },
+
+    // PRIMARY: Product/Information (10%)
+    { intent: 'informational', text: 'פרחים רומנטיים — אילו הם טובים ביותר?', score: 83, offering: 'primary' },
+    { intent: 'informational', text: 'מה ההבדל בין הזרים השונים לחגים?', score: 82, offering: 'primary' },
+    { intent: 'informational', text: 'אילו פרחים מתאימים לבניין משרדים?', score: 81, offering: 'primary' },
+    { intent: 'informational', text: 'איך בוחרים זר פרחים יפה ומעוצב?', score: 80, offering: 'primary' },
+
+    // SECONDARY: Gift-with-flowers (only 3, rare)
+    { intent: 'gift', text: 'איזה זר פרחים מתאים כמתנה לאישה?', score: 78, offering: 'secondary', themeBoost: { gift: 4 } },
+    { intent: 'gift', text: 'פרחים ומתנה ליולדת בירושלים', score: 77, offering: 'secondary', requiresCity: true, themeBoost: { gift: 3 } },
+    { intent: 'gift', text: 'מתנה של פרחים לחברה טובה', score: 76, offering: 'secondary', themeBoost: { gift: 3 } },
+
+    // GENERIC: Brand & comparison
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 72, offering: 'generic' },
+    { intent: 'comparison', text: 'השוואה בין חנויות פרחים בישראל', score: 70, offering: 'generic' },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 68, offering: 'generic' },
   ],
 
   restaurant: [
@@ -722,12 +746,17 @@ function extractThemes(keywords: string[]): KeywordThemes {
 }
 
 /**
- * Lightweight Hebrew quality check.
+ * Lightweight Hebrew quality check — reject broken/awkward phrases.
  */
 function isReadableHebrew(text: string): boolean {
   if (!text) return false
-  if (/(לל|בב|מה ל|של של)/.test(text)) return false
+  // Reject unresolved templates
   if (/\{\{[^}]+\}\}/.test(text)) return false
+  // Reject broken word repetitions
+  if (/(לל|בב|של של|ביום ביום|בושם בושם|פרחים פרחים|מה מה)/.test(text)) return false
+  // Reject awkward double prepositions
+  if (/מה ל(?!ב|א|ש|כ|ה)|מי ל(?!ב|א|ש|כ|ה)/.test(text)) return false
+  // Reject too short
   if (text.length < 6) return false
   return true
 }
@@ -743,6 +772,7 @@ function canonical(text: string): string {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
 
 /**
  * Token-set similarity for near-duplicate detection.
@@ -762,8 +792,9 @@ function isNearDuplicate(a: string, b: string): boolean {
   const minLen = Math.min(tokensA.length, tokensB.length)
   const maxLen = Math.max(tokensA.length, tokensB.length)
   if (minLen === 0) return false
-  // If 80% or more tokens overlap and total length is comparable, treat as dup
-  return intersection / minLen >= 0.8 && Math.abs(maxLen - minLen) <= 1
+  // If 90% or more tokens overlap AND total length is identical, treat as dup.
+  // This prevents "ליום הולדת" and "לשבת" variants from being merged.
+  return intersection / minLen >= 0.9 && maxLen === minLen
 }
 
 /**
@@ -1268,6 +1299,7 @@ export function generatePromptSuggestions({
 
 /**
  * Weight suggestions by offering type: 70% primary, 20% local, 10% secondary/generic.
+ * Semantic deduplication (isNearDuplicate) ensures we don't show similar questions together.
  */
 function weightByOffering(
   built: Array<{
@@ -1314,24 +1346,32 @@ function weightByOffering(
     secondary: Math.round(limit * 0.1),
   }
 
-  // Take up to needed amount from each category, then fill remainder with best available
+  // Helper: pick from a list up to maxCount
+  const pickUpTo = (items: Built[], maxCount: number) => {
+    return items.slice(0, maxCount)
+  }
+
+  // Take up to needed amount from each category
   for (const [key, count] of Object.entries(needed)) {
-    result.push(...byOffering[key as keyof typeof byOffering].slice(0, count))
+    const items = byOffering[key as keyof typeof byOffering]
+    result.push(...pickUpTo(items, count))
   }
 
   // If short, add generics
   if (result.length < limit) {
-    result.push(...byOffering.generic.slice(0, limit - result.length))
+    const remaining = pickUpTo(byOffering.generic, limit - result.length)
+    result.push(...remaining)
   }
 
-  // If still short, add overflow from any category (prioritize primary overage)
+  // If still short, add overflow from any category
   if (result.length < limit) {
     const allRemaining = [
       ...byOffering.primary.slice(needed.primary),
       ...byOffering.local.slice(needed.local),
       ...byOffering.secondary.slice(needed.secondary),
     ]
-    result.push(...allRemaining.slice(0, limit - result.length))
+    const overflow = pickUpTo(allRemaining, limit - result.length)
+    result.push(...overflow)
   }
 
   return result.slice(0, limit)
