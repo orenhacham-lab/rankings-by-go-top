@@ -98,8 +98,8 @@ export default function AIVisibilitySection({
   projectCity?: string | null
   projectKeywords?: string[]
 }) {
-  const t = useMemo(() => createI18n(projectLanguage, projectCountry), [projectLanguage, projectCountry])
-  const isHebrew = detectHebrew(projectLanguage, projectCountry)
+  const t = useMemo(() => createI18n('he', 'IL'), [])
+  const isHebrew = true
 
   const [currentTab, setCurrentTab] = useState<TabType>('results')
   const [allResults, setAllResults] = useState<ResultRow[]>([])

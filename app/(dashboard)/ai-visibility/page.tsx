@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Project, Client } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
@@ -80,6 +80,33 @@ export default function AIVisibilityPage() {
     }
   }
 
+  const overallStats = useMemo(() => {
+    let totalQueries = 0
+    let totalScans = 0
+    let totalMentions = 0
+    let totalCitations = 0
+    let avgScore = 0
+    let scoreCount = 0
+    for (const summary of summaries.values()) {
+      totalQueries += summary.totalQueries
+      totalScans += summary.totalScans
+      totalMentions += summary.totalMentions
+      totalCitations += summary.totalCitations
+      if (summary.totalScans > 0) {
+        avgScore += summary.visibilityScore
+        scoreCount++
+      }
+    }
+    return {
+      totalProjects: projects.length,
+      totalQueries,
+      totalScans,
+      totalMentions,
+      totalCitations,
+      avgScore: scoreCount > 0 ? Math.round(avgScore / scoreCount) : 0,
+    }
+  }, [summaries, projects.length])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
@@ -107,7 +134,36 @@ export default function AIVisibilityPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+            <Card className="p-3">
+              <div className="text-[11px] text-slate-500 mb-1">סה״כ פרויקטים</div>
+              <div className="text-2xl font-bold text-slate-800">{overallStats.totalProjects}</div>
+            </Card>
+            <Card className="p-3">
+              <div className="text-[11px] text-slate-500 mb-1">סה״כ שאילתות</div>
+              <div className="text-2xl font-bold text-slate-800">{overallStats.totalQueries}</div>
+            </Card>
+            <Card className="p-3">
+              <div className="text-[11px] text-slate-500 mb-1">סה״כ סריקות</div>
+              <div className="text-2xl font-bold text-slate-800">{overallStats.totalScans}</div>
+            </Card>
+            <Card className="p-3">
+              <div className="text-[11px] text-slate-500 mb-1">סה״כ אזכורים</div>
+              <div className="text-2xl font-bold text-slate-800">{overallStats.totalMentions}</div>
+            </Card>
+            <Card className="p-3">
+              <div className="text-[11px] text-slate-500 mb-1">סה״כ ציטוטים</div>
+              <div className="text-2xl font-bold text-slate-800">{overallStats.totalCitations}</div>
+            </Card>
+            <Card className="p-3">
+              <div className="text-[11px] text-slate-500 mb-1">ממוצע נראות</div>
+              <div className="text-2xl font-bold text-slate-800">{overallStats.avgScore}%</div>
+            </Card>
+          </div>
+
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">פרויקטים</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((project) => {
             const summary = summaries.get(project.id)
             const score = summary?.visibilityScore ?? 0
@@ -170,6 +226,7 @@ export default function AIVisibilityPage() {
             )
           })}
         </div>
+        </>
       )}
     </div>
   )
