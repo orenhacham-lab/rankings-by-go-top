@@ -1158,6 +1158,11 @@ function buildReason(
  * @param profile Optional business profile with offering preferences
  * @param shuffle If true, randomize order before slicing
  * @param limit Maximum number of suggestions to return (default 12)
+ * @param excludePrompts Normalized prompt texts already shown in the session
+ * @param previousSet Last shown set — generator avoids returning the same set
+ * @param diversify If true (default), use weighted random selection from a top
+ *   pool grouped by intent bucket. This produces a meaningfully different set
+ *   each call. Set to false to get deterministic top-N by score.
  */
 export function generatePromptSuggestions({
   businessName,
@@ -1169,6 +1174,9 @@ export function generatePromptSuggestions({
   profile = null,
   shuffle = false,
   limit = 12,
+  excludePrompts = [],
+  previousSet = [],
+  diversify = true,
 }: {
   businessName: string | null
   domain: string | null
@@ -1179,6 +1187,9 @@ export function generatePromptSuggestions({
   profile?: BusinessProfile | null
   shuffle?: boolean
   limit?: number
+  excludePrompts?: string[]
+  previousSet?: string[]
+  diversify?: boolean
 }): PromptSuggestion[] {
   const business = businessName || ''
   const dom = domain || ''
@@ -1272,8 +1283,29 @@ export function generatePromptSuggestions({
     kept.push(item)
   }
 
-  // Always apply offering-based weighting now that we always have a profile.
-  const suggestions: Built[] = weightByOffering(kept, limit)
+  // Exclude already-seen prompts so the next regenerate shows fresh ones.
+  // `previousSet` is treated like `excludePrompts` — never return the same set.
+  const excludeSet = new Set<string>([
+    ...excludePrompts.map(normalizePromptForCompare),
+    ...previousSet.map(normalizePromptForCompare),
+  ])
+  let pool: Built[] = kept.filter(
+    (item) => !excludeSet.has(normalizePromptForCompare(item.prompt))
+  )
+
+  // Pool-exhaustion fallback: if filtering left us with too few candidates,
+  // fall back to the full deduplicated pool (still excluding the previous set
+  // when possible, so consecutive regenerates never echo each other).
+  if (pool.length < limit) {
+    const onlyPrevious = new Set<string>(previousSet.map(normalizePromptForCompare))
+    pool = kept.filter((item) => !onlyPrevious.has(normalizePromptForCompare(item.prompt)))
+    if (pool.length < limit) pool = kept
+  }
+
+  // Pick suggestions: diversified pool-random when requested, deterministic otherwise.
+  const suggestions: Built[] = diversify
+    ? diversifiedPick(pool, limit)
+    : weightByOffering(pool, limit)
 
   // Build final suggestions
   const result: PromptSuggestion[] = suggestions.map((item, idx) => ({
@@ -1287,7 +1319,7 @@ export function generatePromptSuggestions({
     reason: buildReason(item.def, category, ctx, item.themeMatched),
   }))
 
-  if (shuffle) {
+  if (shuffle && !diversify) {
     for (let i = result.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[result[i], result[j]] = [result[j], result[i]]
@@ -1295,6 +1327,224 @@ export function generatePromptSuggestions({
   }
 
   return result.slice(0, limit)
+}
+
+/**
+ * Normalize a prompt for cross-call comparison. Same logic as the UI's
+ * normalizePrompt — keeps generator + UI in sync for seen-set tracking.
+ */
+function normalizePromptForCompare(p: string): string {
+  return (p || '')
+    .toLowerCase()
+    .replace(/[?!.,;:'"״׳`\-–—]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Classify a question into a coarse intent bucket used to balance the result
+ * set. Buckets are derived from question phrasing (Hebrew + English regex) and
+ * fall back to the QueryDef intent/offering. Each bucket contributes at most
+ * one question per result set, ensuring users see a varied mix.
+ */
+type IntentBucket =
+  | 'recommendation'
+  | 'urgency'
+  | 'price'
+  | 'occasion'
+  | 'trust'
+  | 'brand'
+  | 'secondary'
+  | 'other'
+
+function getIntentBucket(prompt: string, def: QueryDef, offering: string): IntentBucket {
+  // Brand / comparison / alternatives — explicit intents take priority.
+  if (def.intent === 'brand' || def.intent === 'comparison' || def.intent === 'alternatives') {
+    return 'brand'
+  }
+  // Urgency / same-day delivery (most time-sensitive bucket — check first).
+  if (
+    /(משלוח.*מהיום|משלוח.*באותו יום|משלוח.*מהיר|רגע האחרון|בדחיפות|same.?day|urgent|fast delivery)/i.test(
+      prompt
+    )
+  ) {
+    return 'urgency'
+  }
+  // Price / commercial.
+  if (/(כמה עול|מחיר|משתלם|בהנחה|cost|price|how much|cheap|discount)/i.test(prompt)) {
+    return 'price'
+  }
+  // Occasion-based.
+  if (
+    /(ליום הולדת|לשבת|ליולדת|רומנטי|לחג|לנישואין|מתנה רומנטית|לאירוע|birthday|wedding|anniversary|romantic|holiday)/i.test(
+      prompt
+    )
+  ) {
+    return 'occasion'
+  }
+  // Trust / quality / pre-purchase considerations.
+  if (
+    /(איך לבחור|חשוב לבדוק|טריים|איכותי|אמינה|איך יודעים|how to choose|reliable|trust|fresh|quality)/i.test(
+      prompt
+    )
+  ) {
+    return 'trust'
+  }
+  // Secondary offerings (gifts as secondary, etc.).
+  if (offering === 'secondary' || def.intent === 'gift') {
+    return 'secondary'
+  }
+  // Recommendation / local — default for primary discovery questions.
+  if (
+    def.intent === 'recommendation' ||
+    def.intent === 'local' ||
+    /(מומלצת|מומלץ|איפה כדאי|recommend|where can i)/i.test(prompt)
+  ) {
+    return 'recommendation'
+  }
+  return 'other'
+}
+
+/**
+ * Weighted random pick from a list of scored items. Higher score → higher
+ * chance, but lower-scored items still have a non-zero chance, so consecutive
+ * calls produce different selections from the same pool.
+ */
+function weightedRandomPick<T extends { score: number }>(items: T[]): T | undefined {
+  if (items.length === 0) return undefined
+  if (items.length === 1) return items[0]
+  const weights = items.map((i) => Math.max(1, i.score - 60))
+  const total = weights.reduce((a, b) => a + b, 0)
+  if (total <= 0) return items[Math.floor(Math.random() * items.length)]
+  let r = Math.random() * total
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i]
+    if (r <= 0) return items[i]
+  }
+  return items[items.length - 1]
+}
+
+/**
+ * Diversified selection from a pool of scored candidates.
+ *
+ * Algorithm:
+ *   1. Group candidates by IntentBucket.
+ *   2. Define a target distribution (1 each of: recommendation, urgency,
+ *      price, occasion, trust; 0–1 brand; 0–1 secondary).
+ *   3. For each target slot, pick a weighted-random candidate from the top
+ *      of that bucket (top 5 by score). This injects controlled randomness:
+ *      relevance stays high but the exact pick varies per call.
+ *   4. If the result is still short, fill from remaining candidates pool-wide.
+ *
+ * Result: different regenerates produce different SETS (not just reorderings).
+ */
+function diversifiedPick(
+  built: Array<{
+    def: QueryDef
+    prompt: string
+    score: number
+    themeMatched: Array<keyof KeywordThemes>
+    offering: string
+  }>,
+  limit: number
+) {
+  type Built = (typeof built)[number]
+  if (built.length === 0) return [] as Built[]
+
+  // Step 1: group by intent bucket, sorted by score within each bucket.
+  const buckets: Record<IntentBucket, Built[]> = {
+    recommendation: [],
+    urgency: [],
+    price: [],
+    occasion: [],
+    trust: [],
+    brand: [],
+    secondary: [],
+    other: [],
+  }
+  for (const item of built) {
+    const bucket = getIntentBucket(item.prompt, item.def, item.offering)
+    buckets[bucket].push(item)
+  }
+  for (const key of Object.keys(buckets) as IntentBucket[]) {
+    buckets[key].sort((a, b) => b.score - a.score)
+  }
+
+  // Step 2: target distribution. Five "core" buckets each contribute one
+  // question; brand and secondary each contribute up to one when limit ≥ 6.
+  const baseTargets: Array<{ bucket: IntentBucket; count: number }> = [
+    { bucket: 'recommendation', count: 1 },
+    { bucket: 'urgency', count: 1 },
+    { bucket: 'price', count: 1 },
+    { bucket: 'occasion', count: 1 },
+    { bucket: 'trust', count: 1 },
+    { bucket: 'brand', count: limit >= 6 ? 1 : 0 },
+    { bucket: 'secondary', count: limit >= 6 ? 1 : 0 },
+  ]
+
+  const result: Built[] = []
+  const picked = new Set<Built>()
+  const localCanonicals: string[] = []
+
+  // Helper: pick from a bucket using weighted random from its top candidates,
+  // skipping items that would near-duplicate something already picked.
+  const pickFromBucket = (bucket: IntentBucket): Built | undefined => {
+    const candidates = buckets[bucket].filter((c) => !picked.has(c))
+    if (candidates.length === 0) return undefined
+    // Restrict random picking to the top 5 to keep relevance high.
+    const top = candidates.slice(0, 5)
+    // Try a few times to avoid near-duplicates of items already in result.
+    for (let attempt = 0; attempt < Math.min(5, top.length); attempt++) {
+      const pick = weightedRandomPick(top)
+      if (!pick) return undefined
+      const c = canonical(pick.prompt)
+      const dup = localCanonicals.some((e) => e === c || isNearDuplicate(e, c))
+      if (!dup) return pick
+      // Remove the dup candidate and retry.
+      const idx = top.indexOf(pick)
+      if (idx >= 0) top.splice(idx, 1)
+      if (top.length === 0) return undefined
+    }
+    return undefined
+  }
+
+  // Step 3: fill the slots in the order defined above.
+  for (const target of baseTargets) {
+    if (result.length >= limit) break
+    if (target.count === 0) continue
+    const pick = pickFromBucket(target.bucket)
+    if (pick) {
+      result.push(pick)
+      picked.add(pick)
+      localCanonicals.push(canonical(pick.prompt))
+    }
+  }
+
+  // Step 4: if still short, fill from any bucket (still weighted-random from
+  // a top slice, still skipping near-duplicates).
+  if (result.length < limit) {
+    const allRemaining: Built[] = []
+    for (const key of Object.keys(buckets) as IntentBucket[]) {
+      for (const item of buckets[key]) {
+        if (!picked.has(item)) allRemaining.push(item)
+      }
+    }
+    allRemaining.sort((a, b) => b.score - a.score)
+    while (result.length < limit && allRemaining.length > 0) {
+      const top = allRemaining.slice(0, 8)
+      const pick = weightedRandomPick(top)
+      if (!pick) break
+      const idx = allRemaining.indexOf(pick)
+      if (idx >= 0) allRemaining.splice(idx, 1)
+      const c = canonical(pick.prompt)
+      if (localCanonicals.some((e) => e === c || isNearDuplicate(e, c))) continue
+      result.push(pick)
+      picked.add(pick)
+      localCanonicals.push(c)
+    }
+  }
+
+  return result
 }
 
 /**

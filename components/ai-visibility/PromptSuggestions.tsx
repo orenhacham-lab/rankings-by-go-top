@@ -76,72 +76,49 @@ export default function PromptSuggestions({
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Session-level seen tracking — avoids showing the same prompts again.
-  // Reset when the entire pool is exhausted.
+  // Session memory: every prompt shown in any past regenerate (avoid repeats)
+  // and the *last* shown set (never echo the previous set exactly).
   const seenPromptsRef = useRef<Set<string>>(new Set())
+  const lastShownPromptsRef = useRef<string[]>([])
 
-  // Normalize prompt text for dedup comparison
+  // Normalize prompt text for dedup comparison — must match the generator's
+  // internal normalizer so excludePrompts/previousSet are recognized.
   function normalizePrompt(p: string): string {
     return p.toLowerCase().replace(/[?!.,;:'"״׳`\-–—]/g, '').replace(/\s+/g, ' ').trim()
   }
 
-  // Pick a mixed set of suggestions, prioritizing unseen items and variety of intents.
-  function pickMixedSet(
-    allSuggestions: PromptSuggestion[],
-    seenSet: Set<string>,
-    limit = 6
-  ): PromptSuggestion[] {
-    const unseen = allSuggestions.filter((s) => !seenSet.has(normalizePrompt(s.prompt)))
-    const pool = unseen.length >= limit ? unseen : allSuggestions
-
-    // If we had to fall back to full pool, reset session memory
-    if (unseen.length < limit) seenSet.clear()
-
-    // Group by intent for mixing
-    const byIntent = new Map<string, PromptSuggestion[]>()
-    for (const s of pool) {
-      const list = byIntent.get(s.intent) || []
-      list.push(s)
-      byIntent.set(s.intent, list)
+  // Record a freshly produced set into session memory and update state.
+  // If the generator returned fewer items than requested, the pool is
+  // exhausted — reset seen prompts so the next regenerate has options again.
+  function recordAndSet(produced: PromptSuggestion[], requested: number) {
+    const normalized = produced.map((s) => normalizePrompt(s.prompt))
+    if (produced.length < requested) {
+      // Pool exhausted — wipe seen and keep only the just-shown set as
+      // "previous" so the next regenerate avoids an immediate echo.
+      seenPromptsRef.current = new Set(normalized)
+    } else {
+      for (const n of normalized) seenPromptsRef.current.add(n)
     }
-
-    // Round-robin pick across intents — ensures variety, avoids same-pattern sets
-    const picked: PromptSuggestion[] = []
-    const intentKeys = Array.from(byIntent.keys())
-    let safety = 0
-    while (picked.length < limit && safety < 200) {
-      let advanced = false
-      for (const intent of intentKeys) {
-        if (picked.length >= limit) break
-        const list = byIntent.get(intent)
-        if (list && list.length > 0) {
-          picked.push(list.shift()!)
-          advanced = true
-        }
-      }
-      if (!advanced) break
-      safety++
-    }
-
-    // Record what we picked so the next regenerate avoids them
-    for (const s of picked) seenSet.add(normalizePrompt(s.prompt))
-    return picked
+    lastShownPromptsRef.current = normalized
+    setSuggestions(produced)
   }
 
   // Generate fresh suggestions when modal opens
   useEffect(() => {
     if (open) {
-      const all = generatePromptSuggestions({
+      seenPromptsRef.current = new Set()
+      lastShownPromptsRef.current = []
+      const produced = generatePromptSuggestions({
         businessName,
         domain,
         city,
         country,
         language,
         keywords,
-        shuffle: true,
-        limit: 30,
+        diversify: true,
+        limit: 6,
       })
-      setSuggestions(pickMixedSet(all, seenPromptsRef.current, 6))
+      recordAndSet(produced, 6)
       setSelectedIds(new Set())
       setError(null)
     }
@@ -152,17 +129,19 @@ export default function PromptSuggestions({
     setRegenerating(true)
     setError(null)
     await new Promise((r) => setTimeout(r, 250))
-    const all = generatePromptSuggestions({
+    const produced = generatePromptSuggestions({
       businessName,
       domain,
       city,
       country,
       language,
       keywords,
-      shuffle: true,
-      limit: 30,
+      diversify: true,
+      excludePrompts: Array.from(seenPromptsRef.current),
+      previousSet: lastShownPromptsRef.current,
+      limit: 6,
     })
-    setSuggestions(pickMixedSet(all, seenPromptsRef.current, 6))
+    recordAndSet(produced, 6)
     setSelectedIds(new Set())
     setRegenerating(false)
   }
