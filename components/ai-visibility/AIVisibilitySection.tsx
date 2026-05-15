@@ -107,6 +107,8 @@ export default function AIVisibilitySection({
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [showAllResults, setShowAllResults] = useState(false)
+  const [seenPrompts, setSeenPrompts] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
 
   const [showNewPrompt, setShowNewPrompt] = useState(false)
@@ -475,24 +477,37 @@ export default function AIVisibilitySection({
           </div>
 
           <div className="text-sm text-slate-600">
-            {t('showing_results').replace('{count}', String(filteredResults.length))}
+            {t('showing_results').replace('{count}', String(showAllResults ? filteredResults.length : Math.min(3, filteredResults.length)))}
           </div>
 
           {filteredResults.length > 0 ? (
-            <div className="space-y-2">
-              {filteredResults.map((r) => (
-                <ResultRowCard
-                  key={r.id}
-                  result={r}
-                  highlighted={highlightResultId === r.id}
-                  brandVariants={brandVariants}
-                  targetDomain={normalizedTargetDomain}
-                  isHebrew={isHebrew}
-                  onRowClick={openResultDrawer}
-                  t={t}
-                />
-              ))}
-            </div>
+            <>
+              <div className="space-y-2">
+                {filteredResults.slice(0, showAllResults ? undefined : 3).map((r) => (
+                  <ResultRowCard
+                    key={r.id}
+                    result={r}
+                    highlighted={highlightResultId === r.id}
+                    brandVariants={brandVariants}
+                    targetDomain={normalizedTargetDomain}
+                    isHebrew={isHebrew}
+                    onRowClick={openResultDrawer}
+                    t={t}
+                  />
+                ))}
+              </div>
+              {filteredResults.length > 3 && (
+                <div className="text-center mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllResults(!showAllResults)}
+                  >
+                    {showAllResults ? 'הצג פחות' : 'הצג הכל'}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
               <p className="text-sm text-slate-600">{t('no_scans')}</p>

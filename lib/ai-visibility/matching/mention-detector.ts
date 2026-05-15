@@ -4,7 +4,7 @@
  *
  * Supports multiple brand-name variants (Hebrew + English + domain-derived).
  * Example: Business "פרפיום קלאב", Domain "perfumeclub.co.il"
- *   matches: "פרפיום קלאב", "Perfume Club", "perfumeclub", "PerfumeClub"
+ *   matches: "פרפיום קלאב", "Perfume Club", "perfumeclub", "perfume club", "PerfumeClub"
  */
 
 export interface MentionDetectionResult {
@@ -103,58 +103,6 @@ function extractAliases(input: string): string[] {
 }
 
 /**
- * Derive brand-name variants from raw inputs.
- *
- * Given a business name and/or domain, returns a deduplicated list of
- * candidate strings to search for in the response text.
- *
- * Variants include:
- *   - business name (as-is, trimmed)
- *   - parenthesized aliases inside the name
- *   - dash/slash-separated segments
- *   - domain "brand" (hostname without TLD or www, e.g. perfumeclub.co.il → "perfumeclub")
- *   - spaced form of the brand if it contains capitals or compound words
- *   - tightly-joined form of multi-word names ("Perfume Club" → "perfumeclub")
- */
-export function getBrandVariants(
-  brandName: string | null | undefined,
-  domain: string | null | undefined
-): string[] {
-  const variants = new Set<string>()
-  const push = (s: string | null | undefined) => {
-    if (!s) return
-    const trimmed = s.trim()
-    if (trimmed.length >= 2) variants.add(trimmed)
-  }
-
-  // 1. Business name as-is, aliases, and segments
-  if (brandName) {
-    for (const a of extractAliases(brandName)) push(a)
-    // Tight-join multi-word names — "Perfume Club" → "perfumeclub"
-    const noSpaces = brandName.replace(/\s+/g, '').toLowerCase()
-    if (noSpaces.length >= 4 && noSpaces !== brandName.toLowerCase()) push(noSpaces)
-  }
-
-  // 2. Extract brand-part from domain (perfumeclub.co.il → perfumeclub)
-  if (domain) {
-    const cleaned = domain
-      .replace(/^https?:\/\//i, '')
-      .replace(/^www\./i, '')
-      .replace(/\/.*$/, '')
-      .toLowerCase()
-    const firstLabel = cleaned.split('.')[0]
-    if (firstLabel && firstLabel.length >= 3) {
-      push(firstLabel)
-      // 3. Spaced form for compound names like "perfumeclub" → "perfume club"
-      const spaced = splitCompound(firstLabel)
-      if (spaced && spaced !== firstLabel) push(spaced)
-    }
-  }
-
-  return Array.from(variants)
-}
-
-/**
  * Try to split a compound lowercase string into common English words.
  * Currently uses a small dictionary of frequent retail/tech words.
  * Falls back to inserting a space before mid-word capitals.
@@ -188,6 +136,65 @@ function splitCompound(input: string): string {
   }
 
   return input
+}
+
+/**
+ * Derive brand-name variants from raw inputs.
+ *
+ * Given a business name and/or domain, returns a deduplicated list of
+ * candidate strings to search for in the response text.
+ *
+ * Variants include:
+ *   - business name (as-is, trimmed)
+ *   - parenthesized aliases inside the name
+ *   - dash/slash-separated segments
+ *   - domain "brand" (hostname without TLD or www, e.g. perfumeclub.co.il → "perfumeclub")
+ *   - spaced form of the brand if it contains capitals or compound words ("perfumeclub" → "perfume club")
+ *   - tightly-joined form of multi-word names ("Perfume Club" → "perfumeclub")
+ *   - with www prefix variations
+ *   - full domain with protocol
+ */
+export function getBrandVariants(
+  brandName: string | null | undefined,
+  domain: string | null | undefined
+): string[] {
+  const variants = new Set<string>()
+  const push = (s: string | null | undefined) => {
+    if (!s) return
+    const trimmed = s.trim()
+    if (trimmed.length >= 2) variants.add(trimmed)
+  }
+
+  // 1. Business name as-is, aliases, and segments
+  if (brandName) {
+    for (const a of extractAliases(brandName)) push(a)
+    // Tight-join multi-word names — "Perfume Club" → "perfumeclub"
+    const noSpaces = brandName.replace(/\s+/g, '').toLowerCase()
+    if (noSpaces.length >= 4 && noSpaces !== brandName.toLowerCase()) push(noSpaces)
+  }
+
+  // 2. Extract brand-part from domain (perfumeclub.co.il → perfumeclub)
+  if (domain) {
+    const cleaned = domain
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase()
+    const firstLabel = cleaned.split('.')[0]
+    if (firstLabel && firstLabel.length >= 3) {
+      push(firstLabel)
+      // 3. Spaced form for compound names like "perfumeclub" → "perfume club"
+      const spaced = splitCompound(firstLabel)
+      if (spaced && spaced !== firstLabel) push(spaced)
+      // 4. With www prefix
+      push(`www.${firstLabel}`)
+      // 5. Full domain variations
+      push(cleaned)
+      push(`www.${cleaned}`)
+    }
+  }
+
+  return Array.from(variants)
 }
 
 /**
