@@ -182,15 +182,22 @@ export function detectCategory(
 ): BusinessCategory {
   const text = `${business} ${domain} ${keywords.join(' ')}`.toLowerCase()
 
+  // High-priority signals — check these FIRST to override weaker signals.
+  // Flower/florist signals are high-priority; they override gift signals.
+  if (/(flower|florist|פרחים|זרים|זר|משלוח פרחים|משלוחי פרחים|זר פרחים|זרי פרחים|חנות פרחים|bouquets|flower delivery|erez-flowers)/.test(text))
+    return 'florist'
+
   if (/(perfume|fragrance|cologne|פרפיום|בושם|בשמים|או דה פרפיום|או דה טואלט)/.test(text)) return 'perfume'
   if (/(ניקיון|cleaner|cleaning|פוליש|נקיון|פוליסה|nettoyage)/.test(text)) return 'cleaning'
   if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text))
     return 'agency'
   if (/(sportwear|sportswear|sports|ספורט|נעלי ריצה|טייץ|adidas|nike|אדידס|נייקי|פומה|puma)/.test(text)) return 'sports_store'
+
+  // Gift signals — checked AFTER florist so flowers aren't misclassified as gifts.
   if (/(matnot|מתנ|gift shop|gifts|presents|מתנות)/.test(text)) return 'gifts'
+
   if (/(appliance|מקרר|מכונת כביסה|תנור|מוצרי חשמל|חשמל ביתי|electrolux|whirlpool)/.test(text)) return 'appliance_store'
   if (/(saas|app|software|cloud|platform|api|\.io|\.ai)/.test(text)) return 'saas'
-  if (/(flower|florist|פרחים|זרים|זר)/.test(text)) return 'florist'
   if (/(restaurant|cafe|food|bistro|מסעדה|קפה|אוכל|פיצה)/.test(text)) return 'restaurant'
   if (/(clinic|hospital|medical|doctor|dental|מרפאה|רופא|רפואה|שיניים)/.test(text)) return 'healthcare'
   if (/(law|legal|attorney|lawyer|עורך דין|עורכי דין|משפט)/.test(text)) return 'legal'
