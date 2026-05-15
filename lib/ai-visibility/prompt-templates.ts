@@ -925,8 +925,26 @@ export function generatePromptSuggestions({
 /**
  * Weight suggestions by offering type: 70% primary, 20% local, 10% secondary/generic.
  */
-function weightByOffering(built: Array<{ offering: string }>, limit: number) {
-  const byOffering: Record<string, typeof built> = {
+function weightByOffering(
+  built: Array<{
+    def: QueryDef
+    prompt: string
+    score: number
+    themeMatched: Array<keyof KeywordThemes>
+    offering: string
+  }>,
+  limit: number
+) {
+  const byOffering: Record<
+    string,
+    Array<{
+      def: QueryDef
+      prompt: string
+      score: number
+      themeMatched: Array<keyof KeywordThemes>
+      offering: string
+    }>
+  > = {
     primary: [],
     local: [],
     secondary: [],
@@ -938,7 +956,14 @@ function weightByOffering(built: Array<{ offering: string }>, limit: number) {
     else byOffering.generic.push(item)
   }
 
-  const result: typeof built = []
+  type Built = {
+    def: QueryDef
+    prompt: string
+    score: number
+    themeMatched: Array<keyof KeywordThemes>
+    offering: string
+  }
+  const result: Built[] = []
   const needed = {
     primary: Math.round(limit * 0.7),
     local: Math.round(limit * 0.2),
