@@ -9,12 +9,12 @@
  * with keyword-derived variants.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import { generatePromptSuggestions, PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
-import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
+import { createI18n } from '@/lib/ai-visibility/i18n'
 
 const INTENT_TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
   brand: 'info',
@@ -52,8 +52,9 @@ export default function PromptSuggestions({
   keywords?: string[]
   onAdded: () => void
 }) {
-  const t = useMemo(() => createI18n(language, country), [language, country])
-  const isHebrew = detectHebrew(language, country)
+  // UI is always Hebrew/RTL — scan parameters (language/country) remain separate
+  const t = useMemo(() => createI18n('he', 'IL'), [])
+  const isHebrew = true
 
   const intentLabel = (intent: string): string => {
     switch (intent) {
@@ -75,32 +76,62 @@ export default function PromptSuggestions({
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Session-level seen tracking — avoids showing the same prompts again.
+  // Reset when the entire pool is exhausted.
+  const seenPromptsRef = useRef<Set<string>>(new Set())
+
+  // Normalize prompt text for dedup comparison
+  function normalizePrompt(p: string): string {
+    return p.toLowerCase().replace(/[?!.,;:'"״׳`\-–—]/g, '').replace(/\s+/g, ' ').trim()
+  }
+
+  // Pick a mixed set of suggestions, prioritizing unseen items and variety of intents.
+  function pickMixedSet(
+    allSuggestions: PromptSuggestion[],
+    seenSet: Set<string>,
+    limit = 6
+  ): PromptSuggestion[] {
+    const unseen = allSuggestions.filter((s) => !seenSet.has(normalizePrompt(s.prompt)))
+    const pool = unseen.length >= limit ? unseen : allSuggestions
+
+    // If we had to fall back to full pool, reset session memory
+    if (unseen.length < limit) seenSet.clear()
+
+    // Group by intent for mixing
+    const byIntent = new Map<string, PromptSuggestion[]>()
+    for (const s of pool) {
+      const list = byIntent.get(s.intent) || []
+      list.push(s)
+      byIntent.set(s.intent, list)
+    }
+
+    // Round-robin pick across intents — ensures variety, avoids same-pattern sets
+    const picked: PromptSuggestion[] = []
+    const intentKeys = Array.from(byIntent.keys())
+    let safety = 0
+    while (picked.length < limit && safety < 200) {
+      let advanced = false
+      for (const intent of intentKeys) {
+        if (picked.length >= limit) break
+        const list = byIntent.get(intent)
+        if (list && list.length > 0) {
+          picked.push(list.shift()!)
+          advanced = true
+        }
+      }
+      if (!advanced) break
+      safety++
+    }
+
+    // Record what we picked so the next regenerate avoids them
+    for (const s of picked) seenSet.add(normalizePrompt(s.prompt))
+    return picked
+  }
+
   // Generate fresh suggestions when modal opens
   useEffect(() => {
     if (open) {
-      setSuggestions(
-        generatePromptSuggestions({
-          businessName,
-          domain,
-          city,
-          country,
-          language,
-          keywords,
-          shuffle: false,
-        })
-      )
-      setSelectedIds(new Set())
-      setError(null)
-    }
-  }, [open, businessName, domain, city, country, language, keywords])
-
-  async function regenerate() {
-    setRegenerating(true)
-    setError(null)
-    // Small artificial delay for visual feedback
-    await new Promise((r) => setTimeout(r, 250))
-    setSuggestions(
-      generatePromptSuggestions({
+      const all = generatePromptSuggestions({
         businessName,
         domain,
         city,
@@ -108,8 +139,30 @@ export default function PromptSuggestions({
         language,
         keywords,
         shuffle: true,
+        limit: 30,
       })
-    )
+      setSuggestions(pickMixedSet(all, seenPromptsRef.current, 6))
+      setSelectedIds(new Set())
+      setError(null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, businessName, domain, city, country, language, keywords])
+
+  async function regenerate() {
+    setRegenerating(true)
+    setError(null)
+    await new Promise((r) => setTimeout(r, 250))
+    const all = generatePromptSuggestions({
+      businessName,
+      domain,
+      city,
+      country,
+      language,
+      keywords,
+      shuffle: true,
+      limit: 30,
+    })
+    setSuggestions(pickMixedSet(all, seenPromptsRef.current, 6))
     setSelectedIds(new Set())
     setRegenerating(false)
   }

@@ -18,7 +18,7 @@
  * the drawer for the just-completed scan.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
@@ -781,6 +781,57 @@ function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics
 }
 
 /**
+ * Highlight matched brand variants and domain inside text.
+ * Returns React nodes with matched portions wrapped in a styled span.
+ * Case-insensitive. Hebrew/RTL safe — only renders the text, doesn't modify raw.
+ */
+function highlightMatches(
+  text: string,
+  brandVariants: string[],
+  targetDomain: string | null
+): React.ReactNode {
+  if (!text) return text
+
+  // Build a unique, sorted-by-length-desc list of search terms
+  const terms = new Set<string>()
+  for (const v of brandVariants) {
+    if (v && v.trim().length >= 2) terms.add(v.trim())
+  }
+  if (targetDomain && targetDomain.trim().length >= 2) {
+    const cleaned = targetDomain.trim().toLowerCase()
+    terms.add(cleaned)
+    terms.add(`www.${cleaned}`)
+    terms.add(`https://${cleaned}`)
+    terms.add(`http://${cleaned}`)
+    terms.add(`https://www.${cleaned}`)
+    terms.add(`http://www.${cleaned}`)
+  }
+  if (terms.size === 0) return text
+
+  const sortedTerms = Array.from(terms).sort((a, b) => b.length - a.length)
+  const escaped = sortedTerms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'gi')
+
+  const parts = text.split(pattern)
+  const lowerTerms = new Set(sortedTerms.map((s) => s.toLowerCase()))
+
+  return parts.map((part, i) => {
+    if (!part) return null
+    if (lowerTerms.has(part.toLowerCase())) {
+      return (
+        <span
+          key={i}
+          className="font-bold text-emerald-700 bg-emerald-50 px-1 rounded"
+        >
+          {part}
+        </span>
+      )
+    }
+    return <React.Fragment key={i}>{part}</React.Fragment>
+  })
+}
+
+/**
  * Find which brand variant (or domain) actually appears in the response text,
  * for display as a chip on the result row. Falls back to first variant if
  * the response text isn't loaded yet but the row is marked mentioned.
@@ -791,23 +842,37 @@ function findMatchedLabels(
   targetDomain: string | null,
   mentioned: boolean,
   cited: boolean
-): { brandLabels: string[]; domainLabel: string | null } {
+): { brandLabels: string[]; domainLabel: string | null; reMentioned: boolean; reCited: boolean } {
   const labels: string[] = []
   let domainLabel: string | null = null
+  let reMentioned = mentioned
+  let reCited = cited
   if (responseText) {
     const lower = responseText.toLowerCase()
     for (const v of brandVariants) {
       if (lower.includes(v.toLowerCase())) labels.push(v)
     }
-    if (targetDomain && lower.includes(targetDomain.toLowerCase())) {
-      domainLabel = targetDomain
+    if (targetDomain) {
+      const cleaned = targetDomain.toLowerCase()
+      // Detect bare domain, www.domain, full URL, or markdown link
+      if (
+        lower.includes(cleaned) ||
+        lower.includes(`www.${cleaned}`) ||
+        lower.includes(`https://${cleaned}`) ||
+        lower.includes(`http://${cleaned}`)
+      ) {
+        domainLabel = targetDomain
+        reCited = true
+      }
     }
+    // Re-evaluate mentioned flag based on actual content
+    if (labels.length > 0) reMentioned = true
   } else {
     // Row preview without responseText loaded: show first brand variant as a hint.
     if (mentioned && brandVariants[0]) labels.push(brandVariants[0])
   }
-  if (cited && targetDomain && !domainLabel) domainLabel = targetDomain
-  return { brandLabels: Array.from(new Set(labels)), domainLabel }
+  if (reCited && targetDomain && !domainLabel) domainLabel = targetDomain
+  return { brandLabels: Array.from(new Set(labels)), domainLabel, reMentioned, reCited }
 }
 
 function ResultRowCard({
@@ -828,7 +893,7 @@ function ResultRowCard({
   t: T
 }) {
   const meta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
-  const { brandLabels, domainLabel } = findMatchedLabels(
+  const { brandLabels, domainLabel, reMentioned, reCited } = findMatchedLabels(
     result.responseText,
     brandVariants,
     targetDomain,
@@ -855,12 +920,12 @@ function ResultRowCard({
             {meta && <meta.Icon size={16} className={meta.accent} />}
             <span className="text-xs text-slate-600 font-medium">{meta?.name || result.engine}</span>
 
-            {result.mentioned ? (
+            {reMentioned ? (
               <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>
             ) : (
               <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>
             )}
-            {result.targetCited ? (
+            {reCited ? (
               <Badge variant="success" className="!text-xs">{t('target_cited')}</Badge>
             ) : (
               <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>
@@ -990,7 +1055,7 @@ function ResultDetailDrawer({
   if (!open) return null
 
   const engineMeta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
-  const { brandLabels, domainLabel } = findMatchedLabels(
+  const { brandLabels, domainLabel, reMentioned, reCited } = findMatchedLabels(
     result.responseText,
     brandVariants,
     targetDomain,
@@ -1037,14 +1102,14 @@ function ResultDetailDrawer({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-xs text-slate-600">{t('mentioned')}</div>
-                <div className={`text-lg font-bold ${result.mentioned ? 'text-emerald-700' : 'text-slate-400'}`}>
-                  {result.mentioned ? '✓' : '—'}
+                <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {reMentioned ? '✓' : '—'}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-slate-600">{t('target_cited')}</div>
-                <div className={`text-lg font-bold ${result.targetCited ? 'text-emerald-700' : 'text-slate-400'}`}>
-                  {result.targetCited ? '✓' : '—'}
+                <div className={`text-lg font-bold ${reCited ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {reCited ? '✓' : '—'}
                 </div>
               </div>
             </div>
@@ -1104,7 +1169,7 @@ function ResultDetailDrawer({
                   .split('\n')
                   .map((line, i) => (
                     <p key={i} className="leading-relaxed">
-                      {line || <br />}
+                      {line ? highlightMatches(line, brandVariants, targetDomain) : <br />}
                     </p>
                   ))}
               </div>
