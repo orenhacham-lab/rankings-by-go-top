@@ -767,6 +767,322 @@ function isNearDuplicate(a: string, b: string): boolean {
 }
 
 /**
+ * Per-category default offerings used to infer a BusinessProfile from project data.
+ * Each entry contains primary offerings (what the business definitely does),
+ * secondary offerings (related but not the focus), and excluded topics
+ * (unrelated themes that must never dominate the question set).
+ */
+const CATEGORY_PROFILES: Record<
+  BusinessCategory,
+  { primaryOfferings: string[]; secondaryOfferings: string[]; excludedTopics: string[] }
+> = {
+  florist: {
+    primaryOfferings: [
+      'משלוחי פרחים', 'משלוח פרחים', 'זרי פרחים', 'זר פרחים', 'חנות פרחים',
+      'פרחים ליום הולדת', 'פרחים לשבת', 'פרחים רומנטיים', 'פרחים לחג',
+      'בוקטים', 'פרחים טריים', 'פרחי בר',
+      'flower delivery', 'bouquets', 'fresh flowers', 'flower shop',
+      'birthday flowers', 'romantic flowers', 'wedding flowers',
+    ],
+    secondaryOfferings: [
+      'מתנות עם פרחים', 'מארזים עם פרחים', 'אגרטלים', 'צמחים בעציץ',
+      'flower gifts', 'flower arrangements', 'potted plants',
+    ],
+    excludedTopics: [
+      'מתנות כלליות', 'גאדג\'טים', 'מוצרי בית', 'מארזים כלליים',
+      'מוצרי קוסמטיקה', 'general gifts', 'gadgets', 'home goods',
+    ],
+  },
+  perfume: {
+    primaryOfferings: [
+      'בשמים מקוריים', 'בשמים לנשים', 'בשמים לגברים', 'בשמי נישה',
+      'בשמים אונליין', 'או דה פרפיום', 'או דה טואלט', 'מבחר בשמים',
+      'authentic perfumes', 'perfumes for women', 'perfumes for men',
+      'niche perfumes', 'online perfumes', 'eau de parfum',
+    ],
+    secondaryOfferings: [
+      'מתנות ריח', 'דוגמיות בושם', 'מארזי בישום', 'בשמים בהנחה',
+      'fragrance gifts', 'perfume samples', 'perfume sets',
+    ],
+    excludedTopics: [
+      'קוסמטיקה כללית', 'איפור', 'טיפוח עור', 'תכשירי שיער',
+      'general cosmetics', 'makeup', 'skincare', 'hair products',
+    ],
+  },
+  agency: {
+    primaryOfferings: [
+      'קידום אתרים אורגני', 'פרסום ממומן בגוגל', 'שיווק דיגיטלי',
+      'ניהול קמפיינים', 'קידום אתרים מקומי', 'קידום SEO', 'גוגל אדס',
+      'organic SEO', 'Google Ads', 'digital marketing', 'PPC campaigns',
+      'local SEO', 'campaign management',
+    ],
+    secondaryOfferings: [
+      'בניית אתרים', 'ייעוץ שיווקי', 'מיתוג', 'ניהול רשתות חברתיות',
+      'web development', 'marketing consulting', 'branding', 'social media',
+    ],
+    excludedTopics: [
+      'תוכן כללי', 'בלוגים אישיים', 'general blogging', 'personal content',
+    ],
+  },
+  sports_store: {
+    primaryOfferings: [
+      'נעלי ספורט', 'נעלי ריצה', 'ציוד ספורט', 'בגדי ספורט', 'חנות ספורט',
+      'מותגי ספורט', 'sports shoes', 'running shoes', 'sportswear', 'sports gear',
+    ],
+    secondaryOfferings: [
+      'אביזרי ספורט', 'מתנות לרץ', 'תיקי ספורט',
+      'sports accessories', 'gifts for runners',
+    ],
+    excludedTopics: [
+      'בגדי יום-יום', 'אופנת רחוב', 'casual fashion', 'streetwear',
+    ],
+  },
+  gifts: {
+    primaryOfferings: [
+      'מתנות מקוריות', 'מתנה ליום הולדת', 'מתנות לחתונה', 'מתנות לעובדים',
+      'מתנה לחברה', 'מתנות לאמא', 'מתנות לאבא',
+      'unique gifts', 'birthday gifts', 'wedding gifts', 'corporate gifts',
+    ],
+    secondaryOfferings: [
+      'מארזים מעוצבים', 'מתנות אישיות', 'gift baskets', 'personalized gifts',
+    ],
+    excludedTopics: [
+      'מצרכים כלליים', 'מוצרי משרד', 'office supplies', 'household items',
+    ],
+  },
+  appliance_store: {
+    primaryOfferings: [
+      'מקרר', 'מכונת כביסה', 'תנור', 'מייבש כביסה', 'מדיח כלים', 'מזגן',
+      'מוצרי חשמל', 'fridge', 'washing machine', 'oven', 'dryer', 'dishwasher',
+      'home appliances',
+    ],
+    secondaryOfferings: [
+      'אחריות מורחבת', 'התקנה', 'שירות', 'extended warranty', 'installation',
+    ],
+    excludedTopics: [
+      'אלקטרוניקה ניידת', 'טלפונים סלולריים', 'mobile electronics', 'smartphones',
+    ],
+  },
+  saas: {
+    primaryOfferings: [
+      'תוכנה לעסקים', 'כלי SaaS', 'פלטפורמה דיגיטלית',
+      'business software', 'SaaS tool', 'platform', 'cloud software',
+    ],
+    secondaryOfferings: [
+      'חבילות בתשלום', 'ניסיון חינם', 'integrations', 'pricing plans',
+    ],
+    excludedTopics: [
+      'חומרה', 'מוצרים פיזיים', 'hardware', 'physical products',
+    ],
+  },
+  cleaning: {
+    primaryOfferings: [
+      'ניקיון משרדים', 'ניקיון בתים', 'חברת ניקיון', 'שירותי ניקיון',
+      'ניקיון אחרי שיפוץ', 'office cleaning', 'home cleaning', 'cleaning services',
+    ],
+    secondaryOfferings: [
+      'ניקוי שטיחים', 'ניקיון חלונות', 'carpet cleaning', 'window cleaning',
+    ],
+    excludedTopics: [
+      'מוצרי ניקיון', 'מטהרי אוויר', 'cleaning products', 'air fresheners',
+    ],
+  },
+  ecommerce: {
+    primaryOfferings: [
+      'חנות אונליין', 'קניות באינטרנט', 'אונליין שופינג',
+      'online store', 'online shopping', 'ecommerce',
+    ],
+    secondaryOfferings: [
+      'משלוחים', 'החזרות', 'shipping', 'returns',
+    ],
+    excludedTopics: [],
+  },
+  restaurant: {
+    primaryOfferings: [
+      'מסעדה', 'תפריט', 'הזמנת מקום', 'ארוחה', 'restaurant', 'menu', 'reservation',
+    ],
+    secondaryOfferings: [
+      'משלוחים', 'תפריט מיוחד', 'delivery', 'special menu',
+    ],
+    excludedTopics: [
+      'מתכונים', 'בישול ביתי', 'recipes', 'home cooking',
+    ],
+  },
+  healthcare: {
+    primaryOfferings: [
+      'מרפאה פרטית', 'רופא מומחה', 'טיפולים רפואיים',
+      'private clinic', 'medical specialist', 'medical treatments',
+    ],
+    secondaryOfferings: [
+      'בדיקות', 'ייעוץ', 'consultations', 'tests',
+    ],
+    excludedTopics: [
+      'תרופות כלליות', 'תוספי תזונה', 'general medications', 'supplements',
+    ],
+  },
+  legal: {
+    primaryOfferings: [
+      'עורך דין', 'ייעוץ משפטי', 'משרד עורכי דין', 'דיני משפחה',
+      'lawyer', 'legal consultation', 'law firm',
+    ],
+    secondaryOfferings: [
+      'נוטריון', 'תרגום משפטי', 'notary services',
+    ],
+    excludedTopics: [
+      'ייעוץ עצמאי', 'self-help legal', 'DIY legal',
+    ],
+  },
+  real_estate: {
+    primaryOfferings: [
+      'תיווך', 'דירות למכירה', 'דירות להשכרה', 'נדל"ן',
+      'real estate', 'apartments for sale', 'apartments for rent',
+    ],
+    secondaryOfferings: [
+      'ייעוץ משכנתא', 'הערכת שווי', 'mortgage advice',
+    ],
+    excludedTopics: [
+      'עיצוב פנים', 'שיפוצים', 'interior design', 'renovations',
+    ],
+  },
+  fitness: {
+    primaryOfferings: [
+      'חדר כושר', 'אימון אישי', 'מאמן כושר', 'יוגה', 'קרוספיט',
+      'gym', 'personal training', 'fitness trainer', 'yoga', 'crossfit',
+    ],
+    secondaryOfferings: [
+      'תוכניות תזונה', 'תוספי כושר', 'nutrition plans', 'supplements',
+    ],
+    excludedTopics: [
+      'דיאטה כללית', 'general dieting',
+    ],
+  },
+  beauty: {
+    primaryOfferings: [
+      'מספרה', 'סלון יופי', 'איפור', 'מניקור', 'פדיקור', 'טיפולי פנים',
+      'hair salon', 'beauty salon', 'makeup', 'manicure', 'pedicure', 'facials',
+    ],
+    secondaryOfferings: [
+      'מוצרי טיפוח', 'מוצרי שיער', 'hair products', 'beauty products',
+    ],
+    excludedTopics: [],
+  },
+  education: {
+    primaryOfferings: [
+      'קורסים', 'הכשרה מקצועית', 'מכללה', 'בית ספר', 'הוראה',
+      'courses', 'professional training', 'school', 'academy',
+    ],
+    secondaryOfferings: [
+      'הסמכות', 'תעודות', 'certifications',
+    ],
+    excludedTopics: [
+      'בית ספר ציבורי', 'public school',
+    ],
+  },
+  local_service: {
+    primaryOfferings: [
+      'חשמלאי', 'אינסטלטור', 'בעל מקצוע', 'תיקונים בבית',
+      'electrician', 'plumber', 'handyman', 'home repairs',
+    ],
+    secondaryOfferings: [
+      'שיפוצים', 'תחזוקה', 'renovations', 'maintenance',
+    ],
+    excludedTopics: [
+      'מוצרי DIY', 'DIY products', 'tools for sale',
+    ],
+  },
+  generic: {
+    primaryOfferings: [],
+    secondaryOfferings: [],
+    excludedTopics: [],
+  },
+}
+
+/**
+ * Detect Israeli cities mentioned in any of the provided strings.
+ */
+function detectIsraeliCities(...strings: (string | null | undefined)[]): string[] {
+  const text = strings.filter(Boolean).join(' ').toLowerCase()
+  const cities = [
+    'ירושלים', 'תל אביב', 'תל-אביב', 'חיפה', 'באר שבע', 'באר-שבע',
+    'ראשון לציון', 'פתח תקווה', 'אשדוד', 'אשקלון', 'נתניה', 'הרצליה',
+    'רעננה', 'רמת גן', 'גבעתיים', 'בני ברק', 'חולון', 'בת ים',
+    'מעלה אדומים', 'מעלה-אדומים', 'מודיעין', 'כפר סבא', 'נצרת',
+    'טבריה', 'אילת', 'עפולה', 'קריות', 'יבנה', 'רחובות', 'ראש העין',
+  ]
+  const found = new Set<string>()
+  for (const c of cities) {
+    if (text.includes(c)) found.add(c.replace('-', ' '))
+  }
+  return Array.from(found)
+}
+
+/**
+ * Infer a BusinessProfile from existing project data.
+ *
+ * Pipeline: detect category → seed from CATEGORY_PROFILES → augment with
+ * keywords/locations from the project. No database changes needed.
+ *
+ * Example — for "הפרחים של ארז" + "erez-flowers.co.il":
+ *   { primaryCategory: 'florist',
+ *     primaryOfferings: ['משלוחי פרחים', 'זרי פרחים', ...],
+ *     excludedTopics: ['מתנות כלליות', ...] }
+ */
+export function inferBusinessProfile(args: {
+  businessName: string | null
+  domain: string | null
+  keywords?: string[]
+  city?: string | null
+  country?: string | null
+}): BusinessProfile & { primaryCategory: BusinessCategory } {
+  const { businessName, domain, keywords = [], city, country } = args
+  const category = detectCategory(businessName || '', domain || '', keywords)
+  const template = CATEGORY_PROFILES[category] || CATEGORY_PROFILES.generic
+
+  const primaryOfferings = new Set<string>(template.primaryOfferings)
+  const secondaryOfferings = new Set<string>(template.secondaryOfferings)
+  const excludedTopics = new Set<string>(template.excludedTopics)
+
+  // Augment primary offerings from tracked keywords — these are what the
+  // business actively tracks, so they reflect its real focus areas.
+  for (const raw of keywords) {
+    const kw = (raw || '').trim()
+    if (!kw || kw.length < 3) continue
+    // Skip if matches an excluded topic
+    if (Array.from(excludedTopics).some((ex) => kw.toLowerCase().includes(ex.toLowerCase()))) continue
+    // Skip pure brand-name keywords
+    if (businessName && kw.toLowerCase() === businessName.toLowerCase()) continue
+    primaryOfferings.add(kw)
+  }
+
+  // Detect locations from city + keywords + business name
+  const detected = detectIsraeliCities(city, businessName, domain, keywords.join(' '))
+  const serviceLocations = new Set<string>(detected)
+  if (city) serviceLocations.add(city)
+
+  return {
+    primaryCategory: category,
+    primaryOfferings: Array.from(primaryOfferings),
+    secondaryOfferings: Array.from(secondaryOfferings),
+    serviceLocations: Array.from(serviceLocations),
+    excludedTopics: Array.from(excludedTopics),
+  }
+}
+
+/**
+ * Normalized substring match for offering/excluded-topic comparisons.
+ */
+function textMatchesAny(text: string, candidates: string[]): boolean {
+  if (!candidates || candidates.length === 0) return false
+  const lowered = text.toLowerCase()
+  for (const c of candidates) {
+    const term = (c || '').toLowerCase().trim()
+    if (!term || term.length < 3) continue
+    if (lowered.includes(term)) return true
+  }
+  return false
+}
+
+/**
  * Build a reason string explaining why a suggestion was included.
  */
 function buildReason(
@@ -838,7 +1154,17 @@ export function generatePromptSuggestions({
   const lang = language === 'en' ? 'en' : 'he'
   const themes = extractThemes(keywords)
   const ctx: TemplateContext = { business, domain: dom, city, country, language: lang, themes }
-  const category = detectCategory(business, dom, keywords)
+
+  // Always derive a BusinessProfile — infer from project data when none given.
+  // This is what drives the 70/20/10 weighting + excluded-topic filtering.
+  const effectiveProfile = profile ?? inferBusinessProfile({
+    businessName, domain, keywords, city, country,
+  })
+  const category =
+    'primaryCategory' in (effectiveProfile as Record<string, unknown>)
+      ? ((effectiveProfile as { primaryCategory: BusinessCategory }).primaryCategory)
+      : detectCategory(business, dom, keywords)
+
   const bank = lang === 'he' ? HE_BANK : EN_BANK
   const defs = bank[category] || bank.generic
   const intentLabels = lang === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
@@ -860,7 +1186,12 @@ export function generatePromptSuggestions({
   for (const def of eligible) {
     const filled = fillTemplate(def.text, ctx).trim()
     if (lang === 'he' && !isReadableHebrew(filled)) continue
+
+    // Excluded-topic filter: drop any question that hits an excluded theme
+    if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
+
     let score = def.score
+    let effectiveOffering = def.offering || 'generic'
     const matched: Array<keyof KeywordThemes> = []
     if (def.themeBoost) {
       for (const [key, boost] of Object.entries(def.themeBoost)) {
@@ -872,8 +1203,24 @@ export function generatePromptSuggestions({
         }
       }
     }
+
+    // Profile-driven boosts: if the question text matches any primary offering,
+    // boost it strongly and re-tag it as 'primary' so the weighting picks it up.
+    if (textMatchesAny(filled, effectiveProfile.primaryOfferings || [])) {
+      score += 10
+      effectiveOffering = 'primary'
+    } else if (textMatchesAny(filled, effectiveProfile.secondaryOfferings || [])) {
+      score += 4
+      if (effectiveOffering === 'generic') effectiveOffering = 'secondary'
+    }
+
+    // Location boost if a service location matches the city template
+    if (def.requiresCity && (effectiveProfile.serviceLocations || []).length > 0) {
+      score += 3
+    }
+
     if (score < MIN_QUALITY_SCORE) continue
-    built.push({ def, prompt: filled, score, themeMatched: matched, offering: def.offering || 'generic' })
+    built.push({ def, prompt: filled, score, themeMatched: matched, offering: effectiveOffering })
   }
 
   // Semantic deduplication — drop near-duplicates, keep higher-scoring one
@@ -894,11 +1241,8 @@ export function generatePromptSuggestions({
     kept.push(item)
   }
 
-  // Offering-based weighting: distribute final results
-  let suggestions: Built[] = kept
-  if (profile) {
-    suggestions = weightByOffering(kept, limit)
-  }
+  // Always apply offering-based weighting now that we always have a profile.
+  const suggestions: Built[] = weightByOffering(kept, limit)
 
   // Build final suggestions
   const result: PromptSuggestion[] = suggestions.map((item, idx) => ({
