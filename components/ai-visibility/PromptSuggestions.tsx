@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
-import { generatePromptSuggestions, PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 
 const INTENT_TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
@@ -39,6 +39,7 @@ export default function PromptSuggestions({
   country,
   language,
   keywords,
+  manualProfile = null,
   onAdded,
 }: {
   open: boolean
@@ -50,6 +51,7 @@ export default function PromptSuggestions({
   country: string | null
   language: string | null
   keywords?: string[]
+  manualProfile?: ManualAIProfile | null
   onAdded: () => void
 }) {
   // UI is always Hebrew/RTL — scan parameters (language/country) remain separate
@@ -115,6 +117,7 @@ export default function PromptSuggestions({
         country,
         language,
         keywords,
+        manualProfile,
         diversify: true,
         limit: 6,
       })
@@ -123,7 +126,7 @@ export default function PromptSuggestions({
       setError(null)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, businessName, domain, city, country, language, keywords])
+  }, [open, businessName, domain, city, country, language, keywords, manualProfile])
 
   async function regenerate() {
     setRegenerating(true)
@@ -136,6 +139,7 @@ export default function PromptSuggestions({
       country,
       language,
       keywords,
+      manualProfile,
       diversify: true,
       excludePrompts: Array.from(seenPromptsRef.current),
       previousSet: lastShownPromptsRef.current,

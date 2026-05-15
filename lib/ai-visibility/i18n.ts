@@ -200,6 +200,46 @@ const STRINGS = {
   what_was_mentioned: { he: 'מה הוזכר', en: 'What was mentioned' },
   view_details: { he: 'פרטים', en: 'Details' },
   scanned_at: { he: 'נסרק', en: 'Scanned' },
+
+  // AI Business Profile panel
+  ai_business_profile: { he: 'פרופיל AI לעסק', en: 'AI Business Profile' },
+  ai_business_profile_help: {
+    he: 'הפרופיל משפיע רק על שאלות AI מומלצות, לא על הסריקות עצמן.',
+    en: 'This profile affects only recommended AI questions, not scans themselves.',
+  },
+  primary_category: { he: 'קטגוריה ראשית', en: 'Primary category' },
+  secondary_categories: { he: 'קטגוריות משניות', en: 'Secondary categories' },
+  excluded_topics: { he: 'נושאים לא רצויים', en: 'Excluded topics' },
+  auto_detect: { he: 'זיהוי אוטומטי', en: 'Auto-detect' },
+  auto_detected: { he: 'זוהה אוטומטית', en: 'Auto-detected' },
+  manually_set: { he: 'הוגדר ידנית', en: 'Manually set' },
+  auto_badge: { he: 'אוטומטי', en: 'Auto' },
+  manual_badge: { he: 'ידני', en: 'Manual' },
+  save_profile: { he: 'שמור פרופיל AI', en: 'Save AI Profile' },
+  reset_to_auto: { he: 'איפוס לזיהוי אוטומטי', en: 'Reset to auto-detect' },
+  add_tag_placeholder: { he: 'הוסף ולחץ Enter', en: 'Add and press Enter' },
+  profile_saved: { he: 'הפרופיל נשמר', en: 'Profile saved' },
+  profile_reset: { he: 'הפרופיל אופס', en: 'Profile reset' },
+
+  // Category labels for the dropdown (BusinessCategory → display name)
+  cat_florist: { he: 'חנות פרחים', en: 'Flower shop' },
+  cat_perfume: { he: 'חנות בשמים', en: 'Perfume shop' },
+  cat_gifts: { he: 'חנות מתנות', en: 'Gift shop' },
+  cat_agency: { he: 'סוכנות שיווק / SEO', en: 'Marketing / SEO agency' },
+  cat_sports_store: { he: 'חנות ספורט', en: 'Sports store' },
+  cat_appliance_store: { he: 'חנות מוצרי חשמל', en: 'Appliance store' },
+  cat_ecommerce: { he: 'חנות אונליין', en: 'Online store' },
+  cat_local_service: { he: 'שירות מקומי', en: 'Local service' },
+  cat_cleaning: { he: 'חברת ניקיון', en: 'Cleaning company' },
+  cat_saas: { he: 'מוצר SaaS', en: 'SaaS product' },
+  cat_restaurant: { he: 'מסעדה', en: 'Restaurant' },
+  cat_healthcare: { he: 'שירותי בריאות', en: 'Healthcare' },
+  cat_legal: { he: 'משרד עורכי דין', en: 'Law firm' },
+  cat_real_estate: { he: 'נדל״ן', en: 'Real estate' },
+  cat_fitness: { he: 'כושר', en: 'Fitness' },
+  cat_beauty: { he: 'יופי וטיפוח', en: 'Beauty & wellness' },
+  cat_education: { he: 'הכשרה והוראה', en: 'Education' },
+  cat_generic: { he: 'אחר', en: 'Other' },
 } as const
 
 type StringKey = keyof typeof STRINGS

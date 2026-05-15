@@ -1157,12 +1157,28 @@ function buildReason(
 }
 
 /**
+ * Manual AI Business Profile — user override stored per project.
+ * When `mode` is 'manual', the generator uses these values directly.
+ * When `mode` is 'auto' (or the profile is null), auto-detection is used.
+ */
+export type ManualAIProfile = {
+  mode: 'auto' | 'manual'
+  primaryCategory: BusinessCategory | null
+  secondaryCategories: string[]
+  excludedTopics: string[]
+}
+
+/**
  * Generate smart AI query suggestions, business-context driven.
  *
  * With optional business profile: weights offerings (70% primary, 20% local, 10% secondary).
  * @param ctx Project context: business, domain, city, country, language
  * @param keywords Tracked keywords used ONLY as theme signals
  * @param profile Optional business profile with offering preferences
+ * @param manualProfile User-saved manual override. When `mode='manual'`, its
+ *   primaryCategory wins over auto-detection, its secondaryCategories augment
+ *   secondaryOfferings (10% influence), and its excludedTopics are always
+ *   filtered. When `mode='auto'` or null, this is ignored.
  * @param shuffle If true, randomize order before slicing
  * @param limit Maximum number of suggestions to return (default 12)
  * @param excludePrompts Normalized prompt texts already shown in the session
@@ -1179,6 +1195,7 @@ export function generatePromptSuggestions({
   language = 'he',
   keywords = [],
   profile = null,
+  manualProfile = null,
   shuffle = false,
   limit = 12,
   excludePrompts = [],
@@ -1192,6 +1209,7 @@ export function generatePromptSuggestions({
   language?: string | null
   keywords?: string[]
   profile?: BusinessProfile | null
+  manualProfile?: ManualAIProfile | null
   shuffle?: boolean
   limit?: number
   excludePrompts?: string[]
@@ -1206,13 +1224,35 @@ export function generatePromptSuggestions({
 
   // Always derive a BusinessProfile — infer from project data when none given.
   // This is what drives the 70/20/10 weighting + excluded-topic filtering.
-  const effectiveProfile = profile ?? inferBusinessProfile({
+  const autoProfile = profile ?? inferBusinessProfile({
     businessName, domain, keywords, city, country,
   })
-  const category =
-    'primaryCategory' in (effectiveProfile as Record<string, unknown>)
-      ? ((effectiveProfile as { primaryCategory: BusinessCategory }).primaryCategory)
-      : detectCategory(business, dom, keywords)
+
+  // If a manual profile is active, its primaryCategory overrides auto-detection
+  // and its excludedTopics/secondaryCategories augment the auto-inferred profile.
+  const hasManual = manualProfile && manualProfile.mode === 'manual'
+  const category: BusinessCategory = hasManual && manualProfile.primaryCategory
+    ? manualProfile.primaryCategory
+    : (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+
+  // Build the effective profile: keep auto-inferred offerings, but layer manual
+  // secondary categories + excluded topics on top so user choices win.
+  const effectiveProfile: BusinessProfile = hasManual
+    ? {
+        primaryOfferings: autoProfile.primaryOfferings || [],
+        // Manual secondary categories take precedence; auto values appended after.
+        secondaryOfferings: [
+          ...(manualProfile.secondaryCategories || []),
+          ...(autoProfile.secondaryOfferings || []),
+        ],
+        serviceLocations: autoProfile.serviceLocations || [],
+        // Manual excluded topics are ADDED to auto-detected ones (union).
+        excludedTopics: [
+          ...(manualProfile.excludedTopics || []),
+          ...(autoProfile.excludedTopics || []),
+        ],
+      }
+    : autoProfile
 
   const bank = lang === 'he' ? HE_BANK : EN_BANK
   const defs = bank[category] || bank.generic

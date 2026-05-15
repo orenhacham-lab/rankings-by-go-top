@@ -30,8 +30,9 @@ import {
   TrashIcon,
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
+import AIBusinessProfilePanel from './AIBusinessProfilePanel'
 import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
-import { generatePromptSuggestions, type PromptSuggestion } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 
@@ -126,6 +127,7 @@ export default function AIVisibilitySection({
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   const [scanningKey, setScanningKey] = useState<string | null>(null)
+  const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
 
   // Build brand variants once for reuse in result rows (mention chips)
   const brandVariants = useMemo(
@@ -234,6 +236,22 @@ export default function AIVisibilitySection({
     }
   }, [projectId])
 
+  // Load the saved manual AI Business Profile for this project (if any)
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/projects/${projectId}/ai-profile`)
+      .then((r) => (r.ok ? r.json() : { profile: null }))
+      .then((d) => {
+        if (!cancelled) setManualProfile(d.profile ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setManualProfile(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
+
   useEffect(() => {
     const suggestions = generatePromptSuggestions({
       businessName: projectBrandName,
@@ -242,10 +260,11 @@ export default function AIVisibilitySection({
       country: projectCountry,
       language: projectLanguage,
       keywords: projectKeywords,
+      manualProfile,
       shuffle: false,
     })
     setSuggestedQuestions(suggestions.slice(0, 4))
-  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords])
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile])
 
   useEffect(() => {
     loadAllResults()
@@ -519,6 +538,14 @@ export default function AIVisibilitySection({
       {/* TAB 2: AI QUERIES */}
       {currentTab === 'queries' && (
         <>
+          <AIBusinessProfilePanel
+            projectId={projectId}
+            businessName={projectBrandName}
+            domain={projectDomain}
+            keywords={projectKeywords || []}
+            initialProfile={manualProfile}
+            onChange={setManualProfile}
+          />
           <div className="flex items-center justify-between gap-4 mb-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">
               {t('ai_queries')} ({allPrompts.length})
@@ -683,6 +710,7 @@ export default function AIVisibilitySection({
         country={projectCountry}
         language={projectLanguage}
         keywords={projectKeywords}
+        manualProfile={manualProfile}
         onAdded={loadAllResults}
       />
 
