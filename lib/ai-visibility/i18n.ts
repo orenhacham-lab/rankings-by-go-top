@@ -20,8 +20,8 @@ const STRINGS = {
   delete_permanently: { he: 'מחק לצמיתות', en: 'Delete permanently' },
 
   // Header
-  ai_visibility: { he: 'AI Search Visibility', en: 'AI Search Visibility' },
-  ai_visibility_platform: { he: 'AI Search Visibility Platform', en: 'AI Search Visibility Platform' },
+  ai_visibility: { he: 'נראות ב-AI', en: 'AI Search Visibility' },
+  ai_visibility_platform: { he: 'נראות ב-AI', en: 'AI Search Visibility Platform' },
   monitor_engines: { he: 'מעקב אחר 6 מנועי AI', en: 'Monitor across 6 AI engines' },
   beta: { he: 'בטא', en: 'Beta' },
   suggest: { he: '✨ הצע', en: '✨ Suggest' },
