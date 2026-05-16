@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 
@@ -11,6 +12,7 @@ export const metadata = {
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      <PublicNav />
       <div className="flex-1 py-12 px-4">
         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <Breadcrumbs items={[{ label: 'מדיניות פרטיות', href: '/privacy' }]} />
