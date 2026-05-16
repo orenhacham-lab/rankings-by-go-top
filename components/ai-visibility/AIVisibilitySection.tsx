@@ -1429,7 +1429,7 @@ function NewAIQueryModal({
           />
         </div>
 
-        <div className="flex gap-2 border-t border-slate-200 pt-3">
+        <div className="flex gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
           <Button variant="outline" onClick={onClose} disabled={saving} className="flex-1">
             {t('cancel')}
           </Button>

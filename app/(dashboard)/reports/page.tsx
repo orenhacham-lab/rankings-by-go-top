@@ -728,7 +728,7 @@ function AIVisibilityReport({
             </TableBody>
           </Table>
           {reportData.results.length > 50 && (
-            <p className="text-xs text-slate-500 mt-2">מוצגות 50 מתוך {reportData.results.length} תוצאות</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">מוצגות 50 מתוך {reportData.results.length} תוצאות</p>
           )}
         </div>
       </div>

@@ -15,8 +15,8 @@ export default async function BillingPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">תוכניות מנויים</h1>
-      <p className="text-slate-600 mb-8">בחר את התוכנית המתאימה לך</p>
+      <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">תוכניות מנויים</h1>
+      <p className="text-slate-600 dark:text-slate-300 mb-8">בחר את התוכנית המתאימה לך</p>
 
       {entitlement.trialActive && (
         <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -111,10 +111,10 @@ function PlanCard({
     <div
       className={`rounded-lg border-2 p-6 ${
         isCurrent
-          ? 'border-blue-500 bg-blue-50'
+          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
           : isPopular
-            ? 'border-amber-400 bg-amber-50'
-            : 'border-slate-200 bg-white'
+            ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
+            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
       }`}
     >
       {isPopular && (
@@ -128,17 +128,17 @@ function PlanCard({
         </div>
       )}
 
-      <h3 className="text-xl font-bold text-slate-900 mb-2">{name}</h3>
+      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{name}</h3>
 
       <div className="mb-6">
-        <span className="text-4xl font-bold text-slate-900">₪{price}</span>
-        {period && <span className="text-slate-600 ml-2">{period}</span>}
+        <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">₪{price}</span>
+        {period && <span className="text-slate-600 dark:text-slate-300 ml-2">{period}</span>}
       </div>
 
       <ul className="space-y-3 mb-6">
         {features.map((feature, i) => (
-          <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
-            <span className="text-green-600 font-bold mt-0.5">✓</span>
+          <li key={i} className="text-sm text-slate-700 dark:text-slate-200 flex items-start gap-2">
+            <span className="text-green-600 dark:text-green-400 font-bold mt-0.5">✓</span>
             <span>{feature}</span>
           </li>
         ))}
@@ -147,7 +147,7 @@ function PlanCard({
       {isCurrent ? (
         <button
           disabled
-          className="w-full py-2 px-4 rounded-lg bg-slate-200 text-slate-600 font-semibold cursor-not-allowed"
+          className="w-full py-2 px-4 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold cursor-not-allowed"
         >
           התוכנית הנוכחית
         </button>

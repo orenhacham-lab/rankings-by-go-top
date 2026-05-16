@@ -81,30 +81,30 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <Card>
-          <div className="text-xs text-slate-500 mb-1">מנוע</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">מנוע</div>
           <EngineBadge engine={target.engine_type} />
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">מיקום נוכחי</div>
-          <div className="text-2xl font-bold text-slate-800">
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">מיקום נוכחי</div>
+          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
             {latestResult?.found ? `#${latestResult.position}` : '—'}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">המיקום הטוב ביותר</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">המיקום הטוב ביותר</div>
           <div className="text-2xl font-bold text-green-600">
             {bestPosition !== null ? `#${bestPosition}` : '—'}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">המיקום הנמוך ביותר</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">המיקום הנמוך ביותר</div>
           <div className="text-2xl font-bold text-red-500">
             {worstPosition !== null ? `#${worstPosition}` : '—'}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">ממוצע</div>
-          <div className="text-2xl font-bold text-slate-800">
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">ממוצע</div>
+          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
             {avgPosition !== null ? `#${avgPosition}` : '—'}
           </div>
         </Card>
@@ -112,7 +112,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
 
       {/* History Table */}
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-800">
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
           היסטוריה ({results.length} בדיקות)
         </h2>
       </div>
@@ -138,14 +138,14 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
               <Td>{formatDateTime(result.checked_at)}</Td>
               <Td>
                 {result.found && result.position !== null ? (
-                  <span className="font-bold text-slate-800">#{result.position}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-100">#{result.position}</span>
                 ) : (
-                  <span className="text-slate-400">—</span>
+                  <span className="text-slate-400 dark:text-slate-500">—</span>
                 )}
               </Td>
               <Td>
                 {result.previous_position !== null ? (
-                  <span className="text-slate-500">#{result.previous_position}</span>
+                  <span className="text-slate-500 dark:text-slate-400">#{result.previous_position}</span>
                 ) : '—'}
               </Td>
               <Td>
@@ -169,7 +169,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
                 ) : '—'}
               </Td>
               <Td>
-                <span className="text-xs text-slate-600 truncate max-w-40 block">
+                <span className="text-xs text-slate-600 dark:text-slate-300 truncate max-w-40 block">
                   {result.result_title || result.result_address || '—'}
                 </span>
               </Td>

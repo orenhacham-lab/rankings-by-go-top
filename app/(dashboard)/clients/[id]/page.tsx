@@ -60,50 +60,50 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card className="lg:col-span-1">
-          <h3 className="font-semibold text-slate-800 mb-4">פרטי לקוח</h3>
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">פרטי לקוח</h3>
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <dt className="text-slate-500">שם לקוח</dt>
-              <dd className="font-medium">{client.name}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">שם לקוח</dt>
+              <dd className="font-medium dark:text-slate-100">{client.name}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">איש קשר</dt>
-              <dd className="font-medium">{client.contact_name || '—'}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">איש קשר</dt>
+              <dd className="font-medium dark:text-slate-100">{client.contact_name || '—'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">אימייל</dt>
-              <dd className="font-medium">{client.email || '—'}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">אימייל</dt>
+              <dd className="font-medium dark:text-slate-100">{client.email || '—'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">טלפון</dt>
-              <dd className="font-medium">{client.phone || '—'}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">טלפון</dt>
+              <dd className="font-medium dark:text-slate-100">{client.phone || '—'}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">סטטוס</dt>
+              <dt className="text-slate-500 dark:text-slate-400">סטטוס</dt>
               <dd><ActiveBadge active={client.is_active} /></dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500">הוסף בתאריך</dt>
-              <dd>{formatDate(client.created_at)}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">הוסף בתאריך</dt>
+              <dd className="dark:text-slate-200">{formatDate(client.created_at)}</dd>
             </div>
           </dl>
           {client.notes && (
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <p className="text-xs text-slate-500 mb-1">הערות</p>
-              <p className="text-sm text-slate-700">{client.notes}</p>
+            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">הערות</p>
+              <p className="text-sm text-slate-700 dark:text-slate-200">{client.notes}</p>
             </div>
           )}
         </Card>
 
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-800">פרויקטים ({projects.length})</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100">פרויקטים ({projects.length})</h3>
             <Button size="sm" onClick={() => setShowCreateProject(true)}>+ פרויקט חדש</Button>
           </div>
 
           {projects.length === 0 ? (
             <Card className="text-center py-12">
-              <p className="text-slate-400 mb-4">אין פרויקטים ללקוח זה עדיין</p>
+              <p className="text-slate-400 dark:text-slate-500 mb-4">אין פרויקטים ללקוח זה עדיין</p>
               <Button onClick={() => setShowCreateProject(true)}>הוסף פרויקט ראשון</Button>
             </Card>
           ) : (

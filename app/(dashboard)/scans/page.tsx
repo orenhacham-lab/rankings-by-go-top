@@ -72,7 +72,7 @@ export default function ScansPage() {
                   ) : '—'}
                 </Td>
                 <Td>
-                  <span className="text-slate-500 text-sm">
+                  <span className="text-slate-500 dark:text-slate-400 text-sm">
                     {(scan.projects as { clients?: { name: string } })?.clients?.name || '—'}
                   </span>
                 </Td>
@@ -88,19 +88,19 @@ export default function ScansPage() {
                   <span className="text-sm">
                     <span className="text-green-600 font-medium">{scan.completed_targets}</span>
                     {' / '}
-                    <span className="text-slate-600">{scan.total_targets}</span>
+                    <span className="text-slate-600 dark:text-slate-300">{scan.total_targets}</span>
                     {scan.failed_targets > 0 && (
                       <span className="text-red-500 mr-1"> ({scan.failed_targets} נכשלו)</span>
                     )}
                   </span>
                 </Td>
                 <Td>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {scan.started_at ? formatDateTime(scan.started_at) : '—'}
                   </span>
                 </Td>
                 <Td>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {scan.completed_at ? formatDateTime(scan.completed_at) : '—'}
                   </span>
                 </Td>

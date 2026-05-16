@@ -179,8 +179,8 @@ export default function ProjectForm({
       </div>
 
       {/* Scheduling */}
-      <div className="border-t border-slate-200 pt-4">
-        <h4 className="text-sm font-semibold text-slate-700 mb-3">הגדרות סריקה אוטומטית</h4>
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">הגדרות סריקה אוטומטית</h4>
 
         <Select
           label="תדירות סריקה"
@@ -206,7 +206,7 @@ export default function ProjectForm({
               onChange={(e) => setAutoScan(e.target.checked)}
               className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm text-slate-700">הפעל סריקה אוטומטית</span>
+            <span className="text-sm text-slate-700 dark:text-slate-200">הפעל סריקה אוטומטית</span>
           </label>
         )}
       </div>
