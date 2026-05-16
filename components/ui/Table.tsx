@@ -17,7 +17,7 @@ export function Table({ children, className }: TableProps) {
 
 export function TableHead({ children }: { children: React.ReactNode }) {
   return (
-    <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+    <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
       {children}
     </thead>
   )
@@ -53,7 +53,7 @@ export function TableRow({
 export function Th({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     // No uppercase/tracking-wider — those break Hebrew characters visually
-    <th className={cn('px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap', className)}>
+    <th className={cn('px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-300 whitespace-nowrap', className)}>
       {children}
     </th>
   )
@@ -61,7 +61,7 @@ export function Th({ children, className }: { children: React.ReactNode; classNa
 
 export function Td({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <td className={cn('px-4 py-3 text-slate-700 dark:text-slate-300 text-right', className)}>
+    <td className={cn('px-4 py-3 text-slate-700 dark:text-slate-100 text-right', className)}>
       {children}
     </td>
   )
@@ -70,7 +70,7 @@ export function Td({ children, className }: { children: React.ReactNode; classNa
 export function EmptyRow({ colSpan, message }: { colSpan: number; message: string }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-14 text-center text-slate-400 dark:text-slate-500 text-sm">
+      <td colSpan={colSpan} className="px-4 py-14 text-center text-slate-400 dark:text-slate-400 text-sm">
         {message}
       </td>
     </tr>

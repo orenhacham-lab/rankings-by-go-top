@@ -11,8 +11,8 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
     <div className="mb-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{title}</h1>
-          {subtitle && <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">{subtitle}</p>}
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{title}</h1>
+          {subtitle && <p className="text-slate-500 dark:text-slate-300 text-sm mt-0.5">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 md:gap-3">{actions}</div>}
       </div>
