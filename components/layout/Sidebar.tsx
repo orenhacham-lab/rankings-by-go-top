@@ -5,6 +5,9 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import {
   BarChart3,
   Users,
@@ -20,20 +23,20 @@ import {
   MessageCircle,
 } from 'lucide-react'
 
-const navItems = [
-  { href: '/dashboard', label: 'לוח בקרה', icon: BarChart3 },
-  { href: '/clients', label: 'לקוחות', icon: Users },
-  { href: '/projects', label: 'פרויקטים', icon: Folder },
-  { href: '/keywords', label: 'מילות מפתח', icon: KeyRound },
-  { href: '/ai-visibility', label: 'נראות ב-AI', icon: Sparkles },
-  { href: '/scans', label: 'סריקות', icon: Search },
-  { href: '/reports', label: 'דוחות', icon: FileText },
-  { href: '/billing', label: 'מנוי ותשלום', icon: CreditCard },
+const navItemKeys = [
+  { href: '/dashboard', labelKey: 'dashboard' as const, icon: BarChart3 },
+  { href: '/clients', labelKey: 'clients' as const, icon: Users },
+  { href: '/projects', labelKey: 'projects' as const, icon: Folder },
+  { href: '/keywords', labelKey: 'keywords' as const, icon: KeyRound },
+  { href: '/ai-visibility', labelKey: 'aiVisibility' as const, icon: Sparkles },
+  { href: '/scans', labelKey: 'scans' as const, icon: Search },
+  { href: '/reports', labelKey: 'reports' as const, icon: FileText },
+  { href: '/billing', labelKey: 'billing' as const, icon: CreditCard },
 ]
 
-const adminItems = [
-  { href: '/setup', label: 'סטטוס חיבור', icon: Plug },
-  { href: '/admin/logs', label: 'לוג שגיאות', icon: ClipboardList },
+const adminItemKeys = [
+  { href: '/setup', labelKey: 'connectionStatus' as const, icon: Plug },
+  { href: '/admin/logs', labelKey: 'errorLogs' as const, icon: ClipboardList },
 ]
 
 interface SidebarProps {
@@ -42,6 +45,8 @@ interface SidebarProps {
 
 export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname()
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
 
   return (
     <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
@@ -68,12 +73,18 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         </div>
       </div>
 
+      {/* Language Switcher - Hidden on mobile */}
+      <div className="hidden md:block border-b border-slate-200 dark:border-slate-800">
+        <DashboardLanguageSwitcher />
+      </div>
+
       {/* Nav */}
       <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
         <ul className="grid grid-cols-2 gap-2 md:block md:space-y-1 w-full">
-          {navItems.map((item) => {
+          {navItemKeys.map((item) => {
             const IconComponent = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            const label = dict.sidebar[item.labelKey]
             return (
               <li key={item.href}>
                 <Link
@@ -86,7 +97,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                   )}
                 >
                   <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400')} strokeWidth={2} />
-                  <span>{item.label}</span>
+                  <span>{label}</span>
                 </Link>
               </li>
             )
@@ -100,7 +111,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                 className="w-full h-full min-h-[60px] flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-xs font-medium transition-all duration-150 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 text-center leading-tight"
               >
                 <LogOut size={18} className="text-slate-600 dark:text-slate-400" strokeWidth={2} />
-                <span>יציאה</span>
+                <span>{dict.common.logout}</span>
               </button>
             </form>
           </li>
@@ -110,11 +121,12 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       {/* Admin section — only shown to admins */}
       {isAdmin && (
         <div className="px-3 pb-3 hidden md:block">
-          <p className="text-xs font-medium text-slate-400 dark:text-slate-400 px-3 mb-1">מערכת</p>
+          <p className="text-xs font-medium text-slate-400 dark:text-slate-400 px-3 mb-1">{dict.sidebar.system}</p>
           <ul className="space-y-1">
-            {adminItems.map((item) => {
+            {adminItemKeys.map((item) => {
               const IconComponent = item.icon
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const label = dict.sidebar[item.labelKey]
               return (
                 <li key={item.href}>
                   <Link
@@ -127,7 +139,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                     )}
                   >
                     <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400')} strokeWidth={2} />
-                    <span>{item.label}</span>
+                    <span>{label}</span>
                   </Link>
                 </li>
               )
@@ -144,7 +156,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
           >
             <MessageCircle size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />
-            <span>תמיכה</span>
+            <span>{dict.sidebar.support}</span>
           </a>
         </div>
       )}
@@ -158,7 +170,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             className="w-full text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 flex items-center justify-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <LogOut size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />
-            <span>יציאה</span>
+            <span>{dict.common.logout}</span>
           </button>
         </form>
       </div>

@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ScanStatusBadge, PositionChange, EngineBadge } from '@/components/ui/StatusBadge'
 import { formatDateTime } from '@/lib/utils'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
 import { Users, Folder, KeyRound, Search, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 
@@ -37,6 +39,9 @@ interface RankingChange {
 }
 
 export default function DashboardPage() {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   const [stats, setStats] = useState<DashboardStats>({ totalClients: 0, totalProjects: 0, totalKeywords: 0, totalScans: 0 })
   const [latestScans, setLatestScans] = useState<LatestScan[]>([])
   const [improvements, setImprovements] = useState<RankingChange[]>([])
@@ -142,7 +147,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
         <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-        טוען לוח בקרה...
+        {dict.home.loading}
       </div>
     )
   }
@@ -150,27 +155,27 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">לוח בקרה</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">ברוך הבא למערכת Rankings by Go Top</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{dict.home.title}</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">{dict.home.welcome}</p>
       </div>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="לקוחות פעילים" value={stats.totalClients} icon={Users} color="indigo" href="/clients" />
-        <StatCard label="פרויקטים פעילים" value={stats.totalProjects} icon={Folder} color="indigo" href="/projects" />
-        <StatCard label="מילות מפתח" value={stats.totalKeywords} icon={KeyRound} color="indigo" href="/keywords" />
-        <StatCard label="סריקות שבוצעו" value={stats.totalScans} icon={Search} color="indigo" href="/scans" />
+        <StatCard label={dict.home.activeClients} value={stats.totalClients} icon={Users} color="indigo" href="/clients" />
+        <StatCard label={dict.home.activeProjects} value={stats.totalProjects} icon={Folder} color="indigo" href="/projects" />
+        <StatCard label={dict.home.keywords} value={stats.totalKeywords} icon={KeyRound} color="indigo" href="/keywords" />
+        <StatCard label={dict.home.scansPerformed} value={stats.totalScans} icon={Search} color="indigo" href="/scans" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Latest Scans */}
         <Card padding={false}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">סריקות אחרונות</h2>
-            <Link href="/scans" className="text-sm text-blue-600 hover:underline">הכל</Link>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{dict.home.latestScans}</h2>
+            <Link href="/scans" className="text-sm text-blue-600 hover:underline">{dict.home.viewAll}</Link>
           </div>
           {latestScans.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">אין סריקות עדיין</div>
+            <div className="p-8 text-center text-slate-400 text-sm">{dict.home.noScans}</div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {latestScans.map((scan) => (
@@ -181,7 +186,7 @@ export default function DashboardPage() {
                     </Link>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {scan.started_at ? formatDateTime(scan.started_at) : '—'} ·{' '}
-                      {scan.completed_targets}/{scan.total_targets} יעדים
+                      {scan.completed_targets}/{scan.total_targets} {dict.home.targets}
                     </p>
                   </div>
                   <ScanStatusBadge status={scan.status} />
@@ -193,12 +198,12 @@ export default function DashboardPage() {
 
         {/* Quick Links */}
         <Card>
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">קישורים מהירים</h2>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">{dict.home.quickLinks}</h2>
           <div className="grid grid-cols-2 gap-3">
-            <QuickLink href="/clients" icon={Users} label="לקוחות" sub="ניהול לקוחות" />
-            <QuickLink href="/projects" icon={Folder} label="פרויקטים" sub="כל הפרויקטים" />
-            <QuickLink href="/keywords" icon={KeyRound} label="מילות מפתח" sub="מעקב ביטויים" />
-            <QuickLink href="/reports" icon={FileText} label="דוחות" sub="Excel ו-PDF" />
+            <QuickLink href="/clients" icon={Users} label={dict.sidebar.clients} sub={dict.home.clientsManagement} />
+            <QuickLink href="/projects" icon={Folder} label={dict.sidebar.projects} sub={dict.home.allProjects} />
+            <QuickLink href="/keywords" icon={KeyRound} label={dict.sidebar.keywords} sub={dict.home.trackingPhrases} />
+            <QuickLink href="/reports" icon={FileText} label={dict.sidebar.reports} sub={dict.home.excelAndPdf} />
           </div>
         </Card>
       </div>
@@ -209,10 +214,10 @@ export default function DashboardPage() {
         <Card padding={false}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
             <TrendingUp size={20} className="text-green-600 dark:text-green-400" strokeWidth={2} />
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">שיפורים גדולים</h2>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{dict.home.majorImprovements}</h2>
           </div>
           {improvements.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">אין שיפורים לאחרונה</div>
+            <div className="p-8 text-center text-slate-400 text-sm">{dict.home.noRecentImprovements}</div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {improvements.map((item) => (
@@ -234,10 +239,10 @@ export default function DashboardPage() {
         <Card padding={false}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
             <TrendingDown size={20} className="text-red-600 dark:text-red-400" strokeWidth={2} />
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">ירידות גדולות</h2>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">{dict.home.majorDrops}</h2>
           </div>
           {drops.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">אין ירידות לאחרונה</div>
+            <div className="p-8 text-center text-slate-400 text-sm">{dict.home.noRecentDrops}</div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {drops.map((item) => (
