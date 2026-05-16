@@ -84,7 +84,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   )}
                 >
-                  <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600')} strokeWidth={2} />
+                  <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 group-hover:text-indigo-600')} strokeWidth={2} />
                   <span>{item.label}</span>
                 </Link>
               </li>
@@ -125,7 +125,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                         : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                     )}
                   >
-                    <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600')} strokeWidth={2} />
+                    <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 group-hover:text-indigo-600')} strokeWidth={2} />
                     <span>{item.label}</span>
                   </Link>
                 </li>

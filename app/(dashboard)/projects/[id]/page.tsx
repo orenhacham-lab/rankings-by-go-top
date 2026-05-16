@@ -194,13 +194,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               עריכה
             </Button>
             <Button
-              onClick={handleScanAll}
-              loading={scanning}
-              disabled={activeTargets.length === 0}
+              onClick={() => {
+                const section = document.getElementById('keywords-section')
+                section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
               className="flex items-center gap-2"
             >
               <Search size={18} strokeWidth={2} />
-              {scanning ? 'סורק...' : 'סרוק הכל'}
+              עבור לסריקת מילות מפתח
             </Button>
           </div>
         }
@@ -214,7 +215,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Project Module Navigation */}
-      <nav className="mb-6 -mx-1 overflow-x-auto" aria-label="Project modules">
+      <nav className="mb-4 -mx-1 overflow-x-auto" aria-label="Project modules">
         <div className="flex items-center gap-1 px-1 py-1.5 bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-xl border border-slate-200/70 shadow-sm">
           <a
             href="#rankings"
@@ -226,7 +227,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
             <a
               href="#ai-visibility"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 shadow-sm hover:shadow-md transition whitespace-nowrap"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:shadow-sm transition whitespace-nowrap"
             >
               <Sparkles size={18} strokeWidth={2} />
               <span>נראות ב-AI</span>
@@ -244,7 +245,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       </nav>
 
       {/* Project Summary — 5 compact cards in one row on desktop */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         <Card className="p-3">
           <div className="text-xs text-slate-500 mb-1">דומיין</div>
           <div className="font-mono text-sm font-semibold text-slate-800 truncate">{project.target_domain}</div>
@@ -293,11 +294,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Tracking Targets */}
+      {/* Tracking Targets */}
       <div id="keywords-section" className="flex items-center justify-between mb-4 scroll-mt-6">
         <h2 className="text-lg font-semibold text-slate-800">
           מילות מפתח ({targets.length})
         </h2>
         <div className="flex gap-2">
+          <Button
+            onClick={handleScanAll}
+            loading={scanning}
+            disabled={activeTargets.length === 0}
+            className="flex items-center gap-2"
+            size="sm"
+          >
+            <Search size={16} strokeWidth={2} />
+            {scanning ? 'סורק...' : 'סרוק את כל מילות המפתח'}
+          </Button>
           <Link href={`/reports?project_id=${id}`}>
             <Button variant="outline" size="sm" className="flex items-center gap-1.5">
               <FileText size={16} strokeWidth={2} />
@@ -309,7 +321,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </Button>
         </div>
       </div>
-
       <TrackingTargetsTable
         targets={targets}
         latestResults={latestResults}
