@@ -46,7 +46,7 @@ function EngineImageIcon({
 }
 
 export function ChatGPTIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/chatgpt.svg" alt="ChatGPT" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/chatgpt.svg" alt="ChatGPT" size={size} className={`dark:invert ${className || ''}`} />
 }
 
 export function ClaudeIcon({ size = 24, className }: IconProps) {
@@ -66,7 +66,7 @@ export function CopilotIcon({ size = 24, className }: IconProps) {
 }
 
 export function GrokIcon({ size = 24, className }: IconProps) {
-  return <EngineImageIcon src="/ai-engines/grok.svg" alt="Grok" size={size} className={className} />
+  return <EngineImageIcon src="/ai-engines/grok.svg" alt="Grok" size={size} className={`dark:invert ${className || ''}`} />
 }
 
 export function GoogleAIIcon({ size = 24, className }: IconProps) {
