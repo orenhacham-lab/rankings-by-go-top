@@ -59,7 +59,7 @@ export default function EnglishAboutPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.15),_transparent_50%)]" />
 
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Breadcrumbs items={[{ label: 'About', href: '/en/about' }]} />
+          <Breadcrumbs items={[{ label: 'About', href: '/en/about' }]} locale="en" />
 
           <div className="text-center mt-8">
             <h1 className="text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">

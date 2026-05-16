@@ -1,12 +1,14 @@
 import { EnglishLocaleEffect } from '@/components/EnglishLocaleEffect'
 
 export const metadata = {
-  title: 'Google Rank Tracking & AI Visibility - Rankings by Go Top',
-  description: 'Rankings by Go Top - Advanced Google rank tracking and AI visibility platform. Track your Google rankings, Google Maps visibility, and AI mentions (ChatGPT, Gemini, Perplexity). Free trial available.',
+  title: 'Rankings by Go Top | Google Rank Tracking & AI Visibility',
+  description: 'Track Google Organic rankings, Google Maps visibility, and AI mentions (ChatGPT, Gemini, Perplexity) in one professional SEO platform. Free 7-day trial.',
+  keywords: 'rank tracking, SEO tools, Google ranking, AI visibility, ChatGPT visibility, Gemini, Perplexity, Google Maps rankings',
   openGraph: {
-    title: 'Google Rank Tracking & AI Visibility - Rankings by Go Top',
-    description: 'Track your Google rankings, Google Maps visibility, and AI mentions (ChatGPT, Gemini, Perplexity) in one platform.',
+    title: 'Rankings by Go Top | Google Rank Tracking & AI Visibility',
+    description: 'Track Google Organic rankings, Google Maps visibility, and AI mentions in one platform.',
     locale: 'en_US',
+    type: 'website',
   },
 }
 
@@ -16,9 +18,9 @@ export default function EnLayout({
   children: React.ReactNode
 }) {
   return (
-    <>
+    <div dir="ltr" lang="en" className="ltr-scope">
       <EnglishLocaleEffect />
       {children}
-    </>
+    </div>
   )
 }

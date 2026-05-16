@@ -51,7 +51,7 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
                 </Link>
               </li>
               <li>
-                <Link href="/sitemap" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={`${prefix}/sitemap`} className="text-slate-400 hover:text-white transition-colors">
                   {dict.footer.sitemap}
                 </Link>
               </li>
@@ -63,12 +63,12 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
             <h4 className="font-bold mb-4">{dict.footer.legal}</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/privacy" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={`${prefix}/privacy`} className="text-slate-400 hover:text-white transition-colors">
                   {dict.footer.privacy}
                 </Link>
               </li>
               <li>
-                <Link href="/accessibility" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={`${prefix}/accessibility`} className="text-slate-400 hover:text-white transition-colors">
                   {dict.footer.accessibility}
                 </Link>
               </li>

@@ -8,6 +8,25 @@ html {
   direction: rtl;
 }
 
+/* ── LTR overrides for English pages ───────────────────────────── */
+html[lang="en"],
+html[dir="ltr"],
+[dir="ltr"] {
+  direction: ltr;
+}
+
+[dir="ltr"] table th,
+[dir="ltr"] table td {
+  text-align: left;
+}
+
+[dir="ltr"] input,
+[dir="ltr"] textarea,
+[dir="ltr"] select {
+  direction: ltr;
+  text-align: left;
+}
+
 body {
   /* Rubik loaded from Google Fonts in layout.tsx */
   font-family: 'Rubik', 'Segoe UI', Arial, system-ui, sans-serif;
