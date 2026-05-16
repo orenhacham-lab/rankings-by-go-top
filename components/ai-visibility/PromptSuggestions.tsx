@@ -78,15 +78,40 @@ export default function PromptSuggestions({
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Session memory: every prompt shown in any past regenerate (avoid repeats)
-  // and the *last* shown set (never echo the previous set exactly).
+  // Session memory: every prompt shown in any past regenerate (avoid repeats),
+  // the *last* shown set (never echo the previous set exactly),
+  // secondary categories used in the last regenerate (rotate away),
+  // and already-added project questions (never suggest them).
   const seenPromptsRef = useRef<Set<string>>(new Set())
   const lastShownPromptsRef = useRef<string[]>([])
+  const recentlyUsedSecondaryRef = useRef<Set<string>>(new Set())
+  const alreadyAddedPromptsRef = useRef<Set<string>>(new Set())
+  const [loadingAlreadyAdded, setLoadingAlreadyAdded] = useState(false)
 
   // Normalize prompt text for dedup comparison — must match the generator's
   // internal normalizer so excludePrompts/previousSet are recognized.
   function normalizePrompt(p: string): string {
     return p.toLowerCase().replace(/[?!.,;:'"״׳`\-–—]/g, '').replace(/\s+/g, ' ').trim()
+  }
+
+  // Fetch already-added AI queries for this project and add to exclusion set
+  async function fetchAlreadyAdded() {
+    if (!projectId) return
+    try {
+      setLoadingAlreadyAdded(true)
+      const res = await fetch(`/api/ai-visibility/prompts?projectId=${projectId}`)
+      if (!res.ok) return
+      const { prompts } = await res.json()
+      if (Array.isArray(prompts)) {
+        for (const p of prompts) {
+          if (p.prompt) alreadyAddedPromptsRef.current.add(normalizePrompt(p.prompt))
+        }
+      }
+    } catch {
+      // Silently fail — don't block modal opening
+    } finally {
+      setLoadingAlreadyAdded(false)
+    }
   }
 
   // Record a freshly produced set into session memory and update state.
@@ -102,6 +127,22 @@ export default function PromptSuggestions({
       for (const n of normalized) seenPromptsRef.current.add(n)
     }
     lastShownPromptsRef.current = normalized
+
+    // Track which secondary categories were used in this set (for rotation)
+    // Extract secondary category references from prompts
+    if (manualProfile?.secondaryCategories) {
+      const usedSecondary = new Set<string>()
+      for (const secondary of manualProfile.secondaryCategories) {
+        if (!secondary) continue
+        for (const p of produced) {
+          if (p.prompt.toLowerCase().includes(secondary.toLowerCase())) {
+            usedSecondary.add(secondary)
+          }
+        }
+      }
+      recentlyUsedSecondaryRef.current = usedSecondary
+    }
+
     setSuggestions(produced)
   }
 
@@ -110,20 +151,28 @@ export default function PromptSuggestions({
     if (open) {
       seenPromptsRef.current = new Set()
       lastShownPromptsRef.current = []
-      const produced = generatePromptSuggestions({
-        businessName,
-        domain,
-        city,
-        country,
-        language,
-        keywords,
-        manualProfile,
-        diversify: true,
-        limit: 6,
-      })
-      recordAndSet(produced, 6)
-      setSelectedIds(new Set())
+      recentlyUsedSecondaryRef.current = new Set()
+      alreadyAddedPromptsRef.current = new Set()
       setError(null)
+
+      // Fetch already-added prompts first
+      fetchAlreadyAdded().then(() => {
+        const produced = generatePromptSuggestions({
+          businessName,
+          domain,
+          city,
+          country,
+          language,
+          keywords,
+          manualProfile,
+          diversify: true,
+          limit: 6,
+          // Exclude already-added prompts from suggestions
+          excludePrompts: Array.from(alreadyAddedPromptsRef.current),
+        })
+        recordAndSet(produced, 6)
+        setSelectedIds(new Set())
+      })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, businessName, domain, city, country, language, keywords, manualProfile])
@@ -132,6 +181,12 @@ export default function PromptSuggestions({
     setRegenerating(true)
     setError(null)
     await new Promise((r) => setTimeout(r, 250))
+
+    // Combine all exclusions: seen in this session + already added to project
+    const allExcluded = Array.from(seenPromptsRef.current).concat(
+      Array.from(alreadyAddedPromptsRef.current)
+    )
+
     const produced = generatePromptSuggestions({
       businessName,
       domain,
@@ -141,8 +196,9 @@ export default function PromptSuggestions({
       keywords,
       manualProfile,
       diversify: true,
-      excludePrompts: Array.from(seenPromptsRef.current),
+      excludePrompts: allExcluded,
       previousSet: lastShownPromptsRef.current,
+      recentlyUsedSecondaryCategories: Array.from(recentlyUsedSecondaryRef.current),
       limit: 6,
     })
     recordAndSet(produced, 6)

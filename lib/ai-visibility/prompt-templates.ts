@@ -1332,12 +1332,13 @@ export function resolveManualPrimaryCategory(raw: string | null | undefined): Bu
  * @param profile Optional business profile with offering preferences
  * @param manualProfile User-saved manual override. When `mode='manual'`, its
  *   primaryCategory wins over auto-detection, its secondaryCategories augment
- *   secondaryOfferings (10% influence), and its excludedTopics are always
+ *   secondaryOfferings (20-30% influence), and its excludedTopics are always
  *   filtered. When `mode='auto'` or null, this is ignored.
  * @param shuffle If true, randomize order before slicing
  * @param limit Maximum number of suggestions to return (default 12)
  * @param excludePrompts Normalized prompt texts already shown in the session
  * @param previousSet Last shown set — generator avoids returning the same set
+ * @param recentlyUsedSecondaryCategories Categories used in the last regenerate (rotated away)
  * @param diversify If true (default), use weighted random selection from a top
  *   pool grouped by intent bucket. This produces a meaningfully different set
  *   each call. Set to false to get deterministic top-N by score.
@@ -1355,6 +1356,7 @@ export function generatePromptSuggestions({
   limit = 12,
   excludePrompts = [],
   previousSet = [],
+  recentlyUsedSecondaryCategories = [],
   diversify = true,
 }: {
   businessName: string | null
@@ -1369,6 +1371,7 @@ export function generatePromptSuggestions({
   limit?: number
   excludePrompts?: string[]
   previousSet?: string[]
+  recentlyUsedSecondaryCategories?: string[]
   diversify?: boolean
 }): PromptSuggestion[] {
   const business = businessName || ''
@@ -1481,11 +1484,86 @@ export function generatePromptSuggestions({
     built.push({ def, prompt: filled, score, themeMatched: matched, offering: effectiveOffering })
   }
 
+  // Exclude already-seen prompts so the next regenerate shows fresh ones.
+  // `previousSet` is treated like `excludePrompts` — never return the same set.
+  const excludeSet = new Set<string>([
+    ...excludePrompts.map(normalizePromptForCompare),
+    ...previousSet.map(normalizePromptForCompare),
+  ])
+
+  // Generate secondary category questions if we have secondary categories
+  const secondaryCategoryQuestions: Built[] = []
+  if (hasManual && manualProfile.secondaryCategories && manualProfile.secondaryCategories.length > 0) {
+    // Generate questions for each secondary category using templates
+    for (const secondaryCategory of manualProfile.secondaryCategories) {
+      if (!secondaryCategory || secondaryCategory.trim().length === 0) continue
+      const secondary = secondaryCategory.trim()
+
+      // Generate template-based questions for this secondary category
+      const templates = lang === 'he' ? [
+        `איפה אפשר למצוא ${secondary} איכותיים?`,
+        `איפה כדאי לקנות ${secondary}?`,
+        `אילו חנויות מומלצות ל${secondary}?`,
+        `איך לבחור ${secondary} איכותיים?`,
+        `מה חשוב לבדוק לפני שקונים ${secondary}?`,
+        `איך יודעים ש${secondary} במצב טוב?`,
+        `כמה עולים ${secondary}?`,
+        `איפה אפשר לקנות ${secondary} במחירים טובים?`,
+      ] : [
+        `Where to find quality ${secondary}?`,
+        `Where to buy ${secondary}?`,
+        `Best shops for ${secondary}`,
+        `How to choose quality ${secondary}?`,
+        `What to check when buying ${secondary}?`,
+        `How to evaluate ${secondary}?`,
+        `How much should you spend on ${secondary}?`,
+        `Where to find affordable ${secondary}?`,
+      ]
+
+      for (const template of templates) {
+        const filled = template.trim()
+        // Filter by excluded topics
+        if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
+        // Filter by already-seen questions and previous set
+        if (excludeSet.has(normalizePromptForCompare(filled))) continue
+
+        let score = 85 // Secondary category questions get a good baseline score
+        const matched: Array<keyof KeywordThemes> = []
+
+        // Apply theme boosts if applicable
+        if (themes && Object.keys(themes).length > 0) {
+          for (const [key, value] of Object.entries(themes)) {
+            const themeKey = key as keyof KeywordThemes
+            if (themeKey === 'topics') continue
+            if (value && typeof value === 'number' && value > 0) {
+              score += 2
+              matched.push(themeKey)
+            }
+          }
+        }
+
+        secondaryCategoryQuestions.push({
+          def: {
+            intent: 'recommendation' as const,
+            text: template,
+            score: score,
+            offering: 'secondary',
+          },
+          prompt: filled,
+          score,
+          themeMatched: matched,
+          offering: 'secondary',
+        })
+      }
+    }
+  }
+
   // Semantic deduplication — drop near-duplicates, keep higher-scoring one
-  built.sort((a, b) => b.score - a.score)
+  const allBuilt = [...built, ...secondaryCategoryQuestions]
+  allBuilt.sort((a, b) => b.score - a.score)
   const keptCanonicals: string[] = []
   const kept: Built[] = []
-  for (const item of built) {
+  for (const item of allBuilt) {
     const c = canonical(item.prompt)
     let isDup = false
     for (const existing of keptCanonicals) {
@@ -1498,20 +1576,14 @@ export function generatePromptSuggestions({
     keptCanonicals.push(c)
     kept.push(item)
   }
-
-  // Exclude already-seen prompts so the next regenerate shows fresh ones.
-  // `previousSet` is treated like `excludePrompts` — never return the same set.
-  const excludeSet = new Set<string>([
-    ...excludePrompts.map(normalizePromptForCompare),
-    ...previousSet.map(normalizePromptForCompare),
-  ])
-  let pool: Built[] = kept.filter(
+  const poolAfterExclude: Built[] = kept.filter(
     (item) => !excludeSet.has(normalizePromptForCompare(item.prompt))
   )
 
   // Pool-exhaustion fallback: if filtering left us with too few candidates,
   // fall back to the full deduplicated pool (still excluding the previous set
   // when possible, so consecutive regenerates never echo each other).
+  let pool: Built[] = poolAfterExclude
   if (pool.length < limit) {
     const onlyPrevious = new Set<string>(previousSet.map(normalizePromptForCompare))
     pool = kept.filter((item) => !onlyPrevious.has(normalizePromptForCompare(item.prompt)))
@@ -1529,12 +1601,17 @@ export function generatePromptSuggestions({
       mode: manualProfile.mode,
       rawPrimaryCategory: manualProfile.primaryCategory,
       resolvedCategory: category,
-      candidateCount: built.length,
-      poolAfterExclude: pool.length,
+      primaryCandidateCount: built.length,
+      secondaryCandidateCount: secondaryCategoryQuestions.length,
+      totalCandidateCount: allBuilt.length,
+      dedupedCount: kept.length,
+      poolAfterExclude: poolAfterExclude.length,
+      finalPool: pool.length,
       selectedCount: suggestions.length,
       seenPromptsCount: excludePrompts.length,
       previousSetCount: previousSet.length,
       diversify,
+      secondaryCategories: manualProfile.secondaryCategories,
     })
   }
 
@@ -1659,15 +1736,17 @@ function weightedRandomPick<T extends { score: number }>(items: T[]): T | undefi
  * Diversified selection from a pool of scored candidates.
  *
  * Algorithm:
- *   1. Group candidates by IntentBucket.
- *   2. Define a target distribution (1 each of: recommendation, urgency,
- *      price, occasion, trust; 0–1 brand; 0–1 secondary).
- *   3. For each target slot, pick a weighted-random candidate from the top
+ *   1. Separate secondary-category questions (offering='secondary') into their own tier.
+ *   2. Group remaining candidates by IntentBucket.
+ *   3. Define a target distribution that ensures:
+ *      - Secondary category questions: 1–2 out of 6 (20-30%)
+ *      - Core buckets (recommendation, trust, price, etc.): fill the remaining slots
+ *   4. For each target slot, pick a weighted-random candidate from the top
  *      of that bucket (top 5 by score). This injects controlled randomness:
  *      relevance stays high but the exact pick varies per call.
- *   4. If the result is still short, fill from remaining candidates pool-wide.
+ *   5. If the result is still short, fill from remaining candidates pool-wide.
  *
- * Result: different regenerates produce different SETS (not just reorderings).
+ * Result: different regenerates produce different SETS with secondary categories included.
  */
 function diversifiedPick(
   built: Array<{
@@ -1682,7 +1761,11 @@ function diversifiedPick(
   type Built = (typeof built)[number]
   if (built.length === 0) return [] as Built[]
 
-  // Step 1: group by intent bucket, sorted by score within each bucket.
+  // Separate secondary-category questions for dedicated slot allocation
+  const secondaryCategoryQuestions = built.filter((b) => b.offering === 'secondary' && b.def.intent === 'recommendation')
+  const otherQuestions = built.filter((b) => !(b.offering === 'secondary' && b.def.intent === 'recommendation'))
+
+  // Step 1: group remaining by intent bucket, sorted by score within each bucket.
   const buckets: Record<IntentBucket, Built[]> = {
     recommendation: [],
     urgency: [],
@@ -1693,7 +1776,7 @@ function diversifiedPick(
     secondary: [],
     other: [],
   }
-  for (const item of built) {
+  for (const item of otherQuestions) {
     const bucket = getIntentBucket(item.prompt, item.def, item.offering)
     buckets[bucket].push(item)
   }
@@ -1701,16 +1784,19 @@ function diversifiedPick(
     buckets[key].sort((a, b) => b.score - a.score)
   }
 
-  // Step 2: target distribution. Five "core" buckets each contribute one
-  // question; brand and secondary each contribute up to one when limit ≥ 6.
+  // Step 2: target distribution.
+  // Allocate 1–2 slots for secondary category questions (20-30% of limit).
+  // For limit=6: 1-2 slots (17-33%). For limit=12: 2-4 slots (17-33%).
+  const secondarySlotsTarget = limit >= 6 ? 2 : 1
+  const primarySlotsTarget = Math.max(limit - secondarySlotsTarget, limit - 2)
+
   const baseTargets: Array<{ bucket: IntentBucket; count: number }> = [
     { bucket: 'recommendation', count: 1 },
     { bucket: 'urgency', count: 1 },
     { bucket: 'price', count: 1 },
     { bucket: 'occasion', count: 1 },
     { bucket: 'trust', count: 1 },
-    { bucket: 'brand', count: limit >= 6 ? 1 : 0 },
-    { bucket: 'secondary', count: limit >= 6 ? 1 : 0 },
+    { bucket: 'brand', count: primarySlotsTarget > 5 ? 1 : 0 },
   ]
 
   const result: Built[] = []
@@ -1719,8 +1805,11 @@ function diversifiedPick(
 
   // Helper: pick from a bucket using weighted random from its top candidates,
   // skipping items that would near-duplicate something already picked.
-  const pickFromBucket = (bucket: IntentBucket): Built | undefined => {
-    const candidates = buckets[bucket].filter((c) => !picked.has(c))
+  const pickFromBucket = (bucket: IntentBucket | 'secondary_category'): Built | undefined => {
+    const candidates = bucket === 'secondary_category'
+      ? secondaryCategoryQuestions.filter((c) => !picked.has(c))
+      : buckets[bucket as IntentBucket].filter((c) => !picked.has(c))
+
     if (candidates.length === 0) return undefined
     // Restrict random picking to the top 5 to keep relevance high.
     const top = candidates.slice(0, 5)
@@ -1739,7 +1828,7 @@ function diversifiedPick(
     return undefined
   }
 
-  // Step 3: fill the slots in the order defined above.
+  // Step 3: fill primary slots first
   for (const target of baseTargets) {
     if (result.length >= limit) break
     if (target.count === 0) continue
@@ -1751,7 +1840,17 @@ function diversifiedPick(
     }
   }
 
-  // Step 4: if still short, fill from any bucket (still weighted-random from
+  // Step 4: fill secondary category slots
+  for (let i = 0; i < secondarySlotsTarget && result.length < limit; i++) {
+    const pick = pickFromBucket('secondary_category')
+    if (pick) {
+      result.push(pick)
+      picked.add(pick)
+      localCanonicals.push(canonical(pick.prompt))
+    }
+  }
+
+  // Step 5: if still short, fill from any bucket (still weighted-random from
   // a top slice, still skipping near-duplicates).
   if (result.length < limit) {
     const allRemaining: Built[] = []
@@ -1759,6 +1858,10 @@ function diversifiedPick(
       for (const item of buckets[key]) {
         if (!picked.has(item)) allRemaining.push(item)
       }
+    }
+    // Also include unpicked secondary category questions
+    for (const item of secondaryCategoryQuestions) {
+      if (!picked.has(item)) allRemaining.push(item)
     }
     allRemaining.sort((a, b) => b.score - a.score)
     while (result.length < limit && allRemaining.length > 0) {
