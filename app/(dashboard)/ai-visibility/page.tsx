@@ -180,10 +180,10 @@ export default function AIVisibilityPage() {
               <Card key={project.id} className="p-4 hover:shadow-md transition flex flex-col">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 truncate">{project.name}</h3>
-                    <p className="text-xs text-slate-500 truncate font-mono">{project.target_domain}</p>
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">{project.name}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">{project.target_domain}</p>
                     {project.clients?.name && (
-                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{project.clients.name}</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{project.clients.name}</p>
                     )}
                   </div>
                   <Badge variant={scoreTone}>
@@ -192,25 +192,25 @@ export default function AIVisibilityPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
-                  <div className="bg-slate-50 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 mb-0.5">שאילתות</div>
-                    <div className="text-lg font-semibold text-slate-900">{summary?.totalQueries ?? 0}</div>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">שאילתות</div>
+                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalQueries ?? 0}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 mb-0.5">סריקות</div>
-                    <div className="text-lg font-semibold text-slate-900">{summary?.totalScans ?? 0}</div>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">סריקות</div>
+                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalScans ?? 0}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 mb-0.5">הזכרות</div>
-                    <div className="text-lg font-semibold text-slate-900">{summary?.totalMentions ?? 0}</div>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">הזכרות</div>
+                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalMentions ?? 0}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 mb-0.5">ציטוטים</div>
-                    <div className="text-lg font-semibold text-slate-900">{summary?.totalCitations ?? 0}</div>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">ציטוטים</div>
+                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalCitations ?? 0}</div>
                   </div>
                 </div>
 
-                <div className="text-[11px] text-slate-500 mb-3">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
                   סריקה אחרונה: {formatDate(summary?.lastScanAt ?? null)}
                 </div>
 

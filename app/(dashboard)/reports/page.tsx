@@ -491,19 +491,19 @@ function GoogleReport({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-slate-500 mb-1">{"סה\"כ ביטויים"}</div>
-          <div className="text-2xl font-bold text-slate-800">{total}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{"סה\"כ ביטויים"}</div>
+          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{total}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">נמצאו</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">נמצאו</div>
           <div className="text-2xl font-bold text-green-600">{foundCount}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">לא נמצאו</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">לא נמצאו</div>
           <div className="text-2xl font-bold text-red-500">{total - foundCount}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">כיסוי</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">כיסוי</div>
           <div className="text-2xl font-bold text-blue-600">
             {total > 0 ? `${Math.round((foundCount / total) * 100)}%` : '0%'}
           </div>
@@ -511,7 +511,7 @@ function GoogleReport({
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-slate-800">דירוגים נוכחיים ({total})</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100">דירוגים נוכחיים ({total})</h3>
       </div>
 
       <Table>
@@ -608,19 +608,19 @@ function AIVisibilityReport({
       {/* Summary Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-slate-500 mb-1">סריקות AI</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">סריקות AI</div>
           <div className="text-2xl font-bold text-indigo-600">{reportData.summary.totalScans}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">שאילתות AI</div>
-          <div className="text-2xl font-bold text-slate-800">{reportData.summary.totalResults}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">שאילתות AI</div>
+          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{reportData.summary.totalResults}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">אזכורים</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">אזכורים</div>
           <div className="text-2xl font-bold text-green-600">{reportData.summary.mentionedCount}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">אחוז אזכורים</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">אחוז אזכורים</div>
           <div className="text-2xl font-bold text-indigo-600">
             {Math.round(reportData.summary.mentionRate)}%
           </div>
@@ -629,23 +629,23 @@ function AIVisibilityReport({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-slate-500 mb-1">דומיין צוטט</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">דומיין צוטט</div>
           <div className="text-2xl font-bold text-cyan-600">{reportData.summary.totalCitations}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">אחוז ציטוטים</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">אחוז ציטוטים</div>
           <div className="text-2xl font-bold text-indigo-600">
             {Math.round(reportData.summary.citationRate)}%
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">מנועים פעילים</div>
-          <div className="text-2xl font-bold text-slate-800">
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">מנועים פעילים</div>
+          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
             {Object.keys(reportData.summary.engineBreakdown).length}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 mb-1">נראות כללית</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">נראות כללית</div>
           <div className="text-2xl font-bold text-indigo-600">
             {reportData.summary.totalResults > 0 
               ? Math.round(((reportData.summary.mentionedCount + reportData.summary.citedCount) / (reportData.summary.totalResults * 2)) * 100)
@@ -656,7 +656,7 @@ function AIVisibilityReport({
 
       {/* Engine Breakdown */}
       <div className="mb-6">
-        <h3 className="font-semibold text-slate-800 mb-4">ביצוע לפי מנוע</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">ביצוע לפי מנוע</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {engines.map((engine) => {
             const breakdown = reportData.summary.engineBreakdown[engine]
@@ -665,18 +665,18 @@ function AIVisibilityReport({
             const citationRate = Math.round((breakdown.cited / breakdown.scans) * 100)
             return (
               <Card key={engine}>
-                <div className="text-sm font-semibold text-slate-800 mb-3">{engineLabels[engine]}</div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3">{engineLabels[engine]}</div>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-600">סריקות:</span>
+                    <span className="text-slate-600 dark:text-slate-300">סריקות:</span>
                     <span className="font-medium">{breakdown.scans}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600">אזכורים:</span>
+                    <span className="text-slate-600 dark:text-slate-300">אזכורים:</span>
                     <span className="font-medium text-green-600">{breakdown.mentions} ({mentionRate}%)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600">ציטוטים:</span>
+                    <span className="text-slate-600 dark:text-slate-300">ציטוטים:</span>
                     <span className="font-medium text-cyan-600">{breakdown.cited} ({citationRate}%)</span>
                   </div>
                 </div>
@@ -688,7 +688,7 @@ function AIVisibilityReport({
 
       {/* AI Query Results Table */}
       <div className="mb-6">
-        <h3 className="font-semibold text-slate-800 mb-4">תוצאות שאילתות AI ({reportData.results.length})</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">תוצאות שאילתות AI ({reportData.results.length})</h3>
         <div className="overflow-x-auto">
           <Table>
             <TableHead>

@@ -216,12 +216,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Project Module Navigation */}
       <nav className="mb-4 -mx-1 overflow-x-auto" aria-label="Project modules">
-        <div className="flex items-center gap-1 px-1 py-1.5 bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-xl border border-slate-200/70 shadow-sm">
+        <div className="flex items-center gap-1 px-1 py-1.5 bg-gradient-to-r from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 rounded-xl border border-slate-200/70 dark:border-slate-700 shadow-sm">
           <a
             href="#rankings"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-900 bg-white border border-slate-200 shadow-sm hover:shadow transition whitespace-nowrap"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow transition whitespace-nowrap"
           >
-            <BarChart3 size={18} strokeWidth={2} className="text-slate-600" />
+            <BarChart3 size={18} strokeWidth={2} className="text-slate-600 dark:text-slate-300" />
             <span>דירוגי Google Organic / Google Maps</span>
           </a>
           {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
@@ -236,9 +236,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           )}
           <Link
             href={`/reports?project_id=${id}`}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white/70 hover:text-slate-900 transition whitespace-nowrap"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition whitespace-nowrap"
           >
-            <FileText size={18} strokeWidth={2} className="text-slate-600" />
+            <FileText size={18} strokeWidth={2} className="text-slate-600 dark:text-slate-300" />
             <span>דוחות</span>
           </Link>
         </div>
@@ -247,21 +247,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Project Summary — 5 compact cards in one row on desktop */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         <Card className="p-3">
-          <div className="text-xs text-slate-500 mb-1">דומיין</div>
-          <div className="font-mono text-sm font-semibold text-slate-800 truncate">{project.target_domain}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">דומיין</div>
+          <div className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{project.target_domain}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-slate-500 mb-1">מילות מפתח</div>
-          <div className="text-2xl font-bold text-slate-800">{targets.length}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">מילות מפתח</div>
+          <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{targets.length}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-slate-500 mb-1">סריקה אחרונה</div>
-          <div className="text-sm font-medium text-slate-800 truncate">
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">סריקה אחרונה</div>
+          <div className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
             {project.last_scan_at ? formatDateTime(project.last_scan_at) : '—'}
           </div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-slate-500 mb-1">תדירות</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">תדירות</div>
           <div className="flex items-center gap-2">
             <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
               {getFrequencyLabel(project.scan_frequency)}
@@ -269,8 +269,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-slate-500 mb-1">פרמטרים לסריקה</div>
-          <div className="text-[11px] text-slate-700 leading-tight">
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">פרמטרים לסריקה</div>
+          <div className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
             {scanParams.engine} · {scanParams.device} · gl={scanParams.gl} · hl={scanParams.hl}
             {scanParams.location !== '—' && <> · {scanParams.location}</>}
           </div>

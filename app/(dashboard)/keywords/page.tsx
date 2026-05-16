@@ -132,7 +132,7 @@ export default function KeywordsPage() {
         <select
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
           <option value="">בחר פרויקט (חובה)</option>
           {projects.map((project) => (
@@ -145,12 +145,12 @@ export default function KeywordsPage() {
           placeholder="חיפוש מילת מפתח, פרויקט..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
         <select
           value={engineFilter}
           onChange={(e) => setEngineFilter(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
           <option value="">כל המנועים</option>
           <option value="google_search">גוגל חיפוש</option>
@@ -159,7 +159,7 @@ export default function KeywordsPage() {
       </div>
 
       {!selectedProjectId ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400">
           יש לבחור פרויקט כדי להציג מילות מפתח.
         </div>
       ) : loading ? (

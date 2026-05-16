@@ -399,11 +399,11 @@ export default function AIVisibilitySection({
       <section id="ai-visibility" className="space-y-6 mb-10">
         <div className="space-y-4">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
-              <div className="h-4 w-2/3 bg-slate-200 rounded mb-3" />
+            <div key={i} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 animate-pulse">
+              <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[0, 1, 2, 3].map((j) => (
-                  <div key={j} className="h-12 bg-slate-100 rounded" />
+                  <div key={j} className="h-12 bg-slate-100 dark:bg-slate-800 rounded" />
                 ))}
               </div>
             </div>
@@ -422,8 +422,8 @@ export default function AIVisibilitySection({
             <SparkleIcon size={20} className="text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">{t('ai_visibility')}</h2>
-            <p className="text-xs text-slate-500 mt-0">{t('monitor_engines')}</p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{t('ai_visibility')}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0">{t('monitor_engines')}</p>
           </div>
         </div>
       </div>
@@ -443,15 +443,15 @@ export default function AIVisibilitySection({
       )}
 
       {/* TAB BAR — only two tabs */}
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
         {(['results', 'queries'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setCurrentTab(tab)}
             className={`px-4 py-3 text-base font-semibold border-b-2 transition ${
               currentTab === tab
-                ? 'border-indigo-600 text-indigo-700'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
+                ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
             {tab === 'results' && t('tab_results')}
@@ -469,7 +469,7 @@ export default function AIVisibilitySection({
           <EngineMentionCards metrics={engineMetrics} t={t} />
 
           {/* FILTER BAR */}
-          <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 bg-white p-3">
+          <div className="flex flex-wrap gap-2 items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
             <Input
               placeholder={t('search')}
               value={searchQuery}
@@ -479,7 +479,7 @@ export default function AIVisibilitySection({
             <select
               value={filterEngine || ''}
               onChange={(e) => setFilterEngine(e.target.value || null)}
-              className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
             >
               <option value="">{t('all_engines')}</option>
               {SUPPORTED_ENGINES.map((e) => (
@@ -493,7 +493,7 @@ export default function AIVisibilitySection({
               onChange={(e) =>
                 setFilterMentioned(e.target.value === '' ? null : e.target.value === 'yes')
               }
-              className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
             >
               <option value="">{t('all_mention')}</option>
               <option value="yes">{t('mentioned')}</option>
@@ -504,7 +504,7 @@ export default function AIVisibilitySection({
               onChange={(e) =>
                 setFilterCited(e.target.value === '' ? null : e.target.value === 'yes')
               }
-              className="text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1.5"
             >
               <option value="">{t('all_citations')}</option>
               <option value="yes">{t('target_cited')}</option>
@@ -512,7 +512,7 @@ export default function AIVisibilitySection({
             </select>
           </div>
 
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-slate-600 dark:text-slate-300">
             {t('showing_results').replace('{count}', String(showAllResults ? filteredResults.length : Math.min(3, filteredResults.length)))}
           </div>
 
@@ -545,8 +545,8 @@ export default function AIVisibilitySection({
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <p className="text-sm text-slate-600">{t('no_scans')}</p>
+            <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-10 text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-300">{t('no_scans')}</p>
             </div>
           )}
         </>
@@ -580,7 +580,7 @@ export default function AIVisibilitySection({
           />
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                 {t('ai_queries')}
               </h3>
               <Badge variant="neutral" className="!text-xs">{allPrompts.length}</Badge>
@@ -601,10 +601,10 @@ export default function AIVisibilitySection({
                 {allPrompts.slice(0, showAllPrompts ? undefined : 3).map((p) => (
                   <div
                     key={p.id}
-                    className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition"
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 hover:shadow-sm transition"
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
-                      <p className="text-sm font-medium text-slate-900 flex-1 line-clamp-2">{p.prompt}</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 line-clamp-2">{p.prompt}</p>
                       <button
                         onClick={() => setDeletePromptId(p.id)}
                         className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
@@ -627,10 +627,10 @@ export default function AIVisibilitySection({
                             disabled={scanning || scanned}
                             className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition ${
                               scanned
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
+                                ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 cursor-default'
                                 : scanning
-                                ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-wait'
-                                : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer'
+                                ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-wait'
+                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
                             }`}
                           >
                             {meta && <meta.Icon size={14} className={meta.accent} />}
@@ -657,14 +657,14 @@ export default function AIVisibilitySection({
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <p className="text-sm text-slate-600">{t('no_queries')}</p>
+            <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-10 text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-300">{t('no_queries')}</p>
             </div>
           )}
 
           {suggestedQuestions.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50/40 to-white p-5 mt-6">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 mb-4">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-4">
                 {t('smart_questions_title')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -725,8 +725,8 @@ export default function AIVisibilitySection({
           size="md"
         >
           <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
-            <p className="text-sm text-slate-700">{t('delete_question_body')}</p>
-            <div className="flex gap-2 border-t border-slate-200 pt-3">
+            <p className="text-sm text-slate-700 dark:text-slate-200">{t('delete_question_body')}</p>
+            <div className="flex gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
               <Button
                 variant="outline"
                 onClick={() => setDeletePromptId(null)}
@@ -792,30 +792,30 @@ function OverviewSummaryStrip({
   t: T
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-gradient-to-r from-indigo-50 to-white p-6">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 p-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
             {t('total_mentions')}
           </div>
-          <div className="text-4xl font-bold text-emerald-700">{metrics.totalMentions}</div>
-          <div className="text-sm text-slate-600 mt-2">
+          <div className="text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalMentions}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-300 mt-2">
             {t('out_of_results').replace('{count}', String(totalResults))}
           </div>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
             {t('visibility_percent')}
           </div>
-          <div className="text-4xl font-bold text-indigo-700">{metrics.mentionRate}%</div>
-          <div className="text-sm text-slate-600 mt-2">{t('overall')}</div>
+          <div className="text-4xl font-bold text-indigo-700 dark:text-indigo-300">{metrics.mentionRate}%</div>
+          <div className="text-sm text-slate-600 dark:text-slate-300 mt-2">{t('overall')}</div>
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
             {t('target_cited')}
           </div>
-          <div className="text-4xl font-bold text-emerald-700">{metrics.totalCitations}</div>
-          <div className="text-sm text-slate-600 mt-2">{t('citations')}</div>
+          <div className="text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalCitations}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-300 mt-2">{t('citations')}</div>
         </div>
       </div>
     </div>
@@ -829,7 +829,7 @@ function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics
 
   return (
     <div>
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 mb-4">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-4">
         {t('mentions_by_engine')}
       </h3>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -839,15 +839,15 @@ function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics
           return (
             <div
               key={em.engine}
-              className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-md transition flex flex-col items-center text-center"
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 hover:shadow-md transition flex flex-col items-center text-center"
             >
               {meta && <meta.Icon size={32} className={meta.accent} />}
-              <div className="font-semibold text-slate-900 mt-3 text-sm">{meta?.name || em.engine}</div>
-              <div className="text-3xl font-bold text-emerald-600 mt-2">{em.mentions}</div>
-              <div className="text-xs text-slate-600 mt-2">
+              <div className="font-semibold text-slate-900 dark:text-slate-100 mt-3 text-sm">{meta?.name || em.engine}</div>
+              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">{em.mentions}</div>
+              <div className="text-xs text-slate-600 dark:text-slate-300 mt-2">
                 {t('out_of_results').replace('{count}', String(em.scans))}
               </div>
-              {em.scans > 0 && <div className="text-xs text-slate-500 mt-1">({percent}%)</div>}
+              {em.scans > 0 && <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">({percent}%)</div>}
             </div>
           )
         })}
@@ -982,19 +982,19 @@ function ResultRowCard({
   return (
     <div
       onClick={() => onRowClick(result)}
-      className={`rounded-lg border bg-white p-4 hover:shadow-md hover:border-slate-300 transition cursor-pointer ${
-        highlighted ? 'border-indigo-300 ring-2 ring-indigo-200' : 'border-slate-200'
+      className={`rounded-lg border bg-white dark:bg-slate-900 p-4 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition cursor-pointer ${
+        highlighted ? 'border-indigo-300 ring-2 ring-indigo-200 dark:ring-indigo-700' : 'border-slate-200 dark:border-slate-700'
       }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Row 1: query text */}
-          <p className="text-sm font-medium text-slate-900 line-clamp-2">{result.promptText}</p>
+          <p className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-2">{result.promptText}</p>
 
           {/* Row 2: engine + status badges + scan time */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {meta && <meta.Icon size={16} className={meta.accent} />}
-            <span className="text-xs text-slate-600 font-medium">{meta?.name || result.engine}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{meta?.name || result.engine}</span>
 
             {reMentioned ? (
               <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>
@@ -1008,7 +1008,7 @@ function ResultRowCard({
             )}
 
             {scannedAtStr && (
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 · {t('scanned_at')} {scannedAtStr}
               </span>
             )}
@@ -1017,17 +1017,17 @@ function ResultRowCard({
           {/* Row 3: matched variants — only when something was matched */}
           {(brandLabels.length > 0 || domainLabel) && (
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              <span className="text-[11px] text-slate-500 font-medium">{t('what_was_mentioned')}:</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{t('what_was_mentioned')}:</span>
               {brandLabels.map((label) => (
                 <span
                   key={label}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                 >
                   {label}
                 </span>
               ))}
               {domainLabel && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                   {domainLabel}
                 </span>
               )}
@@ -1041,7 +1041,7 @@ function ResultRowCard({
               {result.citationCount} {t('citations')}
             </Badge>
           )}
-          <ExternalLinkIcon size={16} className="text-slate-400" />
+          <ExternalLinkIcon size={16} className="text-slate-400 dark:text-slate-500" />
         </div>
       </div>
     </div>
@@ -1087,17 +1087,17 @@ function SmartQuestionCard({
     question.intent
 
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200 hover:shadow-sm transition">
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:shadow-sm transition">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-900 font-medium line-clamp-2 mb-1.5">{question.prompt}</p>
+        <p className="text-sm text-slate-900 dark:text-slate-100 font-medium line-clamp-2 mb-1.5">{question.prompt}</p>
         <div className="flex items-center gap-1.5 mb-1">
           <Badge variant={intentTone[question.intent] || 'neutral'} className="!text-[9px]">
             {label}
           </Badge>
-          <span className="text-[10px] text-slate-500">{question.qualityScore}%</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">{question.qualityScore}%</span>
         </div>
         {question.reason && (
-          <p className="text-[11px] text-slate-500 line-clamp-2" title={question.reason}>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2" title={question.reason}>
             {question.reason}
           </p>
         )}
@@ -1159,49 +1159,49 @@ function ResultDetailDrawer({
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-end" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-2xl h-full overflow-y-auto shadow-xl animate-in slide-in-from-right"
+        className="bg-white dark:bg-slate-900 w-full max-w-2xl h-full overflow-y-auto shadow-xl animate-in slide-in-from-right"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 border-b border-slate-200 bg-white p-6 flex items-start justify-between">
+        <div className="sticky top-0 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 mb-1">{result.promptText}</h2>
-            <p className="text-sm text-slate-500">{engineMeta?.name || result.engine}</p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">{result.promptText}</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{engineMeta?.name || result.engine}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-2xl leading-none">
             ×
           </button>
         </div>
 
         <div className="space-y-6 p-6">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">{t('scan_activity')}</h3>
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('scan_activity')}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-xs text-slate-600">{t('mentioned')}</div>
-                <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700' : 'text-slate-400'}`}>
+                <div className="text-xs text-slate-600 dark:text-slate-300">{t('mentioned')}</div>
+                <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                   {reMentioned ? '✓' : '—'}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-600">{t('target_cited')}</div>
-                <div className={`text-lg font-bold ${reCited ? 'text-emerald-700' : 'text-slate-400'}`}>
+                <div className="text-xs text-slate-600 dark:text-slate-300">{t('target_cited')}</div>
+                <div className={`text-lg font-bold ${reCited ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                   {reCited ? '✓' : '—'}
                 </div>
               </div>
             </div>
             {(brandLabels.length > 0 || domainLabel) && (
               <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                <span className="text-[11px] text-slate-500 font-medium">{t('what_was_mentioned')}:</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{t('what_was_mentioned')}:</span>
                 {brandLabels.map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                   >
                     {label}
                   </span>
                 ))}
                 {domainLabel && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                     {domainLabel}
                   </span>
                 )}
@@ -1211,7 +1211,7 @@ function ResultDetailDrawer({
 
           {result.citations.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {t('sources')} ({result.citations.length})
               </h3>
               <div className="space-y-2">
@@ -1221,10 +1221,10 @@ function ResultDetailDrawer({
                     href={c.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block p-2 rounded-lg border border-slate-200 hover:border-slate-300 hover:shadow-sm transition"
+                    className="block p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm transition"
                   >
                     <div className="flex items-center gap-2 text-sm">
-                      <span className={`font-medium ${c.is_target_domain ? 'text-emerald-700' : 'text-slate-900'}`}>
+                      <span className={`font-medium ${c.is_target_domain ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}`}>
                         {c.domain}
                       </span>
                       {c.is_target_domain && (
@@ -1239,8 +1239,8 @@ function ResultDetailDrawer({
 
           {result.responseText && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">{t('ai_answer')}</h3>
-              <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('ai_answer')}</h3>
+              <div className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
                 {cleanResponseText(result.responseText)
                   .split('\n')
                   .map((line, i) => (
@@ -1253,7 +1253,7 @@ function ResultDetailDrawer({
           )}
         </div>
 
-        <div className="sticky bottom-0 border-t border-slate-200 bg-white p-6">
+        <div className="sticky bottom-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
           <Button variant="outline" onClick={onClose} className="w-full">
             {t('close')}
           </Button>

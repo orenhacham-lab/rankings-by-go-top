@@ -231,14 +231,14 @@ export default function AIBusinessProfilePanel({
 
   return (
     <div
-      className="rounded-lg border border-slate-200 bg-white mb-4 overflow-hidden"
+      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 mb-4 overflow-hidden"
       dir={isHebrew ? 'rtl' : 'ltr'}
     >
       {/* Collapsed/header — the WHOLE row is clickable */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full text-start p-4 hover:bg-slate-50 active:bg-slate-100 transition flex items-center gap-4 cursor-pointer"
+        className="w-full text-start p-4 hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100 dark:active:bg-slate-700 transition flex items-center gap-4 cursor-pointer"
         aria-expanded={expanded}
       >
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
@@ -251,16 +251,16 @@ export default function AIBusinessProfilePanel({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-bold text-slate-800">{t('ai_business_profile')}</h3>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('ai_business_profile')}</h3>
             <Badge variant={mode === 'manual' ? 'warning' : 'info'}>
               {mode === 'manual' ? t('manual_badge') : t('auto_badge')}
             </Badge>
           </div>
-          <div className="mt-1 text-xs text-slate-600 truncate">
-            <span className="text-slate-500">
+          <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
+            <span className="text-slate-500 dark:text-slate-400">
               {mode === 'manual' ? t('manually_set') : t('auto_detected')}:
             </span>{' '}
-            <span className="font-medium text-slate-800">{displayedCategoryLabel}</span>
+            <span className="font-medium text-slate-800 dark:text-slate-100">{displayedCategoryLabel}</span>
           </div>
         </div>
 
@@ -287,12 +287,12 @@ export default function AIBusinessProfilePanel({
 
       {/* Expanded editor */}
       {expanded && (
-        <div className="px-4 pb-4 pt-2 border-t border-slate-100">
-          <p className="text-xs text-slate-500 mb-3">{t('ai_business_profile_help')}</p>
+        <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-700">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('ai_business_profile_help')}</p>
 
           {/* Primary category — freeform combobox */}
           <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               {t('primary_category')}
             </label>
             <div className="relative">
@@ -307,16 +307,16 @@ export default function AIBusinessProfilePanel({
                 onFocus={() => setSuggestionsOpen(true)}
                 onBlur={() => setTimeout(() => setSuggestionsOpen(false), 120)}
                 placeholder={t('primary_category_placeholder')}
-                className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full rounded-md border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400"
                 dir={isHebrew ? 'rtl' : 'ltr'}
                 autoComplete="off"
               />
               {suggestionsOpen && filteredSuggestions.length > 0 && (
                 <div
-                  className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg"
+                  className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
                   dir={isHebrew ? 'rtl' : 'ltr'}
                 >
-                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-700">
                     {t('category_suggestions')}
                   </div>
                   {filteredSuggestions.map((opt) => (
@@ -348,7 +348,7 @@ export default function AIBusinessProfilePanel({
 
           {/* Secondary categories tag input */}
           <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               {t('secondary_categories')}
             </label>
             <div className="flex flex-wrap gap-1.5 mb-1.5">
@@ -387,14 +387,14 @@ export default function AIBusinessProfilePanel({
                 )
               }
               placeholder={t('add_secondary_placeholder')}
-              className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               dir={isHebrew ? 'rtl' : 'ltr'}
             />
           </div>
 
           {/* Excluded topics tag input */}
           <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               {t('excluded_topics')}
             </label>
             <div className="flex flex-wrap gap-1.5 mb-1.5">
@@ -433,7 +433,7 @@ export default function AIBusinessProfilePanel({
                 )
               }
               placeholder={t('add_excluded_placeholder')}
-              className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               dir={isHebrew ? 'rtl' : 'ltr'}
             />
           </div>

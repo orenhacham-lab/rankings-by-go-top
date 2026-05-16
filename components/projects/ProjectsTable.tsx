@@ -46,7 +46,7 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
           placeholder="חיפוש לפי שם פרויקט, דומיין..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
       </div>
 
@@ -79,13 +79,13 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
               {showClient && (
                 <Td>
                   {project.clients ? (
-                    <Link href={`/clients/${project.clients.id}`} className="text-slate-600 hover:underline text-sm">
+                    <Link href={`/clients/${project.clients.id}`} className="text-slate-600 dark:text-slate-300 hover:underline text-sm">
                       {project.clients.name}
                     </Link>
                   ) : '—'}
                 </Td>
               )}
-              <Td className="font-mono text-xs text-slate-600">{project.target_domain}</Td>
+              <Td className="font-mono text-xs text-slate-600 dark:text-slate-300">{project.target_domain}</Td>
               <Td>
                 <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
                   {getFrequencyLabel(project.scan_frequency)}

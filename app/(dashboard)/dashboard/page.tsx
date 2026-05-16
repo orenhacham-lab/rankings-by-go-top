@@ -150,8 +150,8 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">לוח בקרה</h1>
-        <p className="text-slate-500 text-sm mt-0.5">ברוך הבא למערכת Rankings by Go Top</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">לוח בקרה</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">ברוך הבא למערכת Rankings by Go Top</p>
       </div>
 
       {/* Stat Cards */}
@@ -165,18 +165,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Latest Scans */}
         <Card padding={false}>
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">סריקות אחרונות</h2>
+          <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">סריקות אחרונות</h2>
             <Link href="/scans" className="text-sm text-blue-600 hover:underline">הכל</Link>
           </div>
           {latestScans.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-sm">אין סריקות עדיין</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {latestScans.map((scan) => (
-                <div key={scan.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                <div key={scan.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800">
                   <div>
-                    <Link href={`/projects/${scan.project_id}`} className="font-medium text-slate-700 hover:text-blue-600 text-sm">
+                    <Link href={`/projects/${scan.project_id}`} className="font-medium text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 text-sm">
                       {scan.project_name}
                     </Link>
                     <p className="text-xs text-slate-400 mt-0.5">
@@ -207,18 +207,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Improvements */}
         <Card padding={false}>
-          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-            <TrendingUp size={20} className="text-green-600" strokeWidth={2} />
-            <h2 className="font-semibold text-slate-800">שיפורים גדולים</h2>
+          <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+            <TrendingUp size={20} className="text-green-600 dark:text-green-400" strokeWidth={2} />
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">שיפורים גדולים</h2>
           </div>
           {improvements.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-sm">אין שיפורים לאחרונה</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {improvements.map((item) => (
-                <div key={item.tracking_target_id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                <div key={item.tracking_target_id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800">
                   <div>
-                    <span className="font-medium text-slate-700 text-sm">{item.keyword}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">{item.keyword}</span>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {item.project_name} · #{item.position}
                     </p>
@@ -232,18 +232,18 @@ export default function DashboardPage() {
 
         {/* Drops */}
         <Card padding={false}>
-          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-            <TrendingDown size={20} className="text-red-600" strokeWidth={2} />
-            <h2 className="font-semibold text-slate-800">ירידות גדולות</h2>
+          <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+            <TrendingDown size={20} className="text-red-600 dark:text-red-400" strokeWidth={2} />
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">ירידות גדולות</h2>
           </div>
           {drops.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-sm">אין ירידות לאחרונה</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {drops.map((item) => (
-                <div key={item.tracking_target_id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                <div key={item.tracking_target_id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800">
                   <div>
-                    <span className="font-medium text-slate-700 text-sm">{item.keyword}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">{item.keyword}</span>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {item.project_name} · #{item.position}
                     </p>
@@ -278,8 +278,8 @@ function StatCard({ label, value, icon: Icon, color, href }: {
             <Icon size={22} strokeWidth={2} />
           </div>
           <div>
-            <div className="text-2xl font-bold text-slate-800">{value}</div>
-            <div className="text-xs text-slate-500">{label}</div>
+            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
           </div>
         </div>
       </Card>
@@ -291,14 +291,14 @@ function QuickLink({ href, icon: Icon, label, sub }: { href: string; icon: React
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-blue-200 transition-all"
+      className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-blue-200 dark:hover:border-blue-700 transition-all"
     >
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
         <Icon size={20} strokeWidth={2} />
       </div>
       <div>
-        <div className="font-medium text-slate-700 text-sm">{label}</div>
-        <div className="text-xs text-slate-400">{sub}</div>
+        <div className="font-medium text-slate-700 dark:text-slate-200 text-sm">{label}</div>
+        <div className="text-xs text-slate-400 dark:text-slate-500">{sub}</div>
       </div>
     </Link>
   )

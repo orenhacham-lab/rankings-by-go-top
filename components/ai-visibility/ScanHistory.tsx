@@ -120,29 +120,29 @@ export default function ScanHistory({
   const visibleRuns = runs
 
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden" dir={isHebrew ? 'rtl' : 'ltr'}>
+    <div className="rounded-2xl border border-slate-200/70 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden" dir={isHebrew ? 'rtl' : 'ltr'}>
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50/60 transition border-b border-slate-100"
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50/60 dark:hover:bg-slate-800 transition border-b border-slate-100 dark:border-slate-700"
         type="button"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/80 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" className="text-slate-500" />
-              <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-slate-500" />
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" className="text-slate-500 dark:text-slate-400" />
+              <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-slate-500 dark:text-slate-400" />
             </svg>
           </div>
           <div className="text-start">
-            <div className="text-[13px] font-semibold text-slate-800 leading-tight">{t('scan_activity')}</div>
-            <div className="text-[11px] text-slate-500 leading-tight">
+            <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 leading-tight">{t('scan_activity')}</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
               {loading
                 ? t('loading')
                 : `${visibleRuns.length} ${visibleRuns.length === 1 ? t('event') : t('events')}`}
             </div>
           </div>
         </div>
-        <span className="text-slate-400 text-sm">{expanded ? '−' : '+'}</span>
+        <span className="text-slate-400 dark:text-slate-500 text-sm">{expanded ? '−' : '+'}</span>
       </button>
 
       {expanded && (
@@ -157,14 +157,14 @@ export default function ScanHistory({
             <ActivityFeedSkeleton />
           ) : visibleRuns.length === 0 ? (
             <div className="px-5 py-10 text-center">
-              <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-2.5">
+              <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2.5">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" className="text-slate-400" />
-                  <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-slate-400" />
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" className="text-slate-400 dark:text-slate-500" />
+                  <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-slate-400 dark:text-slate-500" />
                 </svg>
               </div>
-              <div className="text-sm text-slate-600 font-medium">{t('no_scans')}</div>
-              <div className="text-xs text-slate-400 mt-1">{t('no_scans_help')}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-300 font-medium">{t('no_scans')}</div>
+              <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('no_scans_help')}</div>
             </div>
           ) : (
             <ol className="relative">
@@ -186,12 +186,12 @@ export default function ScanHistory({
                         ? 'opacity-0 max-h-0 overflow-hidden'
                         : 'opacity-100 max-h-32'
                     } ${
-                      isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/60'
+                      isSelected ? 'bg-indigo-50/40 dark:bg-indigo-900/20' : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/60'
                     }`}
                     onClick={() => !isFading && onSelectRun(run.id)}
                   >
                     {!isLast && (
-                      <span className="absolute start-[34px] top-12 bottom-0 w-px bg-slate-100" />
+                      <span className="absolute start-[34px] top-12 bottom-0 w-px bg-slate-100 dark:bg-slate-700" />
                     )}
 
                     <div className="flex items-start gap-3 px-5 py-3.5">
@@ -199,43 +199,43 @@ export default function ScanHistory({
                         <div
                           className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
                             isSuccess
-                              ? 'bg-white border-slate-200 shadow-sm'
+                              ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm'
                               : isFailed
-                              ? 'bg-red-50 border-red-200'
-                              : 'bg-white border-slate-200'
+                              ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                           }`}
                         >
                           {engineMeta && Icon ? (
                             <Icon size={16} className={engineMeta.accent} />
                           ) : (
-                            <span className="w-2 h-2 rounded-full bg-slate-300" />
+                            <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" />
                           )}
                         </div>
                         <span
-                          className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                            isSuccess ? 'bg-emerald-500' : isFailed ? 'bg-red-500' : 'bg-slate-300'
+                          className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${
+                            isSuccess ? 'bg-emerald-500' : isFailed ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600'
                           }`}
                         />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                          <span className="text-[13px] font-semibold text-slate-800">
+                          <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-100">
                             {engineMeta?.name || r?.engine || '—'}
                           </span>
-                          <span className="text-[11px] text-slate-400">·</span>
-                          <span className="text-[11px] text-slate-500">
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">·</span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
                             {formatRelative(run.completedAt || run.createdAt, t('just_now'))}
                           </span>
                           {isSelected && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-700 bg-indigo-100 rounded-full px-1.5 py-0.5">
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/40 rounded-full px-1.5 py-0.5">
                               {t('viewing')}
                             </span>
                           )}
                         </div>
 
-                        <div className="text-[13px] text-slate-700 line-clamp-1 leading-snug mb-1.5">
-                          {r?.promptText || <span className="italic text-slate-400">—</span>}
+                        <div className="text-[13px] text-slate-700 dark:text-slate-200 line-clamp-1 leading-snug mb-1.5">
+                          {r?.promptText || <span className="italic text-slate-400 dark:text-slate-500">—</span>}
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap">
@@ -254,11 +254,11 @@ export default function ScanHistory({
                                 </span>
                               )}
                               {!r.mentioned && !r.targetCited && (
-                                <span className="text-[10.5px] text-slate-400">{t('no_mention')}</span>
+                                <span className="text-[10.5px] text-slate-400 dark:text-slate-500">{t('no_mention')}</span>
                               )}
-                              <span className="text-[10.5px] text-slate-400">·</span>
-                              <span className="text-[10.5px] text-slate-500">
-                                <b className="text-slate-700 font-semibold">{r.citationCount}</b> {t('citations').toLowerCase()}
+                              <span className="text-[10.5px] text-slate-400 dark:text-slate-500">·</span>
+                              <span className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                                <b className="text-slate-700 dark:text-slate-200 font-semibold">{r.citationCount}</b> {t('citations').toLowerCase()}
                               </span>
                             </>
                           )}
@@ -304,15 +304,15 @@ function ActivityFeedSkeleton() {
     <ol className="relative">
       {[0, 1, 2].map((i) => (
         <li key={i} className="relative">
-          {i < 2 && <span className="absolute start-[34px] top-12 bottom-0 w-px bg-slate-100" />}
+          {i < 2 && <span className="absolute start-[34px] top-12 bottom-0 w-px bg-slate-100 dark:bg-slate-700" />}
           <div className="flex items-start gap-3 px-5 py-3.5 animate-pulse">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 shrink-0" />
+            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0" />
             <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-32 bg-slate-200 rounded" />
-              <div className="h-3 w-3/4 bg-slate-100 rounded" />
+              <div className="h-3 w-32 bg-slate-200 dark:bg-slate-700 rounded" />
+              <div className="h-3 w-3/4 bg-slate-100 dark:bg-slate-800 rounded" />
               <div className="flex gap-1.5">
-                <div className="h-3.5 w-14 bg-slate-100 rounded-full" />
-                <div className="h-3.5 w-16 bg-slate-100 rounded-full" />
+                <div className="h-3.5 w-14 bg-slate-100 dark:bg-slate-800 rounded-full" />
+                <div className="h-3.5 w-16 bg-slate-100 dark:bg-slate-800 rounded-full" />
               </div>
             </div>
           </div>

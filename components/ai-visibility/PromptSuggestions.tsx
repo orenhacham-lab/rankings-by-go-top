@@ -303,7 +303,7 @@ export default function PromptSuggestions({
     <Modal open={open} onClose={onClose} title={t('smart_questions_title')} size="lg">
       <div className="space-y-4" dir={isHebrew ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between gap-3 text-sm">
-          <p className="text-slate-600 flex-1">{t('smart_questions_help')}</p>
+          <p className="text-slate-600 dark:text-slate-300 flex-1">{t('smart_questions_help')}</p>
           <button
             onClick={regenerate}
             disabled={regenerating}
@@ -324,18 +324,18 @@ export default function PromptSuggestions({
         {regenerating ? (
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white animate-pulse">
-                <div className="w-4 h-4 rounded bg-slate-200 mt-1" />
+              <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 animate-pulse">
+                <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 mt-1" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-slate-200 rounded" />
-                  <div className="h-3 w-20 bg-slate-100 rounded-full" />
+                  <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />
+                  <div className="h-3 w-20 bg-slate-100 dark:bg-slate-800 rounded-full" />
                 </div>
-                <div className="w-12 h-7 bg-slate-100 rounded" />
+                <div className="w-12 h-7 bg-slate-100 dark:bg-slate-800 rounded" />
               </div>
             ))}
           </div>
         ) : suggestions.length === 0 ? (
-          <div className="text-center py-10 text-slate-500">
+          <div className="text-center py-10 text-slate-500 dark:text-slate-400">
             <div className="text-sm mb-3">{t('all_added')}</div>
             <Button size="sm" variant="outline" onClick={regenerate}>
               {t('generate_again')}
@@ -351,8 +351,8 @@ export default function PromptSuggestions({
                   key={s.id}
                   className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-200 ${
                     checked
-                      ? 'border-indigo-300 bg-indigo-50/60 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                      ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-900/20 shadow-sm'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm'
                   }`}
                 >
                   <input
@@ -377,10 +377,10 @@ export default function PromptSuggestions({
                         }}
                         autoFocus
                         dir={isHebrew ? 'rtl' : 'ltr'}
-                        className="w-full px-2 py-1 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-2 py-1 text-sm rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     ) : (
-                      <div className="text-sm font-medium text-slate-900 leading-snug">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 leading-snug">
                         {s.prompt}
                       </div>
                     )}
@@ -390,14 +390,14 @@ export default function PromptSuggestions({
                       </Badge>
                       <button
                         onClick={() => startEdit(s.id, s.prompt)}
-                        className="text-xs text-slate-500 hover:text-slate-700"
+                        className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                         type="button"
                       >
                         {t('edit')}
                       </button>
                     </div>
                     {s.reason && (
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2" title={s.reason}>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2" title={s.reason}>
                         {s.reason}
                       </p>
                     )}
@@ -416,8 +416,8 @@ export default function PromptSuggestions({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-3">
-          <div className="text-xs text-slate-500">
+        <div className="flex items-center justify-between gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
             {selectedCount > 0
               ? `${selectedCount} ${t('selected')} ${t('of')} ${suggestions.length}`
               : `${suggestions.length}`}
