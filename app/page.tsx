@@ -103,7 +103,7 @@ export default async function HomePage() {
                 <div className="w-3 h-3 rounded-full bg-yellow-400" />
                 <div className="w-3 h-3 rounded-full bg-green-400" />
                 <div className="ml-3 px-3 py-1 rounded-md bg-white border border-slate-200 text-xs text-slate-500 font-mono">
-                  app.gotopseo.com/dashboard
+                  gotopseo.com/dashboard
                 </div>
               </div>
               {/* Mock dashboard content */}

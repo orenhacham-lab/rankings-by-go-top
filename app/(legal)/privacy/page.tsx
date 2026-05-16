@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">מבוא</h2>
             <p>
-              Rankings by Go Top (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;) מפעילה את האתר https://rankings.gotop.co.il (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
+              גו טופ שיווק ופרסום דיגיטלי בע״מ (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;), המפעילה את השירות Rankings by Go Top ב-https://www.gotopseo.com (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
             </p>
           </section>
 
