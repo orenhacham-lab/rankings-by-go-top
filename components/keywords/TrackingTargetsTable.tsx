@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Button from '@/components/ui/Button'
@@ -40,6 +42,10 @@ export default function TrackingTargetsTable({
   projectDevice,
   onActionComplete,
 }: TrackingTargetsTableProps) {
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const k = dict.projectDetail.table
+
   const [editingTarget, setEditingTarget] = useState<TrackingTarget | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -117,26 +123,26 @@ export default function TrackingTargetsTable({
         <TableHead>
           <tr>
             <Th>
-              <button type="button" onClick={() => handleSort('keyword')} className="font-semibold">מילת מפתח{sortLabel('keyword')}</button>
+              <button type="button" onClick={() => handleSort('keyword')} className="font-semibold">{k.keyword}{sortLabel('keyword')}</button>
             </Th>
-            <Th>סוג סריקה</Th>
+            <Th>{k.scanType}</Th>
             <Th>
-              <button type="button" onClick={() => handleSort('position')} className="font-semibold">מיקום נוכחי{sortLabel('position')}</button>
+              <button type="button" onClick={() => handleSort('position')} className="font-semibold">{k.position}{sortLabel('position')}</button>
             </Th>
-            <Th>שינוי</Th>
+            <Th>{k.change}</Th>
             <Th>
-              <button type="button" onClick={() => handleSort('date')} className="font-semibold">בדיקה אחרונה{sortLabel('date')}</button>
+              <button type="button" onClick={() => handleSort('date')} className="font-semibold">{k.lastChecked}{sortLabel('date')}</button>
             </Th>
             <Th>
-              <button type="button" onClick={() => handleSort('found')} className="font-semibold">נמצא{sortLabel('found')}</button>
+              <button type="button" onClick={() => handleSort('found')} className="font-semibold">{k.found}{sortLabel('found')}</button>
             </Th>
-            <Th>סטטוס</Th>
-            <Th>פעולות</Th>
+            <Th>{k.status}</Th>
+            <Th>{k.actions}</Th>
           </tr>
         </TableHead>
         <TableBody>
           {targets.length === 0 && (
-            <EmptyRow colSpan={8} message="אין מילות מפתח עדיין. הוסף את הראשונה!" />
+            <EmptyRow colSpan={8} message={k.emptyState} />
           )}
           {sortedTargets.map((target) => {
             const result = latestResults[target.id]
@@ -161,7 +167,7 @@ export default function TrackingTargetsTable({
                         #{result.position}
                       </span>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500 text-sm">לא נמצא</span>
+                      <span className="text-slate-400 dark:text-slate-500 text-sm">{k.notFound}</span>
                     )
                   ) : (
                     <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>
@@ -191,7 +197,7 @@ export default function TrackingTargetsTable({
                 </Td>
                 <Td>
                   <Badge variant={result?.found ? 'success' : 'neutral'}>
-                    {result ? (result.found ? 'כן' : 'לא') : '—'}
+                    {result ? (result.found ? k.yesFound : k.noNotFound) : '—'}
                   </Badge>
                 </Td>
                 <Td>
@@ -206,13 +212,13 @@ export default function TrackingTargetsTable({
                         loading={isScanning}
                         onClick={() => onScanTarget(target.id)}
                       >
-                        סרוק
+                        {k.scan}
                       </Button>
                     )}
                     {result && result.audit_request != null && (
                       <Link href={`/scans/${result.scan_id}/details`}>
                         <Button size="sm" variant="ghost">
-                          פרטים
+                          {k.details}
                         </Button>
                       </Link>
                     )}
@@ -221,7 +227,7 @@ export default function TrackingTargetsTable({
                       variant="ghost"
                       onClick={() => setEditingTarget(target)}
                     >
-                      עריכה
+                      {k.edit}
                     </Button>
                     <Button
                       size="sm"
@@ -229,11 +235,11 @@ export default function TrackingTargetsTable({
                       loading={togglingId === target.id}
                       onClick={() => handleToggleActive(target)}
                     >
-                      {target.is_active ? 'השבת' : 'הפעל'}
+                      {target.is_active ? k.deactivate : k.activate}
                     </Button>
                     <Link href={`/keywords/${target.id}/history`}>
                       <Button size="sm" variant="ghost">
-                        היסטוריה
+                        {k.history}
                       </Button>
                     </Link>
                     {!target.is_active && (
@@ -246,14 +252,14 @@ export default function TrackingTargetsTable({
                             onClick={() => handleDelete(target.id)}
                             className="text-red-600 hover:text-red-700"
                           >
-                            אשר מחיקה
+                            {k.confirmDelete}
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => setConfirmDeleteId(null)}
                           >
-                            ביטול
+                            {k.cancel}
                           </Button>
                         </>
                       ) : (
@@ -263,7 +269,7 @@ export default function TrackingTargetsTable({
                           onClick={() => setConfirmDeleteId(target.id)}
                           className="text-red-500 hover:text-red-600"
                         >
-                          מחק
+                          {k.delete}
                         </Button>
                       )
                     )}
@@ -279,7 +285,7 @@ export default function TrackingTargetsTable({
         <Modal
           open={!!editingTarget}
           onClose={() => setEditingTarget(null)}
-          title="עריכת מילת מפתח"
+          title={k.editKeywordTitle}
           size="md"
         >
           <TrackingTargetForm
