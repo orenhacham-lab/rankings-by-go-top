@@ -7,10 +7,16 @@ import Header from '@/components/layout/Header'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import { formatDateTime } from '@/lib/utils'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 
 export default function KeywordsPage() {
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const k = dict.keywordsPage
+
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [targets, setTargets] = useState<(TrackingTarget & { projects?: { name: string; id: string; clients?: { name: string } } })[]>([])
@@ -117,12 +123,12 @@ export default function KeywordsPage() {
   return (
     <div>
       <Header
-        title="מילות מפתח"
-        subtitle={selectedProjectId ? `סה"כ ${targets.length} מילות מפתח` : 'בחר פרויקט לצפייה במילות המפתח'}
+        title={k.title}
+        subtitle={selectedProjectId ? `${k.countPrefix} ${targets.length} ${k.countSuffix}` : k.selectProjectHint}
         actions={
           selectedProjectId ? (
             <Link href={`/projects/${selectedProjectId}?section=rankings`}>
-              <Button size="sm">פתח פרויקט ←</Button>
+              <Button size="sm">{k.openProjectButton}</Button>
             </Link>
           ) : null
         }
@@ -134,7 +140,7 @@ export default function KeywordsPage() {
           onChange={(e) => setSelectedProjectId(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
-          <option value="">בחר פרויקט (חובה)</option>
+          <option value="">{k.selectProjectPlaceholder}</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>{project.name}</option>
           ))}
@@ -142,7 +148,7 @@ export default function KeywordsPage() {
 
         <input
           type="text"
-          placeholder="חיפוש מילת מפתח, פרויקט..."
+          placeholder={k.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -152,51 +158,51 @@ export default function KeywordsPage() {
           onChange={(e) => setEngineFilter(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
-          <option value="">כל המנועים</option>
-          <option value="google_search">גוגל חיפוש</option>
-          <option value="google_maps">גוגל מפות</option>
+          <option value="">{k.allEngines}</option>
+          <option value="google_search">{k.engineGoogleSearch}</option>
+          <option value="google_maps">{k.engineGoogleMaps}</option>
         </select>
       </div>
 
       {!selectedProjectId ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400">
-          יש לבחור פרויקט כדי להציג מילות מפתח.
+          {k.selectProjectMessage}
         </div>
       ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען...
+          {dict.common.loading}
         </div>
       ) : (
         <Table>
           <TableHead>
             <tr>
-              <Th>מילת מפתח</Th>
-              <Th>פרויקט</Th>
-              <Th>לקוח</Th>
-              <Th>מנוע</Th>
+              <Th>{k.table.keyword}</Th>
+              <Th>{k.table.project}</Th>
+              <Th>{k.table.client}</Th>
+              <Th>{k.table.engine}</Th>
               <Th>
                 <button
                   type="button"
                   onClick={togglePositionSort}
                   className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
-                  title="מיין לפי מיקום"
+                  title={k.sortByPositionTooltip}
                 >
-                  מיקום
+                  {k.table.position}
                   <span className="text-xs">
                     {positionSort === 'asc' ? '▲' : positionSort === 'desc' ? '▼' : '↕'}
                   </span>
                 </button>
               </Th>
-              <Th>שינוי</Th>
-              <Th>בדיקה אחרונה</Th>
-              <Th>סטטוס</Th>
-              <Th>פעולות</Th>
+              <Th>{k.table.change}</Th>
+              <Th>{k.table.lastChecked}</Th>
+              <Th>{k.table.status}</Th>
+              <Th>{k.table.actions}</Th>
             </tr>
           </TableHead>
           <TableBody>
             {sorted.length === 0 && (
-              <EmptyRow colSpan={9} message="לא נמצאו מילות מפתח" />
+              <EmptyRow colSpan={9} message={k.table.emptyState} />
             )}
             {sorted.map((target) => {
               const result = latestResults[target.id]
@@ -228,11 +234,11 @@ export default function KeywordsPage() {
                   </Td>
                   <Td>
                     {result?.error_message ? (
-                      <span className="text-amber-600 text-sm" title={result.error_message}>שגיאת סריקה</span>
+                      <span className="text-amber-600 text-sm" title={result.error_message}>{k.table.scanError}</span>
                     ) : result?.found ? (
                       <span className="font-bold">#{result.position}</span>
                     ) : result ? (
-                      <span className="text-slate-400 text-sm">לא נמצא</span>
+                      <span className="text-slate-400 text-sm">{k.table.notFound}</span>
                     ) : '—'}
                   </Td>
                   <Td>
@@ -249,11 +255,11 @@ export default function KeywordsPage() {
                   <Td>
                     <div className="flex gap-1">
                       <Link href={`/keywords/${target.id}/history`}>
-                        <Button size="sm" variant="ghost">היסטוריה</Button>
+                        <Button size="sm" variant="ghost">{k.actions.history}</Button>
                       </Link>
                       {target.projects && (
                         <Link href={`/projects/${target.projects.id}?section=rankings`}>
-                          <Button size="sm" variant="outline">פתח</Button>
+                          <Button size="sm" variant="outline">{k.actions.open}</Button>
                         </Link>
                       )}
                     </div>
