@@ -73,8 +73,13 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         </div>
       </div>
 
-      {/* Language Switcher - Hidden on mobile */}
+      {/* Language Switcher - Desktop */}
       <div className="hidden md:block border-b border-slate-200 dark:border-slate-800">
+        <DashboardLanguageSwitcher />
+      </div>
+
+      {/* Language Switcher - Mobile (uses same DashboardLanguageProvider state) */}
+      <div className="block md:hidden border-b border-slate-200 dark:border-slate-800">
         <DashboardLanguageSwitcher />
       </div>
 
