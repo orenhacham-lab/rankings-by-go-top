@@ -100,6 +100,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleScanAll() {
+    const keywordsSection = document.getElementById('keywords-section')
+    if (keywordsSection) {
+      keywordsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      keywordsSection.classList.add('ring-2', 'ring-indigo-400')
+      setTimeout(() => {
+        keywordsSection.classList.remove('ring-2', 'ring-indigo-400')
+      }, 1500)
+    }
     setScanning(true)
     setScanMessage('')
     try {
@@ -285,7 +293,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Tracking Targets */}
-      <div id="rankings" className="flex items-center justify-between mb-4 scroll-mt-6">
+      <div id="keywords-section" className="flex items-center justify-between mb-4 scroll-mt-6">
         <h2 className="text-lg font-semibold text-slate-800">
           מילות מפתח ({targets.length})
         </h2>

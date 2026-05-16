@@ -20,19 +20,19 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: 'לוח בקרה', icon: BarChart3, color: 'text-blue-600' },
-  { href: '/clients', label: 'לקוחות', icon: Users, color: 'text-slate-600' },
-  { href: '/projects', label: 'פרויקטים', icon: Folder, color: 'text-purple-600' },
-  { href: '/keywords', label: 'מילות מפתח', icon: KeyRound, color: 'text-amber-600' },
-  { href: '/ai-visibility', label: 'נראות ב-AI', icon: Sparkles, color: 'text-violet-600' },
-  { href: '/scans', label: 'סריקות', icon: Search, color: 'text-orange-600' },
-  { href: '/reports', label: 'דוחות', icon: FileText, color: 'text-slate-600' },
-  { href: '/billing', label: 'מנוי ותשלום', icon: CreditCard, color: 'text-emerald-600' },
+  { href: '/dashboard', label: 'לוח בקרה', icon: BarChart3 },
+  { href: '/clients', label: 'לקוחות', icon: Users },
+  { href: '/projects', label: 'פרויקטים', icon: Folder },
+  { href: '/keywords', label: 'מילות מפתח', icon: KeyRound },
+  { href: '/ai-visibility', label: 'נראות ב-AI', icon: Sparkles },
+  { href: '/scans', label: 'סריקות', icon: Search },
+  { href: '/reports', label: 'דוחות', icon: FileText },
+  { href: '/billing', label: 'מנוי ותשלום', icon: CreditCard },
 ]
 
 const adminItems = [
-  { href: '/setup', label: 'סטטוס חיבור', icon: Plug, color: 'text-slate-600' },
-  { href: '/admin/logs', label: 'לוג שגיאות', icon: ClipboardList, color: 'text-slate-600' },
+  { href: '/setup', label: 'סטטוס חיבור', icon: Plug },
+  { href: '/admin/logs', label: 'לוג שגיאות', icon: ClipboardList },
 ]
 
 interface SidebarProps {
@@ -45,24 +45,24 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   return (
     <aside className="w-full md:w-64 bg-white border-l border-slate-200 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-3 md:p-5 border-b border-slate-200 flex flex-col md:flex-col items-center md:items-center justify-center gap-3 md:gap-3">
+      <div className="p-3 md:p-5 border-b border-slate-200 flex flex-col md:flex-col items-center md:items-center justify-center gap-2 md:gap-1.5">
         {/* Mobile: logo on left of text */}
-        <div className="flex md:flex-col items-center justify-center gap-2 md:gap-3 w-full">
+        <div className="flex md:flex-col items-center justify-center gap-2 md:gap-1.5 w-full">
           <div className="flex items-center justify-center bg-white flex-shrink-0">
             <Image
               src="/gotop-primary.png"
               alt="Go Top logo"
               width={140}
               height={56}
-              className="w-[60px] md:w-[110px] h-auto object-contain"
-              sizes="(max-width: 768px) 60px, 110px"
+              className="w-[51px] md:w-[93px] h-auto object-contain"
+              sizes="(max-width: 768px) 51px, 93px"
               priority
             />
           </div>
 
           <div className="text-center md:text-center">
-            <div className="font-bold text-slate-800 text-sm md:text-lg leading-tight">Rankings by</div>
-            <div className="font-bold text-blue-600 text-sm md:text-lg leading-tight">Go Top</div>
+            <div className="font-semibold text-slate-800 text-xs md:text-sm leading-tight">Rankings by</div>
+            <div className="font-bold text-blue-600 text-sm md:text-base leading-tight">Go Top</div>
           </div>
         </div>
       </div>
@@ -78,13 +78,13 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                 <Link
                   href={item.href}
                   className={cn(
-                    'w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
+                    'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
                     isActive
                       ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   )}
                 >
-                  <IconComponent size={18} className={cn('shrink-0', isActive ? 'text-white' : item.color)} strokeWidth={2} />
+                  <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600')} strokeWidth={2} />
                   <span>{item.label}</span>
                 </Link>
               </li>
@@ -119,13 +119,13 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                   <Link
                     href={item.href}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                      'group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                       isActive
-                        ? 'bg-slate-700 text-white'
+                        ? 'bg-indigo-600 text-white shadow-md'
                         : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                     )}
                   >
-                    <IconComponent size={18} className={cn('shrink-0', isActive ? 'text-white' : item.color)} strokeWidth={2} />
+                    <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600')} strokeWidth={2} />
                     <span>{item.label}</span>
                   </Link>
                 </li>

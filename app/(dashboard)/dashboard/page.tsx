@@ -156,10 +156,10 @@ export default function DashboardPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="לקוחות פעילים" value={stats.totalClients} icon={Users} color="blue" href="/clients" />
-        <StatCard label="פרויקטים פעילים" value={stats.totalProjects} icon={Folder} color="purple" href="/projects" />
-        <StatCard label="מילות מפתח" value={stats.totalKeywords} icon={KeyRound} color="green" href="/keywords" />
-        <StatCard label="סריקות שבוצעו" value={stats.totalScans} icon={Search} color="orange" href="/scans" />
+        <StatCard label="לקוחות פעילים" value={stats.totalClients} icon={Users} color="indigo" href="/clients" />
+        <StatCard label="פרויקטים פעילים" value={stats.totalProjects} icon={Folder} color="indigo" href="/projects" />
+        <StatCard label="מילות מפתח" value={stats.totalKeywords} icon={KeyRound} color="indigo" href="/keywords" />
+        <StatCard label="סריקות שבוצעו" value={stats.totalScans} icon={Search} color="indigo" href="/scans" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -267,10 +267,7 @@ function StatCard({ label, value, icon: Icon, color, href }: {
   href: string
 }) {
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600',
-    purple: 'bg-purple-50 text-purple-600',
-    green: 'bg-green-50 text-green-600',
-    orange: 'bg-orange-50 text-orange-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
   }
 
   return (
