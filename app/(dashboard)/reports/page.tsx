@@ -152,102 +152,96 @@ function ReportsContent() {
     setLoading(true)
     setAiReportData(null)
 
-    const supabase = createClient()
-    const { data: projectData } = await supabase
-      .from('projects')
-      .select('*, clients(*)')
-      .eq('id', projectId)
-      .single()
+    try {
+      const supabase = createClient()
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('*, clients(*)')
+        .eq('id', projectId)
+        .single()
 
-    if (!projectData) {
-      setLoading(false)
-      return
-    }
-
-    // Load AI scan runs
-    const { data: runsData } = await supabase
-      .from('ai_scan_runs')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('started_at', { ascending: false })
-
-    const runs = (runsData || [])
-    const runIds = runs.map((r: any) => r.id)
-
-    // Load results for all runs
-    let results: any[] = []
-    let citations: any[] = []
-    if (runIds.length > 0) {
-      const { data: resultsData } = await supabase
-        .from('ai_scan_results')
-        .select('*')
-        .in('run_id', runIds)
-      results = (resultsData || [])
-
-      // Load citations for all results
-      const resultIds = results.map((r: any) => r.id)
-      if (resultIds.length > 0) {
-        const { data: citationsData } = await supabase
-          .from('ai_citations')
-          .select('*')
-          .in('result_id', resultIds)
-        citations = (citationsData || [])
+      if (!projectData) {
+        setLoading(false)
+        return
       }
-    }
 
-    // Load prompts to get prompt text
-    const promptIds = Array.from(new Set(results.map((r: any) => r.prompt_id).filter(Boolean)))
-    let promptMap = new Map<string, string>()
-    if (promptIds.length > 0) {
-      const { data: promptsData } = await supabase
-        .from('ai_prompts')
-        .select('id, prompt')
-        .in('id', promptIds)
-      for (const p of (promptsData || [])) {
+      // Load from API endpoints instead of direct Supabase queries
+      const [runsRes, promptsRes] = await Promise.all([
+        fetch(`/api/ai-visibility/runs?projectId=${projectId}&limit=500`),
+        fetch(`/api/ai-visibility/prompts?projectId=${projectId}`),
+      ])
+
+      if (!runsRes.ok || !promptsRes.ok) {
+        setLoading(false)
+        return
+      }
+
+      const runsData = await runsRes.json()
+      const promptsData = await promptsRes.json()
+
+      const allRuns = runsData.runs || []
+      const promptMap = new Map<string, string>()
+      for (const p of (promptsData.prompts || [])) {
         promptMap.set(p.id, p.prompt)
       }
-    }
 
-    // Calculate summary
-    const mentionedCount = results.filter((r: any) => r.mentioned).length
-    const citedCount = results.filter((r: any) => r.target_cited).length
-    const totalCitations = results.reduce((sum: number, r: any) => sum + (r.citation_count || 0), 0)
-    
-    const engineBreakdown: Record<string, { scans: number; mentions: number; cited: number }> = {}
-    for (const result of results) {
-      if (!engineBreakdown[result.engine]) {
-        engineBreakdown[result.engine] = { scans: 0, mentions: 0, cited: 0 }
+      // Flatten all results from all runs
+      const results: any[] = []
+      for (const run of allRuns) {
+        for (const result of (run.results || [])) {
+          results.push({
+            ...result,
+            run_id: run.id,
+            engine: result.engine,
+            mentioned: result.mentioned,
+            target_cited: result.targetCited,
+            citation_count: result.citationCount,
+            prompt_id: result.promptId,
+            promptText: result.promptText || promptMap.get(result.promptId) || '',
+            created_at: result.scannedAt || run.completedAt || run.createdAt,
+          })
+        }
       }
-      engineBreakdown[result.engine].scans++
-      if (result.mentioned) engineBreakdown[result.engine].mentions++
-      if (result.target_cited) engineBreakdown[result.engine].cited++
+
+      // Calculate summary
+      const successfulResults = results.filter((r: any) => r.status === 'success')
+      const mentionedCount = successfulResults.filter((r: any) => r.mentioned).length
+      const citedCount = successfulResults.filter((r: any) => r.target_cited).length
+      const totalCitations = successfulResults.reduce((sum: number, r: any) => sum + (r.citation_count || 0), 0)
+
+      const engineBreakdown: Record<string, { scans: number; mentions: number; cited: number }> = {}
+      for (const result of successfulResults) {
+        if (!engineBreakdown[result.engine]) {
+          engineBreakdown[result.engine] = { scans: 0, mentions: 0, cited: 0 }
+        }
+        engineBreakdown[result.engine].scans++
+        if (result.mentioned) engineBreakdown[result.engine].mentions++
+        if (result.target_cited) engineBreakdown[result.engine].cited++
+      }
+
+      const summary = {
+        totalScans: successfulResults.length,
+        totalResults: successfulResults.length,
+        mentionedCount,
+        citedCount,
+        totalCitations,
+        mentionRate: successfulResults.length > 0 ? (mentionedCount / successfulResults.length) * 100 : 0,
+        citationRate: successfulResults.length > 0 ? (citedCount / successfulResults.length) * 100 : 0,
+        engineBreakdown,
+      }
+
+      setAiReportData({
+        project: projectData,
+        results: successfulResults,
+        runs: allRuns,
+        citations: [],
+        summary,
+      })
+    } catch (error) {
+      console.error('Failed to load AI report:', error)
+    } finally {
+      setLoading(false)
     }
-
-    const summary = {
-      totalScans: runs.length,
-      totalResults: results.length,
-      mentionedCount,
-      citedCount,
-      totalCitations,
-      mentionRate: results.length > 0 ? (mentionedCount / results.length) * 100 : 0,
-      citationRate: results.length > 0 ? (citedCount / results.length) * 100 : 0,
-      engineBreakdown,
-    }
-
-    // Enrich results with prompt text
-    const enrichedResults = results.map((r: any) => ({
-      ...r,
-      promptText: promptMap.get(r.prompt_id) || '',
-    }))
-
-    setAiReportData({
-      project: projectData,
-      results: enrichedResults,
-      runs: runs,
-      citations,
-      summary,
-    })
-    setLoading(false)
   }
 
   async function handleReportTypeChange(newType: ReportType) {

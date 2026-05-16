@@ -326,17 +326,17 @@ export async function GET(request: Request) {
     }
   }
 
-  const resultsByRun = new Map<string, (typeof results)[number]>()
+  const resultsByRun = new Map<string, (typeof results)[number][]>()
   for (const r of results) {
     if (!resultsByRun.has(r.run_id as string)) {
-      resultsByRun.set(r.run_id as string, r)
+      resultsByRun.set(r.run_id as string, [])
     }
+    resultsByRun.get(r.run_id as string)?.push(r)
   }
 
   return Response.json({
     runs: (runs ?? []).map((run) => {
-      const r = resultsByRun.get(run.id)
-      const promptText = r?.prompt_id ? promptMap.get(r.prompt_id as string) || null : null
+      const runResults = resultsByRun.get(run.id) || []
       return {
         id: run.id,
         createdAt: run.created_at,
@@ -346,20 +346,21 @@ export async function GET(request: Request) {
         provider: run.provider,
         totalCreditsUsed: run.total_credits_used,
         errorMessage: run.error_message,
-        result: r
-          ? {
-              id: r.id,
-              engine: r.engine,
-              promptText,
-              mentioned: r.mentioned,
-              targetCited: r.target_cited,
-              citationCount: r.citation_count,
-              creditsUsed: r.credits_used,
-              status: r.status,
-              errorMessage: r.error_message,
-              scannedAt: r.scanned_at,
-            }
-          : null,
+        results: runResults.map((r) => {
+          const promptText = r.prompt_id ? promptMap.get(r.prompt_id as string) || null : null
+          return {
+            id: r.id,
+            engine: r.engine,
+            promptText,
+            mentioned: r.mentioned,
+            targetCited: r.target_cited,
+            citationCount: r.citation_count,
+            creditsUsed: r.credits_used,
+            status: r.status,
+            errorMessage: r.error_message,
+            scannedAt: r.scanned_at,
+          }
+        }),
       }
     }),
   })

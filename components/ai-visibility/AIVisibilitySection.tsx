@@ -163,22 +163,25 @@ export default function AIVisibilitySection({
       const runsData = await runsRes.json()
       const promptsData = await promptsRes.json()
 
-      const results: ResultRow[] = (runsData.runs || [])
-        .filter((run: any) => run.result)
-        .map((run: any) => ({
-          id: run.result.id,
-          promptId: run.result.promptId || null,
-          engine: run.result.engine,
-          promptText: run.result.promptText || '',
-          mentioned: run.result.mentioned || false,
-          targetCited: run.result.targetCited || false,
-          citationCount: run.result.citationCount || 0,
-          status: run.result.status,
-          scannedAt: run.completedAt || run.result.scannedAt,
-          citations: [],
-          responseText: null,
-          runId: run.id,
-        }))
+      const results: ResultRow[] = []
+      for (const run of runsData.runs || []) {
+        for (const result of run.results || []) {
+          results.push({
+            id: result.id,
+            promptId: result.promptId || null,
+            engine: result.engine,
+            promptText: result.promptText || '',
+            mentioned: result.mentioned || false,
+            targetCited: result.targetCited || false,
+            citationCount: result.citationCount || 0,
+            status: result.status,
+            scannedAt: run.completedAt || result.scannedAt,
+            citations: [],
+            responseText: null,
+            runId: run.id,
+          })
+        }
+      }
 
       const promptsArr: PromptRow[] = (promptsData.prompts || []) as PromptRow[]
       const promptTextById = new Map(promptsArr.map((p) => [p.id, p.prompt]))
