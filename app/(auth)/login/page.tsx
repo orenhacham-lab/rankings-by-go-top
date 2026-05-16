@@ -179,7 +179,7 @@ function AuthForm() {
             />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Rankings by Go Top</h1>
-          <p className="text-slate-600 mt-1 text-sm">מערכת מעקב דירוגים לקידום אתרים</p>
+          <p className="text-slate-600 mt-1 text-sm">מעקב מיקומים בגוגל ונראות ב-AI</p>
         </div>
 
         {/* Card */}

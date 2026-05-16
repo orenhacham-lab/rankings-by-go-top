@@ -38,16 +38,16 @@ export default async function HomePage() {
           </h1>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
-            עקוב אחר הדירוגים שלך
+            עקוב אחר המיקומים שלך
             <br />
             <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-purple-500 bg-clip-text text-transparent">
-              בגוגל בזמן אמת
+              בגוגל והנראות שלך ב-AI
             </span>
           </h2>
 
           <p className="text-lg lg:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed mb-10">
             מערכת מעקב מקצועית לקידום אתרים. בדוק את המיקום של האתר שלך בגוגל אורגני וגוגל מפות,
-            קבל דוחות מפורטים ועקוב אחרי המתחרים — הכל ממקום אחד.
+            עקוב אחרי אזכורים בתשובות AI, קבל דוחות מפורטים ועקוב אחרי המתחרים — הכל ממקום אחד.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
@@ -84,6 +84,12 @@ export default async function HomePage() {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               תמיכה אישית בעברית
+            </div>
+            <div className="flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              כולל מעקב נראות ב-AI
             </div>
           </div>
 
@@ -204,11 +210,11 @@ export default async function HomePage() {
               {
                 icon: (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                 ),
-                title: 'נתונים מאובטחים',
-                desc: 'כל הנתונים שלך מוצפנים ומאובטחים. ללא שיתוף עם צדדים שלישיים, פרטיות מלאה.',
+                title: 'נראות ב-AI',
+                desc: 'בדוק האם העסק שלך מופיע בתשובות של מנועי AI כמו ChatGPT, Gemini, Perplexity, Copilot, Grok ו-Google AI. עקוב אחרי אזכורים, ציטוטים ומקורות.',
                 color: 'from-rose-500 to-rose-600',
               },
               {
@@ -259,13 +265,13 @@ export default async function HomePage() {
               },
               {
                 num: '02',
-                title: 'הוספת ביטויי מפתח',
-                desc: 'הוסף את הביטויים שאתה רוצה לעקוב אחריהם — בגוגל אורגני, בגוגל מפות או בשניהם.',
+                title: 'הוספת ביטויי מפתח ושאלות AI',
+                desc: 'הוסף את הביטויים שאתה רוצה לעקוב אחריהם בגוגל, והגדר שאלות AI כדי לבדוק איך העסק שלך מופיע בתשובות של מנועי AI.',
               },
               {
                 num: '03',
-                title: 'מעקב ודוחות',
-                desc: 'המערכת תסרוק את המיקומים, תציג מגמות לאורך זמן ותפיק דוחות מקצועיים.',
+                title: 'מעקב, ניתוח ודוחות',
+                desc: 'המערכת תסרוק את המיקומים בגוגל, תבדוק נראות במנועי AI, תציג מגמות לאורך זמן ותפיק דוחות מקצועיים.',
               },
             ].map((step) => (
               <div key={step.num} className="relative">
@@ -292,7 +298,7 @@ export default async function HomePage() {
 
             <div className="relative">
               <h2 className="text-3xl lg:text-5xl font-extrabold text-white mb-4 tracking-tight">
-                מוכן להתחיל לעקוב?
+                עקוב אחר המיקומים שלך בגוגל והנראות שלך ב-AI
               </h2>
               <p className="text-lg lg:text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
                 התחל ניסיון חינם של 7 ימים. ללא התחייבות, ללא כרטיס אשראי.

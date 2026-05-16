@@ -1,9 +1,9 @@
 export const metadata = {
   title: 'מחירים - Rankings by Go Top',
-  description: 'תוכניות מחירים גמישות למעקב מיקומים בגוגל. ניסיון חינם של 7 ימים, ללא התחייבות. תוכניות החל מ-₪69 לחודש.',
+  description: 'תוכניות מחירים גמישות למעקב מיקומים בגוגל ונראות ב-AI. ניסיון חינם של 7 ימים, ללא התחייבות. תוכניות החל מ-₪79 לחודש.',
   openGraph: {
     title: 'מחירים - Rankings by Go Top',
-    description: 'תוכניות מחירים גמישות למעקב מיקומים בגוגל',
+    description: 'תוכניות מחירים גמישות למעקב מיקומים בגוגל ונראות ב-AI',
     url: 'https://www.gotopseo.com/pricing',
     type: 'website',
   },

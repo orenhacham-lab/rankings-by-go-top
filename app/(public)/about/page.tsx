@@ -39,14 +39,14 @@ export default function AboutPage() {
       description: 'דו"ח מפורט על הביצועים שלך בתוצאות הממוקמות'
     },
     {
-      icon: '⚔️',
-      title: 'ניתוח מתחרים',
-      description: 'בדוק איך אתה עומד במול המתחרים שלך'
+      icon: '⚡',
+      title: 'נראות ב-AI',
+      description: 'בדיקה האם העסק שלך מוזכר בתשובות AI, האם הדומיין שלך מצוטט, ואילו מקורות מופיעים לידך'
     },
     {
       icon: '📊',
-      title: 'עקיבה אחרי ביצועים',
-      description: 'דוחות שמראים מה שחשוב באמת'
+      title: 'דוחות וניתוח',
+      description: 'דוחות שמראים מה שחשוב באמת — Google Organic, Google Maps ונראות ב-AI'
     },
   ]
 
@@ -69,7 +69,7 @@ export default function AboutPage() {
               </span>
             </h1>
             <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
-              יותר מ-11 שנים של ניסיון דיגיטלי אמיתי. ועכשיו – תוכנית מעקב מיקומים שמתמקדת בתוצאות.
+              יותר מ-11 שנים של ניסיון דיגיטלי אמיתי. ועכשיו – מערכת למעקב מיקומים בגוגל ונראות ב-AI.
             </p>
           </div>
         </div>
@@ -206,16 +206,25 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <p className="text-center text-lg text-slate-700">
+            <p className="text-center text-lg text-slate-700 mb-8">
               בגלל זה פיתחנו את <strong>Rankings by Go Top</strong> – מערכת עקיבה אחרי מיקומים שמתמקדת בתוצאות כמו שאנחנו מתמקדים.
             </p>
+
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 lg:p-12 border border-indigo-200">
+              <p className="text-lg text-slate-700 mb-4">
+                ואז, בשנים האחרונות, החיפוש השתנה שוב. לקוחות כבר לא מסתמכים רק על תוצאות Google רגילות. הם שואלים את ChatGPT, Gemini, Perplexity ומנועי AI נוספים ומקבלים המלצות ישירות.
+              </p>
+              <p className="text-lg text-slate-700">
+                לכן Rankings by Go Top לא עוקבת רק אחרי מיקומים בגוגל, אלא גם אחרי הדרך שבה העסק שלך מופיע בתשובות AI. כי זה מה שחשוב באמת — להיות גלוי למי שחיפש אותך, בכל המקומות שהם מחפשים.
+              </p>
+            </div>
           </div>
         </section>
 
         {/* Features */}
         <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-4xl font-extrabold text-slate-900 mb-12 text-center">מה חוקרים Rankings by Go Top</h2>
+            <h2 className="text-4xl font-extrabold text-slate-900 mb-12 text-center">מה בודקים ב-Rankings by Go Top</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {features.map((feature) => (

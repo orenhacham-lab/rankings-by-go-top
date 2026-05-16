@@ -1,9 +1,9 @@
 export const metadata = {
   title: 'עמוד אודות - Rankings by Go Top',
-  description: 'גלו הכל על אפליקציית בדיקת המיקומים בגוגל המהפכנית Rankings by Go Top מבית גו טופ שיווק דיגיטלי.',
+  description: 'גלו הכל על Rankings by Go Top - מערכת מעקב מיקומים בגוגל ונראות ב-AI המהפכנית. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI כמו ChatGPT ו-Gemini.',
   openGraph: {
     title: 'עמוד אודות - Rankings by Go Top',
-    description: 'גלו הכל על אפליקציית בדיקת המיקומים בגוגל המהפכנית Rankings by Go Top',
+    description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
     url: 'https://www.gotopseo.com/about',
     type: 'website',
   },

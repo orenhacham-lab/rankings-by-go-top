@@ -3,9 +3,9 @@ import './globals.css'
 import { CookieConsent } from '@/components/CookieConsent'
 
 export const metadata: Metadata = {
-  title: 'מערכת מעקב מיקומים לקידום אתרים - Rankings by Go Top',
-  description: 'Rankings by Go Top - מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות. להרשמה בחינם כנסו עכשיו',
-  keywords: 'מעקב מיקומים, קידום אתרים, SEO, גוגל, דירוג, מפות גוגל',
+  title: 'מעקב מיקומים בגוגל ונראות ב-AI - Rankings by Go Top',
+  description: 'Rankings by Go Top - מערכת מעקב מיקומים בגוגל ונראות ב-AI מתקדמת. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI (ChatGPT, Gemini, Perplexity). להרשמה בחינם כנסו עכשיו',
+  keywords: 'מעקב מיקומים, קידום אתרים, SEO, גוגל, דירוג, מפות גוגל, AI visibility, ChatGPT, Gemini',
   icons: {
     icon: [
       { url: '/favicon.ico' },
@@ -16,8 +16,8 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'מערכת מעקב מיקומים לקידום אתרים - Rankings by Go Top',
-    description: 'מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות',
+    title: 'מעקב מיקומים בגוגל ונראות ב-AI - Rankings by Go Top',
+    description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI (ChatGPT, Gemini, Perplexity)',
     images: ['/gotop-primary.png'],
     url: 'https://www.gotopseo.com',
     siteName: 'Rankings by Go Top',
@@ -84,7 +84,7 @@ export default function RootLayout({
                 name: 'Rankings by Go Top',
                 url: 'https://www.gotopseo.com',
                 logo: 'https://www.gotopseo.com/gotop-primary.png',
-                description: 'מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות',
+                description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
                 sameAs: ['https://www.gotop.co.il'],
                 contactPoint: {
                   '@type': 'ContactPoint',
@@ -102,7 +102,7 @@ export default function RootLayout({
                 '@context': 'https://schema.org',
                 '@type': 'SoftwareApplication',
                 name: 'Rankings by Go Top',
-                description: 'מערכת מעקב מיקומים לקידום אתרים מתקדמת לתוצאות בגוגל אורגני וגוגל מפות',
+                description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
                 url: 'https://www.gotopseo.com',
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',
