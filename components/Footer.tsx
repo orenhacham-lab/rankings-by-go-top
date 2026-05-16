@@ -1,8 +1,14 @@
 'use client'
 
 import Link from 'next/link'
+import type { Locale } from '@/lib/i18n/locales'
+import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
-export function Footer() {
+export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
+  const dict = getPublicDictionary(locale)
+  const prefix = locale === 'en' ? '/en' : ''
+  const homeHref = prefix === '/en' ? '/en' : '/'
+
   return (
     <footer className="bg-slate-900 text-slate-100 py-12 mt-16">
       <div className="max-w-6xl mx-auto px-4">
@@ -16,37 +22,37 @@ export function Footer() {
               </Link>
             </h3>
             <p className="text-slate-400 text-sm">
-              מערכת מעקב מיקומים למקום הראשון בגוגל ונראות ב-AI. עקוב אחר דירוגיך, תחרויות והופעה בתשובות AI כמו ChatGPT ו-Gemini.
+              {dict.footer.tagline}
             </p>
           </div>
 
           {/* Legal Links */}
           <div>
-            <h4 className="font-bold mb-4">עמודים</h4>
+            <h4 className="font-bold mb-4">{dict.footer.pages}</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/" className="text-slate-400 hover:text-white transition-colors">
-                  עמוד הבית
+                <Link href={homeHref} className="text-slate-400 hover:text-white transition-colors">
+                  {dict.footer.home}
                 </Link>
               </li>
               <li>
-                <Link href="/pricing" className="text-slate-400 hover:text-white transition-colors">
-                  מחירים
+                <Link href={`${prefix}/pricing`} className="text-slate-400 hover:text-white transition-colors">
+                  {dict.footer.pricing}
                 </Link>
               </li>
               <li>
-                <Link href="/articles" className="text-slate-400 hover:text-white transition-colors">
-                  מאמרים
+                <Link href={`${prefix}/articles`} className="text-slate-400 hover:text-white transition-colors">
+                  {dict.footer.articles}
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-slate-400 hover:text-white transition-colors">
-                  אודות
+                <Link href={`${prefix}/about`} className="text-slate-400 hover:text-white transition-colors">
+                  {dict.footer.about}
                 </Link>
               </li>
               <li>
                 <Link href="/sitemap" className="text-slate-400 hover:text-white transition-colors">
-                  מפת אתר
+                  {dict.footer.sitemap}
                 </Link>
               </li>
             </ul>
@@ -54,16 +60,16 @@ export function Footer() {
 
           {/* Legal */}
           <div>
-            <h4 className="font-bold mb-4">משפטי</h4>
+            <h4 className="font-bold mb-4">{dict.footer.legal}</h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/privacy" className="text-slate-400 hover:text-white transition-colors">
-                  מדיניות פרטיות
+                  {dict.footer.privacy}
                 </Link>
               </li>
               <li>
                 <Link href="/accessibility" className="text-slate-400 hover:text-white transition-colors">
-                  נגישות
+                  {dict.footer.accessibility}
                 </Link>
               </li>
             </ul>
@@ -71,7 +77,7 @@ export function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="font-bold mb-4">יצירת קשר</h4>
+            <h4 className="font-bold mb-4">{dict.footer.contact}</h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <a
@@ -96,11 +102,10 @@ export function Footer() {
         {/* Bottom */}
         <div className="border-t border-slate-800 pt-8">
           <p className="text-slate-400 text-sm text-center">
-            © 2026 Rankings by Go Top. כל הזכויות שמורות.
+            {dict.footer.copyright}
           </p>
         </div>
       </div>
     </footer>
   )
 }
-

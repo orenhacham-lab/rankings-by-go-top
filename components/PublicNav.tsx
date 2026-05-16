@@ -4,12 +4,18 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Locale } from '@/lib/i18n/locales'
+import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { LanguageSwitcher } from './LanguageSwitcher'
 
-export function PublicNav() {
+export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isAuthed, setIsAuthed] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+
+  const dict = getPublicDictionary(locale)
+  const prefix = locale === 'en' ? '/en' : ''
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -27,10 +33,10 @@ export function PublicNav() {
   }, [])
 
   const links = [
-    { href: '/', label: 'עמוד הבית' },
-    { href: '/pricing', label: 'מחירים' },
-    { href: '/articles', label: 'מאמרים' },
-    { href: '/about', label: 'אודות' },
+    { href: `${prefix}/` === '/en/' ? '/en' : `${prefix}/`, label: dict.nav.home },
+    { href: `${prefix}/pricing`, label: dict.nav.pricing },
+    { href: `${prefix}/articles`, label: dict.nav.articles },
+    { href: `${prefix}/about`, label: dict.nav.about },
   ]
 
   return (
@@ -44,7 +50,7 @@ export function PublicNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 lg:h-28">
           {/* Logo */}
-          <Link href="/" className="flex items-center shrink-0 group">
+          <Link href={prefix === '/en' ? '/en' : '/'} className="flex items-center shrink-0 group">
             <Image
               src="/gotop-primary.png"
               alt="Go Top"
@@ -68,8 +74,9 @@ export function PublicNav() {
             ))}
           </nav>
 
-          {/* CTA Buttons */}
-          <div className="hidden lg:flex items-center gap-3">
+          {/* CTA Buttons + Language Switcher */}
+          <div className="hidden lg:flex items-center gap-4">
+            <LanguageSwitcher locale={locale} />
             {!authChecked ? (
               <div className="w-32 h-10" />
             ) : isAuthed ? (
@@ -77,7 +84,7 @@ export function PublicNav() {
                 href="/dashboard"
                 className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
               >
-                לדאשבורד
+                {dict.nav.toDashboard}
               </Link>
             ) : (
               <>
@@ -85,13 +92,13 @@ export function PublicNav() {
                   href="/login"
                   className="px-4 py-2 text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
                 >
-                  התחברות
+                  {dict.nav.login}
                 </Link>
                 <Link
                   href="/login"
                   className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
                 >
-                  התחל חינם
+                  {dict.nav.startFree}
                 </Link>
               </>
             )}
@@ -101,7 +108,7 @@ export function PublicNav() {
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
-            aria-label="תפריט"
+            aria-label={dict.nav.menu}
           >
             <svg
               className="w-6 h-6 text-slate-700"
@@ -134,13 +141,16 @@ export function PublicNav() {
               ))}
             </nav>
             <div className="border-t border-slate-200 mt-4 pt-4 flex flex-col gap-2">
+              <div className="px-3 py-2">
+                <LanguageSwitcher locale={locale} />
+              </div>
               {isAuthed ? (
                 <Link
                   href="/dashboard"
                   onClick={() => setMobileOpen(false)}
                   className="px-4 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center text-sm font-semibold"
                 >
-                  לדאשבורד
+                  {dict.nav.toDashboard}
                 </Link>
               ) : (
                 <>
@@ -149,14 +159,14 @@ export function PublicNav() {
                     onClick={() => setMobileOpen(false)}
                     className="px-4 py-3 rounded-lg border border-slate-200 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
                   >
-                    התחברות
+                    {dict.nav.login}
                   </Link>
                   <Link
                     href="/login"
                     onClick={() => setMobileOpen(false)}
                     className="px-4 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center text-sm font-semibold"
                   >
-                    התחל חינם
+                    {dict.nav.startFree}
                   </Link>
                 </>
               )}
