@@ -59,6 +59,16 @@ export type BusinessProfile = {
   excludedTopics?: string[]
 }
 
+export type CategoryProfile = {
+  primaryOfferings: string[]
+  secondaryOfferings: string[]
+  excludedTopics: string[]
+  // Semantic slots for proper Hebrew question generation
+  businessType?: string // e.g., "חנות מוצרי כושר", "חנות פרחים"
+  purchaseObjects?: string[] // e.g., ["ציוד כושר", "מוצרי כושר"], ["זר פרחים"]
+  serviceActions?: string[] // e.g., ["לקנות", "להזמין"], ["להזמין"]
+}
+
 export type PromptSuggestion = {
   id: string
   prompt: string
@@ -867,13 +877,10 @@ function isNearDuplicate(a: string, b: string): boolean {
 /**
  * Per-category default offerings used to infer a BusinessProfile from project data.
  * Each entry contains primary offerings (what the business definitely does),
- * secondary offerings (related but not the focus), and excluded topics
- * (unrelated themes that must never dominate the question set).
+ * secondary offerings (related but not the focus), excluded topics,
+ * and semantic slots for proper Hebrew question generation.
  */
-const CATEGORY_PROFILES: Record<
-  BusinessCategory,
-  { primaryOfferings: string[]; secondaryOfferings: string[]; excludedTopics: string[] }
-> = {
+const CATEGORY_PROFILES: Record<BusinessCategory, CategoryProfile> = {
   florist: {
     primaryOfferings: [
       'משלוחי פרחים', 'משלוח פרחים', 'זרי פרחים', 'זר פרחים', 'חנות פרחים',
@@ -1112,6 +1119,89 @@ const CATEGORY_PROFILES: Record<
 }
 
 /**
+ * Semantic slots for each category — used to generate grammatically correct Hebrew questions.
+ * businessType: what the business is (e.g., "חנות מוצרי כושר")
+ * purchaseObjects: what customers buy (e.g., ["ציוד כושר", "מוצרי כושר"])
+ * serviceActions: verbs to use (e.g., ["לקנות", "להזמין"])
+ */
+const CATEGORY_SEMANTIC_SLOTS: Partial<Record<BusinessCategory, {
+  businessType?: string
+  purchaseObjects?: string[]
+  serviceActions?: string[]
+}>> = {
+  florist: {
+    businessType: 'חנות פרחים',
+    purchaseObjects: ['זר פרחים', 'משלוח פרחים', 'פרחים'],
+    serviceActions: ['להזמין', 'לקנות'],
+  },
+  perfume: {
+    businessType: 'חנות בשמים',
+    purchaseObjects: ['בושם', 'בשמים מקוריים', 'בשמים'],
+    serviceActions: ['לקנות', 'לבחור'],
+  },
+  sports_store: {
+    businessType: 'חנות מוצרי כושר',
+    purchaseObjects: ['ציוד כושר', 'מוצרי כושר', 'מכשיר כושר', 'משקולות'],
+    serviceActions: ['לקנות', 'לבחור'],
+  },
+  gifts: {
+    businessType: 'חנות מתנות',
+    purchaseObjects: ['מתנה', 'מתנות', 'מארז מתנות'],
+    serviceActions: ['לקנות', 'להזמין'],
+  },
+  restaurant: {
+    businessType: 'מסעדה',
+    purchaseObjects: ['ארוחה', 'פיתה', 'כרית', 'סלט'],
+    serviceActions: ['לאכול', 'להזמין', 'לבחור'],
+  },
+  beauty: {
+    businessType: 'סלון יופי',
+    purchaseObjects: ['טיפול יופי', 'מספרה', 'טיפול פנים'],
+    serviceActions: ['להזמין', 'לבחור'],
+  },
+  cleaning: {
+    businessType: 'חברת ניקיון',
+    purchaseObjects: ['שירות ניקיון', 'הניקיון', 'שטיפה'],
+    serviceActions: ['להזמין', 'לשכור'],
+  },
+  ecommerce: {
+    businessType: 'חנות אונליין',
+    purchaseObjects: ['מוצר', 'פריט', 'מוצרים'],
+    serviceActions: ['לקנות', 'להזמין'],
+  },
+  saas: {
+    businessType: 'חברת תוכנה',
+    purchaseObjects: ['רישיון', 'מנוי', 'שירות'],
+    serviceActions: ['להשתמש', 'להירשם'],
+  },
+  healthcare: {
+    businessType: 'קליניקה רפואית',
+    purchaseObjects: ['טיפול רפואי', 'ביקור', 'בדיקה'],
+    serviceActions: ['לבקר', 'להזמין'],
+  },
+  legal: {
+    businessType: 'משרד עורכי דין',
+    purchaseObjects: ['ייעוץ משפטי', 'ייעוץ', 'שירות משפטי'],
+    serviceActions: ['להתייעץ', 'להזמין'],
+  },
+  real_estate: {
+    businessType: 'משרד תיווך',
+    purchaseObjects: ['דירה', 'דירות', 'קרקע', 'נכס'],
+    serviceActions: ['לקנות', 'להשכיר', 'לחפש'],
+  },
+  education: {
+    businessType: 'מוסד חינוך',
+    purchaseObjects: ['קורס', 'הכשרה', 'שיעור'],
+    serviceActions: ['ללמוד', 'להירשם', 'לחזור'],
+  },
+  second_hand_fashion: {
+    businessType: 'חנות בגדי יד שנייה לנשים',
+    purchaseObjects: ['בגדי יד שנייה', 'בגד יד שנייה', 'פריט וינטג׳', 'בגד'],
+    serviceActions: ['לקנות', 'להזמין'],
+  },
+}
+
+/**
  * Detect Israeli cities mentioned in any of the provided strings.
  */
 function detectIsraeliCities(...strings: (string | null | undefined)[]): string[] {
@@ -1324,6 +1414,63 @@ export function resolveManualPrimaryCategory(raw: string | null | undefined): Bu
 }
 
 /**
+ * Get semantic slots for a category (businessType, purchaseObjects, serviceActions).
+ * These slots are used to generate grammatically correct Hebrew questions.
+ */
+function getSemanticSlots(category: BusinessCategory): {
+  businessType?: string
+  purchaseObjects?: string[]
+  serviceActions?: string[]
+} {
+  return CATEGORY_SEMANTIC_SLOTS[category] ?? {}
+}
+
+/**
+ * Check if a Hebrew phrase contains invalid verb-object combinations.
+ * Examples to reject:
+ * - "קונים חנות" (buying a store/category, not a product)
+ * - "לקנות חברה" (buying a company)
+ * - "כמה עולה חנות" (how much does a store cost)
+ */
+function isInvalidHebrewPhrase(phrase: string): boolean {
+  const p = phrase.toLowerCase()
+
+  // Reject "קנוי/קונים/לקנות חנות/חברה/מרכז"
+  if (/(קנו|קונים|לקנות|להזמין).*\b(חנות|חברה|משרד|מרכז|מוסד)\b/.test(p)) {
+    return true
+  }
+
+  // Reject "מוצרים + מילה אחרת" when should be "מוצרי"
+  // e.g., "מוצרים כושר" should be "מוצרי כושר"
+  if (/מוצרים\s+(?!ספורט|נישה|בחנות|שונים|אחרים|יוקרה|אונליין|לבית|כלליים)(\S+)/.test(p)) {
+    return true
+  }
+
+  // Reject "כמה עולה חנות/חברה"
+  if (/(כמה עול|מחיר).*\b(חנות|חברה|משרד|מרכז)\b/.test(p)) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Normalize common Hebrew construct-state mistakes.
+ */
+function normalizeHebrewConstructState(phrase: string): string {
+  let normalized = phrase
+  // "מוצרים כושר" → "מוצרי כושר"
+  normalized = normalized.replace(/מוצרים\s+/g, 'מוצרי ')
+  // "בגדים יד שנייה" → "בגדי יד שנייה"
+  normalized = normalized.replace(/בגדים\s+יד/g, 'בגדי יד')
+  // "מוצרים ספורט" → "מוצרי ספורט"
+  normalized = normalized.replace(/מוצרים\s+ספורט/g, 'מוצרי ספורט')
+  // "פרחים יום הולדת" → "פרחים ליום הולדת"
+  normalized = normalized.replace(/פרחים\s+יום\s+הולדת/g, 'פרחים ליום הולדת')
+  return normalized
+}
+
+/**
  * Generate smart AI query suggestions, business-context driven.
  *
  * With optional business profile: weights offerings (70% primary, 20% local, 10% secondary).
@@ -1494,34 +1641,52 @@ export function generatePromptSuggestions({
   // Generate secondary category questions if we have secondary categories
   const secondaryCategoryQuestions: Built[] = []
   if (hasManual && manualProfile.secondaryCategories && manualProfile.secondaryCategories.length > 0) {
-    // Generate questions for each secondary category using templates
+    const slots = getSemanticSlots(category)
+    const purchaseObjects = slots.purchaseObjects || []
+    const serviceActions = slots.serviceActions || ['לקנות', 'להזמין']
+
+    // Generate questions for each secondary category using semantic templates
     for (const secondaryCategory of manualProfile.secondaryCategories) {
       if (!secondaryCategory || secondaryCategory.trim().length === 0) continue
       const secondary = secondaryCategory.trim()
 
-      // Generate template-based questions for this secondary category
-      const templates = lang === 'he' ? [
-        `איפה אפשר למצוא ${secondary} איכותיים?`,
-        `איפה כדאי לקנות ${secondary}?`,
-        `אילו חנויות מומלצות ל${secondary}?`,
-        `איך לבחור ${secondary} איכותיים?`,
-        `מה חשוב לבדוק לפני שקונים ${secondary}?`,
-        `איך יודעים ש${secondary} במצב טוב?`,
-        `כמה עולים ${secondary}?`,
-        `איפה אפשר לקנות ${secondary} במחירים טובים?`,
-      ] : [
-        `Where to find quality ${secondary}?`,
-        `Where to buy ${secondary}?`,
-        `Best shops for ${secondary}`,
-        `How to choose quality ${secondary}?`,
-        `What to check when buying ${secondary}?`,
-        `How to evaluate ${secondary}?`,
-        `How much should you spend on ${secondary}?`,
-        `Where to find affordable ${secondary}?`,
-      ]
+      // Use purchaseObjects if available, otherwise use the secondary category string itself
+      const objectsToUse = purchaseObjects.length > 0 ? purchaseObjects : [secondary]
+      const actionsToUse = serviceActions.length > 0 ? serviceActions : ['לקנות']
+
+      // Generate semantic templates that use proper objects, not just the category name
+      const templates = lang === 'he' ?
+        [
+          // Recommendations
+          `איפה כדאי ל${actionsToUse[0] || 'קנות'} ${secondary} איכותיים?`,
+          `איזו חנות מומלצת ל${secondary}?`,
+          // Quality check (using purchase object to make it grammatical)
+          ...(purchaseObjects.length > 0 ? [
+            `מה חשוב לבדוק לפני ש${actionsToUse[0] === 'להזמין' ? 'מזמינים' : 'קונים'} ${purchaseObjects[0] || secondary}?`,
+          ] : []),
+          // Price (using purchase object)
+          ...(purchaseObjects.length > 0 ? [
+            `כמה עולים ${purchaseObjects[0] || secondary}?`,
+          ] : []),
+          // Discovery
+          `איפה אפשר למצוא ${secondary} איכותיים?`,
+          // Location if applicable
+          `איפה כדאי ל${actionsToUse[0] || 'קנות'} ${secondary}?`,
+        ].filter(Boolean) :
+        [
+          `Where to find quality ${secondary}?`,
+          `Best shops for ${secondary}`,
+          `How to choose quality ${secondary}?`,
+          `What to check when buying ${secondary}?`,
+          `How much should you spend on ${secondary}?`,
+        ]
 
       for (const template of templates) {
-        const filled = template.trim()
+        const filled = normalizeHebrewConstructState(template.trim())
+
+        // Skip invalid Hebrew phrases
+        if (lang === 'he' && isInvalidHebrewPhrase(filled)) continue
+
         // Filter by excluded topics
         if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
         // Filter by already-seen questions and previous set
