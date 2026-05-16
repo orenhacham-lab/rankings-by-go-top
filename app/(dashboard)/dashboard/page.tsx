@@ -7,6 +7,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import { ScanStatusBadge, PositionChange, EngineBadge } from '@/components/ui/StatusBadge'
 import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
+import { Users, Folder, KeyRound, Search, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 
 interface DashboardStats {
   totalClients: number
@@ -155,10 +156,10 @@ export default function DashboardPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="לקוחות פעילים" value={stats.totalClients} icon="👥" color="blue" href="/clients" />
-        <StatCard label="פרויקטים פעילים" value={stats.totalProjects} icon="📁" color="purple" href="/projects" />
-        <StatCard label="מילות מפתח" value={stats.totalKeywords} icon="🔑" color="green" href="/keywords" />
-        <StatCard label="סריקות שבוצעו" value={stats.totalScans} icon="🔍" color="orange" href="/scans" />
+        <StatCard label="לקוחות פעילים" value={stats.totalClients} icon={Users} color="blue" href="/clients" />
+        <StatCard label="פרויקטים פעילים" value={stats.totalProjects} icon={Folder} color="purple" href="/projects" />
+        <StatCard label="מילות מפתח" value={stats.totalKeywords} icon={KeyRound} color="green" href="/keywords" />
+        <StatCard label="סריקות שבוצעו" value={stats.totalScans} icon={Search} color="orange" href="/scans" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -194,10 +195,10 @@ export default function DashboardPage() {
         <Card>
           <h2 className="font-semibold text-slate-800 mb-4">קישורים מהירים</h2>
           <div className="grid grid-cols-2 gap-3">
-            <QuickLink href="/clients" icon="👥" label="לקוחות" sub="ניהול לקוחות" />
-            <QuickLink href="/projects" icon="📁" label="פרויקטים" sub="כל הפרויקטים" />
-            <QuickLink href="/keywords" icon="🔑" label="מילות מפתח" sub="מעקב ביטויים" />
-            <QuickLink href="/reports" icon="📄" label="דוחות" sub="Excel ו-PDF" />
+            <QuickLink href="/clients" icon={Users} label="לקוחות" sub="ניהול לקוחות" />
+            <QuickLink href="/projects" icon={Folder} label="פרויקטים" sub="כל הפרויקטים" />
+            <QuickLink href="/keywords" icon={KeyRound} label="מילות מפתח" sub="מעקב ביטויים" />
+            <QuickLink href="/reports" icon={FileText} label="דוחות" sub="Excel ו-PDF" />
           </div>
         </Card>
       </div>
@@ -206,8 +207,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Improvements */}
         <Card padding={false}>
-          <div className="p-4 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-800">📈 שיפורים גדולים</h2>
+          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+            <TrendingUp size={20} className="text-green-600" strokeWidth={2} />
+            <h2 className="font-semibold text-slate-800">שיפורים גדולים</h2>
           </div>
           {improvements.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-sm">אין שיפורים לאחרונה</div>
@@ -230,8 +232,9 @@ export default function DashboardPage() {
 
         {/* Drops */}
         <Card padding={false}>
-          <div className="p-4 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-800">📉 ירידות גדולות</h2>
+          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+            <TrendingDown size={20} className="text-red-600" strokeWidth={2} />
+            <h2 className="font-semibold text-slate-800">ירידות גדולות</h2>
           </div>
           {drops.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-sm">אין ירידות לאחרונה</div>
@@ -256,10 +259,10 @@ export default function DashboardPage() {
   )
 }
 
-function StatCard({ label, value, icon, color, href }: {
+function StatCard({ label, value, icon: Icon, color, href }: {
   label: string
   value: number
-  icon: string
+  icon: React.ComponentType<{ size: number; strokeWidth: number }>
   color: string
   href: string
 }) {
@@ -274,8 +277,8 @@ function StatCard({ label, value, icon, color, href }: {
     <Link href={href}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${colorMap[color]}`}>
-            {icon}
+          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${colorMap[color]}`}>
+            <Icon size={22} strokeWidth={2} />
           </div>
           <div>
             <div className="text-2xl font-bold text-slate-800">{value}</div>
@@ -287,13 +290,15 @@ function StatCard({ label, value, icon, color, href }: {
   )
 }
 
-function QuickLink({ href, icon, label, sub }: { href: string; icon: string; label: string; sub: string }) {
+function QuickLink({ href, icon: Icon, label, sub }: { href: string; icon: React.ComponentType<{ size: number; strokeWidth: number }>; label: string; sub: string }) {
   return (
     <Link
       href={href}
       className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-blue-200 transition-all"
     >
-      <span className="text-2xl">{icon}</span>
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+        <Icon size={20} strokeWidth={2} />
+      </div>
       <div>
         <div className="font-medium text-slate-700 text-sm">{label}</div>
         <div className="text-xs text-slate-400">{sub}</div>

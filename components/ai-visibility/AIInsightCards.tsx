@@ -9,6 +9,7 @@
  */
 
 import { useMemo } from 'react'
+import { Users, Link2, Lightbulb, CheckCircle2, Circle } from 'lucide-react'
 import { ENGINE_META } from './EngineIcon'
 
 export type Citation = {
@@ -181,9 +182,12 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-          {isHebrew ? '🧠 תובנות AI' : '🧠 AI Insights'}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <Lightbulb size={14} className="text-slate-400" strokeWidth={2} />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {isHebrew ? 'תובנות AI' : 'AI Insights'}
+          </span>
+        </div>
         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
       </div>
 
@@ -193,13 +197,13 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
           label={L.brand_mention}
           status={input.mentioned ? 'positive' : 'neutral'}
           headline={input.mentioned ? L.mentioned : L.not_mentioned}
-          icon={input.mentioned ? '✓' : '○'}
+          icon={input.mentioned ? CheckCircle2 : Circle}
         />
         <InsightCard
           label={L.domain_cite}
           status={input.targetCited ? 'positive' : 'neutral'}
           headline={input.targetCited ? L.cited : L.not_cited}
-          icon={input.targetCited ? '✓' : '○'}
+          icon={input.targetCited ? CheckCircle2 : Circle}
           subtext={
             insights.targetCitationCount > 0 ? `${insights.targetCitationCount} ${L.times}` : undefined
           }
@@ -208,7 +212,7 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
           label={L.recommendation}
           status={insights.hasRecommendation ? 'positive' : 'neutral'}
           headline={insights.hasRecommendation ? L.recommended : L.not_recommended}
-          icon={insights.hasRecommendation ? '★' : '○'}
+          icon={insights.hasRecommendation ? CheckCircle2 : Circle}
         />
       </div>
 
@@ -216,7 +220,7 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <ListCard
           label={L.competitors}
-          icon="👥"
+          icon={Users}
           isEmpty={insights.competitors.length === 0}
           emptyText={L.no_competitors}
         >
@@ -234,7 +238,7 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
 
         <ListCard
           label={L.sources}
-          icon="📎"
+          icon={Link2}
           isEmpty={insights.topDomains.length === 0}
           emptyText={L.no_sources}
         >
@@ -288,13 +292,13 @@ function InsightCard({
   label,
   status,
   headline,
-  icon,
+  icon: IconComponent,
   subtext,
 }: {
   label: string
   status: 'positive' | 'neutral'
   headline: string
-  icon: string
+  icon: React.ComponentType<{ size: number; strokeWidth: number }>
   subtext?: string
 }) {
   const styles =
@@ -304,14 +308,14 @@ function InsightCard({
 
   const iconStyles =
     status === 'positive'
-      ? 'bg-emerald-100 text-emerald-700'
-      : 'bg-slate-100 text-slate-500'
+      ? 'text-emerald-600'
+      : 'text-slate-400'
 
   return (
     <div className={`relative overflow-hidden rounded-xl border p-3.5 shadow-sm hover:shadow-md transition ${styles}`}>
       <div className="flex items-start gap-2.5">
-        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold ${iconStyles}`}>
-          {icon}
+        <div className={`shrink-0 flex items-center justify-center ${iconStyles}`}>
+          <IconComponent size={18} strokeWidth={2} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
@@ -327,22 +331,22 @@ function InsightCard({
 
 function ListCard({
   label,
-  icon,
+  icon: IconComponent,
   isEmpty,
   emptyText,
   children,
 }: {
   label: string
-  icon: string
+  icon: React.ComponentType<{ size: number; strokeWidth: number }>
   isEmpty: boolean
   emptyText: string
   children: React.ReactNode
 }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-base">{icon}</span>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+      <div className="flex items-center gap-2 mb-1 text-slate-500">
+        <IconComponent size={16} strokeWidth={2} />
+        <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
       </div>
       {isEmpty ? (
         <div className="text-xs text-slate-400 italic mt-2 py-2">{emptyText}</div>

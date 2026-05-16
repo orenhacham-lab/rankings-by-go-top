@@ -13,6 +13,7 @@ import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
 import { formatDateTime, getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
+import { BarChart3, FileText } from 'lucide-react'
 
 function ReportsContent() {
   const searchParams = useSearchParams()
@@ -243,17 +244,19 @@ function ReportsContent() {
                   variant="secondary"
                   onClick={handleExportExcel}
                   loading={exporting === 'excel'}
-                  className="!bg-white !text-blue-700 hover:!bg-blue-50"
+                  className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
                 >
-                  📊 יצוא Excel
+                  <BarChart3 size={18} strokeWidth={2} />
+                  יצוא Excel
                 </Button>
                 <Button
                   variant="secondary"
                   onClick={handleExportPDF}
                   loading={exporting === 'pdf'}
-                  className="!bg-white !text-blue-700 hover:!bg-blue-50"
+                  className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
                 >
-                  📄 הורדת דוח
+                  <FileText size={18} strokeWidth={2} />
+                  הורדת דוח
                 </Button>
               </div>
             </div>

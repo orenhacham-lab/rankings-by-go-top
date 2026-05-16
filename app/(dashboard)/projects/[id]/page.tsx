@@ -16,6 +16,7 @@ import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
 import Link from 'next/link'
 import { formatDate, formatDateTime, getDeviceLabel, getFrequencyLabel, getSearchTypeLabel } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
+import { Search, BarChart3, Sparkles, FileText } from 'lucide-react'
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -188,8 +189,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               onClick={handleScanAll}
               loading={scanning}
               disabled={activeTargets.length === 0}
+              className="flex items-center gap-2"
             >
-              {scanning ? 'סורק...' : '🔍 סרוק הכל'}
+              <Search size={18} strokeWidth={2} />
+              {scanning ? 'סורק...' : 'סרוק הכל'}
             </Button>
           </div>
         }
@@ -209,7 +212,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             href="#rankings"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-900 bg-white border border-slate-200 shadow-sm hover:shadow transition whitespace-nowrap"
           >
-            <span className="text-base">📊</span>
+            <BarChart3 size={18} strokeWidth={2} className="text-slate-600" />
             <span>דירוגי Google Organic / Google Maps</span>
           </a>
           {process.env.NEXT_PUBLIC_ENABLE_AI_VISIBILITY === 'true' && (
@@ -217,7 +220,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               href="#ai-visibility"
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 shadow-sm hover:shadow-md transition whitespace-nowrap"
             >
-              <span className="text-base">✨</span>
+              <Sparkles size={18} strokeWidth={2} />
               <span>נראות ב-AI</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/25 font-bold tracking-wider">חדש</span>
             </a>
@@ -226,7 +229,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             href={`/reports?project_id=${id}`}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-white/70 hover:text-slate-900 transition whitespace-nowrap"
           >
-            <span className="text-base">📄</span>
+            <FileText size={18} strokeWidth={2} className="text-slate-600" />
             <span>דוחות</span>
           </Link>
         </div>
@@ -288,7 +291,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </h2>
         <div className="flex gap-2">
           <Link href={`/reports?project_id=${id}`}>
-            <Button variant="outline" size="sm">📄 דוח</Button>
+            <Button variant="outline" size="sm" className="flex items-center gap-1.5">
+              <FileText size={16} strokeWidth={2} />
+              דוח
+            </Button>
           </Link>
           <Button size="sm" onClick={() => setShowAddTarget(true)}>
             + הוסף מילת מפתח
