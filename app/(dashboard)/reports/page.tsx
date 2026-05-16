@@ -13,7 +13,34 @@ import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
 import { formatDateTime, getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
-import { BarChart3, FileText } from 'lucide-react'
+import { BarChart3, FileText, Zap } from 'lucide-react'
+
+type ReportType = 'google' | 'ai'
+
+interface AIScanResult {
+  id: string
+  project_id: string
+  run_id: string
+  prompt_id: string | null
+  prompt_text: string
+  engine: string
+  mentioned: boolean
+  target_cited: boolean
+  citation_count: number
+  target_brand: string | null
+  response_text: string | null
+  created_at: string
+}
+
+interface AIScanRun {
+  id: string
+  project_id: string
+  status: string
+  total_prompts: number
+  completed_prompts: number
+  started_at: string
+  completed_at: string | null
+}
 
 function ReportsContent() {
   const searchParams = useSearchParams()
@@ -21,12 +48,32 @@ function ReportsContent() {
 
   const [projects, setProjects] = useState<(Project & { clients?: Client })[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState(defaultProjectId)
-  const [reportData, setReportData] = useState<{
+  const [reportType, setReportType] = useState<ReportType>('google')
+  
+  // Google report data
+  const [googleReportData, setGoogleReportData] = useState<{
     project: Project & { clients?: Client }
     targets: TrackingTarget[]
     latestResults: Record<string, ScanResult>
     allHistory: ScanResult[]
   } | null>(null)
+  
+  // AI report data
+  const [aiReportData, setAiReportData] = useState<{
+    project: Project & { clients?: Client }
+    results: AIScanResult[]
+    runs: AIScanRun[]
+    summary: {
+      totalScans: number
+      totalResults: number
+      mentionedCount: number
+      citedCount: number
+      mentionRate: number
+      citationRate: number
+      engineBreakdown: Record<string, { scans: number; mentions: number; cited: number }>
+    }
+  } | null>(null)
+  
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
   const [sortColumn, setSortColumn] = useState<'position' | null>('position')
@@ -50,15 +97,15 @@ function ReportsContent() {
   }, [])
 
   useEffect(() => {
-    if (defaultProjectId && projects.length > 0) {
-      loadReport(defaultProjectId)
+    if (defaultProjectId && projects.length > 0 && reportType === 'google') {
+      loadGoogleReport(defaultProjectId)
     }
   }, [defaultProjectId, projects.length])
 
-  async function loadReport(projectId: string) {
+  async function loadGoogleReport(projectId: string) {
     if (!projectId) return
     setLoading(true)
-    setReportData(null)
+    setGoogleReportData(null)
 
     const supabase = createClient()
     const [
@@ -82,7 +129,6 @@ function ReportsContent() {
       .order('checked_at', { ascending: false })
       .limit(1000)
 
-    // Latest per target
     const latest: Record<string, ScanResult> = {}
     for (const r of historyData || []) {
       if (!latest[r.tracking_target_id]) {
@@ -90,7 +136,7 @@ function ReportsContent() {
       }
     }
 
-    setReportData({
+    setGoogleReportData({
       project: projectData,
       targets: targetsData,
       latestResults: latest,
@@ -99,82 +145,141 @@ function ReportsContent() {
     setLoading(false)
   }
 
-  async function handleExportExcel() {
-    if (!reportData) return
-    setExporting('excel')
-    const { exportToExcel } = await import('@/lib/export/excel')
-    exportToExcel({
-      client: reportData.project.clients!,
-      project: reportData.project,
-      targets: reportData.targets,
-      latestResults: reportData.latestResults,
-      allHistory: reportData.allHistory,
+  async function loadAiReport(projectId: string) {
+    if (!projectId) return
+    setLoading(true)
+    setAiReportData(null)
+
+    const supabase = createClient()
+    const { data: projectData } = await supabase
+      .from('projects')
+      .select('*, clients(*)')
+      .eq('id', projectId)
+      .single()
+
+    if (!projectData) {
+      setLoading(false)
+      return
+    }
+
+    // Load AI scan results
+    const { data: resultsData } = await supabase
+      .from('ai_scan_results')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(1000)
+
+    // Load AI scan runs
+    const { data: runsData } = await supabase
+      .from('ai_scan_runs')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('started_at', { ascending: false })
+
+    const results = (resultsData || []) as AIScanResult[]
+    const runs = (runsData || []) as AIScanRun[]
+
+    // Calculate summary
+    const mentionedCount = results.filter(r => r.mentioned).length
+    const citedCount = results.filter(r => r.target_cited).length
+    
+    const engineBreakdown: Record<string, { scans: number; mentions: number; cited: number }> = {}
+    for (const result of results) {
+      if (!engineBreakdown[result.engine]) {
+        engineBreakdown[result.engine] = { scans: 0, mentions: 0, cited: 0 }
+      }
+      engineBreakdown[result.engine].scans++
+      if (result.mentioned) engineBreakdown[result.engine].mentions++
+      if (result.target_cited) engineBreakdown[result.engine].cited++
+    }
+
+    const summary = {
+      totalScans: runs.length,
+      totalResults: results.length,
+      mentionedCount,
+      citedCount,
+      mentionRate: results.length > 0 ? (mentionedCount / results.length) * 100 : 0,
+      citationRate: results.length > 0 ? (citedCount / results.length) * 100 : 0,
+      engineBreakdown,
+    }
+
+    setAiReportData({
+      project: projectData,
+      results,
+      runs,
+      summary,
     })
+    setLoading(false)
+  }
+
+  async function handleReportTypeChange(newType: ReportType) {
+    setReportType(newType)
+    if (selectedProjectId) {
+      if (newType === 'google') {
+        loadGoogleReport(selectedProjectId)
+      } else {
+        loadAiReport(selectedProjectId)
+      }
+    }
+  }
+
+  async function handleExportExcel() {
+    if (!selectedProjectId) return
+    setExporting('excel')
+    
+    if (reportType === 'google' && googleReportData) {
+      const { exportToExcel } = await import('@/lib/export/excel')
+      exportToExcel({
+        client: googleReportData.project.clients!,
+        project: googleReportData.project,
+        targets: googleReportData.targets,
+        latestResults: googleReportData.latestResults,
+        allHistory: googleReportData.allHistory,
+      })
+    } else if (reportType === 'ai' && aiReportData) {
+      // TODO: Implement AI export to Excel
+      alert('ייצוא Excel לנראות ב-AI בעבודה')
+    }
+    
     setExporting(null)
   }
 
   async function handleExportPDF() {
-    if (!reportData) return
+    if (!selectedProjectId) return
     setExporting('pdf')
     try {
-      const res = await fetch('/api/reports/export-pdf', {
+      const endpoint = reportType === 'google' ? '/api/reports/export-pdf' : '/api/reports/export-ai-pdf'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: reportData.project.id }),
+        body: JSON.stringify({ projectId: selectedProjectId }),
       })
 
       if (!res.ok) {
-        let errorDetails = ''
-        try {
-          const errorJson = await res.json()
-          errorDetails = JSON.stringify(errorJson, null, 2)
-          console.error('PDF export server error:', errorJson)
-        } catch {
-          errorDetails = `HTTP ${res.status}`
-        }
-        throw new Error(`HTTP ${res.status}\n${errorDetails}`)
+        throw new Error(`HTTP ${res.status}`)
       }
 
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      const safeName = reportData.project.name.replace(/[/\\:*?"<>|]/g, '-').replace(/\s+/g, '_').slice(0, 60)
+      const projectName = selectedProjectId === googleReportData?.project.id 
+        ? googleReportData.project.name 
+        : aiReportData?.project.name || 'דוח'
+      const safeName = projectName.replace(/[/\\:*?"<>|]/g, '-').slice(0, 60)
       const timestamp = new Date().toISOString().slice(0, 10)
+      const reportTypeLabel = reportType === 'google' ? 'דירוגים' : 'AI'
       link.href = url
-      link.download = `דוח_דירוגים_${safeName}_${timestamp}.pdf`
+      link.download = `דוח_${reportTypeLabel}_${safeName}_${timestamp}.pdf`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     } catch (error) {
       console.error('PDF export error:', error)
-      alert('שגיאה ביהורדת דוח')
+      alert('שגיאה בהורדת דוח')
     } finally {
       setExporting(null)
-    }
-  }
-
-  const foundCount = reportData ? Object.values(reportData.latestResults).filter((r) => r.found).length : 0
-  const total = reportData?.targets.length || 0
-  const primaryEngine = reportData?.targets[0]?.engine_type || 'google_search'
-
-  function getSortedTargets() {
-    if (!reportData) return []
-
-    if (sortColumn === 'position') {
-      const sorted = sortTargetsByPosition(reportData.targets, reportData.latestResults)
-      return sortOrder === 'desc' ? sorted.reverse() : sorted
-    }
-
-    return reportData.targets
-  }
-
-  function handleSortClick(column: 'position') {
-    if (sortColumn === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortColumn(column)
-      setSortOrder('asc')
     }
   }
 
@@ -182,10 +287,10 @@ function ReportsContent() {
     <div>
       <Header
         title="דוחות"
-        subtitle="יצוא דוחות ל-Excel ו-PDF"
+        subtitle={reportType === 'google' ? 'דוחות דירוגים Google' : 'דוחות נראות ב-AI'}
       />
 
-      {/* Project Selector */}
+      {/* Project & Report Type Selector */}
       <Card className="mb-6">
         <div className="flex gap-4 items-end flex-wrap">
           <div className="flex-1 min-w-48">
@@ -202,8 +307,25 @@ function ReportsContent() {
               ]}
             />
           </div>
+          <div className="flex-1 min-w-48">
+            <Select
+              label="סוג דוח"
+              value={reportType}
+              onChange={(e) => handleReportTypeChange(e.target.value as ReportType)}
+              options={[
+                { value: 'google', label: 'דירוגי Google Organic / Maps' },
+                { value: 'ai', label: 'נראות ב-AI' },
+              ]}
+            />
+          </div>
           <Button
-            onClick={() => loadReport(selectedProjectId)}
+            onClick={() => {
+              if (reportType === 'google') {
+                loadGoogleReport(selectedProjectId)
+              } else {
+                loadAiReport(selectedProjectId)
+              }
+            }}
             disabled={!selectedProjectId}
             loading={loading}
           >
@@ -219,162 +341,353 @@ function ReportsContent() {
         </div>
       )}
 
-      {reportData && !loading && (
-        <>
-          {/* Report Header */}
-          <div className="bg-blue-600 text-white rounded-xl p-6 mb-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <div className="text-xs text-blue-200 mb-1">Rankings by Go Top</div>
-                <h2 className="text-xl font-bold">{reportData.project.name}</h2>
-                <p className="text-blue-200 text-sm mt-1">
-                  {reportData.project.clients?.name} · {reportData.project.target_domain}
-                </p>
-                <p className="text-blue-300 text-xs mt-1">
-                  הופק בתאריך {new Date().toLocaleDateString('he-IL')}
-                </p>
-                {reportData && (
-                  <p className="text-blue-200 text-xs mt-1">
-                    engine: {getSearchTypeLabel(primaryEngine, reportData.project.device_type)} · device: {getDeviceLabel(reportData.project.device_type)} · gl: {reportData.project.country.toLowerCase()} · hl: {reportData.project.language} · location: {reportData.project.city || '—'}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  variant="secondary"
-                  onClick={handleExportExcel}
-                  loading={exporting === 'excel'}
-                  className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
-                >
-                  <BarChart3 size={18} strokeWidth={2} />
-                  יצוא Excel
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleExportPDF}
-                  loading={exporting === 'pdf'}
-                  className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
-                >
-                  <FileText size={18} strokeWidth={2} />
-                  הורדת דוח
-                </Button>
-              </div>
-            </div>
-          </div>
+      {/* Google Report */}
+      {reportType === 'google' && googleReportData && !loading && (
+        <GoogleReport 
+          reportData={googleReportData}
+          exporting={exporting}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
+          sortColumn={sortColumn}
+          setSortColumn={setSortColumn}
+          sortOrder={sortOrder}
+          setSortOrder={setSortOrder}
+        />
+      )}
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <div className="text-xs text-slate-500 mb-1">{"סה\"כ ביטויים"}</div>
-              <div className="text-2xl font-bold text-slate-800">{total}</div>
-            </Card>
-            <Card>
-              <div className="text-xs text-slate-500 mb-1">נמצאו</div>
-              <div className="text-2xl font-bold text-green-600">{foundCount}</div>
-            </Card>
-            <Card>
-              <div className="text-xs text-slate-500 mb-1">לא נמצאו</div>
-              <div className="text-2xl font-bold text-red-500">{total - foundCount}</div>
-            </Card>
-            <Card>
-              <div className="text-xs text-slate-500 mb-1">כיסוי</div>
-              <div className="text-2xl font-bold text-blue-600">
-                {total > 0 ? `${Math.round((foundCount / total) * 100)}%` : '0%'}
-              </div>
-            </Card>
-          </div>
-
-          {/* Rankings Table */}
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800">דירוגים נוכחיים ({total})</h3>
-          </div>
-
-          <Table>
-            <TableHead>
-              <tr>
-                <Th>מילת מפתח</Th>
-                <Th>מנוע</Th>
-                <Th>
-                  <button
-                    onClick={() => handleSortClick('position')}
-                    className="cursor-pointer hover:bg-slate-100 select-none w-full h-full px-4 py-3 flex items-center justify-center text-right"
-                  >
-                    <span className="flex items-center gap-2">
-                      מיקום
-                      {sortColumn === 'position' && (
-                        <span className="text-sm">
-                          {sortOrder === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                </Th>
-                <Th>מיקום קודם</Th>
-                <Th>שינוי</Th>
-                <Th>נמצא</Th>
-                <Th>תאריך בדיקה</Th>
-                <Th>URL / כתובת</Th>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {reportData.targets.length === 0 && (
-                <EmptyRow colSpan={8} message="אין מילות מפתח בפרויקט זה" />
-              )}
-              {getSortedTargets().map((target) => {
-                const result = reportData.latestResults[target.id]
-                return (
-                  <TableRow key={target.id}>
-                    <Td>
-                      <span className="font-medium">{target.keyword}</span>
-                    </Td>
-                    <Td>
-                      <EngineBadge engine={target.engine_type} device={reportData.project.device_type} />
-                    </Td>
-                    <Td>
-                      {result?.found ? (
-                        <span className="font-bold text-slate-800">#{result.position}</span>
-                      ) : '—'}
-                    </Td>
-                    <Td>
-                      {result?.previous_position != null ? `#${result.previous_position}` : '—'}
-                    </Td>
-                    <Td>
-                      {result ? <PositionChange change={result.change_value} /> : '—'}
-                    </Td>
-                    <Td>
-                      <Badge variant={result?.found ? 'success' : result ? 'neutral' : 'neutral'}>
-                        {result ? (result.found ? 'כן' : 'לא') : '—'}
-                      </Badge>
-                    </Td>
-                    <Td>
-                      <span className="text-xs text-slate-500">
-                        {result ? formatDateTime(result.checked_at) : '—'}
-                      </span>
-                    </Td>
-                    <Td>
-                      {result?.result_url ? (
-                        <a href={result.result_url} target="_blank" rel="noopener noreferrer"
-                           className="text-blue-500 hover:underline text-xs truncate max-w-48 block">
-                          {result.result_url}
-                        </a>
-                      ) : result?.result_address ? (
-                        <span className="text-xs text-slate-500">{result.result_address}</span>
-                      ) : '—'}
-                    </Td>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </>
+      {/* AI Visibility Report */}
+      {reportType === 'ai' && aiReportData && !loading && (
+        <AIVisibilityReport 
+          reportData={aiReportData}
+          exporting={exporting}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
+        />
       )}
     </div>
   )
 }
 
+// Google Report Component (existing logic)
+function GoogleReport({
+  reportData,
+  exporting,
+  onExportPDF,
+  onExportExcel,
+  sortColumn,
+  setSortColumn,
+  sortOrder,
+  setSortOrder,
+}: any) {
+  const foundCount = Object.values(reportData.latestResults).filter((r: any) => r.found).length
+  const total = reportData.targets.length || 0
+  const primaryEngine = reportData.targets[0]?.engine_type || 'google_search'
+
+  const getSortedTargets = () => {
+    if (!reportData) return []
+    if (sortColumn === 'position') {
+      const sorted = sortTargetsByPosition(reportData.targets, reportData.latestResults)
+      return sortOrder === 'desc' ? sorted.reverse() : sorted
+    }
+    return reportData.targets
+  }
+
+  const handleSortClick = (column: 'position') => {
+    if (sortColumn === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortOrder('asc')
+    }
+  }
+
+  return (
+    <>
+      <div className="bg-blue-600 text-white rounded-xl p-6 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="text-xs text-blue-200 mb-1">Rankings by Go Top</div>
+            <h2 className="text-xl font-bold">{reportData.project.name}</h2>
+            <p className="text-blue-200 text-sm mt-1">
+              {reportData.project.clients?.name} · {reportData.project.target_domain}
+            </p>
+            <p className="text-blue-300 text-xs mt-1">
+              הופק בתאריך {new Date().toLocaleDateString('he-IL')}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={onExportExcel}
+              loading={exporting === 'excel'}
+              className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
+            >
+              <BarChart3 size={18} strokeWidth={2} />
+              יצוא Excel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={onExportPDF}
+              loading={exporting === 'pdf'}
+              className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
+            >
+              <FileText size={18} strokeWidth={2} />
+              הורדת דוח
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">{"סה\"כ ביטויים"}</div>
+          <div className="text-2xl font-bold text-slate-800">{total}</div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">נמצאו</div>
+          <div className="text-2xl font-bold text-green-600">{foundCount}</div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">לא נמצאו</div>
+          <div className="text-2xl font-bold text-red-500">{total - foundCount}</div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">כיסוי</div>
+          <div className="text-2xl font-bold text-blue-600">
+            {total > 0 ? `${Math.round((foundCount / total) * 100)}%` : '0%'}
+          </div>
+        </Card>
+      </div>
+
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-semibold text-slate-800">דירוגים נוכחיים ({total})</h3>
+      </div>
+
+      <Table>
+        <TableHead>
+          <tr>
+            <Th>מילת מפתח</Th>
+            <Th>מנוע</Th>
+            <Th>
+              <button
+                onClick={() => handleSortClick('position')}
+                className="cursor-pointer select-none"
+              >
+                דירוג {sortColumn === 'position' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </button>
+            </Th>
+            <Th>שינוי</Th>
+          </tr>
+        </TableHead>
+        <TableBody>
+          {getSortedTargets().map((target: any) => {
+            const result = reportData.latestResults[target.id]
+            return (
+              <TableRow key={target.id}>
+                <Td>{target.keyword}</Td>
+                <Td><EngineBadge engine={target.engine_type} /></Td>
+                <Td>{result?.found ? result.position : '—'}</Td>
+                <Td>{result && <PositionChange change={result.change_value} />}</Td>
+              </TableRow>
+            )
+          })}
+          {getSortedTargets().length === 0 && (
+            <EmptyRow colSpan={4} message="אין ביטויים בדוח" />
+          )}
+        </TableBody>
+      </Table>
+    </>
+  )
+}
+
+// AI Visibility Report Component
+function AIVisibilityReport({
+  reportData,
+  exporting,
+  onExportPDF,
+  onExportExcel,
+}: any) {
+  const engines = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode']
+  const engineLabels: Record<string, string> = {
+    chatgpt: 'ChatGPT',
+    perplexity: 'Perplexity',
+    gemini: 'Gemini',
+    copilot: 'Copilot',
+    grok: 'Grok',
+    google_ai_mode: 'Google AI',
+  }
+
+  return (
+    <>
+      <div className="bg-indigo-600 text-white rounded-xl p-6 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="text-xs text-indigo-200 mb-1">Rankings by Go Top</div>
+            <h2 className="text-xl font-bold">{reportData.project.name}</h2>
+            <p className="text-indigo-200 text-sm mt-1">
+              {reportData.project.clients?.name} · {reportData.project.target_domain}
+            </p>
+            <p className="text-indigo-300 text-xs mt-1">
+              דוח נראות ב-AI | הופק בתאריך {new Date().toLocaleDateString('he-IL')}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={onExportExcel}
+              loading={exporting === 'excel'}
+              className="!bg-white !text-indigo-700 hover:!bg-indigo-50 flex items-center gap-2"
+            >
+              <BarChart3 size={18} strokeWidth={2} />
+              יצוא Excel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={onExportPDF}
+              loading={exporting === 'pdf'}
+              className="!bg-white !text-indigo-700 hover:!bg-indigo-50 flex items-center gap-2"
+            >
+              <FileText size={18} strokeWidth={2} />
+              הורדת דוח
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">סריקות AI</div>
+          <div className="text-2xl font-bold text-indigo-600">{reportData.summary.totalScans}</div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">שאילתות AI</div>
+          <div className="text-2xl font-bold text-slate-800">{reportData.summary.totalResults}</div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">אזכורים</div>
+          <div className="text-2xl font-bold text-green-600">{reportData.summary.mentionedCount}</div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">אחוז אזכורים</div>
+          <div className="text-2xl font-bold text-indigo-600">
+            {Math.round(reportData.summary.mentionRate)}%
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">דומיין צוטט</div>
+          <div className="text-2xl font-bold text-cyan-600">{reportData.summary.citedCount}</div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">אחוז ציטוטים</div>
+          <div className="text-2xl font-bold text-indigo-600">
+            {Math.round(reportData.summary.citationRate)}%
+          </div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">מנועים פעילים</div>
+          <div className="text-2xl font-bold text-slate-800">
+            {Object.keys(reportData.summary.engineBreakdown).length}
+          </div>
+        </Card>
+        <Card>
+          <div className="text-xs text-slate-500 mb-1">נראות כללית</div>
+          <div className="text-2xl font-bold text-indigo-600">
+            {reportData.summary.totalResults > 0 
+              ? Math.round(((reportData.summary.mentionedCount + reportData.summary.citedCount) / (reportData.summary.totalResults * 2)) * 100)
+              : 0}%
+          </div>
+        </Card>
+      </div>
+
+      {/* Engine Breakdown */}
+      <div className="mb-6">
+        <h3 className="font-semibold text-slate-800 mb-4">ביצוע לפי מנוע</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {engines.map((engine) => {
+            const breakdown = reportData.summary.engineBreakdown[engine]
+            if (!breakdown || breakdown.scans === 0) return null
+            const mentionRate = Math.round((breakdown.mentions / breakdown.scans) * 100)
+            const citationRate = Math.round((breakdown.cited / breakdown.scans) * 100)
+            return (
+              <Card key={engine}>
+                <div className="text-sm font-semibold text-slate-800 mb-3">{engineLabels[engine]}</div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">סריקות:</span>
+                    <span className="font-medium">{breakdown.scans}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">אזכורים:</span>
+                    <span className="font-medium text-green-600">{breakdown.mentions} ({mentionRate}%)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">ציטוטים:</span>
+                    <span className="font-medium text-cyan-600">{breakdown.cited} ({citationRate}%)</span>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* AI Query Results Table */}
+      <div className="mb-6">
+        <h3 className="font-semibold text-slate-800 mb-4">תוצאות שאילתות AI ({reportData.results.length})</h3>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>שאילתה</Th>
+                <Th>מנוע</Th>
+                <Th>הוזכר</Th>
+                <Th>דומיין צוטט</Th>
+                <Th>ציטוטים</Th>
+                <Th>תאריך</Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {reportData.results.slice(0, 50).map((result: any) => (
+                <TableRow key={result.id}>
+                  <Td className="max-w-xs">
+                    {result.prompt_text}
+                  </Td>
+                  <Td><EngineBadge engine={result.engine} /></Td>
+                  <Td>
+                    <Badge variant={result.mentioned ? 'success' : 'neutral'}>
+                      {result.mentioned ? 'כן' : 'לא'}
+                    </Badge>
+                  </Td>
+                  <Td>
+                    <Badge variant={result.target_cited ? 'success' : 'neutral'}>
+                      {result.target_cited ? 'כן' : 'לא'}
+                    </Badge>
+                  </Td>
+                  <Td>{result.citation_count}</Td>
+                  <Td>{formatDateTime(result.created_at)}</Td>
+                </TableRow>
+              ))}
+              {reportData.results.length === 0 && (
+                <EmptyRow colSpan={6} message="אין תוצאות בדוח" />
+              )}
+            </TableBody>
+          </Table>
+          {reportData.results.length > 50 && (
+            <p className="text-xs text-slate-500 mt-2">מוצגות 50 מתוך {reportData.results.length} תוצאות</p>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function ReportsPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-20 text-slate-400">טוען...</div>}>
+    <Suspense fallback={<div>טוען...</div>}>
       <ReportsContent />
     </Suspense>
   )
