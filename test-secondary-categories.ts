@@ -25,8 +25,6 @@ function testSecondaryCategories() {
     primaryCategory: 'חנות בגדי יד שנייה לנשים',
     secondaryCategories: ['וינטג׳', 'מותגים', 'שמלות ערב', 'אקססוריז'],
     excludedTopics: [],
-    updatedAt: new Date().toISOString(),
-    updatedBy: 'test',
   }
 
   // Already added question
