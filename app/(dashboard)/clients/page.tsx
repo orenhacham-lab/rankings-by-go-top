@@ -8,8 +8,13 @@ import ClientForm from '@/components/clients/ClientForm'
 import ClientsTable from '@/components/clients/ClientsTable'
 import { createClient } from '@/lib/supabase/client'
 import { Client } from '@/lib/supabase/types'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ClientsPage() {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -62,11 +67,11 @@ export default function ClientsPage() {
   return (
     <div>
       <Header
-        title="לקוחות"
-        subtitle={`סה"כ ${clients.length} לקוחות`}
+        title={dict.clients.title}
+        subtitle={`${dict.clients.countPrefix} ${clients.length} ${dict.clients.countSuffix}`}
         actions={
           <Button onClick={() => setShowCreate(true)}>
-            + הוסף לקוח
+            {dict.clients.newClient}
           </Button>
         }
       />
@@ -74,7 +79,7 @@ export default function ClientsPage() {
       {loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען...
+          {dict.common.loading}
         </div>
       ) : (
         <ClientsTable clients={clients} onClientsChange={loadClients} />
@@ -83,7 +88,7 @@ export default function ClientsPage() {
       <Modal
         open={showCreate}
         onClose={() => setShowCreate(false)}
-        title="הוספת לקוח חדש"
+        title={dict.clients.modal.newTitle}
         size="md"
       >
         <ClientForm

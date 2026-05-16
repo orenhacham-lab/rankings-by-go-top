@@ -10,6 +10,8 @@ import Modal from '@/components/ui/Modal'
 import ProjectForm from './ProjectForm'
 import { formatDate, getFrequencyLabel } from '@/lib/utils'
 import { toggleProjectActiveAction } from '@/app/actions/projects'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
 
 interface ProjectsTableProps {
@@ -19,9 +21,20 @@ interface ProjectsTableProps {
 }
 
 export default function ProjectsTable({ projects, clients, showClient = true }: ProjectsTableProps) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+
+  function localizedFrequency(freq: string): string {
+    if (freq === 'weekly') return dict.projects.frequency.weekly
+    if (freq === 'monthly') return dict.projects.frequency.monthly
+    if (freq === 'monthly_first_day') return dict.projects.frequency.monthlyFirstDay
+    if (freq === 'manual') return dict.projects.frequency.manual
+    return getFrequencyLabel(freq)
+  }
 
   const filtered = projects.filter(
     (p) =>
@@ -43,7 +56,7 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
       <div className="mb-4">
         <input
           type="text"
-          placeholder="חיפוש לפי שם פרויקט, דומיין..."
+          placeholder={dict.projects.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -53,18 +66,18 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
       <Table>
         <TableHead>
           <tr>
-            <Th>שם פרויקט</Th>
-            {showClient && <Th>לקוח</Th>}
-            <Th>דומיין</Th>
-            <Th>תדירות</Th>
-            <Th>סריקה אחרונה</Th>
-            <Th>סטטוס</Th>
-            <Th>פעולות</Th>
+            <Th>{dict.projects.table.projectName}</Th>
+            {showClient && <Th>{dict.projects.table.client}</Th>}
+            <Th>{dict.projects.table.domain}</Th>
+            <Th>{dict.projects.table.frequency}</Th>
+            <Th>{dict.projects.table.lastScan}</Th>
+            <Th>{dict.projects.table.status}</Th>
+            <Th>{dict.projects.table.actions}</Th>
           </tr>
         </TableHead>
         <TableBody>
           {filtered.length === 0 && (
-            <EmptyRow colSpan={showClient ? 7 : 6} message="לא נמצאו פרויקטים" />
+            <EmptyRow colSpan={showClient ? 7 : 6} message={dict.projects.table.emptyState} />
           )}
           {filtered.map((project) => (
             <TableRow key={project.id}>
@@ -88,7 +101,7 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
               <Td className="font-mono text-xs text-slate-600 dark:text-slate-300">{project.target_domain}</Td>
               <Td>
                 <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
-                  {getFrequencyLabel(project.scan_frequency)}
+                  {localizedFrequency(project.scan_frequency)}
                 </Badge>
               </Td>
               <Td>{project.last_scan_at ? formatDate(project.last_scan_at) : '—'}</Td>
@@ -102,7 +115,7 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
                     variant="ghost"
                     onClick={() => setEditingProject(project)}
                   >
-                    עריכה
+                    {dict.projects.actions.edit}
                   </Button>
                   <Button
                     size="sm"
@@ -110,7 +123,7 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
                     loading={togglingId === project.id}
                     onClick={() => handleToggleActive(project)}
                   >
-                    {project.is_active ? 'השבת' : 'הפעל'}
+                    {project.is_active ? dict.projects.actions.deactivate : dict.projects.actions.activate}
                   </Button>
                 </div>
               </Td>
@@ -123,7 +136,7 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
         <Modal
           open={!!editingProject}
           onClose={() => setEditingProject(null)}
-          title="עריכת פרויקט"
+          title={dict.projects.modal.editTitle}
           size="lg"
         >
           <ProjectForm

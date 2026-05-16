@@ -1,10 +1,16 @@
+'use client'
+
 import Badge from './Badge'
 import { getSearchTypeLabel } from '@/lib/utils'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export function ActiveBadge({ active }: { active: boolean }) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
   return (
     <Badge variant={active ? 'success' : 'neutral'}>
-      {active ? 'פעיל' : 'לא פעיל'}
+      {active ? dict.common.active : dict.common.inactive}
     </Badge>
   )
 }
