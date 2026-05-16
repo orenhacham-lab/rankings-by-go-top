@@ -193,7 +193,7 @@ export default function DashboardPage() {
 
         {/* Quick Links */}
         <Card>
-          <h2 className="font-semibold text-slate-800 mb-4">קישורים מהירים</h2>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">קישורים מהירים</h2>
           <div className="grid grid-cols-2 gap-3">
             <QuickLink href="/clients" icon={Users} label="לקוחות" sub="ניהול לקוחות" />
             <QuickLink href="/projects" icon={Folder} label="פרויקטים" sub="כל הפרויקטים" />

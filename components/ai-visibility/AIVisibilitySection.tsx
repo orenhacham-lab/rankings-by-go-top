@@ -1384,7 +1384,7 @@ function NewAIQueryModal({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-slate-900 mb-2">{t('query_label')}</label>
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">{t('query_label')}</label>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -1408,7 +1408,7 @@ function NewAIQueryModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-900 mb-2">{t('target_domain_label')}</label>
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">{t('target_domain_label')}</label>
           <Input
             type="text"
             value={targetDomain}
@@ -1419,7 +1419,7 @@ function NewAIQueryModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-900 mb-2">{t('target_brand_label')}</label>
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">{t('target_brand_label')}</label>
           <Input
             type="text"
             value={targetBrand}

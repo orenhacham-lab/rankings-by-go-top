@@ -296,7 +296,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Tracking Targets */}
       {/* Tracking Targets */}
       <div id="keywords-section" className="flex items-center justify-between mb-4 scroll-mt-6">
-        <h2 className="text-lg font-semibold text-slate-800">
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
           מילות מפתח ({targets.length})
         </h2>
         <div className="flex gap-2">
