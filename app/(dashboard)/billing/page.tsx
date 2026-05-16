@@ -152,7 +152,7 @@ function PlanCard({
           התוכנית הנוכחית
         </button>
       ) : (
-        <div className="dark:brightness-90 dark:saturate-125">
+        <div className="paypal-button-wrapper">
           <div
             id={`paypal-button-${plan}`}
             className="min-h-12"

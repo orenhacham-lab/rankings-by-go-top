@@ -212,3 +212,11 @@ dialog::backdrop {
   border: none;
   border-top: 1px solid #e2e8f0;
 }
+
+/* ── PayPal Buttons Dark Mode Fix ─────────────────────────────────── */
+/* PayPal renders buttons inside iframes which cannot be styled directly.
+   We use CSS filter on the wrapper: invert flips white→dark, and
+   hue-rotate(180deg) preserves the original blue PayPal color. */
+.dark .paypal-button-wrapper {
+  filter: invert(1) hue-rotate(180deg);
+}
