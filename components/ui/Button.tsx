@@ -14,13 +14,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+          'inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
           {
-            'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-sm': variant === 'primary',
-            'bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300': variant === 'secondary',
-            'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm': variant === 'danger',
-            'text-slate-600 hover:bg-slate-100 hover:text-slate-900': variant === 'ghost',
-            'border border-slate-200 text-slate-700 hover:bg-slate-50 bg-white shadow-sm': variant === 'outline',
+            'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-[0_12px_28px_rgba(79,70,229,0.25)] active:from-blue-700 active:to-indigo-700 shadow-[0_10px_24px_rgba(79,70,229,0.22)] hover:-translate-y-0.5': variant === 'primary',
+            'bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-50 active:bg-slate-100 shadow-sm hover:shadow-md': variant === 'secondary',
+            'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-[0_8px_20px_rgba(220,38,38,0.2)] hover:shadow-[0_12px_28px_rgba(220,38,38,0.3)] hover:-translate-y-0.5': variant === 'danger',
+            'text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200': variant === 'ghost',
+            'border border-slate-200/80 text-slate-700 hover:bg-slate-50 bg-white shadow-sm hover:shadow-md hover:border-slate-300/80': variant === 'outline',
           },
           {
             'text-xs px-3 py-1.5 h-7': size === 'sm',

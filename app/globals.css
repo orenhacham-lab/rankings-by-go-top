@@ -9,8 +9,9 @@ body {
   /* Rubik loaded from Google Fonts in layout.tsx */
   font-family: 'Rubik', 'Segoe UI', Arial, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #f8fafc;
+  background: linear-gradient(180deg, #f8fbff 0%, #f4f6fb 45%, #f8fafc 100%);
   color: #0f172a;
+  min-height: 100vh;
 }
 
 /* ── Table defaults — explicit RTL alignment ───────────────────── */

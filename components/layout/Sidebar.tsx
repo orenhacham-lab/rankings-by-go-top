@@ -4,21 +4,35 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import {
+  BarChart3,
+  Users,
+  Folder,
+  KeyRound,
+  Sparkles,
+  Search,
+  FileText,
+  CreditCard,
+  Plug,
+  ClipboardList,
+  LogOut,
+  MessageCircle,
+} from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: 'לוח בקרה', icon: '📊' },
-  { href: '/clients', label: 'לקוחות', icon: '👥' },
-  { href: '/projects', label: 'פרויקטים', icon: '📁' },
-  { href: '/keywords', label: 'מילות מפתח', icon: '🔑' },
-  { href: '/ai-visibility', label: 'נראות ב-AI', icon: '✨' },
-  { href: '/scans', label: 'סריקות', icon: '🔍' },
-  { href: '/reports', label: 'דוחות', icon: '📄' },
-  { href: '/billing', label: 'מנוי ותשלום', icon: '💳' },
+  { href: '/dashboard', label: 'לוח בקרה', icon: BarChart3, color: 'text-blue-600' },
+  { href: '/clients', label: 'לקוחות', icon: Users, color: 'text-slate-600' },
+  { href: '/projects', label: 'פרויקטים', icon: Folder, color: 'text-purple-600' },
+  { href: '/keywords', label: 'מילות מפתח', icon: KeyRound, color: 'text-amber-600' },
+  { href: '/ai-visibility', label: 'נראות ב-AI', icon: Sparkles, color: 'text-violet-600' },
+  { href: '/scans', label: 'סריקות', icon: Search, color: 'text-orange-600' },
+  { href: '/reports', label: 'דוחות', icon: FileText, color: 'text-slate-600' },
+  { href: '/billing', label: 'מנוי ותשלום', icon: CreditCard, color: 'text-emerald-600' },
 ]
 
 const adminItems = [
-  { href: '/setup', label: 'סטטוס חיבור', icon: '🔌' },
-  { href: '/admin/logs', label: 'לוג שגיאות', icon: '📋' },
+  { href: '/setup', label: 'סטטוס חיבור', icon: Plug, color: 'text-slate-600' },
+  { href: '/admin/logs', label: 'לוג שגיאות', icon: ClipboardList, color: 'text-slate-600' },
 ]
 
 interface SidebarProps {
@@ -57,6 +71,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       <nav className="flex-1 p-3 overflow-hidden md:overflow-y-auto">
         <ul className="grid grid-cols-2 gap-2 md:block md:space-y-1 w-full">
           {navItems.map((item) => {
+            const IconComponent = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
               <li key={item.href}>
@@ -65,11 +80,11 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                   className={cn(
                     'w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
                     isActive
-                      ? 'bg-blue-600 text-white shadow-sm'
+                      ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   )}
                 >
-                  <span className="text-base">{item.icon}</span>
+                  <IconComponent size={18} className={cn('shrink-0', isActive ? 'text-white' : item.color)} strokeWidth={2} />
                   <span>{item.label}</span>
                 </Link>
               </li>
@@ -83,7 +98,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                 type="submit"
                 className="w-full h-full min-h-[60px] flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-xs font-medium transition-all duration-150 text-slate-600 hover:bg-slate-100 hover:text-slate-900 text-center leading-tight"
               >
-                <span className="text-base">🚪</span>
+                <LogOut size={18} className="text-slate-600" strokeWidth={2} />
                 <span>יציאה</span>
               </button>
             </form>
@@ -97,6 +112,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
           <p className="text-xs font-medium text-slate-400 px-3 mb-1">מערכת</p>
           <ul className="space-y-1">
             {adminItems.map((item) => {
+              const IconComponent = item.icon
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <li key={item.href}>
@@ -109,7 +125,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                         : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                     )}
                   >
-                    <span className="text-base">{item.icon}</span>
+                    <IconComponent size={18} className={cn('shrink-0', isActive ? 'text-white' : item.color)} strokeWidth={2} />
                     <span>{item.label}</span>
                   </Link>
                 </li>
@@ -126,7 +142,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             href="mailto:oren@gotop.co.il"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
           >
-            <span className="text-base">💬</span>
+            <MessageCircle size={18} className="text-slate-500" strokeWidth={2} />
             <span>תמיכה</span>
           </a>
         </div>
@@ -139,7 +155,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             type="submit"
             className="w-full text-sm text-slate-500 hover:text-slate-700 flex items-center justify-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
           >
-            <span>🚪</span>
+            <LogOut size={18} className="text-slate-500" strokeWidth={2} />
             <span>יציאה</span>
           </button>
         </form>
