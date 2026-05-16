@@ -145,9 +145,9 @@ export default function TrackingTargetsTable({
               <TableRow key={target.id}>
                 <Td>
                   <div>
-                    <span className="font-medium text-slate-800">{target.keyword}</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-100">{target.keyword}</span>
                     {target.notes && (
-                      <p className="text-xs text-slate-400 mt-0.5">{target.notes}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{target.notes}</p>
                     )}
                   </div>
                 </Td>
@@ -157,14 +157,14 @@ export default function TrackingTargetsTable({
                 <Td>
                   {result ? (
                     result.found ? (
-                      <span className="font-bold text-slate-800 text-base">
+                      <span className="font-bold text-slate-800 dark:text-slate-100 text-base">
                         #{result.position}
                       </span>
                     ) : (
-                      <span className="text-slate-400 text-sm">לא נמצא</span>
+                      <span className="text-slate-400 dark:text-slate-500 text-sm">לא נמצא</span>
                     )
                   ) : (
-                    <span className="text-slate-300 text-sm">—</span>
+                    <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>
                   )}
                 </Td>
                 <Td>

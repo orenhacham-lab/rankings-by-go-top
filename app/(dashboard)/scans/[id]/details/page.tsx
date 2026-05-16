@@ -165,8 +165,8 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                     {/* Response Section */}
                     {auditResponse && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 mb-3">Response</h4>
-                        <div className="bg-slate-50 p-4 rounded space-y-3 text-sm">
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Response</h4>
+                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-3 text-sm">
                           <div>
                             <span className="text-slate-600 dark:text-slate-300">searchParameters.location:</span>
                             <div className="font-mono text-slate-900 dark:text-slate-100">{auditResponse.searchParameters?.location || '(none)'}</div>
@@ -184,7 +184,7 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                               <span className="text-slate-600 dark:text-slate-300">top 10 place titles:</span>
                               <ul className="mt-2 space-y-1 ml-4">
                                 {auditResponse.placesSample.map((place: any, idx: number) => (
-                                  <li key={idx} className="text-slate-700">• {place.title || '(no title)'}</li>
+                                  <li key={idx} className="text-slate-700 dark:text-slate-200">• {place.title || '(no title)'}</li>
                                 ))}
                               </ul>
                             </div>
@@ -196,8 +196,8 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                     {/* Decision Section */}
                     {auditDecision && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 mb-3">Decision</h4>
-                        <div className="bg-slate-50 p-4 rounded space-y-3 text-sm">
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Decision</h4>
+                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded space-y-3 text-sm">
                           <div>
                             <span className="text-slate-600 dark:text-slate-300">found:</span>
                             <div className="font-mono text-slate-900 dark:text-slate-100">{auditDecision.found ? 'yes' : 'no'}</div>
@@ -213,7 +213,7 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                                 <div className="font-mono text-slate-900 dark:text-slate-100">
                                   #{auditDecision.matchedPosition}
                                   {auditDecision.position_source && (
-                                    <span className="text-slate-500 text-xs ml-2">({auditDecision.position_source})</span>
+                                    <span className="text-slate-500 dark:text-slate-400 text-xs ml-2">({auditDecision.position_source})</span>
                                   )}
                                 </div>
                               </div>
@@ -242,7 +242,7 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                     {/* Grid Results Section */}
                     {auditDecision?.grid_enabled && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 mb-3">
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">
                           Grid Scan — {auditDecision.grid_size} ({auditDecision.executed_points || auditDecision.per_point_results?.length || 0} executed{auditDecision.early_stopped && `, ${auditDecision.skipped_points} skipped`})
                         </h4>
 
@@ -264,10 +264,10 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                               : '—',
                               sub: `${auditDecision.per_point_results?.filter((p: any) => p.found).length || 0} / ${auditDecision.executed_points || auditDecision.per_point_results?.length || 0} points` },
                           ].map((m, i) => (
-                            <div key={i} className="bg-slate-50 p-3 rounded text-sm">
-                              <div className="text-slate-500 text-xs mb-1">{m.label}</div>
-                              <div className="font-mono font-semibold text-slate-900">{m.value}</div>
-                              {m.sub && <div className="text-slate-400 text-xs mt-0.5">{m.sub}</div>}
+                            <div key={i} className="bg-slate-50 dark:bg-slate-800 p-3 rounded text-sm">
+                              <div className="text-slate-500 dark:text-slate-400 text-xs mb-1">{m.label}</div>
+                              <div className="font-mono font-semibold text-slate-900 dark:text-slate-100">{m.value}</div>
+                              {m.sub && <div className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">{m.sub}</div>}
                             </div>
                           ))}
                         </div>
@@ -276,11 +276,11 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                         {auditDecision.per_point_results && auditDecision.per_point_results.length > 0 && (
                           <div className="space-y-3">
                             {auditDecision.per_point_results.map((pt: any, idx: number) => (
-                              <div key={idx} className={`p-3 rounded border-l-4 ${pt.found ? 'bg-green-50 border-green-400' : 'bg-slate-50 border-slate-300'}`}>
+                              <div key={idx} className={`p-3 rounded border-l-4 ${pt.found ? 'bg-green-50 dark:bg-green-900/20 border-green-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="font-semibold text-slate-700 text-sm">
+                                  <span className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
                                     #{pt.point_index + 1} {pt.label}
-                                    <span className="font-normal text-slate-400 ml-2 text-xs">{pt.lat}, {pt.lng}</span>
+                                    <span className="font-normal text-slate-400 dark:text-slate-500 ml-2 text-xs">{pt.lat}, {pt.lng}</span>
                                   </span>
                                   <span className={`font-mono font-semibold text-sm ${pt.found ? 'text-green-700' : 'text-slate-400'}`}>
                                     {pt.found ? `#${pt.position}` : 'not found'}
@@ -288,7 +288,7 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                                 </div>
 
                                 {/* Match Status Debug */}
-                                <div className="bg-white p-2 rounded text-xs space-y-1 mb-2">
+                                <div className="bg-white dark:bg-slate-900 p-2 rounded text-xs space-y-1 mb-2">
                                   <div className="grid grid-cols-2 gap-2">
                                     <div>
                                       <span className="text-slate-600 dark:text-slate-300">business_returned:</span>
@@ -314,20 +314,20 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                                     </div>
                                   )}
                                   {pt.result_signature && (
-                                    <div className="text-slate-500 border-t pt-1 mt-1">
+                                    <div className="text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-1 mt-1">
                                       <span className="text-slate-600 dark:text-slate-300">signature:</span>
-                                      <div className="font-mono text-slate-700 break-all text-xs mt-0.5">{pt.result_signature}</div>
+                                      <div className="font-mono text-slate-700 dark:text-slate-200 break-all text-xs mt-0.5">{pt.result_signature}</div>
                                     </div>
                                   )}
                                 </div>
 
                                 {/* Top Places */}
                                 {pt.top_places && pt.top_places.length > 0 && (
-                                  <div className="bg-white p-2 rounded text-xs mb-2">
-                                    <div className="text-slate-600 font-semibold mb-1">Top {pt.top_places.length} places:</div>
+                                  <div className="bg-white dark:bg-slate-900 p-2 rounded text-xs mb-2">
+                                    <div className="text-slate-600 dark:text-slate-300 font-semibold mb-1">Top {pt.top_places.length} places:</div>
                                     <ul className="space-y-0.5 ml-2">
                                       {pt.top_places.map((place: any, pidx: number) => (
-                                        <li key={pidx} className="text-slate-700">
+                                        <li key={pidx} className="text-slate-700 dark:text-slate-200">
                                           #{place.position}: {place.title}
                                         </li>
                                       ))}
@@ -336,11 +336,11 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                                 )}
 
                                 {pt.found && pt.matched_title && (
-                                  <div className="text-slate-600 text-xs mt-1">
+                                  <div className="text-slate-600 dark:text-slate-300 text-xs mt-1">
                                     <strong>Matched:</strong> {pt.matched_title}{pt.matched_address ? ` — ${pt.matched_address}` : ''}
                                   </div>
                                 )}
-                                <div className="text-slate-400 text-xs mt-1">{pt.places_count} places returned</div>
+                                <div className="text-slate-400 dark:text-slate-500 text-xs mt-1">{pt.places_count} places returned</div>
                               </div>
                             ))}
                           </div>
@@ -351,12 +351,12 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                     {/* Attempts Section — only for non-grid scans */}
                     {!auditDecision?.grid_enabled && auditDecision?.attempts && auditDecision.attempts.length > 0 && (
                       <div>
-                        <h4 className="font-semibold text-slate-900 mb-3">Attempts ({auditDecision.attempts.length})</h4>
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-3">Attempts ({auditDecision.attempts.length})</h4>
                         <div className="space-y-3">
                           {auditDecision.attempts.map((attempt: any, idx: number) => (
-                            <div key={idx} className="bg-slate-50 p-3 rounded text-sm border-l-4 border-slate-300">
-                              <div className="font-semibold text-slate-900 mb-2">#{attempt.attemptNumber}: {attempt.context}</div>
-                              <div className="grid grid-cols-2 gap-2 text-slate-700">
+                            <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded text-sm border-l-4 border-slate-300 dark:border-slate-600">
+                              <div className="font-semibold text-slate-900 dark:text-slate-100 mb-2">#{attempt.attemptNumber}: {attempt.context}</div>
+                              <div className="grid grid-cols-2 gap-2 text-slate-700 dark:text-slate-200">
                                 <div>location: <span className="font-mono">{attempt.location || '(none)'}</span></div>
                                 <div>ll: <span className="font-mono">{attempt.ll || '(none)'}</span></div>
                                 <div>found: <span className="font-mono">{attempt.found ? 'yes' : 'no'}</span></div>
