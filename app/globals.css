@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4 custom dark variant for class-based dark mode ───── */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Base RTL setup ────────────────────────────────────────────── */
 html {
   direction: rtl;
