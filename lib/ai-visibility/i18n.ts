@@ -255,6 +255,7 @@ const STRINGS = {
   cat_fitness: { he: 'כושר', en: 'Fitness' },
   cat_beauty: { he: 'יופי וטיפוח', en: 'Beauty & wellness' },
   cat_education: { he: 'הכשרה והוראה', en: 'Education' },
+  cat_second_hand_fashion: { he: 'בגדי יד שנייה לנשים', en: 'Second-hand women\'s fashion' },
   cat_generic: { he: 'אחר', en: 'Other' },
 } as const
 

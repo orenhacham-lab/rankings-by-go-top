@@ -49,6 +49,7 @@ export type BusinessCategory =
   | 'fitness'
   | 'beauty'
   | 'education'
+  | 'second_hand_fashion'
   | 'generic'
 
 export type BusinessProfile = {
@@ -147,6 +148,7 @@ const HE_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   fitness: 'כושר',
   beauty: 'יופי וטיפוח',
   education: 'הכשרה והוראה',
+  second_hand_fashion: 'בגדי יד שנייה לנשים',
   generic: 'עסק',
 }
 
@@ -168,6 +170,7 @@ const EN_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   fitness: 'fitness',
   beauty: 'beauty & wellness',
   education: 'education',
+  second_hand_fashion: 'second-hand women\'s fashion',
   generic: 'business',
 }
 
@@ -452,6 +455,48 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 68, offering: 'generic' },
   ],
 
+  second_hand_fashion: [
+    // PRIMARY: Recommendations (25%)
+    { intent: 'recommendation', text: 'איפה כדאי לקנות בגדי יד שנייה לנשים?', score: 96, offering: 'primary', themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'אילו חנויות יד שנייה לנשים מומלצות בישראל?', score: 95, offering: 'primary', themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'איזו חנות וינטג׳ לנשים מומלצת?', score: 94, offering: 'primary', themeBoost: { audienceWomen: 4 } },
+    { intent: 'recommendation', text: 'איפה אפשר למצוא בגדי יד שנייה איכותיים לנשים?', score: 93, offering: 'primary', themeBoost: { audienceWomen: 4 } },
+    { intent: 'recommendation', text: 'היכן קונים בגדים יד שנייה לנשים בירושלים?', score: 91, offering: 'primary', requiresCity: true, themeBoost: { audienceWomen: 3 } },
+
+    // PRIMARY: Trust / Pre-purchase (20%)
+    { intent: 'pre_purchase', text: 'איך לבחור חנות בגדי יד שנייה אמינה?', score: 94, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'מה חשוב לבדוק לפני שקונים בגדי יד שנייה אונליין?', score: 93, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איך יודעים שבגד יד שנייה במצב טוב?', score: 92, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'האם כדאי לקנות בגדי יד שנייה אונליין?', score: 91, offering: 'primary' },
+    { intent: 'informational', text: 'מה ההבדל בין בגדים וינטג׳ לבגדים יד שנייה?', score: 88, offering: 'primary' },
+
+    // PRIMARY: Price / Value (15%)
+    { intent: 'commercial', text: 'איפה קונים בגדי יד שנייה לנשים במחירים טובים?', score: 92, offering: 'primary', themeBoost: { price: 5 } },
+    { intent: 'commercial', text: 'כמה עולים בגדי יד שנייה איכותיים?', score: 91, offering: 'primary', themeBoost: { price: 5 } },
+    { intent: 'commercial', text: 'האם בגדי יד שנייה משתלמים יותר מבגדים חדשים?', score: 89, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'pre_purchase', text: 'איפה למצוא בגדי מעצבים יד שנייה במחיר סביר?', score: 88, offering: 'primary', themeBoost: { price: 4 } },
+
+    // PRIMARY: Discovery / Style (10%)
+    { intent: 'informational', text: 'איפה אפשר למצוא פריטי וינטג׳ מיוחדים לנשים?', score: 90, offering: 'primary' },
+    { intent: 'informational', text: 'איך למצוא בגדי מעצבים יד שנייה?', score: 89, offering: 'primary' },
+    { intent: 'informational', text: 'איפה קונים בגדי מותגים יד שנייה לנשים?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: 'איך לבנות מלתחה עם בגדי יד שנייה?', score: 87, offering: 'primary' },
+
+    // LOCAL: Location-based (15%)
+    { intent: 'local', text: 'חנות בגדי יד שנייה לנשים מומלצת ב{{city}}', score: 92, offering: 'local', requiresCity: true, themeBoost: { audienceWomen: 3 } },
+    { intent: 'local', text: 'איפה בירושלים קונים בגדי יד שנייה לנשים?', score: 90, offering: 'local', requiresCity: true, themeBoost: { audienceWomen: 3 } },
+    { intent: 'local', text: 'חנויות וינטג׳ לנשים ב{{city}}', score: 88, offering: 'local', requiresCity: true, themeBoost: { audienceWomen: 2 } },
+
+    // SECONDARY: Brand-specific (10%)
+    { intent: 'brand', text: 'האם ששקה מומלצת לקניית בגדי יד שנייה?', score: 86, offering: 'secondary' },
+    { intent: 'brand', text: 'מה אפשר לספר על {{business}}?', score: 85, offering: 'secondary' },
+    { intent: 'brand', text: 'האם כדאי לקנות בגדי יד שנייה מ-{{business}}?', score: 84, offering: 'secondary' },
+
+    // GENERIC: Alternatives & comparison (fallback)
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}} - חנויות בגדים יד שנייה', score: 78, offering: 'generic' },
+    { intent: 'comparison', text: 'השוואה בין חנויות יד שנייה לנשים בישראל', score: 76, offering: 'generic' },
+  ],
+
   restaurant: [
     // Primary & Local: location-based (90%)
     { intent: 'recommendation', text: 'מהן המסעדות הכי מומלצות ב{{city}}?', score: 93, offering: 'primary', requiresCity: true },
@@ -652,6 +697,21 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'local', text: 'Same-day flower delivery in {{city}}', score: 87, offering: 'primary', requiresCity: true },
     { intent: 'recommendation', text: 'Best florist in {{city}}', score: 89, offering: 'primary', requiresCity: true },
     { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  second_hand_fashion: [
+    { intent: 'recommendation', text: 'Where to buy second-hand women\'s clothing?', score: 94, offering: 'primary', themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'Best second-hand fashion shops for women', score: 93, offering: 'primary', themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'Where to find vintage women\'s clothing?', score: 92, offering: 'primary', themeBoost: { audienceWomen: 4 } },
+    { intent: 'pre_purchase', text: 'How to identify quality in second-hand clothing', score: 91, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Is it safe to buy used clothing online?', score: 89, offering: 'primary' },
+    { intent: 'commercial', text: 'Where to find affordable second-hand women\'s clothing', score: 90, offering: 'primary', themeBoost: { price: 5 } },
+    { intent: 'commercial', text: 'How much should you spend on quality second-hand items', score: 88, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'informational', text: 'How to build a wardrobe with second-hand pieces', score: 87, offering: 'primary' },
+    { intent: 'informational', text: 'Where to find designer second-hand clothing', score: 86, offering: 'primary' },
+    { intent: 'local', text: 'Second-hand fashion shops in {{city}}', score: 88, offering: 'local', requiresCity: true, themeBoost: { audienceWomen: 3 } },
+    { intent: 'brand', text: 'Is {{business}} a reliable second-hand clothing store?', score: 84, offering: 'secondary' },
+    { intent: 'alternatives', text: 'Alternatives to {{business}} for second-hand women\'s clothing', score: 80, offering: 'generic' },
   ],
 
   restaurant: [
@@ -1028,6 +1088,22 @@ const CATEGORY_PROFILES: Record<
       'מוצרי DIY', 'DIY products', 'tools for sale',
     ],
   },
+  second_hand_fashion: {
+    primaryOfferings: [
+      'בגדי יד שנייה לנשים', 'אופנה יד שנייה', 'בגדים וינטג׳ לנשים',
+      'בגדי יד שנייה', 'אופנה יד שנייה לנשים', 'חנות בגדי יד שנייה',
+      'second-hand women\'s fashion', 'vintage women\'s clothing', 'used women\'s clothes',
+      'second-hand fashion', 'pre-owned clothing', 'designer second-hand',
+    ],
+    secondaryOfferings: [
+      'בגדי מעצבים יד שנייה', 'מכנסיים יד שנייה', 'חולצות יד שנייה',
+      'designer second-hand', 'preloved fashion', 'thrifted clothing',
+    ],
+    excludedTopics: [
+      'בגדים חדשים', 'בגדי גברים', 'בגדי ילדים',
+      'new clothing', 'men\'s fashion', 'children\'s clothing',
+    ],
+  },
   generic: {
     primaryOfferings: [],
     secondaryOfferings: [],
@@ -1178,7 +1254,7 @@ export type ManualAIProfile = {
 const BUSINESS_CATEGORY_SET: ReadonlySet<BusinessCategory> = new Set<BusinessCategory>([
   'agency', 'ecommerce', 'perfume', 'sports_store', 'gifts', 'appliance_store',
   'saas', 'local_service', 'cleaning', 'florist', 'restaurant', 'healthcare',
-  'legal', 'real_estate', 'fitness', 'beauty', 'education', 'generic',
+  'legal', 'real_estate', 'fitness', 'beauty', 'education', 'second_hand_fashion', 'generic',
 ])
 
 function isBusinessCategory(value: string): value is BusinessCategory {
@@ -1216,6 +1292,9 @@ export function resolveManualPrimaryCategory(raw: string | null | undefined): Bu
   if (/(ניקיון|נקיון|cleaning|cleaner|מנקה)/.test(t)) return 'cleaning'
   // Gifts
   if (/(מתנ|gift|present)/.test(t)) return 'gifts'
+  // Second-hand / vintage women fashion
+  if (/(יד שנייה|וינטג׳|וינטג'|בגדי יד שנייה|אופנה יד שנייה|second.hand|vintage|used clothing|second hand fashion)/.test(t))
+    return 'second_hand_fashion'
   // Sports store
   if (/(ספורט|sport|נעלי ריצה|adidas|nike|פומה)/.test(t)) return 'sports_store'
   // Appliances
@@ -1443,6 +1522,21 @@ export function generatePromptSuggestions({
   const suggestions: Built[] = diversify
     ? diversifiedPick(pool, limit)
     : weightByOffering(pool, limit)
+
+  // Debug logging (dev only)
+  if (process.env.NODE_ENV === 'development' && manualProfile?.mode === 'manual') {
+    console.log('[AI-Profile Debug]', {
+      mode: manualProfile.mode,
+      rawPrimaryCategory: manualProfile.primaryCategory,
+      resolvedCategory: category,
+      candidateCount: built.length,
+      poolAfterExclude: pool.length,
+      selectedCount: suggestions.length,
+      seenPromptsCount: excludePrompts.length,
+      previousSetCount: previousSet.length,
+      diversify,
+    })
+  }
 
   // Build final suggestions
   const result: PromptSuggestion[] = suggestions.map((item, idx) => ({

@@ -43,6 +43,7 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   { value: 'fitness', labelKey: 'cat_fitness' },
   { value: 'beauty', labelKey: 'cat_beauty' },
   { value: 'education', labelKey: 'cat_education' },
+  { value: 'second_hand_fashion', labelKey: 'cat_second_hand_fashion' },
   { value: 'generic', labelKey: 'cat_generic' },
 ]
 
