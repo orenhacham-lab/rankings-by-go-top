@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import {
   BarChart3,
   Users,
@@ -43,9 +44,9 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="w-full md:w-64 bg-white border-l border-slate-200 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
+    <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col md:h-full h-auto md:fixed md:top-0 md:right-0 z-40 shadow-sm">
       {/* Logo */}
-      <div className="p-3 md:p-5 border-b border-slate-200 flex flex-col md:flex-col items-center md:items-center justify-center gap-2 md:gap-1.5">
+      <div className="p-3 md:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-col items-center md:items-center justify-center gap-2 md:gap-1.5">
         {/* Mobile: logo on left of text */}
         <div className="flex md:flex-col items-center justify-center gap-2 md:gap-1.5 w-full">
           <div className="flex items-center justify-center bg-white flex-shrink-0">
@@ -61,8 +62,8 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
           </div>
 
           <div className="text-center md:text-center">
-            <div className="font-semibold text-slate-800 text-xs md:text-sm leading-tight">Rankings by</div>
-            <div className="font-bold text-blue-600 text-sm md:text-base leading-tight">Go Top</div>
+            <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs md:text-sm leading-tight">Rankings by</div>
+            <div className="font-bold text-blue-600 dark:text-blue-400 text-sm md:text-base leading-tight">Go Top</div>
           </div>
         </div>
       </div>
@@ -80,11 +81,11 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                   className={cn(
                     'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-indigo-600 dark:bg-indigo-600 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
                   )}
                 >
-                  <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 group-hover:text-indigo-600')} strokeWidth={2} />
+                  <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400')} strokeWidth={2} />
                   <span>{item.label}</span>
                 </Link>
               </li>
@@ -96,9 +97,9 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             <form action="/api/auth/signout" method="post" className="w-full h-full">
               <button
                 type="submit"
-                className="w-full h-full min-h-[60px] flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-xs font-medium transition-all duration-150 text-slate-600 hover:bg-slate-100 hover:text-slate-900 text-center leading-tight"
+                className="w-full h-full min-h-[60px] flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-xs font-medium transition-all duration-150 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 text-center leading-tight"
               >
-                <LogOut size={18} className="text-slate-600" strokeWidth={2} />
+                <LogOut size={18} className="text-slate-600 dark:text-slate-400" strokeWidth={2} />
                 <span>יציאה</span>
               </button>
             </form>
@@ -109,7 +110,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       {/* Admin section — only shown to admins */}
       {isAdmin && (
         <div className="px-3 pb-3 hidden md:block">
-          <p className="text-xs font-medium text-slate-400 px-3 mb-1">מערכת</p>
+          <p className="text-xs font-medium text-slate-400 dark:text-slate-600 px-3 mb-1">מערכת</p>
           <ul className="space-y-1">
             {adminItems.map((item) => {
               const IconComponent = item.icon
@@ -121,11 +122,11 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
                     className={cn(
                       'group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                       isActive
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                        ? 'bg-indigo-600 dark:bg-indigo-600 text-white shadow-md'
+                        : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-400'
                     )}
                   >
-                    <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 group-hover:text-indigo-600')} strokeWidth={2} />
+                    <IconComponent size={18} className={cn('shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-600 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400')} strokeWidth={2} />
                     <span>{item.label}</span>
                   </Link>
                 </li>
@@ -140,22 +141,23 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         <div className="px-3 pb-3 hidden md:block">
           <a
             href="mailto:oren@gotop.co.il"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-400 transition-colors"
           >
-            <MessageCircle size={18} className="text-slate-500" strokeWidth={2} />
+            <MessageCircle size={18} className="text-slate-500 dark:text-slate-600" strokeWidth={2} />
             <span>תמיכה</span>
           </a>
         </div>
       )}
 
       {/* Footer - Desktop only */}
-      <div className="p-4 border-t border-slate-200 hidden md:block">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700 hidden md:block space-y-2">
+        <ThemeToggle />
         <form action="/api/auth/signout" method="post">
           <button
             type="submit"
-            className="w-full text-sm text-slate-500 hover:text-slate-700 flex items-center justify-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+            className="w-full text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center justify-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <LogOut size={18} className="text-slate-500" strokeWidth={2} />
+            <LogOut size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />
             <span>יציאה</span>
           </button>
         </form>
