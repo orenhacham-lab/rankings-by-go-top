@@ -61,13 +61,15 @@ function ReportsContent() {
   // AI report data
   const [aiReportData, setAiReportData] = useState<{
     project: Project & { clients?: Client }
-    results: AIScanResult[]
+    results: any[]
     runs: AIScanRun[]
+    citations: any[]
     summary: {
       totalScans: number
       totalResults: number
       mentionedCount: number
       citedCount: number
+      totalCitations: number
       mentionRate: number
       citationRate: number
       engineBreakdown: Record<string, { scans: number; mentions: number; cited: number }>
@@ -162,14 +164,6 @@ function ReportsContent() {
       return
     }
 
-    // Load AI scan results
-    const { data: resultsData } = await supabase
-      .from('ai_scan_results')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
-      .limit(1000)
-
     // Load AI scan runs
     const { data: runsData } = await supabase
       .from('ai_scan_runs')
@@ -177,12 +171,47 @@ function ReportsContent() {
       .eq('project_id', projectId)
       .order('started_at', { ascending: false })
 
-    const results = (resultsData || []) as AIScanResult[]
-    const runs = (runsData || []) as AIScanRun[]
+    const runs = (runsData || [])
+    const runIds = runs.map((r: any) => r.id)
+
+    // Load results for all runs
+    let results: any[] = []
+    let citations: any[] = []
+    if (runIds.length > 0) {
+      const { data: resultsData } = await supabase
+        .from('ai_scan_results')
+        .select('*')
+        .in('run_id', runIds)
+      results = (resultsData || [])
+
+      // Load citations for all results
+      const resultIds = results.map((r: any) => r.id)
+      if (resultIds.length > 0) {
+        const { data: citationsData } = await supabase
+          .from('ai_citations')
+          .select('*')
+          .in('result_id', resultIds)
+        citations = (citationsData || [])
+      }
+    }
+
+    // Load prompts to get prompt text
+    const promptIds = Array.from(new Set(results.map((r: any) => r.prompt_id).filter(Boolean)))
+    let promptMap = new Map<string, string>()
+    if (promptIds.length > 0) {
+      const { data: promptsData } = await supabase
+        .from('ai_prompts')
+        .select('id, prompt')
+        .in('id', promptIds)
+      for (const p of (promptsData || [])) {
+        promptMap.set(p.id, p.prompt)
+      }
+    }
 
     // Calculate summary
-    const mentionedCount = results.filter(r => r.mentioned).length
-    const citedCount = results.filter(r => r.target_cited).length
+    const mentionedCount = results.filter((r: any) => r.mentioned).length
+    const citedCount = results.filter((r: any) => r.target_cited).length
+    const totalCitations = results.reduce((sum: number, r: any) => sum + (r.citation_count || 0), 0)
     
     const engineBreakdown: Record<string, { scans: number; mentions: number; cited: number }> = {}
     for (const result of results) {
@@ -199,15 +228,23 @@ function ReportsContent() {
       totalResults: results.length,
       mentionedCount,
       citedCount,
+      totalCitations,
       mentionRate: results.length > 0 ? (mentionedCount / results.length) * 100 : 0,
       citationRate: results.length > 0 ? (citedCount / results.length) * 100 : 0,
       engineBreakdown,
     }
 
+    // Enrich results with prompt text
+    const enrichedResults = results.map((r: any) => ({
+      ...r,
+      promptText: promptMap.get(r.prompt_id) || '',
+    }))
+
     setAiReportData({
       project: projectData,
-      results,
-      runs,
+      results: enrichedResults,
+      runs: runs,
+      citations,
       summary,
     })
     setLoading(false)
@@ -579,7 +616,7 @@ function AIVisibilityReport({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <div className="text-xs text-slate-500 mb-1">דומיין צוטט</div>
-          <div className="text-2xl font-bold text-cyan-600">{reportData.summary.citedCount}</div>
+          <div className="text-2xl font-bold text-cyan-600">{reportData.summary.totalCitations}</div>
         </Card>
         <Card>
           <div className="text-xs text-slate-500 mb-1">אחוז ציטוטים</div>
