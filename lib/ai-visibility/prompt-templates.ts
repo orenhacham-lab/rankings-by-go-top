@@ -1435,23 +1435,66 @@ function getSemanticSlots(category: BusinessCategory): {
 function isInvalidHebrewPhrase(phrase: string): boolean {
   const p = phrase.toLowerCase()
 
-  // Reject "קנוי/קונים/לקנות חנות/חברה/מרכז"
+  // CRITICAL: Reject double-lamed verbs
+  const doubleLamedVerbs = [
+    'ללקנות', 'ללהזמין', 'ללבחור', 'ללמצוא', 'ללקבל', 'ללרכוש',
+    'ללהשוות', 'ללבדוק', 'ללשאול', 'ללחפש'
+  ]
+  for (const verb of doubleLamedVerbs) {
+    if (p.includes(verb)) return true
+  }
+
+  // Reject awkward secondary constructs
+  if (/(וינטג׳|מותגים|אקססוריז)\s+איכותיים/.test(p)) {
+    return true
+  }
+
+  // Reject buying verbs with business types
   if (/(קנו|קונים|לקנות|להזמין).*\b(חנות|חברה|משרד|מרכז|מוסד)\b/.test(p)) {
     return true
   }
 
-  // Reject "מוצרים + מילה אחרת" when should be "מוצרי"
-  // e.g., "מוצרים כושר" should be "מוצרי כושר"
+  // Reject construct-state errors
   if (/מוצרים\s+(?!ספורט|נישה|בחנות|שונים|אחרים|יוקרה|אונליין|לבית|כלליים)(\S+)/.test(p)) {
     return true
   }
 
-  // Reject "כמה עולה חנות/חברה"
+  // Reject price questions about business types
   if (/(כמה עול|מחיר).*\b(חנות|חברה|משרד|מרכז)\b/.test(p)) {
     return true
   }
 
   return false
+}
+
+/**
+ * Map a secondary category string to a proper purchasable object
+ * e.g., "וינטג׳" → "פריטי וינטג׳", "מותגים" → "בגדי מותגים יד שנייה"
+ */
+function resolveSecondaryPurchaseObject(
+  secondaryCategory: string,
+  _primaryCategory: BusinessCategory
+): string {
+  const sec = secondaryCategory.toLowerCase().trim()
+
+  // For second-hand fashion, map secondary categories to proper purchase objects
+  const secondaryObjectMap: Record<string, string> = {
+    'וינטג׳': 'פריטי וינטג׳',
+    'vintage': 'vintage items',
+    'מותגים': 'בגדי מותגים יד שנייה',
+    'brands': 'designer items',
+    'שמלות ערב': 'שמלות ערב יד שנייה',
+    'evening dresses': 'evening dresses',
+    'אקססוריז': 'אקססוריז יד שנייה',
+    'accessories': 'accessories',
+    'בגדי מעצבים': 'בגדי מעצבים יד שנייה',
+    'משקולות': 'משקולות',
+    'weights': 'weights',
+    'הליכונים': 'הליכונים',
+    'treadmills': 'treadmills',
+  }
+
+  return secondaryObjectMap[sec] || secondaryCategory
 }
 
 /**
@@ -1650,31 +1693,42 @@ export function generatePromptSuggestions({
       if (!secondaryCategory || secondaryCategory.trim().length === 0) continue
       const secondary = secondaryCategory.trim()
 
-      // Use purchaseObjects if available, otherwise use the secondary category string itself
-      const objectsToUse = purchaseObjects.length > 0 ? purchaseObjects : [secondary]
+      // Resolve secondary category to proper purchase object
+      const resolvedObject = lang === 'he' ? resolveSecondaryPurchaseObject(secondary, category) : secondary
+      const objectsToUse = purchaseObjects.length > 0 ? purchaseObjects : [resolvedObject]
       const actionsToUse = serviceActions.length > 0 ? serviceActions : ['לקנות']
 
-      // Generate semantic templates that use proper objects, not just the category name
+      // Helper: get action without leading ל if it already has one
+      const getAction = (action: string) => {
+        return action.startsWith('ל') ? action : `ל${action}`
+      }
+
+      // Helper: get bare action (without ל) for use after prepositions like "שקונים", "שמזמינים"
+      const getBareAction = (action: string) => {
+        return action.startsWith('ל') ? action.substring(1) : action
+      }
+
+      // Generate semantic templates that use proper objects and avoid double-lamed verbs
       const templates = lang === 'he' ?
         [
-          // Recommendations
-          `איפה כדאי ל${actionsToUse[0] || 'קנות'} ${secondary} איכותיים?`,
+          // Recommendations - use resolved object
+          `איפה כדאי ${getAction(actionsToUse[0])} ${resolvedObject}?`,
           `איזו חנות מומלצת ל${secondary}?`,
-          // Quality check (using purchase object to make it grammatical)
+          // Quality check
           ...(purchaseObjects.length > 0 ? [
-            `מה חשוב לבדוק לפני ש${actionsToUse[0] === 'להזמין' ? 'מזמינים' : 'קונים'} ${purchaseObjects[0] || secondary}?`,
+            `מה חשוב לבדוק לפני ש${actionsToUse[0] === 'להזמין' ? 'מזמינים' : 'קונים'} ${objectsToUse[0] || resolvedObject}?`,
           ] : []),
-          // Price (using purchase object)
+          // Price
           ...(purchaseObjects.length > 0 ? [
-            `כמה עולים ${purchaseObjects[0] || secondary}?`,
+            `כמה עולים ${objectsToUse[0] || resolvedObject}?`,
           ] : []),
-          // Discovery
-          `איפה אפשר למצוא ${secondary} איכותיים?`,
-          // Location if applicable
-          `איפה כדאי ל${actionsToUse[0] || 'קנות'} ${secondary}?`,
+          // Discovery - use resolved object
+          `איפה אפשר למצוא ${resolvedObject}?`,
+          // Location
+          `איפה כדאי ${getAction(actionsToUse[0])} ${resolvedObject}?`,
         ].filter(Boolean) :
         [
-          `Where to find quality ${secondary}?`,
+          `Where to find ${secondary}?`,
           `Best shops for ${secondary}`,
           `How to choose quality ${secondary}?`,
           `What to check when buying ${secondary}?`,
