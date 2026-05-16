@@ -212,3 +212,22 @@ dialog::backdrop {
   border: none;
   border-top: 1px solid #e2e8f0;
 }
+
+/* ── PayPal/Stripe Buttons - Dark Mode Fix ───────────────────────── */
+.dark div[id^="paypal-button-"] {
+  color: rgb(147, 197, 253) !important;
+}
+
+.dark div[id^="paypal-button-"] button,
+.dark div[id^="paypal-button-"] [role="button"],
+.dark div[id^="paypal-button-"] button * {
+  background-color: transparent !important;
+  color: rgb(147, 197, 253) !important;
+  border-color: rgb(96, 165, 250) !important;
+}
+
+.dark div[id^="paypal-button-"] button:hover,
+.dark div[id^="paypal-button-"] [role="button"]:hover {
+  background-color: rgb(30, 41, 59) !important;
+  color: rgb(191, 219, 254) !important;
+}

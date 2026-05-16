@@ -154,7 +154,8 @@ function PlanCard({
       ) : (
         <div
           id={`paypal-button-${plan}`}
-          className="min-h-12"
+          className="min-h-12 dark:!text-blue-300 dark:!bg-transparent"
+          style={{}}
         />
       )}
     </div>
