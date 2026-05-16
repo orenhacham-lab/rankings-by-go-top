@@ -128,6 +128,8 @@ export default function AIVisibilitySection({
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   const [scanningKey, setScanningKey] = useState<string | null>(null)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
+  const [showAllPrompts, setShowAllPrompts] = useState(false)
+  const [scanStatus, setScanStatus] = useState<string | null>(null)
 
   // Build brand variants once for reuse in result rows (mention chips)
   const brandVariants = useMemo(
@@ -307,6 +309,7 @@ export default function AIVisibilitySection({
     async (promptId: string, engine: string) => {
       const key = `${promptId}:${engine}`
       setScanningKey(key)
+      setScanStatus('סריקת מנוע AI בתהליך…')
       setError(null)
       try {
         const res = await fetch('/api/ai-visibility/runs', {
@@ -320,6 +323,7 @@ export default function AIVisibilitySection({
         }
         const body = await res.json()
         await loadAllResults()
+        setScanStatus('הסריקה הושלמה')
         setCurrentTab('results')
         // After loadAllResults the new result is in state. Use its id to highlight + open.
         if (body.resultId) setHighlightResultId(body.resultId)
@@ -332,8 +336,11 @@ export default function AIVisibilitySection({
         }, 250)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Scan failed')
+        setScanStatus(null)
       } finally {
         setScanningKey(null)
+        // Auto-dismiss success message after 3 seconds
+        setTimeout(() => setScanStatus(null), 3000)
       }
     },
     [projectId, loadAllResults, allResults, openResultDrawer]
@@ -425,13 +432,20 @@ export default function AIVisibilitySection({
         </div>
       )}
 
+      {scanStatus && (
+        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-700 flex items-start gap-2">
+          <span className="shrink-0 animate-pulse">…</span>
+          <span>{scanStatus}</span>
+        </div>
+      )}
+
       {/* TAB BAR — only two tabs */}
       <div className="flex gap-2 border-b border-slate-200">
         {(['results', 'queries'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setCurrentTab(tab)}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+            className={`px-4 py-3 text-base font-semibold border-b-2 transition ${
               currentTab === tab
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
@@ -562,9 +576,12 @@ export default function AIVisibilitySection({
             }}
           />
           <div className="flex items-center justify-between gap-4 mb-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">
-              {t('ai_queries')} ({allPrompts.length})
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">
+                {t('ai_queries')}
+              </h3>
+              <Badge variant="neutral" className="!text-xs">{allPrompts.length}</Badge>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)}>
                 {t('recommend_questions')}
@@ -576,53 +593,66 @@ export default function AIVisibilitySection({
           </div>
 
           {allPrompts.length > 0 ? (
-            <div className="space-y-2">
-              {allPrompts.map((p) => (
-                <div
-                  key={p.id}
-                  className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <p className="text-sm font-medium text-slate-900 flex-1 line-clamp-2">{p.prompt}</p>
-                    <button
-                      onClick={() => setDeletePromptId(p.id)}
-                      className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-                      title={t('delete')}
-                      aria-label={t('delete')}
-                    >
-                      <TrashIcon size={16} />
-                    </button>
+            <>
+              <div className="space-y-2">
+                {allPrompts.slice(0, showAllPrompts ? undefined : 3).map((p) => (
+                  <div
+                    key={p.id}
+                    className="rounded-lg border border-slate-200 bg-white p-3 hover:shadow-sm transition"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <p className="text-sm font-medium text-slate-900 flex-1 line-clamp-2">{p.prompt}</p>
+                      <button
+                        onClick={() => setDeletePromptId(p.id)}
+                        className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                        title={t('delete')}
+                        aria-label={t('delete')}
+                      >
+                        <TrashIcon size={16} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SUPPORTED_ENGINES.map((engine) => {
+                        const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
+                        const key = `${p.id}:${engine}`
+                        const scanned = scannedSet.has(key)
+                        const scanning = scanningKey === key
+                        return (
+                          <button
+                            key={engine}
+                            onClick={() => !scanning && !scanned && scanEngine(p.id, engine)}
+                            disabled={scanning || scanned}
+                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition ${
+                              scanned
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
+                                : scanning
+                                ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-wait'
+                                : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer'
+                            }`}
+                          >
+                            {meta && <meta.Icon size={14} className={meta.accent} />}
+                            <span>{meta?.name || engine}</span>
+                            {scanned && <span className="text-emerald-600">✓</span>}
+                            {scanning && <span className="text-slate-400 animate-pulse">…</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SUPPORTED_ENGINES.map((engine) => {
-                      const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
-                      const key = `${p.id}:${engine}`
-                      const scanned = scannedSet.has(key)
-                      const scanning = scanningKey === key
-                      return (
-                        <button
-                          key={engine}
-                          onClick={() => !scanning && !scanned && scanEngine(p.id, engine)}
-                          disabled={scanning || scanned}
-                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition ${
-                            scanned
-                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
-                              : scanning
-                              ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-wait'
-                              : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer'
-                          }`}
-                        >
-                          {meta && <meta.Icon size={14} className={meta.accent} />}
-                          <span>{meta?.name || engine}</span>
-                          {scanned && <span className="text-emerald-600">✓</span>}
-                          {scanning && <span className="text-slate-400 animate-pulse">…</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
+                ))}
+              </div>
+              {allPrompts.length > 3 && (
+                <div className="text-center mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllPrompts(!showAllPrompts)}
+                  >
+                    {showAllPrompts ? 'הצג פחות' : 'הצג עוד'}
+                  </Button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
               <p className="text-sm text-slate-600">{t('no_queries')}</p>

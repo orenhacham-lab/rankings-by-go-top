@@ -190,6 +190,7 @@ export default function AIBusinessProfilePanel({
       setMode(saved.mode)
       onChange(saved.mode === 'manual' ? saved : null)
       setSuccess(t('profile_saved'))
+      setExpanded(false)
       onProfileSaved?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שמירת הפרופיל נכשלה. נסה שוב.')
@@ -214,6 +215,7 @@ export default function AIBusinessProfilePanel({
       setExcludedTopics([])
       onChange(null)
       setSuccess(t('profile_reset'))
+      setExpanded(false)
       onProfileSaved?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'איפוס הפרופיל נכשל. נסה שוב.')
