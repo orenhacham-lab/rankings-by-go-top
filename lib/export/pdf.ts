@@ -9,6 +9,30 @@ interface ExportData {
   latestResults: Record<string, ScanResult>
 }
 
+interface AIExportData {
+  client: Client
+  project: Project
+  summary: {
+    totalScans: number
+    totalResults: number
+    mentionedCount: number
+    citedCount: number
+    totalCitations: number
+    mentionRate: number
+    citationRate: number
+    engineBreakdown: Record<string, { scans: number; mentions: number; cited: number }>
+  }
+  results: Array<{
+    id: string
+    engine: string
+    promptText: string
+    mentioned: boolean
+    target_cited: boolean
+    citation_count: number
+    created_at: string
+  }>
+}
+
 function generateReportHTML(data: ExportData): string {
   const isHebrewProject = data.project.language?.startsWith('he') || data.project.country === 'IL'
   const now = new Date().toLocaleDateString('he-IL')
@@ -331,7 +355,344 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (m) => map[m])
 }
 
-export { generateReportHTML }
+function generateAIReportHTML(data: AIExportData): string {
+  const now = new Date().toLocaleDateString('he-IL')
+  const isHebrewProject = data.project.language?.startsWith('he') || data.project.country === 'IL'
+
+  const engineLabels: Record<string, string> = {
+    chatgpt: 'ChatGPT',
+    perplexity: 'Perplexity',
+    gemini: 'Gemini',
+    copilot: 'Copilot',
+    grok: 'Grok',
+    google_ai_mode: 'Google AI',
+  }
+
+  const engineOrder = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode']
+  const enginesInReport = engineOrder.filter((e) => data.summary.engineBreakdown[e])
+
+  const engineBreakdownHTML = enginesInReport.map((engine) => {
+    const breakdown = data.summary.engineBreakdown[engine]
+    if (!breakdown || breakdown.scans === 0) return ''
+    const mentionRate = Math.round((breakdown.mentions / breakdown.scans) * 100)
+    const citationRate = Math.round((breakdown.cited / breakdown.scans) * 100)
+    return `
+      <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px; background: #f9fafb;">
+        <div style="font-weight: bold; margin-bottom: 8px; font-size: 11pt;">${escapeHtml(engineLabels[engine] || engine)}</div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 9pt;">
+          <div>
+            <div style="color: #6b7280; margin-bottom: 2px;">סריקות</div>
+            <div style="font-weight: bold; font-size: 12pt;">${breakdown.scans}</div>
+          </div>
+          <div>
+            <div style="color: #6b7280; margin-bottom: 2px;">אזכורים</div>
+            <div style="font-weight: bold; font-size: 12pt; color: #16a34a;">${breakdown.mentions} (${mentionRate}%)</div>
+          </div>
+          <div>
+            <div style="color: #6b7280; margin-bottom: 2px;">ציטוטים</div>
+            <div style="font-weight: bold; font-size: 12pt; color: #0891b2;">${breakdown.cited} (${citationRate}%)</div>
+          </div>
+        </div>
+      </div>
+    `
+  }).join('')
+
+  const tableRows = data.results.slice(0, 100).map((result) => {
+    const date = result.created_at ? new Date(result.created_at).toLocaleDateString('he-IL') : '—'
+    return `
+      <tr>
+        <td class="prompt-cell">${escapeHtml(result.promptText)}</td>
+        <td>${escapeHtml(engineLabels[result.engine] || result.engine)}</td>
+        <td>${result.mentioned ? 'כן' : 'לא'}</td>
+        <td>${result.target_cited ? 'כן' : 'לא'}</td>
+        <td>${result.citation_count}</td>
+        <td>${escapeHtml(date)}</td>
+      </tr>
+    `
+  }).join('')
+
+  return `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="he">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>דוח נראות ב-AI</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+          width: 100%;
+          height: 100%;
+        }
+
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 10pt;
+          direction: rtl;
+          line-height: 1.5;
+          color: #1f2937;
+          padding: 20px;
+          background: #f9fafb;
+        }
+
+        .container {
+          max-width: 1200px;
+          margin: 0 auto;
+          background: white;
+          padding: 30px;
+          border-radius: 8px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header {
+          background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+          color: white;
+          padding: 20px;
+          text-align: center;
+          margin: -30px -30px 20px -30px;
+          border-radius: 8px 8px 0 0;
+        }
+
+        .header h1 {
+          font-size: 24pt;
+          margin-bottom: 5px;
+        }
+
+        .project-info {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 20px;
+          padding-bottom: 15px;
+          border-bottom: 2px solid #e5e7eb;
+          gap: 20px;
+        }
+
+        .project-details {
+          flex: 1;
+        }
+
+        .project-name {
+          font-size: 16pt;
+          font-weight: bold;
+          color: #1f2937;
+          margin-bottom: 5px;
+        }
+
+        .project-meta {
+          font-size: 9pt;
+          color: #6b7280;
+        }
+
+        .summary-stats {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+          margin-bottom: 25px;
+        }
+
+        .stat-box {
+          border: 1px solid #d1d5db;
+          padding: 10px;
+          text-align: center;
+          border-radius: 4px;
+          background: #f9fafb;
+        }
+
+        .stat-label {
+          font-size: 8pt;
+          color: #6b7280;
+          margin-bottom: 6px;
+          font-weight: bold;
+        }
+
+        .stat-value {
+          font-size: 16pt;
+          font-weight: bold;
+          color: #4f46e5;
+        }
+
+        .section-title {
+          font-size: 13pt;
+          font-weight: bold;
+          color: #1f2937;
+          margin-top: 25px;
+          margin-bottom: 15px;
+          padding-bottom: 10px;
+          border-bottom: 2px solid #4f46e5;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 15px;
+          table-layout: fixed;
+          word-break: break-word;
+        }
+
+        th {
+          background: #4f46e5;
+          color: white;
+          padding: 10px;
+          text-align: right;
+          font-weight: bold;
+          font-size: 9pt;
+          border: 1px solid #4f46e5;
+        }
+
+        td {
+          padding: 10px;
+          border: 1px solid #e5e7eb;
+          font-size: 9pt;
+          overflow-wrap: break-word;
+          white-space: normal;
+          text-align: right;
+        }
+
+        tr:nth-child(even) {
+          background: #f9fafb;
+        }
+
+        tr:hover {
+          background: #f0f4ff;
+        }
+
+        .prompt-cell {
+          font-weight: bold;
+          width: 35%;
+        }
+
+        .footer {
+          margin-top: 30px;
+          padding-top: 15px;
+          border-top: 1px solid #e5e7eb;
+          text-align: center;
+          font-size: 8pt;
+          color: #9ca3af;
+        }
+
+        /* Print Styling */
+        @page {
+          size: A4;
+          margin: 10mm;
+        }
+
+        @media print {
+          body {
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+
+          .container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            border-radius: 0;
+            box-shadow: none;
+          }
+
+          .header {
+            margin: 0;
+            border-radius: 0;
+          }
+
+          table {
+            page-break-inside: avoid;
+          }
+
+          tr {
+            page-break-inside: avoid;
+          }
+
+          th, td {
+            border: 1px solid #d1d5db;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>דוח נראות ב-AI</h1>
+        </div>
+
+        <div class="project-info">
+          <div class="project-details">
+            <div class="project-name">${escapeHtml(data.project.name)}</div>
+            <div class="project-meta">${escapeHtml(data.client.name)} | ${escapeHtml(data.project.target_domain)} | ${escapeHtml(now)}</div>
+          </div>
+        </div>
+
+        <div class="summary-stats">
+          <div class="stat-box">
+            <div class="stat-label">שאילתות AI</div>
+            <div class="stat-value">${data.summary.totalResults}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">סריקות</div>
+            <div class="stat-value">${data.summary.totalScans}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">אזכורים</div>
+            <div class="stat-value" style="color: #16a34a;">${data.summary.mentionedCount}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">אחוז אזכורים</div>
+            <div class="stat-value">${Math.round(data.summary.mentionRate)}%</div>
+          </div>
+        </div>
+
+        <div class="summary-stats">
+          <div class="stat-box">
+            <div class="stat-label">דומיין צוטט</div>
+            <div class="stat-value" style="color: #0891b2;">${data.summary.citedCount}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">אחוז ציטוטים</div>
+            <div class="stat-value">${Math.round(data.summary.citationRate)}%</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">סך ציטוטים</div>
+            <div class="stat-value" style="color: #0891b2;">${data.summary.totalCitations}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">נראות כללית</div>
+            <div class="stat-value">${data.summary.totalResults > 0 ? Math.round(((data.summary.mentionedCount + data.summary.citedCount) / (data.summary.totalResults * 2)) * 100) : 0}%</div>
+          </div>
+        </div>
+
+        <div class="section-title">ביצועים לפי מנוע</div>
+        <div>${engineBreakdownHTML}</div>
+
+        <div class="section-title">תוצאות שאילתות AI (${data.results.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th>שאילתה</th>
+              <th>מנוע</th>
+              <th>הוזכר</th>
+              <th>דומיין צוטט</th>
+              <th>ציטוטים</th>
+              <th>תאריך</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Go Top | הופק בתאריך ${escapeHtml(now)}
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+export { generateReportHTML, generateAIReportHTML }
 
 export async function exportToPDF(data: ExportData): Promise<void> {
   const html = generateReportHTML(data)

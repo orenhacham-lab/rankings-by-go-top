@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { generateReportHTML } from '@/lib/export/pdf'
+import { generateReportHTML, generateAIReportHTML } from '@/lib/export/pdf'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 
 export async function POST(req: Request) {
   try {
-    const { projectId } = await req.json()
+    const { projectId, reportType, aiReportData } = await req.json()
 
     if (!projectId) {
       return new Response(
@@ -38,66 +38,92 @@ export async function POST(req: Request) {
       )
     }
 
-    // Fetch tracking targets
-    const { data: targetsData, error: targetsError } = await supabase
-      .from('tracking_targets')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('is_active', true)
+    let html: string
 
-    if (targetsError || !targetsData) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch tracking targets' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
+    if (reportType === 'ai') {
+      // Generate AI Visibility report
+      if (!aiReportData || !aiReportData.summary) {
+        return new Response(
+          JSON.stringify({ error: 'AI report data is required' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
 
-    // Fetch latest scan results
-    const targetIds = targetsData.map((t) => t.id)
-    const { data: resultsData, error: resultsError } = await supabase
-      .from('scan_results')
-      .select('*')
-      .in('tracking_target_id', targetIds)
-      .order('checked_at', { ascending: false })
+      try {
+        html = generateAIReportHTML({
+          client: projectData.clients as Client,
+          project: projectData as Project,
+          summary: aiReportData.summary,
+          results: aiReportData.results || [],
+        })
+      } catch (htmlError) {
+        console.error('[export-pdf] AI HTML generation failed:', htmlError)
+        return new Response(
+          JSON.stringify({
+            error: 'AI HTML generation failed',
+            message: (htmlError as Error).message,
+          }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    } else {
+      // Generate Google Organic / Maps report (existing logic)
+      const { data: targetsData, error: targetsError } = await supabase
+        .from('tracking_targets')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('is_active', true)
 
-    if (resultsError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch scan results' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
+      if (targetsError || !targetsData) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch tracking targets' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
 
-    // Build latest results map
-    const latestResults: Record<string, ScanResult> = {}
-    for (const result of resultsData || []) {
-      if (!latestResults[result.tracking_target_id]) {
-        latestResults[result.tracking_target_id] = result
+      // Fetch latest scan results
+      const targetIds = targetsData.map((t) => t.id)
+      const { data: resultsData, error: resultsError } = await supabase
+        .from('scan_results')
+        .select('*')
+        .in('tracking_target_id', targetIds)
+        .order('checked_at', { ascending: false })
+
+      if (resultsError) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch scan results' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Build latest results map
+      const latestResults: Record<string, ScanResult> = {}
+      for (const result of resultsData || []) {
+        if (!latestResults[result.tracking_target_id]) {
+          latestResults[result.tracking_target_id] = result
+        }
+      }
+
+      try {
+        html = generateReportHTML({
+          client: projectData.clients as Client,
+          project: projectData as Project,
+          targets: targetsData as TrackingTarget[],
+          latestResults,
+        })
+      } catch (htmlError) {
+        console.error('[export-pdf] HTML generation failed:', htmlError)
+        return new Response(
+          JSON.stringify({
+            error: 'HTML generation failed',
+            message: (htmlError as Error).message,
+          }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
       }
     }
 
-    // Generate HTML
-    let html: string
-    try {
-      html = generateReportHTML({
-        client: projectData.clients as Client,
-        project: projectData as Project,
-        targets: targetsData as TrackingTarget[],
-        latestResults,
-      })
-    } catch (htmlError) {
-      console.error('[export-pdf] HTML generation failed:', htmlError)
-      return new Response(
-        JSON.stringify({
-          error: 'HTML generation failed',
-          message: (htmlError as Error).message,
-          stack: (htmlError as Error).stack,
-        }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
-
     console.log(`[export-pdf] HTML generated successfully, length=${html.length}`)
-    console.log(`[export-pdf] targets=${targetsData.length}, results=${Object.keys(latestResults).length}`)
 
     // Send to PDFShift
     const apiKey = process.env.PDFSHIFT_API_KEY
@@ -128,7 +154,6 @@ export async function POST(req: Request) {
         JSON.stringify({
           error: 'Failed to generate PDF',
           pdfShiftStatus: pdfShiftResponse.status,
-          pdfShiftBody: errorText.slice(0, 500),
         }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
@@ -151,7 +176,6 @@ export async function POST(req: Request) {
       JSON.stringify({
         error: 'Internal server error',
         message: (error as Error).message,
-        stack: (error as Error).stack,
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )

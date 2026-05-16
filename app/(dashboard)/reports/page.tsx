@@ -278,13 +278,33 @@ function ReportsContent() {
 
   async function handleExportPDF() {
     if (!selectedProjectId) return
+    if (reportType === 'ai' && !aiReportData) {
+      alert('אנא טען את דוח נראות ב-AI תחילה')
+      return
+    }
+    if (reportType === 'google' && !googleReportData) {
+      alert('אנא טען את דוח דירוגים תחילה')
+      return
+    }
+
     setExporting('pdf')
     try {
-      const endpoint = reportType === 'google' ? '/api/reports/export-pdf' : '/api/reports/export-ai-pdf'
-      const res = await fetch(endpoint, {
+      const payload: any = {
+        projectId: selectedProjectId,
+        reportType,
+      }
+
+      if (reportType === 'ai' && aiReportData) {
+        payload.aiReportData = {
+          summary: aiReportData.summary,
+          results: aiReportData.results,
+        }
+      }
+
+      const res = await fetch('/api/reports/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: selectedProjectId }),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
@@ -294,9 +314,9 @@ function ReportsContent() {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      const projectName = selectedProjectId === googleReportData?.project.id 
-        ? googleReportData.project.name 
-        : aiReportData?.project.name || 'דוח'
+      const projectName = (reportType === 'google'
+        ? googleReportData?.project.name
+        : aiReportData?.project.name) || 'דוח'
       const safeName = projectName.replace(/[/\\:*?"<>|]/g, '-').slice(0, 60)
       const timestamp = new Date().toISOString().slice(0, 10)
       const reportTypeLabel = reportType === 'google' ? 'דירוגים' : 'AI'
