@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { CookieConsent } from '@/components/CookieConsent'
+import { RootThemeProvider } from './RootThemeProvider'
 
 export const metadata: Metadata = {
   title: 'מעקב מיקומים בגוגל ונראות ב-AI - Rankings by Go Top',
@@ -38,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="he" dir="rtl" className="h-full">
+    <html lang="he" dir="rtl" className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
@@ -134,8 +135,10 @@ export default function RootLayout({
             __html: `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PC29G3NQ" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`,
           }}
         />
-        {children}
-        <CookieConsent />
+        <RootThemeProvider>
+          {children}
+          <CookieConsent />
+        </RootThemeProvider>
       </body>
     </html>
   )
