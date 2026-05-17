@@ -216,7 +216,7 @@ export default function TrackingTargetsTable({
                       </Button>
                     )}
                     {result && result.audit_request != null && (
-                      <Link href={`/scans/${result.scan_id}/details`}>
+                      <Link href={`/scans/${result.scan_id}/details?resultId=${result.id}`}>
                         <Button size="sm" variant="ghost">
                           {k.details}
                         </Button>

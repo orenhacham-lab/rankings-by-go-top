@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ScanResult } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
@@ -13,7 +14,18 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ScanDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-slate-400">…</div>}>
+      <ScanDetailsContent params={params} />
+    </Suspense>
+  )
+}
+
+function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const searchParams = useSearchParams()
+  const resultId = searchParams.get('resultId')
+  const targetId = searchParams.get('targetId')
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const t = dict.scans.details
@@ -26,9 +38,15 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     async function loadData() {
       const supabase = createClient()
+      let query = supabase.from('scan_results').select('*').eq('scan_id', id)
+      if (resultId) {
+        query = query.eq('id', resultId)
+      } else if (targetId) {
+        query = query.eq('tracking_target_id', targetId)
+      }
       const [{ data: scanData }, { data: resultsData, error }] = await Promise.all([
         supabase.from('scans').select('project_id').eq('id', id).single(),
-        supabase.from('scan_results').select('*').eq('scan_id', id).order('checked_at', { ascending: false }),
+        query.order('checked_at', { ascending: false }),
       ])
 
       if (error) {
@@ -39,7 +57,7 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
       setLoading(false)
     }
     loadData()
-  }, [id])
+  }, [id, resultId, targetId])
 
   if (loading) {
     return (
