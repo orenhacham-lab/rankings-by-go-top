@@ -19,6 +19,12 @@
  * (why it was suggested), and a quality score.
  */
 
+import {
+  extractSearchObjects,
+  chooseTemplatesByObjectType,
+  type SearchObject,
+} from './search-object-classifier'
+
 export type PromptIntent =
   | 'brand'
   | 'comparison'
@@ -1175,89 +1181,6 @@ const CATEGORY_PROFILES: Record<BusinessCategory, CategoryProfile> = {
 }
 
 /**
- * Semantic slots for each category — used to generate grammatically correct Hebrew questions.
- * businessType: what the business is (e.g., "חנות מוצרי כושר")
- * purchaseObjects: what customers buy (e.g., ["ציוד כושר", "מוצרי כושר"])
- * serviceActions: verbs to use (e.g., ["לקנות", "להזמין"])
- */
-const CATEGORY_SEMANTIC_SLOTS: Partial<Record<BusinessCategory, {
-  businessType?: string
-  purchaseObjects?: string[]
-  serviceActions?: string[]
-}>> = {
-  florist: {
-    businessType: 'חנות פרחים',
-    purchaseObjects: ['זר פרחים', 'משלוח פרחים', 'פרחים'],
-    serviceActions: ['להזמין', 'לקנות'],
-  },
-  perfume: {
-    businessType: 'חנות בשמים',
-    purchaseObjects: ['בושם', 'בשמים מקוריים', 'בשמים'],
-    serviceActions: ['לקנות', 'לבחור'],
-  },
-  sports_store: {
-    businessType: 'חנות מוצרי כושר',
-    purchaseObjects: ['ציוד כושר', 'מוצרי כושר', 'מכשיר כושר', 'משקולות'],
-    serviceActions: ['לקנות', 'לבחור'],
-  },
-  gifts: {
-    businessType: 'חנות מתנות',
-    purchaseObjects: ['מתנה', 'מתנות', 'מארז מתנות'],
-    serviceActions: ['לקנות', 'להזמין'],
-  },
-  restaurant: {
-    businessType: 'מסעדה',
-    purchaseObjects: ['ארוחה', 'פיתה', 'כרית', 'סלט'],
-    serviceActions: ['לאכול', 'להזמין', 'לבחור'],
-  },
-  beauty: {
-    businessType: 'סלון יופי',
-    purchaseObjects: ['טיפול יופי', 'מספרה', 'טיפול פנים'],
-    serviceActions: ['להזמין', 'לבחור'],
-  },
-  cleaning: {
-    businessType: 'חברת ניקיון',
-    purchaseObjects: ['שירות ניקיון', 'הניקיון', 'שטיפה'],
-    serviceActions: ['להזמין', 'לשכור'],
-  },
-  ecommerce: {
-    businessType: 'חנות אונליין',
-    purchaseObjects: ['מוצר', 'פריט', 'מוצרים'],
-    serviceActions: ['לקנות', 'להזמין'],
-  },
-  saas: {
-    businessType: 'חברת תוכנה',
-    purchaseObjects: ['רישיון', 'מנוי', 'שירות'],
-    serviceActions: ['להשתמש', 'להירשם'],
-  },
-  healthcare: {
-    businessType: 'קליניקה רפואית',
-    purchaseObjects: ['טיפול רפואי', 'ביקור', 'בדיקה'],
-    serviceActions: ['לבקר', 'להזמין'],
-  },
-  legal: {
-    businessType: 'משרד עורכי דין',
-    purchaseObjects: ['ייעוץ משפטי', 'ייעוץ', 'שירות משפטי'],
-    serviceActions: ['להתייעץ', 'להזמין'],
-  },
-  real_estate: {
-    businessType: 'משרד תיווך',
-    purchaseObjects: ['דירה', 'דירות', 'קרקע', 'נכס'],
-    serviceActions: ['לקנות', 'להשכיר', 'לחפש'],
-  },
-  education: {
-    businessType: 'מוסד חינוך',
-    purchaseObjects: ['קורס', 'הכשרה', 'שיעור'],
-    serviceActions: ['ללמוד', 'להירשם', 'לחזור'],
-  },
-  second_hand_fashion: {
-    businessType: 'חנות בגדי יד שנייה לנשים',
-    purchaseObjects: ['בגדי יד שנייה', 'בגד יד שנייה', 'פריט וינטג׳', 'בגד'],
-    serviceActions: ['לקנות', 'להזמין'],
-  },
-}
-
-/**
  * Detect Israeli cities mentioned in any of the provided strings.
  */
 function detectIsraeliCities(...strings: (string | null | undefined)[]): string[] {
@@ -1474,18 +1397,6 @@ export function resolveManualPrimaryCategory(raw: string | null | undefined): Bu
 }
 
 /**
- * Get semantic slots for a category (businessType, purchaseObjects, serviceActions).
- * These slots are used to generate grammatically correct Hebrew questions.
- */
-function getSemanticSlots(category: BusinessCategory): {
-  businessType?: string
-  purchaseObjects?: string[]
-  serviceActions?: string[]
-} {
-  return CATEGORY_SEMANTIC_SLOTS[category] ?? {}
-}
-
-/**
  * Check if a Hebrew phrase contains invalid verb-object combinations.
  * Examples to reject:
  * - "קונים חנות" (buying a store/category, not a product)
@@ -1542,9 +1453,7 @@ function isInvalidHebrewPhrase(phrase: string): boolean {
  */
 function isBadQuestion(question: string, businessName: string): boolean {
   const q = question.trim()
-  const ql = q.toLowerCase()
   const brand = (businessName || '').trim()
-  const brandLower = brand.toLowerCase()
 
   // ENGLISH rejections
 
@@ -1569,6 +1478,12 @@ function isBadQuestion(question: string, businessName: string): boolean {
   if (/\bwhere\s+(can\s+i|to)\s+buy\s+(home\s+improvement|seo|consulting|legal\s+services|cleaning|fitness)\b/i.test(q))
     return true
 
+  // Buying a business type ("buy a fitness equipment store") — never valid
+  if (/\bbuy\s+(a\s+)?(fitness|sports|sporting\s+goods|gift|appliance|perfume)\s+store\b/i.test(q))
+    return true
+  if (/\bbuying\s+(a\s+)?(store|company|firm|agency|provider)\b/i.test(q))
+    return true
+
   // HEBREW rejections
 
   // אלטרנטיבות ל{brand} - competitive intent
@@ -1588,41 +1503,15 @@ function isBadQuestion(question: string, businessName: string): boolean {
   // "כמה עולים {plural category}" — should be "כמה עולה" singular
   if (/כמה\s+עולים\s+ציוד/.test(q)) return true
 
+  // Buying a store/business type — never valid in Hebrew
+  if (/(לקנות|קונים|לקניית).*\b(חנות|חברה|משרד|מרכז|מוסד)\b/.test(q)) return true
+  if (/איפה\s+כדאי\s+לקנות\s+חנות/.test(q)) return true
+
   return false
 }
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-/**
- * Map a secondary category string to a proper purchasable object
- * e.g., "וינטג׳" → "פריטי וינטג׳", "מותגים" → "בגדי מותגים יד שנייה"
- */
-function resolveSecondaryPurchaseObject(
-  secondaryCategory: string,
-  _primaryCategory: BusinessCategory
-): string {
-  const sec = secondaryCategory.toLowerCase().trim()
-
-  // For second-hand fashion, map secondary categories to proper purchase objects
-  const secondaryObjectMap: Record<string, string> = {
-    'וינטג׳': 'פריטי וינטג׳',
-    'vintage': 'vintage items',
-    'מותגים': 'בגדי מותגים יד שנייה',
-    'brands': 'designer items',
-    'שמלות ערב': 'שמלות ערב יד שנייה',
-    'evening dresses': 'evening dresses',
-    'אקססוריז': 'אקססוריז יד שנייה',
-    'accessories': 'accessories',
-    'בגדי מעצבים': 'בגדי מעצבים יד שנייה',
-    'משקולות': 'משקולות',
-    'weights': 'weights',
-    'הליכונים': 'הליכונים',
-    'treadmills': 'treadmills',
-  }
-
-  return secondaryObjectMap[sec] || secondaryCategory
 }
 
 /**
@@ -1744,6 +1633,42 @@ export function generatePromptSuggestions({
       }
     : autoProfile
 
+  // Narrow-context exclusions: when the user has explicitly described a
+  // fitness equipment store (not a general sports store), exclude
+  // sports-brand / sports-shoe / sportswear drift from the primary bank.
+  // Same for home-improvement-only profiles, etc. These keep the typed
+  // object pipeline from being drowned out by overly broad bank questions.
+  const narrowSignal = [
+    manualProfile?.primaryCategory || '',
+    ...(manualProfile?.secondaryCategories || []),
+    ...keywords,
+  ]
+    .join(' ')
+    .toLowerCase()
+  const isFitnessEquipmentNarrow =
+    /(ציוד\s+כושר|מוצרי\s+כושר|משקולות|הליכון|אופני\s+כושר|fitness\s+equipment|gym\s+equipment|home\s+gym|dumbbell|treadmill)/.test(
+      narrowSignal
+    ) &&
+    !/(נעלי\s+ספורט|נעלי\s+ריצה|בגדי\s+ספורט|מותגי\s+ספורט|running\s+shoes|sportswear|sports\s+brands?)/.test(
+      narrowSignal
+    )
+  if (isFitnessEquipmentNarrow) {
+    effectiveProfile.excludedTopics = [
+      ...(effectiveProfile.excludedTopics || []),
+      'מותגי ספורט',
+      'נעלי ספורט',
+      'נעלי ריצה',
+      'בגדי ספורט',
+      'ציוד ספורט',
+      'חנות ספורט',
+      'חנויות ספורט',
+      'sports brands',
+      'running shoes',
+      'sportswear',
+      'sports shoes',
+    ]
+  }
+
   const bank = lang === 'he' ? HE_BANK : EN_BANK
   const defs = bank[category] || bank.generic
   const intentLabels = lang === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
@@ -1818,106 +1743,73 @@ export function generatePromptSuggestions({
     ...previousSet.map(normalizePromptForCompare),
   ])
 
-  // Generate secondary category questions if we have secondary categories
+  // ----- Object classification pipeline -----
+  // Replace the old raw-secondary-category loop with a typed pipeline:
+  //   extractSearchObjects → (already includes normalize + reject)
+  //   chooseTemplatesByObjectType → per-object templates
+  //   isBadQuestion → final validation
+  // If a secondary category cannot produce a validated object, it is skipped.
+  // We never generate questions directly from raw secondary strings.
   const secondaryCategoryQuestions: Built[] = []
-  if (hasManual && manualProfile.secondaryCategories && manualProfile.secondaryCategories.length > 0) {
-    const slots = getSemanticSlots(category)
-    const purchaseObjects = slots.purchaseObjects || []
-    const serviceActions = slots.serviceActions || ['לקנות', 'להזמין']
+  const objectDebug: Array<{ raw: string; object?: SearchObject; reason?: string }> = []
+  if (
+    hasManual &&
+    manualProfile.secondaryCategories &&
+    manualProfile.secondaryCategories.length > 0
+  ) {
+    const objects = extractSearchObjects({
+      language: lang as 'he' | 'en',
+      businessName: business,
+      secondaryCategories: manualProfile.secondaryCategories,
+      keywords,
+    })
 
-    // Generate questions for each secondary category using semantic templates
-    for (const secondaryCategory of manualProfile.secondaryCategories) {
-      if (!secondaryCategory || secondaryCategory.trim().length === 0) continue
-      const secondary = secondaryCategory.trim()
+    for (const raw of manualProfile.secondaryCategories) {
+      const trimmed = (raw || '').trim()
+      if (!trimmed) continue
+      const matched = objects.find((o) =>
+        trimmed.toLowerCase().includes(o.text.toLowerCase()) ||
+        o.text.toLowerCase().includes(trimmed.toLowerCase())
+      )
+      if (!matched) objectDebug.push({ raw: trimmed, reason: 'not_normalized_or_rejected' })
+    }
 
-      // Resolve secondary category to proper purchase object
-      const resolvedObject = lang === 'he' ? resolveSecondaryPurchaseObject(secondary, category) : secondary
-      const objectsToUse = purchaseObjects.length > 0 ? purchaseObjects : [resolvedObject]
-      const actionsToUse = serviceActions.length > 0 ? serviceActions : ['לקנות']
-
-      // Helper: get action without leading ל if it already has one
-      const getAction = (action: string) => {
-        return action.startsWith('ל') ? action : `ל${action}`
-      }
-
-      // Helper: get bare action (without ל) for use after prepositions like "שקונים", "שמזמינים"
-      const getBareAction = (action: string) => {
-        return action.startsWith('ל') ? action.substring(1) : action
-      }
-
-      // Generate semantic templates that use proper objects and avoid double-lamed verbs.
-      // CRITICAL: Use "לקניית"/"לקנות" (buy) instead of "ל-X" or "למצוא" which
-      // produce unnatural questions like "איזו חנות מומלצת למשקולות".
-      const bareAction = getBareAction(actionsToUse[0])
-      const verbForm = bareAction === 'הזמין' ? 'הזמנת' : 'קניית'
-      const verbPlural = bareAction === 'הזמין' ? 'מזמינים' : 'קונים'
-
-      const templates = lang === 'he' ?
-        [
-          // Recommendation: "where is recommended to buy X"
-          `איפה כדאי ${getAction(actionsToUse[0])} ${resolvedObject}?`,
-          // Recommendation: "which store is recommended for buying X" (NOT "for X")
-          `איזו חנות מומלצת ל${verbForm} ${resolvedObject}?`,
-          // Quality check: "what to check before buying X"
-          `מה חשוב לבדוק לפני ש${verbPlural} ${resolvedObject}?`,
-          // Price: "how much does X cost"
-          `כמה עולה ${resolvedObject}?`,
-        ].filter(Boolean) :
-        [
-          // Recommendation: "where can I buy X"
-          `Where can I buy ${secondary}?`,
-          // Recommendation: "which store is recommended for buying X"
-          `Which store is recommended for buying ${secondary}?`,
-          // Quality check
-          `What should I check before buying ${secondary}?`,
-          // Price
-          `How much does ${secondary} cost?`,
-        ]
+    for (const obj of objects) {
+      const templates = chooseTemplatesByObjectType(obj, lang as 'he' | 'en', ctx.city)
+      objectDebug.push({ raw: obj.text, object: obj })
 
       for (const template of templates) {
-        const filled = normalizeHebrewConstructState(template.trim())
+        const filled = lang === 'he' ? normalizeHebrewConstructState(template.trim()) : template.trim()
 
-        // Skip invalid Hebrew phrases
+        if (lang === 'he' && !isReadableHebrew(filled)) continue
         if (lang === 'he' && isInvalidHebrewPhrase(filled)) continue
 
-        // CRITICAL: Reject low-quality / unnatural questions from secondary templates
+        // Final validation layer
         if (isBadQuestion(filled, business)) {
           if (process.env.NODE_ENV === 'development') {
-            console.log('[AI-Questions] REJECTED (secondary):', filled)
+            console.log('[AI-Questions] REJECTED (object-pipeline):', filled)
           }
           continue
         }
 
-        // Filter by excluded topics
         if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
-        // Filter by already-seen questions and previous set
         if (excludeSet.has(normalizePromptForCompare(filled))) continue
 
-        let score = 85 // Secondary category questions get a good baseline score
-        const matched: Array<keyof KeywordThemes> = []
-
-        // Apply theme boosts if applicable
-        if (themes && Object.keys(themes).length > 0) {
-          for (const [key, value] of Object.entries(themes)) {
-            const themeKey = key as keyof KeywordThemes
-            if (themeKey === 'topics') continue
-            if (value && typeof value === 'number' && value > 0) {
-              score += 2
-              matched.push(themeKey)
-            }
-          }
-        }
+        // Score by confidence: high-confidence objects beat low-confidence ones,
+        // and product/service templates beat abstract fallbacks.
+        const baseScore = 82 + Math.round(obj.confidence * 10)
+        const score = baseScore
 
         secondaryCategoryQuestions.push({
           def: {
             intent: 'recommendation' as const,
             text: template,
-            score: score,
+            score,
             offering: 'secondary',
           },
           prompt: filled,
           score,
-          themeMatched: matched,
+          themeMatched: [],
           offering: 'secondary',
         })
       }
@@ -1978,6 +1870,7 @@ export function generatePromptSuggestions({
       previousSetCount: previousSet.length,
       diversify,
       secondaryCategories: manualProfile.secondaryCategories,
+      searchObjects: objectDebug,
     })
   }
 
