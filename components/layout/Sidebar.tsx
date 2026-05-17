@@ -65,7 +65,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               priority
             />
             <Image
-              src="/gotop-dark.png"
+              src="/gotop-dark-transparent.png"
               alt="Go Top logo"
               width={140}
               height={56}
