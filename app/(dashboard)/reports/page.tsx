@@ -275,8 +275,28 @@ function ReportsContent() {
         language,
       })
     } else if (reportType === 'ai' && aiReportData) {
-      // TODO: Implement AI export to Excel
-      alert(t.excelExportWorkInProgress)
+      if (!aiReportData.results || aiReportData.results.length === 0) {
+        alert(t.ai.noResultsInReport)
+        setExporting(null)
+        return
+      }
+      const { exportAIVisibilityToExcel } = await import('@/lib/export/excel')
+      exportAIVisibilityToExcel({
+        client: aiReportData.project.clients!,
+        project: aiReportData.project,
+        summary: aiReportData.summary,
+        results: aiReportData.results.map((r: any) => ({
+          prompt_text: r.prompt_text || r.promptText,
+          engine: r.engine,
+          mentioned: !!r.mentioned,
+          target_cited: !!r.target_cited,
+          citation_count: r.citation_count || 0,
+          created_at: r.created_at,
+          response_text: r.response_text || r.responseText || null,
+          citations: r.citations || null,
+        })),
+        language,
+      })
     }
 
     setExporting(null)

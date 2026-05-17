@@ -16,7 +16,7 @@ import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
 import Link from 'next/link'
-import { formatDate, formatDateTime, getFrequencyLabel } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { Search, BarChart3, Sparkles, FileText } from 'lucide-react'
 
@@ -26,6 +26,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const k = dict.projectDetail
+
+  const localizedFrequencyLabel = (freq: string | null | undefined): string => {
+    const f = (freq || 'manual').toLowerCase()
+    const map = dict.projects.frequency as Record<string, string>
+    if (f === 'weekly') return map.weekly
+    if (f === 'monthly') return map.monthly
+    if (f === 'daily') return language === 'he' ? 'יומי' : 'Daily'
+    return map.manual
+  }
 
   const [project, setProject] = useState<Project & { clients?: Client } | null>(null)
   const [targets, setTargets] = useState<TrackingTarget[]>([])
@@ -293,7 +302,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{k.summary.frequency}</div>
           <div className="flex items-center gap-2">
             <Badge variant={project.auto_scan_enabled ? 'info' : 'neutral'}>
-              {getFrequencyLabel(project.scan_frequency)}
+              {localizedFrequencyLabel(project.scan_frequency)}
             </Badge>
           </div>
         </Card>

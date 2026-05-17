@@ -156,3 +156,165 @@ export function exportToExcel(data: ExportData): void {
   const filename = `rankings_${safeFilename(data.project.name)}_${new Date().toISOString().slice(0, 10)}.xlsx`
   XLSX.writeFile(wb, filename)
 }
+
+interface AIEngineBreakdown {
+  scans: number
+  mentions: number
+  cited: number
+}
+
+interface AIExportSummary {
+  totalScans: number
+  totalResults: number
+  mentionedCount: number
+  citedCount: number
+  totalCitations: number
+  mentionRate: number
+  citationRate: number
+  engineBreakdown: Record<string, AIEngineBreakdown>
+}
+
+interface AIExportResult {
+  prompt_text?: string | null
+  promptText?: string | null
+  engine: string
+  mentioned: boolean
+  target_cited: boolean
+  citation_count: number
+  created_at: string
+  response_text?: string | null
+  citations?: Array<{ url?: string | null } | string> | null
+}
+
+interface AIExportData {
+  client: Client
+  project: Project
+  summary: AIExportSummary
+  results: AIExportResult[]
+  language?: ExportLanguage
+}
+
+const ENGINE_DISPLAY: Record<string, string> = {
+  chatgpt: 'ChatGPT',
+  perplexity: 'Perplexity',
+  gemini: 'Gemini',
+  copilot: 'Copilot',
+  grok: 'Grok',
+  google_ai_mode: 'Google AI',
+}
+
+function formatEngine(engine: string): string {
+  return ENGINE_DISPLAY[engine] || engine
+}
+
+function extractCitations(result: AIExportResult): string {
+  if (!result.citations || !Array.isArray(result.citations)) return ''
+  const urls: string[] = []
+  for (const c of result.citations) {
+    if (typeof c === 'string') urls.push(c)
+    else if (c && typeof c === 'object' && c.url) urls.push(c.url)
+  }
+  return urls.slice(0, 5).join('\n')
+}
+
+export function exportAIVisibilityToExcel(data: AIExportData): void {
+  const language = normalizeExportLanguage(data.language)
+  const L = getExportLabels(language)
+  const isRtl = language === 'he'
+  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const generatedAt = new Date().toLocaleDateString(dateLocale)
+
+  const wb = XLSX.utils.book_new()
+
+  const activeEngines = Object.keys(data.summary.engineBreakdown).filter(
+    (e) => data.summary.engineBreakdown[e].scans > 0,
+  )
+  const overallVisibility = data.summary.totalResults > 0
+    ? Math.round(((data.summary.mentionedCount + data.summary.citedCount) / (data.summary.totalResults * 2)) * 100)
+    : 0
+
+  // ── Sheet 1: Summary ──────────────────────────────────────────────
+  const summaryRows: (string | number)[][] = [
+    [L.aiVisibilityReport],
+    [],
+    [L.project, data.project.name],
+    [L.client, data.client?.name || ''],
+    [L.domain, data.project.target_domain],
+    [L.generationDate, generatedAt],
+    [],
+    [L.summaryLine],
+    [L.aiScans, data.summary.totalScans],
+    [L.aiQueries, data.summary.totalResults],
+    [L.mentions, data.summary.mentionedCount],
+    [L.mentionRate, `${Math.round(data.summary.mentionRate)}%`],
+    [L.domainCited, data.summary.citedCount],
+    [L.totalCitations, data.summary.totalCitations],
+    [L.citationRate, `${Math.round(data.summary.citationRate)}%`],
+    [language === 'he' ? 'מנועים פעילים' : 'Active engines', activeEngines.length],
+    [L.overallVisibility, `${overallVisibility}%`],
+  ]
+
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows)
+  wsSummary['!cols'] = [{ wch: 26 }, { wch: 45 }]
+  applySheetDefaults(wsSummary, 0, isRtl)
+  XLSX.utils.book_append_sheet(wb, wsSummary, L.sheetSummary)
+
+  // ── Sheet 2: Engine Performance ──────────────────────────────────
+  const engineHeaders = [
+    L.engine,
+    L.engineScans,
+    L.engineMentions,
+    L.engineCitations,
+    L.mentionRate,
+    L.citationRate,
+  ]
+
+  const engineRows = activeEngines.map((engine) => {
+    const b = data.summary.engineBreakdown[engine]
+    const mRate = b.scans > 0 ? `${Math.round((b.mentions / b.scans) * 100)}%` : '0%'
+    const cRate = b.scans > 0 ? `${Math.round((b.cited / b.scans) * 100)}%` : '0%'
+    return [formatEngine(engine), b.scans, b.mentions, b.cited, mRate, cRate]
+  })
+
+  const wsEngines = XLSX.utils.aoa_to_sheet([engineHeaders, ...engineRows])
+  wsEngines['!cols'] = [
+    { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 16 },
+  ]
+  applySheetDefaults(wsEngines, 1, isRtl)
+  XLSX.utils.book_append_sheet(wb, wsEngines, L.performanceByEngine)
+
+  // ── Sheet 3: AI Query Results ────────────────────────────────────
+  const resultHeaders = [
+    L.query,
+    L.engine,
+    L.mentioned,
+    L.domainCited,
+    L.citations,
+    L.date,
+    language === 'he' ? 'תגובה' : 'Response',
+    language === 'he' ? 'מקורות (URL)' : 'Source URLs',
+  ]
+
+  const resultRows = data.results.map((r) => [
+    r.prompt_text || r.promptText || '',
+    formatEngine(r.engine),
+    r.mentioned ? L.yes : L.no,
+    r.target_cited ? L.yes : L.no,
+    r.citation_count || 0,
+    r.created_at ? new Date(r.created_at).toLocaleDateString(dateLocale) : '',
+    r.response_text || '',
+    extractCitations(r),
+  ])
+
+  const wsResults = XLSX.utils.aoa_to_sheet([resultHeaders, ...resultRows])
+  wsResults['!cols'] = [
+    { wch: 48 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 12 },
+    { wch: 14 }, { wch: 60 }, { wch: 60 },
+  ]
+  applySheetDefaults(wsResults, 1, isRtl)
+  XLSX.utils.book_append_sheet(wb, wsResults, L.aiQueryResults)
+
+  // ── Download ──────────────────────────────────────────────────────
+  const filename = `ai-visibility-report-${safeFilename(data.project.name)}_${new Date().toISOString().slice(0, 10)}.xlsx`
+  XLSX.writeFile(wb, filename)
+}
