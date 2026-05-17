@@ -461,7 +461,7 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'pre_purchase', text: 'איזה פרחים מתאימים לחג?', score: 89, offering: 'primary' },
     { intent: 'pre_purchase', text: 'איזה זר פרחים מתאים ליום נישואין?', score: 88, offering: 'primary' },
     { intent: 'informational', text: 'איזה פרחים מתאימים לאנשים בגילאים שונים?', score: 87, offering: 'primary' },
-    { intent: 'informational', text: 'פרחים לשבת — אילו סוגים מתאימים?', score: 86, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה זר פרחים מעוצב כדאי להזמין לשבת?', score: 86, offering: 'primary' },
 
     // PRIMARY: Trust / Pre-purchase (15%)
     { intent: 'pre_purchase', text: 'איך לבחור חנות פרחים אמינה?', score: 90, offering: 'primary' },
@@ -473,9 +473,9 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'informational', text: 'מה הזרים הטבעיים החזקים והעמידים?', score: 84, offering: 'primary' },
 
     // PRIMARY: Product/Information (10%)
-    { intent: 'informational', text: 'פרחים רומנטיים — אילו הם טובים ביותר?', score: 83, offering: 'primary' },
-    { intent: 'informational', text: 'מה ההבדל בין הזרים השונים לחגים?', score: 82, offering: 'primary' },
-    { intent: 'informational', text: 'אילו פרחים מתאימים לבניין משרדים?', score: 81, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה זר פרחים רומנטי כדאי להזמין?', score: 83, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה זר מתאים לכל חג או אירוע?', score: 82, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה זרים מתאימים לחלל עסקים או משרדים?', score: 81, offering: 'primary' },
     { intent: 'informational', text: 'איך בוחרים זר פרחים יפה ומעוצב?', score: 80, offering: 'primary' },
 
     // SECONDARY: Gift-with-flowers (only 3, rare)
@@ -1882,7 +1882,7 @@ export function generatePromptSuggestions({
     intentLabel: intentLabels[item.def.intent],
     category,
     language: lang,
-    qualityScore: item.score,
+    qualityScore: Math.min(100, Math.round(item.score)),
     reason: buildReason(item.def, category, ctx, item.themeMatched),
   }))
 
