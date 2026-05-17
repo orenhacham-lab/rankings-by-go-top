@@ -13,7 +13,7 @@ export default function AccessibilityPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
       <PublicNav />
-      <main className="flex-1 py-12 px-4">
+      <main className="flex-1 pt-28 lg:pt-36 pb-12 px-4">
         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <Breadcrumbs items={[{ label: 'נגישות', href: '/accessibility' }]} />
         <h1 className="text-4xl font-bold text-slate-900 mb-2">נגישות</h1>

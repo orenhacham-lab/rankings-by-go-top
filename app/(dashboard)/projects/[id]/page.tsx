@@ -323,28 +323,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Tracking Targets */}
-      <div id="keywords-section" className="flex items-center justify-between mb-4 scroll-mt-6">
+      <div id="keywords-section" className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 scroll-mt-6">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
           {k.keywordsSection.title} ({targets.length})
         </h2>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:gap-2 gap-2 w-full sm:w-auto">
           <Button
             onClick={handleScanAll}
             loading={scanning}
             disabled={activeTargets.length === 0}
-            className="flex items-center gap-2"
+            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 w-full sm:w-auto"
             size="sm"
           >
             <Search size={16} strokeWidth={2} />
             {scanning ? k.keywordsSection.scanning : k.keywordsSection.scanAllButton}
           </Button>
-          <Link href={`/reports?project_id=${id}`}>
-            <Button variant="outline" size="sm" className="flex items-center gap-1.5">
+          <Link href={`/reports?project_id=${id}`} className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="flex items-center justify-center gap-1.5 w-full sm:w-auto">
               <FileText size={16} strokeWidth={2} />
               {k.keywordsSection.reportButton}
             </Button>
           </Link>
-          <Button size="sm" onClick={() => setShowAddTarget(true)}>
+          <Button size="sm" onClick={() => setShowAddTarget(true)} className="w-full sm:w-auto">
             {k.keywordsSection.addKeywordButton}
           </Button>
         </div>

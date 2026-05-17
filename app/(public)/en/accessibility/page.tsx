@@ -18,7 +18,7 @@ export default function EnglishAccessibilityPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
       <PublicNav locale="en" />
-      <main className="flex-1 py-12 px-4">
+      <main className="flex-1 pt-28 lg:pt-36 pb-12 px-4">
         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <Breadcrumbs items={[{ label: 'Accessibility', href: '/en/accessibility' }]} locale="en" />
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Accessibility</h1>

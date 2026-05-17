@@ -102,7 +102,10 @@ export default function AIBusinessProfilePanel({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(initialProfile?.mode === 'manual')
+  // Always start collapsed. User must click to open even when a manual
+  // profile was previously saved, so the section doesn't auto-expand and
+  // take up space on every visit.
+  const [expanded, setExpanded] = useState(false)
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const primaryInputRef = useRef<HTMLInputElement | null>(null)
 
