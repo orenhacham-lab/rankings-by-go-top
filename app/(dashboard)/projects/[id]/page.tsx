@@ -88,8 +88,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!section) return
     const sectionMap: Record<string, string> = {
       'ai-visibility': 'ai-visibility',
-      rankings: 'rankings',
-      reports: 'rankings',
+      rankings: 'keywords-section',
+      reports: 'keywords-section',
     }
     const elementId = sectionMap[section]
     if (!elementId) return
@@ -247,7 +247,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       <nav className="mb-4 -mx-1 overflow-x-auto" aria-label="Project modules">
         <div className="flex items-center gap-1 px-1 py-1.5 bg-gradient-to-r from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 rounded-xl border border-slate-200/70 dark:border-slate-700 shadow-sm">
           <a
-            href="#rankings"
+            href="#keywords-section"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow transition whitespace-nowrap"
           >
             <BarChart3 size={18} strokeWidth={2} className="text-slate-600 dark:text-slate-300" />
