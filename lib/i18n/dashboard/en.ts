@@ -410,6 +410,7 @@ export const dashboardEn = {
       positionPrefix: 'Position',
       notFound: 'Not found',
       errorPrefix: 'Error',
+      noAuditData: 'No audit data stored for this scan',
     },
   },
   reports: {

@@ -408,6 +408,7 @@ export const dashboardHe = {
       positionPrefix: 'מיקום',
       notFound: 'לא נמצא',
       errorPrefix: 'שגיאה',
+      noAuditData: 'לא נשמרו נתוני בדיקה עבור סריקה זו',
     },
   },
   reports: {

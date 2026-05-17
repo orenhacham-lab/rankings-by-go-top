@@ -133,7 +133,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
 
                 {!hasAudit ? (
                   <div className="bg-amber-50 border border-amber-200 rounded p-4">
-                    <p className="text-amber-800 text-sm">No audit data stored for this scan</p>
+                    <p className="text-amber-800 text-sm">{t.noAuditData}</p>
                   </div>
                 ) : (
                   <>
