@@ -1,12 +1,14 @@
 import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/types'
 import { getEngineDisplayLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
+import { ExportLanguage, getExportLabels, normalizeExportLanguage } from './i18n'
 
 interface ExportData {
   client: Client
   project: Project
   targets: TrackingTarget[]
   latestResults: Record<string, ScanResult>
+  language?: ExportLanguage
 }
 
 interface AIExportData {
@@ -31,11 +33,15 @@ interface AIExportData {
     citation_count: number
     created_at: string
   }>
+  language?: ExportLanguage
 }
 
 function generateReportHTML(data: ExportData): string {
-  const isHebrewProject = data.project.language?.startsWith('he') || data.project.country === 'IL'
-  const now = new Date().toLocaleDateString('he-IL')
+  const language = normalizeExportLanguage(data.language)
+  const L = getExportLabels(language)
+  const isRtl = language === 'he'
+  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const now = new Date().toLocaleDateString(dateLocale)
 
   const found = data.targets.filter((t) => data.latestResults[t.id]?.found).length
   const notFound = data.targets.length - found
@@ -54,9 +60,9 @@ function generateReportHTML(data: ExportData): string {
 
     const currentPosition = result?.position != null ? String(result.position) : '—'
     const previousPosition = result?.previous_position != null ? String(result.previous_position) : '—'
-    const checkedAt = result?.checked_at ? new Date(result.checked_at).toLocaleDateString('he-IL') : '—'
+    const checkedAt = result?.checked_at ? new Date(result.checked_at).toLocaleDateString(dateLocale) : '—'
     const urlDisplay = result?.result_url ? (result.result_url.length > 50 ? result.result_url.slice(0, 50) + '…' : result.result_url) : '—'
-    const foundText = result ? (result.found ? 'כן' : 'לא') : '—'
+    const foundText = result ? (result.found ? L.yes : L.no) : '—'
     const engine = getEngineDisplayLabel(target.engine_type, data.project.device_type)
     const changeColor = changeStr.startsWith('+') ? '#16a34a' : changeStr.startsWith('-') ? '#dc2626' : '#000'
 
@@ -76,11 +82,11 @@ function generateReportHTML(data: ExportData): string {
 
   return `
     <!DOCTYPE html>
-    <html dir="${isHebrewProject ? 'rtl' : 'ltr'}" lang="${isHebrewProject ? 'he' : 'en'}">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${isRtl ? 'he' : 'en'}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>דוח דירוגים</title>
+      <title>${escapeHtml(L.rankingReport)}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -92,7 +98,7 @@ function generateReportHTML(data: ExportData): string {
         body {
           font-family: Arial, sans-serif;
           font-size: 10pt;
-          direction: ${isHebrewProject ? 'rtl' : 'ltr'};
+          direction: ${isRtl ? 'rtl' : 'ltr'};
           line-height: 1.5;
           color: #1f2937;
           padding: 20px;
@@ -188,7 +194,7 @@ function generateReportHTML(data: ExportData): string {
           background: #1E4ED8;
           color: white;
           padding: 10px;
-          text-align: ${isHebrewProject ? 'right' : 'left'};
+          text-align: ${isRtl ? 'right' : 'left'};
           font-weight: bold;
           font-size: 9pt;
           border: 1px solid #1E4ED8;
@@ -200,7 +206,7 @@ function generateReportHTML(data: ExportData): string {
           font-size: 9pt;
           overflow-wrap: break-word;
           white-space: normal;
-          text-align: ${isHebrewProject ? 'right' : 'left'};
+          text-align: ${isRtl ? 'right' : 'left'};
         }
 
         tr:nth-child(even) {
@@ -288,7 +294,7 @@ function generateReportHTML(data: ExportData): string {
     <body>
       <div class="container">
         <div class="header">
-          <h1>דוח דירוגים</h1>
+          <h1>${escapeHtml(L.rankingReport)}</h1>
         </div>
 
         <div class="project-info">
@@ -300,19 +306,19 @@ function generateReportHTML(data: ExportData): string {
 
         <div class="summary-stats">
           <div class="stat-box">
-            <div class="stat-label">סה״כ ביטויים</div>
+            <div class="stat-label">${escapeHtml(L.totalKeywords)}</div>
             <div class="stat-value">${total}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">נמצאו</div>
+            <div class="stat-label">${escapeHtml(L.foundPlural)}</div>
             <div class="stat-value">${found}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">לא נמצאו</div>
+            <div class="stat-label">${escapeHtml(L.notFoundPlural)}</div>
             <div class="stat-value">${notFound}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">כיסוי</div>
+            <div class="stat-label">${escapeHtml(L.coverage)}</div>
             <div class="stat-value">${coverage}</div>
           </div>
         </div>
@@ -320,13 +326,13 @@ function generateReportHTML(data: ExportData): string {
         <table>
           <thead>
             <tr>
-              <th>ביטוי</th>
-              <th>מנוע</th>
-              <th>מיקום</th>
-              <th>מיקום קודם</th>
-              <th>שינוי</th>
-              <th>נמצא</th>
-              <th>תאריך</th>
+              <th>${escapeHtml(L.keywordCol)}</th>
+              <th>${escapeHtml(L.engine)}</th>
+              <th>${escapeHtml(L.position)}</th>
+              <th>${escapeHtml(L.previousPosition)}</th>
+              <th>${escapeHtml(L.change)}</th>
+              <th>${escapeHtml(L.found)}</th>
+              <th>${escapeHtml(L.date)}</th>
               <th>URL</th>
             </tr>
           </thead>
@@ -336,7 +342,7 @@ function generateReportHTML(data: ExportData): string {
         </table>
 
         <div class="footer">
-          Go Top | הופק בתאריך ${escapeHtml(now)}
+          Go Top | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
         </div>
       </div>
     </body>
@@ -356,8 +362,11 @@ function escapeHtml(text: string): string {
 }
 
 function generateAIReportHTML(data: AIExportData): string {
-  const now = new Date().toLocaleDateString('he-IL')
-  const isHebrewProject = data.project.language?.startsWith('he') || data.project.country === 'IL'
+  const language = normalizeExportLanguage(data.language)
+  const L = getExportLabels(language)
+  const isRtl = language === 'he'
+  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const now = new Date().toLocaleDateString(dateLocale)
 
   const engineLabels: Record<string, string> = {
     chatgpt: 'ChatGPT',
@@ -381,15 +390,15 @@ function generateAIReportHTML(data: AIExportData): string {
         <div style="font-weight: bold; margin-bottom: 8px; font-size: 11pt;">${escapeHtml(engineLabels[engine] || engine)}</div>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 9pt;">
           <div>
-            <div style="color: #6b7280; margin-bottom: 2px;">סריקות</div>
+            <div style="color: #6b7280; margin-bottom: 2px;">${escapeHtml(L.engineScans)}</div>
             <div style="font-weight: bold; font-size: 12pt;">${breakdown.scans}</div>
           </div>
           <div>
-            <div style="color: #6b7280; margin-bottom: 2px;">אזכורים</div>
+            <div style="color: #6b7280; margin-bottom: 2px;">${escapeHtml(L.engineMentions)}</div>
             <div style="font-weight: bold; font-size: 12pt; color: #16a34a;">${breakdown.mentions} (${mentionRate}%)</div>
           </div>
           <div>
-            <div style="color: #6b7280; margin-bottom: 2px;">ציטוטים</div>
+            <div style="color: #6b7280; margin-bottom: 2px;">${escapeHtml(L.engineCitations)}</div>
             <div style="font-weight: bold; font-size: 12pt; color: #0891b2;">${breakdown.cited} (${citationRate}%)</div>
           </div>
         </div>
@@ -398,13 +407,13 @@ function generateAIReportHTML(data: AIExportData): string {
   }).join('')
 
   const tableRows = data.results.slice(0, 100).map((result) => {
-    const date = result.created_at ? new Date(result.created_at).toLocaleDateString('he-IL') : '—'
+    const date = result.created_at ? new Date(result.created_at).toLocaleDateString(dateLocale) : '—'
     return `
       <tr>
         <td class="prompt-cell">${escapeHtml(result.promptText)}</td>
         <td>${escapeHtml(engineLabels[result.engine] || result.engine)}</td>
-        <td>${result.mentioned ? 'כן' : 'לא'}</td>
-        <td>${result.target_cited ? 'כן' : 'לא'}</td>
+        <td>${result.mentioned ? L.yes : L.no}</td>
+        <td>${result.target_cited ? L.yes : L.no}</td>
         <td>${result.citation_count}</td>
         <td>${escapeHtml(date)}</td>
       </tr>
@@ -413,11 +422,11 @@ function generateAIReportHTML(data: AIExportData): string {
 
   return `
     <!DOCTYPE html>
-    <html dir="rtl" lang="he">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${isRtl ? 'he' : 'en'}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>דוח נראות ב-AI</title>
+      <title>${escapeHtml(L.aiVisibilityReport)}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -429,7 +438,7 @@ function generateAIReportHTML(data: AIExportData): string {
         body {
           font-family: Arial, sans-serif;
           font-size: 10pt;
-          direction: rtl;
+          direction: ${isRtl ? 'rtl' : 'ltr'};
           line-height: 1.5;
           color: #1f2937;
           padding: 20px;
@@ -535,7 +544,7 @@ function generateAIReportHTML(data: AIExportData): string {
           background: #4f46e5;
           color: white;
           padding: 10px;
-          text-align: right;
+          text-align: ${isRtl ? 'right' : 'left'};
           font-weight: bold;
           font-size: 9pt;
           border: 1px solid #4f46e5;
@@ -547,7 +556,7 @@ function generateAIReportHTML(data: AIExportData): string {
           font-size: 9pt;
           overflow-wrap: break-word;
           white-space: normal;
-          text-align: right;
+          text-align: ${isRtl ? 'right' : 'left'};
         }
 
         tr:nth-child(even) {
@@ -615,7 +624,7 @@ function generateAIReportHTML(data: AIExportData): string {
     <body>
       <div class="container">
         <div class="header">
-          <h1>דוח נראות ב-AI</h1>
+          <h1>${escapeHtml(L.aiVisibilityReport)}</h1>
         </div>
 
         <div class="project-info">
@@ -627,55 +636,55 @@ function generateAIReportHTML(data: AIExportData): string {
 
         <div class="summary-stats">
           <div class="stat-box">
-            <div class="stat-label">שאילתות AI</div>
+            <div class="stat-label">${escapeHtml(L.aiQueries)}</div>
             <div class="stat-value">${data.summary.totalResults}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">סריקות</div>
+            <div class="stat-label">${escapeHtml(L.aiScans)}</div>
             <div class="stat-value">${data.summary.totalScans}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">אזכורים</div>
+            <div class="stat-label">${escapeHtml(L.mentions)}</div>
             <div class="stat-value" style="color: #16a34a;">${data.summary.mentionedCount}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">אחוז אזכורים</div>
+            <div class="stat-label">${escapeHtml(L.mentionRate)}</div>
             <div class="stat-value">${Math.round(data.summary.mentionRate)}%</div>
           </div>
         </div>
 
         <div class="summary-stats">
           <div class="stat-box">
-            <div class="stat-label">דומיין צוטט</div>
+            <div class="stat-label">${escapeHtml(L.domainCited)}</div>
             <div class="stat-value" style="color: #0891b2;">${data.summary.citedCount}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">אחוז ציטוטים</div>
+            <div class="stat-label">${escapeHtml(L.citationRate)}</div>
             <div class="stat-value">${Math.round(data.summary.citationRate)}%</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">סך ציטוטים</div>
+            <div class="stat-label">${escapeHtml(L.totalCitations)}</div>
             <div class="stat-value" style="color: #0891b2;">${data.summary.totalCitations}</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">נראות כללית</div>
+            <div class="stat-label">${escapeHtml(L.overallVisibility)}</div>
             <div class="stat-value">${data.summary.totalResults > 0 ? Math.round(((data.summary.mentionedCount + data.summary.citedCount) / (data.summary.totalResults * 2)) * 100) : 0}%</div>
           </div>
         </div>
 
-        <div class="section-title">ביצועים לפי מנוע</div>
+        <div class="section-title">${escapeHtml(L.performanceByEngine)}</div>
         <div>${engineBreakdownHTML}</div>
 
-        <div class="section-title">תוצאות שאילתות AI (${data.results.length})</div>
+        <div class="section-title">${escapeHtml(L.aiQueryResults)} (${data.results.length})</div>
         <table>
           <thead>
             <tr>
-              <th>שאילתה</th>
-              <th>מנוע</th>
-              <th>הוזכר</th>
-              <th>דומיין צוטט</th>
-              <th>ציטוטים</th>
-              <th>תאריך</th>
+              <th>${escapeHtml(L.query)}</th>
+              <th>${escapeHtml(L.engine)}</th>
+              <th>${escapeHtml(L.mentioned)}</th>
+              <th>${escapeHtml(L.domainCited)}</th>
+              <th>${escapeHtml(L.citations)}</th>
+              <th>${escapeHtml(L.date)}</th>
             </tr>
           </thead>
           <tbody>
@@ -684,7 +693,7 @@ function generateAIReportHTML(data: AIExportData): string {
         </table>
 
         <div class="footer">
-          Go Top | הופק בתאריך ${escapeHtml(now)}
+          Go Top | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
         </div>
       </div>
     </body>
@@ -695,6 +704,8 @@ function generateAIReportHTML(data: AIExportData): string {
 export { generateReportHTML, generateAIReportHTML }
 
 export async function exportToPDF(data: ExportData): Promise<void> {
+  const language = normalizeExportLanguage(data.language)
+  const L = getExportLabels(language)
   const html = generateReportHTML(data)
   const blob = new Blob([html], { type: 'text/html; charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -702,7 +713,7 @@ export async function exportToPDF(data: ExportData): Promise<void> {
   const safeName = data.project.name.replace(/[/\\:*?"<>|]/g, '-').replace(/\s+/g, '_').slice(0, 60)
   const timestamp = new Date().toISOString().slice(0, 10)
   link.href = url
-  link.download = `דוח_דירוגים_${safeName}_${timestamp}.html`
+  link.download = `${L.rankingsFilename}_${safeName}_${timestamp}.html`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

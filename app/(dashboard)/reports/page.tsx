@@ -272,6 +272,7 @@ function ReportsContent() {
         targets: googleReportData.targets,
         latestResults: googleReportData.latestResults,
         allHistory: googleReportData.allHistory,
+        language,
       })
     } else if (reportType === 'ai' && aiReportData) {
       // TODO: Implement AI export to Excel
@@ -297,6 +298,7 @@ function ReportsContent() {
       const payload: any = {
         projectId: selectedProjectId,
         reportType,
+        language,
       }
 
       if (reportType === 'ai' && aiReportData) {

@@ -1,10 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateReportHTML, generateAIReportHTML } from '@/lib/export/pdf'
+import { normalizeExportLanguage } from '@/lib/export/i18n'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 
 export async function POST(req: Request) {
   try {
-    const { projectId, reportType, aiReportData } = await req.json()
+    const body = await req.json()
+    const { projectId, reportType, aiReportData } = body
+    const language = normalizeExportLanguage(body.language)
 
     if (!projectId) {
       return new Response(
@@ -55,6 +58,7 @@ export async function POST(req: Request) {
           project: projectData as Project,
           summary: aiReportData.summary,
           results: aiReportData.results || [],
+          language,
         })
       } catch (htmlError) {
         console.error('[export-pdf] AI HTML generation failed:', htmlError)
@@ -110,6 +114,7 @@ export async function POST(req: Request) {
           project: projectData as Project,
           targets: targetsData as TrackingTarget[],
           latestResults,
+          language,
         })
       } catch (htmlError) {
         console.error('[export-pdf] HTML generation failed:', htmlError)
