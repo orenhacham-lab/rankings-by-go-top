@@ -410,7 +410,7 @@ export const dashboardEn = {
       positionPrefix: 'Position',
       notFound: 'Not found',
       errorPrefix: 'Error',
-      noAuditData: 'No audit data stored for this scan',
+      noAuditData: 'Detailed audit data is available only for newer Google Maps scans. The ranking result was still saved and is shown above.',
     },
   },
   reports: {

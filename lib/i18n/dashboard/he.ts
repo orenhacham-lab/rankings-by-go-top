@@ -408,7 +408,7 @@ export const dashboardHe = {
       positionPrefix: 'מיקום',
       notFound: 'לא נמצא',
       errorPrefix: 'שגיאה',
-      noAuditData: 'לא נשמרו נתוני בדיקה עבור סריקה זו',
+      noAuditData: 'נתוני בדיקה מורחבים זמינים רק עבור סריקות Google Maps חדשות. תוצאת המיקום עדיין נשמרה ומוצגת למעלה.',
     },
   },
   reports: {
