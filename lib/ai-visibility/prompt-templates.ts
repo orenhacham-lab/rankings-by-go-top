@@ -205,10 +205,23 @@ export function detectCategory(
 
   if (/(perfume|fragrance|cologne|פרפיום|בושם|בשמים|או דה פרפיום|או דה טואלט)/.test(text)) return 'perfume'
   if (/(ניקיון|cleaner|cleaning|פוליש|נקיון|פוליסה|nettoyage)/.test(text)) return 'cleaning'
+
+  // SaaS / software tools (must come BEFORE agency so SEO/SEM tools don't get
+  // classified as marketing agencies)
+  if (/(rank tracker|rank tracking|seo software|seo tool|tracking software|seo platform|seo saas|rank checker|rank monitor|visibility tool|visibility tracking|gotopseo|seoclarity|semrush|ahrefs|moz)/.test(text))
+    return 'saas'
+  if (/(saas|software as a service|cloud platform|\.io|\.ai|api platform|developer tool|monitoring tool|analytics platform|business intelligence)/.test(text)) return 'saas'
+
   if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text))
     return 'agency'
   if (/(home improv|remodel|construc|contractor|kitchen|bathroom|design.build|plumb|electric|hvac|renov|cabinet|שיפוץ|קבלן|רימודל)/.test(text))
     return 'home_improvement_service'
+
+  // Fitness equipment store — must come BEFORE generic fitness/gym so a store
+  // selling weights/treadmills doesn't get classified as a gym.
+  if (/(ציוד כושר|מוצרי כושר|חנות ציוד|חנות ספורט|משקולות|fitness equipment|gym equipment|weights|dumbbell|treadmill|exercise bike|home gym)/.test(text))
+    return 'sports_store'
+
   if (/(sportwear|sportswear|sports|ספורט|נעלי ריצה|טייץ|adidas|nike|אדידס|נייקי|פומה|puma)/.test(text)) return 'sports_store'
 
   // Gift signals — checked AFTER florist so flowers aren't misclassified as gifts.
@@ -714,11 +727,14 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
   ],
 
   saas: [
-    { intent: 'recommendation', text: 'Best SaaS tools for businesses in {{country}}', score: 89, offering: 'primary' },
-    { intent: 'comparison', text: 'Best tools for tracking {{business}} functionality', score: 85, offering: 'primary' },
-    { intent: 'commercial', text: 'How much does {{business}} cost?', score: 81, offering: 'secondary', themeBoost: { price: 3 } },
-    { intent: 'pre_purchase', text: 'How to choose the right SaaS tool for your business?', score: 82, offering: 'primary' },
-    { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
+    { intent: 'recommendation', text: 'What is the best rank tracking software?', score: 92, offering: 'primary' },
+    { intent: 'recommendation', text: 'Which SEO reporting tool is recommended for agencies?', score: 90, offering: 'primary' },
+    { intent: 'recommendation', text: 'What tools track AI visibility in search results?', score: 88, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'How to choose a rank tracking tool for small business?', score: 86, offering: 'primary' },
+    { intent: 'recommendation', text: 'Best Google rank tracking tool for local SEO', score: 89, offering: 'primary' },
+    { intent: 'comparison', text: 'What tools monitor Google organic and Google Maps rankings?', score: 87, offering: 'primary' },
+    { intent: 'commercial', text: 'How much does rank tracking software cost?', score: 84, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'recommendation', text: 'Best SaaS tools for businesses in {{country}}', score: 80, offering: 'secondary' },
   ],
 
   florist: [
@@ -1425,12 +1441,16 @@ export function resolveManualPrimaryCategory(raw: string | null | undefined): Bu
   // Second-hand / vintage women fashion
   if (/(יד שנייה|וינטג׳|וינטג'|בגדי יד שנייה|אופנה יד שנייה|second.hand|vintage|used clothing|second hand fashion)/.test(t))
     return 'second_hand_fashion'
-  // Sports store
+  // Sports / fitness equipment store — must come BEFORE generic fitness so a
+  // store selling weights/treadmills isn't classified as a gym.
+  if (/(חנות ציוד|חנות ספורט|ציוד כושר|מוצרי כושר|משקולות|fitness equipment|gym equipment|home gym|sports store|sporting goods)/.test(t))
+    return 'sports_store'
   if (/(ספורט|sport|נעלי ריצה|adidas|nike|פומה)/.test(t)) return 'sports_store'
   // Appliances
   if (/(מקרר|תנור|מוצרי חשמל|מכונת כביסה|appliance|חשמל ביתי)/.test(t)) return 'appliance_store'
-  // SaaS
-  if (/(saas|software|cloud|platform|api|אפליקציה)/.test(t)) return 'saas'
+  // SaaS — also rank tracking / SEO tools (not the same as SEO agencies)
+  if (/(rank track|seo tool|seo software|tracking software|saas|software|cloud|platform|api|אפליקציה|כלי seo|מערכת מעקב)/.test(t))
+    return 'saas'
   // Restaurant
   if (/(מסעדה|קפה|פיצה|food|restaurant|bistro|cafe)/.test(t)) return 'restaurant'
   // Healthcare
@@ -1505,6 +1525,74 @@ function isInvalidHebrewPhrase(phrase: string): boolean {
   }
 
   return false
+}
+
+/**
+ * Reject low-quality questions that slipped through templates.
+ * Runs on the FINAL filled question text in both languages.
+ *
+ * Common failure modes caught here:
+ * - "Alternatives to {brand}" / "אלטרנטיבות ל..." (competitive intent)
+ * - "similar to {brand}" / "Recommended businesses similar to..."
+ * - "Where to find {product}" (unnatural — should be "Where can I buy")
+ * - "What to check when buying {abstract category}" (e.g. "buying home improvement")
+ * - "איזו חנות מומלצת ל-X" without "לקניית" / "להזמנת" (e.g. "מומלצת למשקולות")
+ * - "איפה אפשר למצוא X" for a product (should be "לקנות")
+ * - "כמה עולים X" for a singular generic category
+ */
+function isBadQuestion(question: string, businessName: string): boolean {
+  const q = question.trim()
+  const ql = q.toLowerCase()
+  const brand = (businessName || '').trim()
+  const brandLower = brand.toLowerCase()
+
+  // ENGLISH rejections
+
+  // Competitor / alternatives intent
+  if (/\balternatives?\s+to\b/i.test(q)) return true
+  if (/\bsimilar\s+to\b/i.test(q)) return true
+  if (/\brecommended\s+businesses?\s+similar\s+to\b/i.test(q)) return true
+  if (/\bcompetitors?\s+of\b/i.test(q)) return true
+  if (/\bbusinesses?\s+like\b/i.test(q)) return true
+  if (brand && new RegExp(`\\b${escapeRegex(brand)}\\s+alternatives?\\b`, 'i').test(q)) return true
+
+  // "Where to find {generic-abstract}" — service categories aren't "found", they're hired
+  // Reject only abstract service categories, not products.
+  if (/\bwhere\s+to\s+find\s+(home\s+improvement|fitness|cleaning|landscaping|construction)\b/i.test(q))
+    return true
+
+  // "What to check when buying {abstract service}" — services aren't "bought"
+  if (/\bwhat\s+to\s+check\s+when\s+buying\s+(home\s+improvement|fitness|cleaning|landscaping|construction|seo|legal|consulting)\b/i.test(q))
+    return true
+
+  // "Where can I buy SEO/home improvement" — services aren't bought
+  if (/\bwhere\s+(can\s+i|to)\s+buy\s+(home\s+improvement|seo|consulting|legal\s+services|cleaning|fitness)\b/i.test(q))
+    return true
+
+  // HEBREW rejections
+
+  // אלטרנטיבות ל{brand} - competitive intent
+  if (/אלטרנטיבות\s+ל/.test(q)) return true
+  if (/חלופות\s+ל/.test(q)) return true
+  if (/דומה?\s+ל/.test(q) && brand && q.includes(brand)) return true
+  if (/עסקים\s+דומים\s+ל/.test(q)) return true
+
+  // "איזו חנות מומלצת למשקולות" — must use "לקניית" / "להזמנת" not bare "ל"
+  // Only reject if "ל" is followed by a product noun (not "לקניית/לקנות/הזמנת/...")
+  if (/איזו\s+חנות\s+מומלצת\s+ל(?!קני|הזמ|בחיר|השג|שירות|רכישת|מציאת)/.test(q))
+    return true
+
+  // "איפה אפשר למצוא X" - should be "איפה אפשר לקנות" for products
+  if (/איפה\s+אפשר\s+למצוא/.test(q)) return true
+
+  // "כמה עולים {plural category}" — should be "כמה עולה" singular
+  if (/כמה\s+עולים\s+ציוד/.test(q)) return true
+
+  return false
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
@@ -1678,6 +1766,15 @@ export function generatePromptSuggestions({
     const filled = fillTemplate(def.text, ctx).trim()
     if (lang === 'he' && !isReadableHebrew(filled)) continue
 
+    // CRITICAL: Reject low-quality / competitive-intent / unnatural questions
+    // even if they came from the curated bank.
+    if (isBadQuestion(filled, business)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AI-Questions] REJECTED (primary):', filled)
+      }
+      continue
+    }
+
     // Excluded-topic filter: drop any question that hits an excluded theme
     if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
 
@@ -1748,31 +1845,33 @@ export function generatePromptSuggestions({
         return action.startsWith('ל') ? action.substring(1) : action
       }
 
-      // Generate semantic templates that use proper objects and avoid double-lamed verbs
+      // Generate semantic templates that use proper objects and avoid double-lamed verbs.
+      // CRITICAL: Use "לקניית"/"לקנות" (buy) instead of "ל-X" or "למצוא" which
+      // produce unnatural questions like "איזו חנות מומלצת למשקולות".
+      const bareAction = getBareAction(actionsToUse[0])
+      const verbForm = bareAction === 'הזמין' ? 'הזמנת' : 'קניית'
+      const verbPlural = bareAction === 'הזמין' ? 'מזמינים' : 'קונים'
+
       const templates = lang === 'he' ?
         [
-          // Recommendations - use resolved object
+          // Recommendation: "where is recommended to buy X"
           `איפה כדאי ${getAction(actionsToUse[0])} ${resolvedObject}?`,
-          `איזו חנות מומלצת ל${secondary}?`,
-          // Quality check
-          ...(purchaseObjects.length > 0 ? [
-            `מה חשוב לבדוק לפני ש${actionsToUse[0] === 'להזמין' ? 'מזמינים' : 'קונים'} ${objectsToUse[0] || resolvedObject}?`,
-          ] : []),
-          // Price
-          ...(purchaseObjects.length > 0 ? [
-            `כמה עולים ${objectsToUse[0] || resolvedObject}?`,
-          ] : []),
-          // Discovery - use resolved object
-          `איפה אפשר למצוא ${resolvedObject}?`,
-          // Location
-          `איפה כדאי ${getAction(actionsToUse[0])} ${resolvedObject}?`,
+          // Recommendation: "which store is recommended for buying X" (NOT "for X")
+          `איזו חנות מומלצת ל${verbForm} ${resolvedObject}?`,
+          // Quality check: "what to check before buying X"
+          `מה חשוב לבדוק לפני ש${verbPlural} ${resolvedObject}?`,
+          // Price: "how much does X cost"
+          `כמה עולה ${resolvedObject}?`,
         ].filter(Boolean) :
         [
-          `Where to find ${secondary}?`,
-          `Best shops for ${secondary}`,
-          `How to choose quality ${secondary}?`,
-          `What to check when buying ${secondary}?`,
-          `How much should you spend on ${secondary}?`,
+          // Recommendation: "where can I buy X"
+          `Where can I buy ${secondary}?`,
+          // Recommendation: "which store is recommended for buying X"
+          `Which store is recommended for buying ${secondary}?`,
+          // Quality check
+          `What should I check before buying ${secondary}?`,
+          // Price
+          `How much does ${secondary} cost?`,
         ]
 
       for (const template of templates) {
@@ -1780,6 +1879,14 @@ export function generatePromptSuggestions({
 
         // Skip invalid Hebrew phrases
         if (lang === 'he' && isInvalidHebrewPhrase(filled)) continue
+
+        // CRITICAL: Reject low-quality / unnatural questions from secondary templates
+        if (isBadQuestion(filled, business)) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[AI-Questions] REJECTED (secondary):', filled)
+          }
+          continue
+        }
 
         // Filter by excluded topics
         if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
