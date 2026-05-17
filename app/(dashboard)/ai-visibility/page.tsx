@@ -215,7 +215,10 @@ export default function AIVisibilityPage() {
                   </div>
                 </div>
 
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
+                <div
+                  className="text-[11px] text-slate-500 dark:text-slate-400 mb-3"
+                  dir={language === 'en' ? 'ltr' : 'rtl'}
+                >
                   {t('last_scan')}: {formatDate(summary?.lastScanAt ?? null)}
                 </div>
 

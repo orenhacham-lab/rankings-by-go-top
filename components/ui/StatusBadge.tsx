@@ -1,7 +1,6 @@
 'use client'
 
 import Badge from './Badge'
-import { getSearchTypeLabel } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -16,11 +15,14 @@ export function ActiveBadge({ active }: { active: boolean }) {
 }
 
 export function ScanStatusBadge({ status }: { status: string }) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   const map: Record<string, { variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; label: string }> = {
-    completed: { variant: 'success', label: 'הושלם' },
-    running: { variant: 'info', label: 'רץ...' },
-    pending: { variant: 'warning', label: 'ממתין' },
-    failed: { variant: 'danger', label: 'נכשל' },
+    completed: { variant: 'success', label: dict.scans.status.completed },
+    running: { variant: 'info', label: dict.scans.status.running },
+    pending: { variant: 'warning', label: dict.scans.status.pending },
+    failed: { variant: 'danger', label: dict.scans.status.failed },
   }
   const cfg = map[status] || { variant: 'neutral', label: status }
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>

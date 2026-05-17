@@ -9,9 +9,15 @@ import Button from '@/components/ui/Button'
 import { formatDateTime } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import Link from 'next/link'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ScanDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const t = dict.scans.details
+
   const [results, setResults] = useState<ScanResult[]>([])
   const [projectId, setProjectId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -39,7 +45,7 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
         <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-        טוען...
+        {dict.scans.loading}
       </div>
     )
   }
@@ -49,16 +55,16 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
     return (
       <div>
         <Header
-          title="פרטי סריקה"
-          subtitle="תיעוד מלא של תוצאות הסריקה"
+          title={t.title}
+          subtitle={t.subtitle}
           actions={
             <Link href={emptyBackHref}>
-              <Button variant="outline" size="sm">← חזור לפרויקט</Button>
+              <Button variant="outline" size="sm">{t.backToProject}</Button>
             </Link>
           }
         />
         <Card>
-          <div className="p-6 text-center text-slate-500">אין תוצאות סריקה</div>
+          <div className="p-6 text-center text-slate-500">{t.noResults}</div>
         </Card>
       </div>
     )
@@ -69,11 +75,11 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
   return (
     <div>
       <Header
-        title="פרטי סריקה"
-        subtitle="תיעוד מלא של תוצאות הסריקה"
+        title={t.title}
+        subtitle={t.subtitle}
         actions={
           <Link href={backHref}>
-            <Button variant="outline" size="sm">← חזור לפרויקט</Button>
+            <Button variant="outline" size="sm">{t.backToProject}</Button>
           </Link>
         }
       />
@@ -94,15 +100,15 @@ export default function ScanDetailsPage({ params }: { params: Promise<{ id: stri
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{result.keyword}</h3>
                     <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-                      תעודה: {formatDateTime(result.checked_at)}
+                      {t.timestamp}: {formatDateTime(result.checked_at)}
                     </div>
                   </div>
                   <div className="text-right">
                     <Badge variant={result.found ? 'success' : 'neutral'}>
-                      {result.found ? `מיקום #${result.position}` : 'לא נמצא'}
+                      {result.found ? `${t.positionPrefix} #${result.position}` : t.notFound}
                     </Badge>
                     {result.error_message && (
-                      <div className="text-sm text-red-600 mt-2">שגיאה: {result.error_message}</div>
+                      <div className="text-sm text-red-600 mt-2">{t.errorPrefix}: {result.error_message}</div>
                     )}
                   </div>
                 </div>

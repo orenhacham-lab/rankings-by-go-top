@@ -326,6 +326,46 @@ export const dashboardHe = {
     bulkSuccess: (created: number, skipped: number) =>
       `נוספו ${created} מילות מפתח${skipped > 0 ? ` (${skipped} כבר קיימות)` : ''}`,
   },
+  scans: {
+    title: 'סריקות',
+    subtitle: 'היסטוריית סריקות מלאה',
+    loading: 'טוען...',
+    loadError: 'שגיאה בטעינת סריקות',
+    table: {
+      project: 'פרויקט',
+      client: 'לקוח',
+      status: 'סטטוס',
+      trigger: 'הפעלה',
+      results: 'תוצאות',
+      started: 'התחיל',
+      finished: 'הסתיים',
+      actions: 'פעולות',
+      viewDetails: 'צפה בפרטים',
+      emptyState: 'אין סריקות עדיין',
+      failedSuffix: (count: number) => `(${count} נכשלו)`,
+    },
+    trigger: {
+      automatic: 'אוטומטי',
+      manual: 'ידני',
+    },
+    status: {
+      completed: 'הושלם',
+      running: 'רץ...',
+      pending: 'ממתין',
+      failed: 'נכשל',
+      inProgress: 'בתהליך',
+    },
+    details: {
+      title: 'פרטי סריקה',
+      subtitle: 'תיעוד מלא של תוצאות הסריקה',
+      backToProject: '← חזור לפרויקט',
+      noResults: 'אין תוצאות סריקה',
+      timestamp: 'תאריך',
+      positionPrefix: 'מיקום',
+      notFound: 'לא נמצא',
+      errorPrefix: 'שגיאה',
+    },
+  },
 } as const
 
 export type DashboardDictionary = typeof dashboardHe
