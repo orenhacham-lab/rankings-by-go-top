@@ -40,6 +40,7 @@ export type BusinessCategory =
   | 'appliance_store'
   | 'saas'
   | 'local_service'
+  | 'home_improvement_service'
   | 'cleaning'
   | 'florist'
   | 'restaurant'
@@ -149,6 +150,7 @@ const HE_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   appliance_store: 'חנות מוצרי חשמל',
   saas: 'מוצר SaaS',
   local_service: 'שירות מקומי',
+  home_improvement_service: 'שיפוצים ובנייה',
   cleaning: 'חברת ניקיון',
   florist: 'חנות פרחים',
   restaurant: 'מסעדה',
@@ -171,6 +173,7 @@ const EN_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   appliance_store: 'home appliance store',
   saas: 'SaaS product',
   local_service: 'local service',
+  home_improvement_service: 'home improvement & remodeling',
   cleaning: 'cleaning company',
   florist: 'florist',
   restaurant: 'restaurant',
@@ -204,6 +207,8 @@ export function detectCategory(
   if (/(ניקיון|cleaner|cleaning|פוליש|נקיון|פוליסה|nettoyage)/.test(text)) return 'cleaning'
   if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text))
     return 'agency'
+  if (/(home improv|remodel|construc|contractor|kitchen|bathroom|design.build|plumb|electric|hvac|renov|cabinet|שיפוץ|קבלן|רימודל)/.test(text))
+    return 'home_improvement_service'
   if (/(sportwear|sportswear|sports|ספורט|נעלי ריצה|טייץ|adidas|nike|אדידס|נייקי|פומה|puma)/.test(text)) return 'sports_store'
 
   // Gift signals — checked AFTER florist so flowers aren't misclassified as gifts.
@@ -618,16 +623,29 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
 
     // Secondary: pricing (10%)
     { intent: 'commercial', text: 'מחירים לשירות מקצועי ב{{city}}', score: 81, offering: 'secondary', requiresCity: true, themeBoost: { price: 3 } },
+  ],
 
-    // Generic: brand (fallback)
-    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
+  home_improvement_service: [
+    // Primary: recommendations & quality checks (70%)
+    { intent: 'recommendation', text: 'מי מומלץ לשיפוץ מטבח ב{{city}}?', score: 93, offering: 'primary', requiresCity: true },
+    { intent: 'recommendation', text: 'איזו חברה מומלצת לשיפוץ חדר אמבטיה ב{{city}}?', score: 92, offering: 'primary', requiresCity: true },
+    { intent: 'pre_purchase', text: 'מה חשוב לבדוק לפני שבוחרים קבלן שיפוצים?', score: 88, offering: 'primary' },
+    { intent: 'recommendation', text: 'איזו חברת design-build מומלצת ב{{city}}?', score: 90, offering: 'primary', requiresCity: true },
+    { intent: 'recommendation', text: 'קבלן שיפוצים מומלץ ב{{city}}', score: 89, offering: 'primary', requiresCity: true },
+    { intent: 'informational', text: 'איך לתכננת שיפוץ בית בצורה נכונה?', score: 85, offering: 'primary' },
+
+    // Secondary: pricing & process (20%)
+    { intent: 'commercial', text: 'כמה עולה שיפוץ בית ב{{city}}?', score: 89, offering: 'secondary', requiresCity: true, themeBoost: { price: 4 } },
+    { intent: 'transactional', text: 'איך בוחרים קבלן לשיפוץ?', score: 83, offering: 'secondary' },
+
+    // Local: specific services (10%)
+    { intent: 'recommendation', text: 'מי מומלץ להתקנת מטבח חדש ב{{city}}?', score: 87, offering: 'local', requiresCity: true },
   ],
 
   generic: [
     { intent: 'recommendation', text: 'אילו עסקים מומלצים בתחום של {{business}}?', score: 79, offering: 'primary' },
     { intent: 'informational', text: 'מה התחום של {{business}}?', score: 69, offering: 'primary' },
     { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
-    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 71, offering: 'generic' },
   ],
 }
 
@@ -697,9 +715,9 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
 
   saas: [
     { intent: 'recommendation', text: 'Best SaaS tools for businesses in {{country}}', score: 89, offering: 'primary' },
-    { intent: 'comparison', text: 'How does {{business}} compare to competitors?', score: 85, offering: 'primary' },
-    { intent: 'alternatives', text: 'Alternatives to {{business}}', score: 89, offering: 'secondary' },
+    { intent: 'comparison', text: 'Best tools for tracking {{business}} functionality', score: 85, offering: 'primary' },
     { intent: 'commercial', text: 'How much does {{business}} cost?', score: 81, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'How to choose the right SaaS tool for your business?', score: 82, offering: 'primary' },
     { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
   ],
 
@@ -721,7 +739,6 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'informational', text: 'Where to find designer second-hand clothing', score: 86, offering: 'primary' },
     { intent: 'local', text: 'Second-hand fashion shops in {{city}}', score: 88, offering: 'local', requiresCity: true, themeBoost: { audienceWomen: 3 } },
     { intent: 'brand', text: 'Is {{business}} a reliable second-hand clothing store?', score: 84, offering: 'secondary' },
-    { intent: 'alternatives', text: 'Alternatives to {{business}} for second-hand women\'s clothing', score: 80, offering: 'generic' },
   ],
 
   restaurant: [
@@ -761,15 +778,24 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
   ],
 
+  home_improvement_service: [
+    { intent: 'recommendation', text: 'Who is recommended for kitchen remodeling in {{city}}?', score: 93, offering: 'primary', requiresCity: true },
+    { intent: 'recommendation', text: 'Best bathroom remodeling contractor in {{city}}', score: 92, offering: 'primary', requiresCity: true },
+    { intent: 'pre_purchase', text: 'What to check before hiring a remodeling contractor?', score: 88, offering: 'primary' },
+    { intent: 'recommendation', text: 'Which design-build company is recommended in {{city}}?', score: 90, offering: 'primary', requiresCity: true },
+    { intent: 'commercial', text: 'How much does home remodeling cost in {{city}}?', score: 89, offering: 'secondary', requiresCity: true, themeBoost: { price: 4 } },
+    { intent: 'transactional', text: 'How to choose a reliable contractor for home projects?', score: 85, offering: 'primary' },
+  ],
+
   local_service: [
     { intent: 'recommendation', text: 'Recommended professionals in {{city}}', score: 87, offering: 'primary', requiresCity: true },
-    { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
+    { intent: 'pre_purchase', text: 'What to look for when hiring a service professional?', score: 81, offering: 'primary' },
+    { intent: 'commercial', text: 'How much do professional services cost in {{city}}?', score: 79, offering: 'secondary', requiresCity: true, themeBoost: { price: 3 } },
   ],
 
   generic: [
-    { intent: 'recommendation', text: 'Recommended businesses similar to {{business}}', score: 77, offering: 'primary' },
+    { intent: 'recommendation', text: 'Best {{business}} features and benefits', score: 77, offering: 'primary' },
     { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
-    { intent: 'alternatives', text: 'Alternatives to {{business}}', score: 71, offering: 'generic' },
   ],
 }
 
@@ -990,6 +1016,20 @@ const CATEGORY_PROFILES: Record<BusinessCategory, CategoryProfile> = {
     ],
     excludedTopics: [
       'מוצרי ניקיון', 'מטהרי אוויר', 'cleaning products', 'air fresheners',
+    ],
+  },
+  home_improvement_service: {
+    primaryOfferings: [
+      'שיפוץ מטבח', 'שיפוץ חדר אמבטיה', 'שיפוץ בית', 'בנייה', 'קבלן שיפוצים',
+      'kitchen remodeling', 'bathroom remodeling', 'home renovation', 'construction',
+      'design-build contractor', 'design and build',
+    ],
+    secondaryOfferings: [
+      'ריהוט בהזמנה', 'עיצוב פנים', 'קירור וחימום',
+      'custom cabinetry', 'interior design', 'HVAC installation',
+    ],
+    excludedTopics: [
+      'ציוד כושר', 'מוצרי חשמל ניידים', 'fitness equipment', 'portable appliances',
     ],
   },
   ecommerce: {
