@@ -54,13 +54,22 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       <div className="p-3 md:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-col items-center md:items-center justify-center gap-2 md:gap-1.5">
         {/* Mobile: logo on left of text */}
         <div className="flex md:flex-col items-center justify-center gap-2 md:gap-1.5 w-full">
-          <div className="flex items-center justify-center bg-white flex-shrink-0">
+          <div className="flex items-center justify-center flex-shrink-0">
             <Image
               src="/gotop-primary.png"
               alt="Go Top logo"
               width={140}
               height={56}
-              className="w-[51px] md:w-[93px] h-auto object-contain"
+              className="block dark:hidden w-[51px] md:w-[93px] h-auto object-contain"
+              sizes="(max-width: 768px) 51px, 93px"
+              priority
+            />
+            <Image
+              src="/gotop-dark.png"
+              alt="Go Top logo"
+              width={140}
+              height={56}
+              className="hidden dark:block w-[51px] md:w-[93px] h-auto object-contain"
               sizes="(max-width: 768px) 51px, 93px"
               priority
             />
