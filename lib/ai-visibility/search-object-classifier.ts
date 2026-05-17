@@ -17,6 +17,7 @@
 export type SearchObjectType =
   | 'product'
   | 'product_category'
+  | 'product_brand'
   | 'service'
   | 'local_service'
   | 'professional_service'
@@ -301,6 +302,12 @@ export function chooseTemplatesByObjectType(
           `איפה כדאי לקנות ${obj}?`,
           `מה חשוב לבדוק לפני שקונים ${obj}?`,
         ]
+      case 'product_brand':
+        return [
+          `איזה ${obj} מומלץ לקנות?`,
+          `מה היתרונות של ${obj}?`,
+          `כמה עולה ${obj}?`,
+        ]
       case 'service':
       case 'local_service':
       case 'professional_service': {
@@ -338,6 +345,12 @@ export function chooseTemplatesByObjectType(
         `What is the best ${obj} for home use?`,
         `Where can I buy ${obj}?`,
         `What should I check before buying ${obj}?`,
+      ]
+    case 'product_brand':
+      return [
+        `Which ${obj} should I buy?`,
+        `What are the pros and cons of ${obj}?`,
+        `How much does ${obj} cost?`,
       ]
     case 'service':
     case 'local_service':

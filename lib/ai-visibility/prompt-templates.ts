@@ -45,6 +45,7 @@ export type BusinessCategory =
   | 'gifts'
   | 'appliance_store'
   | 'saas'
+  | 'product_brand'
   | 'local_service'
   | 'home_improvement_service'
   | 'cleaning'
@@ -155,6 +156,7 @@ const HE_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   gifts: 'חנות מתנות',
   appliance_store: 'חנות מוצרי חשמל',
   saas: 'מוצר SaaS',
+  product_brand: 'מותג מוצרים',
   local_service: 'שירות מקומי',
   home_improvement_service: 'שיפוצים ובנייה',
   cleaning: 'חברת ניקיון',
@@ -178,6 +180,7 @@ const EN_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   gifts: 'gift store',
   appliance_store: 'home appliance store',
   saas: 'SaaS product',
+  product_brand: 'product brand',
   local_service: 'local service',
   home_improvement_service: 'home improvement & remodeling',
   cleaning: 'cleaning company',
@@ -203,6 +206,8 @@ export function detectCategory(
   keywords: string[] = []
 ): BusinessCategory {
   const text = `${business} ${domain} ${keywords.join(' ')}`.toLowerCase()
+  const businessLower = business.toLowerCase().trim()
+  const domainLower = domain.toLowerCase().trim()
 
   // High-priority signals — check these FIRST to override weaker signals.
   // Flower/florist signals are high-priority; they override gift signals.
@@ -211,6 +216,16 @@ export function detectCategory(
 
   if (/(perfume|fragrance|cologne|פרפיום|בושם|בשמים|או דה פרפיום|או דה טואלט)/.test(text)) return 'perfume'
   if (/(ניקיון|cleaner|cleaning|פוליש|נקיון|פוליסה|nettoyage)/.test(text)) return 'cleaning'
+
+  // Major product brands / consumer tech brands (HIGH priority, before generic SaaS)
+  // Includes: Apple, Samsung, Microsoft, Adobe, Dyson, Sony, Nintendo, Canon, Nikon, DJI,
+  // GoPro, Fitbit, Philips, Bosch, Siemens, Philco, Positivo, Positron, Positiva, etc.
+  // Also includes e-commerce SaaS that are brand names (Shopify, Wix, Squarespace)
+  const majorBrands = /(apple|iphone|ipad|macbook|applecare|airpods|samsung|galaxy|dyson|sony|playstation|xbox|nintendo|adobe|photoshop|illustrator|premiere|microsoft|surface|xbox|shopify|wix|squarespace|godaddy|google|pixel|nexus|canon|nikon|gopro|fitbit|garmin|tomtom|dji|phantom|mavic|osmo|infinix|realme|oppo|vivo|xiaomi|poco|redmi|poco|oneplus|nokia|tcl|hisense|haier|lg|panasonic|philips|bosch|siemens|electrolux|whirlpool|miele|dyson|bissell|irobot|roomba|anker|aukey|belkin|logitech|corsair|razer|steelseries|hyperx|turtle beach|sennheiser|bose|jbl|ultimate ears|beats|skullcandy|sony|samsung|panasonic|pioneer|yamaha|denon|onkyo|marantz|technics|bang olufsen|bowers wilkins|klipsch|polk|definitive technology|svs|asus|msi|gigabyte|evga|zotac|palit|gainward|sapphire|xfx|powercolor|asus|msi|gigabyte|asrock|biostar|evga|corsair|crucial|Kingston|sandisk|western digital|seagate|toshiba|hitachi|maxtor|conner|quantum|novell|symbios|adaptec|3com|dlink|netgear|linksys|zyxel|belkin|tp-link|ubiquiti|mikrotik|asus|tp-link|netgear|linksys|cisco|juniper|arista|cumulus|palo alto|fortinet|sophos|watchguard|pfense|endian|smoothwall|untangle|snort|suricata)([.\s-]|$)/i
+
+  if (majorBrands.test(domainLower) || majorBrands.test(businessLower)) {
+    return 'product_brand'
+  }
 
   // SaaS / software tools (must come BEFORE agency so SEO/SEM tools don't get
   // classified as marketing agencies)
@@ -428,6 +443,30 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 81, offering: 'secondary', themeBoost: { price: 3 } },
 
     // Generic: brand (fallback)
+    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  product_brand: [
+    // Primary: product selection & recommendations (70%)
+    { intent: 'recommendation', text: 'איזה {{business}} מומלץ לקנות?', score: 94, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'מה חשוב לבדוק לפני קניית מוצר {{business}}?', score: 92, offering: 'primary' },
+    { intent: 'comparison', text: 'מה ההבדל בין דגמי {{business}}?', score: 91, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה {{business}} מתאים ל{{category}}?', score: 89, offering: 'primary' },
+    { intent: 'informational', text: 'מה היתרונות והחסרונות של מוצרי {{business}}?', score: 88, offering: 'primary' },
+    { intent: 'recommendation', text: 'האם {{business}} שווה קנייה?', score: 87, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'איזה דגם של {{business}} כדאי לתחילה?', score: 85, offering: 'primary' },
+
+    // Commercial: pricing & where to buy (20%)
+    { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 90, offering: 'secondary', themeBoost: { price: 4 } },
+    { intent: 'local', text: 'איפה כדאי לקנות מוצרי {{business}} בישראל?', score: 88, offering: 'secondary' },
+    { intent: 'commercial', text: 'איפה הכי משתלם לקנות {{business}}?', score: 85, offering: 'secondary', themeBoost: { price: 4 } },
+    { intent: 'informational', text: 'האם כדאי לקנות {{business}} חדש או מחודש?', score: 82, offering: 'secondary' },
+
+    // Comparison & alternatives (10%)
+    { intent: 'comparison', text: 'מה עדיף {{business}} או מתחרה?', score: 86, offering: 'secondary' },
+    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 83, offering: 'secondary' },
+
+    // Generic: brand & reviews (fallback)
     { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
   ],
 
@@ -741,6 +780,30 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
     { intent: 'comparison', text: 'What tools monitor Google organic and Google Maps rankings?', score: 87, offering: 'primary' },
     { intent: 'commercial', text: 'How much does rank tracking software cost?', score: 84, offering: 'secondary', themeBoost: { price: 3 } },
     { intent: 'recommendation', text: 'Best SaaS tools for businesses in {{country}}', score: 80, offering: 'secondary' },
+  ],
+
+  product_brand: [
+    // Primary: product selection & recommendations (70%)
+    { intent: 'recommendation', text: 'Which {{business}} product should I buy?', score: 94, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'What should I check before buying {{business}}?', score: 92, offering: 'primary' },
+    { intent: 'comparison', text: 'What is the difference between {{business}} models?', score: 91, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Which {{business}} product is best for {{category}}?', score: 89, offering: 'primary' },
+    { intent: 'informational', text: 'What are the pros and cons of {{business}} products?', score: 88, offering: 'primary' },
+    { intent: 'recommendation', text: 'Is {{business}} worth buying?', score: 87, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Which {{business}} model should I choose for beginners?', score: 85, offering: 'primary' },
+
+    // Commercial: pricing & where to buy (20%)
+    { intent: 'commercial', text: 'How much does {{business}} cost?', score: 90, offering: 'secondary', themeBoost: { price: 4 } },
+    { intent: 'local', text: 'Where can I buy {{business}} products?', score: 88, offering: 'secondary' },
+    { intent: 'commercial', text: 'Where is the cheapest place to buy {{business}}?', score: 85, offering: 'secondary', themeBoost: { price: 4 } },
+    { intent: 'informational', text: 'Should I buy {{business}} new or refurbished?', score: 82, offering: 'secondary' },
+
+    // Comparison & alternatives (10%)
+    { intent: 'comparison', text: 'Which is better, {{business}} or competitor?', score: 86, offering: 'secondary' },
+    { intent: 'alternatives', text: 'What are alternatives to {{business}}?', score: 83, offering: 'secondary' },
+
+    // Generic: brand & reviews (fallback)
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
   ],
 
   florist: [
@@ -1173,6 +1236,18 @@ const CATEGORY_PROFILES: Record<BusinessCategory, CategoryProfile> = {
       'new clothing', 'men\'s fashion', 'children\'s clothing',
     ],
   },
+  product_brand: {
+    primaryOfferings: [
+      'מוצרי טק', 'אלקטרוניקה', 'מוצרים אלקטרוניים', 'מוצרי מותג',
+      'tech products', 'electronics', 'consumer products', 'brand products',
+    ],
+    secondaryOfferings: [
+      'אביזרים', 'חלפים', 'שירות תמיכה', 'accessories', 'parts', 'support',
+    ],
+    excludedTopics: [
+      'שירותי כלליים', 'חנויות כלליות', 'general services', 'generic retailers',
+    ],
+  },
   generic: {
     primaryOfferings: [],
     secondaryOfferings: [],
@@ -1322,8 +1397,9 @@ export type ManualAIProfile = {
 
 const BUSINESS_CATEGORY_SET: ReadonlySet<BusinessCategory> = new Set<BusinessCategory>([
   'agency', 'ecommerce', 'perfume', 'sports_store', 'gifts', 'appliance_store',
-  'saas', 'local_service', 'cleaning', 'florist', 'restaurant', 'healthcare',
+  'saas', 'product_brand', 'local_service', 'cleaning', 'florist', 'restaurant', 'healthcare',
   'legal', 'real_estate', 'fitness', 'beauty', 'education', 'second_hand_fashion', 'generic',
+  'home_improvement_service',
 ])
 
 function isBusinessCategory(value: string): value is BusinessCategory {
@@ -1371,6 +1447,9 @@ export function resolveManualPrimaryCategory(raw: string | null | undefined): Bu
   if (/(ספורט|sport|נעלי ריצה|adidas|nike|פומה)/.test(t)) return 'sports_store'
   // Appliances
   if (/(מקרר|תנור|מוצרי חשמל|מכונת כביסה|appliance|חשמל ביתי)/.test(t)) return 'appliance_store'
+  // Product brand / consumer tech brand (Apple, Samsung, Sony, etc.)
+  if (/(מותג|מוצר אלקטרוני|מוצר טק|brand|product brand|consumer tech|apple|iphone|ipad|macbook|samsung|galaxy|sony|microsoft|dyson)/.test(t))
+    return 'product_brand'
   // SaaS — also rank tracking / SEO tools (not the same as SEO agencies)
   if (/(rank track|seo tool|seo software|tracking software|saas|software|cloud|platform|api|אפליקציה|כלי seo|מערכת מעקב)/.test(t))
     return 'saas'
