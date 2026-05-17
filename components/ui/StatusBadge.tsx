@@ -27,11 +27,20 @@ export function ScanStatusBadge({ status }: { status: string }) {
 }
 
 export function EngineBadge({ engine, device }: { engine: string; device?: string | null }) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   if (engine === 'google_search') {
-    return <Badge variant="info">{getSearchTypeLabel(engine, device)}</Badge>
+    let label: string
+    if (device === 'mobile') {
+      label = dict.common.searchTypeGoogleMobile
+    } else {
+      label = dict.common.searchTypeGoogleDesktop
+    }
+    return <Badge variant="info">{label}</Badge>
   }
   if (engine === 'google_maps') {
-    return <Badge variant="success">גוגל מפות</Badge>
+    return <Badge variant="success">{dict.common.engineGoogleMaps}</Badge>
   }
   return <Badge>{engine}</Badge>
 }

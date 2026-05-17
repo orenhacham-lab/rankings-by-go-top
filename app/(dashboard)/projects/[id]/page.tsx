@@ -16,7 +16,7 @@ import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
 import Link from 'next/link'
-import { formatDate, formatDateTime, getDeviceLabel, getFrequencyLabel, getSearchTypeLabel } from '@/lib/utils'
+import { formatDate, formatDateTime, getFrequencyLabel } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { Search, BarChart3, Sparkles, FileText } from 'lucide-react'
 
@@ -178,9 +178,32 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   const activeTargets = targets.filter((t) => t.is_active)
   const primaryEngine = activeTargets[0]?.engine_type || 'google_search'
+
+  let deviceLabel: string
+  if (project.device_type === 'mobile') {
+    deviceLabel = dict.common.deviceMobile
+  } else if (project.device_type === 'desktop') {
+    deviceLabel = dict.common.deviceDesktop
+  } else {
+    deviceLabel = dict.common.deviceDefault
+  }
+
+  let searchTypeLabel: string
+  if (primaryEngine === 'google_search') {
+    if (project.device_type === 'mobile') {
+      searchTypeLabel = dict.common.searchTypeGoogleMobile
+    } else {
+      searchTypeLabel = dict.common.searchTypeGoogleDesktop
+    }
+  } else if (primaryEngine === 'google_maps') {
+    searchTypeLabel = dict.common.engineGoogleMaps
+  } else {
+    searchTypeLabel = primaryEngine
+  }
+
   const scanParams = {
-    engine: getSearchTypeLabel(primaryEngine, project.device_type),
-    device: getDeviceLabel(project.device_type),
+    engine: searchTypeLabel,
+    device: deviceLabel,
     gl: project.country.toLowerCase(),
     hl: project.language,
     location: project.city || '—',
