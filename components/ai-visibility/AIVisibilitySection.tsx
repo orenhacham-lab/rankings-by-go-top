@@ -1072,18 +1072,20 @@ function SmartQuestionCard({
     gift: 'success',
   }
 
-  // Prefer the precomputed intentLabel (localized in the generator) and fall
-  // back to legacy i18n keys for backwards compatibility.
+  // Intent label follows dashboard UI language, not the project's scan language.
   const label =
-    question.intentLabel ||
     (
       {
         brand: t('intent_brand'),
         comparison: t('intent_comparison'),
+        commercial: t('intent_commercial'),
         local: t('intent_local'),
         transactional: t('intent_transactional'),
         recommendation: t('intent_recommendation'),
         informational: t('intent_informational'),
+        alternatives: t('intent_alternatives'),
+        pre_purchase: t('intent_pre_purchase'),
+        gift: t('intent_gift'),
       } as Record<string, string>
     )[question.intent] ||
     question.intent

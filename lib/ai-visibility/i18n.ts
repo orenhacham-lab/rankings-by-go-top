@@ -137,6 +137,8 @@ const STRINGS = {
   intent_informational: { he: 'מידע', en: 'Informational' },
   intent_alternatives: { he: 'חלופות', en: 'Alternatives' },
   intent_best_of: { he: 'הטובים ביותר', en: 'Best of' },
+  intent_pre_purchase: { he: 'מידע לפני רכישה', en: 'Pre-purchase' },
+  intent_gift: { he: 'מתנה', en: 'Gift' },
 
   // Workspace layout
   select_query_to_view: { he: 'בחר שאלה כדי להציג את פרטיה', en: 'Select a query to view details' },
@@ -241,6 +243,23 @@ const STRINGS = {
   show_all: { he: 'הצג הכל', en: 'Show all' },
   show_more: { he: 'הצג עוד', en: 'Show more' },
   add_to_queries_aria: { he: 'הוסף לרשימת השאילתות', en: 'Add to query list' },
+
+  // AI Insight Cards
+  ai_insights_header: { he: 'תובנות AI', en: 'AI Insights' },
+  insight_brand_mention: { he: 'הזכרת מותג', en: 'Brand Mention' },
+  insight_domain_cite: { he: 'ציטוט דומיין', en: 'Domain Cited' },
+  insight_competitors: { he: 'מתחרים שזוהו', en: 'Competitors Detected' },
+  insight_sources: { he: 'מקורות מובילים', en: 'Top Sources' },
+  insight_recommendation: { he: 'המלצה זוהתה', en: 'Recommendation' },
+  insight_engine: { he: 'מנוע סורק', en: 'Engine' },
+  insight_mentioned_in_answer: { he: 'הוזכר בתשובה', en: 'Mentioned in answer' },
+  insight_cited_as_source: { he: 'מצוטט כמקור', en: 'Cited as source' },
+  insight_brand_recommended: { he: 'המותג שלך מומלץ', en: 'Your brand is recommended' },
+  insight_no_clear_recommendation: { he: 'ללא המלצה ברורה', en: 'No clear recommendation' },
+  insight_no_competitors: { he: 'לא זוהו מתחרים', en: 'No competitors detected' },
+  insight_no_sources_cited: { he: 'אין מקורות מצוטטים', en: 'No sources cited' },
+  insight_mention_count_suffix: { he: 'פעמים', en: 'mentions' },
+  insight_words_in_answer: { he: 'מילים בתשובה', en: 'words in answer' },
 
   // Scan status (live, on-screen)
   scan_in_progress: { he: 'סריקת מנוע AI בתהליך…', en: 'AI engine scan in progress…' },

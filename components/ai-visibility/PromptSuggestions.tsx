@@ -64,10 +64,14 @@ export default function PromptSuggestions({
     switch (intent) {
       case 'brand': return t('intent_brand')
       case 'comparison': return t('intent_comparison')
+      case 'commercial': return t('intent_commercial')
       case 'local': return t('intent_local')
       case 'transactional': return t('intent_transactional')
       case 'recommendation': return t('intent_recommendation')
       case 'informational': return t('intent_informational')
+      case 'alternatives': return t('intent_alternatives')
+      case 'pre_purchase': return t('intent_pre_purchase')
+      case 'gift': return t('intent_gift')
       default: return intent
     }
   }
@@ -388,7 +392,7 @@ export default function PromptSuggestions({
                     )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <Badge variant={INTENT_TONE[s.intent] || 'neutral'}>
-                        {s.intentLabel || intentLabel(s.intent)}
+                        {intentLabel(s.intent)}
                       </Badge>
                       <button
                         onClick={() => startEdit(s.id, s.prompt)}

@@ -135,32 +135,32 @@ function computeInsights(input: InsightInput) {
 
 type AIInsightCardsProps = {
   input: InsightInput
-  isHebrew: boolean
+  isHebrew?: boolean
 }
 
-export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps) {
+export default function AIInsightCards({ input }: AIInsightCardsProps) {
   const { language: dashboardLanguage } = useDashboardLanguage()
   const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
   const insights = useMemo(() => computeInsights(input), [input])
   const engineMeta = ENGINE_META[input.engine]
 
   const L = {
-    brand_mention: dashboardLanguage === 'he' ? 'הזכרת מותג' : 'Brand Mention',
-    domain_cite: dashboardLanguage === 'he' ? 'ציטוט דומיין' : 'Domain Cited',
-    competitors: dashboardLanguage === 'he' ? 'מתחרים שזוהו' : 'Competitors Detected',
-    sources: dashboardLanguage === 'he' ? 'מקורות מובילים' : 'Top Sources',
-    recommendation: dashboardLanguage === 'he' ? 'המלצה זוהתה' : 'Recommendation',
-    engine: dashboardLanguage === 'he' ? 'מנוע סורק' : 'Engine',
-    mentioned: dashboardLanguage === 'he' ? 'הוזכר בתשובה' : 'Mentioned in answer',
-    not_mentioned: dashboardLanguage === 'he' ? 'לא הוזכר' : 'Not mentioned',
-    cited: dashboardLanguage === 'he' ? 'מצוטט כמקור' : 'Cited as source',
-    not_cited: dashboardLanguage === 'he' ? 'לא צוטט' : 'Not cited',
-    recommended: dashboardLanguage === 'he' ? 'המותג שלך מומלץ' : 'Your brand is recommended',
-    not_recommended: dashboardLanguage === 'he' ? 'ללא המלצה ברורה' : 'No clear recommendation',
-    no_competitors: dashboardLanguage === 'he' ? 'לא זוהו מתחרים' : 'No competitors detected',
-    no_sources: dashboardLanguage === 'he' ? 'אין מקורות מצוטטים' : 'No sources cited',
+    brand_mention: t('insight_brand_mention'),
+    domain_cite: t('insight_domain_cite'),
+    competitors: t('insight_competitors'),
+    sources: t('insight_sources'),
+    recommendation: t('insight_recommendation'),
+    engine: t('insight_engine'),
+    mentioned: t('insight_mentioned_in_answer'),
+    not_mentioned: t('not_mentioned'),
+    cited: t('insight_cited_as_source'),
+    not_cited: t('not_cited'),
+    recommended: t('insight_brand_recommended'),
+    not_recommended: t('insight_no_clear_recommendation'),
+    no_competitors: t('insight_no_competitors'),
+    no_sources: t('insight_no_sources_cited'),
     your_domain: t('your_domain'),
-    times: dashboardLanguage === 'he' ? 'פעמים' : 'mentions',
+    times: t('insight_mention_count_suffix'),
   }
 
   return (
@@ -170,7 +170,7 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
         <div className="flex items-center gap-1.5">
           <Lightbulb size={14} className="text-slate-400" strokeWidth={2} />
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            {dashboardLanguage === 'he' ? 'תובנות AI' : 'AI Insights'}
+            {t('ai_insights_header')}
           </span>
         </div>
         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
@@ -261,7 +261,7 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{engineMeta.name}</div>
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            {insights.responseWordCount} {dashboardLanguage === 'he' ? 'מילים בתשובה' : 'words in answer'}
+            {insights.responseWordCount} {t('insight_words_in_answer')}
           </div>
         </div>
       )}

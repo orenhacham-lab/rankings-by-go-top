@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Badge from '@/components/ui/Badge'
 import { ENGINE_META, TrashIcon } from './EngineIcon'
 import { createI18n } from '@/lib/ai-visibility/i18n'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
 export type HistoryRun = {
   id: string
@@ -62,8 +63,6 @@ export default function ScanHistory({
   selectedRunId,
   onSelectRun,
   onDeleteRun,
-  language,
-  country,
   removedRunIds,
 }: {
   projectId: string
@@ -71,12 +70,11 @@ export default function ScanHistory({
   selectedRunId: string | null
   onSelectRun: (runId: string) => void
   onDeleteRun?: (runId: string) => void
-  language?: string | null
-  country?: string | null
   removedRunIds?: Set<string>
 }) {
-  const t = useMemo(() => createI18n(language, country), [language, country])
-  const isHebrew = (language || '').toLowerCase() === 'he' || (country || '').toUpperCase() === 'IL'
+  const { language: dashboardLanguage } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
+  const isHebrew = dashboardLanguage === 'he'
 
   const [runs, setRuns] = useState<HistoryRun[]>([])
   const [loading, setLoading] = useState(true)
