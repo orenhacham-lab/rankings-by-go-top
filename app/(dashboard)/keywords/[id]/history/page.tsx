@@ -11,9 +11,15 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function KeywordHistoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const t = dict.keywordsPage.history
+  const common = dict.common
   const [target, setTarget] = useState<TrackingTarget & { projects?: { name: string; id: string } } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,13 +51,13 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
         <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-        טוען...
+        {common.loading}
       </div>
     )
   }
 
   if (!target) {
-    return <div className="text-center py-20 text-slate-400">מילת מפתח לא נמצאה</div>
+    return <div className="text-center py-20 text-slate-400">{t.keywordNotFound}</div>
   }
 
   const foundResults = results.filter((r) => r.found && r.position !== null)
@@ -63,15 +69,15 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
     : null
 
   return (
-    <div>
+    <div dir={language === 'en' ? 'ltr' : 'rtl'}>
       <Header
         title={target.keyword}
-        subtitle="היסטוריית דירוגים"
+        subtitle={t.subtitle}
         actions={
           <div className="flex gap-2">
             {target.projects && (
               <Link href={`/projects/${target.projects.id}`}>
-                <Button variant="outline" size="sm">← הפרויקט</Button>
+                <Button variant="outline" size="sm">{t.backToProject}</Button>
               </Link>
             )}
           </div>

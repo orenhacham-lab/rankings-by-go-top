@@ -52,6 +52,8 @@ export const dashboardEn = {
     actions: 'Actions',
     status: 'Status',
     saveError: 'Save failed',
+    back: '← Back',
+    notFound: 'Not found',
     lightMode: 'Light mode',
     darkMode: 'Dark mode',
     switchToDarkMode: 'Switch to dark mode',
@@ -69,6 +71,8 @@ export const dashboardEn = {
     countSuffix: 'projects',
     countPrefix: 'Total:',
     newProject: '+ New Project',
+    newProjectTitle: 'New Project',
+    newProjectSubtitle: 'Create a new project',
     searchPlaceholder: 'Search by project name or domain...',
     table: {
       projectName: 'Project name',
@@ -150,6 +154,12 @@ export const dashboardEn = {
     engineGoogleMaps: 'Google Maps',
     selectProjectMessage: 'Select a project to display keywords.',
     sortByPositionTooltip: 'Sort by position',
+    history: {
+      title: 'Ranking History',
+      subtitle: 'Ranking history',
+      keywordNotFound: 'Keyword not found',
+      backToProject: '← Project',
+    },
     table: {
       keyword: 'Keyword',
       project: 'Project',
@@ -445,7 +455,7 @@ export const dashboardEn = {
       premium: 'Premium',
     },
     features: {
-      trial: ['1 project only', 'Up to 30 keywords', '1 scan total', 'Up to 3 AI scans', '7-day trial'],
+      trial: ['1 project', 'Up to 30 keywords', '1 scan per month', 'Up to 3 AI scans', '7-day trial'],
       regular: ['Up to 3 projects', 'Up to 50 keywords per project', '1 scan per month per project', 'Up to 10 AI scans per project'],
       advanced: ['Up to 10 projects', 'Up to 50 keywords per project', '2 scans per month per project', 'Up to 10 AI scans per project'],
       premium: ['Up to 25 projects', 'Up to 100 keywords per project', '2 scans per month per project', 'Up to 20 AI scans per project'],

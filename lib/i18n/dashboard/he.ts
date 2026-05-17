@@ -50,6 +50,8 @@ export const dashboardHe = {
     actions: 'פעולות',
     status: 'סטטוס',
     saveError: 'שגיאה בשמירה',
+    back: '← חזרה',
+    notFound: 'לא נמצא',
     lightMode: 'מצב בהיר',
     darkMode: 'מצב כהה',
     switchToDarkMode: 'עבור למצב כהה',
@@ -67,6 +69,8 @@ export const dashboardHe = {
     countSuffix: 'פרויקטים',
     countPrefix: 'סה"כ',
     newProject: '+ פרויקט חדש',
+    newProjectTitle: 'פרויקט חדש',
+    newProjectSubtitle: 'יצירת פרויקט חדש ללקוח',
     searchPlaceholder: 'חיפוש לפי שם פרויקט, דומיין...',
     table: {
       projectName: 'שם פרויקט',
@@ -148,6 +152,12 @@ export const dashboardHe = {
     engineGoogleMaps: 'גוגל מפות',
     selectProjectMessage: 'יש לבחור פרויקט כדי להציג מילות מפתח.',
     sortByPositionTooltip: 'מיין לפי מיקום',
+    history: {
+      title: 'היסטוריית דירוגים',
+      subtitle: 'היסטוריית דירוגים',
+      keywordNotFound: 'מילת מפתח לא נמצאה',
+      backToProject: '← הפרויקט',
+    },
     table: {
       keyword: 'מילת מפתח',
       project: 'פרויקט',
