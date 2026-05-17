@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { createI18n } from '@/lib/ai-visibility/i18n'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import {
   detectCategory,
   type BusinessCategory,
@@ -75,8 +76,9 @@ export default function AIBusinessProfilePanel({
   onChange: (profile: ManualAIProfile | null) => void
   onProfileSaved?: () => void
 }) {
-  const t = useMemo(() => createI18n('he', 'IL'), [])
-  const isHebrew = true
+  const { language: dashboardLanguage } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
+  const isHebrew = dashboardLanguage === 'he'
 
   const autoCategory = useMemo<BusinessCategory>(
     () => detectCategory(businessName || '', domain || '', keywords || []),
@@ -176,7 +178,7 @@ export default function AIBusinessProfilePanel({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data.error || 'שמירת הפרופיל נכשלה. נסה שוב.')
+        throw new Error(data.error || t('profile_save_failed'))
       }
       const savedProfile = data.profile as
         | { mode: 'auto' | 'manual'; primaryCategory: string | null; secondaryCategories: string[]; excludedTopics: string[] }
@@ -193,7 +195,7 @@ export default function AIBusinessProfilePanel({
       setExpanded(false)
       onProfileSaved?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'שמירת הפרופיל נכשלה. נסה שוב.')
+      setError(e instanceof Error ? e.message : t('profile_save_failed'))
     } finally {
       setSaving(false)
     }
@@ -207,7 +209,7 @@ export default function AIBusinessProfilePanel({
       const res = await fetch(`/api/projects/${projectId}/ai-profile`, { method: 'DELETE' })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'איפוס הפרופיל נכשל. נסה שוב.')
+        throw new Error(body.error || t('profile_reset_failed'))
       }
       setMode('auto')
       setPrimaryCategory('')
@@ -218,7 +220,7 @@ export default function AIBusinessProfilePanel({
       setExpanded(false)
       onProfileSaved?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'איפוס הפרופיל נכשל. נסה שוב.')
+      setError(e instanceof Error ? e.message : t('profile_reset_failed'))
     } finally {
       setSaving(false)
     }

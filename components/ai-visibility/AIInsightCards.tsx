@@ -11,6 +11,8 @@
 import { useMemo } from 'react'
 import { Users, Link2, Lightbulb, CheckCircle2, Circle } from 'lucide-react'
 import { ENGINE_META } from './EngineIcon'
+import { createI18n } from '@/lib/ai-visibility/i18n'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
 export type Citation = {
   id: string
@@ -137,46 +139,29 @@ type AIInsightCardsProps = {
 }
 
 export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps) {
+  const { language: dashboardLanguage } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
   const insights = useMemo(() => computeInsights(input), [input])
   const engineMeta = ENGINE_META[input.engine]
 
-  const L = isHebrew
-    ? {
-        brand_mention: 'הזכרת מותג',
-        domain_cite: 'ציטוט דומיין',
-        competitors: 'מתחרים שזוהו',
-        sources: 'מקורות מובילים',
-        recommendation: 'המלצה זוהתה',
-        engine: 'מנוע סורק',
-        mentioned: 'הוזכר בתשובה',
-        not_mentioned: 'לא הוזכר',
-        cited: 'מצוטט כמקור',
-        not_cited: 'לא צוטט',
-        recommended: 'המותג שלך מומלץ',
-        not_recommended: 'ללא המלצה ברורה',
-        no_competitors: 'לא זוהו מתחרים',
-        no_sources: 'אין מקורות מצוטטים',
-        your_domain: 'הדומיין שלך',
-        times: 'פעמים',
-      }
-    : {
-        brand_mention: 'Brand Mention',
-        domain_cite: 'Domain Cited',
-        competitors: 'Competitors Detected',
-        sources: 'Top Sources',
-        recommendation: 'Recommendation',
-        engine: 'Engine',
-        mentioned: 'Mentioned in answer',
-        not_mentioned: 'Not mentioned',
-        cited: 'Cited as source',
-        not_cited: 'Not cited',
-        recommended: 'Your brand is recommended',
-        not_recommended: 'No clear recommendation',
-        no_competitors: 'No competitors detected',
-        no_sources: 'No sources cited',
-        your_domain: 'Your domain',
-        times: 'mentions',
-      }
+  const L = {
+    brand_mention: dashboardLanguage === 'he' ? 'הזכרת מותג' : 'Brand Mention',
+    domain_cite: dashboardLanguage === 'he' ? 'ציטוט דומיין' : 'Domain Cited',
+    competitors: dashboardLanguage === 'he' ? 'מתחרים שזוהו' : 'Competitors Detected',
+    sources: dashboardLanguage === 'he' ? 'מקורות מובילים' : 'Top Sources',
+    recommendation: dashboardLanguage === 'he' ? 'המלצה זוהתה' : 'Recommendation',
+    engine: dashboardLanguage === 'he' ? 'מנוע סורק' : 'Engine',
+    mentioned: dashboardLanguage === 'he' ? 'הוזכר בתשובה' : 'Mentioned in answer',
+    not_mentioned: dashboardLanguage === 'he' ? 'לא הוזכר' : 'Not mentioned',
+    cited: dashboardLanguage === 'he' ? 'מצוטט כמקור' : 'Cited as source',
+    not_cited: dashboardLanguage === 'he' ? 'לא צוטט' : 'Not cited',
+    recommended: dashboardLanguage === 'he' ? 'המותג שלך מומלץ' : 'Your brand is recommended',
+    not_recommended: dashboardLanguage === 'he' ? 'ללא המלצה ברורה' : 'No clear recommendation',
+    no_competitors: dashboardLanguage === 'he' ? 'לא זוהו מתחרים' : 'No competitors detected',
+    no_sources: dashboardLanguage === 'he' ? 'אין מקורות מצוטטים' : 'No sources cited',
+    your_domain: t('your_domain'),
+    times: dashboardLanguage === 'he' ? 'פעמים' : 'mentions',
+  }
 
   return (
     <div className="space-y-4">
@@ -185,7 +170,7 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
         <div className="flex items-center gap-1.5">
           <Lightbulb size={14} className="text-slate-400" strokeWidth={2} />
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            {isHebrew ? 'תובנות AI' : 'AI Insights'}
+            {dashboardLanguage === 'he' ? 'תובנות AI' : 'AI Insights'}
           </span>
         </div>
         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
@@ -276,7 +261,7 @@ export default function AIInsightCards({ input, isHebrew }: AIInsightCardsProps)
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{engineMeta.name}</div>
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            {insights.responseWordCount} {isHebrew ? 'מילים בתשובה' : 'words in answer'}
+            {insights.responseWordCount} {dashboardLanguage === 'he' ? 'מילים בתשובה' : 'words in answer'}
           </div>
         </div>
       )}

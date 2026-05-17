@@ -15,6 +15,7 @@ import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import { generatePromptSuggestions, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
 const INTENT_TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
   brand: 'info',
@@ -54,9 +55,10 @@ export default function PromptSuggestions({
   manualProfile?: ManualAIProfile | null
   onAdded: () => void
 }) {
-  // UI is always Hebrew/RTL — scan parameters (language/country) remain separate
-  const t = useMemo(() => createI18n('he', 'IL'), [])
-  const isHebrew = true
+  // UI follows dashboard language; scan parameters (language/country) remain separate
+  const { language: dashboardLanguage } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
+  const isHebrew = dashboardLanguage === 'he'
 
   const intentLabel = (intent: string): string => {
     switch (intent) {

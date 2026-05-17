@@ -31,7 +31,8 @@ import {
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
 import AIBusinessProfilePanel from './AIBusinessProfilePanel'
-import { createI18n, isHebrew as detectHebrew } from '@/lib/ai-visibility/i18n'
+import { createI18n } from '@/lib/ai-visibility/i18n'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
@@ -99,8 +100,9 @@ export default function AIVisibilitySection({
   projectCity?: string | null
   projectKeywords?: string[]
 }) {
-  const t = useMemo(() => createI18n('he', 'IL'), [])
-  const isHebrew = true
+  const { language: dashboardLanguage } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(dashboardLanguage), [dashboardLanguage])
+  const isHebrew = dashboardLanguage === 'he'
 
   const [currentTab, setCurrentTab] = useState<TabType>('results')
   const [allResults, setAllResults] = useState<ResultRow[]>([])
@@ -312,7 +314,7 @@ export default function AIVisibilitySection({
     async (promptId: string, engine: string) => {
       const key = `${promptId}:${engine}`
       setScanningKey(key)
-      setScanStatus('סריקת מנוע AI בתהליך…')
+      setScanStatus(t('scan_in_progress'))
       setError(null)
       try {
         const res = await fetch('/api/ai-visibility/runs', {
@@ -326,7 +328,7 @@ export default function AIVisibilitySection({
         }
         const body = await res.json()
         await loadAllResults()
-        setScanStatus('הסריקה הושלמה')
+        setScanStatus(t('scan_done'))
         setCurrentTab('results')
         // After loadAllResults the new result is in state. Use its id to highlight + open.
         if (body.resultId) setHighlightResultId(body.resultId)
@@ -346,7 +348,7 @@ export default function AIVisibilitySection({
         setTimeout(() => setScanStatus(null), 3000)
       }
     },
-    [projectId, loadAllResults, allResults, openResultDrawer]
+    [projectId, loadAllResults, allResults, openResultDrawer, t]
   )
 
   // When allResults updates after a scan, if there's a highlighted id we haven't
@@ -539,7 +541,7 @@ export default function AIVisibilitySection({
                     size="sm"
                     onClick={() => setShowAllResults(!showAllResults)}
                   >
-                    {showAllResults ? 'הצג פחות' : 'הצג הכל'}
+                    {showAllResults ? t('show_less') : t('show_all')}
                   </Button>
                 </div>
               )}
@@ -651,7 +653,7 @@ export default function AIVisibilitySection({
                     size="sm"
                     onClick={() => setShowAllPrompts(!showAllPrompts)}
                   >
-                    {showAllPrompts ? 'הצג פחות' : 'הצג עוד'}
+                    {showAllPrompts ? t('show_less') : t('show_more')}
                   </Button>
                 </div>
               )}
@@ -1105,7 +1107,7 @@ function SmartQuestionCard({
       <button
         onClick={onAdd}
         className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition flex items-center justify-center"
-        aria-label="הוסף לרשימת השאילתות"
+        aria-label={t('add_to_queries_aria')}
       >
         +
       </button>
@@ -1291,6 +1293,7 @@ function NewAIQueryModal({
   onAdded: () => void
   t: T
 }) {
+  const { language: dashboardLanguage } = useDashboardLanguage()
   const [prompt, setPrompt] = useState('')
   const [targetDomain, setTargetDomain] = useState(domain || '')
   const [targetBrand, setTargetBrand] = useState(businessName || '')
@@ -1367,7 +1370,7 @@ function NewAIQueryModal({
 
   if (!open) return null
 
-  const isHebrew = detectHebrew(language, country)
+  const isHebrew = dashboardLanguage === 'he'
 
   const countText =
     parsedQueries.length === 0

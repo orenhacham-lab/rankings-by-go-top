@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Link from 'next/link'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { createI18n } from '@/lib/ai-visibility/i18n'
 
 type Summary = {
   projectId: string
@@ -22,6 +24,9 @@ type Summary = {
 type ProjectRow = Project & { clients?: Client | null }
 
 export default function AIVisibilityPage() {
+  const { language } = useDashboardLanguage()
+  const t = useMemo(() => createI18n(language), [language])
+
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [summaries, setSummaries] = useState<Map<string, Summary>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -59,18 +64,18 @@ export default function AIVisibilityPage() {
           setSummaries(map)
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load')
+        setError(e instanceof Error ? e.message : t('failed_to_load'))
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [])
+  }, [t])
 
   const formatDate = (iso: string | null): string => {
     if (!iso) return '—'
     try {
-      return new Date(iso).toLocaleDateString('he-IL', {
+      return new Date(iso).toLocaleDateString(language === 'en' ? 'en-US' : 'he-IL', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -111,14 +116,14 @@ export default function AIVisibilityPage() {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
         <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-        טוען...
+        {t('loading')}
       </div>
     )
   }
 
   return (
     <div>
-      <Header title="נראות ב-AI" subtitle="ההופעות של האתר שלך בתוצאות AI לפי פרויקט" />
+      <Header title={t('ai_visibility')} subtitle={t('page_subtitle')} />
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
@@ -128,41 +133,41 @@ export default function AIVisibilityPage() {
 
       {projects.length === 0 ? (
         <div className="text-center py-20 text-slate-500">
-          <p className="mb-4">אין פרויקטים זמינים</p>
+          <p className="mb-4">{t('no_projects_available')}</p>
           <Link href="/projects/new">
-            <Button>+ הוסף פרויקט</Button>
+            <Button>{t('add_project')}</Button>
           </Link>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
             <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">סה״כ פרויקטים</div>
+              <div className="text-[11px] text-slate-500 mb-1">{t('total_projects')}</div>
               <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalProjects}</div>
             </Card>
             <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">סה״כ שאילתות</div>
+              <div className="text-[11px] text-slate-500 mb-1">{t('total_queries')}</div>
               <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalQueries}</div>
             </Card>
             <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">סה״כ סריקות</div>
+              <div className="text-[11px] text-slate-500 mb-1">{t('total_scans')}</div>
               <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalScans}</div>
             </Card>
             <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">סה״כ אזכורים</div>
+              <div className="text-[11px] text-slate-500 mb-1">{t('total_mentions')}</div>
               <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalMentions}</div>
             </Card>
             <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">סה״כ ציטוטים</div>
+              <div className="text-[11px] text-slate-500 mb-1">{t('total_citations')}</div>
               <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.totalCitations}</div>
             </Card>
             <Card className="p-3">
-              <div className="text-[11px] text-slate-500 mb-1">ממוצע נראות</div>
+              <div className="text-[11px] text-slate-500 mb-1">{t('avg_visibility')}</div>
               <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{overallStats.avgScore}%</div>
             </Card>
           </div>
 
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">פרויקטים</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{t('projects_heading')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((project) => {
             const summary = summaries.get(project.id)
@@ -187,31 +192,31 @@ export default function AIVisibilityPage() {
                     )}
                   </div>
                   <Badge variant={scoreTone}>
-                    {summary && summary.totalScans > 0 ? `${score}%` : 'אין נתונים'}
+                    {summary && summary.totalScans > 0 ? `${score}%` : t('no_data')}
                   </Badge>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">שאילתות</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('queries')}</div>
                     <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalQueries ?? 0}</div>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">סריקות</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('scans')}</div>
                     <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalScans ?? 0}</div>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">הזכרות</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('mentions')}</div>
                     <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalMentions ?? 0}</div>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-2">
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">ציטוטים</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{t('citations')}</div>
                     <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{summary?.totalCitations ?? 0}</div>
                   </div>
                 </div>
 
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
-                  סריקה אחרונה: {formatDate(summary?.lastScanAt ?? null)}
+                  {t('last_scan')}: {formatDate(summary?.lastScanAt ?? null)}
                 </div>
 
                 <Link
@@ -219,7 +224,7 @@ export default function AIVisibilityPage() {
                   className="mt-auto block"
                 >
                   <Button variant="secondary" size="sm" className="w-full">
-                    פתח נראות ב-AI ←
+                    {t('open_ai_visibility')}
                   </Button>
                 </Link>
               </Card>

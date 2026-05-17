@@ -237,6 +237,38 @@ const STRINGS = {
   close_panel: { he: 'סגור', en: 'Close' },
   category_suggestions: { he: 'הצעות', en: 'Suggestions' },
 
+  // Misc UI labels
+  show_all: { he: 'הצג הכל', en: 'Show all' },
+  show_more: { he: 'הצג עוד', en: 'Show more' },
+  add_to_queries_aria: { he: 'הוסף לרשימת השאילתות', en: 'Add to query list' },
+
+  // Scan status (live, on-screen)
+  scan_in_progress: { he: 'סריקת מנוע AI בתהליך…', en: 'AI engine scan in progress…' },
+  scan_done: { he: 'הסריקה הושלמה', en: 'Scan complete' },
+
+  // Profile errors
+  profile_save_failed: { he: 'שמירת הפרופיל נכשלה. נסה שוב.', en: 'Failed to save profile. Please try again.' },
+  profile_reset_failed: { he: 'איפוס הפרופיל נכשל. נסה שוב.', en: 'Failed to reset profile. Please try again.' },
+
+  // Global AI Visibility page
+  page_subtitle: {
+    he: 'ההופעות של האתר שלך בתוצאות AI לפי פרויקט',
+    en: 'How your site appears in AI results, per project',
+  },
+  no_projects_available: { he: 'אין פרויקטים זמינים', en: 'No projects available' },
+  add_project: { he: '+ הוסף פרויקט', en: '+ Add project' },
+  total_projects: { he: 'סה״כ פרויקטים', en: 'Total projects' },
+  total_queries: { he: 'סה״כ שאילתות', en: 'Total queries' },
+  total_scans: { he: 'סה״כ סריקות', en: 'Total scans' },
+  total_citations: { he: 'סה״כ ציטוטים', en: 'Total citations' },
+  avg_visibility: { he: 'ממוצע נראות', en: 'Avg. visibility' },
+  projects_heading: { he: 'פרויקטים', en: 'Projects' },
+  no_data: { he: 'אין נתונים', en: 'No data' },
+  queries: { he: 'שאילתות', en: 'Queries' },
+  last_scan: { he: 'סריקה אחרונה', en: 'Last scan' },
+  open_ai_visibility: { he: 'פתח נראות ב-AI ←', en: 'Open AI Visibility →' },
+  failed_to_load: { he: 'טעינה נכשלה', en: 'Failed to load' },
+
   // Category labels for the dropdown (BusinessCategory → display name)
   cat_florist: { he: 'חנות פרחים', en: 'Flower shop' },
   cat_perfume: { he: 'חנות בשמים', en: 'Perfume shop' },
