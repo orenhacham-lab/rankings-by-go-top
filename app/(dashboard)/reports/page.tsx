@@ -11,9 +11,11 @@ import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
-import { formatDateTime, getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { BarChart3, FileText, Zap } from 'lucide-react'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 type ReportType = 'google' | 'ai'
 
@@ -45,6 +47,9 @@ interface AIScanRun {
 function ReportsContent() {
   const searchParams = useSearchParams()
   const defaultProjectId = searchParams.get('project_id') || ''
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const t = dict.reports
 
   const [projects, setProjects] = useState<(Project & { clients?: Client })[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState(defaultProjectId)
@@ -258,7 +263,7 @@ function ReportsContent() {
   async function handleExportExcel() {
     if (!selectedProjectId) return
     setExporting('excel')
-    
+
     if (reportType === 'google' && googleReportData) {
       const { exportToExcel } = await import('@/lib/export/excel')
       exportToExcel({
@@ -270,20 +275,20 @@ function ReportsContent() {
       })
     } else if (reportType === 'ai' && aiReportData) {
       // TODO: Implement AI export to Excel
-      alert('ייצוא Excel לנראות ב-AI בעבודה')
+      alert(t.excelExportWorkInProgress)
     }
-    
+
     setExporting(null)
   }
 
   async function handleExportPDF() {
     if (!selectedProjectId) return
     if (reportType === 'ai' && !aiReportData) {
-      alert('אנא טען את דוח נראות ב-AI תחילה')
+      alert(t.loadAIReportFirst)
       return
     }
     if (reportType === 'google' && !googleReportData) {
-      alert('אנא טען את דוח דירוגים תחילה')
+      alert(t.loadGoogleReportFirst)
       return
     }
 
@@ -316,19 +321,19 @@ function ReportsContent() {
       const link = document.createElement('a')
       const projectName = (reportType === 'google'
         ? googleReportData?.project.name
-        : aiReportData?.project.name) || 'דוח'
+        : aiReportData?.project.name) || t.reportFilename
       const safeName = projectName.replace(/[/\\:*?"<>|]/g, '-').slice(0, 60)
       const timestamp = new Date().toISOString().slice(0, 10)
-      const reportTypeLabel = reportType === 'google' ? 'דירוגים' : 'AI'
+      const reportTypeLabel = reportType === 'google' ? t.rankingsLabel : 'AI'
       link.href = url
-      link.download = `דוח_${reportTypeLabel}_${safeName}_${timestamp}.pdf`
+      link.download = `${t.reportFilename}_${reportTypeLabel}_${safeName}_${timestamp}.pdf`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     } catch (error) {
       console.error('PDF export error:', error)
-      alert('שגיאה בהורדת דוח')
+      alert(t.downloadError)
     } finally {
       setExporting(null)
     }
@@ -337,8 +342,8 @@ function ReportsContent() {
   return (
     <div>
       <Header
-        title="דוחות"
-        subtitle={reportType === 'google' ? 'דוחות דירוגים Google' : 'דוחות נראות ב-AI'}
+        title={t.title}
+        subtitle={reportType === 'google' ? t.googleSubtitle : t.aiSubtitle}
       />
 
       {/* Project & Report Type Selector */}
@@ -346,11 +351,11 @@ function ReportsContent() {
         <div className="flex gap-4 items-end flex-wrap">
           <div className="flex-1 min-w-48">
             <Select
-              label="בחר פרויקט"
+              label={t.selectProject}
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               options={[
-                { value: '', label: 'בחר פרויקט...' },
+                { value: '', label: t.selectProjectPlaceholder },
                 ...projects.map((p) => ({
                   value: p.id,
                   label: `${p.clients?.name || ''} — ${p.name}`,
@@ -360,12 +365,12 @@ function ReportsContent() {
           </div>
           <div className="flex-1 min-w-48">
             <Select
-              label="סוג דוח"
+              label={t.reportType}
               value={reportType}
               onChange={(e) => handleReportTypeChange(e.target.value as ReportType)}
               options={[
-                { value: 'google', label: 'דירוגי Google Organic / Maps' },
-                { value: 'ai', label: 'נראות ב-AI' },
+                { value: 'google', label: t.googleReportType },
+                { value: 'ai', label: t.aiReportType },
               ]}
             />
           </div>
@@ -380,7 +385,7 @@ function ReportsContent() {
             disabled={!selectedProjectId}
             loading={loading}
           >
-            טען דוח
+            {t.loadReport}
           </Button>
         </div>
       </Card>
@@ -388,13 +393,13 @@ function ReportsContent() {
       {loading && (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען נתוני דוח...
+          {t.loadingReportData}
         </div>
       )}
 
       {/* Google Report */}
       {reportType === 'google' && googleReportData && !loading && (
-        <GoogleReport 
+        <GoogleReport
           reportData={googleReportData}
           exporting={exporting}
           onExportPDF={handleExportPDF}
@@ -403,16 +408,18 @@ function ReportsContent() {
           setSortColumn={setSortColumn}
           sortOrder={sortOrder}
           setSortOrder={setSortOrder}
+          t={t}
         />
       )}
 
       {/* AI Visibility Report */}
       {reportType === 'ai' && aiReportData && !loading && (
-        <AIVisibilityReport 
+        <AIVisibilityReport
           reportData={aiReportData}
           exporting={exporting}
           onExportPDF={handleExportPDF}
           onExportExcel={handleExportExcel}
+          t={t}
         />
       )}
     </div>
@@ -429,6 +436,7 @@ function GoogleReport({
   setSortColumn,
   sortOrder,
   setSortOrder,
+  t,
 }: any) {
   const foundCount = Object.values(reportData.latestResults).filter((r: any) => r.found).length
   const total = reportData.targets.length || 0
@@ -463,7 +471,7 @@ function GoogleReport({
               {reportData.project.clients?.name} · {reportData.project.target_domain}
             </p>
             <p className="text-blue-300 text-xs mt-1">
-              הופק בתאריך {new Date().toLocaleDateString('he-IL')}
+              {t.generatedOn} {new Date().toLocaleDateString('en-US')}
             </p>
           </div>
           <div className="flex gap-3">
@@ -474,7 +482,7 @@ function GoogleReport({
               className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
             >
               <BarChart3 size={18} strokeWidth={2} />
-              יצוא Excel
+              {t.exportExcel}
             </Button>
             <Button
               variant="secondary"
@@ -483,7 +491,7 @@ function GoogleReport({
               className="!bg-white !text-blue-700 hover:!bg-blue-50 flex items-center gap-2"
             >
               <FileText size={18} strokeWidth={2} />
-              הורדת דוח
+              {t.downloadReport}
             </Button>
           </div>
         </div>
@@ -491,19 +499,19 @@ function GoogleReport({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{"סה\"כ ביטויים"}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.totalKeywords}</div>
           <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{total}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">נמצאו</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.found}</div>
           <div className="text-2xl font-bold text-green-600">{foundCount}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">לא נמצאו</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.notFound}</div>
           <div className="text-2xl font-bold text-red-500">{total - foundCount}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">כיסוי</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.google.coverage}</div>
           <div className="text-2xl font-bold text-blue-600">
             {total > 0 ? `${Math.round((foundCount / total) * 100)}%` : '0%'}
           </div>
@@ -511,23 +519,23 @@ function GoogleReport({
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-100">דירוגים נוכחיים ({total})</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t.google.currentRankings} ({total})</h3>
       </div>
 
       <Table>
         <TableHead>
           <tr>
-            <Th>מילת מפתח</Th>
-            <Th>מנוע</Th>
+            <Th>{t.google.keyword}</Th>
+            <Th>{t.google.engine}</Th>
             <Th>
               <button
                 onClick={() => handleSortClick('position')}
                 className="cursor-pointer select-none"
               >
-                דירוג {sortColumn === 'position' && (sortOrder === 'asc' ? '↑' : '↓')}
+                {t.google.ranking} {sortColumn === 'position' && (sortOrder === 'asc' ? '↑' : '↓')}
               </button>
             </Th>
-            <Th>שינוי</Th>
+            <Th>{t.google.change}</Th>
           </tr>
         </TableHead>
         <TableBody>
@@ -543,7 +551,7 @@ function GoogleReport({
             )
           })}
           {getSortedTargets().length === 0 && (
-            <EmptyRow colSpan={4} message="אין ביטויים בדוח" />
+            <EmptyRow colSpan={4} message={t.google.noKeywordsInReport} />
           )}
         </TableBody>
       </Table>
@@ -557,6 +565,7 @@ function AIVisibilityReport({
   exporting,
   onExportPDF,
   onExportExcel,
+  t,
 }: any) {
   const engines = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode']
   const engineLabels: Record<string, string> = {
@@ -579,7 +588,7 @@ function AIVisibilityReport({
               {reportData.project.clients?.name} · {reportData.project.target_domain}
             </p>
             <p className="text-indigo-300 text-xs mt-1">
-              דוח נראות ב-AI | הופק בתאריך {new Date().toLocaleDateString('he-IL')}
+              {t.ai.aiVisibilityReport} | {t.generatedOn} {new Date().toLocaleDateString('en-US')}
             </p>
           </div>
           <div className="flex gap-3">
@@ -590,7 +599,7 @@ function AIVisibilityReport({
               className="!bg-white !text-indigo-700 hover:!bg-indigo-50 flex items-center gap-2"
             >
               <BarChart3 size={18} strokeWidth={2} />
-              יצוא Excel
+              {t.exportExcel}
             </Button>
             <Button
               variant="secondary"
@@ -599,7 +608,7 @@ function AIVisibilityReport({
               className="!bg-white !text-indigo-700 hover:!bg-indigo-50 flex items-center gap-2"
             >
               <FileText size={18} strokeWidth={2} />
-              הורדת דוח
+              {t.downloadReport}
             </Button>
           </div>
         </div>
@@ -608,19 +617,19 @@ function AIVisibilityReport({
       {/* Summary Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">סריקות AI</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.aiScans}</div>
           <div className="text-2xl font-bold text-indigo-600">{reportData.summary.totalScans}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">שאילתות AI</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.aiQueries}</div>
           <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{reportData.summary.totalResults}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">אזכורים</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.mentions}</div>
           <div className="text-2xl font-bold text-green-600">{reportData.summary.mentionedCount}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">אחוז אזכורים</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.mentionRate}</div>
           <div className="text-2xl font-bold text-indigo-600">
             {Math.round(reportData.summary.mentionRate)}%
           </div>
@@ -629,25 +638,25 @@ function AIVisibilityReport({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">דומיין צוטט</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.domainCited}</div>
           <div className="text-2xl font-bold text-cyan-600">{reportData.summary.totalCitations}</div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">אחוז ציטוטים</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.citationRate}</div>
           <div className="text-2xl font-bold text-indigo-600">
             {Math.round(reportData.summary.citationRate)}%
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">מנועים פעילים</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.activeEngines}</div>
           <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
             {Object.keys(reportData.summary.engineBreakdown).length}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">נראות כללית</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.ai.overallVisibility}</div>
           <div className="text-2xl font-bold text-indigo-600">
-            {reportData.summary.totalResults > 0 
+            {reportData.summary.totalResults > 0
               ? Math.round(((reportData.summary.mentionedCount + reportData.summary.citedCount) / (reportData.summary.totalResults * 2)) * 100)
               : 0}%
           </div>
@@ -656,7 +665,7 @@ function AIVisibilityReport({
 
       {/* Engine Breakdown */}
       <div className="mb-6">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">ביצוע לפי מנוע</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">{t.ai.performanceByEngine}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {engines.map((engine) => {
             const breakdown = reportData.summary.engineBreakdown[engine]
@@ -668,15 +677,15 @@ function AIVisibilityReport({
                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3">{engineLabels[engine]}</div>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">סריקות:</span>
+                    <span className="text-slate-600 dark:text-slate-300">{t.ai.scans}:</span>
                     <span className="font-medium">{breakdown.scans}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">אזכורים:</span>
+                    <span className="text-slate-600 dark:text-slate-300">{t.ai.mentions}:</span>
                     <span className="font-medium text-green-600">{breakdown.mentions} ({mentionRate}%)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">ציטוטים:</span>
+                    <span className="text-slate-600 dark:text-slate-300">{t.ai.citations}:</span>
                     <span className="font-medium text-cyan-600">{breakdown.cited} ({citationRate}%)</span>
                   </div>
                 </div>
@@ -688,17 +697,17 @@ function AIVisibilityReport({
 
       {/* AI Query Results Table */}
       <div className="mb-6">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">תוצאות שאילתות AI ({reportData.results.length})</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">{t.ai.aiQueryResults} ({reportData.results.length})</h3>
         <div className="overflow-x-auto">
           <Table>
             <TableHead>
               <tr>
-                <Th>שאילתה</Th>
-                <Th>מנוע</Th>
-                <Th>הוזכר</Th>
-                <Th>דומיין צוטט</Th>
-                <Th>ציטוטים</Th>
-                <Th>תאריך</Th>
+                <Th>{t.ai.query}</Th>
+                <Th>{t.ai.engine}</Th>
+                <Th>{t.ai.mentioned}</Th>
+                <Th>{t.ai.domainCited2}</Th>
+                <Th>{t.ai.citations2}</Th>
+                <Th>{t.ai.date}</Th>
               </tr>
             </TableHead>
             <TableBody>
@@ -710,12 +719,12 @@ function AIVisibilityReport({
                   <Td><EngineBadge engine={result.engine} /></Td>
                   <Td>
                     <Badge variant={result.mentioned ? 'success' : 'neutral'}>
-                      {result.mentioned ? 'כן' : 'לא'}
+                      {result.mentioned ? t.ai.yes : t.ai.no}
                     </Badge>
                   </Td>
                   <Td>
                     <Badge variant={result.target_cited ? 'success' : 'neutral'}>
-                      {result.target_cited ? 'כן' : 'לא'}
+                      {result.target_cited ? t.ai.yes : t.ai.no}
                     </Badge>
                   </Td>
                   <Td>{result.citation_count}</Td>
@@ -723,12 +732,12 @@ function AIVisibilityReport({
                 </TableRow>
               ))}
               {reportData.results.length === 0 && (
-                <EmptyRow colSpan={6} message="אין תוצאות בדוח" />
+                <EmptyRow colSpan={6} message={t.ai.noResultsInReport} />
               )}
             </TableBody>
           </Table>
           {reportData.results.length > 50 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">מוצגות 50 מתוך {reportData.results.length} תוצאות</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{t.ai.showingResults(50, reportData.results.length)}</p>
           )}
         </div>
       </div>
@@ -737,8 +746,10 @@ function AIVisibilityReport({
 }
 
 export default function ReportsPage() {
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
   return (
-    <Suspense fallback={<div>טוען...</div>}>
+    <Suspense fallback={<div>{dict.reports.loading}</div>}>
       <ReportsContent />
     </Suspense>
   )
