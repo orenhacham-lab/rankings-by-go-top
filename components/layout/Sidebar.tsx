@@ -166,6 +166,11 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
         </div>
       )}
 
+      {/* Footer - Mobile only */}
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700 block md:hidden">
+        <ThemeToggle />
+      </div>
+
       {/* Footer - Desktop only */}
       <div className="p-4 border-t border-slate-200 dark:border-slate-700 hidden md:block space-y-2">
         <ThemeToggle />
