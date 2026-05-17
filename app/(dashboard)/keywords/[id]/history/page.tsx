@@ -69,7 +69,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
     : null
 
   return (
-    <div dir={language === 'en' ? 'ltr' : 'rtl'}>
+    <div>
       <Header
         title={target.keyword}
         subtitle={t.subtitle}

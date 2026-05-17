@@ -342,7 +342,7 @@ function ReportsContent() {
   }
 
   return (
-    <div dir={language === 'en' ? 'ltr' : 'rtl'}>
+    <div>
       <Header
         title={t.title}
         subtitle={reportType === 'google' ? t.googleSubtitle : t.aiSubtitle}

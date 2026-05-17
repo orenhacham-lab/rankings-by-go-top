@@ -51,7 +51,7 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div dir={language === 'en' ? 'ltr' : 'rtl'}>
+    <div>
       <Header
         title={t.newProjectTitle}
         subtitle={t.newProjectSubtitle}
