@@ -87,29 +87,29 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">מנוע</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.engine}</div>
           <EngineBadge engine={target.engine_type} />
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">מיקום נוכחי</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.currentPosition}</div>
           <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
             {latestResult?.found ? `#${latestResult.position}` : '—'}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">המיקום הטוב ביותר</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.bestPosition}</div>
           <div className="text-2xl font-bold text-green-600">
             {bestPosition !== null ? `#${bestPosition}` : '—'}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">המיקום הנמוך ביותר</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.worstPosition}</div>
           <div className="text-2xl font-bold text-red-500">
             {worstPosition !== null ? `#${worstPosition}` : '—'}
           </div>
         </Card>
         <Card>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">ממוצע</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.average}</div>
           <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
             {avgPosition !== null ? `#${avgPosition}` : '—'}
           </div>
@@ -119,25 +119,25 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       {/* History Table */}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-          היסטוריה ({results.length} בדיקות)
+          {t.historyLabel} ({results.length} {t.checks})
         </h2>
       </div>
 
       <Table>
         <TableHead>
           <tr>
-            <Th>תאריך בדיקה</Th>
-            <Th>מיקום</Th>
-            <Th>מיקום קודם</Th>
-            <Th>שינוי</Th>
-            <Th>נמצא</Th>
-            <Th>URL תוצאה</Th>
-            <Th>כותרת</Th>
+            <Th>{t.checkDate}</Th>
+            <Th>{t.position}</Th>
+            <Th>{t.previousPosition}</Th>
+            <Th>{t.change}</Th>
+            <Th>{t.found}</Th>
+            <Th>{t.resultUrl}</Th>
+            <Th>{t.resultTitle}</Th>
           </tr>
         </TableHead>
         <TableBody>
           {results.length === 0 && (
-            <EmptyRow colSpan={7} message="אין היסטוריה עדיין. הפעל סריקה ראשונה." />
+            <EmptyRow colSpan={7} message={t.noHistoryYet} />
           )}
           {results.map((result) => (
             <TableRow key={result.id}>
@@ -159,7 +159,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
               </Td>
               <Td>
                 <Badge variant={result.found ? 'success' : 'neutral'}>
-                  {result.found ? 'נמצא' : 'לא נמצא'}
+                  {result.found ? t.found : t.notFound}
                 </Badge>
               </Td>
               <Td>
