@@ -83,8 +83,8 @@ export const en = {
         features: [
           '1 project',
           'Up to 30 keywords',
-          '1 scan per month',
-          'Up to 3 AI scans',
+          'Up to 30 keyword checks during the trial',
+          'Up to 3 AI scans during the trial',
           'Basic support',
         ],
       },
@@ -94,8 +94,8 @@ export const en = {
         features: [
           'Up to 3 projects',
           'Up to 50 keywords per project',
-          '1 scan per month per project',
-          'Up to 10 AI scans per project',
+          'Up to 50 keyword checks per month per project',
+          'Up to 10 AI scans per month per project',
           'PDF and Excel reports',
           'Google Organic, Google Maps, and AI Visibility',
           'Hebrew support',
@@ -107,8 +107,8 @@ export const en = {
         features: [
           'Up to 10 projects',
           'Up to 50 keywords per project',
-          '2 scans per month per project',
-          'Up to 10 AI scans per project',
+          'Up to 100 keyword checks per month per project',
+          'Up to 10 AI scans per month per project',
           'PDF and Excel reports',
           'Google Organic, Google Maps, and AI Visibility',
           'Advanced trend tracking',
@@ -121,8 +121,8 @@ export const en = {
         features: [
           'Up to 25 projects',
           'Up to 100 keywords per project',
-          '2 scans per month per project',
-          'Up to 20 AI scans per project',
+          'Up to 200 keyword checks per month per project',
+          'Up to 20 AI scans per month per project',
           'PDF and Excel reports',
           'Google Organic, Google Maps, and AI Visibility',
           'Advanced trend tracking',
@@ -152,8 +152,12 @@ export const en = {
         a: 'Trial: up to 3 AI scans. Regular: up to 10 AI scans per project. Advanced: up to 10 AI scans per project. Premium: up to 20 AI scans per project.',
       },
       {
+        q: 'What is a "keyword check"?',
+        a: 'A keyword check means checking one keyword in either Google Organic or Google Maps. For example, 10 keywords in Google Organic only = 10 checks; the same 10 keywords in both Organic and Maps = 20 checks. Every plan includes a monthly keyword-check allowance per project.',
+      },
+      {
         q: 'What does a keyword "scan" include?',
-        a: 'One scan checks the position of every keyword you defined in a project on Google Organic and Google Maps, and produces a full report with positions, trends, and changes. An AI scan checks visibility in answers from various AI engines.',
+        a: 'One scan checks the position of every keyword you defined in a project on Google Organic and Google Maps, and produces a full report with positions, trends, and changes. Each individual position lookup counts as one keyword check. An AI scan checks visibility in answers from various AI engines.',
       },
       {
         q: 'How do I cancel my subscription?',

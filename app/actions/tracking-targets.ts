@@ -112,7 +112,7 @@ export async function createTrackingTargetAction(formData: FormData) {
 
     if ((count ?? 0) >= entitlement.limits.maxKeywordsPerProject) {
       throw new Error(
-        `הגעת למגבלת ${entitlement.limits.maxKeywordsPerProject} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}. שדרג את המנוי להוספת מילות מפתח נוספות.`
+        `הגעת למגבלת ${entitlement.limits.maxKeywordsPerProject} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}. שדרג את המנוי כדי להוסיף מילות מפתח נוספות.`
       )
     }
   }

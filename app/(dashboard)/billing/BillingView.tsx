@@ -59,6 +59,10 @@ export default function BillingView({
         </div>
       )}
 
+      <p className="mb-6 text-xs text-slate-500 dark:text-slate-400">
+        {t.keywordCheckNote}
+      </p>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <PlanCard
           name={t.trialName}

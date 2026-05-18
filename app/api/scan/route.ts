@@ -2,6 +2,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { runScan } from '@/lib/scanner'
 import { getUserEntitlement } from '@/lib/subscription'
+import {
+  buildQuotaError,
+  countActiveTargets,
+  countKeywordChecksThisPeriodForProject,
+  countKeywordChecksTrialLifetime,
+} from '@/lib/quota'
 import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
 
 export async function POST(request: Request) {
@@ -29,36 +35,38 @@ export async function POST(request: Request) {
   let scan: any = null
 
   try {
-    // Check entitlement and scan limits
+    // Check entitlement and keyword-check limits.
+    //
+    // One keyword check = one tracking_target scan (one keyword × one engine).
+    // For "Scan All" we pre-count active targets in the project; for a single
+    // target scan it's always 1. The pre-check blocks BEFORE any scan_run /
+    // Serper call is made when the projected usage would exceed the quota.
     const entitlement = await getUserEntitlement(user.id, supabase)
+    const checksThisScan = targetId
+      ? 1
+      : await countActiveTargets(projectId, admin)
+
+    if (checksThisScan === 0) {
+      return Response.json({ error: 'No active targets found' }, { status: 404 })
+    }
+
     if (!entitlement.isAdmin) {
-      if (entitlement.plan === 'trial') {
-        // Trial users get 1 scan total for the project
-        const { count: projectScanCount } = await supabase
-          .from('scans')
-          .select('id', { count: 'exact', head: true })
-          .eq('project_id', projectId)
+      const isTrial = entitlement.plan === 'trial'
+      const limit = isTrial
+        ? entitlement.limits.maxKeywordChecksTotal
+        : entitlement.limits.maxKeywordChecksPerPeriodPerProject
+      const used = isTrial
+        ? await countKeywordChecksTrialLifetime(user.id, admin)
+        : await countKeywordChecksThisPeriodForProject(projectId, admin)
 
-        if ((projectScanCount ?? 0) >= 1) {
-          return Response.json(
-            { error: 'הגעת למגבלת סריקה אחת בתוכנית הניסיון' },
-            { status: 403 }
-          )
-        }
-      } else {
-        // Paid users are limited by scans per project per period
-        const { count: projectScansThisPeriod } = await supabase
-          .from('scans')
-          .select('id', { count: 'exact', head: true })
-          .eq('project_id', projectId)
-          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-
-        if ((projectScansThisPeriod ?? 0) >= entitlement.limits.maxScansPerPeriod) {
-          return Response.json(
-            { error: `הגעת למגבלת ${entitlement.limits.maxScansPerPeriod} סריקות בחודש לפרוייקט זה בתוכנית ${entitlement.limits.label}` },
-            { status: 403 }
-          )
-        }
+      if (used + checksThisScan > limit) {
+        const payload = buildQuotaError(
+          'QUOTA_KEYWORD_CHECKS',
+          entitlement.plan,
+          entitlement.limits,
+          limit
+        )
+        return Response.json(payload, { status: 403 })
       }
     }
 
@@ -464,12 +472,16 @@ export async function POST(request: Request) {
       .update(updatePayload)
       .eq('id', scan.id)
 
-    // Increment scan counter for paid subscriptions
+    // Source of truth for keyword-check usage is the scan_results table,
+    // which we count from at quota-check time. We also maintain the legacy
+    // subscriptions.scans_this_period field as a coarse running counter
+    // (incremented by the number of checks consumed, not by 1) so old
+    // consumers don't break — it is no longer used for enforcement.
     if (!entitlement.isAdmin && entitlement.plan !== 'trial' && entitlement.subscriptionId) {
       await admin
         .from('subscriptions')
         .update({
-          scans_this_period: entitlement.scansThisPeriod + 1,
+          scans_this_period: entitlement.scansThisPeriod + completedTargets + failedTargets,
         })
         .eq('id', entitlement.subscriptionId)
     }

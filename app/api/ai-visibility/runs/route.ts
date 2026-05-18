@@ -12,6 +12,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { runAIVisibilityScan } from '@/lib/ai-visibility'
 import { isDomainMatch } from '@/lib/ai-visibility/matching/domain-normalize'
+import { getUserEntitlement } from '@/lib/subscription'
+import {
+  buildQuotaError,
+  countAIScansThisPeriodForProject,
+  countAIScansTrialLifetime,
+} from '@/lib/quota'
 
 const SCRAPELLM_TIMEOUT_MS = 300_000
 
@@ -55,6 +61,30 @@ export async function POST(request: Request) {
   }
   if ((project as { user_id?: string }).user_id !== user.id) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Enforce AI-scan quota BEFORE creating ai_scan_runs or calling AI providers.
+  // Trial: lifetime cap across all of the user's projects (3 AI scans total).
+  // Paid:  per-project per-calendar-month cap.
+  const entitlement = await getUserEntitlement(user.id, supabase)
+  if (!entitlement.isAdmin) {
+    const isTrial = entitlement.plan === 'trial'
+    const limit = isTrial
+      ? entitlement.limits.maxAIScansTotal
+      : entitlement.limits.maxAIScansPerPeriodPerProject
+    const used = isTrial
+      ? await countAIScansTrialLifetime(user.id, admin)
+      : await countAIScansThisPeriodForProject(projectId, admin)
+
+    if (used + 1 > limit) {
+      const payload = buildQuotaError(
+        'QUOTA_AI_SCANS',
+        entitlement.plan,
+        entitlement.limits,
+        limit
+      )
+      return Response.json(payload, { status: 403 })
+    }
   }
 
   // Load prompt and verify it belongs to the same project

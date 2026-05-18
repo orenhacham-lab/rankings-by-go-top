@@ -54,10 +54,10 @@ const LOGIN_UI = {
       premium: 'פרמיום',
     },
     planFeatures: {
-      trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'סריקה 1 בסה"כ', 'עד 3 סריקות AI', '7 ימי ניסיון'],
-      regular: ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'סריקה 1 בחודש לכל פרוייקט', 'עד 10 סריקות AI לכל פרויקט'],
-      advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', '2 סריקות בחודש לכל פרוייקט', 'עד 10 סריקות AI לכל פרויקט'],
-      premium: ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', '2 סריקות בחודש לכל פרוייקט', 'עד 20 סריקות AI לכל פרויקט'],
+      trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות מילות מפתח בתקופת הניסיון', 'עד 3 סריקות AI בתקופת הניסיון', '7 ימי ניסיון'],
+      regular: ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 50 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
+      advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
+      premium: ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 20 סריקות AI בחודש לכל פרויקט'],
     },
   },
   en: {
@@ -101,10 +101,10 @@ const LOGIN_UI = {
       premium: 'Premium',
     },
     planFeatures: {
-      trial: ['1 project', 'Up to 30 keywords', '1 scan per month', 'Up to 3 AI scans', '7-day trial'],
-      regular: ['Up to 3 projects', 'Up to 50 keywords per project', '1 scan per month per project', 'Up to 10 AI scans per project'],
-      advanced: ['Up to 10 projects', 'Up to 50 keywords per project', '2 scans per month per project', 'Up to 10 AI scans per project'],
-      premium: ['Up to 25 projects', 'Up to 100 keywords per project', '2 scans per month per project', 'Up to 20 AI scans per project'],
+      trial: ['1 project', 'Up to 30 keywords', 'Up to 30 keyword checks during the trial', 'Up to 3 AI scans during the trial', '7-day trial'],
+      regular: ['Up to 3 projects', 'Up to 50 keywords per project', 'Up to 50 keyword checks per month per project', 'Up to 10 AI scans per month per project'],
+      advanced: ['Up to 10 projects', 'Up to 50 keywords per project', 'Up to 100 keyword checks per month per project', 'Up to 10 AI scans per month per project'],
+      premium: ['Up to 25 projects', 'Up to 100 keywords per project', 'Up to 200 keyword checks per month per project', 'Up to 20 AI scans per month per project'],
     },
   },
 } as const

@@ -6,23 +6,60 @@ export interface PlanLimits {
   maxProjects: number
   maxClients: number
   maxKeywordsPerProject: number
+  /**
+   * Keyword check = checking one keyword in one engine (Google Organic OR
+   * Google Maps). 10 keywords scanned in both engines = 20 keyword checks.
+   *
+   * Trial plans use `maxKeywordChecksTotal` (lifetime cap during trial).
+   * Paid plans use `maxKeywordChecksPerPeriodPerProject` (monthly per project).
+   */
+  maxKeywordChecksPerPeriodPerProject: number
+  maxKeywordChecksTotal: number
+  /**
+   * AI scan = one ai_scan_runs row (one prompt × one AI engine in current
+   * implementation). Trial plans use `maxAIScansTotal` (lifetime during
+   * trial). Paid plans use `maxAIScansPerPeriodPerProject` (monthly per project).
+   */
+  maxAIScansPerPeriodPerProject: number
+  maxAIScansTotal: number
+  /** Legacy field — kept for backwards-compat only; no longer enforced. */
   maxScansPerPeriod: number
   price: number
   label: string
 }
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
-  trial:    { maxProjects: 1,  maxClients: 1,  maxKeywordsPerProject: 30,  maxScansPerPeriod: 1,  price: 0,   label: 'ניסיון' },
-  regular:  { maxProjects: 3,  maxClients: 5,  maxKeywordsPerProject: 50,  maxScansPerPeriod: 1,  price: 79,  label: 'רגיל' },
-  advanced: { maxProjects: 10, maxClients: 20, maxKeywordsPerProject: 50,  maxScansPerPeriod: 2,  price: 199, label: 'מתקדם' },
-  premium:  { maxProjects: 25, maxClients: 100, maxKeywordsPerProject: 100, maxScansPerPeriod: 2,  price: 349, label: 'פרמיום' },
+  trial:    {
+    maxProjects: 1, maxClients: 1, maxKeywordsPerProject: 30,
+    maxKeywordChecksPerPeriodPerProject: 0,  maxKeywordChecksTotal: 30,
+    maxAIScansPerPeriodPerProject: 0,        maxAIScansTotal: 3,
+    maxScansPerPeriod: 1,  price: 0,   label: 'ניסיון',
+  },
+  regular:  {
+    maxProjects: 3, maxClients: 5, maxKeywordsPerProject: 50,
+    maxKeywordChecksPerPeriodPerProject: 50, maxKeywordChecksTotal: 0,
+    maxAIScansPerPeriodPerProject: 10,       maxAIScansTotal: 0,
+    maxScansPerPeriod: 1,  price: 79,  label: 'רגיל',
+  },
+  advanced: {
+    maxProjects: 10, maxClients: 20, maxKeywordsPerProject: 50,
+    maxKeywordChecksPerPeriodPerProject: 100, maxKeywordChecksTotal: 0,
+    maxAIScansPerPeriodPerProject: 10,        maxAIScansTotal: 0,
+    maxScansPerPeriod: 2,  price: 199, label: 'מתקדם',
+  },
+  premium:  {
+    maxProjects: 25, maxClients: 100, maxKeywordsPerProject: 100,
+    maxKeywordChecksPerPeriodPerProject: 200, maxKeywordChecksTotal: 0,
+    maxAIScansPerPeriodPerProject: 20,        maxAIScansTotal: 0,
+    maxScansPerPeriod: 2,  price: 349, label: 'פרמיום',
+  },
 }
 
 export const PLAN_FEATURES: Record<PlanType, string[]> = {
-  trial:    ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'סריקה 1 בסה"כ', 'עד 3 סריקות AI', '7 ימי ניסיון'],
-  regular:  ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'סריקה 1 בחודש לכל פרוייקט', 'עד 10 סריקות AI לכל פרויקט'],
-  advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', '2 סריקות בחודש לכל פרוייקט', 'עד 10 סריקות AI לכל פרויקט'],
-  premium:  ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', '2 סריקות בחודש לכל פרוייקט', 'עד 20 סריקות AI לכל פרויקט'],
+  trial:    ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות מילות מפתח בתקופת הניסיון', 'עד 3 סריקות AI בתקופת הניסיון', '7 ימי ניסיון'],
+  regular:  ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 50 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
+  advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
+  premium:  ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 20 סריקות AI בחודש לכל פרויקט'],
 }
 
 export interface UserEntitlement {
