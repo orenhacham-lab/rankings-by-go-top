@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
-import { PublicFooter } from '@/components/PublicFooter'
+import { Footer } from '@/components/Footer'
 
 export const metadata: Metadata = {
   title: 'בדיקת דירוג בגוגל חיפוש | Rankings by Go Top',
@@ -90,7 +90,7 @@ export default function GoogleOrganicFeaturePage() {
         </section>
       </main>
 
-      <PublicFooter locale="he" />
+      <Footer locale="he" />
     </div>
   )
 }
