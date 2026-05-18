@@ -217,13 +217,22 @@ export function detectCategory(
   if (/(perfume|fragrance|cologne|פרפיום|בושם|בשמים|או דה פרפיום|או דה טואלט)/.test(text)) return 'perfume'
   if (/(ניקיון|cleaner|cleaning|פוליש|נקיון|פוליסה|nettoyage)/.test(text)) return 'cleaning'
 
-  // Major product brands / consumer tech brands (HIGH priority, before generic SaaS)
-  // Includes: Apple, Samsung, Microsoft, Adobe, Dyson, Sony, Nintendo, Canon, Nikon, DJI,
-  // GoPro, Fitbit, Philips, Bosch, Siemens, Philco, Positivo, Positron, Positiva, etc.
-  // Also includes e-commerce SaaS that are brand names (Shopify, Wix, Squarespace)
-  const majorBrands = /(apple|iphone|ipad|macbook|applecare|airpods|samsung|galaxy|dyson|sony|playstation|xbox|nintendo|adobe|photoshop|illustrator|premiere|microsoft|surface|xbox|shopify|wix|squarespace|godaddy|google|pixel|nexus|canon|nikon|gopro|fitbit|garmin|tomtom|dji|phantom|mavic|osmo|infinix|realme|oppo|vivo|xiaomi|poco|redmi|poco|oneplus|nokia|tcl|hisense|haier|lg|panasonic|philips|bosch|siemens|electrolux|whirlpool|miele|dyson|bissell|irobot|roomba|anker|aukey|belkin|logitech|corsair|razer|steelseries|hyperx|turtle beach|sennheiser|bose|jbl|ultimate ears|beats|skullcandy|sony|samsung|panasonic|pioneer|yamaha|denon|onkyo|marantz|technics|bang olufsen|bowers wilkins|klipsch|polk|definitive technology|svs|asus|msi|gigabyte|evga|zotac|palit|gainward|sapphire|xfx|powercolor|asus|msi|gigabyte|asrock|biostar|evga|corsair|crucial|Kingston|sandisk|western digital|seagate|toshiba|hitachi|maxtor|conner|quantum|novell|symbios|adaptec|3com|dlink|netgear|linksys|zyxel|belkin|tp-link|ubiquiti|mikrotik|asus|tp-link|netgear|linksys|cisco|juniper|arista|cumulus|palo alto|fortinet|sophos|watchguard|pfense|endian|smoothwall|untangle|snort|suricata)([.\s-]|$)/i
+  // SaaS / platform brands — must come BEFORE product_brand so brand names like
+  // Shopify/Wix/Notion don't get classified as consumer product ecosystems.
+  // These are tools/platforms where the brand IS the product (singular SaaS),
+  // not a brand of multiple physical products like Apple/Samsung.
+  const saasPlatformBrands = /\b(shopify|wix|squarespace|godaddy|wordpress|woocommerce|magento|bigcommerce|monday|hubspot|salesforce|pipedrive|zoho|freshworks|intercom|zendesk|helpscout|mailchimp|sendgrid|klaviyo|activecampaign|convertkit|constantcontact|notion|slack|asana|trello|clickup|jira|confluence|basecamp|airtable|coda|figma|miro|canva|adobe express|loom|zoom|webex|teams|google workspace|gsuite|dropbox|onedrive|box|semrush|ahrefs|moz|seoclarity|screamingfrog|brightedge|conductor|searchmetrics|sistrix|serpstat|spyfu|raven|brightlocal|whitespark|yext|stripe|paypal|square|braintree|adyen|klarna|afterpay|quickbooks|xero|freshbooks|wave|sage|netsuite|sap|oracle|workday|bamboohr|gusto|rippling|deel|remote|datadog|newrelic|splunk|sumologic|loggly|papertrail|grafana|pagerduty|opsgenie|statuspage|sentry|bugsnag|rollbar|raygun|loggly|crashlytics|firebase|amplitude|mixpanel|heap|fullstory|hotjar|crazyegg|optimizely|launchdarkly|segment|rudderstack|fivetran|stitch|matillion|alteryx|tableau|powerbi|looker|metabase|periscope|chartio|domo|sisense|qlik|thoughtspot|alteryx|databricks|snowflake|redshift|bigquery|webflow|elementor|divi|themeforest|envato|kajabi|teachable|thinkific|podia|gumroad|substack|patreon|onlyfans|memberful|kit|beehiiv|ghost)\b/i
 
-  if (majorBrands.test(domainLower) || majorBrands.test(businessLower)) {
+  if (saasPlatformBrands.test(domainLower) || saasPlatformBrands.test(businessLower)) {
+    return 'saas'
+  }
+
+  // Major consumer / product ecosystem brands (HIGH priority, before generic SaaS)
+  // These are brands that produce a LINE of physical products (iPhone, MacBook,
+  // Galaxy phone, PlayStation, etc.), not single SaaS tools.
+  const productEcosystemBrands = /\b(apple|iphone|ipad|macbook|applecare|airpods|samsung|galaxy|dyson|sony|playstation|xbox|nintendo|switch|adobe creative|photoshop|illustrator|premiere|microsoft surface|surface|pixel|nexus|canon|nikon|gopro|fitbit|garmin|tomtom|dji|phantom|mavic|osmo|infinix|realme|oppo|vivo|xiaomi|poco|redmi|oneplus|nokia|tcl|hisense|haier|panasonic|philips|bosch|siemens|electrolux|whirlpool|miele|bissell|irobot|roomba|anker|aukey|belkin|logitech|corsair|razer|steelseries|hyperx|sennheiser|bose|jbl|beats|skullcandy|pioneer|yamaha|denon|onkyo|marantz|technics|bang olufsen|klipsch|polk|svs|asus|msi|gigabyte|asrock|nike|adidas|puma|reebok|under armour|new balance|asics|brooks|hoka|saucony|tesla|toyota|honda|bmw|mercedes|audi|ford|chevrolet|volkswagen|hyundai|kia|nissan|mazda|subaru|lexus|porsche|ferrari|lamborghini|rolex|omega|tag heuer|breitling|hublot|cartier|tiffany|louis vuitton|gucci|chanel|prada|hermes|dior|burberry|coach|kate spade|michael kors|fendi|valentino|versace|armani|kraft|nestle|coca cola|pepsi|red bull|monster)\b/i
+
+  if (productEcosystemBrands.test(domainLower) || productEcosystemBrands.test(businessLower)) {
     return 'product_brand'
   }
 
@@ -431,43 +440,33 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
   ],
 
   saas: [
-    // Primary: selection & usage (70%)
-    { intent: 'recommendation', text: 'אילו כלי SaaS מומלצים לעסקים בישראל?', score: 91, offering: 'primary' },
-    { intent: 'recommendation', text: 'אילו כלי AI מומלצים לעסקים?', score: 89, offering: 'primary' },
-    { intent: 'comparison', text: 'מה ההבדל בין {{business}} למתחרים?', score: 86, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'איך מתחילים להשתמש ב-{{business}}?', score: 76, offering: 'primary' },
+    // Primary: brand-specific platform selection (70%)
+    { intent: 'pre_purchase', text: 'האם {{business}} מתאים לעסק קטן?', score: 92, offering: 'primary' },
+    { intent: 'comparison', text: 'מה ההבדל בין {{business}} לחלופות?', score: 90, offering: 'primary' },
+    { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 88, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'pre_purchase', text: 'מה היתרונות והחסרונות של {{business}}?', score: 87, offering: 'primary' },
+    { intent: 'informational', text: 'האם {{business}} שווה את המחיר?', score: 85, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'איך מתחילים להשתמש ב-{{business}}?', score: 83, offering: 'primary' },
 
     // Secondary: alternatives & pricing (20% + 10%)
-    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 89, offering: 'secondary' },
-    { intent: 'alternatives', text: 'מה דומה ל-{{business}} אבל זול יותר?', score: 85, offering: 'secondary', themeBoost: { price: 3 } },
-    { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 81, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'alternatives', text: 'אילו כלים דומים ל-{{business}}?', score: 85, offering: 'secondary' },
+    { intent: 'commercial', text: 'האם יש חלופות זולות ל-{{business}}?', score: 82, offering: 'secondary', themeBoost: { price: 3 } },
 
     // Generic: brand (fallback)
     { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
   ],
 
   product_brand: [
-    // Primary: product selection & recommendations (70%)
-    { intent: 'recommendation', text: 'איזה {{business}} מומלץ לקנות?', score: 94, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'מה חשוב לבדוק לפני קניית מוצר {{business}}?', score: 92, offering: 'primary' },
-    { intent: 'comparison', text: 'מה ההבדל בין דגמי {{business}}?', score: 91, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'איזה {{business}} מתאים ל{{category}}?', score: 89, offering: 'primary' },
-    { intent: 'informational', text: 'מה היתרונות והחסרונות של מוצרי {{business}}?', score: 88, offering: 'primary' },
-    { intent: 'recommendation', text: 'האם {{business}} שווה קנייה?', score: 87, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'איזה דגם של {{business}} כדאי לתחילה?', score: 85, offering: 'primary' },
-
-    // Commercial: pricing & where to buy (20%)
-    { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 90, offering: 'secondary', themeBoost: { price: 4 } },
-    { intent: 'local', text: 'איפה כדאי לקנות מוצרי {{business}} בישראל?', score: 88, offering: 'secondary' },
-    { intent: 'commercial', text: 'איפה הכי משתלם לקנות {{business}}?', score: 85, offering: 'secondary', themeBoost: { price: 4 } },
-    { intent: 'informational', text: 'האם כדאי לקנות {{business}} חדש או מחודש?', score: 82, offering: 'secondary' },
-
-    // Comparison & alternatives (10%)
-    { intent: 'comparison', text: 'מה עדיף {{business}} או מתחרה?', score: 86, offering: 'secondary' },
-    { intent: 'alternatives', text: 'אלטרנטיבות ל-{{business}}', score: 83, offering: 'secondary' },
+    // Primary: ecosystem-level questions that read naturally with brand as ecosystem (70%)
+    { intent: 'informational', text: 'מה היתרונות והחסרונות של מוצרי {{business}}?', score: 92, offering: 'primary' },
+    { intent: 'local', text: 'איפה כדאי לקנות מוצרי {{business}} בישראל?', score: 90, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'מה חשוב לבדוק לפני קניית מוצר של {{business}}?', score: 88, offering: 'primary' },
+    { intent: 'commercial', text: 'איפה הכי משתלם לקנות מוצרי {{business}}?', score: 86, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'informational', text: 'האם כדאי לקנות מוצרי {{business}} חדשים או מחודשים?', score: 84, offering: 'primary' },
+    { intent: 'recommendation', text: 'אילו מוצרים של {{business}} מומלצים השנה?', score: 83, offering: 'primary' },
 
     // Generic: brand & reviews (fallback)
-    { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
+    { intent: 'brand', text: 'חוות דעת על מוצרי {{business}}', score: 74, offering: 'generic' },
   ],
 
   florist: [
@@ -772,38 +771,33 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
   ],
 
   saas: [
-    { intent: 'recommendation', text: 'What is the best rank tracking software?', score: 92, offering: 'primary' },
-    { intent: 'recommendation', text: 'Which SEO reporting tool is recommended for agencies?', score: 90, offering: 'primary' },
-    { intent: 'recommendation', text: 'What tools track AI visibility in search results?', score: 88, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'How to choose a rank tracking tool for small business?', score: 86, offering: 'primary' },
-    { intent: 'recommendation', text: 'Best Google rank tracking tool for local SEO', score: 89, offering: 'primary' },
-    { intent: 'comparison', text: 'What tools monitor Google organic and Google Maps rankings?', score: 87, offering: 'primary' },
-    { intent: 'commercial', text: 'How much does rank tracking software cost?', score: 84, offering: 'secondary', themeBoost: { price: 3 } },
-    { intent: 'recommendation', text: 'Best SaaS tools for businesses in {{country}}', score: 80, offering: 'secondary' },
+    // Primary: brand-specific platform selection (70%)
+    { intent: 'pre_purchase', text: 'Is {{business}} good for small businesses?', score: 92, offering: 'primary' },
+    { intent: 'comparison', text: 'What is the difference between {{business}} and competitors?', score: 90, offering: 'primary' },
+    { intent: 'commercial', text: 'How much does {{business}} cost?', score: 88, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'pre_purchase', text: 'What are the pros and cons of {{business}}?', score: 87, offering: 'primary' },
+    { intent: 'informational', text: 'Is {{business}} worth the price?', score: 85, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'How do I get started with {{business}}?', score: 83, offering: 'primary' },
+
+    // Secondary: alternatives & pricing (20% + 10%)
+    { intent: 'alternatives', text: 'What tools are similar to {{business}}?', score: 85, offering: 'secondary' },
+    { intent: 'commercial', text: 'Are there cheaper alternatives to {{business}}?', score: 82, offering: 'secondary', themeBoost: { price: 3 } },
+
+    // Generic: brand (fallback)
+    { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
   ],
 
   product_brand: [
-    // Primary: product selection & recommendations (70%)
-    { intent: 'recommendation', text: 'Which {{business}} product should I buy?', score: 94, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'What should I check before buying {{business}}?', score: 92, offering: 'primary' },
-    { intent: 'comparison', text: 'What is the difference between {{business}} models?', score: 91, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'Which {{business}} product is best for {{category}}?', score: 89, offering: 'primary' },
-    { intent: 'informational', text: 'What are the pros and cons of {{business}} products?', score: 88, offering: 'primary' },
-    { intent: 'recommendation', text: 'Is {{business}} worth buying?', score: 87, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'Which {{business}} model should I choose for beginners?', score: 85, offering: 'primary' },
-
-    // Commercial: pricing & where to buy (20%)
-    { intent: 'commercial', text: 'How much does {{business}} cost?', score: 90, offering: 'secondary', themeBoost: { price: 4 } },
-    { intent: 'local', text: 'Where can I buy {{business}} products?', score: 88, offering: 'secondary' },
-    { intent: 'commercial', text: 'Where is the cheapest place to buy {{business}}?', score: 85, offering: 'secondary', themeBoost: { price: 4 } },
-    { intent: 'informational', text: 'Should I buy {{business}} new or refurbished?', score: 82, offering: 'secondary' },
-
-    // Comparison & alternatives (10%)
-    { intent: 'comparison', text: 'Which is better, {{business}} or competitor?', score: 86, offering: 'secondary' },
-    { intent: 'alternatives', text: 'What are alternatives to {{business}}?', score: 83, offering: 'secondary' },
+    // Primary: ecosystem-level questions that read naturally with brand as ecosystem (70%)
+    { intent: 'informational', text: 'What are the pros and cons of {{business}} products?', score: 92, offering: 'primary' },
+    { intent: 'local', text: 'Where can I buy {{business}} products?', score: 90, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'What should I check before buying a {{business}} product?', score: 88, offering: 'primary' },
+    { intent: 'commercial', text: 'Where is the cheapest place to buy {{business}} products?', score: 86, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'informational', text: 'Should I buy {{business}} products new or refurbished?', score: 84, offering: 'primary' },
+    { intent: 'recommendation', text: 'Which {{business}} products are recommended this year?', score: 83, offering: 'primary' },
 
     // Generic: brand & reviews (fallback)
-    { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
+    { intent: 'brand', text: 'Reviews of {{business}} products', score: 74, offering: 'generic' },
   ],
 
   florist: [
@@ -1534,13 +1528,17 @@ function isBadQuestion(question: string, businessName: string): boolean {
   const q = question.trim()
   const brand = (businessName || '').trim()
 
+  // Unresolved placeholders — always reject
+  if (/\{\{[^}]+\}\}/.test(q)) return true
+
   // ENGLISH rejections
 
-  // Competitor / alternatives intent
+  // Competitor / alternatives intent — too generic, especially for product brands
   if (/\balternatives?\s+to\b/i.test(q)) return true
   if (/\bsimilar\s+to\b/i.test(q)) return true
   if (/\brecommended\s+businesses?\s+similar\s+to\b/i.test(q)) return true
   if (/\bcompetitors?\s+of\b/i.test(q)) return true
+  if (/\bcompetitor\b/i.test(q)) return true
   if (/\bbusinesses?\s+like\b/i.test(q)) return true
   if (brand && new RegExp(`\\b${escapeRegex(brand)}\\s+alternatives?\\b`, 'i').test(q)) return true
 
@@ -1570,6 +1568,7 @@ function isBadQuestion(question: string, businessName: string): boolean {
   if (/חלופות\s+ל/.test(q)) return true
   if (/דומה?\s+ל/.test(q) && brand && q.includes(brand)) return true
   if (/עסקים\s+דומים\s+ל/.test(q)) return true
+  if (/מתחרה|מתחרים|תחרות/.test(q)) return true
 
   // "איזו חנות מומלצת למשקולות" — must use "לקניית" / "להזמנת" not bare "ל"
   // Only reject if "ל" is followed by a product noun (not "לקניית/לקנות/הזמנת/...")
