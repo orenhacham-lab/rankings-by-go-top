@@ -220,7 +220,7 @@ export default async function PricingPage() {
                 </ul>
 
                 <Link
-                  href={user ? '/dashboard' : '/login'}
+                  href={user ? '/dashboard' : '/signup'}
                   className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
                     plan.highlighted
                       ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
@@ -291,7 +291,7 @@ export default async function PricingPage() {
                 התחל ניסיון חינם של 7 ימים ובדוק את היכולות בעצמך
               </p>
               <Link
-                href={user ? '/dashboard' : '/login'}
+                href={user ? '/dashboard' : '/signup'}
                 className="inline-block px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
               >
                 {user ? 'לדאשבורד שלי' : 'התחל ניסיון חינם'}

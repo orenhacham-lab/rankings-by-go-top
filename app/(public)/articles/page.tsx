@@ -138,7 +138,7 @@ export default function ArticlesPage() {
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Link
-                    href="/login"
+                    href="/signup"
                     className="px-6 py-3 rounded-xl bg-white text-blue-600 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
                   >
                     התחל ניסיון חינם

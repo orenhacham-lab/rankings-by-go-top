@@ -16,7 +16,7 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
   const dict = getPublicDictionary(locale)
   const prefix = locale === 'en' ? '/en' : ''
-  const loginHref = locale === 'en' ? '/login?lang=en' : '/login'
+  const signupHref = locale === 'en' ? '/en/signup' : '/signup'
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -90,13 +90,13 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
             ) : (
               <>
                 <Link
-                  href={loginHref}
+                  href={signupHref}
                   className="px-4 py-2 text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
                 >
                   {dict.nav.login}
                 </Link>
                 <Link
-                  href={loginHref}
+                  href={signupHref}
                   className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
                 >
                   {dict.nav.startFree}
@@ -156,14 +156,14 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
               ) : (
                 <>
                   <Link
-                    href={loginHref}
+                    href={signupHref}
                     onClick={() => setMobileOpen(false)}
                     className="px-4 py-3 rounded-lg border border-slate-200 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
                   >
                     {dict.nav.login}
                   </Link>
                   <Link
-                    href={loginHref}
+                    href={signupHref}
                     onClick={() => setMobileOpen(false)}
                     className="px-4 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center text-sm font-semibold"
                   >

@@ -170,7 +170,7 @@ export interface Profile {
   updated_at: string
 }
 
-export type SubscriptionPlan = 'regular' | 'advanced' | 'premium'
+export type SubscriptionPlan = 'regular' | 'advanced' | 'premium' | 'large_agency'
 export type SubscriptionStatus = 'trial' | 'active' | 'inactive' | 'cancelled' | 'expired'
 
 export interface Subscription {

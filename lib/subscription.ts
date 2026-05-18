@@ -53,6 +53,12 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     maxAIScansPerPeriodPerProject: 20,        maxAIScansTotal: 0,
     maxScansPerPeriod: 2,  price: 349, label: 'פרמיום',
   },
+  large_agency: {
+    maxProjects: 100, maxClients: 1000, maxKeywordsPerProject: 200,
+    maxKeywordChecksPerPeriodPerProject: 400, maxKeywordChecksTotal: 0,
+    maxAIScansPerPeriodPerProject: 100,       maxAIScansTotal: 0,
+    maxScansPerPeriod: 5,  price: 799, label: 'סוכנות גדולה',
+  },
 }
 
 export const PLAN_FEATURES: Record<PlanType, string[]> = {
@@ -60,6 +66,7 @@ export const PLAN_FEATURES: Record<PlanType, string[]> = {
   regular:  ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 50 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
   advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
   premium:  ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 20 סריקות AI בחודש לכל פרויקט'],
+  large_agency: ['עד 100 אתרים / פרויקטים', 'עד 200 מילות מפתח לאתר', 'עד 400 בדיקות מילות מפתח לחודש לאתר', 'עד 100 סריקות AI לאתר'],
 }
 
 export interface UserEntitlement {

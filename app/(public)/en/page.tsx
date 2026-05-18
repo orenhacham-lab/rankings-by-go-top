@@ -51,7 +51,7 @@ export default async function EnglishHomePage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
             <Link
-              href={user ? '/dashboard' : '/login?lang=en'}
+              href={user ? '/dashboard' : '/en/signup'}
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-base shadow-lg shadow-blue-600/25 hover:shadow-xl hover:shadow-blue-600/30 hover:from-blue-700 hover:to-indigo-700 transition-all"
             >
               {user ? 'Go to Dashboard' : 'Start Free 7-Day Trial'}
@@ -304,7 +304,7 @@ export default async function EnglishHomePage() {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
-                  href={user ? '/dashboard' : '/login?lang=en'}
+                  href={user ? '/dashboard' : '/en/signup'}
                   className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
                 >
                   {user ? 'Go to Dashboard' : 'Start Free Trial'}

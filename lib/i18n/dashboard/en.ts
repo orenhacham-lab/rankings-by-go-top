@@ -488,12 +488,14 @@ export const dashboardEn = {
       regular: 'Regular',
       advanced: 'Advanced',
       premium: 'Premium',
+      large_agency: 'Large Agency',
     },
     features: {
       trial: ['1 project', 'Up to 30 keywords', 'Up to 30 keyword checks during the trial', 'Up to 3 AI scans during the trial', '7-day trial'],
       regular: ['Up to 3 projects', 'Up to 50 keywords per project', 'Up to 50 keyword checks per month per project', 'Up to 10 AI scans per month per project'],
       advanced: ['Up to 10 projects', 'Up to 50 keywords per project', 'Up to 100 keyword checks per month per project', 'Up to 10 AI scans per month per project'],
       premium: ['Up to 25 projects', 'Up to 100 keywords per project', 'Up to 200 keyword checks per month per project', 'Up to 20 AI scans per month per project'],
+      large_agency: ['Up to 100 sites / projects', 'Up to 200 keywords per site', 'Up to 400 keyword checks per month per site', 'Up to 100 AI scans per site'],
     },
     keywordCheckNote: 'A keyword check means checking one keyword in either Google Organic or Google Maps.',
     paypal: {

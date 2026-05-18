@@ -25,6 +25,7 @@ export default async function BillingPage() {
         regular: PLAN_LIMITS.regular.price,
         advanced: PLAN_LIMITS.advanced.price,
         premium: PLAN_LIMITS.premium.price,
+        large_agency: PLAN_LIMITS.large_agency.price,
       }}
     />
   )

@@ -218,7 +218,7 @@ export default async function EnglishPricingPage() {
                 </ul>
 
                 <Link
-                  href={user ? '/dashboard' : '/login?lang=en'}
+                  href={user ? '/dashboard' : '/en/signup'}
                   className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
                     plan.highlighted
                       ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
@@ -289,7 +289,7 @@ export default async function EnglishPricingPage() {
                 Start your free 7-day trial and test the platform yourself
               </p>
               <Link
-                href={user ? '/dashboard' : '/login?lang=en'}
+                href={user ? '/dashboard' : '/en/signup'}
                 className="inline-block px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
               >
                 {user ? 'Go to Dashboard' : 'Start Free Trial'}

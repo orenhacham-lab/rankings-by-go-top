@@ -4,7 +4,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import BillingClient from './client'
 
-type PlanKey = 'trial' | 'regular' | 'advanced' | 'premium'
+type PlanKey = 'trial' | 'regular' | 'advanced' | 'premium' | 'large_agency'
 
 interface BillingViewProps {
   plan: PlanKey
@@ -63,7 +63,7 @@ export default function BillingView({
         {t.keywordCheckNote}
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <PlanCard
           name={t.trialName}
           price={0}
@@ -108,6 +108,19 @@ export default function BillingView({
           recommendedLabel={t.recommended}
           currentLabel={t.currentPlan}
         />
+        {planPrices.large_agency !== undefined && (
+          <PlanCard
+            name={t.planLabels.large_agency}
+            price={planPrices.large_agency}
+            period={t.perMonth}
+            features={t.features.large_agency}
+            isPopular={false}
+            isCurrent={plan === 'large_agency' && hasActiveSubscription}
+            plan="large_agency"
+            recommendedLabel={t.recommended}
+            currentLabel={t.currentPlan}
+          />
+        )}
       </div>
 
       <BillingClient />

@@ -180,6 +180,7 @@ const EN_PLAN_LABEL: Record<PlanType, string> = {
   regular: 'Regular',
   advanced: 'Advanced',
   premium: 'Premium',
+  large_agency: 'Large Agency',
 }
 
 export function buildQuotaError(

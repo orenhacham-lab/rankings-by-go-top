@@ -44,7 +44,7 @@ export default function EnglishArticlesPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
-                href="/login"
+                href="/en/signup"
                 className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all"
               >
                 Start Free Trial
@@ -79,7 +79,7 @@ export default function EnglishArticlesPage() {
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <Link
-                      href="/login"
+                      href="/en/signup"
                       className="px-6 py-3 rounded-xl bg-white text-blue-600 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
                     >
                       Start Free Trial

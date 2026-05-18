@@ -40,12 +40,14 @@ export default function BillingClient() {
       regular:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_REGULAR,
       advanced: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ADVANCED,
       premium:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PREMIUM,
+      large_agency: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_LARGE_AGENCY,
     }
 
     const plans = [
       { id: 'paypal-button-regular',  plan: 'regular'  },
       { id: 'paypal-button-advanced', plan: 'advanced' },
       { id: 'paypal-button-premium',  plan: 'premium'  },
+      { id: 'paypal-button-large-agency', plan: 'large_agency' },
     ]
 
     for (const { id, plan } of plans) {

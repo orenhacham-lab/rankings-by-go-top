@@ -35,7 +35,7 @@ export default function EnglishSitemapPage() {
       title: 'Account',
       links: [
         { label: 'Sign in', href: '/login?lang=en' },
-        { label: 'Start free trial', href: '/login?lang=en' },
+        { label: 'Start free trial', href: '/en/signup' },
       ],
     },
     {

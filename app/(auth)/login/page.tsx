@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { PLAN_LIMITS, PLAN_FEATURES } from '@/lib/subscription'
 import { getGoogleOAuthUrl, generateState, saveStateToSession } from '@/lib/google-oauth'
 
 // Minimal locale-aware UI strings for the login page. Auth/Supabase logic
@@ -15,8 +14,7 @@ import { getGoogleOAuthUrl, generateState, saveStateToSession } from '@/lib/goog
 const LOGIN_UI = {
   he: {
     subtitle: 'מעקב מיקומים בגוגל ונראות ב-AI',
-    loginTab: 'כניסה',
-    signupTab: 'רישום',
+    heading: 'כניסה',
     googleWith: 'עם Google',
     orEmail: 'או עם אימייל וסיסמה',
     emailLabel: 'כתובת אימייל',
@@ -24,10 +22,8 @@ const LOGIN_UI = {
     passwordLabel: 'סיסמה',
     passwordPlaceholder: '••••••••',
     loginBtn: 'כניסה',
-    signupBtn: 'יצירת חשבון',
-    plansHeading: 'תוכניות מנויים',
-    trialBadge: '7 ימי ניסיון',
-    perMonth: 'לחודש',
+    dontHaveAccount: 'אין לך חשבון?',
+    startTrial: 'התחל ניסיון חינם',
     accessibility: 'נגישות',
     privacy: 'פרטיות',
     articles: 'מאמרים',
@@ -37,33 +33,15 @@ const LOGIN_UI = {
     err: {
       oauthFailed: 'כניסה עם ספק חיצוני נכשלה. בדוק שהספק מופעל בהגדרות Supabase.',
       badCredentials: 'שם משתמש או סיסמה שגויים',
-      alreadyRegistered: 'כתובת האימייל כבר רשומה. נסה להתחבר.',
-      signupFailed: 'שגיאה בהרשמה: ',
       googleFailed: 'שגיאה בכניסה עם Google. נסה שנית.',
       providerNotEnabled: (p: string) => `כניסה עם ${p} אינה מופעלת. אנא השתמש באימייל וסיסמה.`,
       providerError: (p: string) => `שגיאה בכניסה עם ${p}. נסה שנית.`,
       oauthConfig: 'שגיאה בטעינת הגדרות OAuth. נסה שנית.',
     },
-    success: {
-      confirmEmail: 'נשלח אימייל אישור. בדוק את תיבת הדואר שלך.',
-    },
-    planNames: {
-      trial: 'ניסיון',
-      regular: 'רגיל',
-      advanced: 'מתקדם',
-      premium: 'פרמיום',
-    },
-    planFeatures: {
-      trial: ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות מילות מפתח בתקופת הניסיון', 'עד 3 סריקות AI בתקופת הניסיון', '7 ימי ניסיון'],
-      regular: ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 50 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
-      advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
-      premium: ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 20 סריקות AI בחודש לכל פרויקט'],
-    },
   },
   en: {
     subtitle: 'Google ranking & AI visibility tracking',
-    loginTab: 'Sign in',
-    signupTab: 'Sign up',
+    heading: 'Sign in',
     googleWith: 'with Google',
     orEmail: 'Or with email and password',
     emailLabel: 'Email address',
@@ -71,10 +49,8 @@ const LOGIN_UI = {
     passwordLabel: 'Password',
     passwordPlaceholder: '••••••••',
     loginBtn: 'Sign in',
-    signupBtn: 'Create account',
-    plansHeading: 'Subscription plans',
-    trialBadge: '7-day trial',
-    perMonth: '/ month',
+    dontHaveAccount: "Don't have an account?",
+    startTrial: 'Start free trial',
     accessibility: 'Accessibility',
     privacy: 'Privacy',
     articles: 'Articles',
@@ -84,27 +60,10 @@ const LOGIN_UI = {
     err: {
       oauthFailed: 'Sign-in with external provider failed. Verify the provider is enabled in Supabase settings.',
       badCredentials: 'Invalid email or password',
-      alreadyRegistered: 'This email is already registered. Try signing in.',
-      signupFailed: 'Sign-up error: ',
       googleFailed: 'Google sign-in error. Please try again.',
       providerNotEnabled: (p: string) => `Sign-in with ${p} is not enabled. Please use email and password.`,
       providerError: (p: string) => `Sign-in with ${p} failed. Please try again.`,
       oauthConfig: 'Failed to load OAuth configuration. Please try again.',
-    },
-    success: {
-      confirmEmail: 'A confirmation email was sent. Check your inbox.',
-    },
-    planNames: {
-      trial: 'Trial',
-      regular: 'Regular',
-      advanced: 'Advanced',
-      premium: 'Premium',
-    },
-    planFeatures: {
-      trial: ['1 project', 'Up to 30 keywords', 'Up to 30 keyword checks during the trial', 'Up to 3 AI scans during the trial', '7-day trial'],
-      regular: ['Up to 3 projects', 'Up to 50 keywords per project', 'Up to 50 keyword checks per month per project', 'Up to 10 AI scans per month per project'],
-      advanced: ['Up to 10 projects', 'Up to 50 keywords per project', 'Up to 100 keyword checks per month per project', 'Up to 10 AI scans per month per project'],
-      premium: ['Up to 25 projects', 'Up to 100 keywords per project', 'Up to 200 keyword checks per month per project', 'Up to 20 AI scans per month per project'],
     },
   },
 } as const
@@ -122,7 +81,6 @@ function AuthForm() {
   // Use configured app URL or fallback to current origin
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
 
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -133,57 +91,26 @@ function AuthForm() {
     }
     return ''
   })
-  const [success, setSuccess] = useState('')
-
-  function resetForm() {
-    setError('')
-    setSuccess('')
-    setEmail('')
-    setPassword('')
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    setSuccess('')
     setLoading(true)
 
     const supabase = createClient()
 
-    if (mode === 'login') {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
-      if (authError) {
-        setError(t.err.badCredentials)
-        setLoading(false)
-        return
-      }
-      router.replace(nextPath)
-      router.refresh()
-    } else {
-      const { error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(nextPath)}`,
-        },
-      })
-      if (authError) {
-        if (authError.message?.includes('already registered')) {
-          setError(t.err.alreadyRegistered)
-        } else {
-          setError(t.err.signupFailed + authError.message)
-        }
-        setLoading(false)
-        return
-      }
-      setSuccess(t.success.confirmEmail)
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    if (authError) {
+      setError(t.err.badCredentials)
       setLoading(false)
+      return
     }
+    router.replace(nextPath)
+    router.refresh()
   }
 
   async function handleOAuth(provider: 'google') {
     setError('')
-    setSuccess('')
     setOauthLoading(provider)
 
     try {
@@ -287,31 +214,7 @@ function AuthForm() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          {/* Mode toggle */}
-          <div className="flex rounded-lg bg-slate-100 p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => { setMode('login'); resetForm() }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                mode === 'login'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-700'
-              }`}
-            >
-              {t.loginTab}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('signup'); resetForm() }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                mode === 'signup'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-700'
-              }`}
-            >
-              {t.signupTab}
-            </button>
-          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">{t.heading}</h2>
 
           {error && (
             <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -319,13 +222,7 @@ function AuthForm() {
             </div>
           )}
 
-          {success && (
-            <div role="status" className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-              {success}
-            </div>
-          )}
-
-          {/* OAuth buttons */}
+          {/* OAuth buttons - Optional */}
           <div className="space-y-3 mb-6">
             <button
               type="button"
@@ -343,7 +240,7 @@ function AuthForm() {
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
               )}
-              {mode === 'login' ? t.loginTab : t.signupTab} {t.googleWith}
+              Sign in {t.googleWith}
             </button>
           </div>
 
@@ -375,7 +272,7 @@ function AuthForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t.passwordPlaceholder}
               required
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              autoComplete="current-password"
             />
 
             <Button
@@ -384,71 +281,21 @@ function AuthForm() {
               className="w-full"
               size="lg"
             >
-              {mode === 'login' ? t.loginBtn : t.signupBtn}
+              {t.loginBtn}
             </Button>
           </form>
-        </div>
 
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <div className="text-center mb-6">
-            <p className="text-slate-600 font-medium mb-3 text-sm">{t.plansHeading}</p>
-            <div className="grid grid-cols-2 gap-3">
-              {/* Trial Plan */}
-              <div className={`bg-slate-50 rounded-lg p-4 text-center ${isEn ? 'text-left' : 'text-right'}`}>
-                <div className="text-xs text-slate-600 mb-1">{t.trialBadge}</div>
-                <div className="font-bold text-slate-900 text-sm mb-3">{t.planNames.trial}</div>
-                <ul className="text-xs text-slate-600 space-y-1">
-                  {t.planFeatures.trial.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Regular Plan */}
-              <div className={`bg-blue-50 rounded-lg p-4 text-center ${isEn ? 'text-left' : 'text-right'}`}>
-                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.regular.price} {t.perMonth}</div>
-                <div className="font-bold text-slate-900 text-sm mb-3">{t.planNames.regular}</div>
-                <ul className="text-xs text-slate-600 space-y-1">
-                  {t.planFeatures.regular.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Advanced Plan */}
-              <div className={`bg-amber-50 rounded-lg p-4 text-center border border-amber-200 ${isEn ? 'text-left' : 'text-right'}`}>
-                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.advanced.price} {t.perMonth}</div>
-                <div className="font-bold text-slate-900 text-sm mb-3">{t.planNames.advanced}</div>
-                <ul className="text-xs text-slate-600 space-y-1">
-                  {t.planFeatures.advanced.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Premium Plan */}
-              <div className={`bg-purple-50 rounded-lg p-4 text-center ${isEn ? 'text-left' : 'text-right'}`}>
-                <div className="text-xs text-slate-600 mb-1">₪{PLAN_LIMITS.premium.price} {t.perMonth}</div>
-                <div className="font-bold text-slate-900 text-sm mb-3">{t.planNames.premium}</div>
-                <ul className="text-xs text-slate-600 space-y-1">
-                  {t.planFeatures.premium.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+          {/* Sign up link */}
+          <div className="mt-6 text-center pt-6 border-t border-slate-200">
+            <p className="text-slate-600 text-sm">
+              {t.dontHaveAccount}{' '}
+              <Link
+                href={isEn ? '/en/signup' : '/signup'}
+                className="text-blue-600 font-medium hover:underline"
+              >
+                {t.startTrial}
+              </Link>
+            </p>
           </div>
         </div>
 
