@@ -46,6 +46,7 @@ const SIGNUP_UI = {
     },
     success: {
       accountCreated: 'חשבון נוצר בהצלחה! מעביר אותך לדאשבורד...',
+      emailConfirmationRequired: 'החשבון נוצר. בדקו את תיבת האימייל שלכם כדי לאשר את ההרשמה.',
     },
   },
   en: {
@@ -85,6 +86,7 @@ const SIGNUP_UI = {
     },
     success: {
       accountCreated: 'Account created successfully! Redirecting to dashboard...',
+      emailConfirmationRequired: 'Your account was created. Please check your email to confirm your signup.',
     },
   },
 } as const
@@ -213,7 +215,15 @@ export function SignupForm() {
         return
       }
 
-      // 2. Create trial subscription in database (only after auth signup succeeded)
+      // Check if email confirmation is required (no session returned)
+      if (!authData.session) {
+        console.log('Email confirmation required — no session in signup response')
+        setSuccess(t.success.emailConfirmationRequired)
+        setLoading(false)
+        return
+      }
+
+      // 2. Create trial subscription in database (only after auth signup succeeded with session)
       try {
         const now = new Date()
         const trialEndsAt = new Date(now)
@@ -244,7 +254,7 @@ export function SignupForm() {
         return
       }
 
-      // 3. Sign in the user
+      // 3. Sign in the user (should be immediate if session exists)
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
