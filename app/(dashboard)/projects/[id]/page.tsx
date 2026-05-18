@@ -246,9 +246,31 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       />
 
       {scanMessage && (
-        <div className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${scanError ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
-          <span>{scanError ? '✗' : '✓'}</span>
-          <span>{scanMessage}</span>
+        <div
+          role="alert"
+          aria-live="polite"
+          className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md sm:w-auto z-[100]"
+        >
+          <div
+            className={`p-3 pr-2 rounded-lg text-sm flex items-center gap-2 shadow-lg ${
+              scanError
+                ? 'bg-red-50 border border-red-200 text-red-700'
+                : 'bg-green-50 border border-green-200 text-green-700'
+            }`}
+          >
+            <span>{scanError ? '✗' : '✓'}</span>
+            <span className="flex-1">{scanMessage}</span>
+            <button
+              type="button"
+              onClick={() => setScanMessage('')}
+              aria-label="Close"
+              className={`shrink-0 w-6 h-6 inline-flex items-center justify-center rounded hover:bg-black/5 ${
+                scanError ? 'text-red-700' : 'text-green-700'
+              }`}
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
 
