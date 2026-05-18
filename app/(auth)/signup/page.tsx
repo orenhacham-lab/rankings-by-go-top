@@ -4,7 +4,7 @@ import { useState, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
@@ -39,9 +39,10 @@ const SIGNUP_UI = {
       invalidPhone: 'מספר טלפון לא תקין',
       fieldRequired: 'שדה זה הוא חובה',
       termsRequired: 'עליך להסכים לתנאים ולמדיניות הפרטיות',
-      emailExists: 'כתובת האימייל כבר קיימת',
-      signupFailed: 'שגיאה בהרשמה: ',
-      createTrialFailed: 'שגיאה בהוצאת ניסיון: ',
+      emailExists: 'כתובת האימייל כבר רשומה במערכת. נסו להתחבר או לאפס סיסמה.',
+      emailRateLimit: 'נשלחו יותר מדי בקשות הרשמה בזמן קצר. נסו שוב בעוד כמה דקות או השתמשו בכתובת אימייל אחרת.',
+      signupFailed: 'אירעה שגיאה ביצירת החשבון. אנא נסו שוב.',
+      createTrialFailed: 'אירעה שגיאה בהפעלת תקופת הניסיון. אנא נסו שוב.',
     },
     success: {
       accountCreated: 'חשבון נוצר בהצלחה! מעביר אותך לדאשבורד...',
@@ -77,9 +78,10 @@ const SIGNUP_UI = {
       invalidPhone: 'Invalid phone number',
       fieldRequired: 'This field is required',
       termsRequired: 'You must agree to the terms and privacy policy',
-      emailExists: 'This email is already registered',
-      signupFailed: 'Sign-up error: ',
-      createTrialFailed: 'Failed to create trial: ',
+      emailExists: 'This email is already registered. Please sign in or reset your password.',
+      emailRateLimit: 'Too many signup requests were sent in a short time. Please try again in a few minutes or use a different email address.',
+      signupFailed: 'An error occurred while creating your account. Please try again.',
+      createTrialFailed: 'An error occurred while activating your trial. Please try again.',
     },
     success: {
       accountCreated: 'Account created successfully! Redirecting to dashboard...',
@@ -90,8 +92,10 @@ const SIGNUP_UI = {
 export function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const langParam = searchParams.get('lang')
-  const lang: 'he' | 'en' = langParam === 'en' ? 'en' : 'he'
+  const lang: 'he' | 'en' =
+    langParam === 'en' || pathname?.startsWith('/en/') ? 'en' : 'he'
   const isEn = lang === 'en'
   const t = SIGNUP_UI[lang]
 
@@ -179,22 +183,37 @@ export function SignupForm() {
       })
 
       if (authError) {
-        if (authError.message?.includes('already registered')) {
+        console.error('Signup auth error:', authError)
+        const msg = (authError.message || '').toLowerCase()
+        const code = ((authError as { code?: string }).code || '').toLowerCase()
+        if (
+          msg.includes('rate limit') ||
+          msg.includes('too many') ||
+          code.includes('rate_limit') ||
+          code.includes('over_email_send_rate_limit')
+        ) {
+          setError(t.err.emailRateLimit)
+        } else if (
+          msg.includes('already registered') ||
+          msg.includes('already been registered') ||
+          msg.includes('user already exists') ||
+          code.includes('user_already_exists')
+        ) {
           setError(t.err.emailExists)
         } else {
-          setError(t.err.signupFailed + authError.message)
+          setError(t.err.signupFailed)
         }
         setLoading(false)
         return
       }
 
       if (!authData.user) {
-        setError(t.err.signupFailed + 'Unknown error')
+        setError(t.err.signupFailed)
         setLoading(false)
         return
       }
 
-      // 2. Create trial subscription in database
+      // 2. Create trial subscription in database (only after auth signup succeeded)
       try {
         const now = new Date()
         const trialEndsAt = new Date(now)
@@ -212,15 +231,15 @@ export function SignupForm() {
         })
 
         if (!response.ok) {
-          const errorData = await response.json()
+          const errorData = await response.json().catch(() => ({}))
           console.error('Failed to create trial subscription:', errorData)
-          setError(t.err.createTrialFailed + (errorData.error || 'Unknown error'))
+          setError(t.err.createTrialFailed)
           setLoading(false)
           return
         }
       } catch (trialError) {
         console.error('Trial creation error:', trialError)
-        setError(t.err.createTrialFailed + (trialError instanceof Error ? trialError.message : 'Unknown error'))
+        setError(t.err.createTrialFailed)
         setLoading(false)
         return
       }
@@ -245,7 +264,7 @@ export function SignupForm() {
       }, 1000)
     } catch (err) {
       console.error('Signup error:', err)
-      setError(t.err.signupFailed + (err instanceof Error ? err.message : 'Unknown error'))
+      setError(t.err.signupFailed)
       setLoading(false)
     }
   }

@@ -4,10 +4,12 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 
 interface Plan {
+  slug: string
   name: string
-  price: string
-  priceSuffix?: string
   description: string
+  price: string
+  originalPrice?: string
+  priceSuffix?: string
   features: string[]
   cta: string
   highlighted?: boolean
@@ -16,33 +18,36 @@ interface Plan {
 
 const plans: Plan[] = [
   {
-    name: 'Regular',
+    slug: 'single_site',
+    name: 'Single Site',
+    description: 'One site / single project',
     price: '₪79',
     priceSuffix: '/ month',
-    description: 'For small businesses wanting to track multiple projects',
     features: [
-      'Up to 3 projects',
-      'Up to 50 keywords per project',
-      'Up to 50 keyword checks per month per project',
-      'Up to 10 AI scans per month per project',
+      'One site / project',
+      'Up to 50 keywords',
+      'Up to 50 keyword checks per month',
+      'Up to 10 AI scans',
       'PDF & Excel reports',
-      'Google Organic, Google Maps & AI visibility',
+      'Google Organic + Google Maps',
       'Email support',
     ],
     cta: 'Choose Plan',
   },
   {
-    name: 'Advanced',
+    slug: 'boutique',
+    name: 'Boutique',
+    description: 'For growing businesses with multiple sites',
     price: '₪199',
+    originalPrice: '₪299',
     priceSuffix: '/ month',
-    description: 'The most popular plan for growing businesses',
     features: [
-      'Up to 10 projects',
-      'Up to 50 keywords per project',
-      'Up to 100 keyword checks per month per project',
-      'Up to 10 AI scans per month per project',
+      'Up to 10 sites / projects',
+      'Up to 50 keywords per site',
+      'Up to 100 keyword checks per month per site',
+      'Up to 10 AI scans per site',
       'PDF & Excel reports',
-      'Google Organic, Google Maps & AI visibility',
+      'Google Organic + Google Maps + AI visibility',
       'Advanced trend tracking',
       'Priority support',
     ],
@@ -51,20 +56,42 @@ const plans: Plan[] = [
     badge: 'Most Popular',
   },
   {
-    name: 'Premium',
+    slug: 'agency',
+    name: 'Agency',
+    description: 'For agencies and large businesses',
     price: '₪349',
+    originalPrice: '₪449',
     priceSuffix: '/ month',
-    description: 'For agencies and large businesses with advanced needs',
     features: [
-      'Up to 25 projects',
-      'Up to 100 keywords per project',
-      'Up to 200 keyword checks per month per project',
-      'Up to 20 AI scans per month per project',
+      'Up to 25 sites / projects',
+      'Up to 100 keywords per site',
+      'Up to 200 keyword checks per month per site',
+      'Up to 20 AI scans per site',
       'PDF & Excel reports',
-      'Google Organic, Google Maps & AI visibility',
+      'Google Organic + Google Maps + AI visibility',
       'Advanced trend tracking',
       'VIP priority support',
       'Personal onboarding',
+    ],
+    cta: 'Choose Plan',
+  },
+  {
+    slug: 'large_agency',
+    name: 'Large Agency',
+    description: 'For agencies with many clients',
+    price: '₪799',
+    originalPrice: '₪999',
+    priceSuffix: '/ month',
+    features: [
+      'Up to 100 sites / projects',
+      'Up to 200 keywords per site',
+      'Up to 400 keyword checks per month per site',
+      'Up to 100 AI scans per site',
+      'PDF & Excel reports',
+      'Google Organic + Google Maps + AI visibility',
+      'Suited for agencies with many clients',
+      'VIP priority support',
+      'Personal onboarding and coaching',
     ],
     cta: 'Choose Plan',
   },
@@ -164,10 +191,10 @@ export default async function EnglishPricingPage() {
       {/* Pricing Cards */}
       <section className="pb-20 lg:pb-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan) => (
               <div
-                key={plan.name}
+                key={plan.slug}
                 className={`relative rounded-2xl ${
                   plan.highlighted
                     ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
@@ -190,6 +217,11 @@ export default async function EnglishPricingPage() {
                 </div>
 
                 <div className="mb-6">
+                  {plan.originalPrice && (
+                    <div className={`text-sm line-through mb-1 ${plan.highlighted ? 'text-blue-200' : 'text-slate-400'}`}>
+                      {plan.originalPrice}
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1">
                     <span className={`text-4xl lg:text-5xl font-extrabold ${plan.highlighted ? 'text-white' : 'text-slate-900'}`}>
                       {plan.price}
@@ -228,7 +260,7 @@ export default async function EnglishPricingPage() {
                 </ul>
 
                 <Link
-                  href={user ? '/dashboard' : '/en/signup'}
+                  href={user ? '/dashboard' : `/en/signup?plan=${plan.slug}`}
                   className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
                     plan.highlighted
                       ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'

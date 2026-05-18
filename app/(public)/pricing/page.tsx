@@ -6,10 +6,12 @@ import { Footer } from '@/components/Footer'
 
 
 interface Plan {
+  slug: string
   name: string
-  price: string
-  priceSuffix?: string
   description: string
+  price: string
+  originalPrice?: string
+  priceSuffix?: string
   features: string[]
   cta: string
   highlighted?: boolean
@@ -18,33 +20,36 @@ interface Plan {
 
 const plans: Plan[] = [
   {
-    name: 'רגיל',
+    slug: 'single_site',
+    name: 'Single Site',
+    description: 'אתר אחד / פרויקט יחיד',
     price: '₪79',
     priceSuffix: '/ חודש',
-    description: 'לעסקים קטנים שרוצים לעקוב אחרי מספר פרויקטים',
     features: [
-      'עד 3 פרויקטים',
-      'עד 50 מילות מפתח לפרויקט',
-      'עד 50 בדיקות מילות מפתח בחודש לכל פרויקט',
-      'עד 10 סריקות AI בחודש לכל פרויקט',
+      'אתר / פרויקט אחד',
+      'עד 50 מילות מפתח',
+      'עד 50 בדיקות מילות מפתח בחודש',
+      'עד 10 סריקות AI',
       'דוחות PDF ו-Excel',
-      'Google Organic, Google Maps ונראות ב-AI',
+      'Google Organic + Google Maps',
       'תמיכה בעברית',
     ],
     cta: 'בחר תוכנית',
   },
   {
-    name: 'מתקדם',
+    slug: 'boutique',
+    name: 'Boutique',
+    description: 'לעסקים בצמיחה ולמספר אתרים',
     price: '₪199',
+    originalPrice: '₪299',
     priceSuffix: '/ חודש',
-    description: 'התוכנית הפופולרית ביותר לעסקים בצמיחה',
     features: [
-      'עד 10 פרויקטים',
-      'עד 50 מילות מפתח לפרויקט',
-      'עד 100 בדיקות מילות מפתח בחודש לכל פרויקט',
-      'עד 10 סריקות AI בחודש לכל פרויקט',
+      'עד 10 אתרים / פרויקטים',
+      'עד 50 מילות מפתח לכל אתר',
+      'עד 100 בדיקות מילות מפתח בחודש לכל אתר',
+      'עד 10 סריקות AI לכל אתר',
       'דוחות PDF ו-Excel',
-      'Google Organic, Google Maps ונראות ב-AI',
+      'Google Organic + Google Maps + נראות ב-AI',
       'מעקב מגמות מתקדם',
       'תמיכה אישית',
     ],
@@ -53,20 +58,42 @@ const plans: Plan[] = [
     badge: 'הכי פופולרי',
   },
   {
-    name: 'פרמיום',
+    slug: 'agency',
+    name: 'Agency',
+    description: 'לסוכנויות ועסקים גדולים',
     price: '₪349',
+    originalPrice: '₪449',
     priceSuffix: '/ חודש',
-    description: 'לסוכנויות ועסקים גדולים עם דרישות מתקדמות',
     features: [
-      'עד 25 פרויקטים',
-      'עד 100 מילות מפתח לפרויקט',
-      'עד 200 בדיקות מילות מפתח בחודש לכל פרויקט',
-      'עד 20 סריקות AI בחודש לכל פרויקט',
+      'עד 25 אתרים / פרויקטים',
+      'עד 100 מילות מפתח לכל אתר',
+      'עד 200 בדיקות מילות מפתח בחודש לכל אתר',
+      'עד 20 סריקות AI לכל אתר',
       'דוחות PDF ו-Excel',
-      'Google Organic, Google Maps ונראות ב-AI',
+      'Google Organic + Google Maps + נראות ב-AI',
       'מעקב מגמות מתקדם',
-      'תמיכה VIP בעדיפות',
+      'תמיכה VIP',
       'הדרכה אישית',
+    ],
+    cta: 'בחר תוכנית',
+  },
+  {
+    slug: 'large_agency',
+    name: 'Large Agency',
+    description: 'לסוכנויות עם הרבה לקוחות',
+    price: '₪799',
+    originalPrice: '₪999',
+    priceSuffix: '/ חודש',
+    features: [
+      'עד 100 אתרים / פרויקטים',
+      'עד 200 מילות מפתח לכל אתר',
+      'עד 400 בדיקות מילות מפתח בחודש לכל אתר',
+      'עד 100 סריקות AI לכל אתר',
+      'דוחות PDF ו-Excel',
+      'Google Organic + Google Maps + נראות ב-AI',
+      'מתאים לסוכנויות עם הרבה לקוחות',
+      'תמיכה VIP',
+      'הדרכה וליווי אישי',
     ],
     cta: 'בחר תוכנית',
   },
@@ -166,10 +193,10 @@ export default async function PricingPage() {
       {/* Pricing Cards */}
       <section className="pb-20 lg:pb-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan) => (
               <div
-                key={plan.name}
+                key={plan.slug}
                 className={`relative rounded-2xl ${
                   plan.highlighted
                     ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
@@ -192,6 +219,11 @@ export default async function PricingPage() {
                 </div>
 
                 <div className="mb-6">
+                  {plan.originalPrice && (
+                    <div className={`text-sm line-through mb-1 ${plan.highlighted ? 'text-blue-200' : 'text-slate-400'}`}>
+                      {plan.originalPrice}
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1">
                     <span className={`text-4xl lg:text-5xl font-extrabold ${plan.highlighted ? 'text-white' : 'text-slate-900'}`}>
                       {plan.price}
@@ -230,7 +262,7 @@ export default async function PricingPage() {
                 </ul>
 
                 <Link
-                  href={user ? '/dashboard' : '/signup'}
+                  href={user ? '/dashboard' : `/signup?plan=${plan.slug}`}
                   className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
                     plan.highlighted
                       ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
