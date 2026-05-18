@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import BillingClient from './client'
@@ -12,6 +13,7 @@ interface BillingViewProps {
   trialActive: boolean
   trialEndsAt: string | null
   subscriptionEndsAt: string | null
+  hasPaypalSubscriptionId: boolean
   planPrices: Record<PlanKey, number>
 }
 
@@ -21,12 +23,37 @@ export default function BillingView({
   trialActive,
   trialEndsAt,
   subscriptionEndsAt,
+  hasPaypalSubscriptionId,
   planPrices,
 }: BillingViewProps) {
   const { language, isLoaded } = useDashboardLanguage()
   const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
   const t = dict.billing
   const dateLocale = language === 'en' ? 'en-US' : 'he-IL'
+
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelMessage, setCancelMessage] = useState('')
+
+  const handleCancel = async () => {
+    if (!confirm(t.manage.confirmCancel)) return
+    setCancelling(true)
+    setCancelMessage('')
+    try {
+      const response = await fetch('/api/paypal/cancel', { method: 'POST' })
+      const result = await response.json()
+      if (!response.ok) {
+        setCancelMessage(`${t.manage.cancelError} ${result.error || ''}`)
+        setCancelling(false)
+        return
+      }
+      setCancelMessage(t.manage.cancelSuccess)
+      setTimeout(() => window.location.reload(), 1500)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      setCancelMessage(`${t.manage.cancelError} ${errorMsg}`)
+      setCancelling(false)
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -43,6 +70,7 @@ export default function BillingView({
               </span>
             )}
           </p>
+          <p className="text-blue-800 text-sm mt-2">{t.trialNoChargeNotice}</p>
         </div>
       )}
 
@@ -56,6 +84,29 @@ export default function BillingView({
               </span>
             )}
           </p>
+        </div>
+      )}
+
+      {hasActiveSubscription && (
+        <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">{t.manage.title}</h2>
+          {hasPaypalSubscriptionId ? (
+            <>
+              <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.manage.description}</p>
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {cancelling ? t.manage.cancelling : t.manage.cancelButton}
+              </button>
+            </>
+          ) : (
+            <p className="text-slate-700 dark:text-slate-300 text-sm">{t.manage.contactToCancel}</p>
+          )}
+          {cancelMessage && (
+            <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{cancelMessage}</p>
+          )}
         </div>
       )}
 

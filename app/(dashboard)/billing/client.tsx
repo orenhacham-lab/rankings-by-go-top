@@ -47,7 +47,7 @@ export default function BillingClient() {
       { id: 'paypal-button-regular',  plan: 'regular'  },
       { id: 'paypal-button-advanced', plan: 'advanced' },
       { id: 'paypal-button-premium',  plan: 'premium'  },
-      { id: 'paypal-button-large-agency', plan: 'large_agency' },
+      { id: 'paypal-button-large_agency', plan: 'large_agency' },
     ]
 
     for (const { id, plan } of plans) {

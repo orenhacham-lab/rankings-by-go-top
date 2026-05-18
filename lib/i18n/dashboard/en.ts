@@ -498,6 +498,17 @@ export const dashboardEn = {
       large_agency: ['Up to 100 sites / projects', 'Up to 200 keywords per site', 'Up to 400 keyword checks per month per site', 'Up to 100 AI scans per site'],
     },
     keywordCheckNote: 'A keyword check means checking one keyword in either Google Organic or Google Maps.',
+    trialNoChargeNotice: 'You are on a free trial. No payment method was added and you will not be charged automatically.',
+    manage: {
+      title: 'Manage subscription',
+      description: 'You can cancel your subscription at any time. Access to the paid plan will end according to the billing policy.',
+      cancelButton: 'Cancel subscription',
+      cancelling: 'Cancelling...',
+      confirmCancel: 'Are you sure you want to cancel your subscription? Access to the paid plan will end according to the billing policy.',
+      cancelSuccess: 'Subscription cancelled successfully.',
+      cancelError: 'Failed to cancel subscription:',
+      contactToCancel: 'To cancel your subscription, please contact us and we will cancel the billing for you.',
+    },
     paypal: {
       loading: 'Loading PayPal...',
       notConfigured: 'PayPal is not configured. Missing env var: NEXT_PUBLIC_PAYPAL_CLIENT_ID',
