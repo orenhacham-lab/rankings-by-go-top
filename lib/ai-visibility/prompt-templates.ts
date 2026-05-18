@@ -442,15 +442,11 @@ const HE_BANK: Record<BusinessCategory, QueryDef[]> = {
   saas: [
     // Primary: brand-specific platform selection (70%)
     { intent: 'pre_purchase', text: 'האם {{business}} מתאים לעסק קטן?', score: 92, offering: 'primary' },
-    { intent: 'comparison', text: 'מה ההבדל בין {{business}} לחלופות?', score: 90, offering: 'primary' },
-    { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 88, offering: 'primary', themeBoost: { price: 4 } },
-    { intent: 'pre_purchase', text: 'מה היתרונות והחסרונות של {{business}}?', score: 87, offering: 'primary' },
-    { intent: 'informational', text: 'האם {{business}} שווה את המחיר?', score: 85, offering: 'primary', themeBoost: { price: 3 } },
-    { intent: 'pre_purchase', text: 'איך מתחילים להשתמש ב-{{business}}?', score: 83, offering: 'primary' },
-
-    // Secondary: alternatives & pricing (20% + 10%)
-    { intent: 'alternatives', text: 'אילו כלים דומים ל-{{business}}?', score: 85, offering: 'secondary' },
-    { intent: 'commercial', text: 'האם יש חלופות זולות ל-{{business}}?', score: 82, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'כמה עולה {{business}}?', score: 90, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'pre_purchase', text: 'מה היתרונות והחסרונות של {{business}}?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: 'האם {{business}} שווה את המחיר?', score: 86, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'איך מתחילים להשתמש ב-{{business}}?', score: 84, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'למי מתאים {{business}}?', score: 82, offering: 'primary' },
 
     // Generic: brand (fallback)
     { intent: 'brand', text: 'חוות דעת על {{business}}', score: 74, offering: 'generic' },
@@ -773,15 +769,11 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
   saas: [
     // Primary: brand-specific platform selection (70%)
     { intent: 'pre_purchase', text: 'Is {{business}} good for small businesses?', score: 92, offering: 'primary' },
-    { intent: 'comparison', text: 'What is the difference between {{business}} and competitors?', score: 90, offering: 'primary' },
-    { intent: 'commercial', text: 'How much does {{business}} cost?', score: 88, offering: 'primary', themeBoost: { price: 4 } },
-    { intent: 'pre_purchase', text: 'What are the pros and cons of {{business}}?', score: 87, offering: 'primary' },
-    { intent: 'informational', text: 'Is {{business}} worth the price?', score: 85, offering: 'primary', themeBoost: { price: 3 } },
-    { intent: 'pre_purchase', text: 'How do I get started with {{business}}?', score: 83, offering: 'primary' },
-
-    // Secondary: alternatives & pricing (20% + 10%)
-    { intent: 'alternatives', text: 'What tools are similar to {{business}}?', score: 85, offering: 'secondary' },
-    { intent: 'commercial', text: 'Are there cheaper alternatives to {{business}}?', score: 82, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'commercial', text: 'How much does {{business}} cost?', score: 90, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'pre_purchase', text: 'What are the pros and cons of {{business}}?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: 'Is {{business}} worth the price?', score: 86, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'How do I get started with {{business}}?', score: 84, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Who is {{business}} good for?', score: 82, offering: 'primary' },
 
     // Generic: brand (fallback)
     { intent: 'brand', text: 'Reviews of {{business}}', score: 74, offering: 'generic' },
@@ -791,7 +783,7 @@ const EN_BANK: Record<BusinessCategory, QueryDef[]> = {
     // Primary: ecosystem-level questions that read naturally with brand as ecosystem (70%)
     { intent: 'informational', text: 'What are the pros and cons of {{business}} products?', score: 92, offering: 'primary' },
     { intent: 'local', text: 'Where can I buy {{business}} products?', score: 90, offering: 'primary' },
-    { intent: 'pre_purchase', text: 'What should I check before buying a {{business}} product?', score: 88, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'What should I check before buying {{business}} products?', score: 88, offering: 'primary' },
     { intent: 'commercial', text: 'Where is the cheapest place to buy {{business}} products?', score: 86, offering: 'primary', themeBoost: { price: 4 } },
     { intent: 'informational', text: 'Should I buy {{business}} products new or refurbished?', score: 84, offering: 'primary' },
     { intent: 'recommendation', text: 'Which {{business}} products are recommended this year?', score: 83, offering: 'primary' },
@@ -904,6 +896,68 @@ function fillTemplate(template: string, ctx: TemplateContext): string {
     .replace(/\{\{domain\}\}/g, ctx.domain || '')
     .replace(/\{\{city\}\}/g, ctx.city || (isHe ? 'אזורך' : 'your area'))
     .replace(/\{\{country\}\}/g, countryName)
+}
+
+/**
+ * Well-known brand-vs-competitor pairs. Used to generate specific comparison
+ * questions instead of generic "Brand vs competitors". Only used when the
+ * business name matches a known key — otherwise comparison questions are
+ * simply skipped (we do not fall back to generic "competitors").
+ */
+const BRAND_COMPARISONS: Record<string, string[]> = {
+  shopify: ['WooCommerce', 'BigCommerce'],
+  wix: ['Squarespace', 'WordPress'],
+  squarespace: ['Wix', 'WordPress'],
+  woocommerce: ['Shopify', 'BigCommerce'],
+  bigcommerce: ['Shopify', 'WooCommerce'],
+  monday: ['Asana', 'ClickUp'],
+  asana: ['Monday', 'ClickUp', 'Trello'],
+  hubspot: ['Salesforce', 'Pipedrive'],
+  salesforce: ['HubSpot', 'Pipedrive'],
+  pipedrive: ['HubSpot', 'Salesforce'],
+  semrush: ['Ahrefs', 'Moz'],
+  ahrefs: ['Semrush', 'Moz'],
+  moz: ['Semrush', 'Ahrefs'],
+  notion: ['Evernote', 'Obsidian'],
+  slack: ['Microsoft Teams', 'Discord'],
+  canva: ['Adobe Express', 'Figma'],
+  mailchimp: ['Klaviyo', 'ActiveCampaign'],
+  apple: ['Samsung', 'Google'],
+  iphone: ['Samsung Galaxy', 'Google Pixel'],
+  macbook: ['Dell XPS', 'ThinkPad'],
+  samsung: ['Apple', 'Google'],
+  galaxy: ['iPhone', 'Pixel'],
+  sony: ['LG', 'Samsung'],
+  playstation: ['Xbox', 'Nintendo Switch'],
+  xbox: ['PlayStation', 'Nintendo Switch'],
+  nintendo: ['PlayStation', 'Xbox'],
+  nike: ['Adidas', 'Puma'],
+  adidas: ['Nike', 'Puma'],
+  dyson: ['Shark', 'Bissell'],
+  dji: ['Autel', 'Skydio'],
+  gopro: ['DJI Osmo', 'Insta360'],
+}
+
+function getBrandComparisonQuestions(
+  business: string,
+  language: 'he' | 'en'
+): Array<{ text: string; intent: PromptIntent; score: number }> {
+  const key = (business || '').trim().toLowerCase()
+  if (!key) return []
+  const competitors = BRAND_COMPARISONS[key]
+  if (!competitors || competitors.length === 0) return []
+
+  const out: Array<{ text: string; intent: PromptIntent; score: number }> = []
+  for (const competitor of competitors) {
+    if (language === 'he') {
+      out.push({ text: `מה ההבדל בין ${business} ל-${competitor}?`, intent: 'comparison', score: 90 })
+      out.push({ text: `מה עדיף ${business} או ${competitor}?`, intent: 'comparison', score: 88 })
+    } else {
+      out.push({ text: `${business} vs ${competitor}: which is better?`, intent: 'comparison', score: 90 })
+      out.push({ text: `What is the difference between ${business} and ${competitor}?`, intent: 'comparison', score: 88 })
+    }
+  }
+  return out
 }
 
 /**
@@ -1538,7 +1592,7 @@ function isBadQuestion(question: string, businessName: string): boolean {
   if (/\bsimilar\s+to\b/i.test(q)) return true
   if (/\brecommended\s+businesses?\s+similar\s+to\b/i.test(q)) return true
   if (/\bcompetitors?\s+of\b/i.test(q)) return true
-  if (/\bcompetitor\b/i.test(q)) return true
+  if (/\bcompetitors?\b/i.test(q)) return true
   if (/\bbusinesses?\s+like\b/i.test(q)) return true
   if (brand && new RegExp(`\\b${escapeRegex(brand)}\\s+alternatives?\\b`, 'i').test(q)) return true
 
@@ -1565,7 +1619,7 @@ function isBadQuestion(question: string, businessName: string): boolean {
 
   // אלטרנטיבות ל{brand} - competitive intent
   if (/אלטרנטיבות\s+ל/.test(q)) return true
-  if (/חלופות\s+ל/.test(q)) return true
+  if (/חלופות\s+ל|לחלופות/.test(q)) return true
   if (/דומה?\s+ל/.test(q) && brand && q.includes(brand)) return true
   if (/עסקים\s+דומים\s+ל/.test(q)) return true
   if (/מתחרה|מתחרים|תחרות/.test(q)) return true
@@ -1894,8 +1948,28 @@ export function generatePromptSuggestions({
     }
   }
 
+  // Brand-vs-known-competitor questions (only when business name matches a
+  // curated brand pair — never produces generic "X vs competitors").
+  const brandComparisonQuestions: Built[] = []
+  if (category === 'saas' || category === 'product_brand') {
+    const pairs = getBrandComparisonQuestions(business, lang as 'he' | 'en')
+    for (const pair of pairs) {
+      const filled = pair.text.trim()
+      if (lang === 'he' && !isReadableHebrew(filled)) continue
+      if (isBadQuestion(filled, business)) continue
+      if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
+      brandComparisonQuestions.push({
+        def: { intent: pair.intent, text: pair.text, score: pair.score, offering: 'primary' },
+        prompt: filled,
+        score: pair.score,
+        themeMatched: [],
+        offering: 'primary',
+      })
+    }
+  }
+
   // Semantic deduplication — drop near-duplicates, keep higher-scoring one
-  const allBuilt = [...built, ...secondaryCategoryQuestions]
+  const allBuilt = [...built, ...secondaryCategoryQuestions, ...brandComparisonQuestions]
   allBuilt.sort((a, b) => b.score - a.score)
   const keptCanonicals: string[] = []
   const kept: Built[] = []
