@@ -129,6 +129,173 @@ const cases: Case[] = [
     },
     mustNotInclude: [/where\s+to\s+find\s+(florist|flowers)/i, /alternatives\s+to/i],
   },
+  {
+    label: '6. Apple HE — manual product categories + keyword variants',
+    args: {
+      businessName: 'Apple',
+      domain: 'apple.com',
+      language: 'he',
+      city: null,
+      country: 'IL',
+      keywords: ['מקבוק פרו', 'מקבוק אייר'],
+      manualProfile: {
+        mode: 'manual',
+        primaryCategory: null,
+        secondaryCategories: ['אייפון', 'מקבוק', 'אייפד'],
+        excludedTopics: [],
+      },
+      limit: 12,
+      diversify: false,
+    },
+    mustInclude: [/אייפון/, /מקבוק/],
+    mustNotInclude: [
+      /מוצרי\s+Apple/i,
+      /מוצר\s+של\s+Apple/i,
+      /חוות\s+דעת\s+על\s+מוצרי\s+Apple/i,
+      /מה\s+עדיף\s+Apple\s+או\s+Samsung/i,
+      /מה\s+ההבדל\s+בין\s+Apple\s+ל-Samsung/i,
+      /מה\s+ההבדל\s+בין\s+Apple\s+ל-Google/i,
+      /\{\{[^}]+\}\}/,
+      /\bapple\b(?!\s*Watch|\s*Care)/, // lowercase apple shouldn't appear
+    ],
+  },
+  {
+    label: '7. Apple EN — manual product categories + keyword variants',
+    args: {
+      businessName: 'Apple',
+      domain: 'apple.com',
+      language: 'en',
+      city: null,
+      country: 'US',
+      keywords: ['MacBook Pro', 'MacBook Air'],
+      manualProfile: {
+        mode: 'manual',
+        primaryCategory: null,
+        secondaryCategories: ['iPhone', 'MacBook', 'iPad'],
+        excludedTopics: [],
+      },
+      limit: 12,
+      diversify: false,
+    },
+    mustInclude: [/iPhone/, /MacBook/],
+    mustNotInclude: [
+      /Apple\s+products?/i,
+      /products?\s+by\s+Apple/i,
+      /Reviews\s+of\s+Apple\s+products/i,
+      /\bApple\s+vs\s+Samsung\b/i,
+      /\bApple\s+vs\s+Google\b/i,
+      /What\s+is\s+the\s+difference\s+between\s+Apple\s+and\s+(Samsung|Google)/i,
+      /\{\{[^}]+\}\}/,
+    ],
+  },
+  {
+    label: '8. Apple HE — variant comparison',
+    args: {
+      businessName: 'Apple',
+      domain: 'apple.com',
+      language: 'he',
+      city: null,
+      country: 'IL',
+      keywords: ['מקבוק פרו', 'מקבוק אייר'],
+      manualProfile: {
+        mode: 'manual',
+        primaryCategory: null,
+        secondaryCategories: ['אייפון', 'מקבוק', 'אייפד'],
+        excludedTopics: [],
+      },
+      limit: 18,
+      diversify: false,
+    },
+    mustInclude: [
+      /מה\s+ההבדל\s+בין\s+מקבוק\s+פרו\s+ל-?מקבוק\s+אייר|מה\s+עדיף\s+מקבוק\s+פרו\s+או\s+מקבוק\s+אייר/,
+    ],
+    mustNotInclude: [/מוצרי\s+Apple/i],
+  },
+  {
+    label: '9. Apple EN — variant comparison',
+    args: {
+      businessName: 'Apple',
+      domain: 'apple.com',
+      language: 'en',
+      city: null,
+      country: 'US',
+      keywords: ['MacBook Pro', 'MacBook Air'],
+      manualProfile: {
+        mode: 'manual',
+        primaryCategory: null,
+        secondaryCategories: ['iPhone', 'MacBook', 'iPad'],
+        excludedTopics: [],
+      },
+      limit: 18,
+      diversify: false,
+    },
+    mustInclude: [
+      /MacBook\s+Pro\s+vs\s+MacBook\s+Air|What\s+is\s+the\s+difference\s+between\s+MacBook\s+Pro\s+and\s+MacBook\s+Air/i,
+    ],
+    mustNotInclude: [/Apple\s+products?/i],
+  },
+  {
+    label: '10. Shopify HE — must remain SaaS, not product_brand',
+    args: {
+      businessName: 'Shopify',
+      domain: 'shopify.com',
+      language: 'he',
+      city: null,
+      country: 'US',
+      keywords: ['חנות אונליין', 'מערכת מסחר'],
+      manualProfile: null,
+      limit: 12,
+      diversify: false,
+    },
+    mustInclude: [/Shopify/],
+    mustNotInclude: [
+      /מוצרי\s+Shopify/i,
+      /חוות\s+דעת\s+על\s+מוצרי\s+Shopify/i,
+      /\bcompetitors?\b/i,
+      /אלטרנטיבות\s+ל/i,
+      /\{\{[^}]+\}\}/,
+    ],
+  },
+  {
+    label: '11. Shopify EN — must remain SaaS, not product_brand',
+    args: {
+      businessName: 'Shopify',
+      domain: 'shopify.com',
+      language: 'en',
+      city: null,
+      country: 'US',
+      keywords: ['online store builder', 'ecommerce platform'],
+      manualProfile: null,
+      limit: 12,
+      diversify: false,
+    },
+    mustInclude: [/Shopify/],
+    mustNotInclude: [
+      /Shopify\s+products?/i,
+      /Reviews\s+of\s+Shopify\s+products/i,
+      /\bcompetitors?\b/i,
+      /alternatives\s+to/i,
+      /\{\{[^}]+\}\}/,
+    ],
+  },
+  {
+    label: '12. Apple with NO manual profile — fallback to generic ecosystem',
+    args: {
+      businessName: 'Apple',
+      domain: 'apple.com',
+      language: 'he',
+      city: null,
+      country: 'IL',
+      keywords: [],
+      manualProfile: null,
+      limit: 12,
+      diversify: false,
+    },
+    // No manual categories or keywords → known_brand fallback kicks in,
+    // so we still expect product-specific questions (iPhone, MacBook, etc.)
+    mustInclude: [/אייפון|מקבוק|אייפד|iPhone|MacBook|iPad/],
+    mustNotInclude: [/\{\{[^}]+\}\}/],
+  },
 ]
 
 let failures = 0
@@ -140,6 +307,18 @@ for (const c of cases) {
   console.log(`(returned ${out.length} questions)`)
   for (const q of out) {
     console.log(`  · [${q.intent}] ${q.prompt}`)
+  }
+
+  if (c.mustInclude) {
+    for (const pattern of c.mustInclude) {
+      const hit = out.find((q) => pattern.test(q.prompt))
+      if (hit) {
+        console.log(`  ✓ required pattern matched: ${pattern} → "${hit.prompt}"`)
+      } else {
+        console.log(`  !! FAIL — required pattern NOT matched: ${pattern}`)
+        failures++
+      }
+    }
   }
 
   if (c.mustNotInclude) {

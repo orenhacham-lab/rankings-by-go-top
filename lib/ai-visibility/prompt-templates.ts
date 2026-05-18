@@ -961,6 +961,282 @@ function getBrandComparisonQuestions(
 }
 
 /**
+ * Curated product families per major consumer-product brand. Only seeds the
+ * generator when a brand provides NO manual secondary categories / tracking
+ * keywords — manual signals always win. SaaS / platform brands (Shopify, Wix,
+ * Monday, HubSpot, etc.) are intentionally NOT listed here: they remain SaaS.
+ */
+const KNOWN_BRAND_PRODUCTS: Record<string, { he: string[]; en: string[] }> = {
+  apple: {
+    he: ['אייפון', 'מקבוק', 'אייפד', 'Apple Watch', 'AirPods', 'iCloud', 'AppleCare'],
+    en: ['iPhone', 'MacBook', 'iPad', 'Apple Watch', 'AirPods', 'iCloud', 'AppleCare'],
+  },
+  samsung: {
+    he: ['Samsung Galaxy', 'Galaxy Watch', 'Galaxy Buds', 'Galaxy Tab'],
+    en: ['Samsung Galaxy', 'Galaxy Watch', 'Galaxy Buds', 'Galaxy Tab'],
+  },
+  microsoft: {
+    he: ['Surface', 'Xbox', 'Microsoft 365', 'OneDrive'],
+    en: ['Surface', 'Xbox', 'Microsoft 365', 'OneDrive'],
+  },
+  sony: {
+    he: ['PlayStation', 'Sony Alpha', 'אוזניות Sony'],
+    en: ['PlayStation', 'Sony Alpha', 'Sony headphones'],
+  },
+  dyson: {
+    he: ['שואב אבק Dyson', 'Dyson Airwrap', 'מטהר אוויר Dyson'],
+    en: ['Dyson vacuum', 'Dyson Airwrap', 'Dyson purifier'],
+  },
+  nintendo: {
+    he: ['Nintendo Switch', 'Switch OLED'],
+    en: ['Nintendo Switch', 'Switch OLED'],
+  },
+  gopro: {
+    he: ['GoPro Hero', 'GoPro Max'],
+    en: ['GoPro Hero', 'GoPro Max'],
+  },
+  dji: {
+    he: ['DJI Mavic', 'DJI Osmo', 'DJI Mini'],
+    en: ['DJI Mavic', 'DJI Osmo', 'DJI Mini'],
+  },
+  adobe: {
+    he: ['Photoshop', 'Illustrator', 'Premiere Pro'],
+    en: ['Photoshop', 'Illustrator', 'Premiere Pro'],
+  },
+}
+
+/**
+ * Product-to-competitor pairs at the PRODUCT level (not brand level). Used so
+ * Apple/Samsung comparisons read as "iPhone vs Samsung Galaxy" instead of
+ * "Apple vs Samsung" when product terms are known. Lookup key is lower-cased
+ * product term; competitors are the exact strings to insert.
+ */
+const PRODUCT_LEVEL_COMPETITORS: Record<string, string[]> = {
+  iphone: ['Samsung Galaxy', 'Google Pixel'],
+  'אייפון': ['Samsung Galaxy', 'Google Pixel'],
+  macbook: ['Dell XPS', 'ThinkPad'],
+  'מקבוק': ['Dell XPS', 'ThinkPad'],
+  'macbook pro': ['Dell XPS 15', 'ThinkPad X1'],
+  'מקבוק פרו': ['Dell XPS 15', 'ThinkPad X1'],
+  'macbook air': ['Dell XPS 13', 'ThinkPad X13'],
+  'מקבוק אייר': ['Dell XPS 13', 'ThinkPad X13'],
+  ipad: ['Samsung Galaxy Tab', 'Microsoft Surface'],
+  'אייפד': ['Samsung Galaxy Tab', 'Microsoft Surface'],
+  'apple watch': ['Galaxy Watch'],
+  airpods: ['Galaxy Buds', 'Sony WF'],
+  icloud: ['Google Drive', 'OneDrive'],
+  applecare: ['SquareTrade', 'Asurion'],
+  'samsung galaxy': ['iPhone', 'Google Pixel'],
+  'galaxy watch': ['Apple Watch'],
+  'galaxy buds': ['AirPods', 'Sony WF'],
+  'galaxy tab': ['iPad', 'Microsoft Surface'],
+  surface: ['MacBook', 'iPad'],
+  xbox: ['PlayStation', 'Nintendo Switch'],
+  playstation: ['Xbox', 'Nintendo Switch'],
+  'nintendo switch': ['PlayStation', 'Xbox'],
+  'sony alpha': ['Canon EOS', 'Nikon Z'],
+  'dyson vacuum': ['Shark vacuum', 'Bissell'],
+  'שואב אבק dyson': ['Shark', 'Bissell'],
+  'dyson airwrap': ['Shark FlexStyle', 'Revlon One-Step'],
+}
+
+export type ProductTermSpec = {
+  term: string
+  source: 'manual' | 'keyword' | 'known_brand' | 'fallback'
+  specificity: 'variant' | 'product' | 'generic'
+  base?: string
+}
+
+/**
+ * Extract a prioritized list of product terms that should drive the visible
+ * question text for a product_brand business. Priority order:
+ *   1) manual secondaryCategories         (source: 'manual')
+ *   2) tracking keywords                  (source: 'keyword')
+ *   3) known brand products for the brand (source: 'known_brand')
+ *   4) generic brand fallback             (source: 'fallback') — only if
+ *      nothing else produced a specific term
+ *
+ * Keyword variants (e.g., "מקבוק פרו" when "מקבוק" is a manual category) are
+ * detected and tagged so a comparison question can be generated.
+ */
+export function extractProductTerms(input: {
+  businessName: string
+  language: 'he' | 'en'
+  manualSecondaryCategories?: string[]
+  keywords?: string[]
+}): ProductTermSpec[] {
+  const businessName = (input.businessName || '').trim()
+  const manualSecondary = (input.manualSecondaryCategories || [])
+    .map((s) => (s || '').trim())
+    .filter((s) => s.length > 0)
+  const keywords = (input.keywords || [])
+    .map((s) => (s || '').trim())
+    .filter((s) => s.length > 0)
+
+  const out: ProductTermSpec[] = []
+  const seen = new Set<string>()
+  const brandLower = businessName.toLowerCase()
+
+  const add = (
+    term: string,
+    source: ProductTermSpec['source'],
+    specificity: ProductTermSpec['specificity'],
+    base?: string
+  ) => {
+    const clean = (term || '').trim()
+    if (!clean) return
+    if (clean.length < 2) return
+    // Skip pure brand name as a "product term" (it's the fallback bucket only)
+    if (source !== 'fallback' && brandLower && clean.toLowerCase() === brandLower) return
+    const key = clean.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push({ term: clean, source, specificity, base })
+  }
+
+  // --- Priority 1: manual secondary categories ---
+  for (const m of manualSecondary) {
+    add(m, 'manual', 'product')
+  }
+
+  // --- Priority 2: tracking keywords, tagged variant when more specific than a manual term ---
+  for (const kw of keywords) {
+    if (brandLower && kw.toLowerCase() === brandLower) continue
+    let base: string | undefined
+    for (const m of manualSecondary) {
+      const lk = kw.toLowerCase()
+      const lm = m.toLowerCase()
+      if (lk !== lm && lk.includes(lm)) {
+        base = m
+        break
+      }
+    }
+    if (base) {
+      add(kw, 'keyword', 'variant', base)
+    } else {
+      add(kw, 'keyword', 'product')
+    }
+  }
+
+  // --- Priority 3: known brand products for the business name ---
+  const known = KNOWN_BRAND_PRODUCTS[brandLower]
+  if (known) {
+    const list = input.language === 'he' ? known.he : known.en
+    for (const k of list) add(k, 'known_brand', 'product')
+  }
+
+  // --- Priority 4: generic fallback (only if nothing specific) ---
+  const hasSpecific = out.some((t) => t.specificity !== 'generic')
+  if (!hasSpecific && businessName) {
+    add(businessName, 'fallback', 'generic')
+  }
+
+  return out
+}
+
+/**
+ * Build product-aware questions for a product_brand business. Uses the
+ * prioritized product terms returned by extractProductTerms() so manual
+ * secondary categories and tracking keywords actively shape the visible text.
+ *
+ * - Per-term questions use the actual product term ("איזה אייפון מומלץ?")
+ * - When the user tracks multiple variants of the same base (מקבוק פרו /
+ *   מקבוק אייר) a variant comparison is emitted.
+ * - When a term has a known product-level competitor (PRODUCT_LEVEL_COMPETITORS)
+ *   a product-level comparison is emitted instead of a brand-level one.
+ */
+function getProductBrandQuestions(
+  terms: ProductTermSpec[],
+  language: 'he' | 'en'
+): Array<{ text: string; intent: PromptIntent; score: number }> {
+  const out: Array<{ text: string; intent: PromptIntent; score: number }> = []
+  if (!terms || terms.length === 0) return out
+
+  // 1. Per-term templates — manual & variant lead, known_brand fills in
+  for (const t of terms) {
+    if (t.specificity === 'generic') continue
+    const term = t.term
+    const baseScore =
+      t.specificity === 'variant'
+        ? 96
+        : t.source === 'manual'
+          ? 94
+          : t.source === 'keyword'
+            ? 92
+            : 88
+
+    if (language === 'he') {
+      out.push({ text: `איזה ${term} מומלץ לקנות?`, intent: 'recommendation', score: baseScore })
+      out.push({ text: `האם ${term} שווה את המחיר?`, intent: 'commercial', score: baseScore - 2 })
+      out.push({ text: `כמה עולה ${term}?`, intent: 'commercial', score: baseScore - 3 })
+      out.push({ text: `איפה כדאי לקנות ${term} בישראל?`, intent: 'local', score: baseScore - 4 })
+      out.push({ text: `מה חשוב לבדוק לפני קניית ${term}?`, intent: 'pre_purchase', score: baseScore - 5 })
+      out.push({ text: `מה היתרונות והחסרונות של ${term}?`, intent: 'informational', score: baseScore - 6 })
+      if (t.specificity === 'variant' || t.source === 'manual') {
+        out.push({ text: `האם ${term} מתאים לעבודה?`, intent: 'pre_purchase', score: baseScore - 7 })
+        out.push({ text: `האם ${term} מתאים ללימודים?`, intent: 'pre_purchase', score: baseScore - 8 })
+      }
+    } else {
+      out.push({ text: `Which ${term} should I buy?`, intent: 'recommendation', score: baseScore })
+      out.push({ text: `Is ${term} worth the price?`, intent: 'commercial', score: baseScore - 2 })
+      out.push({ text: `How much does ${term} cost?`, intent: 'commercial', score: baseScore - 3 })
+      out.push({ text: `Where can I buy ${term}?`, intent: 'local', score: baseScore - 4 })
+      out.push({ text: `What should I check before buying ${term}?`, intent: 'pre_purchase', score: baseScore - 5 })
+      out.push({ text: `What are the pros and cons of ${term}?`, intent: 'informational', score: baseScore - 6 })
+      if (t.specificity === 'variant' || t.source === 'manual') {
+        out.push({ text: `Is ${term} good for work?`, intent: 'pre_purchase', score: baseScore - 7 })
+        out.push({ text: `Is ${term} good for students?`, intent: 'pre_purchase', score: baseScore - 8 })
+      }
+    }
+  }
+
+  // 2. Variant comparison questions — when ≥2 variants share a base
+  const byBase: Record<string, ProductTermSpec[]> = {}
+  for (const t of terms) {
+    if (t.specificity === 'variant' && t.base) {
+      const key = t.base.toLowerCase()
+      if (!byBase[key]) byBase[key] = []
+      byBase[key].push(t)
+    }
+  }
+  for (const key of Object.keys(byBase)) {
+    const variants = byBase[key]
+    if (variants.length < 2) continue
+    for (let i = 0; i < variants.length; i++) {
+      for (let j = i + 1; j < variants.length; j++) {
+        const a = variants[i].term
+        const b = variants[j].term
+        if (language === 'he') {
+          out.push({ text: `מה ההבדל בין ${a} ל-${b}?`, intent: 'comparison', score: 97 })
+          out.push({ text: `מה עדיף ${a} או ${b}?`, intent: 'comparison', score: 95 })
+        } else {
+          out.push({ text: `${a} vs ${b}: which should I buy?`, intent: 'comparison', score: 97 })
+          out.push({ text: `What is the difference between ${a} and ${b}?`, intent: 'comparison', score: 95 })
+        }
+      }
+    }
+  }
+
+  // 3. Product-level competitor comparisons (replace brand-level)
+  for (const t of terms) {
+    if (t.specificity === 'generic') continue
+    const competitors = PRODUCT_LEVEL_COMPETITORS[t.term.toLowerCase()]
+    if (!competitors || competitors.length === 0) continue
+    for (const comp of competitors) {
+      if (language === 'he') {
+        out.push({ text: `מה ההבדל בין ${t.term} ל-${comp}?`, intent: 'comparison', score: 90 })
+        out.push({ text: `מה עדיף ${t.term} או ${comp}?`, intent: 'comparison', score: 88 })
+      } else {
+        out.push({ text: `${t.term} vs ${comp}: which is better?`, intent: 'comparison', score: 90 })
+        out.push({ text: `What is the difference between ${t.term} and ${comp}?`, intent: 'comparison', score: 88 })
+      }
+    }
+  }
+
+  return out
+}
+
+/**
  * Extract themes from tracked keywords (used only as signals).
  *
  * Themes are higher-level intent markers that BOOST relevant curated questions.
@@ -1807,6 +2083,22 @@ export function generatePromptSuggestions({
 
   const MIN_QUALITY_SCORE = 70
 
+  // Extract product terms for product_brand. When manual secondary categories /
+  // tracking keywords supply specific product terms, the generic "{{business}}
+  // products" / "מוצרי {{business}}" bank entries are suppressed and replaced
+  // with product-aware questions that USE those terms in the visible text.
+  let productTerms: ProductTermSpec[] = []
+  let hasSpecificProductTerms = false
+  if (category === 'product_brand') {
+    productTerms = extractProductTerms({
+      businessName: business,
+      language: lang as 'he' | 'en',
+      manualSecondaryCategories: hasManual ? manualProfile.secondaryCategories || [] : [],
+      keywords,
+    })
+    hasSpecificProductTerms = productTerms.some((t) => t.specificity !== 'generic')
+  }
+
   // Filter: drop entries that require a city when none is configured
   const eligible = defs.filter((d) => !d.requiresCity || !!ctx.city)
 
@@ -1820,6 +2112,11 @@ export function generatePromptSuggestions({
   }
   const built: Built[] = []
   for (const def of eligible) {
+    // For product_brand: when specific product terms exist, suppress the
+    // generic bank ("מוצרי {{business}}" / "{{business}} products"). The
+    // product-aware questions below take over.
+    if (category === 'product_brand' && hasSpecificProductTerms) continue
+
     const filled = fillTemplate(def.text, ctx).trim()
     if (lang === 'he' && !isReadableHebrew(filled)) continue
 
@@ -1949,9 +2246,15 @@ export function generatePromptSuggestions({
   }
 
   // Brand-vs-known-competitor questions (only when business name matches a
-  // curated brand pair — never produces generic "X vs competitors").
+  // curated brand pair — never produces generic "X vs competitors"). For
+  // product_brand, skip when specific product terms exist — product-level
+  // comparisons (iPhone vs Samsung Galaxy) come from getProductBrandQuestions
+  // below and are more useful than brand-level (Apple vs Samsung).
   const brandComparisonQuestions: Built[] = []
-  if (category === 'saas' || category === 'product_brand') {
+  const allowBrandComparisons =
+    category === 'saas' ||
+    (category === 'product_brand' && !hasSpecificProductTerms)
+  if (allowBrandComparisons) {
     const pairs = getBrandComparisonQuestions(business, lang as 'he' | 'en')
     for (const pair of pairs) {
       const filled = pair.text.trim()
@@ -1968,8 +2271,56 @@ export function generatePromptSuggestions({
     }
   }
 
+  // Product-aware questions for product_brand: use the actual product terms
+  // (manual categories, keywords, known brand products) so they appear in the
+  // visible question text rather than being collapsed to "מוצרי [Brand]".
+  const productBrandQuestions: Built[] = []
+  if (category === 'product_brand' && hasSpecificProductTerms) {
+    const items = getProductBrandQuestions(productTerms, lang as 'he' | 'en')
+    for (const it of items) {
+      const filled = it.text.trim()
+      if (lang === 'he' && !isReadableHebrew(filled)) continue
+      if (lang === 'he' && isInvalidHebrewPhrase(filled)) continue
+      if (isBadQuestion(filled, business)) continue
+      if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
+      if (excludeSet.has(normalizePromptForCompare(filled))) continue
+      productBrandQuestions.push({
+        def: { intent: it.intent, text: it.text, score: it.score, offering: 'primary' },
+        prompt: filled,
+        score: it.score,
+        themeMatched: [],
+        offering: 'primary',
+      })
+    }
+  }
+
+  // When product_brand has specific product terms, defensively strip any
+  // generic-brand prompts (e.g., "Apple products", "מוצרי Apple", "Apple vs
+  // Samsung") that may have leaked from secondary pipelines.
+  let mergedPool: Built[] = [
+    ...built,
+    ...productBrandQuestions,
+    ...secondaryCategoryQuestions,
+    ...brandComparisonQuestions,
+  ]
+  if (category === 'product_brand' && hasSpecificProductTerms && business) {
+    const brandEsc = escapeRegex(business)
+    const reGenericProductsHe = new RegExp(`(מוצרי|מוצר\\s+של|חוות\\s+דעת\\s+על\\s+מוצרי)\\s+${brandEsc}`, 'i')
+    const reGenericProductsEn = new RegExp(`\\b${brandEsc}\\s+products?\\b`, 'i')
+    const reBrandVsEn = new RegExp(`\\b${brandEsc}\\s+(vs|versus)\\b`, 'i')
+    const reBrandVsHe = new RegExp(`(מה\\s+עדיף|ההבדל\\s+בין)\\s+${brandEsc}(?!\\p{L})`, 'iu')
+    mergedPool = mergedPool.filter((item) => {
+      const p = item.prompt
+      if (reGenericProductsHe.test(p)) return false
+      if (reGenericProductsEn.test(p)) return false
+      if (reBrandVsEn.test(p)) return false
+      if (reBrandVsHe.test(p)) return false
+      return true
+    })
+  }
+
   // Semantic deduplication — drop near-duplicates, keep higher-scoring one
-  const allBuilt = [...built, ...secondaryCategoryQuestions, ...brandComparisonQuestions]
+  const allBuilt = mergedPool
   allBuilt.sort((a, b) => b.score - a.score)
   const keptCanonicals: string[] = []
   const kept: Built[] = []
@@ -2013,6 +2364,8 @@ export function generatePromptSuggestions({
       resolvedCategory: category,
       primaryCandidateCount: built.length,
       secondaryCandidateCount: secondaryCategoryQuestions.length,
+      productBrandCandidateCount: productBrandQuestions.length,
+      productTerms,
       totalCandidateCount: allBuilt.length,
       dedupedCount: kept.length,
       poolAfterExclude: poolAfterExclude.length,
