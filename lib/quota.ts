@@ -120,6 +120,39 @@ export async function countActiveTargets(
   return count ?? 0
 }
 
+/**
+ * Check if a tracking target has already been scanned (has any scan_results rows).
+ * Used for Trial plan per-target enforcement (one scan per target lifetime).
+ */
+export async function hasTrialTargetAlreadyBeenScanned(
+  targetId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+): Promise<boolean> {
+  const { count } = await supabase
+    .from('scan_results')
+    .select('id', { count: 'exact', head: true })
+    .eq('tracking_target_id', targetId)
+  return (count ?? 0) > 0
+}
+
+/**
+ * Check if any of the given tracking targets have already been scanned.
+ * Used for Trial plan Scan All enforcement.
+ */
+export async function areAnyTrialTargetsAlreadyScanned(
+  targetIds: string[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+): Promise<boolean> {
+  if (targetIds.length === 0) return false
+  const { count } = await supabase
+    .from('scan_results')
+    .select('id', { count: 'exact', head: true })
+    .in('tracking_target_id', targetIds)
+  return (count ?? 0) > 0
+}
+
 // =============================================================================
 // Bilingual error builders. We always include `code` + `limit` + `plan` so the
 // client can re-render in either language if needed.
@@ -130,6 +163,7 @@ export type QuotaCode =
   | 'QUOTA_KEYWORDS_PER_PROJECT'
   | 'QUOTA_KEYWORD_CHECKS'
   | 'QUOTA_AI_SCANS'
+  | 'QUOTA_TRIAL_TARGET_ALREADY_SCANNED'
 
 export type QuotaErrorPayload = {
   error: string
@@ -180,4 +214,37 @@ export function buildQuotaError(
   }
 
   return { error, errorEn, code, limit, plan, planLabel, planLabelEn }
+}
+
+/**
+ * Build error payload for Trial plan per-target re-scan prevention.
+ */
+export function buildTrialTargetAlreadyScannedError(
+  isScanAll: boolean,
+  plan: PlanType,
+  limits: PlanLimits
+): QuotaErrorPayload {
+  const planLabel = limits.label
+  const planLabelEn = EN_PLAN_LABEL[plan]
+
+  let error = ''
+  let errorEn = ''
+
+  if (isScanAll) {
+    error = 'חלק ממילות המפתח כבר נסרקו בתוכנית ניסיון. שדרג את המנוי כדי לבצע בדיקות חוזרות.'
+    errorEn = 'Some keywords have already been checked on the trial plan. Upgrade your plan to run repeated checks.'
+  } else {
+    error = 'כבר ביצעת בדיקת מיקום עבור מילת מפתח זו בתוכנית ניסיון. שדרג את המנוי כדי לבצע בדיקות חוזרות.'
+    errorEn = 'You have already run a ranking check for this keyword on the trial plan. Upgrade your plan to run repeated checks.'
+  }
+
+  return {
+    error,
+    errorEn,
+    code: 'QUOTA_TRIAL_TARGET_ALREADY_SCANNED',
+    limit: 1,
+    plan,
+    planLabel,
+    planLabelEn,
+  }
 }

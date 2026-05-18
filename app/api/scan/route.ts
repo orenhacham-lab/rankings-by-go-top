@@ -4,9 +4,12 @@ import { runScan } from '@/lib/scanner'
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
+  buildTrialTargetAlreadyScannedError,
   countActiveTargets,
   countKeywordChecksThisPeriodForProject,
   countKeywordChecksTrialLifetime,
+  hasTrialTargetAlreadyBeenScanned,
+  areAnyTrialTargetsAlreadyScanned,
 } from '@/lib/quota'
 import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
 
@@ -67,6 +70,34 @@ export async function POST(request: Request) {
           limit
         )
         return Response.json(payload, { status: 403 })
+      }
+
+      // Trial plan: prevent rescanning the same tracking_target.
+      if (entitlement.plan === 'trial') {
+        if (targetId) {
+          // Single target scan: check if this specific target has been scanned
+          const alreadyScanned = await hasTrialTargetAlreadyBeenScanned(targetId, admin)
+          if (alreadyScanned) {
+            const payload = buildTrialTargetAlreadyScannedError(false, entitlement.plan, entitlement.limits)
+            return Response.json(payload, { status: 403 })
+          }
+        } else {
+          // Scan All: check if any active target has been scanned
+          const { data: activeTargets, error: targetIdsErr } = await admin
+            .from('tracking_targets')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('is_active', true)
+
+          if (!targetIdsErr && activeTargets && activeTargets.length > 0) {
+            const targetIds = activeTargets.map((t: { id: string }) => t.id)
+            const anyScanned = await areAnyTrialTargetsAlreadyScanned(targetIds, admin)
+            if (anyScanned) {
+              const payload = buildTrialTargetAlreadyScannedError(true, entitlement.plan, entitlement.limits)
+              return Response.json(payload, { status: 403 })
+            }
+          }
+        }
       }
     }
 
