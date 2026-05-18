@@ -151,7 +151,7 @@ function StatusTab() {
               <p className="font-semibold">כל החיבורים פעילים!</p>
               <p className="text-green-700 text-xs mt-0.5">
                 המערכת מוכנה לשימוש.{' '}
-                <a href="/login" className="underline font-medium">היכנס למערכת</a>
+                <a href="/signup" className="underline font-medium">היכנס למערכת</a>
               </p>
             </div>
           </div>
