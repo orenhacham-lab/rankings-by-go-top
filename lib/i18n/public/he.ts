@@ -2,12 +2,31 @@ export const he = {
   nav: {
     home: 'עמוד הבית',
     pricing: 'מחירים',
+    features: 'יכולות המערכת',
     articles: 'מאמרים',
     about: 'אודות',
     login: 'התחברות',
     startFree: 'התחל חינם',
     toDashboard: 'לדאשבורד',
     menu: 'תפריט',
+    featuresMenu: {
+      googleOrganic: {
+        label: 'בדיקת מיקום בגוגל חיפוש',
+        description: 'עקבו אחרי דירוגים אורגניים בגוגל לפי ביטויים, מדינה, שפה ומכשיר.',
+      },
+      googleMaps: {
+        label: 'בדיקת מיקום בגוגל מפות',
+        description: 'בדקו נראות מקומית בגוגל מפות לפי עיר, אזור וביטויי חיפוש.',
+      },
+      aiVisibility: {
+        label: 'נראות ב-AI',
+        description: 'גלו האם העסק שלכם מוזכר בתשובות ChatGPT, Gemini, Perplexity ו-Google AI.',
+      },
+      reports: {
+        label: 'הפקת דוחות SEO/GEO',
+        description: 'הפיקו דוחות PDF ו-Excel ללקוחות עם מיקומים, מגמות ונראות.',
+      },
+    },
   },
   footer: {
     tagline: 'מערכת מעקב מיקומים למקום הראשון בגוגל ונראות ב-AI. עקוב אחר דירוגיך, תחרויות והופעה בתשובות AI כמו ChatGPT ו-Gemini.',

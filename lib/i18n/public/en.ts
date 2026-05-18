@@ -4,12 +4,31 @@ export const en = {
   nav: {
     home: 'Home',
     pricing: 'Pricing',
+    features: 'Features',
     articles: 'Articles',
     about: 'About',
     login: 'Sign in',
     startFree: 'Start free',
     toDashboard: 'Dashboard',
     menu: 'Menu',
+    featuresMenu: {
+      googleOrganic: {
+        label: 'Google Organic Rank Tracking',
+        description: 'Monitor your rankings on Google search results. Track positions by keyword, location, language, and device across pages 1-2.',
+      },
+      googleMaps: {
+        label: 'Google Maps Rank Tracking',
+        description: 'Check your visibility in Google Maps. Track positions by city, region, and search terms with precise geographic targeting.',
+      },
+      aiVisibility: {
+        label: 'AI Visibility Tracking',
+        description: 'Discover if your business is mentioned in AI answers from ChatGPT, Gemini, Perplexity, and Google AI.',
+      },
+      reports: {
+        label: 'SEO/GEO Reports',
+        description: 'Generate professional PDF and Excel reports for your clients with rankings, trends, and visibility insights.',
+      },
+    },
   },
   footer: {
     tagline: 'A rank tracking platform for first-place visibility on Google and in AI answers. Track your rankings, competitors, and how you appear in answers from ChatGPT, Gemini and other AI engines.',

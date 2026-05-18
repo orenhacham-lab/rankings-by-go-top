@@ -13,6 +13,7 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isAuthed, setIsAuthed] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+  const [featuresOpen, setFeaturesOpen] = useState(false)
 
   const dict = getPublicDictionary(locale)
   const prefix = locale === 'en' ? '/en' : ''
@@ -39,6 +40,33 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
     { href: `${prefix}/pricing`, label: dict.nav.pricing },
     { href: `${prefix}/articles`, label: dict.nav.articles },
     { href: `${prefix}/about`, label: dict.nav.about },
+  ]
+
+  const featureItems = [
+    {
+      id: 'googleOrganic',
+      href: `${prefix}/features/google-organic-rank-tracking`,
+      label: dict.nav.featuresMenu.googleOrganic.label,
+      description: dict.nav.featuresMenu.googleOrganic.description,
+    },
+    {
+      id: 'googleMaps',
+      href: `${prefix}/features/google-maps-rank-tracking`,
+      label: dict.nav.featuresMenu.googleMaps.label,
+      description: dict.nav.featuresMenu.googleMaps.description,
+    },
+    {
+      id: 'aiVisibility',
+      href: `${prefix}/features/ai-visibility-tracking`,
+      label: dict.nav.featuresMenu.aiVisibility.label,
+      description: dict.nav.featuresMenu.aiVisibility.description,
+    },
+    {
+      id: 'reports',
+      href: `${prefix}/features/seo-geo-reports`,
+      label: dict.nav.featuresMenu.reports.label,
+      description: dict.nav.featuresMenu.reports.description,
+    },
   ]
 
   return (
@@ -74,6 +102,35 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
                 {link.label}
               </Link>
             ))}
+            {/* Features Dropdown */}
+            <div className="relative group">
+              <button
+                className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors flex items-center gap-1.5"
+                aria-haspopup="true"
+              >
+                {dict.nav.features}
+                <svg
+                  className="w-4 h-4 transition-transform group-hover:rotate-180"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </button>
+              <div className="absolute top-full left-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-2 z-50">
+                {featureItems.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className="block px-4 py-3 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="font-medium text-slate-900">{item.label}</div>
+                    <div className="text-sm text-slate-600 mt-1">{item.description}</div>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </nav>
 
           {/* CTA Buttons + Language Switcher */}
@@ -141,6 +198,41 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
                   {link.label}
                 </Link>
               ))}
+              {/* Features Dropdown Mobile */}
+              <div className="px-3 py-3">
+                <button
+                  onClick={() => setFeaturesOpen(!featuresOpen)}
+                  className="w-full text-left text-base font-medium text-slate-700 hover:text-blue-600 transition-colors flex items-center justify-between"
+                >
+                  {dict.nav.features}
+                  <svg
+                    className={`w-4 h-4 transition-transform ${featuresOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </button>
+                {featuresOpen && (
+                  <div className="mt-2 space-y-2 border-l-2 border-slate-200 pl-2">
+                    {featureItems.map((item) => (
+                      <Link
+                        key={item.id}
+                        href={item.href}
+                        onClick={() => {
+                          setMobileOpen(false)
+                          setFeaturesOpen(false)
+                        }}
+                        className="block px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        <div className="text-sm font-medium text-slate-900">{item.label}</div>
+                        <div className="text-xs text-slate-600 mt-0.5">{item.description}</div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </nav>
             <div className="border-t border-slate-200 mt-4 pt-4 flex flex-col gap-2">
               <div className="px-3 py-2">
