@@ -21,14 +21,15 @@ export async function POST(request: Request) {
       .eq('user_id', userId)
       .in('status', ['trial', 'active'])
 
-    // Create new trial subscription
+    // Create new trial subscription.
+    // Trial is identified by status='trial' + trial_ends_at; the `plan` column
+    // is only set when the user upgrades to a paid plan (regular/advanced/
+    // premium/large_agency) via PayPal activation. Inserting `plan: 'trial'`
+    // breaks because that value is not in the column's allowed set.
     const { error } = await admin.from('subscriptions').insert({
       user_id: userId,
-      plan: 'trial',
       status: 'trial',
       trial_ends_at: trialEndsAt,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     })
 
     if (error) {

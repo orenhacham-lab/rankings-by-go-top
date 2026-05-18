@@ -16,20 +16,6 @@ interface Plan {
 
 const plans: Plan[] = [
   {
-    name: 'Trial',
-    price: '₪0',
-    priceSuffix: 'Free for 7 days',
-    description: 'Perfect to test the system before making a decision',
-    features: [
-      'One project',
-      'Up to 30 keywords',
-      'Up to 30 keyword checks during the trial',
-      'Up to 3 AI scans during the trial',
-      'Basic support',
-    ],
-    cta: 'Start Free Trial',
-  },
-  {
     name: 'Regular',
     price: '₪79',
     priceSuffix: '/ month',
@@ -151,10 +137,34 @@ export default async function EnglishPricingPage() {
         </div>
       </section>
 
+      {/* Free Trial CTA */}
+      {!user && (
+        <section className="pb-10">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-6 sm:px-8 sm:py-7 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
+              <div className="flex-1">
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
+                  Want to try the platform before choosing a plan?
+                </h3>
+                <p className="text-sm text-slate-600">
+                  Start a free 7-day trial — no credit card required.
+                </p>
+              </div>
+              <Link
+                href="/en/signup"
+                className="inline-block whitespace-nowrap px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm shadow-md hover:bg-blue-700 transition-colors"
+              >
+                Start free trial
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Pricing Cards */}
       <section className="pb-20 lg:pb-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {plans.map((plan) => (
               <div
                 key={plan.name}
