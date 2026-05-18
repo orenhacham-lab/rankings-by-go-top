@@ -389,7 +389,7 @@ export function SignupForm() {
             <Button
               type="submit"
               loading={loading}
-              className="w-full pt-6"
+              className="w-full mt-2"
               size="lg"
             >
               {t.signupBtn}
@@ -402,7 +402,7 @@ export function SignupForm() {
           <p className="text-slate-600 text-sm">
             {t.alreadyHaveAccount}{' '}
             <Link
-              href={isEn ? '/login?lang=en' : '/login'}
+              href={isEn ? '/en/login' : '/login'}
               className="text-blue-600 font-medium hover:underline"
             >
               {t.signIn}

@@ -34,7 +34,7 @@ const plans: Plan[] = [
       'Google Organic + Google Maps',
       'תמיכה בעברית',
     ],
-    cta: 'בחר תוכנית',
+    cta: 'להתנסות חינם',
   },
   {
     slug: 'boutique',
@@ -53,7 +53,7 @@ const plans: Plan[] = [
       'מעקב מגמות מתקדם',
       'תמיכה אישית',
     ],
-    cta: 'בחר תוכנית',
+    cta: 'להתנסות חינם',
     highlighted: true,
     badge: 'הכי פופולרי',
   },
@@ -75,7 +75,7 @@ const plans: Plan[] = [
       'תמיכה VIP',
       'הדרכה אישית',
     ],
-    cta: 'בחר תוכנית',
+    cta: 'להתנסות חינם',
   },
   {
     slug: 'large_agency',
@@ -95,7 +95,7 @@ const plans: Plan[] = [
       'תמיכה VIP',
       'הדרכה וליווי אישי',
     ],
-    cta: 'בחר תוכנית',
+    cta: 'להתנסות חינם',
   },
 ]
 

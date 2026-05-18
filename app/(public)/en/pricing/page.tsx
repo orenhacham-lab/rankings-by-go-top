@@ -32,7 +32,7 @@ const plans: Plan[] = [
       'Google Organic + Google Maps',
       'Email support',
     ],
-    cta: 'Choose Plan',
+    cta: 'Start free trial',
   },
   {
     slug: 'boutique',
@@ -51,7 +51,7 @@ const plans: Plan[] = [
       'Advanced trend tracking',
       'Priority support',
     ],
-    cta: 'Choose Plan',
+    cta: 'Start free trial',
     highlighted: true,
     badge: 'Most Popular',
   },
@@ -73,7 +73,7 @@ const plans: Plan[] = [
       'VIP priority support',
       'Personal onboarding',
     ],
-    cta: 'Choose Plan',
+    cta: 'Start free trial',
   },
   {
     slug: 'large_agency',
@@ -93,7 +93,7 @@ const plans: Plan[] = [
       'VIP priority support',
       'Personal onboarding and coaching',
     ],
-    cta: 'Choose Plan',
+    cta: 'Start free trial',
   },
 ]
 
