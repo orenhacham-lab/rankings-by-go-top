@@ -1207,8 +1207,8 @@ function getProductBrandQuestions(
         const a = variants[i].term
         const b = variants[j].term
         if (language === 'he') {
-          out.push({ text: `מה ההבדל בין ${a} ל-${b}?`, intent: 'comparison', score: 97 })
-          out.push({ text: `מה עדיף ${a} או ${b}?`, intent: 'comparison', score: 95 })
+          out.push({ text: `מה ההבדל בין ${a} ל${b}?`, intent: 'comparison', score: 97 })
+          out.push({ text: `מה עדיף, ${a} או ${b}?`, intent: 'comparison', score: 95 })
         } else {
           out.push({ text: `${a} vs ${b}: which should I buy?`, intent: 'comparison', score: 97 })
           out.push({ text: `What is the difference between ${a} and ${b}?`, intent: 'comparison', score: 95 })
@@ -1224,8 +1224,8 @@ function getProductBrandQuestions(
     if (!competitors || competitors.length === 0) continue
     for (const comp of competitors) {
       if (language === 'he') {
-        out.push({ text: `מה ההבדל בין ${t.term} ל-${comp}?`, intent: 'comparison', score: 90 })
-        out.push({ text: `מה עדיף ${t.term} או ${comp}?`, intent: 'comparison', score: 88 })
+        out.push({ text: `מה ההבדל בין ${t.term} ל${comp}?`, intent: 'comparison', score: 90 })
+        out.push({ text: `מה עדיף, ${t.term} או ${comp}?`, intent: 'comparison', score: 88 })
       } else {
         out.push({ text: `${t.term} vs ${comp}: which is better?`, intent: 'comparison', score: 90 })
         out.push({ text: `What is the difference between ${t.term} and ${comp}?`, intent: 'comparison', score: 88 })
