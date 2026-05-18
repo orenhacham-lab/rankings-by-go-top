@@ -38,6 +38,10 @@ export async function POST() {
       )
     }
 
+    // Cancel renewal in PayPal — stops future billing.
+    // PayPal will send BILLING.SUBSCRIPTION.CANCELLED webhook which marks the
+    // DB row as 'cancelled'. Until current_period_end passes, entitlement
+    // logic continues to grant the user access (see lib/subscription.ts).
     const token = await getPayPalToken()
     const cancelResponse = await fetch(
       `${process.env.PAYPAL_API_URL || 'https://api.paypal.com'}/v1/billing/subscriptions/${sub.paypal_subscription_id}/cancel`,
@@ -47,7 +51,7 @@ export async function POST() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ reason: 'User requested cancellation from dashboard' }),
+        body: JSON.stringify({ reason: 'User requested renewal cancellation from dashboard' }),
       }
     )
 
@@ -56,19 +60,6 @@ export async function POST() {
       console.error('[PayPal Cancel] PayPal API error:', cancelResponse.status, errorText)
       return Response.json(
         { error: `PayPal cancellation failed: ${cancelResponse.statusText}` },
-        { status: 500 }
-      )
-    }
-
-    const { error: updateError } = await admin
-      .from('subscriptions')
-      .update({ status: 'cancelled' })
-      .eq('id', sub.id)
-
-    if (updateError) {
-      console.error('[PayPal Cancel] DB update error:', updateError)
-      return Response.json(
-        { error: `Failed to update subscription status: ${updateError.message}` },
         { status: 500 }
       )
     }

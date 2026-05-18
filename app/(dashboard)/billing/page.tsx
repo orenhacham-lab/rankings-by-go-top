@@ -15,12 +15,14 @@ export default async function BillingPage() {
 
   const { data: activeSub } = await supabase
     .from('subscriptions')
-    .select('paypal_subscription_id')
+    .select('status, paypal_subscription_id')
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .in('status', ['active', 'cancelled'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  const renewalCancelled = activeSub?.status === 'cancelled'
 
   return (
     <BillingView
@@ -30,6 +32,7 @@ export default async function BillingPage() {
       trialEndsAt={entitlement.trialEndsAt}
       subscriptionEndsAt={entitlement.subscriptionEndsAt}
       hasPaypalSubscriptionId={!!activeSub?.paypal_subscription_id}
+      renewalCancelled={renewalCancelled}
       planPrices={{
         trial: PLAN_LIMITS.trial.price,
         regular: PLAN_LIMITS.regular.price,

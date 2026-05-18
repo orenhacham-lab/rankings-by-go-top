@@ -14,6 +14,7 @@ interface BillingViewProps {
   trialEndsAt: string | null
   subscriptionEndsAt: string | null
   hasPaypalSubscriptionId: boolean
+  renewalCancelled: boolean
   planPrices: Record<PlanKey, number>
 }
 
@@ -24,6 +25,7 @@ export default function BillingView({
   trialEndsAt,
   subscriptionEndsAt,
   hasPaypalSubscriptionId,
+  renewalCancelled,
   planPrices,
 }: BillingViewProps) {
   const { language, isLoaded } = useDashboardLanguage()
@@ -90,7 +92,16 @@ export default function BillingView({
       {hasActiveSubscription && (
         <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">{t.manage.title}</h2>
-          {hasPaypalSubscriptionId ? (
+          {renewalCancelled ? (
+            <p className="text-slate-700 dark:text-slate-300 text-sm">
+              {t.manage.renewalAlreadyCancelled}
+              {subscriptionEndsAt && (
+                <span className="font-semibold">
+                  {' '}{new Date(subscriptionEndsAt).toLocaleDateString(dateLocale)}
+                </span>
+              )}
+            </p>
+          ) : hasPaypalSubscriptionId ? (
             <>
               <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.manage.description}</p>
               <button

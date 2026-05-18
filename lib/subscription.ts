@@ -123,12 +123,14 @@ export async function getUserEntitlement(
     }
   }
 
-  // Fetch most recent trial or active subscription
+  // Fetch most recent trial, active, or cancelled subscription.
+  // 'cancelled' status means the renewal was cancelled in PayPal but access
+  // remains valid until current_period_end.
   const { data: sub } = await supabase
     .from('subscriptions')
     .select('id, plan, status, trial_ends_at, current_period_end, scans_this_period, scans_period_key')
     .eq('user_id', userId)
-    .in('status', ['trial', 'active'])
+    .in('status', ['trial', 'active', 'cancelled'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -144,6 +146,10 @@ export async function getUserEntitlement(
     plan = 'trial'
   } else if (sub?.status === 'active') {
     hasActiveSubscription = !sub.current_period_end || new Date(sub.current_period_end) > now
+    plan = hasActiveSubscription ? (sub.plan as SubscriptionPlan) : 'trial'
+  } else if (sub?.status === 'cancelled') {
+    // Renewal cancelled: keep access until paid period ends.
+    hasActiveSubscription = !!sub.current_period_end && new Date(sub.current_period_end) > now
     plan = hasActiveSubscription ? (sub.plan as SubscriptionPlan) : 'trial'
   }
 
@@ -185,12 +191,12 @@ export async function hasAccess(
 
   if (profile?.role === 'admin') return true
 
-  // Check subscription
+  // Check subscription. 'cancelled' status grants access until current_period_end.
   const { data: sub } = await supabase
     .from('subscriptions')
     .select('status, trial_ends_at, current_period_end')
     .eq('user_id', userId)
-    .in('status', ['trial', 'active'])
+    .in('status', ['trial', 'active', 'cancelled'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -203,6 +209,10 @@ export async function hasAccess(
 
   if (sub.status === 'active') {
     return !sub.current_period_end || new Date(sub.current_period_end) > new Date()
+  }
+
+  if (sub.status === 'cancelled') {
+    return !!sub.current_period_end && new Date(sub.current_period_end) > new Date()
   }
 
   return false
