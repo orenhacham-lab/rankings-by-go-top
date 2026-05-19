@@ -214,8 +214,9 @@ export async function POST(request: Request) {
       ...seed,
       geoTargetConstants: [`geoTargetConstants/${geoTargetId}`],
       language: `languageConstants/${languageId}`,
+      includeAdultKeywords: false,
       keywordPlanNetwork: 'GOOGLE_SEARCH',
-      pageSize: 100,
+      pageSize: 1000,
     }
 
     // Safe server-side debug — no secrets.

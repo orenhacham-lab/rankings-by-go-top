@@ -10,7 +10,7 @@ export const COUNTRY_GEO_TARGETS: Record<string, number> = {
 }
 
 export const LANGUAGE_IDS: Record<string, number> = {
-  he: 1009, // Hebrew
+  he: 1027, // Hebrew (Hebrew | iw | 1027)
   en: 1000, // English
   el: 1016, // Greek
   ar: 1019, // Arabic
