@@ -295,7 +295,10 @@ export async function POST(request: Request) {
 
     const data = (await apiResponse.json()) as GoogleAdsResponse
 
+    const rawResultsCount = (data.results || []).length
+
     // Normalize results — Google Ads REST returns camelCase.
+    // No exact-match or originalKeyword filtering — keep all keyword ideas returned by Google.
     const allResults: KeywordIdeaResult[] = (data.results || [])
       .filter((idea) => idea.text)
       .map((idea) => {
@@ -313,13 +316,56 @@ export async function POST(request: Request) {
         }
       })
 
-    // Filter results by minimum monthly searches
-    const results = allResults.filter((r) => r.avgMonthlySearches !== null && r.avgMonthlySearches >= minMonthlySearches)
+    const normalizedResultsCount = allResults.length
+
+    // Filter by minimum monthly searches.
+    // When minMonthlySearches === 0, include results with null avgMonthlySearches too.
+    const filteredResults = allResults.filter((r) => {
+      if (minMonthlySearches === 0) return true
+      return r.avgMonthlySearches !== null && r.avgMonthlySearches >= minMonthlySearches
+    })
+
+    // Sort by avgMonthlySearches DESC, then competitionIndex DESC
+    filteredResults.sort((a, b) => {
+      const av = a.avgMonthlySearches ?? -1
+      const bv = b.avgMonthlySearches ?? -1
+      if (bv !== av) return bv - av
+      const ac = a.competitionIndex ?? -1
+      const bc = b.competitionIndex ?? -1
+      return bc - ac
+    })
+
+    // Return up to 100 results
+    const results = filteredResults.slice(0, 100)
+    const filteredResultsCount = results.length
+
+    console.log('[keyword-ideas] result counts', {
+      rawResultsCount,
+      normalizedResultsCount,
+      filteredResultsCount,
+      minMonthlySearches,
+      seedType,
+      apiVersionUsed: GOOGLE_ADS_API_VERSION,
+    })
+
+    const debugNote =
+      rawResultsCount <= 1
+        ? 'Google Ads returned only one raw keyword idea for this seed'
+        : undefined
 
     return Response.json({
       success: true,
       count: results.length,
       results,
+      debug: {
+        rawResultsCount,
+        normalizedResultsCount,
+        filteredResultsCount,
+        minMonthlySearches,
+        seedType,
+        apiVersionUsed: GOOGLE_ADS_API_VERSION,
+        ...(debugNote ? { debugNote } : {}),
+      },
     })
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'

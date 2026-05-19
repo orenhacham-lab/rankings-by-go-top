@@ -67,11 +67,16 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Extract and deduplicate keywords
-    const keywords = [
+    const keywords: string[] = [
       ...new Set(
         rawKeywords
-          .filter((k: unknown) => typeof k === 'object' && k !== null && 'keyword' in k)
-          .map((k: KeywordToAdd) => (k.keyword as string).trim().toLowerCase())
+          .map((k: unknown) => {
+            if (typeof k === 'object' && k !== null && 'keyword' in k) {
+              const kw = (k as { keyword: unknown }).keyword
+              return typeof kw === 'string' ? kw.trim().toLowerCase() : ''
+            }
+            return ''
+          })
           .filter((k: string) => k.length > 0)
       ),
     ]
@@ -126,7 +131,6 @@ export async function POST(request: Request): Promise<Response> {
       }
 
       if (keywords.length > availableSlots) {
-        const excess = keywords.slice(availableSlots)
         keywords.splice(availableSlots)
       }
     }

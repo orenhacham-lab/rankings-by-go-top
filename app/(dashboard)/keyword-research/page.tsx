@@ -44,6 +44,7 @@ export default function KeywordResearchPage() {
   const [addingToProject, setAddingToProject] = useState(false)
   const [addToProjectMessage, setAddToProjectMessage] = useState('')
   const [addToProjectError, setAddToProjectError] = useState('')
+  const [lastAddedProjectId, setLastAddedProjectId] = useState('')
 
   useEffect(() => {
     fetchProjects()
@@ -150,26 +151,28 @@ export default function KeywordResearchPage() {
 
   const handleAddToProject = async () => {
     if (!selectedProject) {
-      setAddToProjectError('Please select a project')
+      setAddToProjectError(t.addToProject.errorSelectProject)
       return
     }
 
     if (selectedKeywords.size === 0) {
-      setAddToProjectError('Please select at least one keyword')
+      setAddToProjectError(t.addToProject.errorSelectKeywords)
       return
     }
 
     setAddingToProject(true)
     setAddToProjectMessage('')
     setAddToProjectError('')
+    setLastAddedProjectId('')
 
     try {
       const keywordsArray = Array.from(selectedKeywords).map((kw) => ({ keyword: kw }))
+      const projectIdUsed = selectedProject
       const response = await fetch('/api/keyword-research/add-to-project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectId: selectedProject,
+          projectId: projectIdUsed,
           engineType,
           keywords: keywordsArray,
         }),
@@ -178,15 +181,20 @@ export default function KeywordResearchPage() {
       const result = await response.json()
 
       if (!response.ok || !result.success) {
-        setAddToProjectError(result.message || 'Failed to add keywords')
+        if (response.status === 402) {
+          setAddToProjectError(t.addToProject.errorQuota)
+        } else {
+          setAddToProjectError(result.message || t.addToProject.errorGeneral)
+        }
         return
       }
 
-      setAddToProjectMessage(result.message || `Added ${result.added} keywords`)
+      setAddToProjectMessage(t.addToProject.success(result.added || 0, result.skipped || 0))
+      setLastAddedProjectId(projectIdUsed)
       setSelectedKeywords(new Set())
       setSelectedProject('')
     } catch (err) {
-      setAddToProjectError('An error occurred while adding keywords')
+      setAddToProjectError(t.addToProject.errorGeneral)
       console.error('Error adding keywords to project:', err)
     } finally {
       setAddingToProject(false)
@@ -354,63 +362,94 @@ export default function KeywordResearchPage() {
             </div>
           </div>
 
-          {/* Add to Project Section */}
+          {/* Add to Project Section — visible whenever at least one keyword is selected */}
           {selectedKeywords.size > 0 && (
-            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Project *
-                  </label>
-                  <select
-                    value={selectedProject}
-                    onChange={(e) => setSelectedProject(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    disabled={projectsLoading || addingToProject}
-                  >
-                    <option value="">Select project...</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Search Engine
-                  </label>
-                  <select
-                    value={engineType}
-                    onChange={(e) => setEngineType(e.target.value as 'google_organic' | 'google_maps')}
-                    className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    disabled={addingToProject}
-                  >
-                    <option value="google_organic">Google Organic</option>
-                    <option value="google_maps">Google Maps</option>
-                  </select>
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    onClick={handleAddToProject}
-                    disabled={!selectedProject || addingToProject}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    {addingToProject && <Loader2 size={18} className="animate-spin" />}
-                    {addingToProject ? 'Adding...' : `Add ${selectedKeywords.size} keyword${selectedKeywords.size !== 1 ? 's' : ''}`}
-                  </button>
-                </div>
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
+              <div className={`mb-3 font-semibold text-blue-900 dark:text-blue-100 ${isRTL ? 'text-right' : 'text-left'}`}>
+                {t.addToProject.sectionTitle} ({selectedKeywords.size})
               </div>
 
+              {projects.length === 0 && !projectsLoading && (
+                <div className="text-sm text-slate-700 dark:text-slate-300 p-3 bg-white dark:bg-slate-800 rounded">
+                  {t.addToProject.noProjects}
+                </div>
+              )}
+
+              {projectsLoading && (
+                <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  {t.addToProject.projectsLoading}
+                </div>
+              )}
+
+              {projects.length > 0 && !projectsLoading && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                        {t.addToProject.projectLabel} *
+                      </label>
+                      <select
+                        value={selectedProject}
+                        onChange={(e) => setSelectedProject(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                        disabled={addingToProject}
+                      >
+                        <option value="">{t.addToProject.projectPlaceholder}</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                        {t.addToProject.engineLabel}
+                      </label>
+                      <select
+                        value={engineType}
+                        onChange={(e) => setEngineType(e.target.value as 'google_organic' | 'google_maps')}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                        disabled={addingToProject}
+                      >
+                        <option value="google_organic">{t.addToProject.engineGoogleOrganic}</option>
+                        <option value="google_maps">{t.addToProject.engineGoogleMaps}</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-end">
+                      <button
+                        onClick={handleAddToProject}
+                        disabled={!selectedProject || addingToProject}
+                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        {addingToProject && <Loader2 size={18} className="animate-spin" />}
+                        {addingToProject ? t.addToProject.adding : t.addToProject.addButton}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {addToProjectError && (
-                <div className="text-sm text-red-600 dark:text-red-400 mb-2">{addToProjectError}</div>
+                <div className={`text-sm text-red-600 dark:text-red-400 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                  {addToProjectError}
+                </div>
               )}
               {addToProjectMessage && (
-                <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                <div className={`text-sm text-green-700 dark:text-green-400 flex items-center gap-2 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
                   <CheckCircle size={16} />
-                  {addToProjectMessage}
+                  <span>{addToProjectMessage}</span>
+                  {lastAddedProjectId && (
+                    <a
+                      href={`/projects/${lastAddedProjectId}`}
+                      className="text-blue-600 dark:text-blue-400 hover:underline ml-2"
+                    >
+                      {t.addToProject.goToProject}
+                    </a>
+                  )}
                 </div>
               )}
             </div>
