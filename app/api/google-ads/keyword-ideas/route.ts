@@ -7,14 +7,15 @@ interface TokenResponse {
   error_description?: string
 }
 
+// Google Ads REST API uses camelCase, not snake_case.
 interface GoogleAdsKeywordIdea {
   text?: string
-  keyword_idea_metrics?: {
-    avg_monthly_searches?: number
+  keywordIdeaMetrics?: {
+    avgMonthlySearches?: number | string
     competition?: 'LOW' | 'MEDIUM' | 'HIGH'
-    competition_index?: number
-    low_top_of_page_bid_micros?: number
-    high_top_of_page_bid_micros?: number
+    competitionIndex?: number | string
+    lowTopOfPageBidMicros?: number | string
+    highTopOfPageBidMicros?: number | string
   }
 }
 
@@ -24,6 +25,7 @@ interface GoogleAdsResponse {
     code?: number
     message?: string
     status?: string
+    details?: unknown[]
   }
 }
 
@@ -39,11 +41,7 @@ export interface KeywordIdeaResult {
 
 const GOOGLE_ADS_API_VERSION = 'v22'
 
-async function getPayPalToken(): Promise<string> {
-  const auth = Buffer.from(
-    `${process.env.GOOGLE_ADS_CLIENT_ID}:${process.env.GOOGLE_ADS_CLIENT_SECRET}`
-  ).toString('base64')
-
+async function getGoogleAdsAccessToken(): Promise<string> {
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -70,38 +68,82 @@ async function getPayPalToken(): Promise<string> {
   return tokenData.access_token
 }
 
+function toNumber(value: number | string | undefined): number | null {
+  if (value === undefined || value === null || value === '') return null
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
 export async function POST(request: Request) {
   try {
     // Auth check
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+      return Response.json({ error: 'Unauthorized', stage: 'auth' }, { status: 401 })
     }
 
-    // Validate request body
-    const body = await request.json()
-    const { keyword, country = 'IL', language = 'he', url } = body
-
-    if (!keyword || typeof keyword !== 'string' || !keyword.trim()) {
+    // Parse and validate body
+    let body: Record<string, unknown>
+    try {
+      body = await request.json()
+    } catch {
       return Response.json(
-        { error: 'Keyword is required and must be non-empty' },
+        { success: false, stage: 'validation', error: 'Invalid JSON body' },
+        { status: 400 }
+      )
+    }
+
+    const keywordRaw = typeof body.keyword === 'string' ? body.keyword.trim() : ''
+    const country = typeof body.country === 'string' ? body.country : 'IL'
+    const language = typeof body.language === 'string' ? body.language : 'he'
+    const urlRaw = typeof body.url === 'string' ? body.url.trim() : ''
+
+    if (!keywordRaw) {
+      return Response.json(
+        { success: false, stage: 'validation', error: 'Keyword is required' },
         { status: 400 }
       )
     }
 
     if (!isValidCountry(country)) {
       return Response.json(
-        { error: `Unsupported country: ${country}` },
+        {
+          success: false,
+          stage: 'validation',
+          error: 'Unsupported country',
+          received: country,
+          supported: Object.keys(COUNTRY_GEO_TARGETS),
+        },
         { status: 400 }
       )
     }
 
     if (!isValidLanguage(language)) {
       return Response.json(
-        { error: `Unsupported language: ${language}` },
+        {
+          success: false,
+          stage: 'validation',
+          error: 'Unsupported language',
+          received: language,
+          supported: Object.keys(LANGUAGE_IDS),
+        },
         { status: 400 }
       )
+    }
+
+    // Optional URL must be a valid http(s) URL if present; otherwise ignore.
+    let validUrl: string | undefined
+    if (urlRaw) {
+      try {
+        const u = new URL(urlRaw)
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+          validUrl = urlRaw
+        }
+      } catch {
+        // Invalid URL — silently ignore rather than fail the search.
+        validUrl = undefined
+      }
     }
 
     // Check required env vars
@@ -117,7 +159,7 @@ export async function POST(request: Request) {
     const missing = requiredEnvVars.filter((name) => !process.env[name])
     if (missing.length > 0) {
       return Response.json(
-        { error: 'Google Ads API not configured', stage: 'env_check' },
+        { success: false, stage: 'env_check', error: 'Google Ads API not configured' },
         { status: 503 }
       )
     }
@@ -129,44 +171,61 @@ export async function POST(request: Request) {
     // Get access token
     let accessToken: string
     try {
-      accessToken = await getPayPalToken()
+      accessToken = await getGoogleAdsAccessToken()
     } catch (error) {
       const err = error instanceof Error ? error.message : 'unknown'
       if (err === 'refresh_token_invalid') {
         return Response.json(
-          { error: 'Google Ads refresh token is invalid or expired', stage: 'oauth' },
+          { success: false, stage: 'oauth', error: 'Google Ads refresh token is invalid or expired' },
           { status: 503 }
         )
       } else if (err === 'client_credentials_invalid') {
         return Response.json(
-          { error: 'Google Ads OAuth credentials are invalid', stage: 'oauth' },
+          { success: false, stage: 'oauth', error: 'Google Ads OAuth credentials are invalid' },
           { status: 503 }
         )
       }
       return Response.json(
-        { error: 'Failed to obtain Google Ads access token', stage: 'oauth' },
+        { success: false, stage: 'oauth', error: 'Failed to obtain Google Ads access token' },
         { status: 502 }
       )
     }
 
-    // Build the request body for GenerateKeywordIdeas
+    // Build the request body for GenerateKeywordIdeas (REST API — camelCase).
+    // The API accepts ONE of: keywordSeed, urlSeed, keywordAndUrlSeed, siteSeed.
     const geoTargetId = COUNTRY_GEO_TARGETS[country]
-    const languageId = LANGUAGE_IDS[language].toString()
+    const languageId = LANGUAGE_IDS[language]
+    const seedType = validUrl ? 'keywordAndUrlSeed' : 'keywordSeed'
+
+    type SeedField =
+      | { keywordSeed: { keywords: string[] } }
+      | { keywordAndUrlSeed: { url: string; keywords: string[] } }
+
+    const seed: SeedField = validUrl
+      ? { keywordAndUrlSeed: { url: validUrl, keywords: [keywordRaw] } }
+      : { keywordSeed: { keywords: [keywordRaw] } }
 
     const requestBody = {
-      keyword_seed: {
-        keywords: [keyword.trim()],
-      },
-      ...(url && {
-        url_seed: {
-          url: url.trim(),
-        },
-      }),
-      geo_target_constants: [`geoTargetConstants/${geoTargetId}`],
-      language_id: languageId,
-      keyword_plan_network: 'GOOGLE_SEARCH',
-      page_size: 100,
+      ...seed,
+      geoTargetConstants: [`geoTargetConstants/${geoTargetId}`],
+      language: `languageConstants/${languageId}`,
+      keywordPlanNetwork: 'GOOGLE_SEARCH',
+      pageSize: 100,
     }
+
+    // Safe server-side debug — no secrets.
+    console.log('[keyword-ideas] request', {
+      apiVersion: GOOGLE_ADS_API_VERSION,
+      country,
+      language,
+      geoTarget: `geoTargetConstants/${geoTargetId}`,
+      languageConstant: `languageConstants/${languageId}`,
+      seedType,
+      hasKeyword: true,
+      hasUrl: Boolean(validUrl),
+      customerIdPresent: Boolean(customerId),
+      loginCustomerIdPresent: Boolean(loginCustomerId),
+    })
 
     // Call Google Ads API
     const apiUrl = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}:generateKeywordIdeas`
@@ -184,71 +243,85 @@ export async function POST(request: Request) {
 
     if (!apiResponse.ok) {
       const errorBody = (await apiResponse.json().catch(() => ({}))) as GoogleAdsResponse
+      const apiMessage = errorBody.error?.message || ''
+      const apiStatus = errorBody.error?.status || ''
+
+      // Safe server-side log of the API error (Google does not return secrets here).
+      console.error('[keyword-ideas] google ads api error', {
+        httpStatus: apiResponse.status,
+        apiStatus,
+        message: apiMessage,
+      })
 
       if (apiResponse.status === 401) {
         return Response.json(
-          { error: 'Google Ads API authentication failed', stage: 'google_ads_api' },
+          { success: false, stage: 'google_ads_api', error: 'Google Ads API authentication failed' },
           { status: 502 }
         )
       } else if (apiResponse.status === 403) {
-        const msg = errorBody.error?.message || ''
-        if (/developer token/i.test(msg) || /PERMISSION_DENIED/i.test(msg)) {
+        if (/developer token/i.test(apiMessage)) {
           return Response.json(
-            { error: 'Developer token is invalid or not approved', stage: 'google_ads_api' },
+            { success: false, stage: 'google_ads_api', error: 'Developer token is invalid or not approved' },
             { status: 502 }
           )
         }
         return Response.json(
-          { error: 'Permission denied accessing Google Ads API', stage: 'google_ads_api' },
+          { success: false, stage: 'google_ads_api', error: 'Permission denied accessing Google Ads API' },
           { status: 502 }
         )
       } else if (apiResponse.status === 429) {
         return Response.json(
-          { error: 'rate_limit_exceeded', stage: 'google_ads_api' },
+          { success: false, stage: 'google_ads_api', error: 'rate_limit_exceeded' },
           { status: 429 }
         )
       } else if (apiResponse.status === 400) {
         return Response.json(
-          { error: 'Invalid request to Google Ads API', stage: 'google_ads_api' },
-          { status: 400 }
+          {
+            success: false,
+            stage: 'google_ads_api',
+            error: 'Invalid request to Google Ads API',
+            apiMessage: apiMessage.slice(0, 300),
+          },
+          { status: 502 }
         )
       }
 
       return Response.json(
-        { error: 'Google Ads API request failed', stage: 'google_ads_api', status: apiResponse.status },
+        { success: false, stage: 'google_ads_api', error: 'Google Ads API request failed', status: apiResponse.status },
         { status: 502 }
       )
     }
 
     const data = (await apiResponse.json()) as GoogleAdsResponse
 
-    // Normalize results
+    // Normalize results — Google Ads REST returns camelCase.
     const results: KeywordIdeaResult[] = (data.results || [])
       .filter((idea) => idea.text)
       .map((idea) => {
-        const metrics = idea.keyword_idea_metrics || {}
+        const metrics = idea.keywordIdeaMetrics || {}
+        const lowMicros = toNumber(metrics.lowTopOfPageBidMicros)
+        const highMicros = toNumber(metrics.highTopOfPageBidMicros)
         return {
           keyword: idea.text!,
-          avgMonthlySearches: metrics.avg_monthly_searches ?? null,
+          avgMonthlySearches: toNumber(metrics.avgMonthlySearches),
           competition: metrics.competition ?? null,
-          competitionIndex: metrics.competition_index ?? null,
-          lowTopOfPageBid: metrics.low_top_of_page_bid_micros ? metrics.low_top_of_page_bid_micros / 1000000 : null,
-          highTopOfPageBid: metrics.high_top_of_page_bid_micros ? metrics.high_top_of_page_bid_micros / 1000000 : null,
-          currency: country === 'IL' ? 'ILS' : 'USD',
+          competitionIndex: toNumber(metrics.competitionIndex),
+          lowTopOfPageBid: lowMicros !== null ? lowMicros / 1_000_000 : null,
+          highTopOfPageBid: highMicros !== null ? highMicros / 1_000_000 : null,
+          currency: country === 'IL' ? 'ILS' : country === 'GR' || country === 'CY' ? 'EUR' : country === 'GB' ? 'GBP' : 'USD',
         }
       })
 
     return Response.json({
       success: true,
-      results,
       count: results.length,
+      results,
     })
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    const safe = errorMsg.replace(/[A-Za-z0-9-_]{30,}/g, '[redacted]')
-    console.error('[Keyword Research] Error:', errorMsg)
+    console.error('[keyword-ideas] unexpected error', errorMsg)
     return Response.json(
-      { error: 'An unexpected error occurred', stage: 'unexpected' },
+      { success: false, stage: 'unexpected', error: 'An unexpected error occurred' },
       { status: 500 }
     )
   }

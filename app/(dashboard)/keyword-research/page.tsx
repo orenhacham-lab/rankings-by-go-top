@@ -58,13 +58,15 @@ export default function KeywordResearchPage() {
 
       const data = await response.json()
 
-      if (!response.ok) {
-        if (data.error === 'rate_limit_exceeded') {
+      if (!response.ok || data.success === false) {
+        if (data.error === 'rate_limit_exceeded' || response.status === 429) {
           setError(t.states.errorQuota)
-        } else if (data.stage === 'env_check') {
+        } else if (data.stage === 'env_check' || data.stage === 'oauth') {
           setError(t.states.errorEnv)
+        } else if (data.stage === 'validation' && data.error) {
+          setError(`${t.states.errorGeneral} (${data.error})`)
         } else {
-          setError(data.error || t.states.errorGeneral)
+          setError(t.states.errorGeneral)
         }
         return
       }
