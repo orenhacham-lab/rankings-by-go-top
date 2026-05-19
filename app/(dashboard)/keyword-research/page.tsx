@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
-import { Copy, Loader2 } from 'lucide-react'
+import { Copy, Loader2, CheckCircle } from 'lucide-react'
 
 interface KeywordIdeaResult {
   keyword: string
@@ -14,6 +14,11 @@ interface KeywordIdeaResult {
   lowTopOfPageBid: number | null
   highTopOfPageBid: number | null
   currency: string
+}
+
+interface Project {
+  id: string
+  name: string
 }
 
 export default function KeywordResearchPage() {
@@ -31,6 +36,33 @@ export default function KeywordResearchPage() {
   const [error, setError] = useState('')
   const [results, setResults] = useState<KeywordIdeaResult[]>([])
   const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set())
+
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [selectedProject, setSelectedProject] = useState('')
+  const [engineType, setEngineType] = useState('google_organic')
+  const [addingToProject, setAddingToProject] = useState(false)
+  const [addToProjectMessage, setAddToProjectMessage] = useState('')
+  const [addToProjectError, setAddToProjectError] = useState('')
+
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
+  const fetchProjects = async () => {
+    setProjectsLoading(true)
+    try {
+      const response = await fetch('/api/projects')
+      if (response.ok) {
+        const data = await response.json()
+        setProjects(data.projects || [])
+      }
+    } catch (err) {
+      console.error('Error fetching projects:', err)
+    } finally {
+      setProjectsLoading(false)
+    }
+  }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -114,6 +146,51 @@ export default function KeywordResearchPage() {
 
   const copyKeyword = (kw: string) => {
     navigator.clipboard.writeText(kw)
+  }
+
+  const handleAddToProject = async () => {
+    if (!selectedProject) {
+      setAddToProjectError('Please select a project')
+      return
+    }
+
+    if (selectedKeywords.size === 0) {
+      setAddToProjectError('Please select at least one keyword')
+      return
+    }
+
+    setAddingToProject(true)
+    setAddToProjectMessage('')
+    setAddToProjectError('')
+
+    try {
+      const keywordsArray = Array.from(selectedKeywords).map((kw) => ({ keyword: kw }))
+      const response = await fetch('/api/keyword-research/add-to-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selectedProject,
+          engineType,
+          keywords: keywordsArray,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        setAddToProjectError(result.message || 'Failed to add keywords')
+        return
+      }
+
+      setAddToProjectMessage(result.message || `Added ${result.added} keywords`)
+      setSelectedKeywords(new Set())
+      setSelectedProject('')
+    } catch (err) {
+      setAddToProjectError('An error occurred while adding keywords')
+      console.error('Error adding keywords to project:', err)
+    } finally {
+      setAddingToProject(false)
+    }
   }
 
   const competitionColor = (competition: string | null) => {
@@ -276,6 +353,68 @@ export default function KeywordResearchPage() {
               )}
             </div>
           </div>
+
+          {/* Add to Project Section */}
+          {selectedKeywords.size > 0 && (
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Project *
+                  </label>
+                  <select
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    disabled={projectsLoading || addingToProject}
+                  >
+                    <option value="">Select project...</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Search Engine
+                  </label>
+                  <select
+                    value={engineType}
+                    onChange={(e) => setEngineType(e.target.value as 'google_organic' | 'google_maps')}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    disabled={addingToProject}
+                  >
+                    <option value="google_organic">Google Organic</option>
+                    <option value="google_maps">Google Maps</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    onClick={handleAddToProject}
+                    disabled={!selectedProject || addingToProject}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    {addingToProject && <Loader2 size={18} className="animate-spin" />}
+                    {addingToProject ? 'Adding...' : `Add ${selectedKeywords.size} keyword${selectedKeywords.size !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              </div>
+
+              {addToProjectError && (
+                <div className="text-sm text-red-600 dark:text-red-400 mb-2">{addToProjectError}</div>
+              )}
+              {addToProjectMessage && (
+                <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                  <CheckCircle size={16} />
+                  {addToProjectMessage}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Results Table */}
           <div className="overflow-x-auto">
