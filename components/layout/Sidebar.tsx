@@ -21,6 +21,7 @@ import {
   ClipboardList,
   LogOut,
   MessageCircle,
+  Lightbulb,
 } from 'lucide-react'
 
 const navItemKeys = [
@@ -28,6 +29,7 @@ const navItemKeys = [
   { href: '/clients', labelKey: 'clients' as const, icon: Users },
   { href: '/projects', labelKey: 'projects' as const, icon: Folder },
   { href: '/keywords', labelKey: 'keywords' as const, icon: KeyRound },
+  { href: '/keyword-research', labelKey: 'keywordResearch' as const, icon: Lightbulb },
   { href: '/ai-visibility', labelKey: 'aiVisibility' as const, icon: Sparkles },
   { href: '/scans', labelKey: 'scans' as const, icon: Search },
   { href: '/reports', labelKey: 'reports' as const, icon: FileText },
