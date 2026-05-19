@@ -26,6 +26,10 @@ export const he = {
         label: 'הפקת דוחות SEO/GEO',
         description: 'הפיקו דוחות PDF ו-Excel ללקוחות עם מיקומים, מגמות ונראות.',
       },
+      keywordResearch: {
+        label: 'מחקר ביטויים',
+        description: 'גלו ביטויים, נפחי חיפוש ותחרות לפני שמוסיפים אותם למעקב',
+      },
     },
   },
   footer: {

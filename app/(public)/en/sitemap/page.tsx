@@ -39,9 +39,20 @@ export default function EnglishSitemapPage() {
       ],
     },
     {
+      title: 'Features',
+      links: [
+        { label: 'Google Organic Rank Tracking', href: '/en/features/google-organic-rank-tracking' },
+        { label: 'Google Maps Rank Tracking', href: '/en/features/google-maps-rank-tracking' },
+        { label: 'AI Visibility Tracking', href: '/en/features/ai-visibility-tracking' },
+        { label: 'SEO/GEO Reports', href: '/en/features/seo-geo-reports' },
+        { label: 'Keyword Research', href: '/en/features/keyword-research' },
+      ],
+    },
+    {
       title: 'Legal',
       links: [
         { label: 'Privacy Policy', href: '/en/privacy' },
+        { label: 'Terms of Use', href: '/en/terms' },
         { label: 'Accessibility', href: '/en/accessibility' },
       ],
     },

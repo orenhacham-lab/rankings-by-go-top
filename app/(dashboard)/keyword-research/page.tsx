@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
-import { Copy, Loader2, CheckCircle } from 'lucide-react'
+import { generateQuestionsFromKeywords, GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
+import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
+import { Copy, Loader2, CheckCircle, Sparkles } from 'lucide-react'
 
 interface KeywordIdeaResult {
   keyword: string
@@ -47,6 +49,13 @@ export default function KeywordResearchPage() {
   const [addToProjectMessage, setAddToProjectMessage] = useState('')
   const [addToProjectError, setAddToProjectError] = useState('')
   const [lastAddedProjectId, setLastAddedProjectId] = useState('')
+
+  // AI Questions state
+  const [aiQuestionsOpen, setAIQuestionsOpen] = useState(false)
+  const [generatedAIQuestions, setGeneratedAIQuestions] = useState<GeneratedQuestion[]>([])
+  const [addingAIQuestions, setAddingAIQuestions] = useState(false)
+  const [aiQuestionsMessage, setAIQuestionsMessage] = useState('')
+  const [aiQuestionsError, setAIQuestionsError] = useState('')
 
   useEffect(() => {
     fetchProjects()
@@ -229,6 +238,88 @@ export default function KeywordResearchPage() {
     }
   }
 
+  const handleGenerateAIQuestions = () => {
+    if (!selectedProject) {
+      setAIQuestionsError(t.addToProject.errorSelectProject)
+      return
+    }
+
+    if (selectedKeywords.size === 0) {
+      setAIQuestionsError(t.addToProject.errorSelectKeywords)
+      return
+    }
+
+    const keywordsList = Array.from(selectedKeywords)
+    const generated = generateQuestionsFromKeywords(keywordsList, language as 'he' | 'en')
+    setGeneratedAIQuestions(generated)
+    setAIQuestionsOpen(true)
+    setAIQuestionsError('')
+    setAIQuestionsMessage('')
+  }
+
+  const handleAddAIQuestions = async (questions: GeneratedQuestion[]) => {
+    if (!selectedProject || questions.length === 0) {
+      return
+    }
+
+    setAddingAIQuestions(true)
+    setAIQuestionsError('')
+    setAIQuestionsMessage('')
+
+    try {
+      let added = 0
+      let skipped = 0
+
+      for (const question of questions) {
+        const response = await fetch('/api/ai-visibility/prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: selectedProject,
+            prompt: question.question,
+            targetDomain: null,
+            targetBrandName: null,
+            country: country || null,
+            language: language || null,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (response.ok && result.prompt) {
+          if (result.duplicate) {
+            skipped++
+          } else {
+            added++
+          }
+        } else {
+          console.error('Error adding question:', result.error)
+        }
+      }
+
+      if (added > 0) {
+        const msgKey = language === 'he'
+          ? `נוספו ${added} שאלות AI לפרויקט${skipped > 0 ? `. ${skipped} שאלות כבר היו קיימות ודולגו.` : '.'}`
+          : `${added} AI questions were added to the project${skipped > 0 ? `. ${skipped} existing questions were skipped.` : '.'}`
+        setAIQuestionsMessage(msgKey)
+        setGeneratedAIQuestions([])
+        setTimeout(() => setAIQuestionsOpen(false), 1500)
+      } else if (skipped > 0) {
+        const msgKey = language === 'he'
+          ? `${skipped} שאלות כבר היו קיימות ודולגו.`
+          : `${skipped} questions already existed and were skipped.`
+        setAIQuestionsMessage(msgKey)
+        setTimeout(() => setAIQuestionsOpen(false), 1500)
+      }
+    } catch (err) {
+      const errMsg = language === 'he' ? 'שגיאה בהוספת השאלות' : 'Error adding questions'
+      setAIQuestionsError(errMsg)
+      console.error('Error adding AI questions:', err)
+    } finally {
+      setAddingAIQuestions(false)
+    }
+  }
+
   const competitionColor = (competition: string | null) => {
     switch (competition) {
       case 'LOW':
@@ -393,13 +484,24 @@ export default function KeywordResearchPage() {
                 {t.results.deselectAll}
               </button>
               {selectedKeywords.size > 0 && (
-                <button
-                  onClick={copySelected}
-                  className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
-                >
-                  <Copy size={14} />
-                  {t.results.copySelected}
-                </button>
+                <>
+                  <button
+                    onClick={copySelected}
+                    className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
+                  >
+                    <Copy size={14} />
+                    {t.results.copySelected}
+                  </button>
+                  <button
+                    onClick={handleGenerateAIQuestions}
+                    disabled={!selectedProject}
+                    className="text-xs px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 transition-colors flex items-center gap-1"
+                    title={!selectedProject ? t.addToProject.errorSelectProject : ''}
+                  >
+                    <Sparkles size={14} />
+                    {language === 'he' ? 'צור שאלות AI' : 'Create AI questions'}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -461,15 +563,27 @@ export default function KeywordResearchPage() {
                       </select>
                     </div>
 
-                    <div className="flex items-end">
+                    <div className="flex items-end gap-2">
                       <button
                         onClick={handleAddToProject}
                         disabled={!selectedProject || addingToProject}
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                       >
                         {addingToProject && <Loader2 size={18} className="animate-spin" />}
-                        {addingToProject ? t.addToProject.adding : t.addToProject.addButton}
+                        {addingToProject
+                          ? language === 'he'
+                            ? 'מוסיף ביטויים לפרויקט...'
+                            : 'Adding keywords to project...'
+                          : t.addToProject.addButton}
                       </button>
+                      {lastAddedProjectId && !addingToProject && (
+                        <a
+                          href={`/projects/${lastAddedProjectId}`}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                        >
+                          {language === 'he' ? 'עבור לפרויקט' : 'Go to project'}
+                        </a>
+                      )}
                     </div>
                   </div>
                 </>
@@ -580,6 +694,25 @@ export default function KeywordResearchPage() {
           <p>{t.states.empty}</p>
         </div>
       )}
+
+      {/* AI Questions Modal */}
+      <AIQuestionsModal
+        open={aiQuestionsOpen}
+        onClose={() => {
+          setAIQuestionsOpen(false)
+          setGeneratedAIQuestions([])
+          setAIQuestionsMessage('')
+          setAIQuestionsError('')
+        }}
+        questions={generatedAIQuestions}
+        selectedProject={selectedProject}
+        projects={projects}
+        language={language as 'he' | 'en'}
+        isRTL={isRTL}
+        onAddQuestions={handleAddAIQuestions}
+        loading={addingAIQuestions}
+        successMessage={aiQuestionsMessage}
+      />
     </div>
   )
 }

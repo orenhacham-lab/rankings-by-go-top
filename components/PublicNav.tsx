@@ -67,6 +67,12 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
       label: dict.nav.featuresMenu.reports.label,
       description: dict.nav.featuresMenu.reports.description,
     },
+    {
+      id: 'keywordResearch',
+      href: `${prefix}/features/keyword-research`,
+      label: dict.nav.featuresMenu.keywordResearch.label,
+      description: dict.nav.featuresMenu.keywordResearch.description,
+    },
   ]
 
   return (

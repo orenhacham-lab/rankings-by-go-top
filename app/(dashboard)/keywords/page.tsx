@@ -179,7 +179,7 @@ export default function KeywordsPage() {
             <tr>
               <Th>{k.table.keyword}</Th>
               <Th>{k.table.project}</Th>
-              <Th>{k.table.client}</Th>
+              <Th>{k.table.searchVolume}</Th>
               <Th>{k.table.engine}</Th>
               <Th>
                 <button
@@ -222,8 +222,8 @@ export default function KeywordsPage() {
                     ) : '—'}
                   </Td>
                   <Td>
-                    <span className="text-slate-500 text-sm">
-                      {(target.projects as { clients?: { name: string } })?.clients?.name || '—'}
+                    <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
+                      {target.avg_monthly_searches ? target.avg_monthly_searches.toLocaleString() : '—'}
                     </span>
                   </Td>
                   <Td>

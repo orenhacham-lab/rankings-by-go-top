@@ -51,6 +51,25 @@ export default function SitemapPage() {
         { label: 'עמוד מאמרים', href: '/articles' },
       ],
     },
+    {
+      title: 'יכולות המערכת',
+      links: [
+        { label: 'בדיקת מיקום בגוגל אורגני', href: '/features/google-organic-rank-tracking' },
+        { label: 'בדיקת מיקום בגוגל מפות', href: '/features/google-maps-rank-tracking' },
+        { label: 'מעקב נראות AI', href: '/features/ai-visibility-tracking' },
+        { label: 'דוחות SEO/GEO', href: '/features/seo-geo-reports' },
+        { label: 'מחקר ביטויים', href: '/features/keyword-research' },
+      ],
+    },
+    {
+      title: 'חשבון וחוקים',
+      links: [
+        { label: 'כניסה לחשבון', href: '/login' },
+        { label: 'התחל ניסיון חינם', href: '/signup' },
+        { label: 'מדיניות פרטיות', href: '/privacy' },
+        { label: 'תקנון ותנאי שימוש', href: '/terms' },
+      ],
+    },
   ]
 
   return (

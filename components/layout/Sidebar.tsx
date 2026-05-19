@@ -119,14 +119,17 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
             )
           })}
 
-          {/* Mobile logout button - appears in grid, spans full width on mobile */}
-          <li className="md:hidden col-span-2">
+          {/* Mobile logout button - appears in grid next to Billing on mobile */}
+          <li className="md:hidden">
             <form action="/api/auth/signout" method="post" className="w-full h-full">
               <button
                 type="submit"
-                className="w-full h-full min-h-[44px] flex flex-row items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 text-center leading-tight"
+                className={cn(
+                  'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
+                  'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
+                )}
               >
-                <LogOut size={18} className="text-slate-600 dark:text-slate-400" strokeWidth={2} />
+                <LogOut size={18} className="text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 shrink-0 transition-colors" strokeWidth={2} />
                 <span>{dict.common.logout}</span>
               </button>
             </form>

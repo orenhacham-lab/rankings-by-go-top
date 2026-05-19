@@ -178,7 +178,7 @@ export const dashboardHe = {
     table: {
       keyword: 'מילת מפתח',
       project: 'פרויקט',
-      client: 'לקוח',
+      searchVolume: 'נפח חיפוש',
       engine: 'מנוע',
       position: 'מיקום',
       change: 'שינוי',

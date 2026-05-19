@@ -180,7 +180,7 @@ export const dashboardEn = {
     table: {
       keyword: 'Keyword',
       project: 'Project',
-      client: 'Client',
+      searchVolume: 'Search volume',
       engine: 'Engine',
       position: 'Position',
       change: 'Change',

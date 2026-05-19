@@ -28,6 +28,10 @@ export const en = {
         label: 'SEO/GEO Reports',
         description: 'Generate professional PDF and Excel reports for your clients with rankings, trends, and visibility insights.',
       },
+      keywordResearch: {
+        label: 'Keyword Research',
+        description: 'Discover keyword ideas, search volume, and competition before adding them to tracking',
+      },
     },
   },
   footer: {
