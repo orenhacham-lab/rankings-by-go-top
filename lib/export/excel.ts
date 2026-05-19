@@ -71,6 +71,7 @@ export function exportToExcel(data: ExportData): void {
   // ── Sheet 2: Current Rankings ────────────────────────────────────
   const rankingHeaders = [
     L.keyword,
+    L.searchVolume,
     L.engineSearch,
     L.position,
     L.previousPosition,
@@ -95,6 +96,7 @@ export function exportToExcel(data: ExportData): void {
 
     return [
       target.keyword,
+      target.avg_monthly_searches ?? null,
       getSearchTypeLabel(target.engine_type, data.project.device_type),
       result?.found ? result.position ?? '' : '',
       result?.previous_position ?? '',
@@ -109,9 +111,16 @@ export function exportToExcel(data: ExportData): void {
 
   const wsRankings = XLSX.utils.aoa_to_sheet([rankingHeaders, ...rankingRows])
   wsRankings['!cols'] = [
-    { wch: 32 }, { wch: 16 }, { wch: 13 }, { wch: 13 }, { wch: 9 },
+    { wch: 32 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 13 }, { wch: 9 },
     { wch: 8 },  { wch: 15 }, { wch: 52 }, { wch: 42 }, { wch: 32 },
   ]
+  // Apply number format to search volume column (column B, rows 2+)
+  for (let i = 2; i <= rankingRows.length + 1; i++) {
+    const cellRef = XLSX.utils.encode_col(1) + String(i)
+    if (wsRankings[cellRef]) {
+      wsRankings[cellRef].z = '#,##0'
+    }
+  }
   applySheetDefaults(wsRankings, 1, isRtl)
   XLSX.utils.book_append_sheet(wb, wsRankings, L.sheetCurrentRankings)
 

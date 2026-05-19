@@ -65,10 +65,12 @@ function generateReportHTML(data: ExportData): string {
     const foundText = result ? (result.found ? L.yes : L.no) : '—'
     const engine = getEngineDisplayLabel(target.engine_type, data.project.device_type)
     const changeColor = changeStr.startsWith('+') ? '#16a34a' : changeStr.startsWith('-') ? '#dc2626' : '#000'
+    const searchVolume = target.avg_monthly_searches ? target.avg_monthly_searches.toLocaleString() : ''
+    const searchVolumeHtml = searchVolume ? `<div class="search-volume">${escapeHtml(L.searchVolume)}: ${escapeHtml(searchVolume)}</div>` : ''
 
     return `
       <tr>
-        <td class="keyword-cell"><span dir="ltr">${escapeHtml(target.keyword)}</span></td>
+        <td class="keyword-cell"><span dir="ltr">${escapeHtml(target.keyword)}</span>${searchVolumeHtml}</td>
         <td>${escapeHtml(engine)}</td>
         <td>${escapeHtml(currentPosition)}</td>
         <td>${escapeHtml(previousPosition)}</td>
@@ -220,6 +222,14 @@ function generateReportHTML(data: ExportData): string {
         .keyword-cell {
           font-weight: bold;
           width: 15%;
+        }
+
+        .search-volume {
+          font-size: 11px;
+          color: #64748b;
+          margin-top: 4px;
+          line-height: 1.2;
+          font-weight: normal;
         }
 
         .url-cell {
