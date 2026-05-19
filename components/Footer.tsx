@@ -68,6 +68,11 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
                 </Link>
               </li>
               <li>
+                <Link href={`${prefix}/terms`} className="text-slate-400 hover:text-white transition-colors">
+                  {dict.footer.terms}
+                </Link>
+              </li>
+              <li>
                 <Link href={`${prefix}/accessibility`} className="text-slate-400 hover:text-white transition-colors">
                   {dict.footer.accessibility}
                 </Link>

@@ -44,6 +44,7 @@ export const en = {
     sitemap: 'Sitemap',
     legal: 'Legal',
     privacy: 'Privacy Policy',
+    terms: 'Terms of Use',
     accessibility: 'Accessibility',
     contact: 'Contact',
     copyright: '© 2026 Rankings by Go Top. All rights reserved.',
