@@ -26,6 +26,7 @@ export default function KeywordResearchPage() {
   const [country, setCountry] = useState('IL')
   const [selectedLanguage, setSelectedLanguage] = useState('he')
   const [url, setUrl] = useState('')
+  const [minMonthlySearches, setMinMonthlySearches] = useState(30)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState<KeywordIdeaResult[]>([])
@@ -53,6 +54,7 @@ export default function KeywordResearchPage() {
           country,
           language: selectedLanguage,
           url: url.trim() || undefined,
+          minMonthlySearches,
         }),
       })
 
@@ -203,6 +205,21 @@ export default function KeywordResearchPage() {
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder={t.form.urlPlaceholder}
                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Minimum Monthly Searches */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                {t.form.minMonthlySearches}
+              </label>
+              <input
+                type="number"
+                value={minMonthlySearches}
+                onChange={(e) => setMinMonthlySearches(Math.max(0, parseInt(e.target.value) || 0))}
+                min="0"
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 disabled={loading}
               />
             </div>

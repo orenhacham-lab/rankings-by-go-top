@@ -13,10 +13,12 @@ export const LANGUAGE_IDS: Record<string, number> = {
   he: 1009, // Hebrew
   en: 1000, // English
   el: 1016, // Greek
+  ar: 1019, // Arabic
+  ru: 1031, // Russian
 }
 
 export const SUPPORTED_COUNTRIES = ['IL', 'US', 'GB', 'GR', 'CY'] as const
-export const SUPPORTED_LANGUAGES = ['he', 'en', 'el'] as const
+export const SUPPORTED_LANGUAGES = ['he', 'en', 'el', 'ar', 'ru'] as const
 
 export type CountryCode = (typeof SUPPORTED_COUNTRIES)[number]
 export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]
@@ -28,3 +30,4 @@ export function isValidCountry(code: string): code is CountryCode {
 export function isValidLanguage(code: string): code is LanguageCode {
   return SUPPORTED_LANGUAGES.includes(code as LanguageCode)
 }
+

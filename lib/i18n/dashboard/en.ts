@@ -484,6 +484,7 @@ export const dashboardEn = {
       url: 'Domain / landing page',
       urlPlaceholder: 'e.g. https://example.com/page',
       urlOptional: '(optional)',
+      minMonthlySearches: 'Minimum monthly searches',
       search: 'Find keyword ideas',
       searching: 'Finding keyword ideas...',
     },
@@ -518,6 +519,8 @@ export const dashboardEn = {
       he: 'Hebrew',
       en: 'English',
       el: 'Greek',
+      ar: 'Arabic',
+      ru: 'Russian',
     },
   },
   billing: {

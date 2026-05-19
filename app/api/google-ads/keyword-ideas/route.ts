@@ -98,6 +98,7 @@ export async function POST(request: Request) {
     const country = typeof body.country === 'string' ? body.country : 'IL'
     const language = typeof body.language === 'string' ? body.language : 'he'
     const urlRaw = typeof body.url === 'string' ? body.url.trim() : ''
+    const minMonthlySearches = typeof body.minMonthlySearches === 'number' ? Math.max(0, body.minMonthlySearches) : 30
 
     if (!keywordRaw) {
       return Response.json(
@@ -210,7 +211,7 @@ export async function POST(request: Request) {
       geoTargetConstants: [`geoTargetConstants/${geoTargetId}`],
       language: `languageConstants/${languageId}`,
       keywordPlanNetwork: 'GOOGLE_SEARCH',
-      pageSize: 100,
+      pageSize: 500,
     }
 
     // Safe server-side debug — no secrets.
@@ -295,7 +296,7 @@ export async function POST(request: Request) {
     const data = (await apiResponse.json()) as GoogleAdsResponse
 
     // Normalize results — Google Ads REST returns camelCase.
-    const results: KeywordIdeaResult[] = (data.results || [])
+    const allResults: KeywordIdeaResult[] = (data.results || [])
       .filter((idea) => idea.text)
       .map((idea) => {
         const metrics = idea.keywordIdeaMetrics || {}
@@ -311,6 +312,9 @@ export async function POST(request: Request) {
           currency: country === 'IL' ? 'ILS' : country === 'GR' || country === 'CY' ? 'EUR' : country === 'GB' ? 'GBP' : 'USD',
         }
       })
+
+    // Filter results by minimum monthly searches
+    const results = allResults.filter((r) => r.avgMonthlySearches !== null && r.avgMonthlySearches >= minMonthlySearches)
 
     return Response.json({
       success: true,

@@ -482,6 +482,7 @@ export const dashboardHe = {
       url: 'דומיין / עמוד נחיתה',
       urlPlaceholder: 'לדוגמה: https://example.com/page',
       urlOptional: '(אופציונלי)',
+      minMonthlySearches: 'מינימום חיפושים חודשיים',
       search: 'חפש רעיונות',
       searching: 'מחפש רעיונות לביטויים...',
     },
@@ -516,6 +517,8 @@ export const dashboardHe = {
       he: 'עברית',
       en: 'אנגלית',
       el: 'יוונית',
+      ar: 'ערבית',
+      ru: 'רוסית',
     },
   },
   billing: {
