@@ -251,6 +251,15 @@ export async function POST(request: Request) {
         ...(nextPageToken ? { pageToken: nextPageToken } : {}),
       }
 
+      if (pageCount === 1) {
+        console.log('[keyword-ideas] first page request body', {
+          bodyKeys: Object.keys(pageRequestBody),
+          seedType,
+          seedKeywords,
+          hasPageToken: Boolean(nextPageToken),
+        })
+      }
+
       const apiResponse = await fetch(apiUrl, {
         method: 'POST',
         headers: {
