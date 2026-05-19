@@ -508,6 +508,7 @@ export const dashboardEn = {
       errorQuota: 'You have reached the Google Ads API request limit. Please try again later.',
       errorGeneral: 'An error occurred while fetching keyword ideas.',
       fewResults: 'Google Ads returned only a few ideas for this keyword. Try a broader keyword or lower the search volume filter.',
+      filteredOut: 'More ideas were found, but they were filtered by the minimum search volume. Try lowering the filter.',
     },
     countries: {
       IL: 'Israel',

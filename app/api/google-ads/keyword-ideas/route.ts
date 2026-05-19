@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { COUNTRY_GEO_TARGETS, LANGUAGE_IDS, isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
-import { buildKeywordSeedVariants } from '@/lib/google-ads/seed-variants'
 
 interface TokenResponse {
   access_token?: string
@@ -196,12 +195,12 @@ export async function POST(request: Request) {
 
     // Build the request body for GenerateKeywordIdeas (REST API — camelCase).
     // The API accepts ONE of: keywordSeed, urlSeed, keywordAndUrlSeed, siteSeed.
+    // Send the user's keyword exactly as provided — no artificial variants. Let Google
+    // generate related ideas, matching Google Ads Keyword Planner behavior.
     const geoTargetId = COUNTRY_GEO_TARGETS[country]
     const languageId = LANGUAGE_IDS[language]
     const seedType = validUrl ? 'keywordAndUrlSeed' : 'keywordSeed'
-
-    // Expand the input into multiple seed variants so Google returns more diverse ideas.
-    const seedKeywords = buildKeywordSeedVariants(keywordRaw, language)
+    const seedKeywords = [keywordRaw]
 
     type SeedField =
       | { keywordSeed: { keywords: string[] } }
@@ -216,7 +215,7 @@ export async function POST(request: Request) {
       geoTargetConstants: [`geoTargetConstants/${geoTargetId}`],
       language: `languageConstants/${languageId}`,
       keywordPlanNetwork: 'GOOGLE_SEARCH',
-      pageSize: 500,
+      pageSize: 100,
     }
 
     // Safe server-side debug — no secrets.
@@ -228,7 +227,6 @@ export async function POST(request: Request) {
       languageConstant: `languageConstants/${languageId}`,
       seedType,
       seedKeywords,
-      seedKeywordsCount: seedKeywords.length,
       hasUrl: Boolean(validUrl),
       customerIdPresent: Boolean(customerId),
       loginCustomerIdPresent: Boolean(loginCustomerId),
@@ -242,7 +240,7 @@ export async function POST(request: Request) {
     const allRawResults: GoogleAdsKeywordIdea[] = []
     let nextPageToken: string | undefined = undefined
     let pageCount = 0
-    const MAX_PAGES = 10 // Fetch up to 10 pages (5000 results max)
+    const MAX_PAGES = 5 // Fetch up to 5 pages (500 results max)
 
     do {
       pageCount++
@@ -336,11 +334,22 @@ export async function POST(request: Request) {
       nextPageToken = data.nextPageToken
     } while (nextPageToken && pageCount < MAX_PAGES)
 
+    // Whether Google indicated more pages exist (true if last page returned a nextPageToken).
+    const hasNextPageToken = Boolean(nextPageToken)
+
     const rawResultsCount = allRawResults.length
     const firstRawKeywords = allRawResults
       .slice(0, 10)
       .map((r) => r.text || '')
       .filter((s) => s.length > 0)
+
+    // Detailed first raw results (with metrics) for debugging.
+    const firstRawResults = allRawResults.slice(0, 10).map((r) => ({
+      text: r.text || '',
+      avgMonthlySearches: toNumber(r.keywordIdeaMetrics?.avgMonthlySearches),
+      competition: r.keywordIdeaMetrics?.competition ?? null,
+      competitionIndex: toNumber(r.keywordIdeaMetrics?.competitionIndex),
+    }))
 
     // Normalize results — Google Ads REST returns camelCase.
     // No exact-match or originalKeyword filtering — keep all keyword ideas returned by Google.
@@ -391,9 +400,13 @@ export async function POST(request: Request) {
       return bc - ac
     })
 
+    // filteredResultsCount = how many results passed the minMonthlySearches filter (before limit).
+    const filteredResultsCount = filteredResults.length
+
     // Return up to 100 results
     const results = filteredResults.slice(0, 100)
-    const filteredResultsCount = results.length
+
+    const firstNormalizedKeywords = dedupedResults.slice(0, 10).map((r) => r.keyword)
 
     console.log('[keyword-ideas] result summary', {
       rawResultsCount,
@@ -403,8 +416,8 @@ export async function POST(request: Request) {
       minMonthlySearches,
       seedType,
       seedKeywords,
-      seedKeywordsCount: seedKeywords.length,
       pagesFetched: pageCount,
+      hasNextPageToken,
       apiVersionUsed: GOOGLE_ADS_API_VERSION,
       keyword: keywordRaw,
     })
@@ -420,14 +433,18 @@ export async function POST(request: Request) {
       results,
       debug: {
         apiVersionUsed: GOOGLE_ADS_API_VERSION,
+        requestBodySentToGoogle: requestBody,
         seedKeywords,
         seedType,
         rawResultsCount,
         normalizedResultsCount,
         filteredResultsCount,
         minMonthlySearches,
-        firstRawKeywords,
         pagesFetched: pageCount,
+        hasNextPageToken,
+        firstRawKeywords,
+        firstRawResults,
+        firstNormalizedKeywords,
         ...(debugNote ? { debugNote } : {}),
       },
     })

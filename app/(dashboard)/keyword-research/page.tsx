@@ -37,6 +37,7 @@ export default function KeywordResearchPage() {
   const [results, setResults] = useState<KeywordIdeaResult[]>([])
   const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set())
   const [fewResultsWarning, setFewResultsWarning] = useState(false)
+  const [filteredOutWarning, setFilteredOutWarning] = useState(false)
 
   const [projects, setProjects] = useState<Project[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
@@ -72,6 +73,7 @@ export default function KeywordResearchPage() {
     setResults([])
     setSelectedKeywords(new Set())
     setFewResultsWarning(false)
+    setFilteredOutWarning(false)
 
     if (!keyword.trim()) {
       setError(t.states.empty)
@@ -114,8 +116,15 @@ export default function KeywordResearchPage() {
       }
 
       setResults(data.results)
-      if (data.debug && typeof data.debug.rawResultsCount === 'number' && data.debug.rawResultsCount <= 1) {
-        setFewResultsWarning(true)
+      if (data.debug && typeof data.debug.rawResultsCount === 'number') {
+        const raw = data.debug.rawResultsCount
+        const normalized = typeof data.debug.normalizedResultsCount === 'number' ? data.debug.normalizedResultsCount : raw
+        const filtered = typeof data.debug.filteredResultsCount === 'number' ? data.debug.filteredResultsCount : data.results.length
+        if (raw <= 1) {
+          setFewResultsWarning(true)
+        } else if (normalized > filtered && minMonthlySearches > 0) {
+          setFilteredOutWarning(true)
+        }
       }
     } catch (err) {
       setError(t.states.errorGeneral)
@@ -339,6 +348,13 @@ export default function KeywordResearchPage() {
       {fewResultsWarning && results.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
           <p className="text-amber-800 dark:text-amber-300 text-sm">{t.states.fewResults}</p>
+        </div>
+      )}
+
+      {/* Filtered Out Warning */}
+      {filteredOutWarning && !fewResultsWarning && results.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+          <p className="text-blue-800 dark:text-blue-300 text-sm">{t.states.filteredOut}</p>
         </div>
       )}
 
