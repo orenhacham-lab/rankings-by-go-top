@@ -6,47 +6,64 @@ import { PublicNav } from '@/components/PublicNav'
 export default function EnglishAboutPage() {
   const values = [
     {
-      icon: '👥',
       title: 'Personal Service Without Compromise',
-      description: 'We don\'t have a "account manager" that changes every month. You work with professionals who know you.'
+      description:
+        'No "account manager" rotating every month. You work with the same professionals who know your business.',
     },
     {
-      icon: '🔍',
-      title: 'Complete Transparency',
-      description: 'You always know what\'s happening with your system, what worked, what didn\'t, and how we can improve.'
+      title: 'Full Transparency',
+      description: 'You always know what is happening in your account, what worked, what did not, and how to improve.',
     },
     {
-      icon: '📈',
-      title: 'Professional Excellence Driving Results',
-      description: 'We won\'t throw inflated jargon at you. We deliver real results.'
+      title: 'Professionalism That Drives Results',
+      description: 'We do not throw inflated jargon at you. We deliver real, measurable, understandable results.',
     },
     {
-      icon: '💼',
-      title: 'We\'re a Business Too',
-      description: 'So we understand you. The pressure, the budget, and the drive to see results.'
+      title: 'We Run a Business Too',
+      description: 'We understand pressure, budget constraints and the need to see results — because we live it as well.',
     },
   ]
 
-  const features = [
+  const problems = [
     {
-      icon: '🔎',
-      title: 'Search Ranking Tracking',
-      description: 'Real-time monitoring of your rankings in Google organic search'
+      title: 'Manual rank tracking takes too much time',
+      description:
+        'Repeated keyword checks, multiple result screens, and manual calculations that weigh down the daily routine.',
     },
     {
-      icon: '🗺️',
-      title: 'Google Maps Optimization',
-      description: 'Detailed reports on your performance in location-based results'
+      title: 'Reports scattered across multiple tools',
+      description:
+        'Data lives in Google Search, Google Maps, AI engines and other sources — without a single clear picture.',
     },
     {
-      icon: '⚡',
-      title: 'AI Visibility',
-      description: 'Check if your business is mentioned in AI responses, whether your domain is cited, and which sources appear next to you'
+      title: 'AI visibility becomes critical',
+      description:
+        'Customers increasingly ask ChatGPT, Gemini and Perplexity. You need to know whether your business shows up there.',
     },
     {
-      icon: '📊',
-      title: 'Reports & Analysis',
-      description: 'Reports that show what really matters — Google Organic, Google Maps and AI visibility'
+      title: 'Keyword research that connects to action',
+      description:
+        'Knowing what people search is not enough. You need to add keywords to tracking and turn them into AI questions quickly.',
+    },
+  ]
+
+  const approach = [
+    {
+      title: 'Transparency',
+      description: 'Data and methodology are visible, including how each metric is calculated and where it comes from.',
+    },
+    {
+      title: 'Useful data',
+      description: 'Reports that tell a clear business story — not just pretty numbers.',
+    },
+    {
+      title: 'Simple interface',
+      description:
+        'One screen that shows Google rankings, Maps visibility, AI visibility and keyword research — without extra noise.',
+    },
+    {
+      title: 'SEO and GEO combined',
+      description: 'Integrated tracking of organic and geographic results alongside AI engine visibility.',
     },
   ]
 
@@ -63,31 +80,39 @@ export default function EnglishAboutPage() {
 
           <div className="text-center mt-8">
             <h1 className="text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
-              About<br />
+              About
+              <br />
               <span className="bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
                 Rankings by Go Top
               </span>
             </h1>
             <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
-              More than 11 years of real digital experience. Now — a platform for tracking your Google rankings and AI visibility.
+              One platform for tracking Google rankings, AI visibility, keyword research and reports —
+              built by Go Top, a digital agency with more than 11 years of experience in SEO and paid
+              advertising.
             </p>
           </div>
         </div>
       </section>
 
       <main className="flex-1">
-        {/* Story Section */}
+        {/* Who is behind */}
         <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
-                <h2 className="text-4xl font-extrabold text-slate-900">The Go Top Story</h2>
+                <h2 className="text-4xl font-extrabold text-slate-900">Who is behind the platform</h2>
                 <div className="space-y-4 text-slate-700 leading-relaxed">
                   <p>
-                    In a world full of AI, automation and big companies speaking loudly — at Go Top we're doing something different.
+                    Rankings by Go Top is built by Go Top — a digital agency with more than 11 years of
+                    experience in organic SEO, paid advertising and website building for businesses in
+                    Israel and abroad.
                   </p>
                   <p>
-                    Something human, sharp, results-focused — and built on more than 11 years of real digital work. With focus on SEO for businesses, website building, and digital advertising.
+                    The platform was born out of our day-to-day work: we saw which reports clients
+                    actually understand, which data points help them decide, and where existing tools
+                    get in the way. Connecting rank tracking, keyword research and AI visibility into
+                    one workflow grew directly out of real client needs.
                   </p>
                 </div>
               </div>
@@ -110,157 +135,129 @@ export default function EnglishAboutPage() {
                     </svg>
                   </div>
                   <div className="text-6xl font-extrabold text-white mb-2 tracking-tight">11+</div>
-                  <p className="text-white text-xl font-semibold">Years of Experience</p>
-                  <p className="text-blue-100 text-sm mt-2">In the digital world</p>
+                  <p className="text-white text-xl font-semibold">years of experience</p>
+                  <p className="text-blue-100 text-sm mt-2">in SEO and digital marketing</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Philosophy Section */}
+        {/* Why we built it */}
         <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
-          <div className="max-w-5xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div className="relative bg-white rounded-3xl p-12 flex items-center justify-center min-h-96 overflow-hidden shadow-xl border border-slate-200 order-2 lg:order-1">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-[100px]" />
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-50 rounded-tr-[100px]" />
-
-                <div className="relative grid grid-cols-2 gap-4 w-full max-w-xs">
-                  <div className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                    </svg>
-                  </div>
-                  <div className="aspect-square bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-200">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div className="aspect-square bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-200">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                  </div>
-                  <div className="aspect-square bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                </div>
-
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-md border border-slate-200">
-                  <p className="text-sm font-bold text-slate-900">Quality Over Quantity</p>
-                </div>
-              </div>
-
-              <div className="space-y-6 order-1 lg:order-2">
-                <h2 className="text-4xl font-extrabold text-slate-900">Our Philosophy</h2>
-                <div className="space-y-4 text-slate-700 leading-relaxed">
-                  <p>
-                    We focus on quality, not quantity. We choose to work with businesses that fit us — and give them maximum attention, personal service and accurate support.
-                  </p>
-                  <p>
-                    At Go Top we don't get excited about clicks and impressions. We get excited about your phone ringing. Because at the end of the day — that's what really matters.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Why We Built It */}
-        <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto">
-            <h2 className="text-4xl font-extrabold text-slate-900 mb-12 text-center">Why We Built Rankings by Go Top</h2>
-
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 lg:p-12 mb-8 border border-blue-200">
-              <p className="text-lg text-slate-700 mb-6">
-                While many businesses use generic ranking tracking tools, we kept hearing the same issue over and over:
-              </p>
-
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 text-2xl">❌</div>
-                  <div>
-                    <p className="font-semibold text-slate-900">Expensive and complex tools</p>
-                    <p className="text-slate-600">That don't fit small businesses</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 text-2xl">❌</div>
-                  <div>
-                    <p className="font-semibold text-slate-900">Reports nobody understands</p>
-                    <p className="text-slate-600">Data you don't use</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 text-2xl">❌</div>
-                  <div>
-                    <p className="font-semibold text-slate-900">Lack of real support</p>
-                    <p className="text-slate-600">When you need it most</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-center text-lg text-slate-700 mb-8">
-              That's why we built <strong>Rankings by Go Top</strong> — a rank tracking system focused on results, the way we focus on results.
+            <h2 className="text-4xl font-extrabold text-slate-900 mb-6 text-center">
+              Why we built the platform
+            </h2>
+            <p className="text-lg text-slate-600 text-center mb-12 max-w-2xl mx-auto">
+              We wanted to connect every tool you need to monitor a business&rsquo;s digital presence into
+              one place — with a clean interface and data you can act on immediately.
             </p>
 
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 lg:p-12 border border-indigo-200">
-              <p className="text-lg text-slate-700 mb-4">
-                Then, in recent years, search changed again. Customers no longer rely only on regular Google results. They ask ChatGPT, Gemini, Perplexity and other AI engines for direct recommendations.
-              </p>
-              <p className="text-lg text-slate-700">
-                That's why Rankings by Go Top doesn't just track your position in Google — it also tracks how your business appears in AI responses. Because that's what really matters — being visible to anyone who searches for you, wherever they search.
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {problems.map((problem) => (
+                <div
+                  key={problem.title}
+                  className="bg-white rounded-2xl p-6 border border-slate-200 hover:border-blue-300 transition-colors"
+                >
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">{problem.title}</h3>
+                  <p className="text-slate-600 leading-relaxed">{problem.description}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Features */}
+        {/* What we solve */}
+        <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-4xl font-extrabold text-slate-900 mb-6 text-center">
+              What Rankings by Go Top solves
+            </h2>
+            <p className="text-lg text-slate-600 text-center mb-12 max-w-2xl mx-auto">
+              One dashboard that shows the full picture: organic rankings, Maps visibility, AI engine
+              presence and keyword research. The data is connected, not scattered across four separate
+              tools.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl p-8 border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Google rank tracking</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Periodic checks of your rankings on pages 1-2 of Google organic, with trends and
+                  comparisons over time.
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl p-8 border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Google Maps visibility</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Tracking business presence on Google Maps results, with precise geographic targeting.
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl p-8 border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 mb-3">AI visibility tracking</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  See whether your business is mentioned, cited or recommended in answers from ChatGPT,
+                  Gemini, Perplexity and other AI engines.
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl p-8 border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 mb-3">Keyword research that drives action</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Fetch keyword ideas, search volumes and competition from Google Ads — and add the
+                  selected keywords directly to tracking or turn them into AI questions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Our approach */}
         <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-4xl font-extrabold text-slate-900 mb-12 text-center">What We Track at Rankings by Go Top</h2>
+            <h2 className="text-4xl font-extrabold text-slate-900 mb-12 text-center">Our approach</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {features.map((feature) => (
-                <div key={feature.title} className="bg-white rounded-2xl p-8 border border-slate-200 hover:border-blue-300 transition-colors">
-                  <div className="text-5xl mb-4">{feature.icon}</div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-3">{feature.title}</h3>
-                  <p className="text-slate-600">{feature.description}</p>
+              {approach.map((item) => (
+                <div
+                  key={item.title}
+                  className="bg-white rounded-2xl p-8 border border-slate-200"
+                >
+                  <h3 className="text-xl font-bold text-slate-900 mb-3">{item.title}</h3>
+                  <p className="text-slate-600 leading-relaxed">{item.description}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Values */}
+        {/* Why choose */}
         <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-4xl font-extrabold text-slate-900 mb-12 text-center">Why Choose Rankings by Go Top</h2>
+            <h2 className="text-4xl font-extrabold text-slate-900 mb-12 text-center">
+              Why choose Rankings by Go Top
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {values.map((value) => (
-                <div key={value.title} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-200">
-                  <div className="text-5xl mb-4">{value.icon}</div>
+                <div
+                  key={value.title}
+                  className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-200"
+                >
                   <h3 className="text-xl font-bold text-slate-900 mb-3">{value.title}</h3>
-                  <p className="text-slate-600 leading-relaxed">{value.description}</p>
+                  <p className="text-slate-700 leading-relaxed">{value.description}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* CTA Section */}
+        {/* CTA */}
         <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-600 to-blue-500">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-6">Ready to get started?</h2>
             <p className="text-xl text-blue-100 mb-8">
-              Start today for free and test the platform yourself
+              7-day free trial. No credit card, no commitment.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -268,13 +265,13 @@ export default function EnglishAboutPage() {
                 href="/en/signup"
                 className="px-8 py-4 rounded-lg bg-white text-blue-600 font-semibold text-lg hover:bg-blue-50 transition-colors shadow-lg"
               >
-                Start Free Trial
+                Start free trial
               </Link>
               <a
                 href="mailto:oren@gotop.co.il"
                 className="px-8 py-4 rounded-lg border-2 border-white text-white font-semibold text-lg hover:bg-white/10 transition-colors"
               >
-                Contact Our Team
+                Contact our team
               </a>
             </div>
 

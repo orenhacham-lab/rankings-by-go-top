@@ -22,210 +22,239 @@ export default function EnglishTermsPage() {
         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <Breadcrumbs items={[{ label: 'Terms of Use', href: '/en/terms' }]} locale="en" />
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Terms of Use</h1>
-          <p className="text-slate-600 mb-8">Terms of use for Rankings by Go Top</p>
+          <p className="text-slate-600 mb-8">Rankings by Go Top</p>
 
-          <div className="prose prose-sm max-w-none space-y-6 text-slate-700">
+          <div className="prose prose-sm max-w-none space-y-6 text-slate-700 leading-relaxed">
             <section>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-slate-700">
-                  <strong>Disclaimer:</strong> These terms are provided for informational purposes and are not legal advice.
-                  Please consult with a legal professional for advice specific to your situation.
-                </p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">1. Service Definition</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">1. Introduction and Service Definition</h2>
               <p>
-                Rankings by Go Top (&ldquo;Service&rdquo;) is a web-based platform operated by Go Top Digital Marketing & Advertising Ltd.
-                that allows users to track keyword rankings on Google search results, Google Maps visibility, AI visibility in answers from
-                ChatGPT, Gemini, Perplexity, and other AI engines, conduct keyword research, and generate professional reports.
+                Rankings by Go Top (the &ldquo;Service&rdquo; or the &ldquo;Platform&rdquo;) is a SaaS service
+                operated by Go Top Digital Marketing &amp; Advertising Ltd. (the &ldquo;Company&rdquo;). The
+                Service allows customers to track keyword rankings on Google search, monitor Google Maps
+                visibility, measure visibility on AI engines such as ChatGPT, Gemini and Perplexity, conduct
+                keyword research, and generate professional reports.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">2. Use Policy</h2>
-              <p>You agree to use the Service only for lawful purposes and in a way that does not infringe upon the rights of others or
-              restrict their use and enjoyment of the Service. Prohibited behavior includes:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Harassing or causing distress or inconvenience to any person</li>
-                <li>Obscene or abusive messages</li>
-                <li>Disruption of the normal flow of dialogue within the Service</li>
-                <li>Attempting to gain unauthorized access to systems or networks</li>
-                <li>Reverse engineering or attempting to discover passwords or authentication mechanisms</li>
-                <li>Using the Service to automate data scraping beyond fair use</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">3. Account Responsibility</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">2. Acceptance of Terms</h2>
               <p>
-                You are responsible for maintaining the confidentiality of your account login credentials and password.
-                You agree to accept responsibility for all activities that occur under your account. You must notify us
-                immediately of any unauthorized use of your account.
+                By registering for, accessing or using the Service, you confirm that you have read, understood
+                and agree to be bound by these Terms of Use. If you do not agree to any of these terms, you
+                must not register for or use the Service.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">4. Free Trial Period</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">3. Account Registration and User Responsibility</h2>
               <p>
-                The Service offers a 7-day free trial period to new users. During the trial, you have full access to the trial plan features.
-                You may cancel at any time during the trial period without charge. If you do not cancel before the trial period ends,
-                you will be automatically charged for your selected plan.
+                When creating an account, you agree to provide accurate, complete and current information.
+                You are responsible for maintaining the confidentiality of your account credentials and for
+                all activity that takes place under your account. You must notify the Company without delay
+                of any suspected unauthorized access.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">4. Trial Period</h2>
+              <p>
+                The Service offers a 7-day trial period for new customers. The limits applicable during the
+                trial are displayed in the Service and may change from time to time at the Company&rsquo;s
+                discretion. Continued use of the Service after the end of the trial period requires an active
+                paid subscription.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">5. Subscriptions and Payments</h2>
               <p>
-                Subscriptions are charged monthly on a recurring basis. By providing payment information, you authorize us to charge
-                your account monthly for your selected plan. Subscription fees are non-refundable except as provided by law or this agreement.
-                We accept payment through PayPal. All payment processing is handled through third-party secure payment systems.
+                The Service operates on a monthly subscription model. Payments are processed through a
+                third-party payment provider (PayPal). As long as the subscription remains active, billing
+                renews automatically each month according to the selected plan. Prices, plans and limits
+                may change from time to time and updates will be reflected in the Service and on the
+                pricing page.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">6. Billing and Cancellation</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">6. Cancellation</h2>
               <p>
-                You may cancel your subscription at any time through your account settings. Cancellation takes effect immediately.
-                You will retain access to your account and data until the end of your current billing cycle. No prorated refunds are
-                provided for mid-month cancellations.
+                You may cancel renewal of your subscription at any time through your account settings.
+                Access to the Service will be retained until the end of the billing period that has already
+                been paid. No retroactive cancellation of a period that has already been paid will be granted,
+                except as required by applicable law.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">7. Refunds</h2>
               <p>
-                Generally, subscription fees are non-refundable. However, we may provide refunds at our sole discretion for certain
-                circumstances such as service failures or billing errors. Refund requests must be made within 30 days of the charge.
-                Any refunds will be processed through the original payment method.
+                As a rule, subscription fees are non-refundable for a period that has already begun or been
+                paid. The Company may, at its sole discretion or as required by law, grant a refund in
+                exceptional circumstances. Refund requests should be submitted in writing to the
+                Company&rsquo;s email address.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">8. Usage Limits</h2>
               <p>
-                Each plan includes specific limits on projects, keywords, keyword checks, and AI scans. These limits are reset monthly
-                on your subscription renewal date. Exceeding usage limits may result in service suspension or requirement to upgrade to
-                a higher plan. We reserve the right to enforce fair usage policies.
+                Each plan includes limits as set out on the pricing page and in the account dashboard,
+                including:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-4">
+                <li>Number of projects</li>
+                <li>Number of keywords per project</li>
+                <li>Monthly ranking scans</li>
+                <li>Monthly AI visibility scans</li>
+                <li>Keyword research usage</li>
+                <li>Report generation</li>
+              </ul>
+              <p>
+                Limits are displayed in the Service and may change in accordance with the plan and Company
+                policy. Exceeding these limits may result in restricted usage or a requirement to upgrade
+                the plan.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">9. Third-Party Data</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">9. Third-Party Data and Services</h2>
               <p>
-                The Service provides access to data from Google Search, Google Maps, Google Ads, and various AI services.
-                This data is provided as-is. We do not guarantee accuracy, completeness, or real-time updates. You acknowledge
-                that rankings, search volumes, and competition data are estimates and may vary from actual results. Always validate
-                data independently.
+                The Service relies, or may rely, on data and services provided by third parties, including:
+                Google, Google Ads API, Google Maps, various search providers, AI providers (ChatGPT, Gemini,
+                Perplexity and others), payment providers (PayPal), and infrastructure and hosting providers
+                (Supabase and others). Data obtained from third parties may be partial, estimated, delayed
+                or unavailable, and its accuracy and availability are not within the Company&rsquo;s control.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">10. No Warranty</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">10. Data Accuracy and No Warranty of Accuracy</h2>
               <p>
-                THE SERVICE IS PROVIDED ON AN &ldquo;AS IS&rdquo; BASIS WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
-                INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
-                WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR MEET YOUR REQUIREMENTS.
+                The Company does not warrant the absolute accuracy of ranking data, search volumes,
+                competition levels, CPC estimates, AI visibility results or reports. Data is provided
+                &ldquo;AS-IS&rdquo; and there may be differences between Service results and manual checks
+                or data from other sources.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">11. Data Accuracy Disclaimer</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">11. No Guarantee of Business Results</h2>
               <p>
-                While we strive to provide accurate information, we make no guarantees regarding the accuracy of ranking data,
-                search volumes, competition levels, or AI visibility results. Search engine algorithms change frequently.
-                The Service should be used as one tool among many for your SEO strategy, not as the sole source of truth.
+                The Company does not guarantee any business outcomes, including improvements in rankings,
+                traffic, leads, sales, revenue or visibility on AI engines. The Service provides tracking
+                and analytics tools only.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">12. Service Availability</h2>
               <p>
-                We aim to maintain 99% uptime but do not guarantee continuous availability. The Service may be unavailable due to
-                maintenance, updates, technical issues, or circumstances beyond our control. We are not responsible for losses resulting
-                from temporary service interruptions or downtime.
+                The Service is provided as-is and may be subject to outages, maintenance windows, planned
+                or unplanned downtime, limitations of third-party APIs and issues at third-party providers.
+                The Company will make commercially reasonable efforts to minimize service interruptions but
+                does not guarantee continuous 100% availability.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">13. Limited Liability</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">13. Prohibited Use</h2>
+              <p>The following actions are strictly prohibited:</p>
+              <ul className="list-disc list-inside space-y-1 ml-4">
+                <li>Damaging or attempting to disrupt the Service infrastructure</li>
+                <li>Circumventing usage limits or security mechanisms</li>
+                <li>Reverse engineering, decompiling or extracting source code</li>
+                <li>Using the Service for unauthorized scraping</li>
+                <li>Sharing access credentials with unauthorized parties</li>
+                <li>Using the Service in violation of any applicable law</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">14. Intellectual Property</h2>
               <p>
-                TO THE FULLEST EXTENT PERMITTED BY LAW, WE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
-                OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFIT, LOSS OF DATA, OR LOSS OF USE, EVEN IF ADVISED OF THE POSSIBILITY OF
-                SUCH DAMAGES. OUR TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT YOU PAID IN THE 12 MONTHS PRECEDING THE EVENT.
+                All rights in the Service, including its interface, design, source code, reports, logo and
+                brand, belong to the Company. You may not copy, duplicate, distribute, sell or make any
+                unauthorized use of the Service&rsquo;s content or components. Permitted use is limited to
+                the subscriber&rsquo;s own needs in accordance with the purchased plan.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">14. Privacy</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">15. User Content</h2>
               <p>
-                Your use of the Service is also governed by our Privacy Policy. Please review the Privacy Policy to understand our
-                practices regarding the collection and use of your personal information.
+                You are solely responsible for any content you enter into the Service, including domains,
+                keywords, AI questions, client details and any other information. You confirm that you hold
+                the necessary rights and permissions to use this content within the Service.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">15. Intellectual Property</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">16. Privacy</h2>
               <p>
-                The Service, including all content, features, and functionality, is owned by Go Top Digital Marketing & Advertising Ltd.,
-                its licensors, or other providers of such material and is protected by international copyright, trademark, and other
-                intellectual property laws. You may use the Service only for your personal, non-commercial use, unless specifically
-                permitted otherwise.
+                Use of the Service is also governed by the Company&rsquo;s Privacy Policy, which forms an
+                integral part of these terms. Where a separate privacy policy is published on the website,
+                it should be read together with these terms.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">16. User Content</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">17. Limitation of Liability</h2>
               <p>
-                Any keywords, notes, or other content you input into the Service (&ldquo;User Content&rdquo;) remains your property.
-                By using the Service, you grant us a non-exclusive, worldwide license to use, store, and process your User Content
-                for the purpose of providing the Service. We will not share User Content with third parties except as necessary to
-                provide the Service.
+                Subject to applicable law, the Company shall not be liable for any indirect, consequential,
+                special or punitive damages, including loss of profits, loss of data, business impact or
+                reliance on Service data. The Company&rsquo;s aggregate liability, if any, shall not exceed
+                the amounts actually paid by the user during the 12 months preceding the event giving rise
+                to the claim.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">17. Account Termination</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">18. Account Suspension or Termination</h2>
               <p>
-                We may terminate or suspend your account immediately if you violate these terms or engage in prohibited behavior.
-                Upon termination, your right to use the Service ceases immediately. Data may be permanently deleted 90 days after
-                account termination. You may request your data be deleted upon account closure.
+                The Company may suspend or terminate a user account, temporarily or permanently, in case
+                of a breach of these terms, non-payment, suspected misuse, attempts to harm the Service or
+                any other reasonable cause. Upon termination, stored data may be deleted in accordance with
+                Company policy and applicable law.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">18. Changes to Terms</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">19. Changes to the Terms</h2>
               <p>
-                We reserve the right to modify these terms at any time. Changes will be effective upon posting to the Service.
-                Your continued use of the Service following the posting of revised terms means you accept and agree to the changes.
-                It is your responsibility to check these terms regularly for updates.
+                The Company may update these terms from time to time. The updated version will be published
+                on the website and will take effect upon publication. Continued use of the Service after
+                the terms are updated constitutes acceptance of the updated terms.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">19. Jurisdiction and Governing Law</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">20. Governing Law and Jurisdiction</h2>
               <p>
-                These terms are governed by and construed in accordance with the laws of Israel, and you irrevocably submit to the
-                exclusive jurisdiction of the courts located in Israel. This choice of law and jurisdiction applies without regard to
-                your location.
+                These terms are governed by the laws of the State of Israel. Exclusive jurisdiction over
+                any dispute arising from or related to these terms or the use of the Service lies with the
+                competent courts in Israel.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">20. Contact Information</h2>
-              <p>
-                If you have questions about these terms or the Service, please contact us at:
-              </p>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">21. Contact</h2>
+              <p>For any question regarding these terms or the Service, please contact us:</p>
               <p className="mt-4">
-                <strong>Go Top Digital Marketing & Advertising Ltd.</strong><br />
-                Email: <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">oren@gotop.co.il</a><br />
-                Country: Israel
+                <strong>Go Top Digital Marketing &amp; Advertising Ltd.</strong>
+                <br />
+                Email:{' '}
+                <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
+                  oren@gotop.co.il
+                </a>
               </p>
             </section>
 
             <section>
-              <p className="mt-8 pt-8 border-t border-slate-200 text-sm text-slate-600">
+              <p className="mt-8 pt-8 border-t border-slate-200 text-sm text-slate-500">
+                This document is a business draft. We recommend having it reviewed by legal counsel before
+                final use.
+                <br />
                 Last updated: May 2026
               </p>
             </section>

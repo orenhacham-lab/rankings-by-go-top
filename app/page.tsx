@@ -38,16 +38,16 @@ export default async function HomePage() {
           </h1>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-slate-900 leading-tight tracking-tight mb-6">
-            עקוב אחר המיקומים שלך
+            עקבו אחר המיקומים שלכם
             <br />
             <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-purple-500 bg-clip-text text-transparent">
-              בגוגל והנראות שלך ב-AI
+              בגוגל והנראות שלכם ב-AI
             </span>
           </h2>
 
           <p className="text-lg lg:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed mb-10">
-            מערכת מעקב מקצועית לקידום אתרים. בדוק את המיקום של האתר שלך בגוגל אורגני וגוגל מפות,
-            עקוב אחרי אזכורים בתשובות AI, קבל דוחות מפורטים ועקוב אחרי המתחרים — הכל ממקום אחד.
+            מערכת מעקב מקצועית לקידום אתרים. בדקו את המיקום של האתר שלכם בגוגל אורגני וגוגל מפות,
+            עקבו אחר אזכורים בתשובות AI, קבלו דוחות מפורטים ועקבו אחר המתחרים — הכל ממקום אחד.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
@@ -55,13 +55,13 @@ export default async function HomePage() {
               href={user ? '/dashboard' : '/signup'}
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-base shadow-lg shadow-blue-600/25 hover:shadow-xl hover:shadow-blue-600/30 hover:from-blue-700 hover:to-indigo-700 transition-all"
             >
-              {user ? 'לדאשבורד' : 'התחל ניסיון חינם 7 ימים'}
+              {user ? 'לדאשבורד' : 'התחילו ניסיון חינם 7 ימים'}
             </Link>
             <Link
               href="/pricing"
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white border border-slate-200 text-slate-900 font-semibold text-base shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
             >
-              צפה במחירים
+              צפו במחירים
             </Link>
           </div>
 
@@ -164,7 +164,7 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
                 icon: (
@@ -173,7 +173,7 @@ export default async function HomePage() {
                   </svg>
                 ),
                 title: 'גוגל אורגני',
-                desc: 'בדוק את הדירוגים שלך בעמודי 1-2 בגוגל. תוצאות מדויקות עם מיקומים אמיתיים בכל ביטוי.',
+                desc: 'בדקו את הדירוגים שלכם בעמודי 1-2 בגוגל. תוצאות מדויקות עם מיקומים אמיתיים לכל ביטוי.',
                 color: 'from-blue-500 to-blue-600',
               },
               {
@@ -184,7 +184,7 @@ export default async function HomePage() {
                   </svg>
                 ),
                 title: 'גוגל מפות',
-                desc: 'מעקב אחרי המיקומים שלך בגוגל מפות עם מיקוד גיאוגרפי מדויק לפי עיר, מיקוד או נקודת ציון.',
+                desc: 'מעקב אחר המיקומים שלכם בגוגל מפות עם מיקוד גיאוגרפי מדויק לפי עיר, מיקוד או נקודת ציון.',
                 color: 'from-emerald-500 to-emerald-600',
               },
               {
@@ -204,7 +204,7 @@ export default async function HomePage() {
                   </svg>
                 ),
                 title: 'מעקב מגמות',
-                desc: 'ראה איך הדירוגים שלך משתנים לאורך זמן. גרפים אינטראקטיביים והשוואות בין תקופות.',
+                desc: 'ראו איך הדירוגים שלכם משתנים לאורך זמן. גרפים אינטראקטיביים והשוואות בין תקופות.',
                 color: 'from-orange-500 to-orange-600',
               },
               {
@@ -214,7 +214,7 @@ export default async function HomePage() {
                   </svg>
                 ),
                 title: 'נראות ב-AI',
-                desc: 'בדוק האם העסק שלך מופיע בתשובות של מנועי AI כמו ChatGPT, Gemini, Perplexity, Copilot, Grok ו-Google AI. עקוב אחרי אזכורים, ציטוטים ומקורות.',
+                desc: 'בדקו האם העסק שלכם מופיע בתשובות של מנועי AI כמו ChatGPT, Gemini, Perplexity, Copilot, Grok ו-Google AI. עקבו אחר אזכורים, ציטוטים ומקורות.',
                 color: 'from-rose-500 to-rose-600',
               },
               {
@@ -234,7 +234,7 @@ export default async function HomePage() {
                   </svg>
                 ),
                 title: 'תמיכה אישית',
-                desc: 'תמיכה ישירה בעברית מהצוות שלנו. אנחנו פה בשבילך עם תשובות מהירות ופתרונות מדויקים.',
+                desc: 'תמיכה ישירה בעברית מהצוות שלנו. אנחנו כאן בשבילכם עם תשובות מהירות ופתרונות מדויקים.',
                 color: 'from-indigo-500 to-indigo-600',
               },
             ].map((feat) => (
@@ -271,12 +271,12 @@ export default async function HomePage() {
               {
                 num: '01',
                 title: 'הרשמה והגדרת פרויקט',
-                desc: 'צור חשבון חינם, הוסף את האתר שלך ובחר את העיר או האזור שאליו אתה מכוון.',
+                desc: 'צרו חשבון חינם, הוסיפו את האתר שלכם ובחרו את העיר או האזור שאליו אתם מכוונים.',
               },
               {
                 num: '02',
                 title: 'הוספת ביטויי מפתח ושאלות AI',
-                desc: 'הוסף את הביטויים שאתה רוצה לעקוב אחריהם בגוגל, והגדר שאלות AI כדי לבדוק איך העסק שלך מופיע בתשובות של מנועי AI.',
+                desc: 'הוסיפו את הביטויים שברצונכם לעקוב אחריהם בגוגל, והגדירו שאלות AI כדי לבדוק איך העסק שלכם מופיע בתשובות של מנועי AI.',
               },
               {
                 num: '03',
@@ -308,23 +308,23 @@ export default async function HomePage() {
 
             <div className="relative">
               <h2 className="text-3xl lg:text-5xl font-extrabold text-white mb-4 tracking-tight">
-                עקוב אחר המיקומים שלך בגוגל והנראות שלך ב-AI
+                עקבו אחר המיקומים שלכם בגוגל והנראות שלכם ב-AI
               </h2>
               <p className="text-lg lg:text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-                התחל ניסיון חינם של 7 ימים. ללא התחייבות, ללא כרטיס אשראי.
+                התחילו ניסיון חינם של 7 ימים. ללא התחייבות, ללא כרטיס אשראי.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
                   href={user ? '/dashboard' : '/signup'}
                   className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-blue-700 font-semibold text-base shadow-lg hover:shadow-xl hover:bg-blue-50 transition-all"
                 >
-                  {user ? 'לדאשבורד שלי' : 'התחל ניסיון חינם'}
+                  {user ? 'לדאשבורד שלי' : 'התחילו ניסיון חינם'}
                 </Link>
                 <Link
                   href="/pricing"
                   className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white font-semibold text-base hover:bg-white/20 transition-all"
                 >
-                  צפה במחירים
+                  צפו במחירים
                 </Link>
               </div>
             </div>

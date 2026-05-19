@@ -13,35 +13,13 @@ function hasHebrewCharacters(text: string): boolean {
   return /[֐-׿]/.test(text)
 }
 
-function removeModifier(keyword: string, modifier: string): string {
-  // Simple removal of modifier from keyword, handling RTL text
-  const regex = new RegExp(`\\s*${modifier}\\s*`, 'gi')
-  return keyword.replace(regex, '').trim()
-}
-
 /**
  * Generate natural language questions from English keywords
  */
 function generateEnglishQuestions(keyword: string): GeneratedQuestion[] {
   const questions: GeneratedQuestion[] = []
-  const lower = keyword.toLowerCase()
 
-  // Recommendation pattern: contains "best", "recommended", "top", "recommended for"
-  if (/\b(best|recommended|top|recommended for)\b/i.test(keyword)) {
-    const cleaned = removeModifier(keyword, '(best|recommended|top|recommended for)')
-    questions.push({
-      question: `Which ${cleaned} is recommended?`,
-      sourceKeyword: keyword,
-      type: 'recommendation',
-    })
-    questions.push({
-      question: `What is the best ${cleaned}?`,
-      sourceKeyword: keyword,
-      type: 'recommendation',
-    })
-  }
-
-  // Price pattern: contains "price", "cost", "how much", "expensive"
+  // Price pattern
   if (/\b(price|cost|how much|expensive|cheap)\b/i.test(keyword)) {
     questions.push({
       question: `How much does ${keyword} cost?`,
@@ -49,13 +27,13 @@ function generateEnglishQuestions(keyword: string): GeneratedQuestion[] {
       type: 'price',
     })
     questions.push({
-      question: `What factors affect the price of ${keyword}?`,
+      question: `What affects the price of ${keyword}?`,
       sourceKeyword: keyword,
       type: 'price',
     })
   }
 
-  // Comparison pattern: contains "vs", "vs.", "versus", "difference", "vs", "or"
+  // Comparison pattern
   if (/\b(vs|versus|vs\.|difference|compare)\b/i.test(keyword)) {
     questions.push({
       question: `What is the difference between ${keyword}?`,
@@ -64,65 +42,57 @@ function generateEnglishQuestions(keyword: string): GeneratedQuestion[] {
     })
   }
 
-  // If no specific pattern matched, generate general info questions
-  if (questions.length === 0) {
-    questions.push({
-      question: `What should I know about ${keyword}?`,
-      sourceKeyword: keyword,
-      type: 'info',
-    })
-    questions.push({
-      question: `What is the best ${keyword}?`,
-      sourceKeyword: keyword,
-      type: 'recommendation',
-    })
-    questions.push({
-      question: `Is ${keyword} worth buying?`,
-      sourceKeyword: keyword,
-      type: 'recommendation',
-    })
-  }
+  // Generic safe templates that don't require knowing singular/plural form
+  questions.push({
+    question: `What should I check before buying ${keyword}?`,
+    sourceKeyword: keyword,
+    type: 'info',
+  })
+  questions.push({
+    question: `Is it worth buying ${keyword}?`,
+    sourceKeyword: keyword,
+    type: 'recommendation',
+  })
+  questions.push({
+    question: `What are the pros and cons of ${keyword}?`,
+    sourceKeyword: keyword,
+    type: 'info',
+  })
+  questions.push({
+    question: `How to choose ${keyword} the right way?`,
+    sourceKeyword: keyword,
+    type: 'info',
+  })
 
   return questions
 }
 
 /**
- * Generate natural language questions from Hebrew keywords
+ * Generate natural language questions from Hebrew keywords.
+ *
+ * Templates are deliberately written so they remain grammatical regardless of
+ * whether the keyword is singular/plural or masculine/feminine. Avoid templates
+ * like "איזה X מתאים..." which require agreement we cannot reliably infer.
  */
 function generateHebrewQuestions(keyword: string): GeneratedQuestion[] {
   const questions: GeneratedQuestion[] = []
 
-  // Recommendation pattern
-  if (/(מומלץ|טוב|הטוב|ההטוב)/i.test(keyword)) {
-    const cleaned = removeModifier(keyword, '(מומלץ|טוב|הטוב|ההטוב)')
+  // Price-aware templates
+  if (/(מחיר|כמה עולה|עלות)/i.test(keyword)) {
     questions.push({
-      question: `איזה ${cleaned} מומלץ לקנות?`,
-      sourceKeyword: keyword,
-      type: 'recommendation',
-    })
-    questions.push({
-      question: `מה החשוב לבדוק לפני קניית ${cleaned}?`,
-      sourceKeyword: keyword,
-      type: 'info',
-    })
-  }
-
-  // Price pattern
-  if (/(מחיר|כמה עולה|עלות|חסכון)/i.test(keyword)) {
-    questions.push({
-      question: `כמה עולה ${keyword}?`,
+      question: `מה משפיע על המחיר של ${keyword}?`,
       sourceKeyword: keyword,
       type: 'price',
     })
     questions.push({
-      question: `מה משפיע על מחיר ${keyword}?`,
+      question: `מה כדאי לדעת על העלות של ${keyword}?`,
       sourceKeyword: keyword,
       type: 'price',
     })
   }
 
-  // Comparison pattern
-  if (/(הבדל|השוואה|או|vs)/i.test(keyword)) {
+  // Comparison-aware templates
+  if (/(הבדל|השוואה|מול|vs)/i.test(keyword)) {
     questions.push({
       question: `מה ההבדל בין ${keyword}?`,
       sourceKeyword: keyword,
@@ -130,33 +100,32 @@ function generateHebrewQuestions(keyword: string): GeneratedQuestion[] {
     })
   }
 
-  // Home/personal use pattern
-  if (/(לבית|ביתי|אישי)/i.test(keyword)) {
-    questions.push({
-      question: `איזה ${keyword} מתאים לשימוש ביתי?`,
-      sourceKeyword: keyword,
-      type: 'info',
-    })
-  }
-
-  // If no specific pattern matched, generate general info questions
-  if (questions.length === 0) {
-    questions.push({
-      question: `מה חשוב לדעת על ${keyword}?`,
-      sourceKeyword: keyword,
-      type: 'info',
-    })
-    questions.push({
-      question: `איזה ${keyword} מומלץ?`,
-      sourceKeyword: keyword,
-      type: 'recommendation',
-    })
-    questions.push({
-      question: `האם ${keyword} שווה קנייה?`,
-      sourceKeyword: keyword,
-      type: 'recommendation',
-    })
-  }
+  // Generic safe templates — neutral phrasing that works for any keyword form.
+  questions.push({
+    question: `מה חשוב לבדוק לפני שקונים ${keyword}?`,
+    sourceKeyword: keyword,
+    type: 'info',
+  })
+  questions.push({
+    question: `האם כדאי לקנות ${keyword}?`,
+    sourceKeyword: keyword,
+    type: 'recommendation',
+  })
+  questions.push({
+    question: `מה היתרונות והחסרונות של ${keyword}?`,
+    sourceKeyword: keyword,
+    type: 'info',
+  })
+  questions.push({
+    question: `איך לבחור ${keyword} בצורה נכונה?`,
+    sourceKeyword: keyword,
+    type: 'info',
+  })
+  questions.push({
+    question: `מה כדאי לדעת לפני שקונים ${keyword}?`,
+    sourceKeyword: keyword,
+    type: 'info',
+  })
 
   return questions
 }
@@ -170,19 +139,22 @@ export function generateQuestionsFromKeywords(
   language?: 'he' | 'en'
 ): GeneratedQuestion[] {
   const allQuestions: GeneratedQuestion[] = []
+  const seen = new Set<string>()
 
   for (const keyword of keywords) {
-    // Auto-detect language if not specified
     const isHebrew = language === 'he' || (!language && hasHebrewCharacters(keyword))
 
-    let generated: GeneratedQuestion[]
-    if (isHebrew) {
-      generated = generateHebrewQuestions(keyword)
-    } else {
-      generated = generateEnglishQuestions(keyword)
-    }
+    const generated = isHebrew
+      ? generateHebrewQuestions(keyword)
+      : generateEnglishQuestions(keyword)
 
-    allQuestions.push(...generated)
+    for (const q of generated) {
+      const key = q.question.trim().toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        allQuestions.push(q)
+      }
+    }
   }
 
   return allQuestions

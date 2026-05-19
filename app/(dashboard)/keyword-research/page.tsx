@@ -29,6 +29,7 @@ export default function KeywordResearchPage() {
   const t = dict.keywordResearch
   const isRTL = language === 'he'
 
+  const [researchType, setResearchType] = useState<'keyword' | 'url' | 'keyword_url'>('keyword')
   const [keyword, setKeyword] = useState('')
   const [country, setCountry] = useState('IL')
   const [selectedLanguage, setSelectedLanguage] = useState('he')
@@ -83,9 +84,29 @@ export default function KeywordResearchPage() {
     setSelectedKeywords(new Set())
     setFewResultsWarning(false)
     setFilteredOutWarning(false)
+    // Starting a new search clears any previous add-to-project success state.
+    setAddToProjectMessage('')
+    setAddToProjectError('')
+    setLastAddedProjectId('')
 
-    if (!keyword.trim()) {
+    // Validate by research type
+    const trimmedKeyword = keyword.trim()
+    const trimmedUrl = url.trim()
+
+    if (researchType === 'keyword' && !trimmedKeyword) {
       setError(t.states.empty)
+      return
+    }
+    if (researchType === 'url' && !trimmedUrl) {
+      setError(t.form.errorInvalidUrl)
+      return
+    }
+    if (researchType === 'keyword_url' && (!trimmedKeyword || !trimmedUrl)) {
+      if (!trimmedKeyword) {
+        setError(t.states.empty)
+      } else {
+        setError(t.form.errorInvalidUrl)
+      }
       return
     }
 
@@ -96,10 +117,11 @@ export default function KeywordResearchPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          keyword: keyword.trim(),
+          researchType,
+          keyword: trimmedKeyword,
+          url: trimmedUrl,
           country,
           language: selectedLanguage,
-          url: url.trim() || undefined,
           minMonthlySearches,
         }),
       })
@@ -143,7 +165,18 @@ export default function KeywordResearchPage() {
     }
   }
 
+  const clearAddToProjectSuccess = () => {
+    if (addToProjectMessage || lastAddedProjectId) {
+      setAddToProjectMessage('')
+      setLastAddedProjectId('')
+    }
+    if (addToProjectError) {
+      setAddToProjectError('')
+    }
+  }
+
   const toggleKeyword = (kw: string) => {
+    clearAddToProjectSuccess()
     const newSelected = new Set(selectedKeywords)
     if (newSelected.has(kw)) {
       newSelected.delete(kw)
@@ -154,10 +187,12 @@ export default function KeywordResearchPage() {
   }
 
   const selectAll = () => {
+    clearAddToProjectSuccess()
     setSelectedKeywords(new Set(results.map((r) => r.keyword)))
   }
 
   const deselectAll = () => {
+    clearAddToProjectSuccess()
     setSelectedKeywords(new Set())
   }
 
@@ -228,8 +263,9 @@ export default function KeywordResearchPage() {
 
       setAddToProjectMessage(t.addToProject.success(result.added || 0, result.skipped || 0))
       setLastAddedProjectId(projectIdUsed)
-      setSelectedKeywords(new Set())
-      setSelectedProject('')
+      // Keep selection visible after success so the user can see what they added
+      // and the "Go to project" button. The success state is cleared the next time
+      // the user searches, toggles a checkbox, or dismisses the message manually.
     } catch (err) {
       setAddToProjectError(t.addToProject.errorGeneral)
       console.error('Error adding keywords to project:', err)
@@ -344,21 +380,76 @@ export default function KeywordResearchPage() {
       {/* Form */}
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6 mb-8">
         <form onSubmit={handleSearch} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Keyword */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.keyword} *
-              </label>
-              <input
-                type="text"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder={t.form.keywordPlaceholder}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              />
+          {/* Research type */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              {t.form.researchType}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: 'keyword', label: t.form.researchTypeKeyword },
+                  { value: 'url', label: t.form.researchTypeUrl },
+                  { value: 'keyword_url', label: t.form.researchTypeKeywordUrl },
+                ] as const
+              ).map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
+                    researchType === opt.value
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-400'
+                      : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="researchType"
+                    value={opt.value}
+                    checked={researchType === opt.value}
+                    onChange={() => setResearchType(opt.value)}
+                    className="sr-only"
+                    disabled={loading}
+                  />
+                  {opt.label}
+                </label>
+              ))}
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Keyword — shown when keyword or keyword_url */}
+            {(researchType === 'keyword' || researchType === 'keyword_url') && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {t.form.keyword} *
+                </label>
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder={t.form.keywordPlaceholder}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {/* URL — shown when url or keyword_url */}
+            {(researchType === 'url' || researchType === 'keyword_url') && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {t.form.url} *
+                </label>
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder={t.form.urlPlaceholder}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  disabled={loading}
+                />
+              </div>
+            )}
 
             {/* Country */}
             <div>
@@ -398,21 +489,6 @@ export default function KeywordResearchPage() {
               </select>
             </div>
 
-            {/* URL */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {t.form.url} <span className="text-xs text-slate-500">{t.form.urlOptional}</span>
-              </label>
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder={t.form.urlPlaceholder}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={loading}
-              />
-            </div>
-
             {/* Minimum Monthly Searches */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -432,7 +508,12 @@ export default function KeywordResearchPage() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !keyword.trim()}
+            disabled={
+              loading ||
+              (researchType === 'keyword' && !keyword.trim()) ||
+              (researchType === 'url' && !url.trim()) ||
+              (researchType === 'keyword_url' && (!keyword.trim() || !url.trim()))
+            }
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {loading && <Loader2 size={18} className="animate-spin" />}
@@ -499,34 +580,50 @@ export default function KeywordResearchPage() {
                     title={!selectedProject ? t.addToProject.errorSelectProject : ''}
                   >
                     <Sparkles size={14} />
-                    {language === 'he' ? 'צור שאלות AI' : 'Create AI questions'}
+                    {language === 'he' ? 'יצירת שאלות AI' : 'Create AI questions'}
                   </button>
                 </>
               )}
             </div>
           </div>
 
-          {/* Add to Project Section — visible whenever at least one keyword is selected */}
-          {selectedKeywords.size > 0 && (
+          {/* Add to Project Section — visible whenever at least one keyword is selected,
+              OR a success/error message is still showing from the last action. */}
+          {(selectedKeywords.size > 0 || addToProjectMessage || addToProjectError) && (
             <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
-              <div className={`mb-3 font-semibold text-blue-900 dark:text-blue-100 ${isRTL ? 'text-right' : 'text-left'}`}>
-                {t.addToProject.sectionTitle} ({selectedKeywords.size})
+              <div className={`mb-3 font-semibold text-blue-900 dark:text-blue-100 flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+                <span>
+                  {t.addToProject.sectionTitle} ({selectedKeywords.size})
+                </span>
+                {(addToProjectMessage || addToProjectError) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddToProjectMessage('')
+                      setAddToProjectError('')
+                      setLastAddedProjectId('')
+                    }}
+                    className="text-xs font-normal text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline"
+                  >
+                    {language === 'he' ? 'סגירה' : 'Dismiss'}
+                  </button>
+                )}
               </div>
 
-              {projects.length === 0 && !projectsLoading && (
+              {selectedKeywords.size > 0 && projects.length === 0 && !projectsLoading && (
                 <div className="text-sm text-slate-700 dark:text-slate-300 p-3 bg-white dark:bg-slate-800 rounded">
                   {t.addToProject.noProjects}
                 </div>
               )}
 
-              {projectsLoading && (
+              {selectedKeywords.size > 0 && projectsLoading && (
                 <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
                   <Loader2 size={14} className="animate-spin" />
                   {t.addToProject.projectsLoading}
                 </div>
               )}
 
-              {projects.length > 0 && !projectsLoading && (
+              {selectedKeywords.size > 0 && projects.length > 0 && !projectsLoading && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
@@ -595,13 +692,15 @@ export default function KeywordResearchPage() {
                 </div>
               )}
               {addToProjectMessage && (
-                <div className={`text-sm text-green-700 dark:text-green-400 flex items-center gap-2 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-                  <CheckCircle size={16} />
-                  <span>{addToProjectMessage}</span>
+                <div className={`flex flex-col sm:flex-row sm:items-center gap-3 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+                  <div className={`text-sm text-green-700 dark:text-green-400 flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <CheckCircle size={16} />
+                    <span>{addToProjectMessage}</span>
+                  </div>
                   {lastAddedProjectId && (
                     <a
                       href={`/projects/${lastAddedProjectId}`}
-                      className="text-blue-600 dark:text-blue-400 hover:underline ml-2"
+                      className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
                     >
                       {t.addToProject.goToProject}
                     </a>

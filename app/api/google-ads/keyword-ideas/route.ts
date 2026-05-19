@@ -100,13 +100,11 @@ export async function POST(request: Request) {
     const language = typeof body.language === 'string' ? body.language : 'he'
     const urlRaw = typeof body.url === 'string' ? body.url.trim() : ''
     const minMonthlySearches = typeof body.minMonthlySearches === 'number' ? Math.max(0, body.minMonthlySearches) : 30
-
-    if (!keywordRaw) {
-      return Response.json(
-        { success: false, stage: 'validation', error: 'Keyword is required' },
-        { status: 400 }
-      )
-    }
+    // Default to keyword mode when researchType is missing or invalid — preserves
+    // existing keyword-only callers exactly.
+    const researchTypeRaw = typeof body.researchType === 'string' ? body.researchType : 'keyword'
+    const researchType: 'keyword' | 'url' | 'keyword_url' =
+      researchTypeRaw === 'url' || researchTypeRaw === 'keyword_url' ? researchTypeRaw : 'keyword'
 
     if (!isValidCountry(country)) {
       return Response.json(
@@ -134,17 +132,39 @@ export async function POST(request: Request) {
       )
     }
 
-    // Optional URL must be a valid http(s) URL if present; otherwise ignore.
+    // Validate URL when the research type requires it.
     let validUrl: string | undefined
-    if (urlRaw) {
+    if (researchType === 'url' || researchType === 'keyword_url') {
+      if (!urlRaw) {
+        return Response.json(
+          { success: false, stage: 'validation', error: 'Invalid URL' },
+          { status: 400 }
+        )
+      }
       try {
         const u = new URL(urlRaw)
-        if (u.protocol === 'http:' || u.protocol === 'https:') {
-          validUrl = urlRaw
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          return Response.json(
+            { success: false, stage: 'validation', error: 'Invalid URL' },
+            { status: 400 }
+          )
         }
+        validUrl = urlRaw
       } catch {
-        // Invalid URL — silently ignore rather than fail the search.
-        validUrl = undefined
+        return Response.json(
+          { success: false, stage: 'validation', error: 'Invalid URL' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate keyword when the research type requires it.
+    if (researchType === 'keyword' || researchType === 'keyword_url') {
+      if (!keywordRaw) {
+        return Response.json(
+          { success: false, stage: 'validation', error: 'Keyword is required' },
+          { status: 400 }
+        )
       }
     }
 
@@ -195,20 +215,32 @@ export async function POST(request: Request) {
 
     // Build the request body for GenerateKeywordIdeas (REST API — camelCase).
     // The API accepts ONE of: keywordSeed, urlSeed, keywordAndUrlSeed, siteSeed.
-    // Send the user's keyword exactly as provided — no artificial variants. Let Google
-    // generate related ideas, matching Google Ads Keyword Planner behavior.
     const geoTargetId = COUNTRY_GEO_TARGETS[country]
     const languageId = LANGUAGE_IDS[language]
-    const seedType = validUrl ? 'keywordAndUrlSeed' : 'keywordSeed'
-    const seedKeywords = [keywordRaw]
 
+    // Map researchType to the Google Ads seed field. Each request sends exactly
+    // one seed type (oneof).
     type SeedField =
       | { keywordSeed: { keywords: string[] } }
+      | { urlSeed: { url: string } }
       | { keywordAndUrlSeed: { url: string; keywords: string[] } }
 
-    const seed: SeedField = validUrl
-      ? { keywordAndUrlSeed: { url: validUrl, keywords: seedKeywords } }
-      : { keywordSeed: { keywords: seedKeywords } }
+    let seed: SeedField
+    let seedType: 'keywordSeed' | 'urlSeed' | 'keywordAndUrlSeed'
+    let seedKeywords: string[] = []
+
+    if (researchType === 'url') {
+      seedType = 'urlSeed'
+      seed = { urlSeed: { url: validUrl! } }
+    } else if (researchType === 'keyword_url') {
+      seedType = 'keywordAndUrlSeed'
+      seedKeywords = [keywordRaw]
+      seed = { keywordAndUrlSeed: { url: validUrl!, keywords: seedKeywords } }
+    } else {
+      seedType = 'keywordSeed'
+      seedKeywords = [keywordRaw]
+      seed = { keywordSeed: { keywords: seedKeywords } }
+    }
 
     const requestBody = {
       ...seed,
@@ -222,6 +254,7 @@ export async function POST(request: Request) {
     // Safe server-side debug — no secrets.
     console.log('[keyword-ideas] request', {
       apiVersion: GOOGLE_ADS_API_VERSION,
+      researchType,
       country,
       language,
       geoTarget: `geoTargetConstants/${geoTargetId}`,
@@ -415,6 +448,7 @@ export async function POST(request: Request) {
       filteredResultsCount,
       finalResultCount: results.length,
       minMonthlySearches,
+      researchType,
       seedType,
       seedKeywords,
       pagesFetched: pageCount,
@@ -434,6 +468,7 @@ export async function POST(request: Request) {
       results,
       debug: {
         apiVersionUsed: GOOGLE_ADS_API_VERSION,
+        researchType,
         requestBodySentToGoogle: requestBody,
         seedKeywords,
         seedType,
