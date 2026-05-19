@@ -227,10 +227,13 @@ export async function POST(request: Request) {
       geoTarget: `geoTargetConstants/${geoTargetId}`,
       languageConstant: `languageConstants/${languageId}`,
       seedType,
+      seedKeywords,
       seedKeywordsCount: seedKeywords.length,
       hasUrl: Boolean(validUrl),
       customerIdPresent: Boolean(customerId),
       loginCustomerIdPresent: Boolean(loginCustomerId),
+      minMonthlySearches,
+      pageSize: requestBody.pageSize,
     })
 
     // Call Google Ads API with pagination support
@@ -312,6 +315,12 @@ export async function POST(request: Request) {
       }
 
       const data = (await apiResponse.json()) as GoogleAdsResponse
+      const pageResultCount = data.results?.length ?? 0
+      console.log(`[keyword-ideas] page ${pageCount} fetched`, {
+        resultsInThisPage: pageResultCount,
+        totalSoFar: allRawResults.length + pageResultCount,
+        hasNextPageToken: Boolean(data.nextPageToken),
+      })
       if (data.results) {
         allRawResults.push(...data.results)
       }
@@ -377,15 +386,18 @@ export async function POST(request: Request) {
     const results = filteredResults.slice(0, 100)
     const filteredResultsCount = results.length
 
-    console.log('[keyword-ideas] result counts', {
+    console.log('[keyword-ideas] result summary', {
       rawResultsCount,
       normalizedResultsCount,
       filteredResultsCount,
+      finalResultCount: results.length,
       minMonthlySearches,
       seedType,
+      seedKeywords,
       seedKeywordsCount: seedKeywords.length,
-      pagesFeched: pageCount,
+      pagesFetched: pageCount,
       apiVersionUsed: GOOGLE_ADS_API_VERSION,
+      keyword: keywordRaw,
     })
 
     const debugNote =
