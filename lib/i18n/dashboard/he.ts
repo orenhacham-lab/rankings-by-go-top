@@ -505,6 +505,7 @@ export const dashboardHe = {
       errorEnv: 'חיבור Google Ads API לא הוגדר עדיין.',
       errorQuota: 'הגעת למגבלת הקריאות של Google Ads API. נסה שוב מאוחר יותר.',
       errorGeneral: 'אירעה שגיאה בשליפת רעיונות לביטויים.',
+      fewResults: 'Google Ads החזיר מעט רעיונות עבור הביטוי הזה. נסו ביטוי רחב יותר או הורידו את סינון החיפושים.',
     },
     countries: {
       IL: 'ישראל',

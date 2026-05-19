@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { COUNTRY_GEO_TARGETS, LANGUAGE_IDS, isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
+import { buildKeywordSeedVariants } from '@/lib/google-ads/seed-variants'
 
 interface TokenResponse {
   access_token?: string
@@ -198,13 +199,16 @@ export async function POST(request: Request) {
     const languageId = LANGUAGE_IDS[language]
     const seedType = validUrl ? 'keywordAndUrlSeed' : 'keywordSeed'
 
+    // Expand the input into multiple seed variants so Google returns more diverse ideas.
+    const seedKeywords = buildKeywordSeedVariants(keywordRaw, language)
+
     type SeedField =
       | { keywordSeed: { keywords: string[] } }
       | { keywordAndUrlSeed: { url: string; keywords: string[] } }
 
     const seed: SeedField = validUrl
-      ? { keywordAndUrlSeed: { url: validUrl, keywords: [keywordRaw] } }
-      : { keywordSeed: { keywords: [keywordRaw] } }
+      ? { keywordAndUrlSeed: { url: validUrl, keywords: seedKeywords } }
+      : { keywordSeed: { keywords: seedKeywords } }
 
     const requestBody = {
       ...seed,
@@ -222,7 +226,7 @@ export async function POST(request: Request) {
       geoTarget: `geoTargetConstants/${geoTargetId}`,
       languageConstant: `languageConstants/${languageId}`,
       seedType,
-      hasKeyword: true,
+      seedKeywordsCount: seedKeywords.length,
       hasUrl: Boolean(validUrl),
       customerIdPresent: Boolean(customerId),
       loginCustomerIdPresent: Boolean(loginCustomerId),
@@ -295,11 +299,16 @@ export async function POST(request: Request) {
 
     const data = (await apiResponse.json()) as GoogleAdsResponse
 
-    const rawResultsCount = (data.results || []).length
+    const rawResults = data.results || []
+    const rawResultsCount = rawResults.length
+    const firstRawKeywords = rawResults
+      .slice(0, 10)
+      .map((r) => r.text || '')
+      .filter((s) => s.length > 0)
 
     // Normalize results — Google Ads REST returns camelCase.
     // No exact-match or originalKeyword filtering — keep all keyword ideas returned by Google.
-    const allResults: KeywordIdeaResult[] = (data.results || [])
+    const allResults: KeywordIdeaResult[] = rawResults
       .filter((idea) => idea.text)
       .map((idea) => {
         const metrics = idea.keywordIdeaMetrics || {}
@@ -316,11 +325,22 @@ export async function POST(request: Request) {
         }
       })
 
-    const normalizedResultsCount = allResults.length
+    // Deduplicate normalized results by keyword (case-insensitive, trimmed).
+    const seenKeywords = new Set<string>()
+    const dedupedResults: KeywordIdeaResult[] = []
+    for (const r of allResults) {
+      const key = r.keyword.trim().toLowerCase()
+      if (!seenKeywords.has(key)) {
+        seenKeywords.add(key)
+        dedupedResults.push(r)
+      }
+    }
+
+    const normalizedResultsCount = dedupedResults.length
 
     // Filter by minimum monthly searches.
     // When minMonthlySearches === 0, include results with null avgMonthlySearches too.
-    const filteredResults = allResults.filter((r) => {
+    const filteredResults = dedupedResults.filter((r) => {
       if (minMonthlySearches === 0) return true
       return r.avgMonthlySearches !== null && r.avgMonthlySearches >= minMonthlySearches
     })
@@ -345,6 +365,7 @@ export async function POST(request: Request) {
       filteredResultsCount,
       minMonthlySearches,
       seedType,
+      seedKeywordsCount: seedKeywords.length,
       apiVersionUsed: GOOGLE_ADS_API_VERSION,
     })
 
@@ -358,12 +379,14 @@ export async function POST(request: Request) {
       count: results.length,
       results,
       debug: {
+        apiVersionUsed: GOOGLE_ADS_API_VERSION,
+        seedKeywords,
+        seedType,
         rawResultsCount,
         normalizedResultsCount,
         filteredResultsCount,
         minMonthlySearches,
-        seedType,
-        apiVersionUsed: GOOGLE_ADS_API_VERSION,
+        firstRawKeywords,
         ...(debugNote ? { debugNote } : {}),
       },
     })

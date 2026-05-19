@@ -36,11 +36,12 @@ export default function KeywordResearchPage() {
   const [error, setError] = useState('')
   const [results, setResults] = useState<KeywordIdeaResult[]>([])
   const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set())
+  const [fewResultsWarning, setFewResultsWarning] = useState(false)
 
   const [projects, setProjects] = useState<Project[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [selectedProject, setSelectedProject] = useState('')
-  const [engineType, setEngineType] = useState('google_organic')
+  const [engineType, setEngineType] = useState<'google_search' | 'google_maps'>('google_search')
   const [addingToProject, setAddingToProject] = useState(false)
   const [addToProjectMessage, setAddToProjectMessage] = useState('')
   const [addToProjectError, setAddToProjectError] = useState('')
@@ -70,6 +71,7 @@ export default function KeywordResearchPage() {
     setError('')
     setResults([])
     setSelectedKeywords(new Set())
+    setFewResultsWarning(false)
 
     if (!keyword.trim()) {
       setError(t.states.empty)
@@ -112,6 +114,9 @@ export default function KeywordResearchPage() {
       }
 
       setResults(data.results)
+      if (data.debug && typeof data.debug.rawResultsCount === 'number' && data.debug.rawResultsCount <= 1) {
+        setFewResultsWarning(true)
+      }
     } catch (err) {
       setError(t.states.errorGeneral)
       console.error('Keyword research error:', err)
@@ -329,6 +334,13 @@ export default function KeywordResearchPage() {
         </div>
       )}
 
+      {/* Few Results Warning */}
+      {fewResultsWarning && results.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
+          <p className="text-amber-800 dark:text-amber-300 text-sm">{t.states.fewResults}</p>
+        </div>
+      )}
+
       {/* Results */}
       {results.length > 0 && (
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
@@ -410,11 +422,11 @@ export default function KeywordResearchPage() {
                       </label>
                       <select
                         value={engineType}
-                        onChange={(e) => setEngineType(e.target.value as 'google_organic' | 'google_maps')}
+                        onChange={(e) => setEngineType(e.target.value as 'google_search' | 'google_maps')}
                         className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                         disabled={addingToProject}
                       >
-                        <option value="google_organic">{t.addToProject.engineGoogleOrganic}</option>
+                        <option value="google_search">{t.addToProject.engineGoogleOrganic}</option>
                         <option value="google_maps">{t.addToProject.engineGoogleMaps}</option>
                       </select>
                     </div>

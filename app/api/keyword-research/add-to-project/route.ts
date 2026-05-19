@@ -5,11 +5,8 @@ interface KeywordToAdd {
   keyword: string
 }
 
-interface AddKeywordsRequest {
-  projectId: string
-  engineType: 'google_organic' | 'google_maps'
-  keywords: KeywordToAdd[]
-}
+const VALID_ENGINE_TYPES = ['google_search', 'google_maps'] as const
+type EngineType = (typeof VALID_ENGINE_TYPES)[number]
 
 interface AddKeywordsResult {
   success: boolean
@@ -42,22 +39,30 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const projectId = typeof body.projectId === 'string' ? body.projectId : ''
-    const engineType = typeof body.engineType === 'string' ? body.engineType : ''
+    const engineTypeRaw = typeof body.engineType === 'string' ? body.engineType : ''
     const rawKeywords = Array.isArray(body.keywords) ? body.keywords : []
 
     if (!projectId) {
       return Response.json(
-        { success: false, message: 'Project ID is required' },
+        { success: false, stage: 'validation', message: 'Project ID is required' },
         { status: 400 }
       )
     }
 
-    if (!engineType || !['google_organic', 'google_maps'].includes(engineType)) {
+    if (!VALID_ENGINE_TYPES.includes(engineTypeRaw as EngineType)) {
       return Response.json(
-        { success: false, message: 'Invalid engine type' },
+        {
+          success: false,
+          stage: 'validation',
+          message: 'Unsupported engine type',
+          received: engineTypeRaw,
+          supported: VALID_ENGINE_TYPES,
+        },
         { status: 400 }
       )
     }
+
+    const engineType: EngineType = engineTypeRaw as EngineType
 
     if (rawKeywords.length === 0) {
       return Response.json(
