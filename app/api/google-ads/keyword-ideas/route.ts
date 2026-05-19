@@ -22,6 +22,7 @@ interface GoogleAdsKeywordIdea {
 
 interface GoogleAdsResponse {
   results?: GoogleAdsKeywordIdea[]
+  nextPageToken?: string
   error?: {
     code?: number
     message?: string
@@ -232,83 +233,100 @@ export async function POST(request: Request) {
       loginCustomerIdPresent: Boolean(loginCustomerId),
     })
 
-    // Call Google Ads API
+    // Call Google Ads API with pagination support
     const apiUrl = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}:generateKeywordIdeas`
 
-    const apiResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'developer-token': developerToken,
-        'login-customer-id': loginCustomerId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    })
+    const allRawResults: GoogleAdsKeywordIdea[] = []
+    let nextPageToken: string | undefined = undefined
+    let pageCount = 0
+    const MAX_PAGES = 10 // Fetch up to 10 pages (5000 results max)
 
-    if (!apiResponse.ok) {
-      const errorBody = (await apiResponse.json().catch(() => ({}))) as GoogleAdsResponse
-      const apiMessage = errorBody.error?.message || ''
-      const apiStatus = errorBody.error?.status || ''
+    do {
+      pageCount++
+      const pageRequestBody = {
+        ...requestBody,
+        ...(nextPageToken ? { pageToken: nextPageToken } : {}),
+      }
 
-      // Safe server-side log of the API error (Google does not return secrets here).
-      console.error('[keyword-ideas] google ads api error', {
-        httpStatus: apiResponse.status,
-        apiStatus,
-        message: apiMessage,
+      const apiResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'developer-token': developerToken,
+          'login-customer-id': loginCustomerId,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pageRequestBody),
       })
 
-      if (apiResponse.status === 401) {
-        return Response.json(
-          { success: false, stage: 'google_ads_api', error: 'Google Ads API authentication failed' },
-          { status: 502 }
-        )
-      } else if (apiResponse.status === 403) {
-        if (/developer token/i.test(apiMessage)) {
+      if (!apiResponse.ok) {
+        const errorBody = (await apiResponse.json().catch(() => ({}))) as GoogleAdsResponse
+        const apiMessage = errorBody.error?.message || ''
+        const apiStatus = errorBody.error?.status || ''
+
+        // Safe server-side log of the API error (Google does not return secrets here).
+        console.error('[keyword-ideas] google ads api error', {
+          httpStatus: apiResponse.status,
+          apiStatus,
+          message: apiMessage,
+          page: pageCount,
+        })
+
+        if (apiResponse.status === 401) {
           return Response.json(
-            { success: false, stage: 'google_ads_api', error: 'Developer token is invalid or not approved' },
+            { success: false, stage: 'google_ads_api', error: 'Google Ads API authentication failed' },
+            { status: 502 }
+          )
+        } else if (apiResponse.status === 403) {
+          if (/developer token/i.test(apiMessage)) {
+            return Response.json(
+              { success: false, stage: 'google_ads_api', error: 'Developer token is invalid or not approved' },
+              { status: 502 }
+            )
+          }
+          return Response.json(
+            { success: false, stage: 'google_ads_api', error: 'Permission denied accessing Google Ads API' },
+            { status: 502 }
+          )
+        } else if (apiResponse.status === 429) {
+          return Response.json(
+            { success: false, stage: 'google_ads_api', error: 'rate_limit_exceeded' },
+            { status: 429 }
+          )
+        } else if (apiResponse.status === 400) {
+          return Response.json(
+            {
+              success: false,
+              stage: 'google_ads_api',
+              error: 'Invalid request to Google Ads API',
+              apiMessage: apiMessage.slice(0, 300),
+            },
             { status: 502 }
           )
         }
+
         return Response.json(
-          { success: false, stage: 'google_ads_api', error: 'Permission denied accessing Google Ads API' },
-          { status: 502 }
-        )
-      } else if (apiResponse.status === 429) {
-        return Response.json(
-          { success: false, stage: 'google_ads_api', error: 'rate_limit_exceeded' },
-          { status: 429 }
-        )
-      } else if (apiResponse.status === 400) {
-        return Response.json(
-          {
-            success: false,
-            stage: 'google_ads_api',
-            error: 'Invalid request to Google Ads API',
-            apiMessage: apiMessage.slice(0, 300),
-          },
+          { success: false, stage: 'google_ads_api', error: 'Google Ads API request failed', status: apiResponse.status },
           { status: 502 }
         )
       }
 
-      return Response.json(
-        { success: false, stage: 'google_ads_api', error: 'Google Ads API request failed', status: apiResponse.status },
-        { status: 502 }
-      )
-    }
+      const data = (await apiResponse.json()) as GoogleAdsResponse
+      if (data.results) {
+        allRawResults.push(...data.results)
+      }
+      nextPageToken = data.nextPageToken
+    } while (nextPageToken && pageCount < MAX_PAGES)
 
-    const data = (await apiResponse.json()) as GoogleAdsResponse
-
-    const rawResults = data.results || []
-    const rawResultsCount = rawResults.length
-    const firstRawKeywords = rawResults
+    const rawResultsCount = allRawResults.length
+    const firstRawKeywords = allRawResults
       .slice(0, 10)
       .map((r) => r.text || '')
       .filter((s) => s.length > 0)
 
     // Normalize results — Google Ads REST returns camelCase.
     // No exact-match or originalKeyword filtering — keep all keyword ideas returned by Google.
-    const allResults: KeywordIdeaResult[] = rawResults
+    const allResults: KeywordIdeaResult[] = allRawResults
       .filter((idea) => idea.text)
       .map((idea) => {
         const metrics = idea.keywordIdeaMetrics || {}
@@ -366,6 +384,7 @@ export async function POST(request: Request) {
       minMonthlySearches,
       seedType,
       seedKeywordsCount: seedKeywords.length,
+      pagesFeched: pageCount,
       apiVersionUsed: GOOGLE_ADS_API_VERSION,
     })
 
@@ -387,6 +406,7 @@ export async function POST(request: Request) {
         filteredResultsCount,
         minMonthlySearches,
         firstRawKeywords,
+        pagesFetched: pageCount,
         ...(debugNote ? { debugNote } : {}),
       },
     })
