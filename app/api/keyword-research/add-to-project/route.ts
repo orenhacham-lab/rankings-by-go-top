@@ -8,6 +8,11 @@ interface KeywordToAdd {
 const VALID_ENGINE_TYPES = ['google_search', 'google_maps'] as const
 type EngineType = (typeof VALID_ENGINE_TYPES)[number]
 
+const KEYWORD_RESEARCH_NOTES: Record<string, string> = {
+  he: 'נוסף דרך מחקר ביטויים',
+  en: 'Added from Keyword Research module',
+}
+
 interface AddKeywordsResult {
   success: boolean
   added: number
@@ -40,6 +45,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const projectId = typeof body.projectId === 'string' ? body.projectId : ''
     const engineTypeRaw = typeof body.engineType === 'string' ? body.engineType : ''
+    const language = typeof body.language === 'string' ? body.language : 'en'
     const rawKeywords = Array.isArray(body.keywords) ? body.keywords : []
 
     if (!projectId) {
@@ -163,6 +169,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Insert new keywords
+    const note = KEYWORD_RESEARCH_NOTES[language] || KEYWORD_RESEARCH_NOTES['en']
     const toInsert = newKeywords.map((keyword) => ({
       user_id: user.id,
       project_id: projectId,
@@ -171,7 +178,7 @@ export async function POST(request: Request): Promise<Response> {
       target_domain: null,
       target_business_name: null,
       preferred_landing_page: null,
-      notes: 'Added from Keyword Research module',
+      notes: note,
       location_mode: 'project',
       custom_city: null,
       grid_size: null,

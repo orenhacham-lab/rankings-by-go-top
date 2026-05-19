@@ -180,6 +180,7 @@ export default function KeywordResearchPage() {
           projectId: projectIdUsed,
           engineType,
           keywords: keywordsArray,
+          language: selectedLanguage,
         }),
       })
 
