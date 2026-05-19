@@ -3,6 +3,57 @@ import { getUserEntitlement } from '@/lib/subscription'
 
 interface KeywordToAdd {
   keyword: string
+  avgMonthlySearches?: number | null
+  competition?: 'LOW' | 'MEDIUM' | 'HIGH' | null
+  competitionIndex?: number | null
+  lowTopOfPageBid?: number | null
+  highTopOfPageBid?: number | null
+  currency?: string | null
+}
+
+interface KeywordMetrics {
+  avg_monthly_searches: number | null
+  competition: 'LOW' | 'MEDIUM' | 'HIGH' | null
+  competition_index: number | null
+  low_top_of_page_bid: number | null
+  high_top_of_page_bid: number | null
+  metrics_currency: string | null
+  metrics_updated_at: string | null
+}
+
+const EMPTY_METRICS: KeywordMetrics = {
+  avg_monthly_searches: null,
+  competition: null,
+  competition_index: null,
+  low_top_of_page_bid: null,
+  high_top_of_page_bid: null,
+  metrics_currency: null,
+  metrics_updated_at: null,
+}
+
+function extractMetricsFromItem(item: unknown): KeywordMetrics {
+  if (typeof item !== 'object' || item === null) return EMPTY_METRICS
+  const obj = item as Record<string, unknown>
+  const competition =
+    obj.competition === 'LOW' || obj.competition === 'MEDIUM' || obj.competition === 'HIGH'
+      ? obj.competition
+      : null
+  const hasAnyMetric =
+    typeof obj.avgMonthlySearches === 'number' ||
+    competition !== null ||
+    typeof obj.competitionIndex === 'number' ||
+    typeof obj.lowTopOfPageBid === 'number' ||
+    typeof obj.highTopOfPageBid === 'number'
+
+  return {
+    avg_monthly_searches: typeof obj.avgMonthlySearches === 'number' ? obj.avgMonthlySearches : null,
+    competition,
+    competition_index: typeof obj.competitionIndex === 'number' ? obj.competitionIndex : null,
+    low_top_of_page_bid: typeof obj.lowTopOfPageBid === 'number' ? obj.lowTopOfPageBid : null,
+    high_top_of_page_bid: typeof obj.highTopOfPageBid === 'number' ? obj.highTopOfPageBid : null,
+    metrics_currency: typeof obj.currency === 'string' && obj.currency.length > 0 ? obj.currency : null,
+    metrics_updated_at: hasAnyMetric ? new Date().toISOString() : null,
+  }
 }
 
 const VALID_ENGINE_TYPES = ['google_search', 'google_maps'] as const
@@ -77,20 +128,18 @@ export async function POST(request: Request): Promise<Response> {
       )
     }
 
-    // Extract and deduplicate keywords
-    const keywords: string[] = [
-      ...new Set(
-        rawKeywords
-          .map((k: unknown) => {
-            if (typeof k === 'object' && k !== null && 'keyword' in k) {
-              const kw = (k as { keyword: unknown }).keyword
-              return typeof kw === 'string' ? kw.trim().toLowerCase() : ''
-            }
-            return ''
-          })
-          .filter((k: string) => k.length > 0)
-      ),
-    ]
+    // Extract keywords + per-keyword metrics, deduplicate by lowercase keyword.
+    const metricsByKeyword = new Map<string, KeywordMetrics>()
+    const keywords: string[] = []
+    for (const item of rawKeywords) {
+      if (typeof item !== 'object' || item === null || !('keyword' in item)) continue
+      const kw = (item as { keyword: unknown }).keyword
+      if (typeof kw !== 'string') continue
+      const normalized = kw.trim().toLowerCase()
+      if (!normalized || metricsByKeyword.has(normalized)) continue
+      metricsByKeyword.set(normalized, extractMetricsFromItem(item))
+      keywords.push(normalized)
+    }
 
     if (keywords.length === 0) {
       return Response.json(
@@ -168,23 +217,27 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    // Insert new keywords
+    // Insert new keywords (with metrics from keyword research, when available)
     const note = KEYWORD_RESEARCH_NOTES[language] || KEYWORD_RESEARCH_NOTES['en']
-    const toInsert = newKeywords.map((keyword) => ({
-      user_id: user.id,
-      project_id: projectId,
-      keyword: keyword,
-      engine_type: engineType,
-      target_domain: null,
-      target_business_name: null,
-      preferred_landing_page: null,
-      notes: note,
-      location_mode: 'project',
-      custom_city: null,
-      grid_size: null,
-      postal_code: null,
-      is_active: true,
-    }))
+    const toInsert = newKeywords.map((keyword) => {
+      const metrics = metricsByKeyword.get(keyword) ?? EMPTY_METRICS
+      return {
+        user_id: user.id,
+        project_id: projectId,
+        keyword: keyword,
+        engine_type: engineType,
+        target_domain: null,
+        target_business_name: null,
+        preferred_landing_page: null,
+        notes: note,
+        location_mode: 'project',
+        custom_city: null,
+        grid_size: null,
+        postal_code: null,
+        is_active: true,
+        ...metrics,
+      }
+    })
 
     let insertedCount = 0
     if (toInsert.length > 0) {

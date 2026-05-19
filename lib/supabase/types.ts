@@ -114,6 +114,13 @@ export interface TrackingTarget {
   exact_resolved_lng: number | null
   exact_resolution_source: ExactPointResolutionSource | null
   exact_geocoding_provider: string | null
+  avg_monthly_searches: number | null
+  competition: 'LOW' | 'MEDIUM' | 'HIGH' | null
+  competition_index: number | null
+  low_top_of_page_bid: number | null
+  high_top_of_page_bid: number | null
+  metrics_currency: string | null
+  metrics_updated_at: string | null
   created_at: string
   updated_at: string
   // joins

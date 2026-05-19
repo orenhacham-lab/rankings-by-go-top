@@ -47,6 +47,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [scanningTargets, setScanningTargets] = useState<Set<string>>(new Set())
   const [scanMessage, setScanMessage] = useState('')
   const [scanError, setScanError] = useState(false)
+  const [updatingVolumes, setUpdatingVolumes] = useState(false)
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
@@ -142,6 +143,44 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       showScanResult(k.messages.scanNetworkError, true)
     } finally {
       setScanning(false)
+    }
+  }
+
+  async function handleUpdateVolumes() {
+    setUpdatingVolumes(true)
+    setScanMessage('')
+    try {
+      const response = await fetch('/api/google-ads/keyword-metrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id }),
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        const updated = typeof data.updated === 'number' ? data.updated : 0
+        const noData = typeof data.noData === 'number' ? data.noData : 0
+        const skipped = typeof data.skipped === 'number' ? data.skipped : 0
+        if (updated === 0 && noData === 0 && skipped > 0) {
+          showScanResult(k.keywordsSection.volumesUpToDate, false)
+        } else if (updated > 0 && noData > 0) {
+          showScanResult(k.keywordsSection.volumesPartial(updated, noData), false)
+        } else if (updated > 0) {
+          showScanResult(k.keywordsSection.volumesSuccess(updated), false)
+        } else {
+          showScanResult(k.keywordsSection.volumesNoData, false)
+        }
+        await loadData()
+      } else if (response.status === 503) {
+        showScanResult(k.keywordsSection.volumesNotConfigured, true)
+      } else if (response.status === 429) {
+        showScanResult(k.keywordsSection.volumesQuota, true)
+      } else {
+        showScanResult(k.keywordsSection.volumesError, true)
+      }
+    } catch {
+      showScanResult(k.keywordsSection.volumesError, true)
+    } finally {
+      setUpdatingVolumes(false)
     }
   }
 
@@ -375,6 +414,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               {k.keywordsSection.reportButton}
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUpdateVolumes}
+            loading={updatingVolumes}
+            disabled={targets.length === 0}
+            className="w-full sm:w-auto"
+          >
+            {updatingVolumes
+              ? k.keywordsSection.updatingVolumes
+              : k.keywordsSection.updateVolumesButton}
+          </Button>
           <Button size="sm" onClick={() => setShowAddTarget(true)} className="w-full sm:w-auto">
             {k.keywordsSection.addKeywordButton}
           </Button>

@@ -126,6 +126,7 @@ export default function TrackingTargetsTable({
               <button type="button" onClick={() => handleSort('keyword')} className="font-semibold">{k.keyword}{sortLabel('keyword')}</button>
             </Th>
             <Th>{k.scanType}</Th>
+            <Th>{k.searchVolume}</Th>
             <Th>
               <button type="button" onClick={() => handleSort('position')} className="font-semibold">{k.position}{sortLabel('position')}</button>
             </Th>
@@ -142,7 +143,7 @@ export default function TrackingTargetsTable({
         </TableHead>
         <TableBody>
           {targets.length === 0 && (
-            <EmptyRow colSpan={8} message={k.emptyState} />
+            <EmptyRow colSpan={9} message={k.emptyState} />
           )}
           {sortedTargets.map((target) => {
             const result = latestResults[target.id]
@@ -159,6 +160,20 @@ export default function TrackingTargetsTable({
                 </Td>
                 <Td>
                   <EngineBadge engine={target.engine_type} device={projectDevice} />
+                </Td>
+                <Td>
+                  {target.avg_monthly_searches !== null && target.avg_monthly_searches !== undefined ? (
+                    <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
+                      {target.avg_monthly_searches.toLocaleString()}
+                    </span>
+                  ) : (
+                    <span
+                      className="text-slate-400 dark:text-slate-500 text-sm"
+                      title={k.notChecked}
+                    >
+                      —
+                    </span>
+                  )}
                 </Td>
                 <Td>
                   {result ? (

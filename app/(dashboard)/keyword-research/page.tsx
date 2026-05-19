@@ -180,7 +180,20 @@ export default function KeywordResearchPage() {
     setLastAddedProjectId('')
 
     try {
-      const keywordsArray = Array.from(selectedKeywords).map((kw) => ({ keyword: kw }))
+      // Include metrics from research result so they are stored on the new targets.
+      const resultsByKeyword = new Map(results.map((r) => [r.keyword, r]))
+      const keywordsArray = Array.from(selectedKeywords).map((kw) => {
+        const r = resultsByKeyword.get(kw)
+        return {
+          keyword: kw,
+          avgMonthlySearches: r?.avgMonthlySearches ?? null,
+          competition: r?.competition ?? null,
+          competitionIndex: r?.competitionIndex ?? null,
+          lowTopOfPageBid: r?.lowTopOfPageBid ?? null,
+          highTopOfPageBid: r?.highTopOfPageBid ?? null,
+          currency: r?.currency ?? null,
+        }
+      })
       const projectIdUsed = selectedProject
       const response = await fetch('/api/keyword-research/add-to-project', {
         method: 'POST',
