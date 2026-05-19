@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 
 // Google Ads API version — bumped periodically by Google.
-const GOOGLE_ADS_API_VERSION = 'v17'
+const GOOGLE_ADS_API_VERSION = 'v22'
 
 interface TokenResponse {
   access_token?: string
@@ -97,17 +97,16 @@ export async function GET() {
     //    `customers:listAccessibleCustomers` is the canonical low-impact check:
     //    it requires a valid developer token + access token but no specific
     //    customer permissions, so it isolates auth/config errors clearly.
-    const listResponse = await fetch(
-      `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'developer-token': developerToken,
-          'login-customer-id': loginCustomerId,
-        },
-      }
-    )
+    //    Note: login-customer-id is ignored for this endpoint, so we omit it.
+    const listEndpoint = `customers:listAccessibleCustomers`
+    const listUrl = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/${listEndpoint}`
+    const listResponse = await fetch(listUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'developer-token': developerToken,
+      },
+    })
 
     if (!listResponse.ok) {
       const errorBody = (await listResponse.json().catch(() => ({}))) as GoogleAdsErrorResponse
@@ -117,14 +116,16 @@ export async function GET() {
       let friendly = 'Google Ads API request failed.'
       if (listResponse.status === 401) {
         friendly = 'Authentication failed. Access token rejected by Google Ads API.'
+      } else if (listResponse.status === 404) {
+        friendly = 'The Google Ads API version or endpoint is not available. Check that the API version is supported by Google.'
       } else if (listResponse.status === 403 || apiStatus === 'PERMISSION_DENIED') {
         if (/developer token/i.test(apiMessage)) {
           friendly = 'Developer token is invalid or not approved. Verify GOOGLE_ADS_DEVELOPER_TOKEN and approval status in Google Ads.'
         } else {
-          friendly = 'Permission denied. Check that the OAuth account has access to the manager account and that GOOGLE_ADS_LOGIN_CUSTOMER_ID is correct.'
+          friendly = 'Permission denied. Check that the OAuth account has access to the manager account.'
         }
       } else if (listResponse.status === 400) {
-        friendly = 'Bad request. GOOGLE_ADS_LOGIN_CUSTOMER_ID may be malformed (must be 10 digits, no dashes).'
+        friendly = 'Bad request. Check that all required env vars are correctly formatted.'
       }
 
       return Response.json(
@@ -132,6 +133,8 @@ export async function GET() {
           success: false,
           stage: 'google_ads_api',
           status: listResponse.status,
+          apiVersionUsed: GOOGLE_ADS_API_VERSION,
+          endpointUsed: listEndpoint,
           error: friendly,
         },
         { status: 502 }
@@ -151,6 +154,7 @@ export async function GET() {
         {
           success: false,
           stage: 'customer_id_check',
+          apiVersionUsed: GOOGLE_ADS_API_VERSION,
           error:
             'OAuth account does not have access to the configured GOOGLE_ADS_CUSTOMER_ID. Verify the customer ID and that the OAuth user is linked to it.',
           accessibleAccountsCount: accessibleCount,
@@ -162,6 +166,7 @@ export async function GET() {
     return Response.json({
       success: true,
       message: 'Google Ads API connection works',
+      apiVersionUsed: GOOGLE_ADS_API_VERSION,
       accessibleAccountsCount: accessibleCount,
     })
   } catch (error) {
