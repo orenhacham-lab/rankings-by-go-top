@@ -26,42 +26,78 @@ interface Project {
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
 type OpportunityKey = 'high' | 'medium' | 'low'
 
-function getVolumeScore(volume: number): number {
-  // Tiered scoring with broader long-tail support
-  if (volume >= 1000) return 100
-  if (volume >= 500) return 85
-  if (volume >= 100) return 70
-  if (volume >= 30) return 55
-  if (volume >= 10) return 35
-  return 0
-}
+const STRONG_INTENT_KEYWORDS_HE = [
+  'קנייה', 'כמה עולה', 'מחיר', 'היכן', 'איפה', 'דירוג', 'ביקורת', 'סקירה',
+  'משוואה', 'vs', 'הטוב ביותר', 'כיצד', 'אופן', 'טיפים', 'עצות', 'הדרכה',
+  'למידה', 'צעדים', 'תהליך', 'שירות', 'מומלץ', 'מוקדש',
+]
 
-function getCompetitionScore(r: KeywordIdeaResult): number {
-  if (r.competition === 'LOW') return 100
-  if (r.competition === 'MEDIUM') return 65
-  if (r.competition === 'HIGH') return 15
-  const ci = r.competitionIndex ?? 100
-  return Math.max(0, 100 - ci)
-}
+const STRONG_INTENT_KEYWORDS_EN = [
+  'buy', 'how much', 'price', 'cost', 'where', 'review', 'best', 'top',
+  'vs', 'comparison', 'guide', 'how to', 'tips', 'tutorial', 'learn',
+  'steps', 'process', 'service', 'recommended', 'expert',
+]
 
 function getWordCount(keyword: string): number {
   return keyword.trim().split(/\s+/).filter(Boolean).length
 }
 
+function getCompetitionEaseScore(r: KeywordIdeaResult): number {
+  // Use competitionIndex if available (100 - index), otherwise fallback to enum values
+  if (r.competitionIndex !== null && r.competitionIndex !== undefined) {
+    return Math.max(0, Math.min(100, 100 - r.competitionIndex))
+  }
+
+  if (r.competition === 'LOW') return 90
+  if (r.competition === 'MEDIUM') return 55
+  if (r.competition === 'HIGH') return 20
+  return 50
+}
+
+function getVolumeScore(volume: number): number {
+  if (volume >= 5000) return 100
+  if (volume >= 1000) return 85
+  if (volume >= 500) return 75
+  if (volume >= 100) return 60
+  if (volume >= 30) return 45
+  if (volume >= 10) return 25
+  return 0
+}
+
 function getLongTailScore(keyword: string): number {
   const wc = getWordCount(keyword)
-  if (wc <= 1) return 0
-  if (wc === 2) return 35
-  if (wc === 3) return 70
+  if (wc === 1) return 0
+  if (wc === 2) return 40
+  if (wc === 3) return 75
   return 100
 }
 
-function computeOpportunityScore(r: KeywordIdeaResult): number {
-  // SEO opportunity: competition 0.55, volume 0.30, long-tail bonus 0.15
+function getIntentScore(keyword: string, language: string): number {
+  const lowerKeyword = keyword.toLowerCase()
+  const intentKeywords = language === 'he' ? STRONG_INTENT_KEYWORDS_HE : STRONG_INTENT_KEYWORDS_EN
+
+  const matches = intentKeywords.filter(intent =>
+    lowerKeyword.includes(intent.toLowerCase())
+  ).length
+
+  if (matches >= 2) return 100
+  if (matches === 1) return 70
+  return 30
+}
+
+function computeOpportunityScore(r: KeywordIdeaResult, language: string = 'en'): number {
+  // 4-component scoring system with exact weights
+  const competitionEaseScore = getCompetitionEaseScore(r)
   const volumeScore = getVolumeScore(r.avgMonthlySearches ?? 0)
-  const competitionScore = getCompetitionScore(r)
   const longTailScore = getLongTailScore(r.keyword)
-  return competitionScore * 0.55 + volumeScore * 0.30 + longTailScore * 0.15
+  const intentScore = getIntentScore(r.keyword, language)
+
+  return (
+    competitionEaseScore * 0.40 +
+    volumeScore * 0.25 +
+    longTailScore * 0.20 +
+    intentScore * 0.15
+  )
 }
 
 function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
@@ -73,17 +109,44 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
   return 'mediumPotential'
 }
 
-function getOpportunityKey(r: KeywordIdeaResult): OpportunityKey {
-  // Badge is derived from the actual opportunityScore — not a hardcoded
-  // competition lookup. HIGH competition only acts as a guardrail (cannot reach "high").
-  const score = computeOpportunityScore(r)
+function getOpportunityKey(r: KeywordIdeaResult, language: string = 'en'): OpportunityKey {
+  // 4-component scoring with guardrails
+  const score = computeOpportunityScore(r, language)
+  const volume = r.avgMonthlySearches ?? 0
+  const wordCount = getWordCount(r.keyword)
+  const competitionIndex = r.competitionIndex ?? null
+  const intentScore = getIntentScore(r.keyword, language)
 
-  if (r.competition === 'HIGH') {
-    // HIGH limits the ceiling: can be medium if score is decent, but never high.
+  // GUARDRAIL 1: volume < 10 → max badge is medium
+  if (volume < 10) {
     if (score >= 45) return 'medium'
     return 'low'
   }
 
+  // GUARDRAIL 2: HIGH competition + wordCount <= 1 → must be low
+  if (r.competition === 'HIGH' && wordCount <= 1) {
+    return 'low'
+  }
+
+  // GUARDRAIL 3: HIGH competition + wordCount >= 3 + intentScore >= 70 → can be medium if score >= 45
+  if (r.competition === 'HIGH' && wordCount >= 3 && intentScore >= 70) {
+    if (score >= 45) return 'medium'
+    return 'low'
+  }
+
+  // GUARDRAIL 4: competitionIndex >= 90 + wordCount <= 2 → max low
+  if (competitionIndex !== null && competitionIndex >= 90 && wordCount <= 2) {
+    return 'low'
+  }
+
+  // GUARDRAIL 5: competitionIndex >= 90 + wordCount >= 3 → max medium
+  if (competitionIndex !== null && competitionIndex >= 90 && wordCount >= 3) {
+    if (score >= 70) return 'medium'
+    if (score >= 45) return 'medium'
+    return 'low'
+  }
+
+  // Standard badge logic (no guardrails apply)
   if (score >= 70) return 'high'
   if (score >= 45) return 'medium'
   return 'low'
@@ -96,7 +159,7 @@ interface OpportunityBadgeInfo {
 }
 
 function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): OpportunityBadgeInfo {
-  const key = getOpportunityKey(r)
+  const key = getOpportunityKey(r, language)
 
   const labels = {
     he: {
@@ -504,8 +567,8 @@ export default function KeywordResearchPage() {
           bVal = b.competition ? competitionRank[b.competition] : -1
           break
         case 'opportunity':
-          aVal = computeOpportunityScore(a)
-          bVal = computeOpportunityScore(b)
+          aVal = computeOpportunityScore(a, language)
+          bVal = computeOpportunityScore(b, language)
           break
         default:
           return 0
@@ -514,7 +577,7 @@ export default function KeywordResearchPage() {
       return (aVal - bVal) * dir
     })
     return copy
-  }, [results, sortBy, sortDir])
+  }, [results, sortBy, sortDir, language])
 
   const sortIndicator = (key: SortKey) => {
     if (sortBy !== key) return ' ↕'
@@ -525,11 +588,11 @@ export default function KeywordResearchPage() {
   const topOpportunities = useMemo(() => {
     if (results.length === 0) return []
     return results
-      .map((r) => ({ ...r, score: computeOpportunityScore(r) }))
+      .map((r) => ({ ...r, score: computeOpportunityScore(r, language) }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
-  }, [results])
+  }, [results, language])
 
   const selectKeywordFromOpportunity = (kw: string) => {
     if (selectedKeywords.has(kw)) return

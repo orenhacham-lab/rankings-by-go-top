@@ -514,7 +514,7 @@ export const dashboardEn = {
       resultsCount: 'Results count',
       monthlySearches: 'Monthly searches',
       opportunity: 'Opportunity',
-      opportunityTooltip: 'SEO opportunity is based on competition, search volume, and keyword specificity. High competition limits the score but does not determine it alone.',
+      opportunityTooltip: 'SEO opportunity is calculated from 4 factors: competition (40%), search volume (25%), long-tail keywords (20%), and search intent (15%). High competition limits the score but does not determine it alone.',
       competition: 'Competition',
       lowCpc: 'Low CPC',
       highCpc: 'High CPC',
