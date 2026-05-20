@@ -24,7 +24,7 @@ interface Project {
 }
 
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
-type OpportunityKey = 'high' | 'competitive' | 'medium' | 'low'
+type OpportunityKey = 'high' | 'medium' | 'low'
 
 function getVolumeScore(volume: number): number {
   // Tiered scoring with broader long-tail support
@@ -92,11 +92,7 @@ function getOpportunityKey(r: KeywordIdeaResult): OpportunityKey {
     return 'low'
   }
 
-  if (r.competition === 'HIGH') {
-    if (vol >= 500) return 'competitive'
-    return 'low'
-  }
-
+  // HIGH competition always gets "low" — see other columns for volume/competition
   return 'low'
 }
 
@@ -112,13 +108,11 @@ function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): O
   const labels = {
     he: {
       high: 'גבוה',
-      competitive: 'תחרותי',
       medium: 'בינוני',
       low: 'נמוך',
     },
     en: {
       high: 'High',
-      competitive: 'Competitive',
       medium: 'Medium',
       low: 'Low',
     },
@@ -126,7 +120,6 @@ function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): O
 
   const colorClasses = {
     high: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
-    competitive: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
     medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
     low: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
   }
