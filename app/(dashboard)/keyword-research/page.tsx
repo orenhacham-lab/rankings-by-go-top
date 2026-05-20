@@ -30,39 +30,87 @@ function getWordCount(keyword: string): number {
   return keyword.trim().split(/\s+/).filter(Boolean).length
 }
 
+function getCompetitionEaseScore(r: KeywordIdeaResult): number {
+  if (r.competitionIndex !== null && r.competitionIndex !== undefined) {
+    return Math.max(0, Math.min(100, 100 - r.competitionIndex))
+  }
+
+  if (r.competition === 'LOW') return 85
+  if (r.competition === 'MEDIUM') return 55
+  if (r.competition === 'HIGH') return 25
+  return 50
+}
+
+function getVolumeScore(volume: number): number {
+  if (volume >= 5000) return 100
+  if (volume >= 1000) return 90
+  if (volume >= 500) return 80
+  if (volume >= 100) return 70
+  if (volume >= 30) return 50
+  if (volume >= 10) return 30
+  return 0
+}
+
+function getLongTailScore(keyword: string): number {
+  const wc = getWordCount(keyword)
+  if (wc === 1) return 0
+  if (wc === 2) return 40
+  if (wc === 3) return 75
+  return 100
+}
+
+function getLowCpcBonus(r: KeywordIdeaResult): number {
+  const highCpc = r.highTopOfPageBid ?? (r.lowTopOfPageBid ?? 0)
+
+  if (!highCpc) return 50
+
+  if (highCpc <= 1) return 100
+  if (highCpc <= 2) return 75
+  if (highCpc <= 5) return 45
+  return 20
+}
+
+function getSeoPotentialScore(r: KeywordIdeaResult): number {
+  const competitionEaseScore = getCompetitionEaseScore(r)
+  const volumeScore = getVolumeScore(r.avgMonthlySearches ?? 0)
+  const longTailScore = getLongTailScore(r.keyword)
+  const lowCpcBonus = getLowCpcBonus(r)
+
+  return (
+    competitionEaseScore * 0.45 +
+    volumeScore * 0.30 +
+    longTailScore * 0.15 +
+    lowCpcBonus * 0.10
+  )
+}
+
 function getSeoPotentialBadge(r: KeywordIdeaResult): OpportunityKey {
+  const score = getSeoPotentialScore(r)
   const volume = r.avgMonthlySearches ?? 0
   const competition = r.competition
   const wc = getWordCount(r.keyword)
 
-  if (volume < 10) return 'low'
-
-  if (competition === 'LOW') {
-    if (volume >= 30) return 'high'
-    return 'medium'
-  }
-
-  if (competition === 'MEDIUM') {
-    if (volume >= 300) return 'high'
-    if (volume >= 100 && wc >= 2) return 'high'
-    if (volume >= 30) return 'medium'
+  // Guardrail 1: volume < 10 → max medium
+  if (volume < 10) {
+    if (score >= 45) return 'medium'
     return 'low'
   }
 
-  if (competition === 'HIGH') {
-    if (volume >= 100 && wc >= 3) return 'medium'
+  // Guardrail 2: HIGH + wordCount <= 1 → max low
+  if (competition === 'HIGH' && wc <= 1) {
     return 'low'
   }
 
-  const index = r.competitionIndex
-  if (typeof index === 'number') {
-    if (index <= 30 && volume >= 30) return 'high'
-    if (index <= 60 && volume >= 100 && wc >= 2) return 'high'
-    if (index <= 60 && volume >= 30) return 'medium'
-    if (index > 80 && volume >= 100 && wc >= 3) return 'medium'
+  // Guardrail 3: HIGH + wordCount >= 2 → max medium
+  if (competition === 'HIGH' && wc >= 2) {
+    if (score >= 70) return 'medium'
+    if (score >= 45) return 'medium'
     return 'low'
   }
 
+  // Standard badge logic
+  if (score >= 70) return 'high'
+  if (score >= 45) return 'medium'
   return 'low'
 }
 
@@ -467,20 +515,9 @@ export default function KeywordResearchPage() {
   const sortedResults = useMemo(() => {
     if (results.length === 0) return results
     const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
-    const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
     const copy = [...results]
     const dir = sortDir === 'asc' ? 1 : -1
     copy.sort((a, b) => {
-      if (sortBy === 'opportunity') {
-        const aRank = opportunityRank[getSeoPotentialBadge(a)]
-        const bRank = opportunityRank[getSeoPotentialBadge(b)]
-        if (aRank !== bRank) return (aRank - bRank) * dir
-        const aVol = a.avgMonthlySearches ?? -1
-        const bVol = b.avgMonthlySearches ?? -1
-        if (aVol === bVol) return 0
-        return (aVol - bVol) * dir
-      }
-
       let aVal: number
       let bVal: number
       switch (sortBy) {
@@ -500,6 +537,10 @@ export default function KeywordResearchPage() {
           aVal = a.competition ? competitionRank[a.competition] : -1
           bVal = b.competition ? competitionRank[b.competition] : -1
           break
+        case 'opportunity':
+          aVal = getSeoPotentialScore(a)
+          bVal = getSeoPotentialScore(b)
+          break
         default:
           return 0
       }
@@ -517,15 +558,10 @@ export default function KeywordResearchPage() {
   // Top opportunities computed from existing results — no extra API calls.
   const topOpportunities = useMemo(() => {
     if (results.length === 0) return []
-    const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
     return results
-      .map((r) => ({ ...r, badge: getSeoPotentialBadge(r) }))
+      .map((r) => ({ ...r, badge: getSeoPotentialBadge(r), score: getSeoPotentialScore(r) }))
       .filter((r) => r.badge !== 'low')
-      .sort((a, b) => {
-        const rankDiff = opportunityRank[b.badge] - opportunityRank[a.badge]
-        if (rankDiff !== 0) return rankDiff
-        return (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0)
-      })
+      .sort((a, b) => b.score - a.score)
       .slice(0, 5)
   }, [results])
 
