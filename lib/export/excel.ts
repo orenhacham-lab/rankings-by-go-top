@@ -3,6 +3,7 @@ import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/type
 import { getDeviceLabel, getSearchTypeLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { ExportLanguage, getExportLabels, normalizeExportLanguage } from './i18n'
+import { getEstimatedCtrByPosition, getEstimatedOrganicClicks } from './traffic-estimate'
 
 interface ExportData {
   client: Client
@@ -77,6 +78,8 @@ export function exportToExcel(data: ExportData): void {
     L.previousPosition,
     L.change,
     L.found,
+    L.estimatedCtr,
+    L.estimatedOrganicClicks,
     L.checkDate,
     L.resultUrl,
     L.titleOrAddress,
@@ -94,6 +97,10 @@ export function exportToExcel(data: ExportData): void {
         : String(result.change_value)
     }
 
+    const positionForTraffic = result?.found ? result.position : null
+    const estimatedCtrValue = getEstimatedCtrByPosition(positionForTraffic)
+    const estimatedClicksValue = getEstimatedOrganicClicks(target.avg_monthly_searches, positionForTraffic)
+
     return [
       target.keyword,
       target.avg_monthly_searches ?? null,
@@ -102,6 +109,8 @@ export function exportToExcel(data: ExportData): void {
       result?.previous_position ?? '',
       changeDisplay,
       result ? (result.found ? L.yes : L.no) : '',
+      estimatedCtrValue,
+      estimatedClicksValue,
       result?.checked_at ? new Date(result.checked_at).toLocaleDateString(dateLocale) : '',
       result?.result_url ?? '',
       result?.result_title || result?.result_address || '',
@@ -112,11 +121,25 @@ export function exportToExcel(data: ExportData): void {
   const wsRankings = XLSX.utils.aoa_to_sheet([rankingHeaders, ...rankingRows])
   wsRankings['!cols'] = [
     { wch: 32 }, { wch: 12 }, { wch: 16 }, { wch: 13 }, { wch: 13 }, { wch: 9 },
-    { wch: 8 },  { wch: 15 }, { wch: 52 }, { wch: 42 }, { wch: 32 },
+    { wch: 8 },  { wch: 13 }, { wch: 20 }, { wch: 15 }, { wch: 52 }, { wch: 42 }, { wch: 32 },
   ]
   // Apply number format to search volume column (column B, rows 2+)
   for (let i = 2; i <= rankingRows.length + 1; i++) {
     const cellRef = XLSX.utils.encode_col(1) + String(i)
+    if (wsRankings[cellRef]) {
+      wsRankings[cellRef].z = '#,##0'
+    }
+  }
+  // Apply percent format to estimated CTR column (column H, rows 2+)
+  for (let i = 2; i <= rankingRows.length + 1; i++) {
+    const cellRef = XLSX.utils.encode_col(7) + String(i)
+    if (wsRankings[cellRef]) {
+      wsRankings[cellRef].z = '0.00%'
+    }
+  }
+  // Apply number format to estimated clicks column (column I, rows 2+)
+  for (let i = 2; i <= rankingRows.length + 1; i++) {
+    const cellRef = XLSX.utils.encode_col(8) + String(i)
     if (wsRankings[cellRef]) {
       wsRankings[cellRef].z = '#,##0'
     }

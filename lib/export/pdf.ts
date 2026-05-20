@@ -2,6 +2,7 @@ import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/type
 import { getEngineDisplayLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { ExportLanguage, getExportLabels, normalizeExportLanguage } from './i18n'
+import { getEstimatedOrganicClicks } from './traffic-estimate'
 
 interface ExportData {
   client: Client
@@ -47,6 +48,13 @@ function generateReportHTML(data: ExportData): string {
   const notFound = data.targets.length - found
   const total = data.targets.length
   const coverage = total > 0 ? `${Math.round((found / total) * 100)}%` : '0%'
+
+  const estimatedTrafficTotal = data.targets.reduce((sum, target) => {
+    const result = data.latestResults[target.id]
+    const position = result?.found ? result.position : null
+    return sum + getEstimatedOrganicClicks(target.avg_monthly_searches, position)
+  }, 0)
+  const estimatedTrafficFormatted = estimatedTrafficTotal.toLocaleString(isRtl ? 'he-IL' : 'en-US')
 
   const sortedTargets = sortTargetsByPosition(data.targets, data.latestResults)
   const tableRows = sortedTargets.map((target) => {
@@ -160,7 +168,7 @@ function generateReportHTML(data: ExportData): string {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 10px;
-          margin-bottom: 25px;
+          margin-bottom: 10px;
         }
 
         .stat-box {
@@ -182,6 +190,41 @@ function generateReportHTML(data: ExportData): string {
           font-size: 16pt;
           font-weight: bold;
           color: #1E4ED8;
+        }
+
+        .traffic-kpi {
+          border: 1px solid #d1d5db;
+          padding: 12px 16px;
+          border-radius: 4px;
+          background: #f9fafb;
+          margin-bottom: 25px;
+          display: flex;
+          align-items: baseline;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .traffic-kpi-label {
+          font-size: 9pt;
+          color: #6b7280;
+          font-weight: bold;
+        }
+
+        .traffic-kpi-value {
+          font-size: 16pt;
+          font-weight: bold;
+          color: #1E4ED8;
+        }
+
+        .traffic-kpi-unit {
+          font-size: 9pt;
+          color: #6b7280;
+        }
+
+        .traffic-kpi-caption {
+          font-size: 8pt;
+          color: #9ca3af;
+          flex-basis: 100%;
         }
 
         table {
@@ -331,6 +374,13 @@ function generateReportHTML(data: ExportData): string {
             <div class="stat-label">${escapeHtml(L.coverage)}</div>
             <div class="stat-value">${coverage}</div>
           </div>
+        </div>
+
+        <div class="traffic-kpi">
+          <span class="traffic-kpi-label">${escapeHtml(L.estimatedOrganicTraffic)}:</span>
+          <span class="traffic-kpi-value">${escapeHtml(estimatedTrafficFormatted)}</span>
+          <span class="traffic-kpi-unit">${escapeHtml(L.estimatedTrafficUnit)}</span>
+          <span class="traffic-kpi-caption">${escapeHtml(L.estimatedTrafficCaption)}</span>
         </div>
 
         <table>
