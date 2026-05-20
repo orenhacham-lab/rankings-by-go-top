@@ -51,7 +51,8 @@ function getSeoPotentialBadge(r: KeywordIdeaResult): OpportunityKey {
 
   if (competition === 'HIGH') {
     if (volume >= 1000 && wc >= 2) return 'medium'
-    if (volume >= 100 && wc >= 3) return 'medium'
+    if (volume >= 100 && wc >= 2) return 'medium'
+    if (volume >= 50 && wc >= 3) return 'medium'
     return 'low'
   }
 
