@@ -528,6 +528,7 @@ export const dashboardEn = {
       noResults: 'No keyword ideas were found for this search.',
       errorEnv: 'Google Ads API connection is not configured yet.',
       errorQuota: 'You have reached the Google Ads API request limit. Please try again later.',
+      errorResourceExhausted: 'Google Ads API temporarily limited this keyword research request. Try selecting fewer results or try again later.',
       errorGeneral: 'An error occurred while fetching keyword ideas.',
       fewResults: 'Google Ads returned only a few ideas for this keyword. Try a broader keyword or lower the search volume filter.',
       filteredOut: 'More ideas were found, but they were filtered by the minimum search volume. Try lowering the filter.',

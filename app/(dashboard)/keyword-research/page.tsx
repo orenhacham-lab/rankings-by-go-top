@@ -35,7 +35,7 @@ export default function KeywordResearchPage() {
   const [selectedLanguage, setSelectedLanguage] = useState('he')
   const [url, setUrl] = useState('')
   const [minMonthlySearches, setMinMonthlySearches] = useState(30)
-  const [resultsLimit, setResultsLimit] = useState<100 | 250 | 500>(100)
+  const [resultsLimit, setResultsLimit] = useState<100 | 250>(100)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState<KeywordIdeaResult[]>([])
@@ -136,7 +136,9 @@ export default function KeywordResearchPage() {
       const data = await response.json()
 
       if (!response.ok || data.success === false) {
-        if (data.error === 'rate_limit_exceeded' || response.status === 429) {
+        if (data.error === 'resource_exhausted') {
+          setError(t.states.errorResourceExhausted)
+        } else if (data.error === 'rate_limit_exceeded' || response.status === 429) {
           setError(t.states.errorQuota)
         } else if (data.stage === 'env_check' || data.stage === 'oauth') {
           setError(t.states.errorEnv)
@@ -568,7 +570,7 @@ export default function KeywordResearchPage() {
                 value={resultsLimit}
                 onChange={(e) => {
                   const v = Number(e.target.value)
-                  if (v === 100 || v === 250 || v === 500) {
+                  if (v === 100 || v === 250) {
                     setResultsLimit(v)
                   }
                 }}
@@ -577,7 +579,6 @@ export default function KeywordResearchPage() {
               >
                 <option value={100}>100</option>
                 <option value={250}>250</option>
-                <option value={500}>500</option>
               </select>
             </div>
           </div>

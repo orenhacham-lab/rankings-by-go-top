@@ -106,12 +106,12 @@ export async function POST(request: Request) {
     const researchType: 'keyword' | 'url' | 'keyword_url' =
       researchTypeRaw === 'url' || researchTypeRaw === 'keyword_url' ? researchTypeRaw : 'keyword'
 
-    // resultsLimit: how many results to return to the client. Allowed: 100, 250, 500.
-    // Missing/invalid → 100. Hard cap at 500.
-    const ALLOWED_RESULT_LIMITS = [100, 250, 500] as const
+    // resultsLimit: how many results to return to the client. Allowed: 100, 250.
+    // Missing/invalid → 100. pageSize sent to Google = resultsLimit (no hardcoded 1000).
+    const ALLOWED_RESULT_LIMITS = [100, 250] as const
     const resultsLimitRaw = typeof body.resultsLimit === 'number' ? body.resultsLimit : 100
-    const resultsLimit: 100 | 250 | 500 = (ALLOWED_RESULT_LIMITS as readonly number[]).includes(resultsLimitRaw)
-      ? (resultsLimitRaw as 100 | 250 | 500)
+    const resultsLimit: 100 | 250 = (ALLOWED_RESULT_LIMITS as readonly number[]).includes(resultsLimitRaw)
+      ? (resultsLimitRaw as 100 | 250)
       : 100
 
     if (!isValidCountry(country)) {
@@ -256,7 +256,7 @@ export async function POST(request: Request) {
       language: `languageConstants/${languageId}`,
       includeAdultKeywords: false,
       keywordPlanNetwork: 'GOOGLE_SEARCH',
-      pageSize: 1000,
+      pageSize: resultsLimit,
     }
 
     // Safe server-side debug — no secrets.
@@ -282,7 +282,7 @@ export async function POST(request: Request) {
     const allRawResults: GoogleAdsKeywordIdea[] = []
     let nextPageToken: string | undefined = undefined
     let pageCount = 0
-    const MAX_PAGES = 5 // Fetch up to 5 pages (500 results max)
+    const MAX_PAGES = 1 // Fetch single page only to avoid rate limiting
 
     do {
       pageCount++
@@ -346,6 +346,13 @@ export async function POST(request: Request) {
             { status: 429 }
           )
         } else if (apiResponse.status === 400) {
+          // Check if error is RESOURCE_EXHAUSTED (service quota or rate limit)
+          if (/resource.*exhausted/i.test(apiMessage) || /quota/i.test(apiMessage)) {
+            return Response.json(
+              { success: false, stage: 'google_ads_api', error: 'resource_exhausted' },
+              { status: 429 }
+            )
+          }
           return Response.json(
             {
               success: false,
@@ -483,6 +490,8 @@ export async function POST(request: Request) {
         requestBodySentToGoogle: requestBody,
         seedKeywords,
         seedType,
+        pageSizeSentToGoogle: requestBody.pageSize,
+        maxPages: MAX_PAGES,
         rawResultsCount,
         normalizedResultsCount,
         filteredResultsCount,
