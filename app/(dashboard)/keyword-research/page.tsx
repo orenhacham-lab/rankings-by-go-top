@@ -6,7 +6,8 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
 import { generateQuestionsFromKeywords, GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
-import { Copy, Loader2, CheckCircle, Sparkles } from 'lucide-react'
+import TrendModal from '@/components/keyword-research/TrendModal'
+import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
 
 interface KeywordIdeaResult {
   keyword: string
@@ -156,6 +157,21 @@ export default function KeywordResearchPage() {
   const [addingAIQuestions, setAddingAIQuestions] = useState(false)
   const [aiQuestionsMessage, setAIQuestionsMessage] = useState('')
   const [aiQuestionsError, setAIQuestionsError] = useState('')
+
+  // Trend state
+  interface TrendData {
+    avgMonthlySearches: number | null
+    monthlySearchVolumes: Array<{ month: string; year: number; searches: number }>
+    trend: 'up' | 'down' | 'stable' | 'seasonal' | 'unknown'
+    peakMonth: { month: string; year: number; searches: number } | null
+    lowestMonth: { month: string; year: number; searches: number } | null
+  }
+  const [trendModalOpen, setTrendModalOpen] = useState(false)
+  const [selectedTrendKeyword, setSelectedTrendKeyword] = useState('')
+  const [trendLoading, setTrendLoading] = useState(false)
+  const [trendError, setTrendError] = useState('')
+  const [trendCache, setTrendCache] = useState<Map<string, TrendData>>(new Map())
+  const [trendData, setTrendData] = useState<TrendData | undefined>()
 
   useEffect(() => {
     fetchProjects()
@@ -307,6 +323,59 @@ export default function KeywordResearchPage() {
 
   const copyKeyword = (kw: string) => {
     navigator.clipboard.writeText(kw)
+  }
+
+  const handleOpenTrendModal = async (kw: string) => {
+    setSelectedTrendKeyword(kw)
+    setTrendError('')
+    setTrendLoading(true)
+    setTrendModalOpen(true)
+
+    const cacheKey = `${kw}-${country}-${selectedLanguage}`
+    if (trendCache.has(cacheKey)) {
+      setTrendData(trendCache.get(cacheKey))
+      setTrendLoading(false)
+      return
+    }
+
+    try {
+      const response = await fetch('/api/google-ads/keyword-trends', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword: kw,
+          country,
+          language: selectedLanguage,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        setTrendError(data.error || 'Failed to fetch trend data')
+        setTrendData(undefined)
+        return
+      }
+
+      const trendInfo: TrendData = {
+        avgMonthlySearches: data.avgMonthlySearches,
+        monthlySearchVolumes: data.monthlySearchVolumes,
+        trend: data.trend,
+        peakMonth: data.peakMonth,
+        lowestMonth: data.lowestMonth,
+      }
+
+      setTrendData(trendInfo)
+      const newCache = new Map(trendCache)
+      newCache.set(cacheKey, trendInfo)
+      setTrendCache(newCache)
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred'
+      setTrendError(errorMsg)
+      setTrendData(undefined)
+    } finally {
+      setTrendLoading(false)
+    }
   }
 
   const handleAddToProject = async () => {
@@ -1082,13 +1151,22 @@ export default function KeywordResearchPage() {
                       {result.highTopOfPageBid ? `${result.highTopOfPageBid.toFixed(2)} ${result.currency}` : '—'}
                     </td>
                     <td className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      <button
-                        onClick={() => copyKeyword(result.keyword)}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
-                      >
-                        <Copy size={16} />
-                        <span className="text-xs">{t.results.copy}</span>
-                      </button>
+                      <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <button
+                          onClick={() => copyKeyword(result.keyword)}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
+                        >
+                          <Copy size={16} />
+                          <span className="text-xs">{t.results.copy}</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenTrendModal(result.keyword)}
+                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 flex items-center gap-1 transition-colors"
+                        >
+                          <TrendingUp size={16} />
+                          <span className="text-xs">{t.trend.button}</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1122,6 +1200,23 @@ export default function KeywordResearchPage() {
         onAddQuestions={handleAddAIQuestions}
         loading={addingAIQuestions}
         successMessage={aiQuestionsMessage}
+      />
+
+      {/* Trend Modal */}
+      <TrendModal
+        open={trendModalOpen}
+        onClose={() => {
+          setTrendModalOpen(false)
+          setSelectedTrendKeyword('')
+          setTrendData(undefined)
+          setTrendError('')
+        }}
+        keyword={selectedTrendKeyword}
+        language={language as 'he' | 'en'}
+        isRTL={isRTL}
+        loading={trendLoading}
+        error={trendError}
+        data={trendData}
       />
     </div>
   )
