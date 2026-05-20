@@ -349,20 +349,45 @@ export default function KeywordResearchPage() {
         }),
       })
 
-      const data = await response.json()
+      let data: {
+        success?: boolean
+        stage?: string
+        error?: string
+        apiMessage?: string
+        debug?: unknown
+        avgMonthlySearches?: number | null
+        monthlySearchVolumes?: Array<{ month: string; year: number; searches: number }>
+        trend?: 'up' | 'down' | 'stable' | 'seasonal' | 'unknown'
+        peakMonth?: { month: string; year: number; searches: number } | null
+        lowestMonth?: { month: string; year: number; searches: number } | null
+      } = {}
+      try {
+        data = await response.json()
+      } catch {
+        // Response body was not JSON.
+      }
 
       if (!response.ok || !data.success) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[trend-modal] fetch failed', {
+            httpStatus: response.status,
+            stage: data.stage,
+            error: data.error,
+            apiMessage: data.apiMessage,
+            debug: data.debug,
+          })
+        }
         setTrendError(data.error || 'Failed to fetch trend data')
         setTrendData(undefined)
         return
       }
 
       const trendInfo: TrendData = {
-        avgMonthlySearches: data.avgMonthlySearches,
-        monthlySearchVolumes: data.monthlySearchVolumes,
-        trend: data.trend,
-        peakMonth: data.peakMonth,
-        lowestMonth: data.lowestMonth,
+        avgMonthlySearches: data.avgMonthlySearches ?? null,
+        monthlySearchVolumes: data.monthlySearchVolumes ?? [],
+        trend: data.trend ?? 'unknown',
+        peakMonth: data.peakMonth ?? null,
+        lowestMonth: data.lowestMonth ?? null,
       }
 
       setTrendData(trendInfo)
@@ -370,8 +395,10 @@ export default function KeywordResearchPage() {
       newCache.set(cacheKey, trendInfo)
       setTrendCache(newCache)
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred'
-      setTrendError(errorMsg)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[trend-modal] network/runtime error', err)
+      }
+      setTrendError('network_error')
       setTrendData(undefined)
     } finally {
       setTrendLoading(false)
