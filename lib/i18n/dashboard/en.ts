@@ -522,6 +522,21 @@ export const dashboardEn = {
       selectAll: 'Select all',
       deselectAll: 'Deselect all',
     },
+    opportunities: {
+      show: 'Show recommended opportunities',
+      hide: 'Hide opportunities',
+      title: 'Recommended opportunities',
+      subtitle: 'Keywords to consider based on search volume, competition, and estimated cost.',
+      select: 'Select',
+      selected: 'Selected',
+      searches: 'searches',
+      badges: {
+        lowCompetition: 'Low competition',
+        commercial: 'Commercial',
+        highVolume: 'High volume',
+        mediumPotential: 'Medium potential',
+      },
+    },
     states: {
       empty: 'Enter a keyword to start keyword research.',
       loading: 'Finding keyword ideas...',

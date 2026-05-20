@@ -520,6 +520,21 @@ export const dashboardHe = {
       selectAll: 'בחירת הכל',
       deselectAll: 'ביטול בחירה',
     },
+    opportunities: {
+      show: 'הצג הזדמנויות מומלצות',
+      hide: 'הסתר הזדמנויות',
+      title: 'הזדמנויות מומלצות',
+      subtitle: 'ביטויים שכדאי לשקול לפי נפח חיפוש, תחרות ועלות משוערת.',
+      select: 'בחר',
+      selected: 'נבחר',
+      searches: 'חיפושים',
+      badges: {
+        lowCompetition: 'תחרות נמוכה',
+        commercial: 'מסחרי',
+        highVolume: 'נפח גבוה',
+        mediumPotential: 'פוטנציאל בינוני',
+      },
+    },
     states: {
       empty: 'הזינו מילת מפתח כדי להתחיל מחקר ביטויים.',
       loading: 'מחפש רעיונות לביטויים...',

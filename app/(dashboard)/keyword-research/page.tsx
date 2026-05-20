@@ -23,6 +23,29 @@ interface Project {
   name: string
 }
 
+type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
+
+function computeOpportunityScore(r: KeywordIdeaResult): number {
+  const vol = r.avgMonthlySearches ?? 0
+  if (vol < 50) return 0
+  const volumeScore = Math.min(Math.log10(vol + 1) / 4, 1) * 40
+  const compScore = r.competition === 'LOW' ? 30 : r.competition === 'MEDIUM' ? 18 : 5
+  const cpc = r.highTopOfPageBid ?? 0
+  const commercialScore = Math.min(cpc / 5, 1) * 20
+  const ci = r.competitionIndex
+  const ciScore = ci !== null ? Math.max(0, (100 - ci) / 100) * 10 : 5
+  return volumeScore + compScore + commercialScore + ciScore
+}
+
+function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
+  const vol = r.avgMonthlySearches ?? 0
+  const cpc = r.highTopOfPageBid ?? 0
+  if (r.competition === 'LOW' && vol >= 100) return 'lowCompetition'
+  if (cpc >= 2 && vol >= 500) return 'commercial'
+  if (vol >= 1000) return 'highVolume'
+  return 'mediumPotential'
+}
+
 export default function KeywordResearchPage() {
   const { language, isLoaded } = useDashboardLanguage()
   const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
@@ -56,6 +79,9 @@ export default function KeywordResearchPage() {
   type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc'
   const [sortBy, setSortBy] = useState<SortKey>('monthlySearches')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // Opportunities panel (closed by default to keep page lightweight)
+  const [opportunitiesOpen, setOpportunitiesOpen] = useState(false)
 
   // AI Questions state
   const [aiQuestionsOpen, setAIQuestionsOpen] = useState(false)
@@ -413,6 +439,24 @@ export default function KeywordResearchPage() {
     return sortDir === 'asc' ? ' ▲' : ' ▼'
   }
 
+  // Top opportunities computed from existing results — no extra API calls.
+  const topOpportunities = useMemo(() => {
+    if (results.length === 0) return []
+    return results
+      .map((r) => ({ ...r, score: computeOpportunityScore(r) }))
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+  }, [results])
+
+  const selectKeywordFromOpportunity = (kw: string) => {
+    if (selectedKeywords.has(kw)) return
+    const next = new Set(selectedKeywords)
+    next.add(kw)
+    setSelectedKeywords(next)
+    clearAddToProjectSuccess()
+  }
+
   const competitionColor = (competition: string | null) => {
     switch (competition) {
       case 'LOW':
@@ -630,6 +674,16 @@ export default function KeywordResearchPage() {
               {t.results.resultsCount}: <span className="font-bold text-slate-900 dark:text-slate-100">{results.length}</span>
             </div>
             <div className="flex gap-2 flex-wrap">
+              {topOpportunities.length > 0 && (
+                <button
+                  onClick={() => setOpportunitiesOpen((v) => !v)}
+                  className="text-xs px-3 py-1 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors flex items-center gap-1"
+                  aria-expanded={opportunitiesOpen}
+                >
+                  <Sparkles size={14} />
+                  {opportunitiesOpen ? t.opportunities.hide : t.opportunities.show}
+                </button>
+              )}
               <button
                 onClick={selectAll}
                 className="text-xs px-3 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -777,6 +831,61 @@ export default function KeywordResearchPage() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Opportunities Panel — opt-in, compact, no extra API calls */}
+          {opportunitiesOpen && topOpportunities.length > 0 && (
+            <div className="mb-4 p-3 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
+              <div className={`mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  {t.opportunities.title}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {t.opportunities.subtitle}
+                </p>
+              </div>
+              <ul className="divide-y divide-amber-100 dark:divide-amber-900/30">
+                {topOpportunities.map((r, i) => {
+                  const isSelected = selectedKeywords.has(r.keyword)
+                  const badge = t.opportunities.badges[getBadgeKey(r)]
+                  return (
+                    <li
+                      key={r.keyword}
+                      className={`flex items-center flex-wrap gap-x-3 gap-y-1 py-1.5 text-xs ${isRTL ? 'flex-row-reverse text-right' : ''}`}
+                    >
+                      <span className="text-slate-500 dark:text-slate-400 font-mono w-5 shrink-0">
+                        {i + 1}.
+                      </span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100 truncate min-w-0 flex-1">
+                        {r.keyword}
+                      </span>
+                      <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        {r.avgMonthlySearches?.toLocaleString() ?? '—'} {t.opportunities.searches}
+                      </span>
+                      <span className={`whitespace-nowrap ${competitionColor(r.competition)}`}>
+                        {r.competition ?? '—'}
+                      </span>
+                      {r.highTopOfPageBid !== null && r.highTopOfPageBid !== undefined && (
+                        <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                          CPC {r.highTopOfPageBid.toFixed(2)} {r.currency}
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 whitespace-nowrap text-[10px] font-medium">
+                        {badge}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => selectKeywordFromOpportunity(r.keyword)}
+                        disabled={isSelected}
+                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white text-[11px] font-medium transition-colors whitespace-nowrap"
+                      >
+                        {isSelected ? t.opportunities.selected : t.opportunities.select}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
             </div>
           )}
 
