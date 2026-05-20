@@ -26,16 +26,32 @@ interface Project {
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
 type OpportunityKey = 'high' | 'competitive' | 'medium' | 'low'
 
+function getVolumeScore(volume: number): number {
+  // Tiered scoring to prevent huge volumes from dominating
+  if (volume >= 1000) return 100
+  if (volume >= 500) return 75
+  if (volume >= 100) return 55
+  if (volume >= 30) return 25
+  return 0
+}
+
+function getCompetitionScore(r: KeywordIdeaResult): number {
+  // Competition is weighted heavily — LOW opportunity should be much better than HIGH
+  if (r.competition === 'LOW') return 100
+  if (r.competition === 'MEDIUM') return 65
+  if (r.competition === 'HIGH') return 15
+  // No competition data — use competitionIndex as fallback
+  const ci = r.competitionIndex ?? 100
+  return Math.max(0, 100 - ci)
+}
+
 function computeOpportunityScore(r: KeywordIdeaResult): number {
-  // SEO opportunity: volume × competition only. CPC is not part of this score.
-  const vol = r.avgMonthlySearches ?? 0
-  const volumeScore = Math.min(Math.log10(vol + 1) / 4, 1) * 100
-  const competitionScore =
-    r.competition === 'LOW' ? 100 :
-    r.competition === 'MEDIUM' ? 65 :
-    r.competition === 'HIGH' ? 20 :
-    40
-  return volumeScore * 0.65 + competitionScore * 0.35
+  // SEO opportunity: competition weighted 0.65, volume weighted 0.35
+  // This ensures LOW/MEDIUM with decent volume beats HIGH with huge volume
+  const volume = r.avgMonthlySearches ?? 0
+  const volumeScore = getVolumeScore(volume)
+  const competitionScore = getCompetitionScore(r)
+  return competitionScore * 0.65 + volumeScore * 0.35
 }
 
 function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
@@ -48,26 +64,25 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
 }
 
 function getOpportunityKey(r: KeywordIdeaResult): OpportunityKey {
-  // SEO opportunity badge. HIGH competition can never be "high".
+  // SEO opportunity badge — reflects which keywords to promote first
   const vol = r.avgMonthlySearches ?? 0
 
-  if (r.competition === 'HIGH') {
-    if (vol >= 500) return 'competitive'
-    return 'low'
+  // High: worth promoting now
+  if ((r.competition === 'LOW' && vol >= 100) || (r.competition === 'MEDIUM' && vol >= 500)) {
+    return 'high'
   }
 
-  if (r.competition === 'MEDIUM') {
-    if (vol >= 500) return 'high'
-    if (vol >= 100) return 'medium'
-    return 'low'
+  // Medium: decent opportunity
+  if ((r.competition === 'LOW' && vol >= 30) || (r.competition === 'MEDIUM' && vol >= 100)) {
+    return 'medium'
   }
 
-  if (r.competition === 'LOW') {
-    if (vol >= 100) return 'high'
-    if (vol >= 30) return 'medium'
-    return 'low'
+  // Competitive: lots of volume but high difficulty
+  if (r.competition === 'HIGH' && vol >= 500) {
+    return 'competitive'
   }
 
+  // Low: not worth prioritizing now
   return 'low'
 }
 
