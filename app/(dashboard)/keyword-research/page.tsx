@@ -26,78 +26,44 @@ interface Project {
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
 type OpportunityKey = 'high' | 'medium' | 'low'
 
-const STRONG_INTENT_KEYWORDS_HE = [
-  'קנייה', 'כמה עולה', 'מחיר', 'היכן', 'איפה', 'דירוג', 'ביקורת', 'סקירה',
-  'משוואה', 'vs', 'הטוב ביותר', 'כיצד', 'אופן', 'טיפים', 'עצות', 'הדרכה',
-  'למידה', 'צעדים', 'תהליך', 'שירות', 'מומלץ', 'מוקדש',
-]
-
-const STRONG_INTENT_KEYWORDS_EN = [
-  'buy', 'how much', 'price', 'cost', 'where', 'review', 'best', 'top',
-  'vs', 'comparison', 'guide', 'how to', 'tips', 'tutorial', 'learn',
-  'steps', 'process', 'service', 'recommended', 'expert',
-]
-
 function getWordCount(keyword: string): number {
   return keyword.trim().split(/\s+/).filter(Boolean).length
 }
 
-function getCompetitionEaseScore(r: KeywordIdeaResult): number {
-  // Use competitionIndex if available (100 - index), otherwise fallback to enum values
-  if (r.competitionIndex !== null && r.competitionIndex !== undefined) {
-    return Math.max(0, Math.min(100, 100 - r.competitionIndex))
+function getSeoPotentialBadge(r: KeywordIdeaResult): OpportunityKey {
+  const volume = r.avgMonthlySearches ?? 0
+  const competition = r.competition
+  const wc = getWordCount(r.keyword)
+
+  if (volume < 10) return 'low'
+
+  if (competition === 'LOW') {
+    if (volume >= 30) return 'high'
+    return 'medium'
   }
 
-  if (r.competition === 'LOW') return 90
-  if (r.competition === 'MEDIUM') return 55
-  if (r.competition === 'HIGH') return 20
-  return 50
-}
+  if (competition === 'MEDIUM') {
+    if (volume >= 300) return 'high'
+    if (volume >= 100 && wc >= 2) return 'high'
+    if (volume >= 30) return 'medium'
+    return 'low'
+  }
 
-function getVolumeScore(volume: number): number {
-  if (volume >= 5000) return 100
-  if (volume >= 1000) return 85
-  if (volume >= 500) return 75
-  if (volume >= 100) return 60
-  if (volume >= 30) return 45
-  if (volume >= 10) return 25
-  return 0
-}
+  if (competition === 'HIGH') {
+    if (volume >= 100 && wc >= 3) return 'medium'
+    return 'low'
+  }
 
-function getLongTailScore(keyword: string): number {
-  const wc = getWordCount(keyword)
-  if (wc === 1) return 0
-  if (wc === 2) return 40
-  if (wc === 3) return 75
-  return 100
-}
+  const index = r.competitionIndex
+  if (typeof index === 'number') {
+    if (index <= 30 && volume >= 30) return 'high'
+    if (index <= 60 && volume >= 100 && wc >= 2) return 'high'
+    if (index <= 60 && volume >= 30) return 'medium'
+    if (index > 80 && volume >= 100 && wc >= 3) return 'medium'
+    return 'low'
+  }
 
-function getIntentScore(keyword: string, language: string): number {
-  const lowerKeyword = keyword.toLowerCase()
-  const intentKeywords = language === 'he' ? STRONG_INTENT_KEYWORDS_HE : STRONG_INTENT_KEYWORDS_EN
-
-  const matches = intentKeywords.filter(intent =>
-    lowerKeyword.includes(intent.toLowerCase())
-  ).length
-
-  if (matches >= 2) return 100
-  if (matches === 1) return 70
-  return 30
-}
-
-function computeOpportunityScore(r: KeywordIdeaResult, language: string = 'en'): number {
-  // 4-component scoring system with exact weights
-  const competitionEaseScore = getCompetitionEaseScore(r)
-  const volumeScore = getVolumeScore(r.avgMonthlySearches ?? 0)
-  const longTailScore = getLongTailScore(r.keyword)
-  const intentScore = getIntentScore(r.keyword, language)
-
-  return (
-    competitionEaseScore * 0.40 +
-    volumeScore * 0.25 +
-    longTailScore * 0.20 +
-    intentScore * 0.15
-  )
+  return 'low'
 }
 
 function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
@@ -109,49 +75,6 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
   return 'mediumPotential'
 }
 
-function getOpportunityKey(r: KeywordIdeaResult, language: string = 'en'): OpportunityKey {
-  // 4-component scoring with guardrails
-  const score = computeOpportunityScore(r, language)
-  const volume = r.avgMonthlySearches ?? 0
-  const wordCount = getWordCount(r.keyword)
-  const competitionIndex = r.competitionIndex ?? null
-  const intentScore = getIntentScore(r.keyword, language)
-
-  // GUARDRAIL 1: volume < 10 → max badge is medium
-  if (volume < 10) {
-    if (score >= 45) return 'medium'
-    return 'low'
-  }
-
-  // GUARDRAIL 2: HIGH competition + wordCount <= 1 → must be low
-  if (r.competition === 'HIGH' && wordCount <= 1) {
-    return 'low'
-  }
-
-  // GUARDRAIL 3: HIGH competition + wordCount >= 3 + intentScore >= 70 → can be medium if score >= 45
-  if (r.competition === 'HIGH' && wordCount >= 3 && intentScore >= 70) {
-    if (score >= 45) return 'medium'
-    return 'low'
-  }
-
-  // GUARDRAIL 4: competitionIndex >= 90 + wordCount <= 2 → max low
-  if (competitionIndex !== null && competitionIndex >= 90 && wordCount <= 2) {
-    return 'low'
-  }
-
-  // GUARDRAIL 5: competitionIndex >= 90 + wordCount >= 3 → max medium
-  if (competitionIndex !== null && competitionIndex >= 90 && wordCount >= 3) {
-    if (score >= 70) return 'medium'
-    if (score >= 45) return 'medium'
-    return 'low'
-  }
-
-  // Standard badge logic (no guardrails apply)
-  if (score >= 70) return 'high'
-  if (score >= 45) return 'medium'
-  return 'low'
-}
-
 interface OpportunityBadgeInfo {
   key: OpportunityKey
   label: string
@@ -159,7 +82,7 @@ interface OpportunityBadgeInfo {
 }
 
 function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): OpportunityBadgeInfo {
-  const key = getOpportunityKey(r, language)
+  const key = getSeoPotentialBadge(r)
 
   const labels = {
     he: {
@@ -544,9 +467,20 @@ export default function KeywordResearchPage() {
   const sortedResults = useMemo(() => {
     if (results.length === 0) return results
     const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
+    const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
     const copy = [...results]
     const dir = sortDir === 'asc' ? 1 : -1
     copy.sort((a, b) => {
+      if (sortBy === 'opportunity') {
+        const aRank = opportunityRank[getSeoPotentialBadge(a)]
+        const bRank = opportunityRank[getSeoPotentialBadge(b)]
+        if (aRank !== bRank) return (aRank - bRank) * dir
+        const aVol = a.avgMonthlySearches ?? -1
+        const bVol = b.avgMonthlySearches ?? -1
+        if (aVol === bVol) return 0
+        return (aVol - bVol) * dir
+      }
+
       let aVal: number
       let bVal: number
       switch (sortBy) {
@@ -566,10 +500,6 @@ export default function KeywordResearchPage() {
           aVal = a.competition ? competitionRank[a.competition] : -1
           bVal = b.competition ? competitionRank[b.competition] : -1
           break
-        case 'opportunity':
-          aVal = computeOpportunityScore(a, language)
-          bVal = computeOpportunityScore(b, language)
-          break
         default:
           return 0
       }
@@ -577,7 +507,7 @@ export default function KeywordResearchPage() {
       return (aVal - bVal) * dir
     })
     return copy
-  }, [results, sortBy, sortDir, language])
+  }, [results, sortBy, sortDir])
 
   const sortIndicator = (key: SortKey) => {
     if (sortBy !== key) return ' ↕'
@@ -587,12 +517,17 @@ export default function KeywordResearchPage() {
   // Top opportunities computed from existing results — no extra API calls.
   const topOpportunities = useMemo(() => {
     if (results.length === 0) return []
+    const opportunityRank: Record<OpportunityKey, number> = { low: 1, medium: 2, high: 3 }
     return results
-      .map((r) => ({ ...r, score: computeOpportunityScore(r, language) }))
-      .filter((r) => r.score > 0)
-      .sort((a, b) => b.score - a.score)
+      .map((r) => ({ ...r, badge: getSeoPotentialBadge(r) }))
+      .filter((r) => r.badge !== 'low')
+      .sort((a, b) => {
+        const rankDiff = opportunityRank[b.badge] - opportunityRank[a.badge]
+        if (rankDiff !== 0) return rankDiff
+        return (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0)
+      })
       .slice(0, 5)
-  }, [results, language])
+  }, [results])
 
   const selectKeywordFromOpportunity = (kw: string) => {
     if (selectedKeywords.has(kw)) return
