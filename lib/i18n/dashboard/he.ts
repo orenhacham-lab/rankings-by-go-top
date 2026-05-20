@@ -502,6 +502,7 @@ export const dashboardHe = {
       researchTypeUrl: 'לפי כתובת אתר',
       researchTypeKeywordUrl: 'מילת מפתח + כתובת אתר',
       minMonthlySearches: 'מינימום חיפושים חודשיים',
+      resultsToShow: 'כמות תוצאות להצגה',
       search: 'חיפוש רעיונות',
       searching: 'מחפש רעיונות לביטויים...',
       errorInvalidUrl: 'כתובת ה-URL אינה תקינה',

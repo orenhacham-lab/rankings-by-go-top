@@ -35,6 +35,7 @@ export default function KeywordResearchPage() {
   const [selectedLanguage, setSelectedLanguage] = useState('he')
   const [url, setUrl] = useState('')
   const [minMonthlySearches, setMinMonthlySearches] = useState(30)
+  const [resultsLimit, setResultsLimit] = useState<100 | 250 | 500>(100)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState<KeywordIdeaResult[]>([])
@@ -128,6 +129,7 @@ export default function KeywordResearchPage() {
           country,
           language: selectedLanguage,
           minMonthlySearches,
+          resultsLimit,
         }),
       })
 
@@ -555,6 +557,28 @@ export default function KeywordResearchPage() {
                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 disabled={loading}
               />
+            </div>
+
+            {/* Results Limit */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                {t.form.resultsToShow}
+              </label>
+              <select
+                value={resultsLimit}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  if (v === 100 || v === 250 || v === 500) {
+                    setResultsLimit(v)
+                  }
+                }}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                disabled={loading}
+              >
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+              </select>
             </div>
           </div>
 

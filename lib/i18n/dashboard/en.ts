@@ -504,6 +504,7 @@ export const dashboardEn = {
       researchTypeUrl: 'Website / URL',
       researchTypeKeywordUrl: 'Keyword + URL',
       minMonthlySearches: 'Minimum monthly searches',
+      resultsToShow: 'Results to show',
       search: 'Find keyword ideas',
       searching: 'Finding keyword ideas...',
       errorInvalidUrl: 'Invalid URL',

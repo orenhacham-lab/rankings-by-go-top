@@ -106,6 +106,14 @@ export async function POST(request: Request) {
     const researchType: 'keyword' | 'url' | 'keyword_url' =
       researchTypeRaw === 'url' || researchTypeRaw === 'keyword_url' ? researchTypeRaw : 'keyword'
 
+    // resultsLimit: how many results to return to the client. Allowed: 100, 250, 500.
+    // Missing/invalid → 100. Hard cap at 500.
+    const ALLOWED_RESULT_LIMITS = [100, 250, 500] as const
+    const resultsLimitRaw = typeof body.resultsLimit === 'number' ? body.resultsLimit : 100
+    const resultsLimit: 100 | 250 | 500 = (ALLOWED_RESULT_LIMITS as readonly number[]).includes(resultsLimitRaw)
+      ? (resultsLimitRaw as 100 | 250 | 500)
+      : 100
+
     if (!isValidCountry(country)) {
       return Response.json(
         {
@@ -437,8 +445,9 @@ export async function POST(request: Request) {
     // filteredResultsCount = how many results passed the minMonthlySearches filter (before limit).
     const filteredResultsCount = filteredResults.length
 
-    // Return up to 100 results
-    const results = filteredResults.slice(0, 100)
+    // Apply user-selected results limit (100, 250, or 500). Hard cap at 500.
+    const results = filteredResults.slice(0, resultsLimit)
+    const returnedResultsCount = results.length
 
     const firstNormalizedKeywords = dedupedResults.slice(0, 10).map((r) => r.keyword)
 
@@ -447,6 +456,8 @@ export async function POST(request: Request) {
       normalizedResultsCount,
       filteredResultsCount,
       finalResultCount: results.length,
+      resultsLimit,
+      returnedResultsCount,
       minMonthlySearches,
       researchType,
       seedType,
@@ -475,6 +486,8 @@ export async function POST(request: Request) {
         rawResultsCount,
         normalizedResultsCount,
         filteredResultsCount,
+        resultsLimit,
+        returnedResultsCount,
         minMonthlySearches,
         pagesFetched: pageCount,
         hasNextPageToken,
