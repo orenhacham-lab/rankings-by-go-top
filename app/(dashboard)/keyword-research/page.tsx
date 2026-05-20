@@ -660,11 +660,11 @@ export default function KeywordResearchPage() {
                       </select>
                     </div>
 
-                    <div className="flex items-end gap-2">
+                    <div className="flex items-end">
                       <button
                         onClick={handleAddToProject}
                         disabled={!selectedProject || addingToProject}
-                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                       >
                         {addingToProject && <Loader2 size={18} className="animate-spin" />}
                         {addingToProject
@@ -673,14 +673,6 @@ export default function KeywordResearchPage() {
                             : 'Adding keywords to project...'
                           : t.addToProject.addButton}
                       </button>
-                      {lastAddedProjectId && !addingToProject && (
-                        <a
-                          href={`/projects/${lastAddedProjectId}`}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-                        >
-                          {language === 'he' ? 'עבור לפרויקט' : 'Go to project'}
-                        </a>
-                      )}
                     </div>
                   </div>
                 </>

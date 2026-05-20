@@ -65,7 +65,7 @@ export default function SitemapPage() {
       title: 'חשבון וחוקים',
       links: [
         { label: 'כניסה לחשבון', href: '/login' },
-        { label: 'התחל ניסיון חינם', href: '/signup' },
+        { label: 'התחילו ניסיון חינם', href: '/signup' },
         { label: 'מדיניות פרטיות', href: '/privacy' },
         { label: 'תקנון ותנאי שימוש', href: '/terms' },
       ],
@@ -130,13 +130,13 @@ export default function SitemapPage() {
 
             <div className="mt-8 pt-8 border-t border-slate-200">
               <p className="text-slate-600 text-sm">
-                לקבלת מידע נוסף, בקר ב
+                לקבלת מידע נוסף, בקרו ב
                 <Link href="/about" className="text-blue-600 hover:underline mx-1">
                   עמוד אודות
                 </Link>
                 או{' '}
                 <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
-                  צור קשר
+                  צרו קשר
                 </a>
               </p>
             </div>

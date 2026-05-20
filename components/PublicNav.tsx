@@ -42,6 +42,9 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
     { href: `${prefix}/about`, label: dict.nav.about },
   ]
 
+  const homeLink = links[0]
+  const restLinks = links.slice(1)
+
   const featureItems = [
     {
       id: 'googleOrganic',
@@ -99,15 +102,13 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
           {/* Desktop Menu */}
           <nav className="hidden lg:flex items-center gap-8">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+            <Link
+              key={homeLink.href}
+              href={homeLink.href}
+              className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
+            >
+              {homeLink.label}
+            </Link>
             {/* Features Dropdown */}
             <div className="relative group">
               <button
@@ -137,6 +138,15 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
                 ))}
               </div>
             </div>
+            {restLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
           {/* CTA Buttons + Language Switcher */}
@@ -194,16 +204,14 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
         {mobileOpen && (
           <div className="lg:hidden border-t border-slate-200 bg-white py-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
             <nav className="flex flex-col gap-1">
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="px-3 py-3 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              <Link
+                key={homeLink.href}
+                href={homeLink.href}
+                onClick={() => setMobileOpen(false)}
+                className="px-3 py-3 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+              >
+                {homeLink.label}
+              </Link>
               {/* Features Dropdown Mobile */}
               <div className="px-3 py-3">
                 <button
@@ -239,6 +247,16 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
                   </div>
                 )}
               </div>
+              {restLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="px-3 py-3 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </nav>
             <div className="border-t border-slate-200 mt-4 pt-4 flex flex-col gap-2">
               <div className="px-3 py-2">

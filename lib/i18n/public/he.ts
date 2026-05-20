@@ -42,7 +42,7 @@ export const he = {
     sitemap: 'מפת אתר',
     legal: 'משפטי',
     privacy: 'מדיניות פרטיות',
-    terms: 'תנאים להשתמש',
+    terms: 'תקנון ותנאי שימוש',
     accessibility: 'נגישות',
     contact: 'יצירת קשר',
     copyright: '© 2026 Rankings by Go Top. כל הזכויות שמורות.',

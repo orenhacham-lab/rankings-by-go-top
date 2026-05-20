@@ -1,8 +1,18 @@
-'use client'
-
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+
+export const metadata = {
+  title: 'תקנון ותנאי שימוש | Rankings by Go Top',
+  description: 'תקנון ותנאי השימוש של Rankings by Go Top — התנאים המסדירים את השימוש בשירות.',
+  robots: 'noindex, nofollow',
+  openGraph: {
+    title: 'תקנון ותנאי שימוש | Rankings by Go Top',
+    description: 'תקנון ותנאי השימוש של Rankings by Go Top',
+    url: 'https://www.gotopseo.com/terms',
+    locale: 'he_IL',
+  },
+}
 
 export default function HebrewTermsPage() {
   return (
