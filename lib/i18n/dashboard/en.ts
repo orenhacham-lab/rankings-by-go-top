@@ -513,6 +513,7 @@ export const dashboardEn = {
       keyword: 'Keyword',
       resultsCount: 'Results count',
       monthlySearches: 'Monthly searches',
+      opportunity: 'Opportunity',
       competition: 'Competition',
       lowCpc: 'Low CPC',
       highCpc: 'High CPC',

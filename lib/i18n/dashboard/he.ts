@@ -511,6 +511,7 @@ export const dashboardHe = {
       keyword: 'ביטוי',
       resultsCount: 'כמות תוצאות',
       monthlySearches: 'חיפושים חודשיים',
+      opportunity: 'פוטנציאל',
       competition: 'תחרות',
       lowCpc: 'CPC נמוך',
       highCpc: 'CPC גבוה',

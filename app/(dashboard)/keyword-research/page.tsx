@@ -24,6 +24,7 @@ interface Project {
 }
 
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
+type OpportunityKey = 'high' | 'commercial' | 'competitive' | 'medium' | 'low'
 
 function computeOpportunityScore(r: KeywordIdeaResult): number {
   const vol = r.avgMonthlySearches ?? 0
@@ -44,6 +45,67 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
   if (cpc >= 2 && vol >= 500) return 'commercial'
   if (vol >= 1000) return 'highVolume'
   return 'mediumPotential'
+}
+
+function getOpportunityKey(r: KeywordIdeaResult): OpportunityKey {
+  const vol = r.avgMonthlySearches ?? 0
+  const cpc = r.highTopOfPageBid ?? 0
+
+  // Commercial (high CPC first priority)
+  if (cpc >= 2 && vol >= 500) return 'commercial'
+
+  // Competitive (HIGH comp + high volume)
+  if (r.competition === 'HIGH' && vol >= 1000) return 'competitive'
+
+  // High potential (LOW/MEDIUM comp + good volume)
+  if ((r.competition === 'LOW' || r.competition === 'MEDIUM') && vol >= 1000) return 'high'
+
+  // Medium potential
+  if (vol >= 200) return 'medium'
+
+  // Low
+  return 'low'
+}
+
+interface OpportunityBadgeInfo {
+  key: OpportunityKey
+  label: string
+  colorClass: string
+}
+
+function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): OpportunityBadgeInfo {
+  const key = getOpportunityKey(r)
+
+  const labels = {
+    he: {
+      high: 'גבוה',
+      commercial: 'מסחרי',
+      competitive: 'תחרותי',
+      medium: 'בינוני',
+      low: 'נמוך',
+    },
+    en: {
+      high: 'High',
+      commercial: 'Commercial',
+      competitive: 'Competitive',
+      medium: 'Medium',
+      low: 'Low',
+    },
+  }
+
+  const colorClasses = {
+    high: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
+    commercial: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
+    competitive: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
+    medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
+    low: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
+  }
+
+  return {
+    key,
+    label: labels[language][key],
+    colorClass: colorClasses[key],
+  }
 }
 
 export default function KeywordResearchPage() {
@@ -76,7 +138,7 @@ export default function KeywordResearchPage() {
   const [lastAddedProjectId, setLastAddedProjectId] = useState('')
 
   // Sorting state for results table
-  type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc'
+  type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc' | 'opportunity'
   const [sortBy, setSortBy] = useState<SortKey>('monthlySearches')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -403,6 +465,7 @@ export default function KeywordResearchPage() {
   const sortedResults = useMemo(() => {
     if (results.length === 0) return results
     const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
+    const opportunityRank: Record<OpportunityKey, number> = { high: 5, commercial: 4, competitive: 3, medium: 2, low: 1 }
     const copy = [...results]
     const dir = sortDir === 'asc' ? 1 : -1
     copy.sort((a, b) => {
@@ -424,6 +487,10 @@ export default function KeywordResearchPage() {
         case 'competition':
           aVal = a.competition ? competitionRank[a.competition] : -1
           bVal = b.competition ? competitionRank[b.competition] : -1
+          break
+        case 'opportunity':
+          aVal = opportunityRank[getOpportunityKey(a)]
+          bVal = opportunityRank[getOpportunityKey(b)]
           break
         default:
           return 0
@@ -915,6 +982,16 @@ export default function KeywordResearchPage() {
                       <span className="text-xs">{sortIndicator('monthlySearches')}</span>
                     </button>
                   </th>
+                  <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100 hidden sm:table-cell`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('opportunity')}
+                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'opportunity' ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                    >
+                      {t.results.opportunity}
+                      <span className="text-xs">{sortIndicator('opportunity')}</span>
+                    </button>
+                  </th>
                   <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
                     <button
                       type="button"
@@ -966,6 +1043,16 @@ export default function KeywordResearchPage() {
                     </td>
                     <td className={`px-4 py-3 text-slate-600 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
                       {result.avgMonthlySearches?.toLocaleString() ?? '—'}
+                    </td>
+                    <td className={`px-4 py-3 hidden sm:table-cell ${isRTL ? 'text-right' : 'text-left'}`}>
+                      {(() => {
+                        const badge = getOpportunityBadgeInfo(result, language as 'he' | 'en')
+                        return (
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${badge.colorClass}`}>
+                            {badge.label}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className={`px-4 py-3 ${competitionColor(result.competition)} ${isRTL ? 'text-right' : 'text-left'}`}>
                       {result.competition ?? '—'}
