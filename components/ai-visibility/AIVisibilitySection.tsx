@@ -580,18 +580,18 @@ export default function AIVisibilitySection({
               setSuggestedQuestions(refreshed.slice(0, 4))
             }}
           />
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                 {t('ai_queries')}
               </h3>
               <Badge variant="neutral" className="!text-xs">{allPrompts.length}</Badge>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)}>
+            <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)} className="w-full sm:w-auto">
                 {t('recommend_questions')}
               </Button>
-              <Button size="sm" onClick={() => setShowNewPrompt(true)}>
+              <Button size="sm" onClick={() => setShowNewPrompt(true)} className="w-full sm:w-auto">
                 {t('new_query')}
               </Button>
             </div>
@@ -794,30 +794,30 @@ function OverviewSummaryStrip({
   t: T
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 p-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 p-4 sm:p-6">
+      <div className="grid grid-cols-3 gap-3 sm:gap-6">
+        <div className="min-w-0">
+          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
             {t('total_mentions')}
           </div>
-          <div className="text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalMentions}</div>
-          <div className="text-sm text-slate-600 dark:text-slate-300 mt-2">
+          <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalMentions}</div>
+          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">
             {t('out_of_results').replace('{count}', String(totalResults))}
           </div>
         </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+        <div className="min-w-0">
+          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
             {t('visibility_percent')}
           </div>
-          <div className="text-4xl font-bold text-indigo-700 dark:text-indigo-300">{metrics.mentionRate}%</div>
-          <div className="text-sm text-slate-600 dark:text-slate-300 mt-2">{t('overall')}</div>
+          <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300">{metrics.mentionRate}%</div>
+          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('overall')}</div>
         </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+        <div className="min-w-0">
+          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
             {t('target_cited')}
           </div>
-          <div className="text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalCitations}</div>
-          <div className="text-sm text-slate-600 dark:text-slate-300 mt-2">{t('citations')}</div>
+          <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalCitations}</div>
+          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('citations')}</div>
         </div>
       </div>
     </div>
@@ -834,22 +834,23 @@ function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics
       <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-4">
         {t('mentions_by_engine')}
       </h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
         {engineList.map((em) => {
           const meta = ENGINE_META[em.engine as keyof typeof ENGINE_META]
           const percent = em.scans > 0 ? Math.round((em.mentions / em.scans) * 100) : 0
           return (
             <div
               key={em.engine}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 hover:shadow-md transition flex flex-col items-center text-center"
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 sm:p-4 hover:shadow-md transition flex flex-col items-center text-center"
             >
-              {meta && <meta.Icon size={32} className={meta.accent} />}
-              <div className="font-semibold text-slate-900 dark:text-slate-100 mt-3 text-sm">{meta?.name || em.engine}</div>
-              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">{em.mentions}</div>
-              <div className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+              {meta && <meta.Icon size={24} className={`${meta.accent} sm:hidden`} />}
+              {meta && <meta.Icon size={32} className={`${meta.accent} hidden sm:block`} />}
+              <div className="font-semibold text-slate-900 dark:text-slate-100 mt-2 sm:mt-3 text-xs sm:text-sm truncate max-w-full">{meta?.name || em.engine}</div>
+              <div className="text-xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 sm:mt-2">{em.mentions}</div>
+              <div className="hidden sm:block text-xs text-slate-600 dark:text-slate-300 mt-2">
                 {t('out_of_results').replace('{count}', String(em.scans))}
               </div>
-              {em.scans > 0 && <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">({percent}%)</div>}
+              {em.scans > 0 && <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1">({percent}%)</div>}
             </div>
           )
         })}

@@ -153,6 +153,7 @@ export const dashboardHe = {
     engineGoogleMaps: 'גוגל מפות',
     selectProjectMessage: 'יש לבחור פרויקט כדי להציג מילות מפתח.',
     sortByPositionTooltip: 'מיין לפי מיקום',
+    sortByVolumeTooltip: 'מיין לפי נפח חיפושים',
     history: {
       title: 'היסטוריית דירוגים',
       subtitle: 'היסטוריית דירוגים',
@@ -507,6 +508,7 @@ export const dashboardHe = {
     },
     results: {
       keyword: 'ביטוי',
+      resultsCount: 'כמות תוצאות',
       monthlySearches: 'חיפושים חודשיים',
       competition: 'תחרות',
       lowCpc: 'CPC נמוך',

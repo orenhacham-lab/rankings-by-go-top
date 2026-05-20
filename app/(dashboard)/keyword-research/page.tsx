@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
@@ -50,6 +50,11 @@ export default function KeywordResearchPage() {
   const [addToProjectMessage, setAddToProjectMessage] = useState('')
   const [addToProjectError, setAddToProjectError] = useState('')
   const [lastAddedProjectId, setLastAddedProjectId] = useState('')
+
+  // Sorting state for results table
+  type SortKey = 'monthlySearches' | 'competition' | 'lowCpc' | 'highCpc'
+  const [sortBy, setSortBy] = useState<SortKey>('monthlySearches')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   // AI Questions state
   const [aiQuestionsOpen, setAIQuestionsOpen] = useState(false)
@@ -356,6 +361,54 @@ export default function KeywordResearchPage() {
     }
   }
 
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortBy(key)
+    setSortDir('desc')
+  }
+
+  const sortedResults = useMemo(() => {
+    if (results.length === 0) return results
+    const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
+    const copy = [...results]
+    const dir = sortDir === 'asc' ? 1 : -1
+    copy.sort((a, b) => {
+      let aVal: number
+      let bVal: number
+      switch (sortBy) {
+        case 'monthlySearches':
+          aVal = a.avgMonthlySearches ?? -1
+          bVal = b.avgMonthlySearches ?? -1
+          break
+        case 'lowCpc':
+          aVal = a.lowTopOfPageBid ?? -1
+          bVal = b.lowTopOfPageBid ?? -1
+          break
+        case 'highCpc':
+          aVal = a.highTopOfPageBid ?? -1
+          bVal = b.highTopOfPageBid ?? -1
+          break
+        case 'competition':
+          aVal = a.competition ? competitionRank[a.competition] : -1
+          bVal = b.competition ? competitionRank[b.competition] : -1
+          break
+        default:
+          return 0
+      }
+      if (aVal === bVal) return 0
+      return (aVal - bVal) * dir
+    })
+    return copy
+  }, [results, sortBy, sortDir])
+
+  const sortIndicator = (key: SortKey) => {
+    if (sortBy !== key) return ' ↕'
+    return sortDir === 'asc' ? ' ▲' : ' ▼'
+  }
+
   const competitionColor = (competition: string | null) => {
     switch (competition) {
       case 'LOW':
@@ -548,8 +601,8 @@ export default function KeywordResearchPage() {
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
           {/* Results Toolbar */}
           <div className={`flex flex-col sm:flex-row gap-2 mb-4 justify-between items-start sm:items-center`}>
-            <div className={`text-sm text-slate-600 dark:text-slate-400`}>
-              {t.results.keyword}: {results.length}
+            <div className={`text-sm font-medium text-slate-700 dark:text-slate-200`}>
+              {t.results.resultsCount}: <span className="font-bold text-slate-900 dark:text-slate-100">{results.length}</span>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button
@@ -719,16 +772,44 @@ export default function KeywordResearchPage() {
                     {t.results.keyword}
                   </th>
                   <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    {t.results.monthlySearches}
+                    <button
+                      type="button"
+                      onClick={() => handleSort('monthlySearches')}
+                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'monthlySearches' ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                    >
+                      {t.results.monthlySearches}
+                      <span className="text-xs">{sortIndicator('monthlySearches')}</span>
+                    </button>
                   </th>
                   <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    {t.results.competition}
+                    <button
+                      type="button"
+                      onClick={() => handleSort('competition')}
+                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'competition' ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                    >
+                      {t.results.competition}
+                      <span className="text-xs">{sortIndicator('competition')}</span>
+                    </button>
                   </th>
                   <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    {t.results.lowCpc}
+                    <button
+                      type="button"
+                      onClick={() => handleSort('lowCpc')}
+                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'lowCpc' ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                    >
+                      {t.results.lowCpc}
+                      <span className="text-xs">{sortIndicator('lowCpc')}</span>
+                    </button>
                   </th>
                   <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
-                    {t.results.highCpc}
+                    <button
+                      type="button"
+                      onClick={() => handleSort('highCpc')}
+                      className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'highCpc' ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                    >
+                      {t.results.highCpc}
+                      <span className="text-xs">{sortIndicator('highCpc')}</span>
+                    </button>
                   </th>
                   <th className={`px-4 py-3 ${isRTL ? 'text-right' : 'text-left'} font-semibold text-slate-900 dark:text-slate-100`}>
                     {t.results.action}
@@ -736,7 +817,7 @@ export default function KeywordResearchPage() {
                 </tr>
               </thead>
               <tbody>
-                {results.map((result, idx) => (
+                {sortedResults.map((result, idx) => (
                   <tr key={idx} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="px-4 py-3">
                       <input

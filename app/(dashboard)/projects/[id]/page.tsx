@@ -397,38 +397,44 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
           {k.keywordsSection.title} ({targets.length})
         </h2>
-        <div className="grid grid-cols-2 sm:flex sm:gap-2 gap-2 w-full sm:w-auto">
-          <Button
-            onClick={handleScanAll}
-            loading={scanning}
-            disabled={activeTargets.length === 0}
-            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 w-full sm:w-auto"
-            size="sm"
-          >
-            <Search size={16} strokeWidth={2} />
-            {scanning ? k.keywordsSection.scanning : k.keywordsSection.scanAllButton}
-          </Button>
-          <Link href={`/reports?project_id=${id}`} className="w-full sm:w-auto">
-            <Button variant="outline" size="sm" className="flex items-center justify-center gap-1.5 w-full sm:w-auto">
-              <FileText size={16} strokeWidth={2} />
-              {k.keywordsSection.reportButton}
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+          {/* Primary actions: scan + add on the same row, taller on mobile */}
+          <div className="grid grid-cols-2 gap-2 sm:contents">
+            <Button
+              onClick={handleScanAll}
+              loading={scanning}
+              disabled={activeTargets.length === 0}
+              className="flex items-center justify-center gap-2 w-full sm:w-auto py-3 sm:py-1.5 text-sm"
+              size="sm"
+            >
+              <Search size={16} strokeWidth={2} />
+              {scanning ? k.keywordsSection.scanning : k.keywordsSection.scanAllButton}
             </Button>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleUpdateVolumes}
-            loading={updatingVolumes}
-            disabled={targets.length === 0}
-            className="w-full sm:w-auto"
-          >
-            {updatingVolumes
-              ? k.keywordsSection.updatingVolumes
-              : k.keywordsSection.updateVolumesButton}
-          </Button>
-          <Button size="sm" onClick={() => setShowAddTarget(true)} className="w-full sm:w-auto">
-            {k.keywordsSection.addKeywordButton}
-          </Button>
+            <Button size="sm" onClick={() => setShowAddTarget(true)} className="w-full sm:w-auto py-3 sm:py-1.5 text-sm">
+              {k.keywordsSection.addKeywordButton}
+            </Button>
+          </div>
+          {/* Secondary actions: report + update volumes — same row on mobile, normal flow on desktop */}
+          <div className="grid grid-cols-2 gap-2 sm:contents">
+            <Link href={`/reports?project_id=${id}`} className="w-full sm:w-auto">
+              <Button variant="outline" size="sm" className="flex items-center justify-center gap-1.5 w-full sm:w-auto">
+                <FileText size={16} strokeWidth={2} />
+                {k.keywordsSection.reportButton}
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleUpdateVolumes}
+              loading={updatingVolumes}
+              disabled={targets.length === 0}
+              className="w-full sm:w-auto"
+            >
+              {updatingVolumes
+                ? k.keywordsSection.updatingVolumes
+                : k.keywordsSection.updateVolumesButton}
+            </Button>
+          </div>
         </div>
       </div>
       <TrackingTargetsTable

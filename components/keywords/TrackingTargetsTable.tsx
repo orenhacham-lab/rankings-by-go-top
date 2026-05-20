@@ -50,10 +50,11 @@ export default function TrackingTargetsTable({
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [sortBy, setSortBy] = useState<'position' | 'keyword' | 'date' | 'found'>('position')
+  type SortColumn = 'position' | 'keyword' | 'date' | 'found' | 'volume'
+  const [sortBy, setSortBy] = useState<SortColumn>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
-  function handleSort(column: 'position' | 'keyword' | 'date' | 'found') {
+  function handleSort(column: SortColumn) {
     if (sortBy === column) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
       return
@@ -84,6 +85,12 @@ export default function TrackingTargetsTable({
         return (aDate - bDate) * dir
       }
 
+      if (sortBy === 'volume') {
+        const aVol = a.avg_monthly_searches ?? -1
+        const bVol = b.avg_monthly_searches ?? -1
+        return (aVol - bVol) * dir
+      }
+
       const aFound = aResult?.found ? 1 : 0
       const bFound = bResult?.found ? 1 : 0
       return (aFound - bFound) * dir
@@ -91,7 +98,7 @@ export default function TrackingTargetsTable({
     return copy
   }, [targets, latestResults, sortBy, sortDir])
 
-  function sortLabel(column: 'position' | 'keyword' | 'date' | 'found') {
+  function sortLabel(column: SortColumn) {
     if (sortBy !== column) return ''
     return sortDir === 'asc' ? ' ▲' : ' ▼'
   }
@@ -126,7 +133,9 @@ export default function TrackingTargetsTable({
               <button type="button" onClick={() => handleSort('keyword')} className="font-semibold">{k.keyword}{sortLabel('keyword')}</button>
             </Th>
             <Th>{k.scanType}</Th>
-            <Th>{k.searchVolume}</Th>
+            <Th>
+              <button type="button" onClick={() => handleSort('volume')} className="font-semibold">{k.searchVolume}{sortLabel('volume')}</button>
+            </Th>
             <Th>
               <button type="button" onClick={() => handleSort('position')} className="font-semibold">{k.position}{sortLabel('position')}</button>
             </Th>

@@ -137,7 +137,7 @@ export default function GoogleMapsFeaturePage() {
         {/* How It Works */}
         <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-amber-50 to-orange-50">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-4xl font-bold text-slate-900 text-center mb-16">איך לעקוב אחרי הדירוג שלך</h2>
+            <h2 className="text-4xl font-bold text-slate-900 text-center mb-16">איך לעקוב אחרי הדירוגים שלכם</h2>
 
             <div className="grid md:grid-cols-3 gap-8">
               <div className="relative">
@@ -165,7 +165,7 @@ export default function GoogleMapsFeaturePage() {
                 <div className="bg-white rounded-lg p-8 border border-slate-200">
                   <h3 className="text-lg font-bold text-slate-900 mb-3">קבלו מעקב יומי</h3>
                   <p className="text-slate-700">
-                    כל יום המערכת תבדוק את הדירוג שלך בגוגל מפות. ראו כיצד השינויים משפיעים.
+                    כל יום המערכת תבדוק את הדירוגים שלכם בגוגל מפות. ראו כיצד השינויים משפיעים.
                   </p>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export default function GoogleMapsFeaturePage() {
                 <Award className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">מעקב ביקורות וזמן התגובה</h3>
-                  <p className="text-slate-700">ראו כמה ביקורות יש לך, מה הדירוג הממוצע, וזמן התגובה שלך.</p>
+                  <p className="text-slate-700">ראו כמה ביקורות יש לכם, מה הדירוג הממוצע, וזמן התגובה שלכם.</p>
                 </div>
               </div>
 
@@ -207,7 +207,7 @@ export default function GoogleMapsFeaturePage() {
                 <Users className="w-6 h-6 text-indigo-600 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">שיתוף פעולה לעסקים עם כמה סניפים</h3>
-                  <p className="text-slate-700">אם יש לך כמה עיסוקים או סניפים, אתה יכול לעקוב אחרי כולם בתוך מערכת אחת.</p>
+                  <p className="text-slate-700">אם יש לכם כמה סניפים, אפשר לעקוב אחרי כולם בתוך מערכת אחת.</p>
                 </div>
               </div>
 
@@ -223,7 +223,7 @@ export default function GoogleMapsFeaturePage() {
                 <Phone className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">מעקב טלפונים וקישורים</h3>
-                  <p className="text-slate-700">ראו כמה אנשים חיפשו את הטלפון או קישור של העסק שלך.</p>
+                  <p className="text-slate-700">ראו כמה אנשים חיפשו את הטלפון או הקישור של העסק שלכם.</p>
                 </div>
               </div>
             </div>

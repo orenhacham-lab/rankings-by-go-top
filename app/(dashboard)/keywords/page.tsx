@@ -25,6 +25,7 @@ export default function KeywordsPage() {
   const [search, setSearch] = useState('')
   const [engineFilter, setEngineFilter] = useState('')
   const [positionSort, setPositionSort] = useState<'none' | 'asc' | 'desc'>('none')
+  const [volumeSort, setVolumeSort] = useState<'none' | 'asc' | 'desc'>('none')
 
   useEffect(() => {
     async function loadProjects() {
@@ -99,21 +100,39 @@ export default function KeywordsPage() {
   })
 
   const sorted = [...filtered].sort((a, b) => {
-    if (positionSort === 'none') return 0
+    if (volumeSort !== 'none') {
+      const aVol = a.avg_monthly_searches ?? -1
+      const bVol = b.avg_monthly_searches ?? -1
+      if (aVol !== bVol) {
+        return volumeSort === 'asc' ? aVol - bVol : bVol - aVol
+      }
+    }
 
-    const aResult = latestResults[a.id]
-    const bResult = latestResults[b.id]
+    if (positionSort !== 'none') {
+      const aResult = latestResults[a.id]
+      const bResult = latestResults[b.id]
+      const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
+      const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
+      return positionSort === 'asc' ? aPos - bPos : bPos - aPos
+    }
 
-    const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
-    const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
-
-    return positionSort === 'asc' ? aPos - bPos : bPos - aPos
+    return 0
   })
 
   function togglePositionSort() {
+    setVolumeSort('none')
     setPositionSort((prev) => {
       if (prev === 'none') return 'asc'
       if (prev === 'asc') return 'desc'
+      return 'none'
+    })
+  }
+
+  function toggleVolumeSort() {
+    setPositionSort('none')
+    setVolumeSort((prev) => {
+      if (prev === 'none') return 'desc'
+      if (prev === 'desc') return 'asc'
       return 'none'
     })
   }
@@ -179,7 +198,19 @@ export default function KeywordsPage() {
             <tr>
               <Th>{k.table.keyword}</Th>
               <Th>{k.table.project}</Th>
-              <Th>{k.table.searchVolume}</Th>
+              <Th>
+                <button
+                  type="button"
+                  onClick={toggleVolumeSort}
+                  className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
+                  title={k.sortByVolumeTooltip}
+                >
+                  {k.table.searchVolume}
+                  <span className="text-xs">
+                    {volumeSort === 'asc' ? '▲' : volumeSort === 'desc' ? '▼' : '↕'}
+                  </span>
+                </button>
+              </Th>
               <Th>{k.table.engine}</Th>
               <Th>
                 <button

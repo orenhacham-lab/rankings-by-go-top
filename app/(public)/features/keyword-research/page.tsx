@@ -6,7 +6,7 @@ import { Search, TrendingUp, Target, PieChart, Zap, Check } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'מחקר ביטויים | Rankings by Go Top',
-  description: 'גלו רעיונות ביטויים מנתוני Google Ads. בדקו נפח חיפוש, תחרות והערכות CPC. הוסיפו ביטויים ישירות למעקב וליצירת שאלות AI.',
+  description: 'גלו רעיונות לביטויים מנתוני Google Ads. בדקו נפח חיפוש, תחרות והערכות CPC. הוסיפו ביטויים ישירות למעקב וליצירת שאלות AI.',
 }
 
 export default function KeywordResearchFeaturePage() {
@@ -33,7 +33,7 @@ export default function KeywordResearchFeaturePage() {
 
             {/* Subheading */}
             <p className="text-xl text-slate-600 text-center mb-12 max-w-2xl mx-auto">
-              חפשו רעיונות ביטויים, בדקו נפח חיפוש ותחרות, והוסיפו אותם ישירות למעקב דירוגים או לשאלות נראות AI.
+              חפשו רעיונות לביטויים, בדקו נפח חיפוש ותחרות, והוסיפו אותם ישירות למעקב דירוגים או לשאלות נראות AI.
             </p>
 
             {/* CTAs */}
@@ -42,13 +42,13 @@ export default function KeywordResearchFeaturePage() {
                 href="/signup"
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-amber-700 hover:to-orange-700 transition-all text-center"
               >
-                התחל ניסיון חינם
+                להתנסות בחינם
               </Link>
               <Link
                 href="/pricing"
                 className="px-8 py-4 rounded-lg border-2 border-slate-300 text-slate-700 text-lg font-semibold hover:bg-slate-50 transition-all text-center"
               >
-                צפה בתמחור
+                צפייה בתמחור
               </Link>
             </div>
           </div>
@@ -57,39 +57,39 @@ export default function KeywordResearchFeaturePage() {
         {/* Features Section */}
         <section className="py-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-12 text-center">מה אתה יכול לעשות</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-12 text-center">מה אפשר לעשות במערכת</h2>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {[
                 {
                   icon: Search,
-                  title: 'רעיונות ביטויים',
-                  description: 'מצא רעיונות ביטויים קשורים בהתאם לביטוי ההזרה שלך באמצעות נתוני Google Ads API.',
+                  title: 'רעיונות לביטויים',
+                  description: 'קבלו רעיונות לביטויים רלוונטיים בהתבסס על ביטוי זרע או כתובת אתר, באמצעות נתונים מ-Google Ads API.',
                 },
                 {
                   icon: TrendingUp,
                   title: 'נפח חיפוש',
-                  description: 'צפה בנפח חיפוש חודשי משוער לכל ביטוי כדי להבין את הביקוש.',
+                  description: 'צפו בנפח חיפוש חודשי משוער לכל ביטוי כדי להבין את גודל הביקוש.',
                 },
                 {
                   icon: Target,
                   title: 'נתוני תחרות',
-                  description: 'בדוק רמות תחרות (נמוכה, בינונית, גבוהה) ואינדקס תחרותיות.',
+                  description: 'בדקו את רמת התחרות (נמוכה, בינונית או גבוהה) ואת מדד התחרותיות לכל ביטוי.',
                 },
                 {
                   icon: PieChart,
                   title: 'הערכות CPC',
-                  description: 'ראה הערכות של הצעות מחיר מינימום ומקסימום בראש העמוד.',
+                  description: 'ראו הערכות של הצעת מחיר מינימלית ומקסימלית בראש העמוד, להבנת עלות הקליק.',
                 },
                 {
                   icon: Zap,
                   title: 'הוספה מהירה לפרויקטים',
-                  description: 'הוסף ביטויים נבחרים ישירות לפרויקטים שלך למעקב דירוגים מיידי.',
+                  description: 'הוסיפו ביטויים נבחרים ישירות לפרויקטים שלכם למעקב דירוגים מיידי.',
                 },
                 {
                   icon: Check,
-                  title: 'יצור שאלות AI',
-                  description: 'הפוך ביטויים לשאלות בשפה טבעית לסריקת נראות AI.',
+                  title: 'יצירת שאלות AI',
+                  description: 'הפכו ביטויים לשאלות בשפה טבעית למעקב נראות במנועי AI.',
                 },
               ].map((feature, i) => {
                 const Icon = feature.icon
@@ -97,7 +97,7 @@ export default function KeywordResearchFeaturePage() {
                   <div key={i} className="p-6 rounded-lg border border-slate-200 hover:border-amber-300 hover:shadow-lg transition-all">
                     <Icon className="w-8 h-8 text-amber-600 mb-4" />
                     <h3 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h3>
-                    <p className="text-slate-600">{feature.description}</p>
+                    <p className="text-slate-600 leading-relaxed">{feature.description}</p>
                   </div>
                 )
               })}
@@ -114,18 +114,18 @@ export default function KeywordResearchFeaturePage() {
               {[
                 {
                   number: '1',
-                  title: 'חפש ביטויים',
-                  description: 'הכנס ביטוי זרע בחר את המדינה והשפה שלך.',
+                  title: 'חפשו ביטויים',
+                  description: 'הזינו ביטוי זרע או כתובת אתר, ובחרו מדינה ושפה.',
                 },
                 {
                   number: '2',
-                  title: 'בדוק תוצאות',
-                  description: 'עיין בתיקיות הביטויים עם נתוני נפח חיפוש, תחרות ו-CPC.',
+                  title: 'בדקו תוצאות',
+                  description: 'עיינו ברעיונות שמוצגים יחד עם נפח חיפוש, רמת תחרות והערכות CPC.',
                 },
                 {
                   number: '3',
-                  title: 'קח צעדים',
-                  description: 'הוסף ביטויים לפרויקט או צור שאלות AI מהם.',
+                  title: 'פעלו לפי הנתונים',
+                  description: 'הוסיפו ביטויים לפרויקט קיים או הפכו אותם לשאלות AI בלחיצה אחת.',
                 },
               ].map((step) => (
                 <div key={step.number} className="text-center">
@@ -133,7 +133,7 @@ export default function KeywordResearchFeaturePage() {
                     {step.number}
                   </div>
                   <h3 className="text-xl font-semibold text-slate-900 mb-2">{step.title}</h3>
-                  <p className="text-slate-600">{step.description}</p>
+                  <p className="text-slate-600 leading-relaxed">{step.description}</p>
                 </div>
               ))}
             </div>
@@ -143,12 +143,12 @@ export default function KeywordResearchFeaturePage() {
         {/* Data Note */}
         <section className="py-16 px-4 sm:px-6 lg:px-8 bg-amber-50 border-t border-amber-200">
           <div className="max-w-3xl mx-auto">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">אודות הנתונים</h3>
-            <p className="text-slate-600 mb-3">
-              נתוני מחקר ביטויים מגיעים מ-Google Ads API. נפחי חיפוש, רמות תחרות והערכות CPC הם משוערים וממולאים מנתוני מצטברים של Google. ביצועים בפועל עשויים להשתנות לפי קמפיין, כיוונון והגורמים אחרים.
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">על מקורות הנתונים</h3>
+            <p className="text-slate-600 mb-3 leading-relaxed">
+              נתוני מחקר הביטויים מתקבלים מ-Google Ads API. נפחי חיפוש, רמות תחרות והערכות CPC הם משוערים ומבוססים על נתונים מצטברים של Google. ביצועים בפועל עשויים להשתנות בהתאם לקמפיין, לתחום ולשאר נסיבות.
             </p>
-            <p className="text-slate-600">
-              השתמש בנתונים אלה כנקודת התחלה לאסטרטגיית ה-SEO ותוכן שלך. תמיד אמת עם הנתיחות שלך שלך ובדיקה.
+            <p className="text-slate-600 leading-relaxed">
+              השתמשו בנתונים הללו כנקודת פתיחה לאסטרטגיית ה-SEO והתוכן שלכם, ואמתו אותם תמיד מול נתוני המעקב והניתוח שלכם בפועל.
             </p>
           </div>
         </section>
@@ -156,15 +156,15 @@ export default function KeywordResearchFeaturePage() {
         {/* CTA Section */}
         <section className="py-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-slate-900 mb-6">מוכן להאיץ את מחקר הביטויים שלך?</h2>
+            <h2 className="text-3xl font-bold text-slate-900 mb-6">מוכנים להאיץ את מחקר הביטויים?</h2>
             <p className="text-xl text-slate-600 mb-8">
-              התחל את הניסיון החינם 7 ימים שלך היום. לא נדרש כרטיס אשראי.
+              התחילו ניסיון חינם ל-7 ימים, ללא צורך בכרטיס אשראי.
             </p>
             <Link
               href="/signup"
               className="inline-block px-8 py-4 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white text-lg font-semibold shadow-lg hover:shadow-xl hover:from-amber-700 hover:to-orange-700 transition-all"
             >
-              התחל ניסיון חינם
+              להתנסות בחינם
             </Link>
           </div>
         </section>

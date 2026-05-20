@@ -155,6 +155,7 @@ export const dashboardEn = {
     engineGoogleMaps: 'Google Maps',
     selectProjectMessage: 'Select a project to display keywords.',
     sortByPositionTooltip: 'Sort by position',
+    sortByVolumeTooltip: 'Sort by search volume',
     history: {
       title: 'Ranking History',
       subtitle: 'Ranking history',
@@ -509,6 +510,7 @@ export const dashboardEn = {
     },
     results: {
       keyword: 'Keyword',
+      resultsCount: 'Results count',
       monthlySearches: 'Monthly searches',
       competition: 'Competition',
       lowCpc: 'Low CPC',
