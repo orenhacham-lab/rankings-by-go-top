@@ -514,7 +514,7 @@ export const dashboardEn = {
       resultsCount: 'Results count',
       monthlySearches: 'Monthly searches',
       opportunity: 'Opportunity',
-      opportunityTooltip: 'SEO potential is calculated from competition (45%), search volume (30%), long-tail (15%), and low CPC bonus (10%). High competition with short keywords remains low even with low CPC.',
+      opportunityTooltip: 'SEO potential is based on competition, search volume, and keyword specificity. CPC does not affect SEO potential.',
       competition: 'Competition',
       lowCpc: 'Low CPC',
       highCpc: 'High CPC',
