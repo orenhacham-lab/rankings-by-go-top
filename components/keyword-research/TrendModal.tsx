@@ -43,6 +43,7 @@ const translations = {
     lowestMonth: 'חודש נמוך ביותר',
     disclaimer: 'הנתונים מבוססים על Google Ads Keyword Planner ועשויים להיות משוערים.',
     close: 'סגור',
+    searches: 'חיפושים',
   },
   en: {
     title: (keyword: string) => `Search Trend: ${keyword}`,
@@ -60,6 +61,38 @@ const translations = {
     lowestMonth: 'Lowest month',
     disclaimer: 'Data is based on Google Ads Keyword Planner and may be approximate.',
     close: 'Close',
+    searches: 'Searches',
+  },
+}
+
+const monthNames = {
+  he: {
+    JANUARY: 'ינואר',
+    FEBRUARY: 'פברואר',
+    MARCH: 'מרץ',
+    APRIL: 'אפריל',
+    MAY: 'מאי',
+    JUNE: 'יוני',
+    JULY: 'יולי',
+    AUGUST: 'אוגוסט',
+    SEPTEMBER: 'ספטמבר',
+    OCTOBER: 'אוקטובר',
+    NOVEMBER: 'נובמבר',
+    DECEMBER: 'דצמבר',
+  },
+  en: {
+    JANUARY: 'Jan',
+    FEBRUARY: 'Feb',
+    MARCH: 'Mar',
+    APRIL: 'Apr',
+    MAY: 'May',
+    JUNE: 'Jun',
+    JULY: 'Jul',
+    AUGUST: 'Aug',
+    SEPTEMBER: 'Sep',
+    OCTOBER: 'Oct',
+    NOVEMBER: 'Nov',
+    DECEMBER: 'Dec',
   },
 }
 
@@ -89,10 +122,41 @@ const getTrendColor = (trend: string): string => {
   }
 }
 
+const getLocalizedMonthName = (monthEnum: string, language: 'he' | 'en'): string => {
+  const monthMap = monthNames[language] as Record<string, string>
+  return monthMap[monthEnum] || monthEnum
+}
+
+interface ChartDataPoint extends MonthlySearch {
+  displayMonth: string
+}
+
+const CustomTooltip = ({ active, payload, language }: { active?: boolean; payload?: any; language: 'he' | 'en' }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload as ChartDataPoint
+    const labels = translations[language]
+    return (
+      <div className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-100">
+        <p>{data.displayMonth}</p>
+        <p>
+          {labels.searches}: {data.searches.toLocaleString()}
+        </p>
+      </div>
+    )
+  }
+  return null
+}
+
 export default function TrendModal({ open, onClose, keyword, language, isRTL, loading = false, error, data }: TrendModalProps) {
   if (!open) return null
 
   const labels = translations[language]
+
+  // Transform chart data to include localized month names
+  const chartData: ChartDataPoint[] = (data?.monthlySearchVolumes || []).map((item) => ({
+    ...item,
+    displayMonth: getLocalizedMonthName(item.month, language),
+  }))
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -186,24 +250,16 @@ export default function TrendModal({ open, onClose, keyword, language, isRTL, lo
               {/* Chart */}
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.monthlySearchVolumes}>
+                  <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis
-                      dataKey="month"
+                      dataKey="displayMonth"
                       tick={{ fontSize: 12 }}
                       stroke="#9ca3af"
                       style={{ direction: isRTL ? 'rtl' : 'ltr' }}
                     />
                     <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                    <Tooltip
-                      formatter={(value: any) => (typeof value === 'number' ? value.toLocaleString() : value)}
-                      contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '1px solid #475569',
-                        borderRadius: '8px',
-                        color: '#f1f5f9',
-                      }}
-                    />
+                    <Tooltip content={<CustomTooltip language={language} />} />
                     <Line
                       type="monotone"
                       dataKey="searches"
