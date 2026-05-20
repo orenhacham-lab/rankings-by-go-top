@@ -27,31 +27,41 @@ type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotentia
 type OpportunityKey = 'high' | 'competitive' | 'medium' | 'low'
 
 function getVolumeScore(volume: number): number {
-  // Tiered scoring to prevent huge volumes from dominating
+  // Tiered scoring with broader long-tail support
   if (volume >= 1000) return 100
-  if (volume >= 500) return 75
-  if (volume >= 100) return 55
-  if (volume >= 30) return 25
+  if (volume >= 500) return 85
+  if (volume >= 100) return 70
+  if (volume >= 30) return 55
+  if (volume >= 10) return 35
   return 0
 }
 
 function getCompetitionScore(r: KeywordIdeaResult): number {
-  // Competition is weighted heavily — LOW opportunity should be much better than HIGH
   if (r.competition === 'LOW') return 100
   if (r.competition === 'MEDIUM') return 65
   if (r.competition === 'HIGH') return 15
-  // No competition data — use competitionIndex as fallback
   const ci = r.competitionIndex ?? 100
   return Math.max(0, 100 - ci)
 }
 
+function getWordCount(keyword: string): number {
+  return keyword.trim().split(/\s+/).filter(Boolean).length
+}
+
+function getLongTailScore(keyword: string): number {
+  const wc = getWordCount(keyword)
+  if (wc <= 1) return 0
+  if (wc === 2) return 35
+  if (wc === 3) return 70
+  return 100
+}
+
 function computeOpportunityScore(r: KeywordIdeaResult): number {
-  // SEO opportunity: competition weighted 0.65, volume weighted 0.35
-  // This ensures LOW/MEDIUM with decent volume beats HIGH with huge volume
-  const volume = r.avgMonthlySearches ?? 0
-  const volumeScore = getVolumeScore(volume)
+  // SEO opportunity: competition 0.55, volume 0.30, long-tail bonus 0.15
+  const volumeScore = getVolumeScore(r.avgMonthlySearches ?? 0)
   const competitionScore = getCompetitionScore(r)
-  return competitionScore * 0.65 + volumeScore * 0.35
+  const longTailScore = getLongTailScore(r.keyword)
+  return competitionScore * 0.55 + volumeScore * 0.30 + longTailScore * 0.15
 }
 
 function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
@@ -64,25 +74,29 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
 }
 
 function getOpportunityKey(r: KeywordIdeaResult): OpportunityKey {
-  // SEO opportunity badge — reflects which keywords to promote first
+  // SEO opportunity badge — competition + volume + long-tail. HIGH never gets "high".
   const vol = r.avgMonthlySearches ?? 0
+  const wc = getWordCount(r.keyword)
 
-  // High: worth promoting now
-  if ((r.competition === 'LOW' && vol >= 100) || (r.competition === 'MEDIUM' && vol >= 500)) {
-    return 'high'
+  if (r.competition === 'LOW') {
+    if (vol >= 30) return 'high'
+    if (vol >= 10 && wc >= 3) return 'high'
+    if (vol >= 10) return 'medium'
+    return 'low'
   }
 
-  // Medium: decent opportunity
-  if ((r.competition === 'LOW' && vol >= 30) || (r.competition === 'MEDIUM' && vol >= 100)) {
-    return 'medium'
+  if (r.competition === 'MEDIUM') {
+    if (vol >= 100) return 'high'
+    if (vol >= 30) return 'medium'
+    if (vol >= 10 && wc >= 3) return 'medium'
+    return 'low'
   }
 
-  // Competitive: lots of volume but high difficulty
-  if (r.competition === 'HIGH' && vol >= 500) {
-    return 'competitive'
+  if (r.competition === 'HIGH') {
+    if (vol >= 500) return 'competitive'
+    return 'low'
   }
 
-  // Low: not worth prioritizing now
   return 'low'
 }
 
