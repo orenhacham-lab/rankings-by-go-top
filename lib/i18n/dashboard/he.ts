@@ -512,7 +512,7 @@ export const dashboardHe = {
       resultsCount: 'כמות תוצאות',
       monthlySearches: 'חיפושים חודשיים',
       opportunity: 'פוטנציאל',
-      opportunityTooltip: 'פוטנציאל SEO מחושב לפי תחרות, נפח חיפוש ומיקוד הביטוי. ביטויי long tail מקבלים בונוס קטן.',
+      opportunityTooltip: 'פוטנציאל SEO מחושב לפי תחרות, נפח חיפוש ומיקוד הביטוי. תחרות גבוהה מגבילה את הציון, אך אינה קובעת לבד את הפוטנציאל.',
       competition: 'תחרות',
       lowCpc: 'CPC נמוך',
       highCpc: 'CPC גבוה',

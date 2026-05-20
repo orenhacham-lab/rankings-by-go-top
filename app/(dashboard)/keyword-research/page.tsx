@@ -74,25 +74,18 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
 }
 
 function getOpportunityKey(r: KeywordIdeaResult): OpportunityKey {
-  // SEO opportunity badge — competition + volume + long-tail. HIGH never gets "high".
-  const vol = r.avgMonthlySearches ?? 0
-  const wc = getWordCount(r.keyword)
+  // Badge is derived from the actual opportunityScore — not a hardcoded
+  // competition lookup. HIGH competition only acts as a guardrail (cannot reach "high").
+  const score = computeOpportunityScore(r)
 
-  if (r.competition === 'LOW') {
-    if (vol >= 30) return 'high'
-    if (vol >= 10 && wc >= 3) return 'high'
-    if (vol >= 10) return 'medium'
+  if (r.competition === 'HIGH') {
+    // HIGH limits the ceiling: can be medium if score is decent, but never high.
+    if (score >= 45) return 'medium'
     return 'low'
   }
 
-  if (r.competition === 'MEDIUM') {
-    if (vol >= 100) return 'high'
-    if (vol >= 30) return 'medium'
-    if (vol >= 10 && wc >= 3) return 'medium'
-    return 'low'
-  }
-
-  // HIGH competition always gets "low" — see other columns for volume/competition
+  if (score >= 70) return 'high'
+  if (score >= 45) return 'medium'
   return 'low'
 }
 

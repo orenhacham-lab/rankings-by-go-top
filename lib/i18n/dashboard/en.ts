@@ -514,7 +514,7 @@ export const dashboardEn = {
       resultsCount: 'Results count',
       monthlySearches: 'Monthly searches',
       opportunity: 'Opportunity',
-      opportunityTooltip: 'SEO opportunity is based on competition, search volume, and keyword specificity. Long-tail keywords receive a small boost.',
+      opportunityTooltip: 'SEO opportunity is based on competition, search volume, and keyword specificity. High competition limits the score but does not determine it alone.',
       competition: 'Competition',
       lowCpc: 'Low CPC',
       highCpc: 'High CPC',
