@@ -843,9 +843,8 @@ function EngineMentionCards({ metrics, t }: { metrics: Map<string, EngineMetrics
               key={em.engine}
               className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 sm:p-4 hover:shadow-md transition flex flex-col items-center text-center"
             >
-              {meta && <meta.Icon size={24} className={`${meta.accent} sm:hidden`} />}
-              {meta && <meta.Icon size={32} className={`${meta.accent} hidden sm:block`} />}
-              <div className="font-semibold text-slate-900 dark:text-slate-100 mt-2 sm:mt-3 text-xs sm:text-sm truncate max-w-full">{meta?.name || em.engine}</div>
+              {meta && <meta.Icon size={32} className={`${meta.accent} mb-2 sm:mb-1`} />}
+              <div className="font-semibold text-slate-900 dark:text-slate-100 mt-1 sm:mt-2 text-xs sm:text-sm truncate max-w-full">{meta?.name || em.engine}</div>
               <div className="text-xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 sm:mt-2">{em.mentions}</div>
               <div className="hidden sm:block text-xs text-slate-600 dark:text-slate-300 mt-2">
                 {t('out_of_results').replace('{count}', String(em.scans))}
