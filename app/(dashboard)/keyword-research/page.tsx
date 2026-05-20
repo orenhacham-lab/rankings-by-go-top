@@ -24,18 +24,18 @@ interface Project {
 }
 
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
-type OpportunityKey = 'high' | 'commercial' | 'competitive' | 'medium' | 'low'
+type OpportunityKey = 'high' | 'competitive' | 'medium' | 'low'
 
 function computeOpportunityScore(r: KeywordIdeaResult): number {
+  // SEO opportunity: volume × competition only. CPC is not part of this score.
   const vol = r.avgMonthlySearches ?? 0
-  if (vol < 50) return 0
-  const volumeScore = Math.min(Math.log10(vol + 1) / 4, 1) * 40
-  const compScore = r.competition === 'LOW' ? 30 : r.competition === 'MEDIUM' ? 18 : 5
-  const cpc = r.highTopOfPageBid ?? 0
-  const commercialScore = Math.min(cpc / 5, 1) * 20
-  const ci = r.competitionIndex
-  const ciScore = ci !== null ? Math.max(0, (100 - ci) / 100) * 10 : 5
-  return volumeScore + compScore + commercialScore + ciScore
+  const volumeScore = Math.min(Math.log10(vol + 1) / 4, 1) * 100
+  const competitionScore =
+    r.competition === 'LOW' ? 100 :
+    r.competition === 'MEDIUM' ? 65 :
+    r.competition === 'HIGH' ? 20 :
+    40
+  return volumeScore * 0.65 + competitionScore * 0.35
 }
 
 function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
@@ -48,22 +48,26 @@ function getBadgeKey(r: KeywordIdeaResult): BadgeKey {
 }
 
 function getOpportunityKey(r: KeywordIdeaResult): OpportunityKey {
+  // SEO opportunity badge. HIGH competition can never be "high".
   const vol = r.avgMonthlySearches ?? 0
-  const cpc = r.highTopOfPageBid ?? 0
 
-  // Commercial (high CPC first priority)
-  if (cpc >= 2 && vol >= 500) return 'commercial'
+  if (r.competition === 'HIGH') {
+    if (vol >= 500) return 'competitive'
+    return 'low'
+  }
 
-  // Competitive (HIGH comp + high volume)
-  if (r.competition === 'HIGH' && vol >= 1000) return 'competitive'
+  if (r.competition === 'MEDIUM') {
+    if (vol >= 500) return 'high'
+    if (vol >= 100) return 'medium'
+    return 'low'
+  }
 
-  // High potential (LOW/MEDIUM comp + good volume)
-  if ((r.competition === 'LOW' || r.competition === 'MEDIUM') && vol >= 1000) return 'high'
+  if (r.competition === 'LOW') {
+    if (vol >= 100) return 'high'
+    if (vol >= 30) return 'medium'
+    return 'low'
+  }
 
-  // Medium potential
-  if (vol >= 200) return 'medium'
-
-  // Low
   return 'low'
 }
 
@@ -79,14 +83,12 @@ function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): O
   const labels = {
     he: {
       high: 'גבוה',
-      commercial: 'מסחרי',
       competitive: 'תחרותי',
       medium: 'בינוני',
       low: 'נמוך',
     },
     en: {
       high: 'High',
-      commercial: 'Commercial',
       competitive: 'Competitive',
       medium: 'Medium',
       low: 'Low',
@@ -95,7 +97,6 @@ function getOpportunityBadgeInfo(r: KeywordIdeaResult, language: 'he' | 'en'): O
 
   const colorClasses = {
     high: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
-    commercial: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
     competitive: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
     medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
     low: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
@@ -465,7 +466,6 @@ export default function KeywordResearchPage() {
   const sortedResults = useMemo(() => {
     if (results.length === 0) return results
     const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
-    const opportunityRank: Record<OpportunityKey, number> = { high: 5, commercial: 4, competitive: 3, medium: 2, low: 1 }
     const copy = [...results]
     const dir = sortDir === 'asc' ? 1 : -1
     copy.sort((a, b) => {
@@ -489,8 +489,8 @@ export default function KeywordResearchPage() {
           bVal = b.competition ? competitionRank[b.competition] : -1
           break
         case 'opportunity':
-          aVal = opportunityRank[getOpportunityKey(a)]
-          bVal = opportunityRank[getOpportunityKey(b)]
+          aVal = computeOpportunityScore(a)
+          bVal = computeOpportunityScore(b)
           break
         default:
           return 0
@@ -986,6 +986,7 @@ export default function KeywordResearchPage() {
                     <button
                       type="button"
                       onClick={() => handleSort('opportunity')}
+                      title={t.results.opportunityTooltip}
                       className={`inline-flex items-center gap-1 hover:text-blue-600 transition-colors ${sortBy === 'opportunity' ? 'text-blue-600 dark:text-blue-400' : ''}`}
                     >
                       {t.results.opportunity}

@@ -512,6 +512,7 @@ export const dashboardHe = {
       resultsCount: 'כמות תוצאות',
       monthlySearches: 'חיפושים חודשיים',
       opportunity: 'פוטנציאל',
+      opportunityTooltip: 'הפוטנציאל מחושב לפי נפח חיפוש ותחרות. CPC אינו קובע פוטנציאל SEO.',
       competition: 'תחרות',
       lowCpc: 'CPC נמוך',
       highCpc: 'CPC גבוה',

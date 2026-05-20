@@ -514,6 +514,7 @@ export const dashboardEn = {
       resultsCount: 'Results count',
       monthlySearches: 'Monthly searches',
       opportunity: 'Opportunity',
+      opportunityTooltip: 'Opportunity is based on search volume and competition. CPC does not determine SEO opportunity.',
       competition: 'Competition',
       lowCpc: 'Low CPC',
       highCpc: 'High CPC',
