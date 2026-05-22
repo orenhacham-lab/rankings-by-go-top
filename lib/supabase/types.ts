@@ -48,6 +48,11 @@ export interface Database {
         Insert: Omit<AICitation, 'id' | 'created_at'>
         Update: Partial<Omit<AICitation, 'id' | 'created_at'>>
       }
+      ai_visibility_competitors: {
+        Row: AIVisibilityCompetitor
+        Insert: Omit<AIVisibilityCompetitor, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<AIVisibilityCompetitor, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -306,4 +311,16 @@ export interface AICitation {
   created_at: string
   // joins
   ai_scan_results?: AIScanResult
+}
+
+export interface AIVisibilityCompetitor {
+  id: string
+  user_id: string
+  project_id: string
+  name: string
+  domain: string | null
+  aliases: string[]
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }

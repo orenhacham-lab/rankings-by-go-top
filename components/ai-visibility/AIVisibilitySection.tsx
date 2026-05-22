@@ -31,6 +31,7 @@ import {
 } from './EngineIcon'
 import PromptSuggestions from './PromptSuggestions'
 import AIBusinessProfilePanel from './AIBusinessProfilePanel'
+import CompetitorsPanel from './CompetitorsPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
@@ -580,6 +581,9 @@ export default function AIVisibilitySection({
               setSuggestedQuestions(refreshed.slice(0, 4))
             }}
           />
+          <div className="mt-3">
+            <CompetitorsPanel projectId={projectId} />
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">

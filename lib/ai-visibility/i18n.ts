@@ -308,6 +308,45 @@ const STRINGS = {
   cat_education: { he: 'הכשרה והוראה', en: 'Education' },
   cat_second_hand_fashion: { he: 'בגדי יד שנייה לנשים', en: 'Second-hand women\'s fashion' },
   cat_generic: { he: 'אחר', en: 'Other' },
+
+  // Competitors panel (Phase 1)
+  competitors_title: { he: 'מתחרים למעקב', en: 'Tracked competitors' },
+  competitors_subtitle: {
+    he: 'הגדירו עד 3 מתחרים שאתם רוצים לעקוב אחריהם בתשובות AI.',
+    en: 'Define up to 3 competitors you want to track in AI answers.',
+  },
+  competitor_name: { he: 'שם המתחרה', en: 'Competitor name' },
+  competitor_name_placeholder: { he: 'לדוגמה: Adidas', en: 'e.g. Adidas' },
+  competitor_domain: { he: 'דומיין (אופציונלי)', en: 'Domain (optional)' },
+  competitor_domain_placeholder: { he: 'example.com', en: 'example.com' },
+  competitor_aliases: { he: 'שמות נוספים', en: 'Alternative names' },
+  competitor_aliases_help: {
+    he: 'שמות נוספים לזיהוי, מופרדים בפסיקים',
+    en: 'Alternative names to detect, separated by commas',
+  },
+  competitor_aliases_placeholder: { he: 'אדידאס, adidas, ‎ADIDAS', en: 'adidas, ADIDAS' },
+  competitor_add: { he: 'הוספת מתחרה', en: 'Add competitor' },
+  competitor_save: { he: 'שמירה', en: 'Save' },
+  competitor_cancel: { he: 'ביטול', en: 'Cancel' },
+  competitor_edit: { he: 'עריכה', en: 'Edit' },
+  competitor_delete: { he: 'מחיקה', en: 'Delete' },
+  competitor_max_reached: {
+    he: 'הגעת למקסימום של 3 מתחרים פעילים. השבת אחד כדי להוסיף חדש.',
+    en: 'You\'ve reached the limit of 3 active competitors. Deactivate one to add another.',
+  },
+  competitor_empty: {
+    he: 'עדיין לא הוגדרו מתחרים. הוסיפו מתחרה ראשון כדי להתחיל.',
+    en: 'No competitors defined yet. Add your first competitor to get started.',
+  },
+  competitor_delete_confirm: {
+    he: 'להסיר את המתחרה מהמעקב הפעיל? ההיסטוריה תישמר.',
+    en: 'Remove this competitor from active tracking? History will be kept.',
+  },
+  competitor_loading: { he: 'טוען מתחרים…', en: 'Loading competitors…' },
+  competitor_load_failed: { he: 'טעינת המתחרים נכשלה.', en: 'Failed to load competitors.' },
+  competitor_active_count: { he: 'מתחרים פעילים', en: 'Active competitors' },
+  competitor_inactive: { he: 'לא פעיל', en: 'Inactive' },
+  competitor_reactivate: { he: 'הפעלה מחדש', en: 'Reactivate' },
 } as const
 
 type StringKey = keyof typeof STRINGS
