@@ -357,17 +357,35 @@ export default function AIVisibilitySection({
     return s
   }, [allResults])
 
-  // Per-prompt insights: dedupe by (promptId, engine) keeping latest result
+  // Per-prompt insights: dedupe by (promptKey, engine) keeping latest result
   // per engine, then aggregate mentions/citations. Read-only over allResults.
+  // Keying tries promptId first; falls back to normalized promptText when the
+  // result has no promptId attached (older runs / cascade-detached results).
   const promptInsights = useMemo(() => {
+    const normalizeText = (text: string): string =>
+      text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+
+    // Build text-based lookups for the active prompts: text -> prompt.id
+    const promptIdByText = new Map<string, string>()
+    for (const p of allPrompts) {
+      const norm = normalizeText(p.prompt || '')
+      if (norm) promptIdByText.set(norm, p.id)
+    }
+
     const sorted = [...allResults].sort((a, b) =>
       (b.scannedAt || '').localeCompare(a.scannedAt || '')
     )
     const byPrompt = new Map<string, Map<string, ResultRow>>()
     for (const r of sorted) {
-      if (r.status !== 'success' || !r.promptId) continue
-      if (!byPrompt.has(r.promptId)) byPrompt.set(r.promptId, new Map())
-      const engineMap = byPrompt.get(r.promptId)!
+      if (r.status !== 'success') continue
+      let key: string | null = r.promptId
+      if (!key && r.promptText) {
+        const norm = normalizeText(r.promptText)
+        key = promptIdByText.get(norm) || null
+      }
+      if (!key) continue
+      if (!byPrompt.has(key)) byPrompt.set(key, new Map())
+      const engineMap = byPrompt.get(key)!
       if (!engineMap.has(r.engine)) engineMap.set(r.engine, r)
     }
     const insights = new Map<string, PromptInsight>()
@@ -393,7 +411,7 @@ export default function AIVisibilitySection({
       })
     }
     return insights
-  }, [allResults])
+  }, [allResults, allPrompts])
 
   // Open the drawer for a specific result, fetching full details on demand.
   const openResultDrawer = useCallback(async (result: ResultRow) => {

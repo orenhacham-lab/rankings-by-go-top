@@ -381,6 +381,7 @@ export async function GET(request: Request) {
           return {
             id: r.id,
             engine: r.engine,
+            promptId: r.prompt_id ?? null,
             promptText,
             mentioned: r.mentioned,
             targetCited: r.target_cited,
