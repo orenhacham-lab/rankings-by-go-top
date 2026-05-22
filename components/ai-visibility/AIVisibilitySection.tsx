@@ -819,38 +819,51 @@ function AIVisibilityScoreCard({
     level === 'low'
       ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800'
       : level === 'medium'
-      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800'
+      ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
       : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800'
   const scoreColor =
     level === 'low'
       ? 'text-orange-600 dark:text-orange-400'
       : level === 'medium'
-      ? 'text-amber-600 dark:text-amber-400'
+      ? 'text-yellow-600 dark:text-yellow-400'
       : 'text-emerald-600 dark:text-emerald-400'
+  const barColor =
+    level === 'low'
+      ? 'bg-orange-400 dark:bg-orange-500'
+      : level === 'medium'
+      ? 'bg-yellow-400 dark:bg-yellow-500'
+      : 'bg-emerald-400 dark:bg-emerald-500'
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-white to-indigo-50/50 dark:from-slate-900 dark:to-slate-800 p-4 sm:p-5">
-      <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-white to-indigo-50/40 dark:from-slate-900 dark:to-slate-800 p-4 sm:p-5">
+      <div className={`flex items-center justify-between gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
         <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse' : ''}`}>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
               {t('ai_visibility_score')}
             </h3>
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badgeClass}`}
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badgeClass}`}
               title={t('score_help')}
             >
               {badgeText}
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1" title={t('score_help')}>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug" title={t('score_help')}>
             {t('score_subtext')}
           </p>
         </div>
-        <div className={`flex items-baseline gap-1 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`} dir="ltr">
-          <span className={`text-4xl sm:text-5xl font-bold ${scoreColor}`}>{safeScore}</span>
-          <span className="text-base sm:text-lg font-semibold text-slate-400 dark:text-slate-500">/100</span>
+        <div className="shrink-0" dir="ltr">
+          <span className={`text-3xl sm:text-4xl font-bold tabular-nums ${scoreColor}`}>{safeScore}</span>
+          <span className="text-sm sm:text-base font-semibold text-slate-400 dark:text-slate-500 ml-0.5">/100</span>
         </div>
+      </div>
+      {/* Progress bar */}
+      <div className="mt-3 w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden" dir="ltr">
+        <div
+          className={`h-full ${barColor} transition-all`}
+          style={{ width: `${safeScore}%` }}
+        />
       </div>
     </div>
   )

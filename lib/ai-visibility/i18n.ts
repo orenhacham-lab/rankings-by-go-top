@@ -394,8 +394,8 @@ const STRINGS = {
     en: 'The score is based on the percentage of AI answers where the business appeared.',
   },
   score_subtext: {
-    he: 'מבוסס על אחוז הנראות בסריקה האחרונה.',
-    en: 'Based on visibility rate in the latest scan.',
+    he: 'מבוסס על אחוז התשובות שבהן העסק הופיע במנועי AI.',
+    en: 'Based on the percentage of AI answers where the business appeared.',
   },
   score_low: { he: 'נמוך', en: 'Low' },
   score_medium: { he: 'בינוני', en: 'Medium' },
