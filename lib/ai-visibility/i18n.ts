@@ -147,6 +147,7 @@ const STRINGS = {
 
   // New dashboard structure
   engine: { he: 'מנוע', en: 'Engine' },
+  engines: { he: 'מנועים', en: 'engines' },
   all_engines: { he: 'כל המנועים', en: 'All engines' },
   all_mention: { he: 'כל האזכורים', en: 'All mentions' },
   all_citations: { he: 'כל הציטוטים', en: 'All citations' },
