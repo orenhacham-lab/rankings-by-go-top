@@ -461,9 +461,8 @@ const STRINGS = {
   },
 
   // Phase 6 — Per-question insights (Queries tab)
-  prompt_visibility: { he: 'נראות', en: 'Visibility' },
-  prompt_status: { he: 'סטטוס', en: 'Status' },
-  prompt_domain_cited: { he: 'דומיין צוטט', en: 'Domain cited' },
+  prompt_mentions: { he: 'אזכורים', en: 'Mentions' },
+  prompt_site_cited: { he: 'האתר צוטט', en: 'Site cited' },
   prompt_engines_of: { he: '{mentioned} מתוך {total} מנועים', en: '{mentioned} of {total} engines' },
   prompt_yes: { he: 'כן', en: 'Yes' },
   prompt_no: { he: 'לא', en: 'No' },
