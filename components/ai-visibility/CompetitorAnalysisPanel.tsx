@@ -13,9 +13,26 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
+import { TrendingUp, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { ENGINE_META } from './EngineIcon'
+
+const SMALL_SAMPLE_THRESHOLD = 5
+
+/**
+ * Format an engine key (eg. 'google_ai_mode', 'chatgpt') into a friendly
+ * display name (eg. 'Google AI', 'ChatGPT'). Falls back to a title-cased
+ * version of the key when the engine isn't in ENGINE_META.
+ */
+function formatEngineLabel(engineKey: string): string {
+  const normalized = engineKey.toLowerCase()
+  // google_ai_overview is an alias for google_ai_mode
+  const lookupKey = normalized === 'google_ai_overview' ? 'google_ai_mode' : normalized
+  const meta = ENGINE_META[lookupKey]
+  if (meta?.name) return meta.name
+  return engineKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
 
 type EngineStats = {
   mentions: number
@@ -31,11 +48,12 @@ type CompetitorData = {
   mentionsCount: number
   totalResults: number
   mentionRate: number
+  matchedAliases?: string[]
   byEngine: Record<string, EngineStats>
 }
 
 type ProjectData = {
-  name: string
+  name: string | null
   mentionsCount: number
   totalResults: number
   mentionRate: number
@@ -52,6 +70,7 @@ type AnalysisResponse = {
     scanCompletedAt?: string
     enginesCount?: number
     resultsCount?: number
+    engines?: string[]
   }
 }
 
@@ -138,6 +157,22 @@ export default function CompetitorAnalysisPanel({ projectId }: { projectId: stri
     }))
   }
 
+  // Format "X of Y results" naturally per language.
+  const formatResultsText = (mentions: number, total: number): string => {
+    return language === 'he'
+      ? `${mentions} מתוך ${total} תוצאות`
+      : `${mentions} of ${total} results`
+  }
+
+  const businessDisplayName = data.project.name || t('competitor_your_business')
+  const totalResults = data.project.totalResults
+  const showSmallSampleWarning = totalResults > 0 && totalResults < SMALL_SAMPLE_THRESHOLD
+
+  const smallSampleMessage =
+    language === 'he'
+      ? 'ההשוואה מבוססת על מספר קטן של תוצאות. להרצת השוואה מדויקת יותר, הוסיפו שאלות AI נוספות או הריצו סריקה רחבה יותר.'
+      : 'This comparison is based on a small number of results. For a more reliable comparison, add more AI questions or run a broader scan.'
+
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 space-y-4">
       {/* Header */}
@@ -149,13 +184,21 @@ export default function CompetitorAnalysisPanel({ projectId }: { projectId: stri
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('competitor_analysis_help')}</p>
       </div>
 
+      {/* Small sample warning */}
+      {showSmallSampleWarning && (
+        <div className={`flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
+          <Info size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{smallSampleMessage}</p>
+        </div>
+      )}
+
       {/* Project mention card */}
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:from-indigo-900/20 dark:to-indigo-800/10 p-3">
         <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <div className={isRTL ? 'text-right' : 'text-left'}>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('competitor_your_business')}</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{businessDisplayName}</p>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              {data.project.mentionsCount} {t('competitor_mentions')} / {data.project.totalResults}
+              {formatResultsText(data.project.mentionsCount, data.project.totalResults)}
             </p>
           </div>
           <div className="text-right">
@@ -177,7 +220,7 @@ export default function CompetitorAnalysisPanel({ projectId }: { projectId: stri
               <div className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{competitor.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {competitor.mentionsCount} {t('competitor_mentions')} / {competitor.totalResults}
+                  {formatResultsText(competitor.mentionsCount, competitor.totalResults)}
                 </p>
               </div>
               <div className="text-right">
@@ -207,9 +250,9 @@ export default function CompetitorAnalysisPanel({ projectId }: { projectId: stri
               <div className="mt-2 space-y-1 pt-2 border-t border-slate-200 dark:border-slate-700">
                 {Object.entries(competitor.byEngine).map(([engine, stats]) => (
                   <div key={engine} className={`flex items-center justify-between gap-2 px-2 py-1 text-xs ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <span className="text-slate-600 dark:text-slate-400 capitalize">{engine}</span>
-                    <span className="text-slate-700 dark:text-slate-300 font-medium">
-                      {stats.mentions}/{stats.total} ({stats.rate}%)
+                    <span className="text-slate-700 dark:text-slate-300 font-medium">{formatEngineLabel(engine)}</span>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {formatResultsText(stats.mentions, stats.total)} — {stats.rate}%
                     </span>
                   </div>
                 ))}

@@ -57,7 +57,7 @@ async function authAndProject(projectId: string | null | undefined) {
 
   const { data: project, error: projectError } = await admin
     .from('projects')
-    .select('id, user_id, business_name, target_domain, country, language')
+    .select('id, user_id, name, business_name, target_domain, country, language')
     .eq('id', projectId)
     .maybeSingle()
 
@@ -152,11 +152,13 @@ export async function GET(
     })
   }
 
-  // Load all scan results for this run
+  // Load all scan results for this run (only successful ones — pending/error
+  // results have no response_text and would skew percentages)
   const { data: scanResults, error: resultsError } = await auth.admin
     .from('ai_scan_results')
-    .select('id, engine, response_text, source_count, citation_count, mentioned, target_cited')
+    .select('id, engine, response_text, source_count, citation_count, mentioned, target_cited, status')
     .eq('run_id', latestRun.id)
+    .eq('status', 'success')
     .order('scanned_at', { ascending: true })
 
   if (resultsError) {
@@ -167,87 +169,95 @@ export async function GET(
   const resultsList = (scanResults as any[]) || []
   const totalResults = resultsList.length
 
+  // Build distinct engine list for meta (debug visibility)
+  const enginesInRun = Array.from(new Set(resultsList.map((r: any) => r.engine).filter(Boolean)))
+
   if (totalResults === 0) {
     return Response.json({
       success: true,
       project: null,
       competitors: [],
-      meta: { emptyState: 'no_results', scanRunId: latestRun.id, scanCompletedAt: latestRun.completed_at, enginesCount: latestRun.total_engines || 0, resultsCount: 0 },
+      meta: {
+        emptyState: 'no_results',
+        scanRunId: latestRun.id,
+        scanCompletedAt: latestRun.completed_at,
+        enginesCount: latestRun.total_engines || 0,
+        resultsCount: 0,
+        engines: enginesInRun,
+      },
     })
   }
 
-  // Detect project/business mentions
-  const projectName = (auth.project as any)?.business_name || null
+  // Detect project/business mentions. Prefer business_name (more accurate brand),
+  // fallback to project.name for display.
+  const projectBusinessName = (auth.project as any)?.business_name || null
+  const projectFallbackName = (auth.project as any)?.name || null
+  const projectName = projectBusinessName || projectFallbackName
   const projectDomain = (auth.project as any)?.target_domain || null
 
+  // Detect project mentions ONCE across all results (not per-competitor)
   let projectMentions = 0
   const projectByEngine: EngineStats = {}
 
-  // Detect competitor mentions
+  for (const result of resultsList) {
+    const responseText = result.response_text || ''
+    const engine = result.engine || 'unknown'
+
+    if (!projectByEngine[engine]) {
+      projectByEngine[engine] = { mentions: 0, total: 0, rate: 0 }
+    }
+    projectByEngine[engine].total += 1
+
+    if (projectName || projectDomain) {
+      const detectionResult = detectBrandNameMention(responseText, projectName, projectDomain)
+      if (detectionResult.mentioned) {
+        projectByEngine[engine].mentions += 1
+        projectMentions += 1
+      }
+    }
+  }
+
+  // Detect competitor mentions per competitor across all results
   const competitorStats = competitorsList.map((comp: any) => {
     const compMentions: EngineStats = {}
     let totalMentions = 0
+    const matchedAliasesSet = new Set<string>()
 
     for (const result of resultsList) {
       const responseText = result.response_text || ''
       const engine = result.engine || 'unknown'
 
-      // Initialize engine stats
       if (!compMentions[engine]) {
         compMentions[engine] = { mentions: 0, total: 0, rate: 0 }
       }
       compMentions[engine].total += 1
 
-      // Project mention detection
-      if (!projectByEngine[engine]) {
-        projectByEngine[engine] = { mentions: 0, total: 0, rate: 0 }
-      }
-      projectByEngine[engine].total += 1
-
-      // Detect project mention if project name or domain exists
-      let projectMentioned = false
-      if (projectName || projectDomain) {
-        const detectionResult = detectBrandNameMention(responseText, projectName, projectDomain)
-        if (detectionResult.mentioned) {
-          projectMentioned = true
-          projectByEngine[engine].mentions += 1
-          projectMentions += 1
-        }
-      }
-
       // Detect competitor mentions (name, aliases, domain)
       let competitorMentioned = false
-      const matchedAliases: string[] = []
 
       if (comp.name) {
         const nameResult = detectBrandNameMention(responseText, comp.name)
         if (nameResult.mentioned) {
           competitorMentioned = true
-          matchedAliases.push(...nameResult.matchedVariants)
+          for (const v of nameResult.matchedVariants) matchedAliasesSet.add(v)
         }
       }
 
-      // Check aliases
       if (comp.aliases && Array.isArray(comp.aliases)) {
         for (const alias of comp.aliases) {
           const aliasResult = detectBrandNameMention(responseText, alias)
           if (aliasResult.mentioned) {
             competitorMentioned = true
-            matchedAliases.push(...aliasResult.matchedVariants)
+            for (const v of aliasResult.matchedVariants) matchedAliasesSet.add(v)
           }
         }
       }
 
-      // Check domain
       if (comp.domain) {
         const normalizedCompDomain = normalizeDomain(comp.domain)
-        const normalizedResponseDomain = responseText
-          .toLowerCase()
-          .includes(normalizedCompDomain.toLowerCase())
-
-        if (normalizedResponseDomain) {
+        if (normalizedCompDomain && responseText.toLowerCase().includes(normalizedCompDomain.toLowerCase())) {
           competitorMentioned = true
-          matchedAliases.push(normalizedCompDomain)
+          matchedAliasesSet.add(normalizedCompDomain)
         }
       }
 
@@ -271,6 +281,7 @@ export async function GET(
       mentionsCount: totalMentions,
       totalResults,
       mentionRate: totalResults > 0 ? Math.round((totalMentions / totalResults) * 100) : 0,
+      matchedAliases: Array.from(matchedAliasesSet),
       byEngine: compMentions,
     }
   })
@@ -284,7 +295,7 @@ export async function GET(
   return Response.json({
     success: true,
     project: {
-      name: projectName || 'Your business',
+      name: projectName,
       mentionsCount: projectMentions,
       totalResults,
       mentionRate: totalResults > 0 ? Math.round((projectMentions / totalResults) * 100) : 0,
@@ -296,6 +307,7 @@ export async function GET(
       scanCompletedAt: latestRun.completed_at,
       enginesCount: latestRun.total_engines || 0,
       resultsCount: totalResults,
+      engines: enginesInRun,
     },
   })
 }
