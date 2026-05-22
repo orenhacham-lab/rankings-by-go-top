@@ -86,6 +86,11 @@ type EngineMetrics = {
 
 type TabType = 'results' | 'queries' | 'competitors'
 
+type CompetitorAnalysisData = {
+  project: { name: string | null; mentionsCount: number; totalResults: number; mentionRate: number } | null
+  competitors: Array<{ id: string; name: string; mentionsCount: number; mentionRate: number }>
+}
+
 export default function AIVisibilitySection({
   projectId,
   projectCountry,
@@ -136,6 +141,8 @@ export default function AIVisibilitySection({
   const [showAllPrompts, setShowAllPrompts] = useState(false)
   const [scanStatus, setScanStatus] = useState<string | null>(null)
   const [competitorsRefreshKey, setCompetitorsRefreshKey] = useState(0)
+  const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysisData | null>(null)
+  const [competitorAnalysisStatus, setCompetitorAnalysisStatus] = useState<'idle' | 'loading' | 'loaded' | 'error' | 'empty'>('idle')
 
   // Build brand variants once for reuse in result rows (mention chips)
   const brandVariants = useMemo(
@@ -290,6 +297,47 @@ export default function AIVisibilitySection({
   useEffect(() => {
     loadAllResults()
   }, [loadAllResults])
+
+  // Fetch competitor analysis (read-only) so we can build a competitor-leading
+  // recommendation when a competitor has more mentions than the project.
+  // Refetches whenever scan results or competitors change.
+  useEffect(() => {
+    let cancelled = false
+    setCompetitorAnalysisStatus('loading')
+    fetch(`/api/projects/${projectId}/ai-visibility/competitor-analysis`)
+      .then(async (r) => {
+        if (!r.ok) return { ok: false as const, status: r.status, data: null }
+        const data = await r.json().catch(() => null)
+        return { ok: true as const, status: r.status, data }
+      })
+      .then((res) => {
+        if (cancelled) return
+        if (!res.ok || !res.data || !res.data.success) {
+          setCompetitorAnalysis(null)
+          setCompetitorAnalysisStatus('error')
+          return
+        }
+        // Empty states from the API (no competitors / no scan / table missing)
+        if (!res.data.project || !Array.isArray(res.data.competitors) || res.data.competitors.length === 0) {
+          setCompetitorAnalysis(null)
+          setCompetitorAnalysisStatus('empty')
+          return
+        }
+        setCompetitorAnalysis({
+          project: res.data.project,
+          competitors: res.data.competitors,
+        })
+        setCompetitorAnalysisStatus('loaded')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setCompetitorAnalysis(null)
+        setCompetitorAnalysisStatus('error')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, allResults.length, competitorsRefreshKey])
 
   const scannedSet = useMemo(() => {
     const s = new Set<string>()
@@ -572,7 +620,14 @@ export default function AIVisibilitySection({
 
           {/* RECOMMENDATIONS CARD */}
           {globalMetrics && (
-            <RecommendationsCard metrics={globalMetrics} engineMetrics={engineMetrics} allResults={allResults} t={t} isRTL={isHebrew} />
+            <RecommendationsCard
+              metrics={globalMetrics}
+              engineMetrics={engineMetrics}
+              allResults={allResults}
+              competitorAnalysis={competitorAnalysis}
+              t={t}
+              isRTL={isHebrew}
+            />
           )}
         </>
       )}
@@ -941,16 +996,46 @@ function RecommendationsCard({
   metrics,
   engineMetrics,
   allResults,
+  competitorAnalysis,
   t,
   isRTL,
 }: {
   metrics: GlobalMetrics
   engineMetrics: Map<string, EngineMetrics>
   allResults: ResultRow[]
+  competitorAnalysis: CompetitorAnalysisData | null
   t: T
   isRTL: boolean
 }) {
   const recommendations: Recommendation[] = []
+
+  // Rule 0: Competitor leading — a competitor has more mentions than the
+  // project. Highest priority because it shows real competitive risk.
+  if (competitorAnalysis && competitorAnalysis.project && competitorAnalysis.competitors.length > 0) {
+    const projectMentions = competitorAnalysis.project.mentionsCount
+    // Find the competitor with the largest positive gap over the project
+    let leadingCompetitor: { name: string; gap: number } | null = null
+    for (const comp of competitorAnalysis.competitors) {
+      const gap = comp.mentionsCount - projectMentions
+      if (gap > 0 && comp.name && (!leadingCompetitor || gap > leadingCompetitor.gap)) {
+        leadingCompetitor = { name: comp.name, gap }
+      }
+    }
+    if (leadingCompetitor) {
+      const bodyText = t('rec_competitor_leading_body')
+        .replace('{competitorName}', leadingCompetitor.name)
+        .replace('{gap}', String(leadingCompetitor.gap))
+      recommendations.push({
+        id: 'competitor_leading',
+        type: 'competitor_leading',
+        severity: 'high',
+        titleKey: 'rec_competitor_leading_title',
+        body: bodyText,
+        bodyKey: 'rec_competitor_leading_body',
+        priority: 1,
+      })
+    }
+  }
 
   // Rule 1: Weak engines — engines with scans but no mentions
   const allWeakEngines = Array.from(engineMetrics.values())

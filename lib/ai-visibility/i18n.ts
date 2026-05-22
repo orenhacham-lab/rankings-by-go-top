@@ -426,19 +426,26 @@ const STRINGS = {
   // Recommendation 1: Weak engines — engines with no mentions
   rec_weak_engines_title: { he: 'העסק לא מופיע בחלק ממנועי AI', en: 'The business is missing from some AI engines' },
   rec_weak_engines_body: {
-    he: 'העסק לא הופיע ב-{engines}. בדקו אילו שאלות נבדקו במנועים האלה, והוסיפו באתר תשובות ישירות וברורות סביב הנושאים האלה.',
-    en: 'The business did not appear in {engines}. Review the questions tested in those engines and add clear, direct answers around those topics on your site.',
+    he: 'העסק לא הופיע ב-{engines}. בדקו אילו שאלות נבדקו במנועים האלה, והוסיפו באתר תשובות ישירות סביב הנושאים שחזרו בסריקה.',
+    en: 'The business did not appear in {engines}. Review the questions tested in those engines and add direct answers around the recurring topics from the scan.',
   },
 
   // Recommendation 2: Weak questions — questions with low visibility
   rec_weak_questions_title: { he: 'יש שאלות שבהן העסק כמעט לא מופיע', en: 'Some questions have weak visibility' },
   rec_weak_questions_body_single: {
-    he: 'העסק לא הופיע בשאלה: {question}. מומלץ ליצור או לשפר עמוד תוכן שעונה ישירות על השאלה הזו.',
-    en: 'The business did not appear for the question: {question}. Create or improve a page that directly answers this question.',
+    he: 'העסק לא הופיע בשאלה: {question}. מומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלה הזו, עם ניסוח ברור שמזכיר את השירותים והיתרונות של העסק.',
+    en: 'The business did not appear for the question: {question}. Create a dedicated content section or FAQ that directly answers this question and clearly mentions the business services and advantages.',
   },
   rec_weak_questions_body_multi: {
-    he: 'העסק כמעט לא הופיע בשאלות כמו: {questions}. מומלץ ליצור תוכן שעונה ישירות על השאלות האלה.',
-    en: 'The business had weak visibility for questions such as: {questions}. Create content that directly answers these questions.',
+    he: 'העסק כמעט לא הופיע בשאלות כמו: {questions}. מומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלות האלה, עם ניסוח ברור שמזכיר את השירותים והיתרונות של העסק.',
+    en: 'The business had weak visibility for questions such as: {questions}. Create a dedicated content section or FAQ that directly answers these questions and clearly mentions the business services and advantages.',
+  },
+
+  // Recommendation 3: Competitor leading — competitor has more mentions than project
+  rec_competitor_leading_title: { he: 'מתחרה מוביל בנתח האזכורים', en: 'A competitor leads in share of voice' },
+  rec_competitor_leading_body: {
+    he: '{competitorName} הופיע ב-{gap} תשובות יותר מהעסק. בדקו באילו שאלות הוא מופיע והעסק לא, וצרו תוכן ייעודי סביב השאלות האלה.',
+    en: '{competitorName} appeared in {gap} more answers than your business. Review the questions where they appear and your business does not, then create targeted content around those questions.',
   },
 } as const
 
