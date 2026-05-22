@@ -34,6 +34,7 @@ const STRINGS = {
   mention_frequency: { he: 'תדירות הזכרה', en: 'Mention Frequency' },
   citation_share: { he: '% נתח ציטוט', en: 'Citation Share' },
   engine_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage' },
+  engines_coverage_help: { he: 'מספר מנועי AI שמצאו לפחות הזכרה אחת של העסק', en: 'Number of AI engines that found at least one mention of the business' },
   share_of_voice: { he: 'Share of Voice', en: 'Share of Voice' },
   recommendation_present: { he: 'המלצה נוכחת', en: 'Recommendation Present' },
   mentioned: { he: 'הוזכר', en: 'Mentioned' },

@@ -73,6 +73,7 @@ type GlobalMetrics = {
   mentionRate: number
   citationRate: number
   enginesCovered: number
+  enginesWithMentions: number
 }
 
 type EngineMetrics = {
@@ -229,6 +230,15 @@ export default function AIVisibilitySection({
       })
 
       const successfulScans = resultsWithText.filter((r) => r.status === 'success').length
+
+      // Count engines that have at least one mention
+      let enginesWithMentions = 0
+      for (const [, metrics] of engineMap) {
+        if (metrics.mentions > 0) {
+          enginesWithMentions++
+        }
+      }
+
       setGlobalMetrics({
         totalScans: successfulScans,
         totalMentions,
@@ -236,6 +246,7 @@ export default function AIVisibilitySection({
         mentionRate: successfulScans > 0 ? Math.round((totalMentions / successfulScans) * 100) : 0,
         citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
         enginesCovered: engines.size,
+        enginesWithMentions,
       })
 
       setEngineMetrics(engineMap)
@@ -891,11 +902,11 @@ function OverviewSummaryStrip({
           </div>
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
-            {t('visibility_percent')}
+          <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate" title={t('engines_coverage_help')}>
+            {t('engine_coverage')}
           </div>
-          <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300">{metrics.mentionRate}%</div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('overall')}</div>
+          <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300">{metrics.enginesWithMentions}</div>
+          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('of_engines')}</div>
         </div>
         <div className="min-w-0">
           <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
