@@ -905,8 +905,10 @@ function OverviewSummaryStrip({
           <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate" title={t('engines_coverage_help')}>
             {t('engine_coverage')}
           </div>
-          <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300 tabular-nums" dir="ltr">{metrics.enginesWithMentions}/{metrics.enginesCovered}</div>
-          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('ai_engines')}</div>
+          <div className="text-2xl sm:text-4xl font-bold text-indigo-700 dark:text-indigo-300">{metrics.enginesWithMentions}</div>
+          <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">
+            {t('of_n_ai_engines').replace('{count}', String(metrics.enginesCovered))}
+          </div>
         </div>
         <div className="min-w-0">
           <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 sm:mb-2 truncate">
