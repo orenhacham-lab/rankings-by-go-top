@@ -35,17 +35,31 @@ const ERR = {
 
 async function authAndProject(projectId: string | null | undefined) {
   if (!projectId || typeof projectId !== 'string') {
-    return { error: ERR.notFound, status: 404 as const }
+    return { error: ERR.notFound, status: 404 as const, stage: 'params' as const }
   }
 
-  const supabase = await createClient()
+  let supabase
+  try {
+    supabase = await createClient()
+  } catch (e) {
+    console.error('[ai-vis-competitors] supabase client creation error', { projectId, message: String(e) })
+    return { error: 'Missing Supabase configuration.', status: 503 as const, stage: 'supabase_config' as const }
+  }
+
   const { data: userData, error: authError } = await supabase.auth.getUser()
   if (authError || !userData?.user) {
-    return { error: ERR.unauthorized, status: 401 as const }
+    return { error: ERR.unauthorized, status: 401 as const, stage: 'auth' as const }
   }
   const user = userData.user
 
-  const admin = createAdminClient()
+  let admin
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    console.error('[ai-vis-competitors] admin client creation error', { projectId, message: String(e) })
+    return { error: 'Database configuration error.', status: 503 as const, stage: 'db_config' as const }
+  }
+
   const { data: project, error: projectError } = await admin
     .from('projects')
     .select('id, user_id')
@@ -53,20 +67,23 @@ async function authAndProject(projectId: string | null | undefined) {
     .maybeSingle()
 
   if (projectError) {
+    if (projectError.code === '42P01') {
+      return { error: ERR.columnMissing, status: 503 as const, stage: 'missing_table' as const }
+    }
     console.error('[ai-vis-competitors] project lookup error', {
       projectId,
       message: projectError.message,
       code: projectError.code,
     })
-    return { error: ERR.notFound, status: 404 as const }
+    return { error: ERR.notFound, status: 404 as const, stage: 'db_error' as const }
   }
   if (!project) {
-    return { error: ERR.notFound, status: 404 as const }
+    return { error: ERR.notFound, status: 404 as const, stage: 'project_not_found' as const }
   }
 
   const ownerId = (project as { user_id?: string | null }).user_id
   if (ownerId && ownerId !== user.id) {
-    return { error: ERR.forbidden, status: 403 as const }
+    return { error: ERR.forbidden, status: 403 as const, stage: 'permission' as const }
   }
 
   return { user, admin, projectId }

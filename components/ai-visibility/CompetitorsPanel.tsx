@@ -49,11 +49,12 @@ function aliasesToText(aliases: string[]): string {
 
 const emptyDraft: DraftForm = { name: '', domain: '', aliasesText: '' }
 
-export default function CompetitorsPanel({ projectId }: { projectId: string }) {
+export default function CompetitorsPanel({ projectId, defaultCollapsed = true }: { projectId: string; defaultCollapsed?: boolean }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => createI18n(language), [language])
   const isRTL = language === 'he'
 
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   const [competitors, setCompetitors] = useState<Competitor[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -201,13 +202,48 @@ export default function CompetitorsPanel({ projectId }: { projectId: string }) {
   const isFormOpen = adding || editingId !== null
   const canAddMore = activeCount < MAX_ACTIVE
 
+  if (isCollapsed && !loadError && !loading) {
+    return (
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 sm:p-4">
+        <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className={isRTL ? 'text-right' : 'text-left'}>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {t('competitors_title')}
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              {t('competitor_active_count')}: <span className="font-semibold">{activeCount}</span> / {MAX_ACTIVE}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsCollapsed(false)}
+          >
+            {t('competitor_edit')}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5">
       <div className={`flex items-start justify-between gap-3 mb-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
         <div className={isRTL ? 'text-right' : 'text-left'}>
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-            {t('competitors_title')}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              {t('competitors_title')}
+            </h3>
+            {!loading && !loadError && (
+              <button
+                onClick={() => setIsCollapsed(true)}
+                className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                title={t('close_panel')}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {t('competitors_subtitle')}
           </p>
