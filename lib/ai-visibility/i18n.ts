@@ -426,19 +426,31 @@ const STRINGS = {
   // Recommendation 1: Weak engines — engines with no mentions
   rec_weak_engines_title: { he: 'העסק לא מופיע בחלק ממנועי AI', en: 'The business is missing from some AI engines' },
   rec_weak_engines_body: {
-    he: 'העסק לא הופיע ב-{engines}. בדקו אילו שאלות נבדקו במנועים האלה, והוסיפו באתר תשובות ישירות סביב הנושאים שחזרו בסריקה.',
-    en: 'The business did not appear in {engines}. Review the questions tested in those engines and add direct answers around the recurring topics from the scan.',
+    he: 'העסק לא הופיע ב-{engines}.\nבדקו את השאלות שנבדקו במנועים האלה, וחזקו באתר תשובות סביב הנושאים שחזרו בסריקה.',
+    en: 'The business did not appear in {engines}.\nReview the questions tested in those engines and strengthen answers around the recurring topics from the scan.',
   },
 
   // Recommendation 2: Weak questions — questions with low visibility
   rec_weak_questions_title: { he: 'יש שאלות שבהן העסק כמעט לא מופיע', en: 'Some questions have weak visibility' },
-  rec_weak_questions_body_single: {
-    he: 'העסק כמעט לא הופיע בשאלה:\n{question}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה עליה ישירות ומבליט את יתרונות העסק.',
-    en: 'The business had weak visibility for:\n{question}\n\nCreate a content section or FAQ that answers it directly and highlights the business advantages.',
+
+  // Zero mentions: business did not appear at all
+  rec_weak_questions_zero_single: {
+    he: 'העסק לא הופיע בשאלה:\n{question}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלה ומבליטה את יתרונות העסק.',
+    en: 'The business did not appear for the question:\n{question}\n\nCreate a content section or FAQ that answers it directly and highlights the business advantages.',
   },
-  rec_weak_questions_body_multi: {
-    he: 'העסק כמעט לא הופיע בשאלות:\n{questions}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה עליהן ישירות ומבליט את יתרונות העסק.',
-    en: 'The business had weak visibility for:\n{questions}\n\nCreate content or FAQ sections that answer them directly and highlight the business advantages.',
+  rec_weak_questions_zero_multi: {
+    he: 'העסק לא הופיע בשאלות:\n{questions}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלות ומבליטה את יתרונות העסק.',
+    en: 'The business did not appear for the questions:\n{questions}\n\nCreate content or FAQ sections that answer them directly and highlight the business advantages.',
+  },
+
+  // Weak visibility: business appeared but rarely (< 0.25 rate)
+  rec_weak_questions_weak_single: {
+    he: 'העסק כמעט לא הופיע בשאלה:\n{question}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלה ומבליטה את יתרונות העסק.',
+    en: 'The business had weak visibility for the question:\n{question}\n\nCreate a content section or FAQ that answers it directly and highlights the business advantages.',
+  },
+  rec_weak_questions_weak_multi: {
+    he: 'העסק כמעט לא הופיע בשאלות:\n{questions}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלות ומבליטה את יתרונות העסק.',
+    en: 'The business had weak visibility for the questions:\n{questions}\n\nCreate content or FAQ sections that answer them directly and highlight the business advantages.',
   },
 
   // Recommendation 3: Competitor leading — competitor has more mentions than project

@@ -1097,7 +1097,7 @@ function RecommendationsCard({
       .replace(/[?.!,;؟،]+\s*$/u, '')
       .trim()
 
-  const weakQuestionsMap = new Map<string, { text: string; mentionRate: number }>()
+  const weakQuestionsMap = new Map<string, { text: string; mentionRate: number; mentions: number }>()
   for (const stat of questionStats.values()) {
     const rate = stat.total > 0 ? stat.mentions / stat.total : 0
     if (rate >= 0.25) continue
@@ -1107,22 +1107,32 @@ function RecommendationsCard({
     // Keep the lowest mention rate when duplicates collide
     const existing = weakQuestionsMap.get(normalized)
     if (!existing || rate < existing.mentionRate) {
-      weakQuestionsMap.set(normalized, { text: stat.promptText.trim(), mentionRate: rate })
+      weakQuestionsMap.set(normalized, { text: stat.promptText.trim(), mentionRate: rate, mentions: stat.mentions })
     }
   }
-  const weakQuestions = Array.from(weakQuestionsMap.values())
+  const allWeakQuestions = Array.from(weakQuestionsMap.values())
 
-  if (weakQuestions.length > 0) {
-    weakQuestions.sort((a, b) => a.mentionRate - b.mentionRate)
-    const topWeak = weakQuestions.slice(0, 2)
+  // Separate into zero mentions (did not appear) and weak mentions (barely appeared)
+  const zeroMentionQuestions = allWeakQuestions.filter((q) => q.mentions === 0).sort((a, b) => a.mentionRate - b.mentionRate)
+  const weakMentionQuestions = allWeakQuestions.filter((q) => q.mentions > 0).sort((a, b) => a.mentionRate - b.mentionRate)
+
+  // Prefer zero mentions if available; otherwise use weak mentions
+  const questionGroup = zeroMentionQuestions.length > 0 ? zeroMentionQuestions : weakMentionQuestions
+  const isZeroMentions = zeroMentionQuestions.length > 0
+
+  if (questionGroup.length > 0) {
+    const topQuestions = questionGroup.slice(0, 2)
     let bodyText: string
+    let bodyKey: string
 
-    if (topWeak.length === 1) {
-      bodyText = t('rec_weak_questions_body_single').replace('{question}', `"${topWeak[0].text}"`)
+    if (topQuestions.length === 1) {
+      bodyKey = isZeroMentions ? 'rec_weak_questions_zero_single' : 'rec_weak_questions_weak_single'
+      bodyText = t(bodyKey as any).replace('{question}', `"${topQuestions[0].text}"`)
     } else {
+      bodyKey = isZeroMentions ? 'rec_weak_questions_zero_multi' : 'rec_weak_questions_weak_multi'
       // Put each question on its own line so the body reads as a list
-      const questionsBlock = topWeak.map((q) => `"${q.text}"`).join('\n')
-      bodyText = t('rec_weak_questions_body_multi').replace('{questions}', questionsBlock)
+      const questionsBlock = topQuestions.map((q) => `"${q.text}"`).join('\n')
+      bodyText = t(bodyKey as any).replace('{questions}', questionsBlock)
     }
 
     recommendations.push({
@@ -1131,7 +1141,7 @@ function RecommendationsCard({
       severity: 'high',
       titleKey: 'rec_weak_questions_title',
       body: bodyText,
-      bodyKey: 'rec_weak_questions_body',
+      bodyKey,
       priority: 2,
     })
   }
@@ -1205,16 +1215,16 @@ function RecommendationItem({
   const bodyText = rec.body || t(rec.bodyKey as any)
 
   return (
-    <div className={`rounded-md border bg-white dark:bg-slate-900 px-3 py-2.5 ${borderClass}`}>
+    <div className={`rounded-md border bg-white dark:bg-slate-900 px-3 py-2.5 sm:px-4 sm:py-3 ${borderClass}`}>
       <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse justify-end' : ''}`}>
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+        <h4 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
           {t(rec.titleKey as any)}
         </h4>
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${badgeClass}`}>
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${badgeClass}`}>
           {severityLabel}
         </span>
       </div>
-      <p className={`text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
+      <p className={`text-xs text-slate-600 dark:text-slate-400 mt-2 sm:mt-2.5 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
         {bodyText}
       </p>
     </div>
