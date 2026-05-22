@@ -404,6 +404,18 @@ const STRINGS = {
   score_low: { he: 'נמוך', en: 'Low' },
   score_medium: { he: 'בינוני', en: 'Medium' },
   score_high: { he: 'גבוה', en: 'High' },
+
+  // Timeline change card (Phase 5)
+  timeline_change_title: { he: 'שינוי מהסריקה הקודמת', en: 'Change since previous scan' },
+  timeline_metric_score: { he: 'ציון נראות AI', en: 'AI Visibility Score' },
+  timeline_metric_mentions: { he: 'אזכורים', en: 'Mentions' },
+  timeline_metric_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage' },
+  timeline_metric_citations: { he: 'דומיין צוטט', en: 'Domain citations' },
+  timeline_no_change: { he: 'ללא שינוי', en: 'No change' },
+  timeline_no_history: {
+    he: 'אין עדיין מספיק נתונים להשוואה. לאחר סריקה נוספת יוצגו כאן שינויים.',
+    en: 'Not enough historical data yet. Changes will appear after another scan.',
+  },
 } as const
 
 type StringKey = keyof typeof STRINGS

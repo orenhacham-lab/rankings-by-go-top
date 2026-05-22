@@ -86,6 +86,31 @@ type EngineMetrics = {
 
 type TabType = 'results' | 'queries' | 'competitors'
 
+type TimelineSnapshot = {
+  visibilityScore: number
+  mentionRate: number
+  totalMentions: number
+  successfulResults: number
+  enginesWithMentions: number
+  enginesCovered: number
+  citedDomains: number
+}
+
+type TimelineChange = {
+  visibilityScore: number
+  mentionRate: number
+  totalMentions: number
+  enginesWithMentions: number
+  citedDomains: number
+}
+
+type TimelineData = {
+  hasPrevious: boolean
+  current: TimelineSnapshot | null
+  previous: TimelineSnapshot | null
+  change: TimelineChange | null
+}
+
 export default function AIVisibilitySection({
   projectId,
   projectCountry,
@@ -136,6 +161,8 @@ export default function AIVisibilitySection({
   const [showAllPrompts, setShowAllPrompts] = useState(false)
   const [scanStatus, setScanStatus] = useState<string | null>(null)
   const [competitorsRefreshKey, setCompetitorsRefreshKey] = useState(0)
+  const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
+  const [timelineLoading, setTimelineLoading] = useState(true)
 
   // Build brand variants once for reuse in result rows (mention chips)
   const brandVariants = useMemo(
@@ -290,6 +317,37 @@ export default function AIVisibilitySection({
   useEffect(() => {
     loadAllResults()
   }, [loadAllResults])
+
+  // Load timeline summary (change since previous scan).
+  // Re-fetched whenever allResults changes — i.e., after a new scan completes.
+  useEffect(() => {
+    let cancelled = false
+    setTimelineLoading(true)
+    fetch(`/api/projects/${projectId}/ai-visibility/timeline-summary`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return
+        if (data && data.success) {
+          setTimelineData({
+            hasPrevious: !!data.hasPrevious,
+            current: data.current ?? null,
+            previous: data.previous ?? null,
+            change: data.change ?? null,
+          })
+        } else {
+          setTimelineData(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTimelineData(null)
+      })
+      .finally(() => {
+        if (!cancelled) setTimelineLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, allResults.length])
 
   const scannedSet = useMemo(() => {
     const s = new Set<string>()
@@ -485,6 +543,9 @@ export default function AIVisibilitySection({
           )}
           {globalMetrics && (
             <OverviewSummaryStrip metrics={globalMetrics} totalResults={allResults.length} t={t} />
+          )}
+          {!timelineLoading && timelineData && (
+            <TimelineChangeCard data={timelineData} t={t} isRTL={isHebrew} />
           )}
           <EngineMentionCards metrics={engineMetrics} t={t} />
 
@@ -876,6 +937,81 @@ function AIVisibilityScoreCard({
           style={{ width: `${safeScore}%` }}
         />
       </div>
+    </div>
+  )
+}
+
+function TimelineChangeCard({
+  data,
+  t,
+  isRTL,
+}: {
+  data: TimelineData
+  t: T
+  isRTL: boolean
+}) {
+  if (!data.hasPrevious || !data.change) {
+    return (
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2">
+          {t('timeline_change_title')}
+        </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug">
+          {t('timeline_no_history')}
+        </p>
+      </div>
+    )
+  }
+
+  const items: Array<{ label: string; delta: number }> = [
+    { label: t('timeline_metric_score'), delta: data.change.visibilityScore },
+    { label: t('timeline_metric_mentions'), delta: data.change.totalMentions },
+    { label: t('timeline_metric_coverage'), delta: data.change.enginesWithMentions },
+    { label: t('timeline_metric_citations'), delta: data.change.citedDomains },
+  ]
+
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-3">
+        {t('timeline_change_title')}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        {items.map((item) => (
+          <DeltaRow key={item.label} label={item.label} delta={item.delta} t={t} isRTL={isRTL} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DeltaRow({
+  label,
+  delta,
+  t,
+  isRTL,
+}: {
+  label: string
+  delta: number
+  t: T
+  isRTL: boolean
+}) {
+  const sign = delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral'
+  const display =
+    sign === 'neutral'
+      ? t('timeline_no_change')
+      : `${delta > 0 ? '+' : ''}${delta}`
+
+  const valueClass =
+    sign === 'positive'
+      ? 'text-emerald-700 dark:text-emerald-400'
+      : sign === 'negative'
+      ? 'text-rose-700 dark:text-rose-400'
+      : 'text-slate-500 dark:text-slate-400'
+
+  return (
+    <div className={`flex items-center justify-between gap-3 rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 px-3 py-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+      <span className="text-xs text-slate-600 dark:text-slate-300 truncate">{label}</span>
+      <span className={`text-sm font-semibold tabular-nums ${valueClass}`} dir="ltr">{display}</span>
     </div>
   )
 }
