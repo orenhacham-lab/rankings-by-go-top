@@ -167,6 +167,7 @@ const STRINGS = {
   tab_overview: { he: 'סקירה', en: 'Overview' },
   tab_results: { he: 'תוצאות', en: 'Results' },
   tab_queries: { he: 'שאלות AI', en: 'AI Queries' },
+  tab_competitors: { he: 'מתחרים', en: 'Competitors' },
   showing_results: { he: 'מציג {count} תוצאות', en: 'Showing {count} results' },
   mentions_by_engine: { he: 'אזכורים לפי מנוע AI', en: 'Mentions by AI Engine' },
   total_mentions: { he: 'סה״כ אזכורים', en: 'Total mentions' },

@@ -83,7 +83,7 @@ type EngineMetrics = {
   rate: number
 }
 
-type TabType = 'results' | 'queries'
+type TabType = 'results' | 'queries' | 'competitors'
 
 export default function AIVisibilitySection({
   projectId,
@@ -447,9 +447,9 @@ export default function AIVisibilitySection({
         </div>
       )}
 
-      {/* TAB BAR — only two tabs */}
+      {/* TAB BAR */}
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-        {(['results', 'queries'] as const).map((tab) => (
+        {(['results', 'queries', 'competitors'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setCurrentTab(tab)}
@@ -461,6 +461,7 @@ export default function AIVisibilitySection({
           >
             {tab === 'results' && t('tab_results')}
             {tab === 'queries' && t('tab_queries')}
+            {tab === 'competitors' && t('tab_competitors')}
           </button>
         ))}
       </div>
@@ -583,12 +584,6 @@ export default function AIVisibilitySection({
               setSuggestedQuestions(refreshed.slice(0, 4))
             }}
           />
-          <div className="mt-3">
-            <CompetitorsPanel projectId={projectId} onCompetitorsChanged={() => setCompetitorsRefreshKey(k => k + 1)} />
-          </div>
-          <div className="mt-3">
-            <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
-          </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
@@ -709,6 +704,18 @@ export default function AIVisibilitySection({
               </div>
             </div>
           )}
+        </>
+      )}
+
+      {/* TAB 3: COMPETITORS */}
+      {currentTab === 'competitors' && (
+        <>
+          <CompetitorsPanel
+            projectId={projectId}
+            defaultCollapsed={false}
+            onCompetitorsChanged={() => setCompetitorsRefreshKey((k) => k + 1)}
+          />
+          <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
         </>
       )}
 

@@ -103,34 +103,7 @@ export async function GET(
     return Response.json({ error: auth.error }, { status: auth.status })
   }
 
-  // Load latest completed scan run
-  const { data: latestRun, error: runError } = await auth.admin
-    .from('ai_scan_runs')
-    .select('id, project_id, status, completed_at, total_engines')
-    .eq('project_id', auth.projectId)
-    .eq('status', 'completed')
-    .order('completed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (runError) {
-    if (runError.code === '42P01') {
-      return Response.json({ success: true, project: null, competitors: [], meta: { emptyState: 'table_missing' } })
-    }
-    console.error('[competitor-analysis] scan run lookup error', { projectId, message: runError.message })
-    return Response.json({ error: ERR.dbError }, { status: 500 })
-  }
-
-  if (!latestRun) {
-    return Response.json({
-      success: true,
-      project: null,
-      competitors: [],
-      meta: { emptyState: 'no_completed_scan' },
-    })
-  }
-
-  // Load active competitors
+  // Load active competitors first — if none, no point loading scan results
   const { data: competitors, error: competitorsError } = await auth.admin
     .from('ai_visibility_competitors')
     .select('id, user_id, project_id, name, domain, aliases, is_active, created_at, updated_at')
@@ -139,6 +112,9 @@ export async function GET(
     .order('created_at', { ascending: true })
 
   if (competitorsError) {
+    if ((competitorsError as any).code === '42P01') {
+      return Response.json({ success: true, project: null, competitors: [], meta: { emptyState: 'table_missing' } })
+    }
     console.error('[competitor-analysis] competitors lookup error', { projectId })
     return Response.json({ error: ERR.dbError }, { status: 500 })
   }
@@ -150,29 +126,58 @@ export async function GET(
       success: true,
       project: null,
       competitors: [],
-      meta: { emptyState: 'no_competitors', scanRunId: latestRun.id, scanCompletedAt: latestRun.completed_at, enginesCount: latestRun.total_engines || 0, resultsCount: 0 },
+      meta: { emptyState: 'no_competitors', resultsCount: 0 },
     })
   }
 
-  // Load all scan results for this run (only successful ones — pending/error
-  // results have no response_text and would skew percentages)
+  // Load ALL successful scan results for this project across ALL runs.
+  // Each engine scan creates its own run, so the previous "latest run only"
+  // approach saw just one engine. Match what the Results tab shows by
+  // pulling every successful result for the project.
   const { data: scanResults, error: resultsError } = await auth.admin
     .from('ai_scan_results')
-    .select('id, engine, response_text, source_count, citation_count, mentioned, target_cited, status')
-    .eq('run_id', latestRun.id)
+    .select('id, run_id, prompt_id, engine, response_text, source_count, citation_count, mentioned, target_cited, status, scanned_at')
+    .eq('project_id', auth.projectId)
     .eq('status', 'success')
-    .order('scanned_at', { ascending: true })
+    .order('scanned_at', { ascending: false })
 
   if (resultsError) {
-    console.error('[competitor-analysis] scan results lookup error', { projectId, runId: latestRun.id })
+    if ((resultsError as any).code === '42P01') {
+      return Response.json({ success: true, project: null, competitors: [], meta: { emptyState: 'table_missing' } })
+    }
+    console.error('[competitor-analysis] scan results lookup error', { projectId, message: resultsError.message })
     return Response.json({ error: ERR.dbError }, { status: 500 })
   }
 
-  const resultsList = (scanResults as any[]) || []
+  // Deduplicate by (prompt_id, engine) — keep only the latest result per pair.
+  // If a prompt has no id (legacy), key by engine + result id so it's kept.
+  const seenKeys = new Set<string>()
+  const allResults = (scanResults as any[]) || []
+  const resultsList: any[] = []
+  for (const r of allResults) {
+    const key = `${r.prompt_id || `__noprompt__${r.id}`}:${r.engine || 'unknown'}`
+    if (seenKeys.has(key)) continue
+    seenKeys.add(key)
+    resultsList.push(r)
+  }
+
   const totalResults = resultsList.length
 
-  // Build distinct engine list for meta (debug visibility)
+  // Build debug meta: distinct engines, run ids, latest date per engine
   const enginesInRun = Array.from(new Set(resultsList.map((r: any) => r.engine).filter(Boolean)))
+  const runIds = Array.from(new Set(resultsList.map((r: any) => r.run_id).filter(Boolean)))
+  const latestResultDates: Record<string, string> = {}
+  for (const r of resultsList) {
+    const engine = r.engine || 'unknown'
+    if (!latestResultDates[engine] || (r.scanned_at && r.scanned_at > latestResultDates[engine])) {
+      latestResultDates[engine] = r.scanned_at || ''
+    }
+  }
+  const latestScannedAt = resultsList.reduce<string | null>((acc, r) => {
+    if (!r.scanned_at) return acc
+    if (!acc || r.scanned_at > acc) return r.scanned_at
+    return acc
+  }, null)
 
   if (totalResults === 0) {
     return Response.json({
@@ -180,12 +185,13 @@ export async function GET(
       project: null,
       competitors: [],
       meta: {
-        emptyState: 'no_results',
-        scanRunId: latestRun.id,
-        scanCompletedAt: latestRun.completed_at,
-        enginesCount: latestRun.total_engines || 0,
+        emptyState: 'no_completed_scan',
+        resultsSource: 'latest_per_engine',
         resultsCount: 0,
-        engines: enginesInRun,
+        enginesCount: 0,
+        engines: [],
+        runIds: [],
+        latestResultDates: {},
       },
     })
   }
@@ -305,11 +311,13 @@ export async function GET(
     },
     competitors: competitorStats,
     meta: {
-      scanRunId: latestRun.id,
-      scanCompletedAt: latestRun.completed_at,
-      enginesCount: latestRun.total_engines || 0,
+      resultsSource: 'latest_per_engine',
+      scanCompletedAt: latestScannedAt,
+      enginesCount: enginesInRun.length,
       resultsCount: totalResults,
       engines: enginesInRun,
+      runIds,
+      latestResultDates,
     },
   })
 }
