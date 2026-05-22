@@ -1087,15 +1087,30 @@ function RecommendationsCard({
     questionStats.set(key, existing)
   }
 
-  const weakQuestions: { text: string; mentionRate: number }[] = []
+  // Normalize prompt text for dedupe: trim, lowercase, collapse whitespace,
+  // and strip trailing punctuation (?, ., !, Hebrew/Arabic equivalents).
+  const normalizeQuestion = (text: string): string =>
+    text
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[?.!,;؟،]+\s*$/u, '')
+      .trim()
+
+  const weakQuestionsMap = new Map<string, { text: string; mentionRate: number }>()
   for (const stat of questionStats.values()) {
     const rate = stat.total > 0 ? stat.mentions / stat.total : 0
-    if (rate === 0 || rate < 0.25) {
-      if (stat.promptText && stat.promptText.length > 0) {
-        weakQuestions.push({ text: stat.promptText, mentionRate: rate })
-      }
+    if (rate >= 0.25) continue
+    if (!stat.promptText || stat.promptText.length === 0) continue
+    const normalized = normalizeQuestion(stat.promptText)
+    if (!normalized) continue
+    // Keep the lowest mention rate when duplicates collide
+    const existing = weakQuestionsMap.get(normalized)
+    if (!existing || rate < existing.mentionRate) {
+      weakQuestionsMap.set(normalized, { text: stat.promptText.trim(), mentionRate: rate })
     }
   }
+  const weakQuestions = Array.from(weakQuestionsMap.values())
 
   if (weakQuestions.length > 0) {
     weakQuestions.sort((a, b) => a.mentionRate - b.mentionRate)
