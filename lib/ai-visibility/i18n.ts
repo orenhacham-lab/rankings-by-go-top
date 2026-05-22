@@ -347,6 +347,32 @@ const STRINGS = {
   competitor_active_count: { he: 'מתחרים פעילים', en: 'Active competitors' },
   competitor_inactive: { he: 'לא פעיל', en: 'Inactive' },
   competitor_reactivate: { he: 'הפעלה מחדש', en: 'Reactivate' },
+
+  // Competitor analysis (Phase 2)
+  competitor_analysis_title: { he: 'השוואת מתחרים', en: 'Competitor comparison' },
+  competitor_analysis_help: {
+    he: 'כמה פעמים כל אחד מוזכר בתוצאות AI בהשוואה לעסק שלכם.',
+    en: 'How often each competitor is mentioned in AI results compared to your business.',
+  },
+  competitor_analysis_no_competitors: {
+    he: 'הוסיפו מתחרים כדי להשוות את הנראות שלכם במנועי AI.',
+    en: 'Add competitors to compare your AI visibility.',
+  },
+  competitor_analysis_no_scan: {
+    he: 'אין עדיין סריקה זמינה להשוואת מתחרים. הריצו סריקת AI תחילה.',
+    en: 'No scan is available yet for competitor comparison. Run an AI scan first.',
+  },
+  competitor_analysis_no_mentions: {
+    he: 'לא נמצאו אזכורים למתחרים בסריקה האחרונה.',
+    en: 'No competitor mentions were found in the latest scan.',
+  },
+  competitor_analysis_loading: { he: 'טוען נתונים…', en: 'Loading…' },
+  competitor_analysis_failed: { he: 'טעינת הנתונים נכשלה.', en: 'Failed to load data.' },
+  competitor_visibility: { he: 'נראות', en: 'Visibility' },
+  competitor_mentions: { he: 'אזכורים', en: 'Mentions' },
+  competitor_by_engine: { he: 'פירוט לפי מנוע', en: 'Breakdown by engine' },
+  competitor_your_business: { he: 'העסק שלכם', en: 'Your business' },
+  competitor_zero_mentions: { he: 'אין אזכורים', en: 'No mentions' },
 } as const
 
 type StringKey = keyof typeof STRINGS
