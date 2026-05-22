@@ -459,6 +459,19 @@ const STRINGS = {
     he: '{competitorName} הופיע ב-{gap} תשובות יותר מהעסק. בדקו באילו שאלות הוא מופיע והעסק לא, וצרו תוכן ייעודי סביב השאלות האלה.',
     en: '{competitorName} appeared in {gap} more answers than your business. Review the questions where they appear and your business does not, then create targeted content around those questions.',
   },
+
+  // Phase 6 — Per-question insights (Queries tab)
+  prompt_visibility: { he: 'נראות', en: 'Visibility' },
+  prompt_status: { he: 'סטטוס', en: 'Status' },
+  prompt_domain_cited: { he: 'דומיין צוטט', en: 'Domain cited' },
+  prompt_engines_of: { he: '{mentioned} מתוך {total} מנועים', en: '{mentioned} of {total} engines' },
+  prompt_yes: { he: 'כן', en: 'Yes' },
+  prompt_no: { he: 'לא', en: 'No' },
+  prompt_not_scanned_yet: { he: 'עוד לא נסרק', en: 'Not scanned yet' },
+  prompt_status_missing: { he: 'לא מופיע', en: 'Missing' },
+  prompt_status_weak: { he: 'חלש', en: 'Weak' },
+  prompt_status_medium: { he: 'בינוני', en: 'Medium' },
+  prompt_status_good: { he: 'טוב', en: 'Good' },
 } as const
 
 type StringKey = keyof typeof STRINGS

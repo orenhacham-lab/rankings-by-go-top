@@ -91,6 +91,14 @@ type CompetitorAnalysisData = {
   competitors: Array<{ id: string; name: string; mentionsCount: number; mentionRate: number }>
 }
 
+type PromptInsight = {
+  totalEngines: number
+  businessMentionEngines: number
+  mentionRate: number
+  targetCitedCount: number
+  status: 'missing' | 'weak' | 'medium' | 'good'
+}
+
 export default function AIVisibilitySection({
   projectId,
   projectCountry,
@@ -347,6 +355,44 @@ export default function AIVisibilitySection({
       }
     })
     return s
+  }, [allResults])
+
+  // Per-prompt insights: dedupe by (promptId, engine) keeping latest result
+  // per engine, then aggregate mentions/citations. Read-only over allResults.
+  const promptInsights = useMemo(() => {
+    const sorted = [...allResults].sort((a, b) =>
+      (b.scannedAt || '').localeCompare(a.scannedAt || '')
+    )
+    const byPrompt = new Map<string, Map<string, ResultRow>>()
+    for (const r of sorted) {
+      if (r.status !== 'success' || !r.promptId) continue
+      if (!byPrompt.has(r.promptId)) byPrompt.set(r.promptId, new Map())
+      const engineMap = byPrompt.get(r.promptId)!
+      if (!engineMap.has(r.engine)) engineMap.set(r.engine, r)
+    }
+    const insights = new Map<string, PromptInsight>()
+    for (const [pid, engineMap] of byPrompt) {
+      const results = Array.from(engineMap.values())
+      const totalEngines = results.length
+      const businessMentionEngines = results.filter((r) => r.mentioned).length
+      const targetCitedCount = results.filter((r) => r.targetCited).length
+      const mentionRate = totalEngines > 0
+        ? Math.round((businessMentionEngines / totalEngines) * 100)
+        : 0
+      let status: PromptInsight['status']
+      if (businessMentionEngines === 0) status = 'missing'
+      else if (mentionRate < 30) status = 'weak'
+      else if (mentionRate < 70) status = 'medium'
+      else status = 'good'
+      insights.set(pid, {
+        totalEngines,
+        businessMentionEngines,
+        mentionRate,
+        targetCitedCount,
+        status,
+      })
+    }
+    return insights
   }, [allResults])
 
   // Open the drawer for a specific result, fetching full details on demand.
@@ -694,6 +740,7 @@ export default function AIVisibilitySection({
                         <TrashIcon size={16} />
                       </button>
                     </div>
+                    <PromptInsightRow insight={promptInsights.get(p.id) ?? null} t={t} isRTL={isHebrew} />
                     <div className="flex flex-wrap gap-1.5">
                       {SUPPORTED_ENGINES.map((engine) => {
                         const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
@@ -1230,6 +1277,63 @@ function RecommendationItem({
       <p className={`text-xs text-slate-600 dark:text-slate-400 mt-2 sm:mt-2.5 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
         {bodyText}
       </p>
+    </div>
+  )
+}
+
+function PromptInsightRow({
+  insight,
+  t,
+  isRTL,
+}: {
+  insight: PromptInsight | null
+  t: T
+  isRTL: boolean
+}) {
+  if (!insight) {
+    return (
+      <div className={`text-xs text-slate-500 dark:text-slate-400 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+        {t('prompt_not_scanned_yet')}
+      </div>
+    )
+  }
+
+  const statusKey = (`prompt_status_${insight.status}`) as
+    | 'prompt_status_missing'
+    | 'prompt_status_weak'
+    | 'prompt_status_medium'
+    | 'prompt_status_good'
+
+  const statusClass = {
+    missing: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+    weak: 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    medium: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+    good: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  }[insight.status]
+
+  const visibilityText = t('prompt_engines_of')
+    .replace('{mentioned}', String(insight.businessMentionEngines))
+    .replace('{total}', String(insight.totalEngines))
+
+  const citedText = insight.targetCitedCount > 0 ? t('prompt_yes') : t('prompt_no')
+
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 ${
+        isRTL ? 'flex-row-reverse justify-end' : ''
+      }`}
+    >
+      <span className="inline-flex items-center gap-1">
+        <span className="text-slate-500 dark:text-slate-400">{t('prompt_visibility')}:</span>
+        <span className="font-semibold text-slate-700 dark:text-slate-200">{visibilityText}</span>
+      </span>
+      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusClass}`}>
+        {t(statusKey)}
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span className="text-slate-500 dark:text-slate-400">{t('prompt_domain_cited')}:</span>
+        <span className="font-semibold text-slate-700 dark:text-slate-200">{citedText}</span>
+      </span>
     </div>
   )
 }
