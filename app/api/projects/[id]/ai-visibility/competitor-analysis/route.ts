@@ -14,6 +14,8 @@
  * Gated by ENABLE_AI_VISIBILITY=true.
  */
 
+export const dynamic = 'force-dynamic'
+
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'

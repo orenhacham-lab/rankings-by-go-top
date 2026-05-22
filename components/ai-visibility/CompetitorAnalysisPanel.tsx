@@ -74,7 +74,7 @@ type AnalysisResponse = {
   }
 }
 
-export default function CompetitorAnalysisPanel({ projectId }: { projectId: string }) {
+export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: { projectId: string; refreshKey?: number }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => createI18n(language), [language])
   const isRTL = language === 'he'
@@ -107,7 +107,7 @@ export default function CompetitorAnalysisPanel({ projectId }: { projectId: stri
 
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, refreshKey])
 
   // Empty states
   if (loading) {
@@ -170,8 +170,8 @@ export default function CompetitorAnalysisPanel({ projectId }: { projectId: stri
 
   const smallSampleMessage =
     language === 'he'
-      ? 'ההשוואה מבוססת על מספר קטן של תוצאות. להרצת השוואה מדויקת יותר, הוסיפו שאלות AI נוספות או הריצו סריקה רחבה יותר.'
-      : 'This comparison is based on a small number of results. For a more reliable comparison, add more AI questions or run a broader scan.'
+      ? 'ההשוואה מבוססת על מעט תוצאות. לתמונה מדויקת יותר, הוסיפו שאלות AI והריצו סריקה רחבה יותר.'
+      : 'This comparison is based on limited results. Add more AI questions or run a broader scan for better accuracy.'
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 space-y-4">

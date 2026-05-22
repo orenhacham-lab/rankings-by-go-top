@@ -134,6 +134,7 @@ export default function AIVisibilitySection({
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
   const [showAllPrompts, setShowAllPrompts] = useState(false)
   const [scanStatus, setScanStatus] = useState<string | null>(null)
+  const [competitorsRefreshKey, setCompetitorsRefreshKey] = useState(0)
 
   // Build brand variants once for reuse in result rows (mention chips)
   const brandVariants = useMemo(
@@ -583,10 +584,10 @@ export default function AIVisibilitySection({
             }}
           />
           <div className="mt-3">
-            <CompetitorsPanel projectId={projectId} />
+            <CompetitorsPanel projectId={projectId} onCompetitorsChanged={() => setCompetitorsRefreshKey(k => k + 1)} />
           </div>
           <div className="mt-3">
-            <CompetitorAnalysisPanel projectId={projectId} />
+            <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
             <div className="flex items-center gap-2">

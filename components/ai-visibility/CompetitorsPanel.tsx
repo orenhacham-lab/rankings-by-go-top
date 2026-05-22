@@ -49,7 +49,7 @@ function aliasesToText(aliases: string[]): string {
 
 const emptyDraft: DraftForm = { name: '', domain: '', aliasesText: '' }
 
-export default function CompetitorsPanel({ projectId, defaultCollapsed = true }: { projectId: string; defaultCollapsed?: boolean }) {
+export default function CompetitorsPanel({ projectId, defaultCollapsed = true, onCompetitorsChanged }: { projectId: string; defaultCollapsed?: boolean; onCompetitorsChanged?: () => void }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => createI18n(language), [language])
   const isRTL = language === 'he'
@@ -149,6 +149,7 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true }:
       }
       await load()
       closeForm()
+      onCompetitorsChanged?.()
     } catch {
       setSaveError(t('competitor_load_failed'))
     } finally {
@@ -169,6 +170,7 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true }:
         return
       }
       await load()
+      onCompetitorsChanged?.()
     } catch {
       alert(t('competitor_load_failed'))
     }
@@ -194,6 +196,7 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true }:
         return
       }
       await load()
+      onCompetitorsChanged?.()
     } catch {
       alert(t('competitor_load_failed'))
     }
@@ -246,6 +249,9 @@ export default function CompetitorsPanel({ projectId, defaultCollapsed = true }:
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {t('competitors_subtitle')}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {isRTL ? 'המתחרים ישמשו להשוואת נראות בתשובות AI.' : 'These competitors are used to compare AI visibility.'}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {t('competitor_active_count')}: <span className="font-semibold">{activeCount}</span> / {MAX_ACTIVE}
