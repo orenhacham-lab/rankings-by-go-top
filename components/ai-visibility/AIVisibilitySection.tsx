@@ -86,31 +86,6 @@ type EngineMetrics = {
 
 type TabType = 'results' | 'queries' | 'competitors'
 
-type TimelineSnapshot = {
-  visibilityScore: number
-  mentionRate: number
-  totalMentions: number
-  successfulResults: number
-  enginesWithMentions: number
-  enginesCovered: number
-  citedDomains: number
-}
-
-type TimelineChange = {
-  visibilityScore: number
-  mentionRate: number
-  totalMentions: number
-  enginesWithMentions: number
-  citedDomains: number
-}
-
-type TimelineData = {
-  hasPrevious: boolean
-  current: TimelineSnapshot | null
-  previous: TimelineSnapshot | null
-  change: TimelineChange | null
-}
-
 export default function AIVisibilitySection({
   projectId,
   projectCountry,
@@ -161,8 +136,6 @@ export default function AIVisibilitySection({
   const [showAllPrompts, setShowAllPrompts] = useState(false)
   const [scanStatus, setScanStatus] = useState<string | null>(null)
   const [competitorsRefreshKey, setCompetitorsRefreshKey] = useState(0)
-  const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
-  const [timelineLoading, setTimelineLoading] = useState(true)
 
   // Build brand variants once for reuse in result rows (mention chips)
   const brandVariants = useMemo(
@@ -317,37 +290,6 @@ export default function AIVisibilitySection({
   useEffect(() => {
     loadAllResults()
   }, [loadAllResults])
-
-  // Load timeline summary (change since previous scan).
-  // Re-fetched whenever allResults changes — i.e., after a new scan completes.
-  useEffect(() => {
-    let cancelled = false
-    setTimelineLoading(true)
-    fetch(`/api/projects/${projectId}/ai-visibility/timeline-summary`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled) return
-        if (data && data.success) {
-          setTimelineData({
-            hasPrevious: !!data.hasPrevious,
-            current: data.current ?? null,
-            previous: data.previous ?? null,
-            change: data.change ?? null,
-          })
-        } else {
-          setTimelineData(null)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setTimelineData(null)
-      })
-      .finally(() => {
-        if (!cancelled) setTimelineLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [projectId, allResults.length])
 
   const scannedSet = useMemo(() => {
     const s = new Set<string>()
@@ -544,9 +486,6 @@ export default function AIVisibilitySection({
           {globalMetrics && (
             <OverviewSummaryStrip metrics={globalMetrics} totalResults={allResults.length} t={t} />
           )}
-          {!timelineLoading && timelineData && (
-            <TimelineChangeCard data={timelineData} t={t} isRTL={isHebrew} />
-          )}
           <EngineMentionCards metrics={engineMetrics} t={t} />
 
           {/* FILTER BAR */}
@@ -629,6 +568,11 @@ export default function AIVisibilitySection({
             <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-10 text-center">
               <p className="text-sm text-slate-600 dark:text-slate-300">{t('no_scans')}</p>
             </div>
+          )}
+
+          {/* RECOMMENDATIONS CARD */}
+          {globalMetrics && (
+            <RecommendationsCard metrics={globalMetrics} engineMetrics={engineMetrics} t={t} isRTL={isHebrew} />
           )}
         </>
       )}
@@ -941,81 +885,6 @@ function AIVisibilityScoreCard({
   )
 }
 
-function TimelineChangeCard({
-  data,
-  t,
-  isRTL,
-}: {
-  data: TimelineData
-  t: T
-  isRTL: boolean
-}) {
-  if (!data.hasPrevious || !data.change) {
-    return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2">
-          {t('timeline_change_title')}
-        </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug">
-          {t('timeline_no_history')}
-        </p>
-      </div>
-    )
-  }
-
-  const items: Array<{ label: string; delta: number }> = [
-    { label: t('timeline_metric_score'), delta: data.change.visibilityScore },
-    { label: t('timeline_metric_mentions'), delta: data.change.totalMentions },
-    { label: t('timeline_metric_coverage'), delta: data.change.enginesWithMentions },
-    { label: t('timeline_metric_citations'), delta: data.change.citedDomains },
-  ]
-
-  return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-3">
-        {t('timeline_change_title')}
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-        {items.map((item) => (
-          <DeltaRow key={item.label} label={item.label} delta={item.delta} t={t} isRTL={isRTL} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function DeltaRow({
-  label,
-  delta,
-  t,
-  isRTL,
-}: {
-  label: string
-  delta: number
-  t: T
-  isRTL: boolean
-}) {
-  const sign = delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral'
-  const display =
-    sign === 'neutral'
-      ? t('timeline_no_change')
-      : `${delta > 0 ? '+' : ''}${delta}`
-
-  const valueClass =
-    sign === 'positive'
-      ? 'text-emerald-700 dark:text-emerald-400'
-      : sign === 'negative'
-      ? 'text-rose-700 dark:text-rose-400'
-      : 'text-slate-500 dark:text-slate-400'
-
-  return (
-    <div className={`flex items-center justify-between gap-3 rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 px-3 py-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-      <span className="text-xs text-slate-600 dark:text-slate-300 truncate">{label}</span>
-      <span className={`text-sm font-semibold tabular-nums ${valueClass}`} dir="ltr">{display}</span>
-    </div>
-  )
-}
-
 function OverviewSummaryStrip({
   metrics,
   totalResults,
@@ -1052,6 +921,170 @@ function OverviewSummaryStrip({
           </div>
           <div className="text-2xl sm:text-4xl font-bold text-emerald-700 dark:text-emerald-400">{metrics.totalCitations}</div>
           <div className="hidden sm:block text-sm text-slate-600 dark:text-slate-300 mt-2">{t('citations')}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface Recommendation {
+  id: string
+  severity: 'high' | 'medium' | 'low'
+  titleKey: string
+  bodyKey: string
+  priority: number
+}
+
+function RecommendationsCard({
+  metrics,
+  engineMetrics,
+  t,
+  isRTL,
+}: {
+  metrics: GlobalMetrics
+  engineMetrics: Map<string, EngineMetrics>
+  t: T
+  isRTL: boolean
+}) {
+  const recommendations: Recommendation[] = []
+
+  // Rule 1: Low visibility (mentionRate < 30%)
+  if (metrics.mentionRate < 30) {
+    recommendations.push({
+      id: 'low_visibility',
+      severity: 'high',
+      titleKey: 'rec_low_visibility_title',
+      bodyKey: 'rec_low_visibility_body',
+      priority: 1,
+    })
+  }
+
+  // Rule 2: Low engine coverage (enginesWithMentions / enginesCovered < 0.5)
+  if (metrics.enginesCovered > 0 && metrics.enginesWithMentions / metrics.enginesCovered < 0.5) {
+    recommendations.push({
+      id: 'low_coverage',
+      severity: 'medium',
+      titleKey: 'rec_low_coverage_title',
+      bodyKey: 'rec_low_coverage_body',
+      priority: 4,
+    })
+  }
+
+  // Rule 3: Domain not cited (targetCitations === 0)
+  if (metrics.totalCitations === 0) {
+    recommendations.push({
+      id: 'domain_not_cited',
+      severity: 'medium',
+      titleKey: 'rec_domain_not_cited_title',
+      bodyKey: 'rec_domain_not_cited_body',
+      priority: 3,
+    })
+  }
+
+  // Rule 4: Mentioned but not cited (totalMentions > 0 && targetCitations === 0)
+  if (metrics.totalMentions > 0 && metrics.totalCitations === 0) {
+    recommendations.push({
+      id: 'mentioned_not_cited',
+      severity: 'medium',
+      titleKey: 'rec_mentioned_not_cited_title',
+      bodyKey: 'rec_mentioned_not_cited_body',
+      priority: 5,
+    })
+  }
+
+  // Rule 6: Engine with no mentions (any engine with scans but no mentions)
+  const engineWithNoMentions = Array.from(engineMetrics.values()).find(
+    (em) => em.scans > 0 && em.mentions === 0
+  )
+  if (engineWithNoMentions) {
+    recommendations.push({
+      id: 'engine_no_mentions',
+      severity: 'medium',
+      titleKey: 'rec_engine_no_mentions_title',
+      bodyKey: 'rec_engine_no_mentions_body',
+      priority: 6,
+    })
+  }
+
+  // Sort by severity (high → medium → low) then by priority
+  const severityOrder = { high: 0, medium: 1, low: 2 }
+  const sorted = [...recommendations].sort((a, b) => {
+    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
+    if (severityDiff !== 0) return severityDiff
+    return a.priority - b.priority
+  })
+
+  // Take top 3
+  const topThree = sorted.slice(0, 3)
+
+  if (topThree.length === 0) {
+    return (
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 mt-6">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+          {t('recommendations_title')}
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('recommendations_desc')}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 italic">{t('recommendations_none')}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 mt-6">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+        {t('recommendations_title')}
+      </h3>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">{t('recommendations_desc')}</p>
+      <div className="space-y-3">
+        {topThree.map((rec) => (
+          <RecommendationItem key={rec.id} rec={rec} t={t} isRTL={isRTL} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RecommendationItem({
+  rec,
+  t,
+  isRTL,
+}: {
+  rec: Recommendation
+  t: T
+  isRTL: boolean
+}) {
+  const severityColors = {
+    high: 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800',
+    medium: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
+    low: 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
+  }
+
+  const severityText = {
+    high: 'text-rose-700 dark:text-rose-300',
+    medium: 'text-amber-700 dark:text-amber-300',
+    low: 'text-slate-600 dark:text-slate-400',
+  }
+
+  const severityLabel =
+    rec.severity === 'high'
+      ? t('rec_severity_high')
+      : rec.severity === 'medium'
+      ? t('rec_severity_medium')
+      : t('rec_severity_low')
+
+  return (
+    <div className={`rounded-md border p-3 ${severityColors[rec.severity]} ${isRTL ? 'text-right' : 'text-left'}`}>
+      <div className={`flex items-start gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+        <span className={`text-[11px] font-bold uppercase whitespace-nowrap ${severityText[rec.severity]}`}>
+          {severityLabel}
+        </span>
+        <div className="flex-1 min-w-0">
+          <h4 className={`text-sm font-semibold text-slate-900 dark:text-slate-100 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {t(rec.titleKey as any)}
+          </h4>
+          <p className={`text-xs text-slate-700 dark:text-slate-300 mt-1 leading-snug ${isRTL ? 'text-right' : 'text-left'}`}>
+            {t(rec.bodyKey as any)}
+          </p>
         </div>
       </div>
     </div>

@@ -405,16 +405,60 @@ const STRINGS = {
   score_medium: { he: 'בינוני', en: 'Medium' },
   score_high: { he: 'גבוה', en: 'High' },
 
-  // Timeline change card (Phase 5)
-  timeline_change_title: { he: 'שינוי מהסריקה הקודמת', en: 'Change since previous scan' },
-  timeline_metric_score: { he: 'ציון נראות AI', en: 'AI Visibility Score' },
-  timeline_metric_mentions: { he: 'אזכורים', en: 'Mentions' },
-  timeline_metric_coverage: { he: 'כיסוי מנועים', en: 'Engine Coverage' },
-  timeline_metric_citations: { he: 'דומיין צוטט', en: 'Domain citations' },
-  timeline_no_change: { he: 'ללא שינוי', en: 'No change' },
-  timeline_no_history: {
-    he: 'אין עדיין מספיק נתונים להשוואה. לאחר סריקה נוספת יוצגו כאן שינויים.',
-    en: 'Not enough historical data yet. Changes will appear after another scan.',
+  // Recommendations card
+  recommendations_title: { he: 'המלצות לשיפור נראות AI', en: 'Recommendations to improve AI visibility' },
+  recommendations_desc: {
+    he: 'המלצות מבוססות על תוצאות הסריקה הנוכחית, ללא סריקות נוספות.',
+    en: 'Recommendations are based on the current scan results, without running additional scans.',
+  },
+  recommendations_none: {
+    he: 'לא נמצאו המלצות דחופות כרגע. המשיכו לעקוב אחרי הסריקות הבאות.',
+    en: 'No urgent recommendations were found right now. Keep monitoring future scans.',
+  },
+  rec_severity_high: { he: 'דחוף', en: 'High' },
+  rec_severity_medium: { he: 'בינוני', en: 'Medium' },
+  rec_severity_low: { he: 'נמוך', en: 'Low' },
+
+  // Recommendation 1: Low visibility
+  rec_low_visibility_title: { he: 'הנראות במנועי AI נמוכה', en: 'AI visibility is low' },
+  rec_low_visibility_body: {
+    he: 'מומלץ להוסיף באתר תשובות ברורות לשאלות נפוצות, עמודי FAQ ותוכן שמסביר את השירותים המרכזיים.',
+    en: 'Add clear answers to common questions, FAQ sections, and content that explains your core services.',
+  },
+
+  // Recommendation 2: Low engine coverage
+  rec_low_coverage_title: { he: 'העסק מופיע במעט מנועי AI', en: 'The business appears in only a few AI engines' },
+  rec_low_coverage_body: {
+    he: 'בדקו באילו מנועים אין אזכורים, וחזקו תוכן ישיר וברור סביב השאלות שנסרקו.',
+    en: 'Review the engines with no mentions and strengthen clear content around the scanned questions.',
+  },
+
+  // Recommendation 3: Domain not cited
+  rec_domain_not_cited_title: { he: 'האתר כמעט לא מצוטט כמקור', en: 'The domain is rarely cited as a source' },
+  rec_domain_not_cited_body: {
+    he: 'מומלץ לשפר עמודי מידע באתר, להוסיף מבנה כותרות ברור, Schema ותשובות ממוקדות שניתן לצטט.',
+    en: 'Improve informational pages, add clear headings, structured data, and focused answers that can be cited.',
+  },
+
+  // Recommendation 4: Mentioned but not cited
+  rec_mentioned_not_cited_title: { he: 'העסק מוזכר, אבל האתר לא משמש כמקור', en: 'The business is mentioned, but the site is not cited' },
+  rec_mentioned_not_cited_body: {
+    he: 'נסו לחזק את התוכן באתר כך שמנועי AI יוכלו להסתמך עליו כמקור ישיר.',
+    en: 'Strengthen on-site content so AI engines can rely on your website as a direct source.',
+  },
+
+  // Recommendation 5: Competitor leads
+  rec_competitor_leads_title: { he: 'מתחרה מוביל בנתח האזכורים', en: 'A competitor leads in share of voice' },
+  rec_competitor_leads_body: {
+    he: 'בדקו באילו שאלות המתחרה מופיע ואתם לא, וצרו תוכן ייעודי סביב אותן שאלות.',
+    en: 'Review the questions where the competitor appears and your business does not, then create targeted content around them.',
+  },
+
+  // Recommendation 6: Engine with no mentions
+  rec_engine_no_mentions_title: { he: 'יש מנועים שבהם העסק לא מופיע', en: 'Some AI engines do not mention the business' },
+  rec_engine_no_mentions_body: {
+    he: 'התמקדו בשאלות שנבדקו במנועים ללא אזכורים, והוסיפו באתר תשובות ישירות וברורות יותר.',
+    en: 'Focus on questions tested in engines with no mentions and add clearer, direct answers on the website.',
   },
 } as const
 
