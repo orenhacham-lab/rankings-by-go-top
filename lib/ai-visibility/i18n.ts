@@ -433,12 +433,12 @@ const STRINGS = {
   // Recommendation 2: Weak questions — questions with low visibility
   rec_weak_questions_title: { he: 'יש שאלות שבהן העסק כמעט לא מופיע', en: 'Some questions have weak visibility' },
   rec_weak_questions_body_single: {
-    he: 'העסק כמעט לא הופיע בשאלה: {question}. מומלץ ליצור עמוד תוכן או פסקת FAQ שעונה עליה ישירות ומציגים את היתרונות של העסק.',
-    en: 'The business had weak visibility for: {question}. Create a content section or FAQ that answers it directly and highlights the business advantages.',
+    he: 'העסק כמעט לא הופיע בשאלה:\n{question}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה עליה ישירות ומבליט את יתרונות העסק.',
+    en: 'The business had weak visibility for:\n{question}\n\nCreate a content section or FAQ that answers it directly and highlights the business advantages.',
   },
   rec_weak_questions_body_multi: {
-    he: 'העסק כמעט לא הופיע בשאלות כמו: {questions}. מומלץ ליצור תוכן או FAQ שעונים עליהן ישירות ומציגים את היתרונות של העסק.',
-    en: 'The business had weak visibility for questions such as: {questions}. Create content or FAQ sections that answer them directly and highlight the business advantages.',
+    he: 'העסק כמעט לא הופיע בשאלות:\n{questions}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה עליהן ישירות ומבליט את יתרונות העסק.',
+    en: 'The business had weak visibility for:\n{questions}\n\nCreate content or FAQ sections that answer them directly and highlight the business advantages.',
   },
 
   // Recommendation 3: Competitor leading — competitor has more mentions than project

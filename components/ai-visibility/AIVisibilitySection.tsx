@@ -1120,10 +1120,9 @@ function RecommendationsCard({
     if (topWeak.length === 1) {
       bodyText = t('rec_weak_questions_body_single').replace('{question}', `"${topWeak[0].text}"`)
     } else {
-      const andConjunction = isRTL ? 'ו' : 'and'
-      const q1 = `"${topWeak[0].text}"`
-      const q2 = `"${topWeak[1].text}"`
-      bodyText = t('rec_weak_questions_body_multi').replace('{questions}', `${q1} ${andConjunction} ${q2}`)
+      // Put each question on its own line so the body reads as a list
+      const questionsBlock = topWeak.map((q) => `"${q.text}"`).join('\n')
+      bodyText = t('rec_weak_questions_body_multi').replace('{questions}', questionsBlock)
     }
 
     recommendations.push({
@@ -1215,7 +1214,7 @@ function RecommendationItem({
           {severityLabel}
         </span>
       </div>
-      <p className={`text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed ${isRTL ? 'text-right' : 'text-left'}`}>
+      <p className={`text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed whitespace-pre-line ${isRTL ? 'text-right' : 'text-left'}`}>
         {bodyText}
       </p>
     </div>
