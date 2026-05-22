@@ -190,14 +190,6 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
   const sov = data?.shareOfVoice
   const sovMentionsLabel = t('share_of_voice_mentions')
 
-  // Debug: log SoV data in development
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.debug('[CompetitorAnalysisPanel] Raw data:', data)
-    console.debug('[CompetitorAnalysisPanel] Share of Voice data:', sov)
-    console.debug('[CompetitorAnalysisPanel] SoV totalMentions:', sov?.totalMentions)
-    console.debug('[CompetitorAnalysisPanel] SoV entities count:', sov?.entities?.length)
-  }
-
   return (
     <div className="space-y-3">
     {/* AI Share of Voice card */}

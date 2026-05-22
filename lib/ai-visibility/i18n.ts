@@ -386,6 +386,20 @@ const STRINGS = {
     en: 'No mentions yet for your business or competitors. Run more scans to see share of voice.',
   },
   share_of_voice_mentions: { he: 'אזכורים', en: 'mentions' },
+
+  // AI Visibility Score (Phase 4)
+  ai_visibility_score: { he: 'ציון נראות AI', en: 'AI Visibility Score' },
+  score_help: {
+    he: 'הציון מבוסס על אחוז התשובות שבהן העסק הופיע במנועי AI.',
+    en: 'The score is based on the percentage of AI answers where the business appeared.',
+  },
+  score_subtext: {
+    he: 'מבוסס על אחוז הנראות בסריקה האחרונה.',
+    en: 'Based on visibility rate in the latest scan.',
+  },
+  score_low: { he: 'נמוך', en: 'Low' },
+  score_medium: { he: 'בינוני', en: 'Medium' },
+  score_high: { he: 'גבוה', en: 'High' },
 } as const
 
 type StringKey = keyof typeof STRINGS
