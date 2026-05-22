@@ -300,6 +300,33 @@ export async function GET(
     stats.rate = stats.total > 0 ? Math.round((stats.mentions / stats.total) * 100) : 0
   }
 
+  // AI Share of Voice — relative share of total mentions across project +
+  // all active competitors. Different from Visibility Rate (which is per
+  // result), this is per mention across the whole entity set.
+  const sovTotal =
+    projectMentions + competitorStats.reduce((sum, c) => sum + c.mentionsCount, 0)
+  const sovEntities: Array<{
+    type: 'project' | 'competitor'
+    competitorId?: string
+    name: string
+    mentionsCount: number
+    sharePercent: number
+  }> = [
+    {
+      type: 'project' as const,
+      name: projectName || '',
+      mentionsCount: projectMentions,
+      sharePercent: sovTotal > 0 ? Math.round((projectMentions / sovTotal) * 100) : 0,
+    },
+    ...competitorStats.map((c) => ({
+      type: 'competitor' as const,
+      competitorId: c.id,
+      name: c.name,
+      mentionsCount: c.mentionsCount,
+      sharePercent: sovTotal > 0 ? Math.round((c.mentionsCount / sovTotal) * 100) : 0,
+    })),
+  ].sort((a, b) => b.sharePercent - a.sharePercent || b.mentionsCount - a.mentionsCount)
+
   return Response.json({
     success: true,
     project: {
@@ -310,6 +337,10 @@ export async function GET(
       byEngine: projectByEngine,
     },
     competitors: competitorStats,
+    shareOfVoice: {
+      totalMentions: sovTotal,
+      entities: sovEntities,
+    },
     meta: {
       resultsSource: 'latest_per_engine',
       scanCompletedAt: latestScannedAt,

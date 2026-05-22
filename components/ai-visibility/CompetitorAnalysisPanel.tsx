@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { TrendingUp, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { TrendingUp, ChevronDown, ChevronUp, Info, BarChart3 } from 'lucide-react'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { ENGINE_META } from './EngineIcon'
@@ -60,10 +60,24 @@ type ProjectData = {
   byEngine: Record<string, EngineStats>
 }
 
+type ShareOfVoiceEntity = {
+  type: 'project' | 'competitor'
+  competitorId?: string
+  name: string
+  mentionsCount: number
+  sharePercent: number
+}
+
+type ShareOfVoice = {
+  totalMentions: number
+  entities: ShareOfVoiceEntity[]
+}
+
 type AnalysisResponse = {
   success: boolean
   project: ProjectData | null
   competitors: CompetitorData[]
+  shareOfVoice?: ShareOfVoice
   meta: {
     emptyState?: string
     scanRunId?: string
@@ -173,7 +187,60 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
       ? 'ההשוואה מבוססת על מעט תוצאות. לתמונה מדויקת יותר, הוסיפו שאלות AI והריצו סריקה רחבה יותר.'
       : 'This comparison is based on limited results. Add more AI questions or run a broader scan for better accuracy.'
 
+  const sov = data.shareOfVoice
+  const sovMentionsLabel = t('share_of_voice_mentions')
+
   return (
+    <div className="space-y-3">
+    {/* AI Share of Voice card */}
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 space-y-3">
+      <div className={isRTL ? 'text-right' : 'text-left'}>
+        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <BarChart3 size={18} className="text-indigo-600 dark:text-indigo-400" />
+          {t('share_of_voice_title')}
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('share_of_voice_help')}</p>
+      </div>
+
+      {!sov || sov.totalMentions === 0 ? (
+        <div className={`flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-3 py-2 ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
+          <Info size={14} className="text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{t('share_of_voice_empty')}</p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {sov.entities.map((entity) => {
+            const key = entity.type === 'project' ? '__project__' : entity.competitorId || entity.name
+            const isProject = entity.type === 'project'
+            const barColor = isProject ? 'bg-indigo-500 dark:bg-indigo-400' : 'bg-slate-400 dark:bg-slate-500'
+            return (
+              <li key={key} className="space-y-1">
+                <div className={`flex items-center justify-between gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                  <span className={`text-sm font-medium truncate ${isProject ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                    {entity.name || (isProject ? t('competitor_your_business') : '')}
+                  </span>
+                  <span className={`text-xs text-slate-500 dark:text-slate-400 shrink-0 ${isRTL ? 'text-left' : 'text-right'}`}>
+                    <span className={`font-semibold ${isProject ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-slate-100'}`}>
+                      {entity.sharePercent}%
+                    </span>
+                    {' · '}
+                    {entity.mentionsCount} {sovMentionsLabel}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div
+                    className={`h-full ${barColor} transition-all`}
+                    style={{ width: `${Math.max(entity.sharePercent, entity.mentionsCount > 0 ? 2 : 0)}%` }}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+
+    {/* Competitor Comparison card */}
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 space-y-4">
       {/* Header */}
       <div className={isRTL ? 'text-right' : 'text-left'}>
@@ -268,6 +335,7 @@ export default function CompetitorAnalysisPanel({ projectId, refreshKey = 0 }: {
           {new Date(data.meta.scanCompletedAt).toLocaleDateString(language === 'he' ? 'he-IL' : 'en-US')}
         </p>
       )}
+    </div>
     </div>
   )
 }

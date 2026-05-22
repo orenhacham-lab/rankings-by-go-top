@@ -352,8 +352,8 @@ const STRINGS = {
   // Competitor analysis (Phase 2)
   competitor_analysis_title: { he: 'השוואת מתחרים', en: 'Competitor comparison' },
   competitor_analysis_help: {
-    he: 'כמה פעמים כל אחד מוזכר בתוצאות AI בהשוואה לעסק שלכם.',
-    en: 'How often each competitor is mentioned in AI results compared to your business.',
+    he: 'כמה פעמים כל עסק מוזכר בתשובות AI מתוך התוצאות שנבדקו.',
+    en: 'How often each business is mentioned in AI answers across the checked results.',
   },
   competitor_analysis_no_competitors: {
     he: 'הוסיפו מתחרים כדי להשוות את הנראות שלכם במנועי AI.',
@@ -374,6 +374,18 @@ const STRINGS = {
   competitor_by_engine: { he: 'פירוט לפי מנוע', en: 'Breakdown by engine' },
   competitor_your_business: { he: 'העסק שלכם', en: 'Your business' },
   competitor_zero_mentions: { he: 'אין אזכורים', en: 'No mentions' },
+
+  // AI Share of Voice (Phase 3)
+  share_of_voice_title: { he: 'AI Share of Voice', en: 'AI Share of Voice' },
+  share_of_voice_help: {
+    he: 'חלק יחסי מכלל האזכורים שנמצאו בתשובות AI.',
+    en: 'Relative share of all mentions found in AI answers.',
+  },
+  share_of_voice_empty: {
+    he: 'אין עדיין אזכורים בתשובות AI עבור העסק או המתחרים. הריצו סריקות נוספות כדי לראות נתח שיח.',
+    en: 'No mentions yet for your business or competitors. Run more scans to see share of voice.',
+  },
+  share_of_voice_mentions: { he: 'אזכורים', en: 'mentions' },
 } as const
 
 type StringKey = keyof typeof STRINGS
