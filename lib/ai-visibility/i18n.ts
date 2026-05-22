@@ -457,8 +457,8 @@ const STRINGS = {
   // Recommendation 6: Engine with no mentions
   rec_engine_no_mentions_title: { he: 'יש מנועים שבהם העסק לא מופיע', en: 'Some AI engines do not mention the business' },
   rec_engine_no_mentions_body: {
-    he: 'התמקדו בשאלות שנבדקו במנועים ללא אזכורים, והוסיפו באתר תשובות ישירות וברורות יותר.',
-    en: 'Focus on questions tested in engines with no mentions and add clearer, direct answers on the website.',
+    he: 'בדקו אילו שאלות לא יצרו אזכור במנועים האלה, והוסיפו באתר תשובות ישירות וברורות סביב הנושאים האלה.',
+    en: 'Review which questions did not generate a mention in those engines, and add clear, direct answers around those topics on your site.',
   },
 } as const
 

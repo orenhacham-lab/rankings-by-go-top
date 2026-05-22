@@ -1019,23 +1019,23 @@ function RecommendationsCard({
 
   if (topThree.length === 0) {
     return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 mt-6">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 mt-6">
         <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
           {t('recommendations_title')}
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('recommendations_desc')}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t('recommendations_desc')}</p>
         <p className="text-sm text-slate-600 dark:text-slate-300 italic">{t('recommendations_none')}</p>
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 mt-6">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 mt-6">
       <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
         {t('recommendations_title')}
       </h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">{t('recommendations_desc')}</p>
-      <div className="space-y-3">
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('recommendations_desc')}</p>
+      <div className="space-y-2">
         {topThree.map((rec) => (
           <RecommendationItem key={rec.id} rec={rec} t={t} isRTL={isRTL} />
         ))}
@@ -1053,17 +1053,17 @@ function RecommendationItem({
   t: T
   isRTL: boolean
 }) {
-  const severityColors = {
-    high: 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800',
-    medium: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
-    low: 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
-  }
+  const borderClass = {
+    high: 'border-rose-200 dark:border-rose-800',
+    medium: 'border-amber-200 dark:border-amber-800',
+    low: 'border-slate-200 dark:border-slate-700',
+  }[rec.severity]
 
-  const severityText = {
-    high: 'text-rose-700 dark:text-rose-300',
-    medium: 'text-amber-700 dark:text-amber-300',
-    low: 'text-slate-600 dark:text-slate-400',
-  }
+  const badgeClass = {
+    high: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+    medium: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    low: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  }[rec.severity]
 
   const severityLabel =
     rec.severity === 'high'
@@ -1073,20 +1073,18 @@ function RecommendationItem({
       : t('rec_severity_low')
 
   return (
-    <div className={`rounded-md border p-3 ${severityColors[rec.severity]} ${isRTL ? 'text-right' : 'text-left'}`}>
-      <div className={`flex items-start gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-        <span className={`text-[11px] font-bold uppercase whitespace-nowrap ${severityText[rec.severity]}`}>
+    <div className={`rounded-md border bg-white dark:bg-slate-900 px-3 py-2.5 ${borderClass}`}>
+      <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse justify-end' : ''}`}>
+        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+          {t(rec.titleKey as any)}
+        </h4>
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${badgeClass}`}>
           {severityLabel}
         </span>
-        <div className="flex-1 min-w-0">
-          <h4 className={`text-sm font-semibold text-slate-900 dark:text-slate-100 ${isRTL ? 'text-right' : 'text-left'}`}>
-            {t(rec.titleKey as any)}
-          </h4>
-          <p className={`text-xs text-slate-700 dark:text-slate-300 mt-1 leading-snug ${isRTL ? 'text-right' : 'text-left'}`}>
-            {t(rec.bodyKey as any)}
-          </p>
-        </div>
       </div>
+      <p className={`text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed ${isRTL ? 'text-right' : 'text-left'}`}>
+        {t(rec.bodyKey as any)}
+      </p>
     </div>
   )
 }
