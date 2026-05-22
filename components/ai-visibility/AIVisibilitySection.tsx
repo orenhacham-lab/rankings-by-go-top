@@ -1341,7 +1341,8 @@ function PromptInsightRow({
       <span> {t('prompt_site_cited')}:</span>
       <span className="font-semibold text-slate-700 dark:text-slate-200"> {citedText} </span>
       <span className="text-slate-400 dark:text-slate-500">|</span>
-      <span> {statusText}</span>
+      <span> {t('prompt_status')}:</span>
+      <span className="font-semibold text-slate-700 dark:text-slate-200"> {statusText}</span>
     </div>
   )
 }

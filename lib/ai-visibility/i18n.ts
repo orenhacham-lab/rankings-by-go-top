@@ -463,7 +463,8 @@ const STRINGS = {
   // Phase 6 — Per-question insights (Queries tab)
   prompt_mentions: { he: 'אזכורים', en: 'Mentions' },
   prompt_site_cited: { he: 'האתר צוטט', en: 'Site cited' },
-  prompt_engines_of: { he: '{mentioned} מתוך {total} מנועים', en: '{mentioned} of {total} engines' },
+  prompt_status: { he: 'סטטוס', en: 'Status' },
+  prompt_engines_of: { he: '{mentioned}/{total} מנועים', en: '{mentioned}/{total} engines' },
   prompt_yes: { he: 'כן', en: 'Yes' },
   prompt_no: { he: 'לא', en: 'No' },
   prompt_not_scanned_yet: { he: 'עוד לא נסרק', en: 'Not scanned yet' },
