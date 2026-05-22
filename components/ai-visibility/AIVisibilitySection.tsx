@@ -1044,23 +1044,26 @@ function RecommendationsCard({
 
   if (allWeakEngines.length > 0) {
     const displayEngines = allWeakEngines.slice(0, 3)
+    const moreCount = allWeakEngines.length > 3 ? allWeakEngines.length - 3 : 0
     const andConjunction = isRTL ? 'ו' : 'and'
 
-    // Format comma-separated list with "and" before last item
+    // Format the list of engine names. When a "+more" suffix is needed,
+    // separate displayed engines with commas only — the "and ..." conjunction
+    // comes from the suffix itself. Without a suffix, use "and" before the
+    // last item for natural reading.
     let engineNames: string
-    if (displayEngines.length === 1) {
+    if (moreCount > 0) {
+      engineNames = displayEngines.join(', ')
+      const moreLabel = isRTL
+        ? (moreCount === 1 ? 'ועוד מנוע אחד' : `ועוד ${moreCount} מנועים`)
+        : (moreCount === 1 ? 'and 1 more engine' : `and ${moreCount} more engines`)
+      engineNames = `${engineNames} ${moreLabel}`
+    } else if (displayEngines.length === 1) {
       engineNames = displayEngines[0]
     } else if (displayEngines.length === 2) {
       engineNames = `${displayEngines[0]} ${andConjunction} ${displayEngines[1]}`
     } else {
       engineNames = `${displayEngines[0]}, ${displayEngines[1]} ${andConjunction} ${displayEngines[2]}`
-    }
-
-    // Add suffix if there are more than 3
-    const moreCount = allWeakEngines.length > 3 ? allWeakEngines.length - 3 : 0
-    if (moreCount > 0) {
-      const moreLabel = isRTL ? `עוד ${moreCount} מנועים` : `and ${moreCount} more engines`
-      engineNames = `${engineNames}, ${moreLabel}`
     }
 
     const bodyText = t('rec_weak_engines_body').replace('{engines}', engineNames)
