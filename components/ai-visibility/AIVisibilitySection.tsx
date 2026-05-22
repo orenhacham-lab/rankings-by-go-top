@@ -572,7 +572,7 @@ export default function AIVisibilitySection({
 
           {/* RECOMMENDATIONS CARD */}
           {globalMetrics && (
-            <RecommendationsCard metrics={globalMetrics} engineMetrics={engineMetrics} t={t} isRTL={isHebrew} />
+            <RecommendationsCard metrics={globalMetrics} engineMetrics={engineMetrics} allResults={allResults} t={t} isRTL={isHebrew} />
           )}
         </>
       )}
@@ -929,80 +929,111 @@ function OverviewSummaryStrip({
 
 interface Recommendation {
   id: string
+  type: 'weak_engines' | 'weak_questions' | 'competitor_leading'
   severity: 'high' | 'medium' | 'low'
   titleKey: string
   bodyKey: string
+  body?: string
   priority: number
 }
 
 function RecommendationsCard({
   metrics,
   engineMetrics,
+  allResults,
   t,
   isRTL,
 }: {
   metrics: GlobalMetrics
   engineMetrics: Map<string, EngineMetrics>
+  allResults: ResultRow[]
   t: T
   isRTL: boolean
 }) {
   const recommendations: Recommendation[] = []
 
-  // Rule 1: Low visibility (mentionRate < 30%)
-  if (metrics.mentionRate < 30) {
+  // Rule 1: Weak engines — engines with scans but no mentions
+  const allWeakEngines = Array.from(engineMetrics.values())
+    .filter((em) => em.scans > 0 && em.mentions === 0)
+    .map((em) => ENGINE_META[em.engine as keyof typeof ENGINE_META]?.name || em.engine)
+
+  if (allWeakEngines.length > 0) {
+    const displayEngines = allWeakEngines.slice(0, 3)
+    const andConjunction = isRTL ? 'ו' : 'and'
+
+    // Format comma-separated list with "and" before last item
+    let engineNames: string
+    if (displayEngines.length === 1) {
+      engineNames = displayEngines[0]
+    } else if (displayEngines.length === 2) {
+      engineNames = `${displayEngines[0]} ${andConjunction} ${displayEngines[1]}`
+    } else {
+      engineNames = `${displayEngines[0]}, ${displayEngines[1]} ${andConjunction} ${displayEngines[2]}`
+    }
+
+    // Add suffix if there are more than 3
+    const moreCount = allWeakEngines.length > 3 ? allWeakEngines.length - 3 : 0
+    if (moreCount > 0) {
+      const moreLabel = isRTL ? `עוד ${moreCount} מנועים` : `and ${moreCount} more engines`
+      engineNames = `${engineNames}, ${moreLabel}`
+    }
+
+    const bodyText = t('rec_weak_engines_body').replace('{engines}', engineNames)
+
     recommendations.push({
-      id: 'low_visibility',
+      id: 'weak_engines',
+      type: 'weak_engines',
       severity: 'high',
-      titleKey: 'rec_low_visibility_title',
-      bodyKey: 'rec_low_visibility_body',
-      priority: 1,
-    })
-  }
-
-  // Rule 2: Low engine coverage (enginesWithMentions / enginesCovered < 0.5)
-  if (metrics.enginesCovered > 0 && metrics.enginesWithMentions / metrics.enginesCovered < 0.5) {
-    recommendations.push({
-      id: 'low_coverage',
-      severity: 'medium',
-      titleKey: 'rec_low_coverage_title',
-      bodyKey: 'rec_low_coverage_body',
-      priority: 4,
-    })
-  }
-
-  // Rule 3: Domain not cited (targetCitations === 0)
-  if (metrics.totalCitations === 0) {
-    recommendations.push({
-      id: 'domain_not_cited',
-      severity: 'medium',
-      titleKey: 'rec_domain_not_cited_title',
-      bodyKey: 'rec_domain_not_cited_body',
+      titleKey: 'rec_weak_engines_title',
+      body: bodyText,
+      bodyKey: 'rec_weak_engines_body',
       priority: 3,
     })
   }
 
-  // Rule 4: Mentioned but not cited (totalMentions > 0 && targetCitations === 0)
-  if (metrics.totalMentions > 0 && metrics.totalCitations === 0) {
-    recommendations.push({
-      id: 'mentioned_not_cited',
-      severity: 'medium',
-      titleKey: 'rec_mentioned_not_cited_title',
-      bodyKey: 'rec_mentioned_not_cited_body',
-      priority: 5,
-    })
+  // Rule 2: Weak questions — questions where business didn't appear in most/all engines
+  const questionStats = new Map<string | null, { total: number; mentions: number; promptText: string }>()
+  for (const result of allResults) {
+    if (result.status !== 'success') continue
+    const key = result.promptId || `__noprompt__${result.id}`
+    const existing = questionStats.get(key) || { total: 0, mentions: 0, promptText: result.promptText }
+    existing.total++
+    if (result.mentioned) existing.mentions++
+    questionStats.set(key, existing)
   }
 
-  // Rule 6: Engine with no mentions (any engine with scans but no mentions)
-  const engineWithNoMentions = Array.from(engineMetrics.values()).find(
-    (em) => em.scans > 0 && em.mentions === 0
-  )
-  if (engineWithNoMentions) {
+  const weakQuestions: { text: string; mentionRate: number }[] = []
+  for (const stat of questionStats.values()) {
+    const rate = stat.total > 0 ? stat.mentions / stat.total : 0
+    if (rate === 0 || rate < 0.25) {
+      if (stat.promptText && stat.promptText.length > 0) {
+        weakQuestions.push({ text: stat.promptText, mentionRate: rate })
+      }
+    }
+  }
+
+  if (weakQuestions.length > 0) {
+    weakQuestions.sort((a, b) => a.mentionRate - b.mentionRate)
+    const topWeak = weakQuestions.slice(0, 2)
+    let bodyText: string
+
+    if (topWeak.length === 1) {
+      bodyText = t('rec_weak_questions_body_single').replace('{question}', `"${topWeak[0].text}"`)
+    } else {
+      const andConjunction = isRTL ? 'ו' : 'and'
+      const q1 = `"${topWeak[0].text}"`
+      const q2 = `"${topWeak[1].text}"`
+      bodyText = t('rec_weak_questions_body_multi').replace('{questions}', `${q1} ${andConjunction} ${q2}`)
+    }
+
     recommendations.push({
-      id: 'engine_no_mentions',
-      severity: 'medium',
-      titleKey: 'rec_engine_no_mentions_title',
-      bodyKey: 'rec_engine_no_mentions_body',
-      priority: 6,
+      id: 'weak_questions',
+      type: 'weak_questions',
+      severity: 'high',
+      titleKey: 'rec_weak_questions_title',
+      body: bodyText,
+      bodyKey: 'rec_weak_questions_body',
+      priority: 2,
     })
   }
 
@@ -1024,7 +1055,7 @@ function RecommendationsCard({
           {t('recommendations_title')}
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t('recommendations_desc')}</p>
-        <p className="text-sm text-slate-600 dark:text-slate-300 italic">{t('recommendations_none')}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 italic">{t('recommendations_none_specific')}</p>
       </div>
     )
   }
@@ -1072,6 +1103,8 @@ function RecommendationItem({
       ? t('rec_severity_medium')
       : t('rec_severity_low')
 
+  const bodyText = rec.body || t(rec.bodyKey as any)
+
   return (
     <div className={`rounded-md border bg-white dark:bg-slate-900 px-3 py-2.5 ${borderClass}`}>
       <div className={`flex items-center gap-2 flex-wrap ${isRTL ? 'flex-row-reverse justify-end' : ''}`}>
@@ -1083,7 +1116,7 @@ function RecommendationItem({
         </span>
       </div>
       <p className={`text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed ${isRTL ? 'text-right' : 'text-left'}`}>
-        {t(rec.bodyKey as any)}
+        {bodyText}
       </p>
     </div>
   )

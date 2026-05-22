@@ -415,50 +415,30 @@ const STRINGS = {
     he: 'לא נמצאו המלצות דחופות כרגע. המשיכו לעקוב אחרי הסריקות הבאות.',
     en: 'No urgent recommendations were found right now. Keep monitoring future scans.',
   },
+  recommendations_none_specific: {
+    he: 'כל השאלות מכוסות ולעסק נראות טובה בכל המנועים.',
+    en: 'All questions are covered and the business has good visibility across all engines.',
+  },
   rec_severity_high: { he: 'דחוף', en: 'High' },
   rec_severity_medium: { he: 'בינוני', en: 'Medium' },
   rec_severity_low: { he: 'נמוך', en: 'Low' },
 
-  // Recommendation 1: Low visibility
-  rec_low_visibility_title: { he: 'הנראות במנועי AI נמוכה', en: 'AI visibility is low' },
-  rec_low_visibility_body: {
-    he: 'מומלץ להוסיף באתר תשובות ברורות לשאלות נפוצות, עמודי FAQ ותוכן שמסביר את השירותים המרכזיים.',
-    en: 'Add clear answers to common questions, FAQ sections, and content that explains your core services.',
+  // Recommendation 1: Weak engines — engines with no mentions
+  rec_weak_engines_title: { he: 'העסק לא מופיע בחלק ממנועי AI', en: 'The business is missing from some AI engines' },
+  rec_weak_engines_body: {
+    he: 'העסק לא הופיע ב-{engines}. בדקו אילו שאלות נבדקו במנועים האלה, והוסיפו באתר תשובות ישירות וברורות סביב הנושאים האלה.',
+    en: 'The business did not appear in {engines}. Review the questions tested in those engines and add clear, direct answers around those topics on your site.',
   },
 
-  // Recommendation 2: Low engine coverage
-  rec_low_coverage_title: { he: 'העסק מופיע במעט מנועי AI', en: 'The business appears in only a few AI engines' },
-  rec_low_coverage_body: {
-    he: 'בדקו באילו מנועים אין אזכורים, וחזקו תוכן ישיר וברור סביב השאלות שנסרקו.',
-    en: 'Review the engines with no mentions and strengthen clear content around the scanned questions.',
+  // Recommendation 2: Weak questions — questions with low visibility
+  rec_weak_questions_title: { he: 'יש שאלות שבהן העסק כמעט לא מופיע', en: 'Some questions have weak visibility' },
+  rec_weak_questions_body_single: {
+    he: 'העסק לא הופיע בשאלה: {question}. מומלץ ליצור או לשפר עמוד תוכן שעונה ישירות על השאלה הזו.',
+    en: 'The business did not appear for the question: {question}. Create or improve a page that directly answers this question.',
   },
-
-  // Recommendation 3: Domain not cited
-  rec_domain_not_cited_title: { he: 'האתר כמעט לא מצוטט כמקור', en: 'The domain is rarely cited as a source' },
-  rec_domain_not_cited_body: {
-    he: 'מומלץ לשפר עמודי מידע באתר, להוסיף מבנה כותרות ברור, Schema ותשובות ממוקדות שניתן לצטט.',
-    en: 'Improve informational pages, add clear headings, structured data, and focused answers that can be cited.',
-  },
-
-  // Recommendation 4: Mentioned but not cited
-  rec_mentioned_not_cited_title: { he: 'העסק מוזכר, אבל האתר לא משמש כמקור', en: 'The business is mentioned, but the site is not cited' },
-  rec_mentioned_not_cited_body: {
-    he: 'נסו לחזק את התוכן באתר כך שמנועי AI יוכלו להסתמך עליו כמקור ישיר.',
-    en: 'Strengthen on-site content so AI engines can rely on your website as a direct source.',
-  },
-
-  // Recommendation 5: Competitor leads
-  rec_competitor_leads_title: { he: 'מתחרה מוביל בנתח האזכורים', en: 'A competitor leads in share of voice' },
-  rec_competitor_leads_body: {
-    he: 'בדקו באילו שאלות המתחרה מופיע ואתם לא, וצרו תוכן ייעודי סביב אותן שאלות.',
-    en: 'Review the questions where the competitor appears and your business does not, then create targeted content around them.',
-  },
-
-  // Recommendation 6: Engine with no mentions
-  rec_engine_no_mentions_title: { he: 'יש מנועים שבהם העסק לא מופיע', en: 'Some AI engines do not mention the business' },
-  rec_engine_no_mentions_body: {
-    he: 'בדקו אילו שאלות לא יצרו אזכור במנועים האלה, והוסיפו באתר תשובות ישירות וברורות סביב הנושאים האלה.',
-    en: 'Review which questions did not generate a mention in those engines, and add clear, direct answers around those topics on your site.',
+  rec_weak_questions_body_multi: {
+    he: 'העסק כמעט לא הופיע בשאלות כמו: {questions}. מומלץ ליצור תוכן שעונה ישירות על השאלות האלה.',
+    en: 'The business had weak visibility for questions such as: {questions}. Create content that directly answers these questions.',
   },
 } as const
 
