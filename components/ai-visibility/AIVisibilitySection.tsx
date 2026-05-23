@@ -1646,7 +1646,7 @@ function ResultRowCard({
               <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>
             )}
             {reCited ? (
-              <Badge variant="success" className="!text-xs">{t('target_cited')}</Badge>
+              <Badge variant="info" className="!text-xs">{t('target_cited')}</Badge>
             ) : (
               <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>
             )}
@@ -1837,8 +1837,8 @@ function ResultDetailDrawer({
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-600 dark:text-slate-300">{t('target_cited')}</div>
-                <div className={`text-lg font-bold ${reCited ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                <div className="text-xs text-blue-600 dark:text-blue-400">{t('target_cited')}</div>
+                <div className={`text-lg font-bold ${reCited ? 'text-blue-700 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
                   {reCited ? '✓' : '—'}
                 </div>
               </div>
