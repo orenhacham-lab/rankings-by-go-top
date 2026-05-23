@@ -1470,6 +1470,30 @@ function highlightMatches(
  * for display as a chip on the result row. Falls back to first variant if
  * the response text isn't loaded yet but the row is marked mentioned.
  */
+/**
+ * Strip protocol, query params, hash, and trailing slashes for clean display.
+ * Detection variants are not modified — this is presentation only.
+ */
+function cleanDisplayDomain(s: string | null): string | null {
+  if (!s) return s
+  return s
+    .replace(/^https?:\/\//i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/+$/, '')
+    .trim()
+}
+
+/**
+ * Check if a citation's domain matches the target domain (ignoring www prefix).
+ * Used for citation-list rendering and for setting reCited from sources.
+ */
+function isTargetCitation(citationDomain: string | null | undefined, targetDomain: string | null): boolean {
+  if (!citationDomain || !targetDomain) return false
+  const c = citationDomain.toLowerCase().replace(/^www\./, '')
+  const t = targetDomain.toLowerCase().replace(/^www\./, '')
+  return c === t
+}
+
 function findMatchedLabels(
   responseText: string | null,
   brandVariants: string[],
@@ -1480,10 +1504,12 @@ function findMatchedLabels(
 ): { brandLabels: string[]; domainLabel: string | null; reMentioned: boolean; reCited: boolean } {
   const brandLabels: string[] = []
   let domainLabel: string | null = null
+  // Fallback to DB-stored values when we can't re-evaluate
   let reMentioned = mentioned
   let reCited = cited
 
-  // A variant is "domain-form" if it looks like a URL or domain (has TLD, www, or scheme)
+  // A variant is "domain-form" if it looks like a URL or domain (has TLD, www, or scheme).
+  // This is a CLASSIFICATION check — detection itself is unchanged.
   const isDomainForm = (s: string): boolean => {
     const t = s.toLowerCase().trim()
     if (/^https?:\/\//.test(t)) return true
@@ -1493,9 +1519,14 @@ function findMatchedLabels(
   }
 
   if (responseText) {
+    // We can re-evaluate precisely from the actual text — reset and rebuild
+    // so domain-only responses do not falsely flag as "mentioned".
+    reMentioned = false
+    reCited = false
+
     const lower = responseText.toLowerCase()
 
-    // Find every variant that appears in the response
+    // Find every variant that appears in the response (detection unchanged)
     const matched: string[] = []
     for (const v of brandVariants) {
       if (lower.includes(v.toLowerCase())) matched.push(v)
@@ -1513,7 +1544,9 @@ function findMatchedLabels(
       if (!isShorterSubstring) filtered.push(variant)
     }
 
-    // Classify: domain-form variants become domainLabel + reCited; the rest are brand labels
+    // Strict classification:
+    //   domain-form match  → reCited only  (never reMentioned)
+    //   brand-form match   → reMentioned only  (never reCited)
     for (const v of filtered) {
       if (isDomainForm(v)) {
         if (!domainLabel || v.length > domainLabel.length) {
@@ -1522,10 +1555,11 @@ function findMatchedLabels(
         reCited = true
       } else {
         brandLabels.push(v)
+        reMentioned = true
       }
     }
 
-    // Legacy explicit targetDomain check (backward compatibility)
+    // Explicit targetDomain substring check (only contributes to reCited)
     if (targetDomain) {
       const cleaned = targetDomain.toLowerCase()
       if (
@@ -1538,18 +1572,13 @@ function findMatchedLabels(
         reCited = true
       }
     }
-
-    // If anything was matched (brand or domain), the row was mentioned
-    if (brandLabels.length > 0 || reCited) reMentioned = true
   }
 
-  // Check citations for target domain match (even if not in response text)
+  // Check citations for target domain match. Citations contribute ONLY to
+  // reCited — having the domain in the sources list is a citation, not a mention.
   if (citations && citations.length > 0 && targetDomain) {
-    const targetLower = targetDomain.toLowerCase()
     for (const c of citations) {
-      const citationDomain = c.domain?.toLowerCase() || ''
-      // Check if citation domain matches target (exact or with www prefix)
-      if (citationDomain === targetLower || citationDomain === `www.${targetLower}`) {
+      if (c.is_target_domain || isTargetCitation(c.domain, targetDomain)) {
         if (!domainLabel) domainLabel = c.domain || targetDomain
         reCited = true
         break
@@ -1558,7 +1587,11 @@ function findMatchedLabels(
   }
 
   if (reCited && targetDomain && !domainLabel) domainLabel = targetDomain
-  return { brandLabels: Array.from(new Set(brandLabels)), domainLabel, reMentioned, reCited }
+
+  // Final display cleanup: strip protocols / query params from the domain label
+  const displayDomain = cleanDisplayDomain(domainLabel)
+
+  return { brandLabels: Array.from(new Set(brandLabels)), domainLabel: displayDomain, reMentioned, reCited }
 }
 
 function ResultRowCard({
@@ -1829,24 +1862,30 @@ function ResultDetailDrawer({
                 {t('sources')} ({result.citations.length})
               </h3>
               <div className="space-y-2">
-                {result.citations.map((c, i) => (
-                  <a
-                    key={i}
-                    href={c.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm transition"
-                  >
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className={`font-medium ${c.is_target_domain ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                        {c.domain}
-                      </span>
-                      {c.is_target_domain && (
-                        <Badge variant="success" className="!text-xs">{t('your_domain')}</Badge>
-                      )}
-                    </div>
-                  </a>
-                ))}
+                {result.citations.map((c, i) => {
+                  // Fall back to client-side www-tolerant match when backend
+                  // is_target_domain wasn't set on legacy rows.
+                  const isTarget = c.is_target_domain || isTargetCitation(c.domain, targetDomain)
+                  const displayDomain = cleanDisplayDomain(c.domain) || c.domain
+                  return (
+                    <a
+                      key={i}
+                      href={c.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm transition"
+                    >
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className={`font-medium ${isTarget ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}`}>
+                          {displayDomain}
+                        </span>
+                        {isTarget && (
+                          <Badge variant="success" className="!text-xs">{t('your_domain')}</Badge>
+                        )}
+                      </div>
+                    </a>
+                  )
+                })}
               </div>
             </div>
           )}
