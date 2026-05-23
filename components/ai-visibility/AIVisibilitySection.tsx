@@ -2062,8 +2062,9 @@ function GeoExplanationSection({
  * GEO Recommendations — Phase 1C "What can be improved?" section.
  *
  * Rule-based, actionable, business-facing suggestions grounded in gaps
- * detected in geoInsights. Renders nothing when generator returns empty
- * (no detectable gaps).
+ * detected in geoInsights. Shows fallback message when no gaps are
+ * detected (positive reinforcement if the business appeared + cited, or
+ * generic "no clear gaps" otherwise).
  */
 function GeoRecommendationsSection({
   geoInsights,
@@ -2085,21 +2086,44 @@ function GeoRecommendationsSection({
     isHebrew,
   })
 
-  if (recs.length === 0) return null
+  // Fallback message when no recommendations are generated
+  let fallbackText: string | null = null
+  if (recs.length === 0) {
+    if (displayMentioned && displayCited) {
+      // Positive reinforcement: business is appearing well
+      fallbackText = isHebrew
+        ? 'שמרו על תוכן ברור עם מחירים, ביקורות והמלצות כדי לחזק את הופעתכם בתוצאות דומות.'
+        : 'Keep your content clear with pricing, reviews, and recommendations to strengthen your visibility in similar queries.'
+    } else {
+      // Generic: no clear improvements detected
+      fallbackText = isHebrew
+        ? 'לא זוהו פעולות שיפור ברורות בתוצאה הזו.'
+        : 'No clear improvements were detected in this result.'
+    }
+  }
+
+  // If no recommendations and no fallback, don't render
+  if (recs.length === 0 && !fallbackText) return null
 
   return (
     <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-2">
       <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
         {t('geo_recommendations_title')}
       </h3>
-      <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-        {recs.map((r) => (
-          <li key={r.key} className="flex gap-2">
-            <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">→</span>
-            <span>{r.text}</span>
-          </li>
-        ))}
-      </ul>
+      {recs.length > 0 ? (
+        <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+          {recs.map((r) => (
+            <li key={r.key} className="flex gap-2">
+              <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">→</span>
+              <span>{r.text}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+          {fallbackText}
+        </p>
+      )}
     </div>
   )
 }
