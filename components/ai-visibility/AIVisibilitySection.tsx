@@ -40,6 +40,7 @@ import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
 import { generateGeoExplanation } from '@/lib/ai-visibility/geo-explanations'
+import { generateGeoRecommendations } from '@/lib/ai-visibility/geo-recommendations'
 
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
@@ -932,6 +933,7 @@ export default function AIVisibilitySection({
           result={selectedResult}
           brandVariants={brandVariants}
           targetDomain={normalizedTargetDomain}
+          isHebrew={isHebrew}
           onClose={() => {
             setDrawerOpen(false)
             setTimeout(() => setSelectedResult(null), 300)
@@ -1816,6 +1818,7 @@ function ResultDetailDrawer({
   result,
   brandVariants,
   targetDomain,
+  isHebrew,
   onClose,
   t,
 }: {
@@ -1823,6 +1826,7 @@ function ResultDetailDrawer({
   result: ResultRow
   brandVariants: string[]
   targetDomain: string | null
+  isHebrew: boolean
   onClose: () => void
   t: T
 }) {
@@ -1927,11 +1931,19 @@ function ResultDetailDrawer({
             displayCited={result.displayCited}
             displayBrandLabels={result.displayBrandLabels}
             displayDomainLabel={result.displayDomainLabel}
-            isHebrew={brandVariants.some((v) => /[֐-׿]/.test(v))}
+            isHebrew={isHebrew}
             t={t}
           />
 
-          <GeoInsightsSection insights={result.geoInsights} t={t} />
+          <GeoRecommendationsSection
+            geoInsights={result.geoInsights}
+            displayMentioned={result.displayMentioned}
+            displayCited={result.displayCited}
+            isHebrew={isHebrew}
+            t={t}
+          />
+
+          <GeoInsightsCollapsible insights={result.geoInsights} t={t} />
 
           {result.citations.length > 0 && (
             <div className="space-y-2">
@@ -2047,17 +2059,61 @@ function GeoExplanationSection({
 }
 
 /**
- * GEO Insights — Phase 1A compact drawer section.
+ * GEO Recommendations — Phase 1C "What can be improved?" section.
  *
- * Read-only display of rule-based signals computed by the API:
- *   - Query intent(s)
- *   - Citation type(s) across the result's sources
- *   - Content patterns detected in the AI answer
- *
- * Renders nothing when no signals are present (degrades silently when the
- * server response lacks geoInsights or all fields are empty).
+ * Rule-based, actionable, business-facing suggestions grounded in gaps
+ * detected in geoInsights. Renders nothing when generator returns empty
+ * (no detectable gaps).
  */
-function GeoInsightsSection({
+function GeoRecommendationsSection({
+  geoInsights,
+  displayMentioned,
+  displayCited,
+  isHebrew,
+  t,
+}: {
+  geoInsights: GeoInsights | null
+  displayMentioned: boolean
+  displayCited: boolean
+  isHebrew: boolean
+  t: T
+}) {
+  const recs = generateGeoRecommendations({
+    geoInsights,
+    displayMentioned,
+    displayCited,
+    isHebrew,
+  })
+
+  if (recs.length === 0) return null
+
+  return (
+    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-2">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        {t('geo_recommendations_title')}
+      </h3>
+      <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+        {recs.map((r) => (
+          <li key={r.key} className="flex gap-2">
+            <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">→</span>
+            <span>{r.text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/**
+ * GEO Insights — Phase 1C collapsible technical details panel.
+ *
+ * Renders the raw signals as compact chips inside a collapsible <details>
+ * element. The summary line shows the section name; users opt in to see
+ * the technical breakdown rather than having it pushed to the foreground.
+ *
+ * Renders nothing when no signals are present.
+ */
+function GeoInsightsCollapsible({
   insights,
   t,
 }: {
@@ -2113,35 +2169,41 @@ function GeoInsightsSection({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-        {t('geo_insights_title')}
-      </h3>
+    <details className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 group">
+      <summary className="cursor-pointer list-none p-3 flex items-center justify-between gap-2 select-none hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg">
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+          {t('geo_insights_title')} <span className="text-slate-400 dark:text-slate-500">· {t('geo_technical_details')}</span>
+        </span>
+        <span className="text-slate-400 dark:text-slate-500 text-xs group-open:rotate-180 transition-transform">▾</span>
+      </summary>
+      <div className="p-4 pt-0 space-y-3 border-t border-slate-200 dark:border-slate-700 mt-0">
+        {data.queryIntents.length > 0 && (
+          <div className="pt-3">
+            <GeoChipRow
+              label={t('geo_query_intent')}
+              chips={data.queryIntents.map((i) => intentLabel(i))}
+              tone="indigo"
+            />
+          </div>
+        )}
 
-      {data.queryIntents.length > 0 && (
-        <GeoChipRow
-          label={t('geo_query_intent')}
-          chips={data.queryIntents.map((i) => intentLabel(i))}
-          tone="indigo"
-        />
-      )}
+        {data.citationTypes.length > 0 && (
+          <GeoChipRow
+            label={t('geo_citation_types')}
+            chips={data.citationTypes.map((c) => citationLabel(c))}
+            tone="slate"
+          />
+        )}
 
-      {data.citationTypes.length > 0 && (
-        <GeoChipRow
-          label={t('geo_citation_types')}
-          chips={data.citationTypes.map((c) => citationLabel(c))}
-          tone="slate"
-        />
-      )}
-
-      {activeSignals.length > 0 && (
-        <GeoChipRow
-          label={t('geo_content_signals')}
-          chips={activeSignals.map((s) => s.label)}
-          tone="emerald"
-        />
-      )}
-    </div>
+        {activeSignals.length > 0 && (
+          <GeoChipRow
+            label={t('geo_content_signals')}
+            chips={activeSignals.map((s) => s.label)}
+            tone="emerald"
+          />
+        )}
+      </div>
+    </details>
   )
 }
 

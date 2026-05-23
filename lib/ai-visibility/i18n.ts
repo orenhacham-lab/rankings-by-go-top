@@ -488,6 +488,16 @@ const STRINGS = {
     en: 'Not enough signals to explain this result reliably.',
   },
 
+  // GEO Recommendations (Phase 1C — what can be improved)
+  geo_recommendations_title: { he: 'מה אפשר לשפר?', en: 'What can be improved?' },
+  geo_recommendations_none: {
+    he: 'לא זוהו פערים ברורים בתוצאה הזו. המשיכו בעבודה הטובה.',
+    en: 'No clear gaps detected in this result. Keep up the good work.',
+  },
+
+  // GEO Insights collapsible label (Phase 1C — technical details)
+  geo_technical_details: { he: 'פרטים טכניים', en: 'Technical details' },
+
   // Query intents
   geo_intent_transactional: { he: 'מסחרי', en: 'Transactional' },
   geo_intent_informational: { he: 'מידע', en: 'Informational' },

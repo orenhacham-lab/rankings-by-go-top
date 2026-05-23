@@ -1,33 +1,46 @@
 /**
- * GEO Explanations — Phase 1B (rule-based narrative generation).
+ * GEO Explanations — Phase 1C business-facing narrative.
  *
- * Converts raw GEO Insights signals into 2–4 clear human-readable bullets
+ * Converts raw GEO Insights signals into 3–5 clear business-facing bullets
  * explaining why a result appeared (or didn't) in AI engine responses.
  *
- * All bullets are rule-based; no AI generation, no hallucination, no
- * invented explanations. Each bullet must be grounded in a specific signal.
- *
- * Returns bullets directly as localized strings (HE/EN).
+ * Style: written for business owners — explains WHY each signal matters,
+ * not just what it is. Avoids technical jargon (transactional, homepage,
+ * intent signals). All bullets are rule-based; no AI generation.
  */
 
-import type { GeoInsights, QueryIntent, CitationType } from './geo-signals'
+import type { GeoInsights } from './geo-signals'
 
 export interface GeoExplanation {
   bullets: string[]
   hasSignals: boolean
 }
 
+const EMPTY_INSIGHTS: GeoInsights = {
+  queryIntents: [],
+  citationTypes: [],
+  contentSignals: {
+    hasList: false,
+    hasComparisonLanguage: false,
+    hasPricingLanguage: false,
+    hasReviewLanguage: false,
+    hasLocalLanguage: false,
+    hasRecommendationLanguage: false,
+  },
+}
+
 /**
- * Generate a human-readable explanation for why this result occurred.
+ * Generate a human-readable, business-facing explanation for this result.
  *
- * Generates 2–4 bullets covering (in order):
- *   1. Query intent (if recognized)
- *   2. Citation sources (if non-homepage/non-brand)
- *   3. Visibility outcome (mention/citation status) — always included
- *   4. Bonus: relevant content signals
+ * Bullets follow a narrative arc:
+ *   1. What kind of question this is (intent)
+ *   2. Which kinds of sources the engine trusted (citation type)
+ *   3. What was in the answer (key content signal)
+ *   4. How the business performed (visibility outcome) — always included
  *
- * Returns empty bullets if truly insufficient signals (e.g., no intent,
- * no sources, no mention/citation, no content patterns).
+ * Each bullet explains WHY this matters for AI visibility, not just what
+ * was detected. Rule-based only; if signals are sparse, returns fewer
+ * bullets rather than padding with vague language.
  */
 export function generateGeoExplanation(args: {
   geoInsights: GeoInsights | null
@@ -41,189 +54,170 @@ export function generateGeoExplanation(args: {
     geoInsights,
     displayMentioned,
     displayCited,
-    displayBrandLabels,
-    displayDomainLabel,
     isHebrew: he,
   } = args
 
-  // Safe defaults if no geoInsights from server
-  const data = geoInsights ?? {
-    queryIntents: [],
-    citationTypes: [],
-    contentSignals: {
-      hasList: false,
-      hasComparisonLanguage: false,
-      hasPricingLanguage: false,
-      hasReviewLanguage: false,
-      hasLocalLanguage: false,
-      hasRecommendationLanguage: false,
-    },
-  }
-
+  const data = geoInsights ?? EMPTY_INSIGHTS
   const bullets: string[] = []
 
   // ─────────────────────────────────────────────────────────────────────
-  // 1. Intent explanation (1 bullet, most prominent intent)
+  // 1. Intent (1 bullet) — explains WHY the engine behaves a certain way
   // ─────────────────────────────────────────────────────────────────────
   if (data.queryIntents.includes('transactional')) {
     bullets.push(
       he
-        ? 'זו שאלה עם כוונת קנייה. במקרים כאלה מנועי AI נוטים להעדיף תשובות עם מחירים וביקורות.'
-        : 'This is a buying intent query. AI engines typically prioritize answers with pricing and reviews.'
+        ? 'השאלה הזו קשורה לקבלת החלטת רכישה, ולכן מנועי AI נותנים עדיפות לתשובות ברורות ומעשיות עם מחירים, יתרונות והמלצות.'
+        : 'This query is about making a purchasing decision, so AI engines favor clear, practical answers with pricing, benefits, and recommendations.'
     )
   } else if (data.queryIntents.includes('review')) {
     bullets.push(
       he
-        ? 'זו שאלה המחפשת המלצות או ביקורות. מנועי AI נוטים להדגיש חוות דעות בתשובה.'
-        : 'This query seeks recommendations or reviews. AI engines emphasize opinions in answers.'
+        ? 'השאלה מחפשת המלצות וחוות דעות, ולכן מנועי AI מעדיפים תשובות הכוללות ביקורות, דירוגים והוכחות חברתיות.'
+        : 'This query seeks recommendations and opinions, so AI engines favor answers backed by reviews, ratings, and social proof.'
     )
   } else if (data.queryIntents.includes('comparison')) {
     bullets.push(
       he
-        ? 'זו שאלת השוואה. המנוע כנראה התמקד בהבדלים בין אפשרויות.'
-        : 'This is a comparison query. The engine likely focused on differences between options.'
+        ? 'השאלה דורשת השוואה בין אפשרויות, ולכן מנועי AI מעדיפים תוכן שמציג הבדלים בצורה ברורה ומאורגנת.'
+        : 'This query asks for a comparison between options, so AI engines favor content that presents differences in a clear, organized way.'
     )
   } else if (data.queryIntents.includes('local')) {
     bullets.push(
       he
-        ? 'זו שאלה עם כוונה מקומית. מנועי AI מחפשים עסקים או שירותים קרוב למיקום.'
-        : 'This query has local intent. AI engines seek businesses or services near the location.'
+        ? 'השאלה ממוקדת באזור גיאוגרפי מסוים, ולכן מנועי AI יעדיפו עסקים עם נוכחות מקומית ברורה ומידע מיקום זמין.'
+        : 'This query is focused on a specific geographic area, so AI engines favor businesses with a clear local presence and visible location information.'
     )
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // 2. Citation source explanation
+  // 2. Citation source (1 bullet) — explains source authority signal
   // ─────────────────────────────────────────────────────────────────────
   if (data.citationTypes.length > 0) {
     const isBrandOrHome =
       data.citationTypes.includes('brand_site') || data.citationTypes.includes('homepage')
 
-    // If brand/homepage are present, mention that (strong signal)
     if (isBrandOrHome) {
       bullets.push(
         he
-          ? 'המנוע הסתמך על אתר המותג או דף הבית, מקורות חזקים וישירים.'
-          : 'The engine relied on the brand site or homepage, strong direct sources.'
+          ? 'המנוע הסתמך על האתר הרשמי של העסק — סימן חיובי לחוזק המותג במנועי AI.'
+          : 'The engine relied on the official business website — a positive signal of brand strength in AI engines.'
       )
     } else if (data.citationTypes.includes('marketplace')) {
-      // Marketplace emphasis for buying queries
       bullets.push(
         he
-          ? 'המנוע הסתמך על שווקים מקוונים (אמזון, eBay וכו\'), פופולריים בשאלות קנייה.'
-          : 'The engine relied on online marketplaces (Amazon, eBay, etc.), popular for buying queries.'
-      )
-    } else if (data.citationTypes.includes('forum')) {
-      // Forum emphasis for review/discussion queries
-      bullets.push(
-        he
-          ? 'המנוע הסתמך על פורומים וקהילות, מקורות לביקורות וחוות דעות.'
-          : 'The engine relied on forums and communities, sources for reviews and opinions.'
+          ? 'המנוע הסתמך על שווקים מקוונים גדולים, שמשקפים אמון צרכני ופופולריות של מוצרים.'
+          : 'The engine relied on large online marketplaces, which reflect consumer trust and product popularity.'
       )
     } else if (data.citationTypes.includes('review')) {
-      // Review sites
       bullets.push(
         he
-          ? 'המנוע הסתמך על אתרי ביקורות, המציגים דירוגים והמלצות.'
-          : 'The engine relied on review sites, which display ratings and recommendations.'
-    )
-    } else if (data.citationTypes.includes('directory')) {
-      // Directory emphasis
-      bullets.push(
-        he
-          ? 'המנוע הסתמך על ספרי עסקים (דיוקטוריז), מקורות לחיפוש עסקים.'
-          : 'The engine relied on business directories, sources for finding businesses.'
+          ? 'המנוע הסתמך על אתרי ביקורות — מקור מהימן להמלצות אובייקטיביות מהציבור.'
+          : 'The engine relied on review sites — a trusted source for objective public recommendations.'
       )
-    } else if (data.citationTypes.includes('blog') || data.citationTypes.includes('comparison')) {
-      // Blog/comparison articles
+    } else if (data.citationTypes.includes('forum')) {
       bullets.push(
         he
-          ? 'המנוע הסתמך על מאמרים וערכים השוואתיים, מקורות מידע.'
-          : 'The engine relied on articles and comparison guides, information sources.'
+          ? 'המנוע הסתמך על דיונים בקהילות, שבהם משתמשים אמיתיים חולקים ניסיון אישי.'
+          : 'The engine relied on community discussions, where real users share personal experience.'
+      )
+    } else if (data.citationTypes.includes('directory')) {
+      bullets.push(
+        he
+          ? 'המנוע הסתמך על ספרי עסקים, שמסייעים לזיהוי וסיווג עסקים מקומיים בצורה אמינה.'
+          : 'The engine relied on business directories, which help identify and categorize local businesses reliably.'
+      )
+    } else if (
+      data.citationTypes.includes('blog') ||
+      data.citationTypes.includes('comparison')
+    ) {
+      bullets.push(
+        he
+          ? 'המנוע הסתמך על מאמרים ומדריכים — מקור עומק שמשמש להעמקה בנושאים מקצועיים.'
+          : 'The engine relied on articles and guides — depth sources used for in-depth coverage of professional topics.'
       )
     }
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // 3. Visibility outcome (primary answer to "why?") — always include
+  // 3. Content pattern (1 bullet) — explains WHY this content style helps
+  // ─────────────────────────────────────────────────────────────────────
+  // Pick the single most relevant content signal for the intent
+  const cs = data.contentSignals
+  if (cs.hasPricingLanguage && data.queryIntents.includes('transactional')) {
+    bullets.push(
+      he
+        ? 'מנועי AI נוטים להעדיף תשובות עם מחירים ברורים בשאלות קנייה — וזה הופיע גם כאן.'
+        : 'AI engines tend to favor answers with clear pricing for buying queries — and that appeared here too.'
+    )
+  } else if (cs.hasReviewLanguage) {
+    bullets.push(
+      he
+        ? 'תוכן עם ביקורות ודירוגים עוזר למנועי AI לבחור תשובות אמינות יותר.'
+        : 'Content with reviews and ratings helps AI engines choose more trustworthy answers.'
+    )
+  } else if (cs.hasComparisonLanguage && data.queryIntents.includes('comparison')) {
+    bullets.push(
+      he
+        ? 'תוכן השוואתי מסייע למנועי AI להסביר הבדלים ולתת תשובות מעמיקות יותר.'
+        : 'Comparison content helps AI engines explain differences and provide deeper answers.'
+    )
+  } else if (cs.hasRecommendationLanguage) {
+    bullets.push(
+      he
+        ? 'תוכן עם המלצות ברורות מקל על מנועי AI להעביר תשובה מובהקת למשתמש.'
+        : 'Content with clear recommendations makes it easier for AI engines to deliver a definitive answer to the user.'
+    )
+  } else if (cs.hasPricingLanguage) {
+    bullets.push(
+      he
+        ? 'הופעת מחירים בתשובה מספקת מידע מעשי שמשתמשים מצפים לקבל ממנועי AI.'
+        : 'Pricing in the answer provides the practical info users expect from AI engines.'
+    )
+  } else if (cs.hasList) {
+    bullets.push(
+      he
+        ? 'מבנה רשימה בתשובה מקל על מנועי AI לסכם ולהציג מידע בצורה ברורה.'
+        : 'A list structure in the answer makes it easier for AI engines to summarize and present information clearly.'
+    )
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 4. Visibility outcome — primary "why?" answer, always included
   // ─────────────────────────────────────────────────────────────────────
   if (displayMentioned && displayCited) {
     bullets.push(
       he
-        ? 'העסק הופיע בתשובה וגם צוטט כמקור — סימן חזק מאוד לנראות במנוע.'
-        : 'The business appeared in the answer and was cited as a source — very strong visibility signal.'
+        ? 'העסק מופיע בתשובה וגם משמש כמקור — סימן חזק במיוחד לאמון של המנוע בעסק.'
+        : 'The business appears in the answer and is also used as a source — a particularly strong signal of engine trust in the business.'
     )
   } else if (displayMentioned) {
     bullets.push(
       he
-        ? 'העסק הופיע בתשובה כי שם העסק זוהה ישירות בטקסט.'
-        : 'The business appeared because its name was directly identified in the text.'
+        ? 'העסק מופיע בתשובה כי המנוע מצא בו רלוונטיות ישירה לשאלה.'
+        : 'The business appears in the answer because the engine found it directly relevant to the question.'
     )
   } else if (displayCited) {
     bullets.push(
       he
-        ? 'האתר צוטט כמקור בתשובה, סימן חזק לנראות במנוע AI.'
-        : 'The website was cited as a source in the answer, a strong AI visibility signal.'
+        ? 'האתר משמש כמקור בתשובה — מעיד על אמון של המנוע באתר כמקור מוסמך.'
+        : 'The website is used as a source in the answer — indicating engine trust in the site as an authoritative source.'
     )
   } else {
     bullets.push(
       he
-        ? 'העסק לא הופיע בתוצאה הזו. כדאי לבדוק אם קיימים באתר תכנים שעונים ישירות על השאלה.'
-        : 'The business did not appear in this result. Check if your site has content directly answering the query.'
+        ? 'העסק לא הופיע בתוצאה הזו, וזה מצביע על כך שהמנוע לא מצא תוכן מספיק רלוונטי או חזק שמתאים לשאלה.'
+        : 'The business did not appear in this result, indicating the engine did not find sufficiently relevant or strong content matching the query.'
     )
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // 4. Content signal (if room and relevant)
-  // ─────────────────────────────────────────────────────────────────────
-  if (bullets.length < 4) {
-    // Pricing is relevant for transactional / buying queries
-    if (
-      data.contentSignals.hasPricingLanguage &&
-      (data.queryIntents.includes('transactional') || data.queryIntents.length === 0)
-    ) {
-      bullets.push(
-        he
-          ? 'בתשובה הופיעו מחירים, מה שמתאים לשאלות קנייה.'
-          : 'The answer included pricing information, suitable for buying queries.'
-      )
-    }
-    // Reviews/ratings for review queries
-    else if (
-      data.contentSignals.hasReviewLanguage &&
-      (data.queryIntents.includes('review') || data.queryIntents.length === 0)
-    ) {
-      bullets.push(
-        he
-          ? 'בתשובה הופיעו דירוגים וביקורות, שיכולים להשפיע על בחירת ההמלצות.'
-          : 'The answer included ratings and reviews, which influence recommendation choices.'
-      )
-    }
-    // Comparison language
-    else if (
-      data.contentSignals.hasComparisonLanguage &&
-      data.queryIntents.includes('comparison')
-    ) {
-      bullets.push(
-        he
-          ? 'בתשובה הופיעה השוואה בין עסקים או מוצרים, מתאים לכוונת השאלה.'
-          : 'The answer included a comparison between businesses or products, matching the query intent.'
-      )
-    }
-  }
+  // Cap at 5 bullets (intent + source + content + visibility = max 4 here)
+  const finalBullets = bullets.slice(0, 5)
 
-  // Trim to max 4 bullets
-  const finalBullets = bullets.slice(0, 4)
-
-  // Check if we have meaningful signals. If truly minimal, return empty.
+  // Insufficient signals: only the fallback "did not appear" bullet, no
+  // intent, no citation, no content — show no explanation at all so the
+  // UI can render the fallback message instead.
   const hasSignals =
-    finalBullets.length > 0 &&
-    !(
-      finalBullets.length === 1 &&
-      !displayMentioned &&
-      !displayCited &&
-      data.queryIntents.length === 0 &&
-      data.citationTypes.length === 0
-    )
+    finalBullets.length > 1 || displayMentioned || displayCited
 
   return {
     bullets: finalBullets,
