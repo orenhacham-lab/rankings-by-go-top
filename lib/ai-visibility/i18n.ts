@@ -473,6 +473,42 @@ const STRINGS = {
   prompt_status_weak: { he: 'חלש', en: 'Weak' },
   prompt_status_medium: { he: 'בינוני', en: 'Medium' },
   prompt_status_good: { he: 'טוב', en: 'Good' },
+
+  // GEO Insights (Phase 1A — drawer-only compact section)
+  geo_insights_title: { he: 'תובנות GEO', en: 'GEO Insights' },
+  geo_query_intent: { he: 'כוונת שאלה', en: 'Query intent' },
+  geo_citation_types: { he: 'סוגי מקורות', en: 'Source types' },
+  geo_content_signals: { he: 'דפוסי תוכן', en: 'Content patterns' },
+  geo_none: { he: '—', en: '—' },
+
+  // Query intents
+  geo_intent_transactional: { he: 'מסחרי', en: 'Transactional' },
+  geo_intent_informational: { he: 'מידע', en: 'Informational' },
+  geo_intent_comparison: { he: 'השוואה', en: 'Comparison' },
+  geo_intent_review: { he: 'ביקורת', en: 'Review' },
+  geo_intent_local: { he: 'מקומי', en: 'Local' },
+  geo_intent_navigational: { he: 'ניווט', en: 'Navigational' },
+
+  // Citation types
+  geo_citation_homepage: { he: 'דף בית', en: 'Homepage' },
+  geo_citation_category: { he: 'קטגוריה', en: 'Category' },
+  geo_citation_product: { he: 'מוצר', en: 'Product' },
+  geo_citation_comparison: { he: 'השוואה', en: 'Comparison' },
+  geo_citation_review: { he: 'ביקורת', en: 'Review' },
+  geo_citation_blog: { he: 'בלוג', en: 'Blog' },
+  geo_citation_marketplace: { he: 'שוק מקוון', en: 'Marketplace' },
+  geo_citation_forum: { he: 'פורום', en: 'Forum' },
+  geo_citation_directory: { he: 'מדריך עסקים', en: 'Directory' },
+  geo_citation_brand_site: { he: 'אתר המותג', en: 'Brand site' },
+  geo_citation_unknown: { he: 'לא מסווג', en: 'Unknown' },
+
+  // Content signals
+  geo_signal_list: { he: 'רשימה', en: 'List' },
+  geo_signal_comparison: { he: 'השוואה', en: 'Comparison' },
+  geo_signal_pricing: { he: 'מחיר', en: 'Pricing' },
+  geo_signal_review: { he: 'ביקורות', en: 'Reviews' },
+  geo_signal_local: { he: 'מקומי', en: 'Local' },
+  geo_signal_recommendation: { he: 'המלצה', en: 'Recommendation' },
 } as const
 
 type StringKey = keyof typeof STRINGS

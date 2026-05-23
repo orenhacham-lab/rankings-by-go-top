@@ -14,6 +14,7 @@ import { runAIVisibilityScan } from '@/lib/ai-visibility'
 import { isDomainMatch } from '@/lib/ai-visibility/matching/domain-normalize'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { computeDisplayMatches } from '@/lib/ai-visibility/display-classification'
+import { computeGeoInsights } from '@/lib/ai-visibility/geo-signals'
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
@@ -351,22 +352,24 @@ export async function GET(request: Request) {
 
   // Fetch citations grouped by result_id so the server-side classifier can
   // detect target citations even when the DB target_cited flag was set false
-  // at scan time. We only need minimal fields.
+  // at scan time. We only need minimal fields. URL is also pulled so the
+  // GEO citation-type classifier can read the path.
   const resultIds = results.map((r) => r.id as string)
   const citationsByResult = new Map<
     string,
-    Array<{ domain: string | null; is_target_domain: boolean | null }>
+    Array<{ domain: string | null; url: string | null; is_target_domain: boolean | null }>
   >()
   if (resultIds.length > 0) {
     const { data: citationRows } = await admin
       .from('ai_citations')
-      .select('result_id, domain, is_target_domain')
+      .select('result_id, domain, url, is_target_domain')
       .in('result_id', resultIds)
     for (const c of citationRows ?? []) {
       const rid = c.result_id as string
       const arr = citationsByResult.get(rid) ?? []
       arr.push({
         domain: (c.domain as string | null) ?? null,
+        url: (c.url as string | null) ?? null,
         is_target_domain: (c.is_target_domain as boolean | null) ?? null,
       })
       citationsByResult.set(rid, arr)
@@ -410,13 +413,23 @@ export async function GET(request: Request) {
         errorMessage: run.error_message,
         results: runResults.map((r) => {
           const promptText = r.prompt_id ? promptMap.get(r.prompt_id as string) || null : null
+          const citationsForResult = citationsByResult.get(r.id as string) ?? null
           const display = computeDisplayMatches({
             responseText: (r.response_text as string | null) ?? null,
             brandVariants,
             targetDomain: projectTargetDomain,
             mentioned: (r.mentioned as boolean | null) ?? false,
             cited: (r.target_cited as boolean | null) ?? false,
-            citations: citationsByResult.get(r.id as string) ?? null,
+            citations: citationsForResult,
+          })
+          // GEO Insights — rule-based, read-only enrichment. Degrades to
+          // empty arrays / false flags when responseText or citations are
+          // unavailable. Never alters scan or DB state.
+          const geoInsights = computeGeoInsights({
+            prompt: promptText,
+            responseText: (r.response_text as string | null) ?? null,
+            citations: citationsForResult,
+            targetDomain: projectTargetDomain,
           })
           return {
             id: r.id,
@@ -437,6 +450,7 @@ export async function GET(request: Request) {
             displayCited: display.displayCited,
             displayBrandLabels: display.displayBrandLabels,
             displayDomainLabel: display.displayDomainLabel,
+            geoInsights,
           }
         }),
       }

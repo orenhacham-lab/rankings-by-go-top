@@ -38,6 +38,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
+import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
 
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
@@ -61,6 +62,21 @@ type ResultRow = {
   displayCited: boolean
   displayBrandLabels: string[]
   displayDomainLabel: string | null
+  // GEO Insights — server-computed, rule-based, read-only. Drawer-only UI.
+  geoInsights: GeoInsights | null
+}
+
+const EMPTY_GEO_INSIGHTS: GeoInsights = {
+  queryIntents: [],
+  citationTypes: [],
+  contentSignals: {
+    hasList: false,
+    hasComparisonLanguage: false,
+    hasPricingLanguage: false,
+    hasReviewLanguage: false,
+    hasLocalLanguage: false,
+    hasRecommendationLanguage: false,
+  },
 }
 
 type PromptRow = {
@@ -215,6 +231,7 @@ export default function AIVisibilitySection({
             displayCited: hasDisplay ? result.displayCited : (result.targetCited || false),
             displayBrandLabels: Array.isArray(result.displayBrandLabels) ? result.displayBrandLabels : [],
             displayDomainLabel: typeof result.displayDomainLabel === 'string' ? result.displayDomainLabel : null,
+            geoInsights: result.geoInsights ?? null,
           })
         }
       }
@@ -1903,6 +1920,8 @@ function ResultDetailDrawer({
             )}
           </div>
 
+          <GeoInsightsSection insights={result.geoInsights} t={t} />
+
           {result.citations.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -1959,6 +1978,138 @@ function ResultDetailDrawer({
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * GEO Insights — Phase 1A compact drawer section.
+ *
+ * Read-only display of rule-based signals computed by the API:
+ *   - Query intent(s)
+ *   - Citation type(s) across the result's sources
+ *   - Content patterns detected in the AI answer
+ *
+ * Renders nothing when no signals are present (degrades silently when the
+ * server response lacks geoInsights or all fields are empty).
+ */
+function GeoInsightsSection({
+  insights,
+  t,
+}: {
+  insights: GeoInsights | null
+  t: T
+}) {
+  const data = insights ?? EMPTY_GEO_INSIGHTS
+
+  const activeSignals: Array<{ key: string; label: string }> = []
+  if (data.contentSignals.hasList) activeSignals.push({ key: 'list', label: t('geo_signal_list') })
+  if (data.contentSignals.hasComparisonLanguage)
+    activeSignals.push({ key: 'comparison', label: t('geo_signal_comparison') })
+  if (data.contentSignals.hasPricingLanguage)
+    activeSignals.push({ key: 'pricing', label: t('geo_signal_pricing') })
+  if (data.contentSignals.hasReviewLanguage)
+    activeSignals.push({ key: 'review', label: t('geo_signal_review') })
+  if (data.contentSignals.hasLocalLanguage)
+    activeSignals.push({ key: 'local', label: t('geo_signal_local') })
+  if (data.contentSignals.hasRecommendationLanguage)
+    activeSignals.push({ key: 'recommendation', label: t('geo_signal_recommendation') })
+
+  const hasAny =
+    data.queryIntents.length > 0 ||
+    data.citationTypes.length > 0 ||
+    activeSignals.length > 0
+  if (!hasAny) return null
+
+  const intentLabel = (i: QueryIntent): string => {
+    switch (i) {
+      case 'transactional': return t('geo_intent_transactional')
+      case 'informational': return t('geo_intent_informational')
+      case 'comparison': return t('geo_intent_comparison')
+      case 'review': return t('geo_intent_review')
+      case 'local': return t('geo_intent_local')
+      case 'navigational': return t('geo_intent_navigational')
+    }
+  }
+
+  const citationLabel = (c: CitationType): string => {
+    switch (c) {
+      case 'homepage': return t('geo_citation_homepage')
+      case 'category': return t('geo_citation_category')
+      case 'product': return t('geo_citation_product')
+      case 'comparison': return t('geo_citation_comparison')
+      case 'review': return t('geo_citation_review')
+      case 'blog': return t('geo_citation_blog')
+      case 'marketplace': return t('geo_citation_marketplace')
+      case 'forum': return t('geo_citation_forum')
+      case 'directory': return t('geo_citation_directory')
+      case 'brand_site': return t('geo_citation_brand_site')
+      case 'unknown': return t('geo_citation_unknown')
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 space-y-3">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        {t('geo_insights_title')}
+      </h3>
+
+      {data.queryIntents.length > 0 && (
+        <GeoChipRow
+          label={t('geo_query_intent')}
+          chips={data.queryIntents.map((i) => intentLabel(i))}
+          tone="indigo"
+        />
+      )}
+
+      {data.citationTypes.length > 0 && (
+        <GeoChipRow
+          label={t('geo_citation_types')}
+          chips={data.citationTypes.map((c) => citationLabel(c))}
+          tone="slate"
+        />
+      )}
+
+      {activeSignals.length > 0 && (
+        <GeoChipRow
+          label={t('geo_content_signals')}
+          chips={activeSignals.map((s) => s.label)}
+          tone="emerald"
+        />
+      )}
+    </div>
+  )
+}
+
+function GeoChipRow({
+  label,
+  chips,
+  tone,
+}: {
+  label: string
+  chips: string[]
+  tone: 'indigo' | 'slate' | 'emerald'
+}) {
+  const toneClasses =
+    tone === 'indigo'
+      ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+      : tone === 'emerald'
+      ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600'
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+        {label}:
+      </span>
+      {chips.map((c, i) => (
+        <span
+          key={`${c}-${i}`}
+          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border ${toneClasses}`}
+        >
+          {c}
+        </span>
+      ))}
     </div>
   )
 }
