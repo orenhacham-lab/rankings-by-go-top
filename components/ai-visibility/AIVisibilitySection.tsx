@@ -424,11 +424,17 @@ export default function AIVisibilitySection({
         const data = await res.json()
         const fullResult = data.results?.[0]
         if (fullResult) {
-          setSelectedResult({
+          const enriched: ResultRow = {
             ...result,
             citations: fullResult.citations || [],
             responseText: fullResult.responseText || null,
-          })
+          }
+          setSelectedResult(enriched)
+          // Propagate loaded responseText back into allResults so the list view
+          // can re-evaluate mention/citation badges using actual content.
+          setAllResults((prev) =>
+            prev.map((r) => (r.id === result.id ? { ...r, citations: enriched.citations, responseText: enriched.responseText } : r))
+          )
         }
       }
     } catch (e) {
@@ -1471,17 +1477,30 @@ function findMatchedLabels(
   mentioned: boolean,
   cited: boolean
 ): { brandLabels: string[]; domainLabel: string | null; reMentioned: boolean; reCited: boolean } {
-  const labels: string[] = []
+  const brandLabels: string[] = []
   let domainLabel: string | null = null
   let reMentioned = mentioned
   let reCited = cited
+
+  // A variant is "domain-form" if it looks like a URL or domain (has TLD, www, or scheme)
+  const isDomainForm = (s: string): boolean => {
+    const t = s.toLowerCase().trim()
+    if (/^https?:\/\//.test(t)) return true
+    if (/^www\./.test(t)) return true
+    if (/\.[a-z]{2,}(\/|$|\?|#)/.test(t)) return true
+    return false
+  }
+
   if (responseText) {
     const lower = responseText.toLowerCase()
+
+    // Find every variant that appears in the response
     const matched: string[] = []
     for (const v of brandVariants) {
       if (lower.includes(v.toLowerCase())) matched.push(v)
     }
-    // Filter to show only most specific matches (longer variants that contain shorter ones)
+
+    // Filter to most specific matches (drop shorter substrings of longer matches)
     const filtered: string[] = []
     for (const variant of matched) {
       const variantLower = variant.toLowerCase()
@@ -1490,30 +1509,41 @@ function findMatchedLabels(
         other.toLowerCase().includes(variantLower) &&
         other.length > variant.length
       )
-      if (!isShorterSubstring) {
-        filtered.push(variant)
+      if (!isShorterSubstring) filtered.push(variant)
+    }
+
+    // Classify: domain-form variants become domainLabel + reCited; the rest are brand labels
+    for (const v of filtered) {
+      if (isDomainForm(v)) {
+        if (!domainLabel || v.length > domainLabel.length) {
+          domainLabel = v
+        }
+        reCited = true
+      } else {
+        brandLabels.push(v)
       }
     }
-    labels.push(...filtered)
 
+    // Legacy explicit targetDomain check (backward compatibility)
     if (targetDomain) {
       const cleaned = targetDomain.toLowerCase()
-      // Detect bare domain, www.domain, full URL, or markdown link
       if (
         lower.includes(cleaned) ||
         lower.includes(`www.${cleaned}`) ||
         lower.includes(`https://${cleaned}`) ||
         lower.includes(`http://${cleaned}`)
       ) {
-        domainLabel = targetDomain
+        if (!domainLabel) domainLabel = targetDomain
         reCited = true
       }
     }
-    // Re-evaluate mentioned flag based on actual content
-    if (labels.length > 0) reMentioned = true
+
+    // If anything was matched (brand or domain), the row was mentioned
+    if (brandLabels.length > 0 || reCited) reMentioned = true
   }
+
   if (reCited && targetDomain && !domainLabel) domainLabel = targetDomain
-  return { brandLabels: Array.from(new Set(labels)), domainLabel, reMentioned, reCited }
+  return { brandLabels: Array.from(new Set(brandLabels)), domainLabel, reMentioned, reCited }
 }
 
 function ResultRowCard({
