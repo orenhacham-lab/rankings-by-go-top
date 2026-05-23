@@ -277,7 +277,7 @@ export default function AIVisibilitySection({
         totalCitations,
         mentionRate: successfulScans > 0 ? Math.round((totalMentions / successfulScans) * 100) : 0,
         citationRate: successfulScans > 0 ? Math.round((totalCitations / successfulScans) * 100) : 0,
-        enginesCovered: engines.size,
+        enginesCovered: SUPPORTED_ENGINES.length,
         enginesWithMentions,
       })
 
