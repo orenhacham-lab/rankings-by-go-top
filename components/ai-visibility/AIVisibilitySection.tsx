@@ -2419,47 +2419,60 @@ function GeoCompetitorIntelligenceSection({
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 1: Trusted Sources Dominating Visibility
+  // Card 1: Recurring websites — focus on specific domains by name.
+  // Answers "Who keeps showing up?". No category language (that's Card 3).
   // ─────────────────────────────────────────────────────────────────────
   const trustedSourcesCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
-    const topCat = intelligence.categoryBreakdown[0]
-    const secondCat = intelligence.categoryBreakdown[1]
+    const domains = intelligence.trustedDomains
+    const topDomain = domains[0]
+    const secondDomain = domains[1]
 
-    if (topCat) {
-      const catLabel = categoryLabel(topCat.category)
-      if (topCat.percentage >= 30) {
+    if (topDomain) {
+      // Lead: name the most dominant domain directly
+      if (topDomain.uniqueEngineCount >= 3) {
         lines.push({
           text: isHebrew
-            ? `${capitalize(catLabel)} הופיעו לעיתים קרובות בתשובות מנועי AI (${topCat.percentage}% מהמקורות החוזרים).`
-            : `${capitalize(catLabel)} appeared repeatedly across AI engine answers (${topCat.percentage}% of recurring sources).`,
+            ? `${topDomain.domain} חזר על עצמו ב-${topDomain.uniqueEngineCount} מנועי AI שונים.`
+            : `${topDomain.domain} recurred across ${topDomain.uniqueEngineCount} different AI engines.`,
           isFirst: true,
         })
       } else {
         lines.push({
           text: isHebrew
-            ? `${capitalize(catLabel)} חזרו על פני סריקות מרובות במנועים שונים.`
-            : `${capitalize(catLabel)} recurred across multiple scans and engines.`,
+            ? `${topDomain.domain} בלט בנוכחות חוזרת בתשובות מנועי AI.`
+            : `${topDomain.domain} stood out with consistent presence across AI answers.`,
           isFirst: true,
         })
       }
     }
 
-    if (secondCat && secondCat.percentage >= 15) {
+    if (secondDomain) {
       lines.push({
         text: isHebrew
-          ? `${capitalize(categoryLabel(secondCat.category))} נכחו גם הם בין המקורות החוזרים.`
-          : `${capitalize(categoryLabel(secondCat.category))} also appeared among recurring sources.`,
+          ? `${secondDomain.domain} הופיע גם הוא במספר תוצאות שונות.`
+          : `${secondDomain.domain} also appeared in multiple results.`,
         isFirst: false,
       })
     }
 
-    const pills = intelligence.trustedDomains.slice(0, 3).map((d) => d.domain)
+    // Closing context line — only if we have 3+ recurring sites
+    if (domains.length >= 3) {
+      lines.push({
+        text: isHebrew
+          ? `סך הכל ${domains.length} אתרים חזרו על עצמם בסריקות.`
+          : `In total, ${domains.length} websites recurred across scans.`,
+        isFirst: false,
+      })
+    }
+
+    const pills = domains.slice(0, 3).map((d) => d.domain)
     return { lines, pills }
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 2: Competitor Content Structure
+  // Card 2: Content types — what kind of content AI engines pick.
+  // No domain names here. Sharp, specific sentences.
   // ─────────────────────────────────────────────────────────────────────
   const contentStructureCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
@@ -2478,19 +2491,18 @@ function GeoCompetitorIntelligenceSection({
 
     if (topTypes.length === 0) return { lines, pills: [] }
 
-    // Lead with first dominant content type, qualitative
     const describeType = (type: string): string => {
       const labels: Record<string, { he: string; en: string }> = {
-        review: { he: 'תוכן מבוסס ביקורות', en: 'review-driven content' },
-        marketplace: { he: 'דפי שווקים מקוונים', en: 'marketplace pages' },
-        comparison: { he: 'תוכן השוואתי', en: 'comparison-focused content' },
+        review: { he: 'ביקורות', en: 'reviews' },
+        marketplace: { he: 'דפי שווקים', en: 'marketplace pages' },
+        comparison: { he: 'דפי השוואה', en: 'comparison pages' },
         category: { he: 'דפי קטגוריה', en: 'category pages' },
         product: { he: 'דפי מוצר', en: 'product pages' },
-        forum: { he: 'דיונים קהילתיים', en: 'community discussions' },
-        blog: { he: 'מאמרים מערכתיים', en: 'editorial articles' },
-        brand_site: { he: 'אתרי מותג רשמיים', en: 'official brand sites' },
-        homepage: { he: 'דפי בית של מותגים', en: 'brand homepages' },
-        directory: { he: 'מדריכי עסקים', en: 'business directories' },
+        forum: { he: 'דיוני פורומים', en: 'forum discussions' },
+        blog: { he: 'בלוגים וכתבות', en: 'blogs and articles' },
+        brand_site: { he: 'אתרי מותג', en: 'brand sites' },
+        homepage: { he: 'דפי בית', en: 'homepages' },
+        directory: { he: 'ספריות עסקיות', en: 'business directories' },
       }
       return labels[type]?.[isHebrew ? 'he' : 'en'] || type
     }
@@ -2498,8 +2510,8 @@ function GeoCompetitorIntelligenceSection({
     const first = describeType(topTypes[0])
     lines.push({
       text: isHebrew
-        ? `${capitalize(first)} חוזרים בתוצאות שזכו לחשיפה במנועי AI.`
-        : `${capitalize(first)} recurred in results that gained visibility in AI engines.`,
+        ? `${first} הם סוג התוכן שמופיע הכי הרבה בתשובות AI.`
+        : `${capitalize(first)} are the content type AI surfaces most often.`,
       isFirst: true,
     })
 
@@ -2507,8 +2519,8 @@ function GeoCompetitorIntelligenceSection({
       const second = describeType(topTypes[1])
       lines.push({
         text: isHebrew
-          ? `${capitalize(second)} מילאו תפקיד משני אך משמעותי.`
-          : `${capitalize(second)} played a secondary but consistent role.`,
+          ? `מיד אחריהם — ${second}, גם הם חוזרים בתדירות גבוהה.`
+          : `Close behind — ${second}, which also recur frequently.`,
         isFirst: false,
       })
     }
@@ -2517,8 +2529,8 @@ function GeoCompetitorIntelligenceSection({
       const third = describeType(topTypes[2])
       lines.push({
         text: isHebrew
-          ? `${capitalize(third)} הופיעו גם הם בקרב המקורות החוזרים.`
-          : `${capitalize(third)} were also present among recurring sources.`,
+          ? `${third} מהווים את התוכן השלישי בחשיבותו.`
+          : `${capitalize(third)} round out the dominant content mix.`,
         isFirst: false,
       })
     }
@@ -2527,55 +2539,61 @@ function GeoCompetitorIntelligenceSection({
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 3: Engine Trust Patterns — varied sentence structure
+  // Card 3: Per-engine source preferences — pure category language, no
+  // domain names (avoids overlap with Card 1). Skip engines where no
+  // clear category emerges (no generic fallback).
   // ─────────────────────────────────────────────────────────────────────
   const enginePatternsCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-    // Templates for variety - rotate so it doesn't feel repetitive
     const templates = isHebrew
-      ? [
-          (name: string, cat: string) => `${name} הציג בעיקר ${cat}.`,
-          (name: string, cat: string) => `${cat} הופיעו לרוב בתשובות של ${name}.`,
-          (name: string, cat: string) => `${name} נטה ל${cat}.`,
-          (name: string, cat: string) => `ב-${name}, ${cat} בלטו במיוחד.`,
-        ]
-      : [
-          (name: string, cat: string) => `${name} surfaced more ${cat}.`,
-          (name: string, cat: string) => `${cat} appeared frequently in ${name} answers.`,
-          (name: string, cat: string) => `${name} leaned toward ${cat}.`,
-          (name: string, cat: string) => `In ${name}, ${cat} stood out as recurring sources.`,
-        ]
+      ? {
+          one: (name: string, c1: string) => `${name} הציג בעיקר ${c1}.`,
+          two: (name: string, c1: string, c2: string) => `${name} הציג בעיקר ${c1} ו${c2}.`,
+        }
+      : {
+          one: (name: string, c1: string) => `${capitalize(name)} mostly surfaced ${c1}.`,
+          two: (name: string, c1: string, c2: string) => `${capitalize(name)} mostly surfaced ${c1} and ${c2}.`,
+        }
 
-    let templateIdx = 0
+    let firstLineSet = false
     for (const ep of intelligence.enginePreferences.slice(0, 4)) {
       const name = engineDisplayName(ep.engine)
       if (ep.topCompetitors.length === 0) continue
 
-      // Find dominant category for this engine's top competitor
-      const topDomain = ep.topCompetitors[0].domain
-      const matchedTrustedDomain = intelligence.trustedDomains.find(
-        (d) => d.domain === topDomain
-      )
-      const cat = matchedTrustedDomain
-        ? categoryLabel(matchedTrustedDomain.category)
-        : isHebrew
-        ? 'מקורות חוזרים'
-        : 'recurring sources'
+      // Aggregate categories across this engine's top competitors. Use
+      // trustedDomains as the lookup source. Pick the 1–2 most common.
+      const catCount = new Map<CompetitorCategory, number>()
+      for (const tc of ep.topCompetitors) {
+        const td = intelligence.trustedDomains.find((d) => d.domain === tc.domain)
+        if (!td) continue
+        catCount.set(td.category, (catCount.get(td.category) || 0) + 1)
+      }
 
-      const template = templates[templateIdx % templates.length]
-      lines.push({
-        text: template(name, cat),
-        isFirst: templateIdx === 0,
-      })
-      templateIdx++
+      const sortedCats = Array.from(catCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([c]) => c)
+
+      // No identifiable category → skip this engine line entirely.
+      // Avoid generic "recurring sources" fallback.
+      if (sortedCats.length === 0) continue
+
+      const cat1 = categoryLabel(sortedCats[0])
+      const text =
+        sortedCats.length >= 2
+          ? templates.two(name, cat1, categoryLabel(sortedCats[1]))
+          : templates.one(name, cat1)
+
+      lines.push({ text, isFirst: !firstLineSet })
+      firstLineSet = true
     }
 
     return { lines, pills: [] }
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 4: Visibility Loss Analysis — most strategic card
+  // Card 4: Visibility loss — sharp, specific. Lead with the dominant
+  // domain that took the spot when relevant; otherwise lead with category.
   // ─────────────────────────────────────────────────────────────────────
   const visibilityLossCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
@@ -2585,38 +2603,46 @@ function GeoCompetitorIntelligenceSection({
       return { lines, pills: [] }
     }
 
-    // Lead: what category dominates loss scenarios
-    if (loss.dominantCategories.length > 0) {
+    // Lead: name the dominant replacement domain when available.
+    if (loss.dominantDomains.length > 0) {
+      const topDomain = loss.dominantDomains[0]
+      lines.push({
+        text: isHebrew
+          ? `${topDomain} הוא האתר שמופיע הכי הרבה בתשובות שבהן העסק נעדר.`
+          : `${topDomain} is the website appearing most often when the business is absent.`,
+        isFirst: true,
+      })
+    } else if (loss.dominantCategories.length > 0) {
       const topLossCat = categoryLabel(loss.dominantCategories[0])
       lines.push({
         text: isHebrew
-          ? `כאשר הפרויקט לא הופיע, ${topLossCat} הופיעו במקומו לעיתים קרובות.`
-          : `When the project did not appear, ${topLossCat} most often appeared in its place.`,
+          ? `${topLossCat} תופסים את המקום של העסק בתשובות.`
+          : `${capitalize(topLossCat)} are taking the business's spot in AI answers.`,
         isFirst: true,
       })
     }
 
-    // Secondary: second dominant category
-    if (loss.dominantCategories.length >= 2) {
-      const second = categoryLabel(loss.dominantCategories[1])
+    // Secondary: dominant category context if we led with a domain.
+    if (loss.dominantDomains.length > 0 && loss.dominantCategories.length > 0) {
+      const topLossCat = categoryLabel(loss.dominantCategories[0])
       lines.push({
         text: isHebrew
-          ? `${capitalize(second)} החליפו אותו בחלק מהתשובות.`
-          : `${capitalize(second)} replaced it in a portion of answers.`,
+          ? `רוב התחליפים הם ${topLossCat}.`
+          : `Most replacements are ${topLossCat}.`,
         isFirst: false,
       })
     }
 
-    // Tertiary: insight about content type if available
+    // Tertiary: concrete content-type insight.
     if (loss.frequentCitationTypes.length > 0) {
       const topLossType = loss.frequentCitationTypes[0].type
       const typeDescriptions: Record<string, { he: string; en: string }> = {
-        review: { he: 'תוכן ביקורות תפס את החלל בתדירות גבוהה', en: 'review content filled the gap frequently' },
-        comparison: { he: 'דפי השוואה הופיעו במקום הפרויקט בתשובות רבות', en: 'comparison pages frequently appeared instead' },
-        marketplace: { he: 'דפי שווקים מקוונים הופיעו לרוב כתחליף', en: 'marketplace pages often served as replacement' },
-        forum: { he: 'דיונים קהילתיים הופיעו כמקור בתשובות שבהן הפרויקט נעדר', en: 'community discussions appeared where the project was absent' },
-        blog: { he: 'תוכן מערכתי החליף את הפרויקט במספר תשובות', en: 'editorial content replaced the project in several answers' },
-        brand_site: { he: 'אתרי מותגים מתחרים הופיעו במקום הפרויקט', en: 'competing brand sites appeared in the project\'s place' },
+        review: { he: 'ביקורות צרכנים תופסות את המקום בתדירות גבוהה', en: 'consumer reviews fill the gap frequently' },
+        comparison: { he: 'דפי השוואה נכנסים במקום העסק בתשובות', en: 'comparison pages step in instead' },
+        marketplace: { he: 'דפי שווקים תופסים את המקום ברוב המקרים', en: 'marketplace pages take the spot most often' },
+        forum: { he: 'דיוני פורומים תופסים את המקום של העסק', en: 'forum discussions fill the gap' },
+        blog: { he: 'בלוגים וכתבות מערכתיות מחליפים את העסק', en: 'blogs and editorial articles replace the business' },
+        brand_site: { he: 'אתרי מותגים מתחרים נכנסים במקום העסק', en: 'competing brand sites step into the business\'s place' },
       }
       const desc = typeDescriptions[topLossType]
       if (desc) {
@@ -2651,6 +2677,7 @@ function GeoCompetitorIntelligenceSection({
           icon={<Award className="w-5 h-5" />}
           lines={trustedSourcesCard.lines}
           pills={trustedSourcesCard.pills}
+          pillsLabel={t('geo_comp_pills_label')}
           emptyText={t('geo_comp_no_data_sources')}
         />
         <IntelligenceCard
@@ -2675,6 +2702,7 @@ function GeoCompetitorIntelligenceSection({
           icon={<TrendingDown className="w-5 h-5" />}
           lines={visibilityLossCard.lines}
           pills={visibilityLossCard.pills}
+          pillsLabel={t('geo_comp_pills_label')}
           emptyText={t('geo_comp_no_data_loss')}
         />
       </div>
@@ -2693,6 +2721,7 @@ function IntelligenceCard({
   icon,
   lines,
   pills,
+  pillsLabel,
   emptyText,
 }: {
   title: string
@@ -2700,6 +2729,7 @@ function IntelligenceCard({
   icon: React.ReactNode
   lines: Array<{ text: string; isFirst?: boolean }>
   pills: string[]
+  pillsLabel?: string
   emptyText: string
 }) {
   const accent =
@@ -2747,15 +2777,22 @@ function IntelligenceCard({
         <p className="text-xs text-slate-500 dark:text-slate-400 italic">{emptyText}</p>
       )}
       {pills.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {pills.map((domain) => (
-            <span
-              key={domain}
-              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-            >
-              {domain}
-            </span>
-          ))}
+        <div className="pt-1 space-y-1.5">
+          {pillsLabel && (
+            <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              {pillsLabel}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {pills.map((domain) => (
+              <span
+                key={domain}
+                className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+              >
+                {domain}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>

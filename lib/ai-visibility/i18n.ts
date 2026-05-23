@@ -520,28 +520,32 @@ const STRINGS = {
   // GEO Competitor Intelligence (Phase 2C — AI visibility market intelligence)
   geo_comp_title: { he: 'תובנות תחרות ב-AI', en: 'AI Market Intelligence' },
   geo_comp_subtitle: {
-    he: 'אילו מקורות ומתחרים מקבלים הצגה בתשובות AI',
-    en: 'Which sources and competitors get featured in AI answers',
+    he: 'מבט על המקורות והמתחרים שדומיננטיים בתשובות מנועי AI',
+    en: 'An overview of the sources and competitors dominating AI engine answers',
   },
-  geo_comp_card_sources: { he: 'המקורות שמקבלים הצגה בתשובות', en: 'Top sources in AI answers' },
-  geo_comp_card_content: { he: 'סוגי התוכן שמנועים בוחרים', en: 'Content types that win' },
-  geo_comp_card_engines: { he: 'מה כל מנוע מעדיף', en: 'What each engine prioritizes' },
-  geo_comp_card_loss: { he: 'המתחרים שלך כשאתה לא שם', en: 'Your competition when you\'re absent' },
+  geo_comp_card_sources: { he: 'האתרים שחוזרים בתשובות AI', en: 'Websites that keep appearing' },
+  geo_comp_card_content: { he: 'איזה תוכן מופיע יותר בתשובות AI', en: 'What content appears most in AI answers' },
+  geo_comp_card_engines: { he: 'אילו מקורות בולטים בכל מנוע', en: 'Which sources stand out in each engine' },
+  geo_comp_card_loss: { he: 'מי מופיע כשהעסק לא מופיע', en: 'Who appears when your business doesn\'t' },
+  geo_comp_pills_label: {
+    he: 'דוגמאות לאתרים שחזרו בתוצאות:',
+    en: 'Examples of recurring sites:',
+  },
   geo_comp_no_data_sources: {
-    he: 'ככל שתהיה יותר נתונים, המקורות המובילים יתעדכנו כאן.',
-    en: 'As more scans accumulate, the top sources will appear here.',
+    he: 'אין עדיין מספיק סריקות כדי לזהות אתרים שחוזרים על עצמם.',
+    en: 'Not enough scans yet to identify recurring sites.',
   },
   geo_comp_no_data_content: {
-    he: 'עוד לא מספיק נתונים כדי לראות איזה תוכן מנצח.',
-    en: 'More data needed to identify winning content patterns.',
+    he: 'עוד אין מספיק נתונים כדי לזהות סוגי תוכן בולטים.',
+    en: 'Not enough data yet to identify dominant content types.',
   },
   geo_comp_no_data_engines: {
-    he: 'יותר סריקות יגידו לנו מה כל מנוע אוהב.',
-    en: 'Run more scans to see what each engine prefers.',
+    he: 'יידרשו עוד סריקות במגוון מנועים כדי לזהות העדפות.',
+    en: 'More scans across engines needed to identify preferences.',
   },
   geo_comp_no_data_loss: {
-    he: 'כשתהיו תוצאות שבהן אתה לא מופיע, נראה כאן מה תופס את המקום.',
-    en: 'When you\'re missing from results, we\'ll show what replaces you here.',
+    he: 'כשיהיו תוצאות שבהן העסק לא הופיע, נראה כאן מה תפס את המקום.',
+    en: 'When the business is missing from results, what replaced it will appear here.',
   },
 
   // Category language (varied, not "ecosystem"-heavy)
