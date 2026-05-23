@@ -14,11 +14,15 @@ import { runAIVisibilityScan } from '@/lib/ai-visibility'
 import { isDomainMatch } from '@/lib/ai-visibility/matching/domain-normalize'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { computeDisplayMatches } from '@/lib/ai-visibility/display-classification'
-import { computeGeoInsights } from '@/lib/ai-visibility/geo-signals'
+import { computeGeoInsights, classifyCitationType } from '@/lib/ai-visibility/geo-signals'
 import {
   computeGeoOpportunityMapping,
   type OpportunityResultInput,
 } from '@/lib/ai-visibility/geo-opportunity-mapping'
+import {
+  computeGeoCompetitorIntelligence,
+  type CompetitorIntelligenceInput,
+} from '@/lib/ai-visibility/geo-competitor-intelligence'
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
@@ -406,6 +410,7 @@ export async function GET(request: Request) {
   // Build per-result enrichment once, then reuse for both the per-run
   // payload AND the project-level opportunity mapping aggregation.
   const opportunityInputs: OpportunityResultInput[] = []
+  const competitorIntelligenceInputs: CompetitorIntelligenceInput[] = []
 
   const responseRuns = (runs ?? []).map((run) => {
     const runResults = resultsByRun.get(run.id) || []
@@ -448,6 +453,19 @@ export async function GET(request: Request) {
             displayCited: display.displayCited,
             geoInsights,
           })
+
+          // Competitor intelligence — track citations for all results
+          // (successful and failed) to understand competitor landscape.
+          competitorIntelligenceInputs.push({
+            engine: r.engine as string,
+            displayMentioned: display.displayMentioned,
+            displayCited: display.displayCited,
+            targetDomain: projectTargetDomain,
+            citations: (citationsForResult ?? []).map((c) => ({
+              domain: c.domain || '',
+              citationType: classifyCitationType(c.url, c.domain, projectTargetDomain),
+            })),
+          })
         }
 
         return {
@@ -479,8 +497,15 @@ export async function GET(request: Request) {
   // successful scan results. Read-only; safe to return alongside runs.
   const geoOpportunityMapping = computeGeoOpportunityMapping(opportunityInputs)
 
+  // Project-level GEO Competitor Intelligence — deterministic analysis of
+  // competitor domains, categories, and visibility patterns.
+  const geoCompetitorIntelligence = computeGeoCompetitorIntelligence(
+    competitorIntelligenceInputs
+  )
+
   return Response.json({
     runs: responseRuns,
     geoOpportunityMapping,
+    geoCompetitorIntelligence,
   })
 }
