@@ -19,7 +19,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Link, Bot, AlertTriangle } from 'lucide-react'
+import { BarChart3, Link, Bot, AlertTriangle, Award, Layers, Cpu, TrendingDown } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
@@ -50,6 +50,10 @@ import type {
   EngineStats,
   MissingOpportunity,
 } from '@/lib/ai-visibility/geo-opportunity-mapping'
+import type {
+  GeoCompetitorIntelligence,
+  CompetitorCategory,
+} from '@/lib/ai-visibility/geo-competitor-intelligence'
 
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
@@ -160,6 +164,7 @@ export default function AIVisibilitySection({
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [geoOpportunityMapping, setGeoOpportunityMapping] = useState<GeoOpportunityMapping | null>(null)
+  const [geoCompetitorIntelligence, setGeoCompetitorIntelligence] = useState<GeoCompetitorIntelligence | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAllResults, setShowAllResults] = useState(false)
   const [seenPrompts, setSeenPrompts] = useState<Set<string>>(new Set())
@@ -225,6 +230,13 @@ export default function AIVisibilitySection({
       setGeoOpportunityMapping(
         runsData.geoOpportunityMapping
           ? (runsData.geoOpportunityMapping as GeoOpportunityMapping)
+          : null
+      )
+
+      // Project-level GEO Competitor Intelligence — server-computed, read-only.
+      setGeoCompetitorIntelligence(
+        runsData.geoCompetitorIntelligence
+          ? (runsData.geoCompetitorIntelligence as GeoCompetitorIntelligence)
           : null
       )
 
@@ -775,6 +787,13 @@ export default function AIVisibilitySection({
           {/* GEO OPPORTUNITY MAPPING (Phase 2A) — project-level aggregated insights */}
           <GeoOpportunityMappingSection
             mapping={geoOpportunityMapping}
+            isHebrew={isHebrew}
+            t={t}
+          />
+
+          {/* GEO COMPETITOR INTELLIGENCE (Phase 2C) — AI search market intelligence */}
+          <GeoCompetitorIntelligenceSection
+            intelligence={geoCompetitorIntelligence}
             isHebrew={isHebrew}
             t={t}
           />
@@ -2350,6 +2369,397 @@ function OpportunityCard({
 function capitalize(s: string): string {
   if (!s) return s
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/**
+ * GEO Competitor Intelligence — Phase 2C
+ *
+ * AI search market intelligence section. Surfaces which sources AI engines
+ * trust, what content patterns repeatedly win visibility, how different
+ * engines differ, and what tends to replace the project when it loses
+ * visibility.
+ *
+ * Framing: executive intelligence (not analytics dump). Insights first,
+ * supporting domain pills are visual texture only. Max 1 percentage per
+ * card. Authority scores never exposed in UI.
+ */
+function GeoCompetitorIntelligenceSection({
+  intelligence,
+  isHebrew,
+  t,
+}: {
+  intelligence: GeoCompetitorIntelligence | null
+  isHebrew: boolean
+  t: T
+}) {
+  if (!intelligence) return null
+
+  const hasAnyData =
+    intelligence.trustedDomains.length > 0 ||
+    intelligence.enginePreferences.length > 0 ||
+    intelligence.visibilityLossPatterns.dominantDomains.length > 0
+
+  if (!hasAnyData) return null
+
+  const categoryLabel = (cat: CompetitorCategory): string => {
+    switch (cat) {
+      case 'review': return t('geo_comp_cat_review')
+      case 'marketplace': return t('geo_comp_cat_marketplace')
+      case 'forum': return t('geo_comp_cat_forum')
+      case 'brand': return t('geo_comp_cat_brand')
+      case 'editorial': return t('geo_comp_cat_editorial')
+      case 'directory': return t('geo_comp_cat_directory')
+      default: return t('geo_comp_cat_unknown')
+    }
+  }
+
+  const engineDisplayName = (engine: string): string => {
+    const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
+    return meta?.name || engine
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 1: Trusted Sources Dominating Visibility
+  // ─────────────────────────────────────────────────────────────────────
+  const trustedSourcesCard = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
+    const topCat = intelligence.categoryBreakdown[0]
+    const secondCat = intelligence.categoryBreakdown[1]
+
+    if (topCat) {
+      const catLabel = categoryLabel(topCat.category)
+      if (topCat.percentage >= 30) {
+        lines.push({
+          text: isHebrew
+            ? `${capitalize(catLabel)} הופיעו לעיתים קרובות בתשובות מנועי AI (${topCat.percentage}% מהמקורות החוזרים).`
+            : `${capitalize(catLabel)} appeared repeatedly across AI engine answers (${topCat.percentage}% of recurring sources).`,
+          isFirst: true,
+        })
+      } else {
+        lines.push({
+          text: isHebrew
+            ? `${capitalize(catLabel)} חזרו על פני סריקות מרובות במנועים שונים.`
+            : `${capitalize(catLabel)} recurred across multiple scans and engines.`,
+          isFirst: true,
+        })
+      }
+    }
+
+    if (secondCat && secondCat.percentage >= 15) {
+      lines.push({
+        text: isHebrew
+          ? `${capitalize(categoryLabel(secondCat.category))} נכחו גם הם בין המקורות החוזרים.`
+          : `${capitalize(categoryLabel(secondCat.category))} also appeared among recurring sources.`,
+        isFirst: false,
+      })
+    }
+
+    const pills = intelligence.trustedDomains.slice(0, 3).map((d) => d.domain)
+    return { lines, pills }
+  })()
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 2: Competitor Content Structure
+  // ─────────────────────────────────────────────────────────────────────
+  const contentStructureCard = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
+
+    // Collect citation types from trusted domains to understand structure
+    const typeFreq = new Map<string, number>()
+    for (const d of intelligence.trustedDomains) {
+      for (const t of d.citationTypes) {
+        typeFreq.set(t, (typeFreq.get(t) || 0) + 1)
+      }
+    }
+    const topTypes = Array.from(typeFreq.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([type]) => type)
+
+    if (topTypes.length === 0) return { lines, pills: [] }
+
+    // Lead with first dominant content type, qualitative
+    const describeType = (type: string): string => {
+      const labels: Record<string, { he: string; en: string }> = {
+        review: { he: 'תוכן מבוסס ביקורות', en: 'review-driven content' },
+        marketplace: { he: 'דפי שווקים מקוונים', en: 'marketplace pages' },
+        comparison: { he: 'תוכן השוואתי', en: 'comparison-focused content' },
+        category: { he: 'דפי קטגוריה', en: 'category pages' },
+        product: { he: 'דפי מוצר', en: 'product pages' },
+        forum: { he: 'דיונים קהילתיים', en: 'community discussions' },
+        blog: { he: 'מאמרים מערכתיים', en: 'editorial articles' },
+        brand_site: { he: 'אתרי מותג רשמיים', en: 'official brand sites' },
+        homepage: { he: 'דפי בית של מותגים', en: 'brand homepages' },
+        directory: { he: 'מדריכי עסקים', en: 'business directories' },
+      }
+      return labels[type]?.[isHebrew ? 'he' : 'en'] || type
+    }
+
+    const first = describeType(topTypes[0])
+    lines.push({
+      text: isHebrew
+        ? `${capitalize(first)} חוזרים בתוצאות שזכו לחשיפה במנועי AI.`
+        : `${capitalize(first)} recurred in results that gained visibility in AI engines.`,
+      isFirst: true,
+    })
+
+    if (topTypes.length >= 2) {
+      const second = describeType(topTypes[1])
+      lines.push({
+        text: isHebrew
+          ? `${capitalize(second)} מילאו תפקיד משני אך משמעותי.`
+          : `${capitalize(second)} played a secondary but consistent role.`,
+        isFirst: false,
+      })
+    }
+
+    if (topTypes.length >= 3) {
+      const third = describeType(topTypes[2])
+      lines.push({
+        text: isHebrew
+          ? `${capitalize(third)} הופיעו גם הם בקרב המקורות החוזרים.`
+          : `${capitalize(third)} were also present among recurring sources.`,
+        isFirst: false,
+      })
+    }
+
+    return { lines, pills: [] }
+  })()
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 3: Engine Trust Patterns — varied sentence structure
+  // ─────────────────────────────────────────────────────────────────────
+  const enginePatternsCard = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
+
+    // Templates for variety - rotate so it doesn't feel repetitive
+    const templates = isHebrew
+      ? [
+          (name: string, cat: string) => `${name} הציג בעיקר ${cat}.`,
+          (name: string, cat: string) => `${cat} הופיעו לרוב בתשובות של ${name}.`,
+          (name: string, cat: string) => `${name} נטה ל${cat}.`,
+          (name: string, cat: string) => `ב-${name}, ${cat} בלטו במיוחד.`,
+        ]
+      : [
+          (name: string, cat: string) => `${name} surfaced more ${cat}.`,
+          (name: string, cat: string) => `${cat} appeared frequently in ${name} answers.`,
+          (name: string, cat: string) => `${name} leaned toward ${cat}.`,
+          (name: string, cat: string) => `In ${name}, ${cat} stood out as recurring sources.`,
+        ]
+
+    let templateIdx = 0
+    for (const ep of intelligence.enginePreferences.slice(0, 4)) {
+      const name = engineDisplayName(ep.engine)
+      if (ep.topCompetitors.length === 0) continue
+
+      // Find dominant category for this engine's top competitor
+      const topDomain = ep.topCompetitors[0].domain
+      const matchedTrustedDomain = intelligence.trustedDomains.find(
+        (d) => d.domain === topDomain
+      )
+      const cat = matchedTrustedDomain
+        ? categoryLabel(matchedTrustedDomain.category)
+        : isHebrew
+        ? 'מקורות חוזרים'
+        : 'recurring sources'
+
+      const template = templates[templateIdx % templates.length]
+      lines.push({
+        text: template(name, cat),
+        isFirst: templateIdx === 0,
+      })
+      templateIdx++
+    }
+
+    return { lines, pills: [] }
+  })()
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 4: Visibility Loss Analysis — most strategic card
+  // ─────────────────────────────────────────────────────────────────────
+  const visibilityLossCard = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
+    const loss = intelligence.visibilityLossPatterns
+
+    if (loss.dominantCategories.length === 0 && loss.dominantDomains.length === 0) {
+      return { lines, pills: [] }
+    }
+
+    // Lead: what category dominates loss scenarios
+    if (loss.dominantCategories.length > 0) {
+      const topLossCat = categoryLabel(loss.dominantCategories[0])
+      lines.push({
+        text: isHebrew
+          ? `כאשר הפרויקט לא הופיע, ${topLossCat} הופיעו במקומו לעיתים קרובות.`
+          : `When the project did not appear, ${topLossCat} most often appeared in its place.`,
+        isFirst: true,
+      })
+    }
+
+    // Secondary: second dominant category
+    if (loss.dominantCategories.length >= 2) {
+      const second = categoryLabel(loss.dominantCategories[1])
+      lines.push({
+        text: isHebrew
+          ? `${capitalize(second)} החליפו אותו בחלק מהתשובות.`
+          : `${capitalize(second)} replaced it in a portion of answers.`,
+        isFirst: false,
+      })
+    }
+
+    // Tertiary: insight about content type if available
+    if (loss.frequentCitationTypes.length > 0) {
+      const topLossType = loss.frequentCitationTypes[0].type
+      const typeDescriptions: Record<string, { he: string; en: string }> = {
+        review: { he: 'תוכן ביקורות תפס את החלל בתדירות גבוהה', en: 'review content filled the gap frequently' },
+        comparison: { he: 'דפי השוואה הופיעו במקום הפרויקט בתשובות רבות', en: 'comparison pages frequently appeared instead' },
+        marketplace: { he: 'דפי שווקים מקוונים הופיעו לרוב כתחליף', en: 'marketplace pages often served as replacement' },
+        forum: { he: 'דיונים קהילתיים הופיעו כמקור בתשובות שבהן הפרויקט נעדר', en: 'community discussions appeared where the project was absent' },
+        blog: { he: 'תוכן מערכתי החליף את הפרויקט במספר תשובות', en: 'editorial content replaced the project in several answers' },
+        brand_site: { he: 'אתרי מותגים מתחרים הופיעו במקום הפרויקט', en: 'competing brand sites appeared in the project\'s place' },
+      }
+      const desc = typeDescriptions[topLossType]
+      if (desc) {
+        lines.push({
+          text: desc[isHebrew ? 'he' : 'en'] + '.',
+          isFirst: false,
+        })
+      }
+    }
+
+    const pills = loss.dominantDomains.slice(0, 3)
+    return { lines, pills }
+  })()
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            {t('geo_comp_title')}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {t('geo_comp_subtitle')}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <IntelligenceCard
+          title={t('geo_comp_card_sources')}
+          tone="violet"
+          icon={<Award className="w-5 h-5" />}
+          lines={trustedSourcesCard.lines}
+          pills={trustedSourcesCard.pills}
+          emptyText={t('geo_comp_no_data_sources')}
+        />
+        <IntelligenceCard
+          title={t('geo_comp_card_content')}
+          tone="teal"
+          icon={<Layers className="w-5 h-5" />}
+          lines={contentStructureCard.lines}
+          pills={contentStructureCard.pills}
+          emptyText={t('geo_comp_no_data_content')}
+        />
+        <IntelligenceCard
+          title={t('geo_comp_card_engines')}
+          tone="slate"
+          icon={<Cpu className="w-5 h-5" />}
+          lines={enginePatternsCard.lines}
+          pills={enginePatternsCard.pills}
+          emptyText={t('geo_comp_no_data_engines')}
+        />
+        <IntelligenceCard
+          title={t('geo_comp_card_loss')}
+          tone="rose"
+          icon={<TrendingDown className="w-5 h-5" />}
+          lines={visibilityLossCard.lines}
+          pills={visibilityLossCard.pills}
+          emptyText={t('geo_comp_no_data_loss')}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * IntelligenceCard — premium card for Competitor Intelligence section.
+ * Same visual language as OpportunityCard, plus subtle domain pills as
+ * concrete grounding (max 3, never ranked, secondary to the insight).
+ */
+function IntelligenceCard({
+  title,
+  tone,
+  icon,
+  lines,
+  pills,
+  emptyText,
+}: {
+  title: string
+  tone: 'violet' | 'teal' | 'slate' | 'rose'
+  icon: React.ReactNode
+  lines: Array<{ text: string; isFirst?: boolean }>
+  pills: string[]
+  emptyText: string
+}) {
+  const accent =
+    tone === 'violet'
+      ? 'border-violet-200 dark:border-violet-800/60 bg-violet-50/40 dark:bg-violet-900/10'
+      : tone === 'teal'
+      ? 'border-teal-200 dark:border-teal-800/60 bg-teal-50/40 dark:bg-teal-900/10'
+      : tone === 'rose'
+      ? 'border-rose-200 dark:border-rose-800/60 bg-rose-50/40 dark:bg-rose-900/10'
+      : 'border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/10'
+
+  const iconTone =
+    tone === 'violet'
+      ? 'text-violet-600 dark:text-violet-400'
+      : tone === 'teal'
+      ? 'text-teal-600 dark:text-teal-400'
+      : tone === 'rose'
+      ? 'text-rose-600 dark:text-rose-400'
+      : 'text-slate-600 dark:text-slate-400'
+
+  return (
+    <div className={`rounded-xl border ${accent} p-4 space-y-3`}>
+      <div className="flex items-center gap-2">
+        <div className={iconTone} aria-hidden="true">{icon}</div>
+        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
+      </div>
+      {lines.length > 0 ? (
+        <ul className="space-y-1.5 text-xs leading-relaxed">
+          {lines.map((line, i) => (
+            <li key={i} className="flex gap-1.5">
+              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span
+                className={
+                  line.isFirst
+                    ? 'font-medium text-slate-800 dark:text-slate-200'
+                    : 'text-slate-700 dark:text-slate-300'
+                }
+              >
+                {line.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{emptyText}</p>
+      )}
+      {pills.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {pills.map((domain) => (
+            <span
+              key={domain}
+              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+            >
+              {domain}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 /**

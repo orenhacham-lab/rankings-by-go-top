@@ -516,6 +516,42 @@ const STRINGS = {
   geo_opp_no_data_citations: { he: 'ממתינים לנתונים עוד כדי לזהות מקורות משמעותיים.', en: 'Waiting for more data to identify significant sources.' },
   geo_opp_no_data_engines: { he: 'ככל שיצטברו סריקות, דפוסים ייחודיים למנועים יופיעו כאן.', en: 'As scans accumulate, unique engine patterns will emerge here.' },
   geo_opp_no_data_missing: { he: 'פערים יתגלו ככל שיצטברו יותר תוצאות כושלות.', en: 'Gaps will become clear as more unsuccessful results accumulate.' },
+
+  // GEO Competitor Intelligence (Phase 2C — AI visibility market intelligence)
+  geo_comp_title: { he: 'תובנות תחרות ב-AI', en: 'GEO Competitor Intelligence' },
+  geo_comp_subtitle: {
+    he: 'מי מקבל אמון מהמנועים בנישה הזו ואיפה הפרויקט מאבד נראות',
+    en: 'Who AI engines trust in this niche and where the project loses visibility',
+  },
+  geo_comp_card_sources: { he: 'מקורות מובילים בנראות', en: 'Sources leading in visibility' },
+  geo_comp_card_content: { he: 'מבנה תוכן תחרותי', en: 'Competitor content structure' },
+  geo_comp_card_engines: { he: 'דפוסי אמון של מנועים', en: 'Engine trust patterns' },
+  geo_comp_card_loss: { he: 'מה תפס את מקומכם בתשובות', en: 'What replaced you in AI answers' },
+  geo_comp_no_data_sources: {
+    he: 'יופיעו כאן מקורות שחוזרים על פני סריקות מרובות.',
+    en: 'Sources recurring across multiple scans will appear here.',
+  },
+  geo_comp_no_data_content: {
+    he: 'דפוסי תוכן תחרותיים יתגלו עם יותר נתונים.',
+    en: 'Competitor content patterns will emerge with more data.',
+  },
+  geo_comp_no_data_engines: {
+    he: 'דפוסי אמון ייחודיים למנועים יופיעו עם הצטברות סריקות.',
+    en: 'Engine-specific trust patterns will surface as scans accumulate.',
+  },
+  geo_comp_no_data_loss: {
+    he: 'ניתוח אובדן נראות זמין רק עם תוצאות שבהן הפרויקט לא הופיע.',
+    en: 'Loss analysis becomes available when the project does not appear in some results.',
+  },
+
+  // Category language (varied, not "ecosystem"-heavy)
+  geo_comp_cat_review: { he: 'מקורות ביקורת', en: 'review platforms' },
+  geo_comp_cat_marketplace: { he: 'פלטפורמות מסחר', en: 'marketplace platforms' },
+  geo_comp_cat_forum: { he: 'דיונים קהילתיים', en: 'community discussions' },
+  geo_comp_cat_brand: { he: 'אתרי מותג רשמיים', en: 'official brand websites' },
+  geo_comp_cat_editorial: { he: 'תוכן מערכתי', en: 'editorial sources' },
+  geo_comp_cat_directory: { he: 'מדריכי עסקים', en: 'directory listings' },
+  geo_comp_cat_unknown: { he: 'מקורות נוספים', en: 'additional sources' },
   geo_opp_visibility_rate: { he: 'נראות', en: 'visibility' },
   geo_opp_preliminary_trend: { he: 'מגמה ראשונית: ', en: 'Preliminary trend: ' },
   geo_opp_small_sample_warning: {
