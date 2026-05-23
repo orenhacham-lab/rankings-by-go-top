@@ -205,6 +205,7 @@ const STRINGS = {
 
   // Result row enrichments
   what_was_mentioned: { he: 'מה הוזכר', en: 'What was mentioned' },
+  what_was_cited: { he: 'מה צוטט', en: 'What was cited' },
   view_details: { he: 'פרטים', en: 'Details' },
   scanned_at: { he: 'נסרק', en: 'Scanned' },
 

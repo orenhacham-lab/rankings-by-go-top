@@ -1659,7 +1659,7 @@ function ResultRowCard({
           </div>
 
           {/* Row 3: matched variants — only when something was matched */}
-          {(brandLabels.length > 0 || domainLabel) && (
+          {brandLabels.length > 0 && (
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
               <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{t('what_was_mentioned')}:</span>
               {brandLabels.map((label) => (
@@ -1670,11 +1670,14 @@ function ResultRowCard({
                   {label}
                 </span>
               ))}
-              {domainLabel && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                  {domainLabel}
-                </span>
-              )}
+            </div>
+          )}
+          {domainLabel && (
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{t('what_was_cited')}:</span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                {domainLabel}
+              </span>
             </div>
           )}
         </div>
@@ -1836,7 +1839,7 @@ function ResultDetailDrawer({
                 </div>
               </div>
             </div>
-            {(brandLabels.length > 0 || domainLabel) && (
+            {brandLabels.length > 0 && (
               <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{t('what_was_mentioned')}:</span>
                 {brandLabels.map((label) => (
@@ -1847,11 +1850,14 @@ function ResultDetailDrawer({
                     {label}
                   </span>
                 ))}
-                {domainLabel && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                    {domainLabel}
-                  </span>
-                )}
+              </div>
+            )}
+            {domainLabel && (
+              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{t('what_was_cited')}:</span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  {domainLabel}
+                </span>
               </div>
             )}
           </div>
