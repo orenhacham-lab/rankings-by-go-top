@@ -556,6 +556,24 @@ const STRINGS = {
   geo_comp_cat_editorial: { he: 'בלוגים וכתבות', en: 'blogs & articles' },
   geo_comp_cat_directory: { he: 'ספריות עסקיות', en: 'directories' },
   geo_comp_cat_unknown: { he: 'מקורות אחרים', en: 'other sources' },
+
+  // Business mention intelligence (Phase 2D)
+  geo_biz_title: { he: 'עסקים שהופיעו בתשובות AI', en: 'Businesses mentioned in AI answers' },
+  geo_biz_subtitle: {
+    he: 'אילו עסקים/מתחרים הוזכרו בפועל בתשובות',
+    en: 'Which businesses and competitors were actually mentioned',
+  },
+  geo_biz_when_absent: { he: 'עסקים שהופיעו כשאתה לא הופעת', en: 'Competitors when you\'re absent' },
+  geo_biz_mentioned: { he: '{name} הוזכר ב-{count} תוצאות בתשובות AI.', en: '{name} was mentioned in {count} AI responses.' },
+  geo_biz_no_data: {
+    he: 'אין עדיין מספיק סריקות כדי לדעת אילו עסקים מופיעים בתשובות.',
+    en: 'Not enough scans yet to identify mentioned businesses.',
+  },
+  geo_biz_none_found: {
+    he: 'אף עסק מהרשימה לא הוזכר בתשובות.',
+    en: 'None of the listed competitors were mentioned.',
+  },
+
   geo_opp_visibility_rate: { he: 'נראות', en: 'visibility' },
   geo_opp_preliminary_trend: { he: 'מגמה ראשונית: ', en: 'Preliminary trend: ' },
   geo_opp_small_sample_warning: {

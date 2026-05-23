@@ -23,6 +23,10 @@ import {
   computeGeoCompetitorIntelligence,
   type CompetitorIntelligenceInput,
 } from '@/lib/ai-visibility/geo-competitor-intelligence'
+import {
+  computeBusinessMentionIntelligence,
+  type BusinessMentionInput,
+} from '@/lib/ai-visibility/geo-business-mentions'
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
   // Verify user owns the project
   const { data: project, error: projectError } = await admin
     .from('projects')
-    .select('id, user_id, target_domain, business_name, country, language')
+    .select('id, user_id, target_domain, business_name, country, language, competitors')
     .eq('id', projectId)
     .single()
 
@@ -411,6 +415,7 @@ export async function GET(request: Request) {
   // payload AND the project-level opportunity mapping aggregation.
   const opportunityInputs: OpportunityResultInput[] = []
   const competitorIntelligenceInputs: CompetitorIntelligenceInput[] = []
+  const businessMentionInputs: BusinessMentionInput[] = []
 
   const responseRuns = (runs ?? []).map((run) => {
     const runResults = resultsByRun.get(run.id) || []
@@ -466,6 +471,15 @@ export async function GET(request: Request) {
               citationType: classifyCitationType(c.url, c.domain, projectTargetDomain),
             })),
           })
+
+          // Business mention intelligence — track which competitors were
+          // mentioned in response text (vs. which sources were cited).
+          businessMentionInputs.push({
+            engine: r.engine as string,
+            responseText: (r.response_text ?? null) as string | null,
+            displayMentioned: display.displayMentioned,
+            displayCited: display.displayCited,
+          })
         }
 
         return {
@@ -503,9 +517,27 @@ export async function GET(request: Request) {
     competitorIntelligenceInputs
   )
 
+  // Load active competitors for business mention intelligence
+  const { data: projectCompetitors } = await admin
+    .from('ai_visibility_competitors')
+    .select('name, aliases')
+    .eq('project_id', projectId)
+    .eq('is_active', true)
+
+  // Business mention intelligence — detect which competitors were mentioned
+  // in response text (vs. just being cited as sources).
+  const businessMentionIntelligence = computeBusinessMentionIntelligence(
+    businessMentionInputs,
+    (projectCompetitors ?? []).map((c) => ({
+      name: (c as any).name,
+      aliases: (c as any).aliases,
+    }))
+  )
+
   return Response.json({
     runs: responseRuns,
     geoOpportunityMapping,
     geoCompetitorIntelligence,
+    businessMentionIntelligence,
   })
 }
