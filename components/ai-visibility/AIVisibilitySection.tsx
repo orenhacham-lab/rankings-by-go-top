@@ -2089,70 +2089,148 @@ function GeoOpportunityMappingSection({
 
   const isPreliminarySample = (sampleSize: number): boolean => sampleSize >= 3 && sampleSize <= 5
 
-  // Compose premium, concise insights (top 2-3 only, quality > quantity)
-  const contentSentences = mapping.contentSignals.slice(0, 3).map((s, idx) => {
-    const isPrelim = isPreliminarySample(s.totalWithSignal)
-    const strength = s.visibilityRate >= 70 ? 'חזק' : s.visibilityRate >= 50 ? 'בינוני' : 'חלש'
-    const note = isPrelim ? ' *' : ''
-    return {
-      text: isHebrew
-        ? `${signalShortLabel(s.signal)}: ${s.visibilityRate}% חשיפה (${s.successWithSignal}/${s.totalWithSignal})${note}`
-        : `${capitalize(signalShortLabel(s.signal))}: ${s.visibilityRate}% visibility (${s.successWithSignal}/${s.totalWithSignal})${note}`,
-      isFirst: idx === 0,
-      isPrelim,
-    }
-  })
+  // Content Signals: first insight is data-driven, rest are qualitative
+  const contentSentences = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
 
-  const citationSentences = mapping.citationTypes.slice(0, 3).map((c, idx) => {
-    const isPrelim = isPreliminarySample(c.totalWithType)
-    const note = isPrelim ? ' *' : ''
-    return {
-      text: isHebrew
-        ? `${citationShortLabel(c.type)}: ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${note}`
-        : `${capitalize(citationShortLabel(c.type))}: ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${note}`,
-      isFirst: idx === 0,
-      isPrelim,
-    }
-  })
+    const all = mapping.contentSignals.slice(0, 3)
 
+    // First: data-driven with percentages
+    if (all.length > 0) {
+      const s = all[0]
+      const isPrelim = isPreliminarySample(s.totalWithSignal)
+      lines.push({
+        text: isHebrew
+          ? `שיעור החשיפה הגבוה ביותר הופיע עם ${signalShortLabel(s.signal)} — ${s.visibilityRate}% (${s.successWithSignal}/${s.totalWithSignal})${isPrelim ? ' *' : ''}`
+          : `Highest visibility rate appeared with ${signalShortLabel(s.signal)} — ${s.visibilityRate}% (${s.successWithSignal}/${s.totalWithSignal})${isPrelim ? ' *' : ''}`,
+        isFirst: true,
+        isPrelim,
+      })
+    }
+
+    // Rest: qualitative insights without percentages
+    for (let i = 1; i < all.length; i++) {
+      const s = all[i]
+      lines.push({
+        text: isHebrew
+          ? `${capitalize(signalShortLabel(s.signal))} הופיעו לעיתים קרובות בתוצאות מוצלחות.`
+          : `${capitalize(signalShortLabel(s.signal))} appeared frequently in successful results.`,
+        isFirst: false,
+      })
+    }
+
+    return lines.length > 0 ? lines : []
+  })()
+
+  // Citations: first is data-driven, rest are qualitative
+  const citationSentences = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
+
+    const all = mapping.citationTypes.slice(0, 3)
+
+    // First: data-driven with percentages
+    if (all.length > 0) {
+      const c = all[0]
+      const isPrelim = isPreliminarySample(c.totalWithType)
+      lines.push({
+        text: isHebrew
+          ? `המקור השכיח ביותר היה ${citationShortLabel(c.type)} — ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${isPrelim ? ' *' : ''}`
+          : `Most common source was ${citationShortLabel(c.type)} — ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${isPrelim ? ' *' : ''}`,
+        isFirst: true,
+        isPrelim,
+      })
+    }
+
+    // Rest: qualitative
+    for (let i = 1; i < all.length; i++) {
+      const c = all[i]
+      lines.push({
+        text: isHebrew
+          ? `${capitalize(citationShortLabel(c.type))} הופיעו בתדירות גבוהה בתוצאות מוצלחות.`
+          : `${capitalize(citationShortLabel(c.type))} appeared frequently in successful results.`,
+        isFirst: false,
+      })
+    }
+
+    return lines.length > 0 ? lines : []
+  })()
+
+  // Engine Patterns: qualitative, no percentages
   const engineSentences = mapping.enginePatterns.slice(0, 4).map((e, idx) => {
     const name = engineDisplayName(e.engine)
     if (e.topSignals.length === 0 && e.topCitationTypes.length === 0) {
       return {
         text: isHebrew
-          ? `${name}: עדיין מעט סריקות לזיהוי דפוס ברור`
-          : `${name}: more scans needed to identify clear pattern`,
+          ? `${name}: עדיין מעט סריקות לזיהוי העדפות`
+          : `${name}: more scans needed to identify preferences`,
         isFirst: idx === 0,
         isEmpty: true,
       }
     }
     const signals = e.topSignals.slice(0, 2).map(signalShortLabel)
-    const citations = e.topCitationTypes.slice(0, 2).map(citationShortLabel)
-    const parts: string[] = []
-    if (signals.length > 0) parts.push(signals.join(' + '))
-    if (citations.length > 0) parts.push(`מ${citations.join(' / ')}`)
+    const citations = e.topCitationTypes.slice(0, 1).map(citationShortLabel)
+
+    let preference = ''
+    if (signals.length > 0 && citations.length > 0) {
+      preference = isHebrew
+        ? `${name} הציע בעדיפות ${signals.join(' ו')} מתוך ${citations.join()}.`
+        : `${name} prefers ${signals.join(' and ')} from ${citations.join()}.`
+    } else if (signals.length > 0) {
+      preference = isHebrew
+        ? `${name} הציע בעדיפות תוכן עם ${signals.join(' ו')}.`
+        : `${name} prefers content with ${signals.join(' and ')}.`
+    } else {
+      preference = isHebrew
+        ? `${name} התבסס בעיקר על ${citations.join()}.`
+        : `${name} relied primarily on ${citations.join()}.`
+    }
+
     return {
-      text: isHebrew
-        ? `${name}: ${parts.join(' ')} (${e.totalSuccess} סריקות)`
-        : `${name}: ${parts.join(' ')} (${e.totalSuccess} scans)`,
+      text: preference,
       isFirst: idx === 0,
       isEmpty: false,
     }
   })
 
-  const missingSentences = mapping.missingOpportunities.slice(0, 3).map((m, idx) => {
-    const label = m.category === 'content'
-      ? signalShortLabel(m.signal as ContentSignalKey)
-      : m.signal === 'brand_site'
-      ? 'אתר המותג'
-      : citationShortLabel(m.signal as CitationType)
-    return {
-      text: isHebrew
-        ? `${label}: חסר ב-${m.failureRate}% תוצאות חלשות (${m.failureCount}/${mapping.totalFailed})`
-        : `${capitalize(label)}: missing in ${m.failureRate}% weak results (${m.failureCount}/${mapping.totalFailed})`,
-      isFirst: idx === 0,
+  // Missing Opportunities: reframe from negative to strategic
+  const missingSentences = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
+
+    const all = mapping.missingOpportunities.slice(0, 3)
+
+    for (const m of all) {
+      const label = m.category === 'content'
+        ? signalShortLabel(m.signal as ContentSignalKey)
+        : m.signal === 'brand_site'
+        ? 'האתר הרשמי'
+        : citationShortLabel(m.signal as CitationType)
+
+      const isFirst = lines.length === 0
+
+      // Strategic reframing instead of "missing"
+      let text: string
+      if (isHebrew) {
+        if (m.category === 'content') {
+          text = `בתוצאות שבהן העסק לא הופיע, לא זוהו ${label} בתדירות גבוהה.`
+        } else {
+          text = `בהופעות חלשות, ${label} הופיעו בתדירות נמוכה בהשוואה לתוצאות מוצלחות.`
+        }
+      } else {
+        if (m.category === 'content') {
+          text = `In weak results, ${label} appeared less frequently than in successful ones.`
+        } else {
+          text = `Weak results tended to lack ${label} as a cited source.`
+        }
+      }
+
+      lines.push({
+        text,
+        isFirst,
+      })
     }
-  })
+
+    return lines.length > 0 ? lines : []
+  })()
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
