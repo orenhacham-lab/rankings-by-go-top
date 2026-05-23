@@ -1475,7 +1475,8 @@ function findMatchedLabels(
   brandVariants: string[],
   targetDomain: string | null,
   mentioned: boolean,
-  cited: boolean
+  cited: boolean,
+  citations?: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }> | null
 ): { brandLabels: string[]; domainLabel: string | null; reMentioned: boolean; reCited: boolean } {
   const brandLabels: string[] = []
   let domainLabel: string | null = null
@@ -1542,6 +1543,20 @@ function findMatchedLabels(
     if (brandLabels.length > 0 || reCited) reMentioned = true
   }
 
+  // Check citations for target domain match (even if not in response text)
+  if (citations && citations.length > 0 && targetDomain) {
+    const targetLower = targetDomain.toLowerCase()
+    for (const c of citations) {
+      const citationDomain = c.domain?.toLowerCase() || ''
+      // Check if citation domain matches target (exact or with www prefix)
+      if (citationDomain === targetLower || citationDomain === `www.${targetLower}`) {
+        if (!domainLabel) domainLabel = c.domain || targetDomain
+        reCited = true
+        break
+      }
+    }
+  }
+
   if (reCited && targetDomain && !domainLabel) domainLabel = targetDomain
   return { brandLabels: Array.from(new Set(brandLabels)), domainLabel, reMentioned, reCited }
 }
@@ -1569,7 +1584,8 @@ function ResultRowCard({
     brandVariants,
     targetDomain,
     result.mentioned,
-    result.targetCited
+    result.targetCited,
+    result.citations
   )
 
   const scannedAtStr = result.scannedAt ? formatShortDateTime(result.scannedAt, isHebrew) : null
@@ -1733,7 +1749,8 @@ function ResultDetailDrawer({
     brandVariants,
     targetDomain,
     result.mentioned,
-    result.targetCited
+    result.targetCited,
+    result.citations
   )
 
   function cleanResponseText(text: string): string {
