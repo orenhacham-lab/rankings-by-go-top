@@ -41,6 +41,14 @@ import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
 import { generateGeoExplanation } from '@/lib/ai-visibility/geo-explanations'
 import { generateGeoRecommendations } from '@/lib/ai-visibility/geo-recommendations'
+import type {
+  GeoOpportunityMapping,
+  ContentSignalKey,
+  SignalStats,
+  CitationStats,
+  EngineStats,
+  MissingOpportunity,
+} from '@/lib/ai-visibility/geo-opportunity-mapping'
 
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
@@ -150,6 +158,7 @@ export default function AIVisibilitySection({
   const [allPrompts, setAllPrompts] = useState<PromptRow[]>([])
   const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics | null>(null)
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
+  const [geoOpportunityMapping, setGeoOpportunityMapping] = useState<GeoOpportunityMapping | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAllResults, setShowAllResults] = useState(false)
   const [seenPrompts, setSeenPrompts] = useState<Set<string>>(new Set())
@@ -209,6 +218,14 @@ export default function AIVisibilitySection({
 
       const runsData = await runsRes.json()
       const promptsData = await promptsRes.json()
+
+      // Project-level GEO Opportunity Mapping — server-computed, read-only.
+      // Falls back to null when API has no aggregation (older deploy).
+      setGeoOpportunityMapping(
+        runsData.geoOpportunityMapping
+          ? (runsData.geoOpportunityMapping as GeoOpportunityMapping)
+          : null
+      )
 
       const results: ResultRow[] = []
       for (const run of runsData.runs || []) {
@@ -753,6 +770,13 @@ export default function AIVisibilitySection({
               isRTL={isHebrew}
             />
           )}
+
+          {/* GEO OPPORTUNITY MAPPING (Phase 2A) — project-level aggregated insights */}
+          <GeoOpportunityMappingSection
+            mapping={geoOpportunityMapping}
+            isHebrew={isHebrew}
+            t={t}
+          />
         </>
       )}
 
@@ -2003,6 +2027,208 @@ function ResultDetailDrawer({
       </div>
     </div>
   )
+}
+
+/**
+ * GEO Opportunity Mapping — Phase 2A project-level intelligence panel.
+ *
+ * Renders 4 compact cards summarizing aggregated, deterministic insights
+ * across all of the project's AI scan results:
+ *   1. Content Signals    — which content patterns correlate with visibility
+ *   2. Citation Performance — which source types lead to higher visibility
+ *   3. Engine Patterns    — what each engine consistently surfaces
+ *   4. Missing Opportunities — what's commonly missing in failed results
+ *
+ * All numbers come from rule-based aggregation; no AI generation.
+ */
+function GeoOpportunityMappingSection({
+  mapping,
+  isHebrew,
+  t,
+}: {
+  mapping: GeoOpportunityMapping | null
+  isHebrew: boolean
+  t: T
+}) {
+  if (!mapping || mapping.totalResults === 0) {
+    return null
+  }
+
+  const signalShortLabel = (s: ContentSignalKey): string => {
+    switch (s) {
+      case 'pricing': return t('geo_opp_signal_pricing')
+      case 'reviews': return t('geo_opp_signal_reviews')
+      case 'comparison': return t('geo_opp_signal_comparison')
+      case 'list': return t('geo_opp_signal_list')
+      case 'recommendation': return t('geo_opp_signal_recommendation')
+      case 'local': return t('geo_opp_signal_local')
+    }
+  }
+
+  const citationShortLabel = (c: CitationType): string => {
+    switch (c) {
+      case 'homepage': return t('geo_opp_cite_homepage')
+      case 'category': return t('geo_opp_cite_category')
+      case 'product': return t('geo_opp_cite_product')
+      case 'comparison': return t('geo_opp_cite_comparison')
+      case 'review': return t('geo_opp_cite_review')
+      case 'blog': return t('geo_opp_cite_blog')
+      case 'marketplace': return t('geo_opp_cite_marketplace')
+      case 'forum': return t('geo_opp_cite_forum')
+      case 'directory': return t('geo_opp_cite_directory')
+      case 'brand_site': return t('geo_opp_cite_brand_site')
+      case 'unknown': return t('geo_citation_unknown')
+    }
+  }
+
+  const engineDisplayName = (engine: string): string => {
+    const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
+    return meta?.name || engine
+  }
+
+  // Compose business-facing sentences from deterministic data
+  const contentSentences = mapping.contentSignals.slice(0, 4).map((s) =>
+    isHebrew
+      ? `תוכן עם ${signalShortLabel(s.signal)} הופיע ב-${s.visibilityRate}% מהתשובות הצלחתיות.`
+      : `Content with ${signalShortLabel(s.signal)} appeared in ${s.visibilityRate}% of successful answers.`
+  )
+
+  const citationSentences = mapping.citationTypes.slice(0, 4).map((c) =>
+    isHebrew
+      ? `${citationShortLabel(c.type)} מתואמים עם ${c.visibilityRate}% נראות.`
+      : `${capitalize(citationShortLabel(c.type))} correlate with ${c.visibilityRate}% visibility.`
+  )
+
+  const engineSentences = mapping.enginePatterns.slice(0, 4).map((e) => {
+    const name = engineDisplayName(e.engine)
+    const signalsText = e.topSignals.map(signalShortLabel).join(isHebrew ? ', ' : ', ')
+    const citationsText = e.topCitationTypes.map(citationShortLabel).join(isHebrew ? ', ' : ', ')
+    if (e.topSignals.length === 0 && e.topCitationTypes.length === 0) {
+      return isHebrew
+        ? `${name} הצליח ב-${e.totalSuccess} סריקות, ללא דפוס מובהק.`
+        : `${name} succeeded in ${e.totalSuccess} scans, with no dominant pattern.`
+    }
+    if (e.topSignals.length > 0 && e.topCitationTypes.length > 0) {
+      return isHebrew
+        ? `${name} מעדיף לעיתים קרובות תשובות עם ${signalsText}, מבוססות על ${citationsText}.`
+        : `${name} frequently prefers answers with ${signalsText}, sourced from ${citationsText}.`
+    }
+    if (e.topSignals.length > 0) {
+      return isHebrew
+        ? `${name} מעדיף לעיתים קרובות תשובות עם ${signalsText}.`
+        : `${name} frequently prefers answers with ${signalsText}.`
+    }
+    return isHebrew
+      ? `${name} מסתמך בעיקר על ${citationsText}.`
+      : `${name} relies mostly on ${citationsText}.`
+  })
+
+  const missingSentences = mapping.missingOpportunities.slice(0, 4).map((m) => {
+    const label = m.category === 'content'
+      ? signalShortLabel(m.signal as ContentSignalKey)
+      : citationShortLabel(m.signal as CitationType)
+    return isHebrew
+      ? `${m.failureRate}% מהתוצאות הכושלות חסרות ${label}.`
+      : `${m.failureRate}% of failed results lacked ${label}.`
+  })
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            {t('geo_opp_title')}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {t('geo_opp_subtitle')}
+          </p>
+        </div>
+        <span className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+          {mapping.totalSuccess}/{mapping.totalResults}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <OpportunityCard
+          title={t('geo_opp_card_content')}
+          tone="emerald"
+          icon="📊"
+          sentences={contentSentences}
+          emptyText={t('geo_opp_no_data')}
+        />
+        <OpportunityCard
+          title={t('geo_opp_card_citations')}
+          tone="blue"
+          icon="🔗"
+          sentences={citationSentences}
+          emptyText={t('geo_opp_no_data')}
+        />
+        <OpportunityCard
+          title={t('geo_opp_card_engines')}
+          tone="indigo"
+          icon="🤖"
+          sentences={engineSentences}
+          emptyText={t('geo_opp_no_data')}
+        />
+        <OpportunityCard
+          title={t('geo_opp_card_missing')}
+          tone="amber"
+          icon="⚠️"
+          sentences={missingSentences}
+          emptyText={t('geo_opp_no_data')}
+        />
+      </div>
+    </div>
+  )
+}
+
+function OpportunityCard({
+  title,
+  tone,
+  icon,
+  sentences,
+  emptyText,
+}: {
+  title: string
+  tone: 'emerald' | 'blue' | 'indigo' | 'amber'
+  icon: string
+  sentences: string[]
+  emptyText: string
+}) {
+  const accent =
+    tone === 'emerald'
+      ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-900/10'
+      : tone === 'blue'
+      ? 'border-blue-200 dark:border-blue-800/60 bg-blue-50/40 dark:bg-blue-900/10'
+      : tone === 'indigo'
+      ? 'border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-900/10'
+      : 'border-amber-200 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-900/10'
+
+  return (
+    <div className={`rounded-xl border ${accent} p-4 space-y-2`}>
+      <div className="flex items-center gap-2">
+        <span className="text-base leading-none" aria-hidden="true">{icon}</span>
+        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
+      </div>
+      {sentences.length > 0 ? (
+        <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+          {sentences.map((s, i) => (
+            <li key={i} className="flex gap-1.5">
+              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span>{s}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{emptyText}</p>
+      )}
+    </div>
+  )
+}
+
+function capitalize(s: string): string {
+  if (!s) return s
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 /**

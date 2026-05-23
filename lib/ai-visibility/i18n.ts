@@ -498,6 +498,43 @@ const STRINGS = {
   // GEO Insights collapsible label (Phase 1C — technical details)
   geo_technical_details: { he: 'פרטים טכניים', en: 'Technical details' },
 
+  // GEO Opportunity Mapping (Phase 2A — project-level aggregated insights)
+  geo_opp_title: { he: 'מיפוי הזדמנויות GEO', en: 'GEO Opportunity Mapping' },
+  geo_opp_subtitle: {
+    he: 'תובנות מצטברות מכל סריקות ה-AI של הפרויקט',
+    en: 'Aggregated intelligence across all AI scan results for this project',
+  },
+  geo_opp_empty: {
+    he: 'אין עדיין מספיק סריקות להפקת תובנות מצטברות. הריצו עוד סריקות כדי לקבל מיפוי מלא.',
+    en: 'Not enough scans yet to produce aggregated insights. Run more scans to see the full mapping.',
+  },
+  geo_opp_card_content: { he: 'סיגנלים בתוכן', en: 'Content Signals' },
+  geo_opp_card_citations: { he: 'ביצועי מקורות', en: 'Citation Performance' },
+  geo_opp_card_engines: { he: 'תבניות לפי מנוע', en: 'Engine Patterns' },
+  geo_opp_card_missing: { he: 'הזדמנויות חסרות', en: 'Missing Opportunities' },
+  geo_opp_no_data: { he: 'אין נתונים זמינים בקטגוריה זו.', en: 'No data available in this category.' },
+  geo_opp_visibility_rate: { he: 'נראות', en: 'visibility' },
+
+  // Content signal short labels (used inside aggregation sentences)
+  geo_opp_signal_pricing: { he: 'מחירים', en: 'pricing' },
+  geo_opp_signal_reviews: { he: 'ביקורות', en: 'reviews' },
+  geo_opp_signal_comparison: { he: 'תוכן השוואתי', en: 'comparison content' },
+  geo_opp_signal_list: { he: 'רשימות / FAQ', en: 'lists / FAQ' },
+  geo_opp_signal_recommendation: { he: 'המלצות', en: 'recommendations' },
+  geo_opp_signal_local: { he: 'מידע מקומי', en: 'local information' },
+
+  // Citation type short labels
+  geo_opp_cite_homepage: { he: 'דפי בית', en: 'homepages' },
+  geo_opp_cite_category: { he: 'עמודי קטגוריה', en: 'category pages' },
+  geo_opp_cite_product: { he: 'עמודי מוצר', en: 'product pages' },
+  geo_opp_cite_comparison: { he: 'עמודי השוואה', en: 'comparison pages' },
+  geo_opp_cite_review: { he: 'אתרי ביקורות', en: 'review sites' },
+  geo_opp_cite_blog: { he: 'בלוגים ומאמרים', en: 'blogs and articles' },
+  geo_opp_cite_marketplace: { he: 'שווקים מקוונים', en: 'marketplaces' },
+  geo_opp_cite_forum: { he: 'פורומים', en: 'forums' },
+  geo_opp_cite_directory: { he: 'מדריכי עסקים', en: 'directories' },
+  geo_opp_cite_brand_site: { he: 'אתרי מותג', en: 'brand websites' },
+
   // Query intents
   geo_intent_transactional: { he: 'מסחרי', en: 'Transactional' },
   geo_intent_informational: { he: 'מידע', en: 'Informational' },

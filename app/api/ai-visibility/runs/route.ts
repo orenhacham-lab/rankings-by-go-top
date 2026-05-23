@@ -15,6 +15,10 @@ import { isDomainMatch } from '@/lib/ai-visibility/matching/domain-normalize'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { computeDisplayMatches } from '@/lib/ai-visibility/display-classification'
 import { computeGeoInsights } from '@/lib/ai-visibility/geo-signals'
+import {
+  computeGeoOpportunityMapping,
+  type OpportunityResultInput,
+} from '@/lib/ai-visibility/geo-opportunity-mapping'
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
@@ -399,61 +403,84 @@ export async function GET(request: Request) {
     resultsByRun.get(r.run_id as string)?.push(r)
   }
 
-  return Response.json({
-    runs: (runs ?? []).map((run) => {
-      const runResults = resultsByRun.get(run.id) || []
-      return {
-        id: run.id,
-        createdAt: run.created_at,
-        startedAt: run.started_at,
-        completedAt: run.completed_at,
-        status: run.status,
-        provider: run.provider,
-        totalCreditsUsed: run.total_credits_used,
-        errorMessage: run.error_message,
-        results: runResults.map((r) => {
-          const promptText = r.prompt_id ? promptMap.get(r.prompt_id as string) || null : null
-          const citationsForResult = citationsByResult.get(r.id as string) ?? null
-          const display = computeDisplayMatches({
-            responseText: (r.response_text as string | null) ?? null,
-            brandVariants,
-            targetDomain: projectTargetDomain,
-            mentioned: (r.mentioned as boolean | null) ?? false,
-            cited: (r.target_cited as boolean | null) ?? false,
-            citations: citationsForResult,
-          })
-          // GEO Insights — rule-based, read-only enrichment. Degrades to
-          // empty arrays / false flags when responseText or citations are
-          // unavailable. Never alters scan or DB state.
-          const geoInsights = computeGeoInsights({
-            prompt: promptText,
-            responseText: (r.response_text as string | null) ?? null,
-            citations: citationsForResult,
-            targetDomain: projectTargetDomain,
-          })
-          return {
-            id: r.id,
-            engine: r.engine,
-            promptId: r.prompt_id ?? null,
-            promptText,
-            // Raw DB values — preserved as-is, never overwritten.
-            mentioned: r.mentioned,
-            targetCited: r.target_cited,
-            citationCount: r.citation_count,
-            creditsUsed: r.credits_used,
-            status: r.status,
-            errorMessage: r.error_message,
-            scannedAt: r.scanned_at,
-            // Effective display values — what the UI should use for badges,
-            // counts, and labels. Stable across refreshes.
+  // Build per-result enrichment once, then reuse for both the per-run
+  // payload AND the project-level opportunity mapping aggregation.
+  const opportunityInputs: OpportunityResultInput[] = []
+
+  const responseRuns = (runs ?? []).map((run) => {
+    const runResults = resultsByRun.get(run.id) || []
+    return {
+      id: run.id,
+      createdAt: run.created_at,
+      startedAt: run.started_at,
+      completedAt: run.completed_at,
+      status: run.status,
+      provider: run.provider,
+      totalCreditsUsed: run.total_credits_used,
+      errorMessage: run.error_message,
+      results: runResults.map((r) => {
+        const promptText = r.prompt_id ? promptMap.get(r.prompt_id as string) || null : null
+        const citationsForResult = citationsByResult.get(r.id as string) ?? null
+        const display = computeDisplayMatches({
+          responseText: (r.response_text as string | null) ?? null,
+          brandVariants,
+          targetDomain: projectTargetDomain,
+          mentioned: (r.mentioned as boolean | null) ?? false,
+          cited: (r.target_cited as boolean | null) ?? false,
+          citations: citationsForResult,
+        })
+        // GEO Insights — rule-based, read-only enrichment. Degrades to
+        // empty arrays / false flags when responseText or citations are
+        // unavailable. Never alters scan or DB state.
+        const geoInsights = computeGeoInsights({
+          prompt: promptText,
+          responseText: (r.response_text as string | null) ?? null,
+          citations: citationsForResult,
+          targetDomain: projectTargetDomain,
+        })
+
+        // Collect aggregation input — only "success" status results, so
+        // failed/error scans don't pollute the opportunity rates.
+        if (r.status === 'success') {
+          opportunityInputs.push({
+            engine: r.engine as string,
             displayMentioned: display.displayMentioned,
             displayCited: display.displayCited,
-            displayBrandLabels: display.displayBrandLabels,
-            displayDomainLabel: display.displayDomainLabel,
             geoInsights,
-          }
-        }),
-      }
-    }),
+          })
+        }
+
+        return {
+          id: r.id,
+          engine: r.engine,
+          promptId: r.prompt_id ?? null,
+          promptText,
+          // Raw DB values — preserved as-is, never overwritten.
+          mentioned: r.mentioned,
+          targetCited: r.target_cited,
+          citationCount: r.citation_count,
+          creditsUsed: r.credits_used,
+          status: r.status,
+          errorMessage: r.error_message,
+          scannedAt: r.scanned_at,
+          // Effective display values — what the UI should use for badges,
+          // counts, and labels. Stable across refreshes.
+          displayMentioned: display.displayMentioned,
+          displayCited: display.displayCited,
+          displayBrandLabels: display.displayBrandLabels,
+          displayDomainLabel: display.displayDomainLabel,
+          geoInsights,
+        }
+      }),
+    }
+  })
+
+  // Project-level GEO Opportunity Mapping — deterministic counts over all
+  // successful scan results. Read-only; safe to return alongside runs.
+  const geoOpportunityMapping = computeGeoOpportunityMapping(opportunityInputs)
+
+  return Response.json({
+    runs: responseRuns,
+    geoOpportunityMapping,
   })
 }
