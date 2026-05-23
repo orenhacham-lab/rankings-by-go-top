@@ -19,6 +19,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { BarChart3, Link, Bot, AlertTriangle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
@@ -2086,18 +2087,27 @@ function GeoOpportunityMappingSection({
     return meta?.name || engine
   }
 
-  // Compose business-facing sentences from deterministic data
-  const contentSentences = mapping.contentSignals.slice(0, 4).map((s) =>
-    isHebrew
-      ? `תוכן עם ${signalShortLabel(s.signal)} הופיע ב-${s.visibilityRate}% מהתשובות הצלחתיות.`
-      : `Content with ${signalShortLabel(s.signal)} appeared in ${s.visibilityRate}% of successful answers.`
-  )
+  const getPreliminaryPrefix = (sampleSize: number): string => {
+    if (sampleSize >= 3 && sampleSize <= 5) {
+      return t('geo_opp_preliminary_trend')
+    }
+    return ''
+  }
 
-  const citationSentences = mapping.citationTypes.slice(0, 4).map((c) =>
-    isHebrew
-      ? `${citationShortLabel(c.type)} מתואמים עם ${c.visibilityRate}% נראות.`
-      : `${capitalize(citationShortLabel(c.type))} correlate with ${c.visibilityRate}% visibility.`
-  )
+  // Compose business-facing sentences from deterministic data with sample counts
+  const contentSentences = mapping.contentSignals.slice(0, 4).map((s) => {
+    const prefix = getPreliminaryPrefix(s.totalWithSignal)
+    return isHebrew
+      ? `${prefix}בסריקות שבהן הופיעו ${signalShortLabel(s.signal)}, העסק הופיע ב-${s.visibilityRate}% מהמקרים (${s.successWithSignal} מתוך ${s.totalWithSignal}).`
+      : `${prefix}When ${signalShortLabel(s.signal)} appeared, the business appeared in ${s.visibilityRate}% of cases (${s.successWithSignal} out of ${s.totalWithSignal}).`
+  })
+
+  const citationSentences = mapping.citationTypes.slice(0, 4).map((c) => {
+    const prefix = getPreliminaryPrefix(c.totalWithType)
+    return isHebrew
+      ? `${prefix}כאשר העסק מופיע בתוך מקור מסוג ${citationShortLabel(c.type)}, הוא מופיע בתשובה ב-${c.visibilityRate}% מהמקרים (${c.successWithType} מתוך ${c.totalWithType}).`
+      : `${prefix}When sources of type ${citationShortLabel(c.type)} are present, the business appears in ${c.visibilityRate}% of cases (${c.successWithType} out of ${c.totalWithType}).`
+  })
 
   const engineSentences = mapping.enginePatterns.slice(0, 4).map((e) => {
     const name = engineDisplayName(e.engine)
@@ -2105,31 +2115,33 @@ function GeoOpportunityMappingSection({
     const citationsText = e.topCitationTypes.map(citationShortLabel).join(isHebrew ? ', ' : ', ')
     if (e.topSignals.length === 0 && e.topCitationTypes.length === 0) {
       return isHebrew
-        ? `${name} הצליח ב-${e.totalSuccess} סריקות, ללא דפוס מובהק.`
-        : `${name} succeeded in ${e.totalSuccess} scans, with no dominant pattern.`
+        ? `${name} הצליח ב-${e.totalSuccess} סריקות, ללא דפוס ברור.`
+        : `${name} succeeded in ${e.totalSuccess} scans, with no clear pattern.`
     }
     if (e.topSignals.length > 0 && e.topCitationTypes.length > 0) {
       return isHebrew
-        ? `${name} מעדיף לעיתים קרובות תשובות עם ${signalsText}, מבוססות על ${citationsText}.`
-        : `${name} frequently prefers answers with ${signalsText}, sourced from ${citationsText}.`
+        ? `${name} מופיע בעדיפות עם ${signalsText}, בדרך כלל מתוך ${citationsText}.`
+        : `${name} appears when ${signalsText} are present, typically from ${citationsText}.`
     }
     if (e.topSignals.length > 0) {
       return isHebrew
-        ? `${name} מעדיף לעיתים קרובות תשובות עם ${signalsText}.`
-        : `${name} frequently prefers answers with ${signalsText}.`
+        ? `${name} מופיע בעדיפות עם ${signalsText}.`
+        : `${name} appears when ${signalsText} are present.`
     }
     return isHebrew
       ? `${name} מסתמך בעיקר על ${citationsText}.`
-      : `${name} relies mostly on ${citationsText}.`
+      : `${name} relies primarily on ${citationsText}.`
   })
 
   const missingSentences = mapping.missingOpportunities.slice(0, 4).map((m) => {
     const label = m.category === 'content'
       ? signalShortLabel(m.signal as ContentSignalKey)
+      : m.signal === 'brand_site'
+      ? 'אתר המותג'
       : citationShortLabel(m.signal as CitationType)
     return isHebrew
-      ? `${m.failureRate}% מהתוצאות הכושלות חסרות ${label}.`
-      : `${m.failureRate}% of failed results lacked ${label}.`
+      ? `בתוצאות חלשות, ${label} חסר ב-${m.failureRate}% מהמקרים (${m.failureCount} מתוך ${mapping.totalFailed}).`
+      : `In failed results, ${label} is missing in ${m.failureRate}% of cases (${m.failureCount} out of ${mapping.totalFailed}).`
   })
 
   return (
@@ -2148,34 +2160,43 @@ function GeoOpportunityMappingSection({
         </span>
       </div>
 
+      {mapping.totalResults < 20 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex gap-3">
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            {t('geo_opp_small_sample_warning')}
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <OpportunityCard
           title={t('geo_opp_card_content')}
           tone="emerald"
-          icon="📊"
+          icon={<BarChart3 className="w-5 h-5" />}
           sentences={contentSentences}
-          emptyText={t('geo_opp_no_data')}
+          emptyText={t('geo_opp_no_data_content')}
         />
         <OpportunityCard
           title={t('geo_opp_card_citations')}
           tone="blue"
-          icon="🔗"
+          icon={<Link className="w-5 h-5" />}
           sentences={citationSentences}
-          emptyText={t('geo_opp_no_data')}
+          emptyText={t('geo_opp_no_data_citations')}
         />
         <OpportunityCard
           title={t('geo_opp_card_engines')}
           tone="indigo"
-          icon="🤖"
+          icon={<Bot className="w-5 h-5" />}
           sentences={engineSentences}
-          emptyText={t('geo_opp_no_data')}
+          emptyText={t('geo_opp_no_data_engines')}
         />
         <OpportunityCard
           title={t('geo_opp_card_missing')}
           tone="amber"
-          icon="⚠️"
+          icon={<AlertTriangle className="w-5 h-5" />}
           sentences={missingSentences}
-          emptyText={t('geo_opp_no_data')}
+          emptyText={t('geo_opp_no_data_missing')}
         />
       </div>
     </div>
@@ -2191,7 +2212,7 @@ function OpportunityCard({
 }: {
   title: string
   tone: 'emerald' | 'blue' | 'indigo' | 'amber'
-  icon: string
+  icon: React.ReactNode
   sentences: string[]
   emptyText: string
 }) {
@@ -2204,10 +2225,19 @@ function OpportunityCard({
       ? 'border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-900/10'
       : 'border-amber-200 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-900/10'
 
+  const iconTone =
+    tone === 'emerald'
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : tone === 'blue'
+      ? 'text-blue-600 dark:text-blue-400'
+      : tone === 'indigo'
+      ? 'text-indigo-600 dark:text-indigo-400'
+      : 'text-amber-600 dark:text-amber-400'
+
   return (
     <div className={`rounded-xl border ${accent} p-4 space-y-2`}>
       <div className="flex items-center gap-2">
-        <span className="text-base leading-none" aria-hidden="true">{icon}</span>
+        <div className={`${iconTone}`} aria-hidden="true">{icon}</div>
         <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
       </div>
       {sentences.length > 0 ? (
