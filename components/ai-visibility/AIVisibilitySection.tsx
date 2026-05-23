@@ -47,6 +47,7 @@ type ResultRow = {
   promptId: string | null
   engine: string
   promptText: string
+  // Raw DB values — never overwritten.
   mentioned: boolean
   targetCited: boolean
   citationCount: number
@@ -54,6 +55,12 @@ type ResultRow = {
   scannedAt: string | null
   citations: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }>
   responseText: string | null
+  // Server-computed display values — present from /api/ai-visibility/runs;
+  // used everywhere the UI counts or labels mentions/citations.
+  displayMentioned: boolean
+  displayCited: boolean
+  displayBrandLabels: string[]
+  displayDomainLabel: string | null
 }
 
 type PromptRow = {
@@ -188,6 +195,9 @@ export default function AIVisibilitySection({
       const results: ResultRow[] = []
       for (const run of runsData.runs || []) {
         for (const result of run.results || []) {
+          // Prefer the server-computed display fields. If a stale API response
+          // doesn't include them (older deploys), fall back to the raw DB flags.
+          const hasDisplay = typeof result.displayMentioned === 'boolean'
           results.push({
             id: result.id,
             promptId: result.promptId || null,
@@ -201,6 +211,10 @@ export default function AIVisibilitySection({
             citations: [],
             responseText: null,
             runId: run.id,
+            displayMentioned: hasDisplay ? result.displayMentioned : (result.mentioned || false),
+            displayCited: hasDisplay ? result.displayCited : (result.targetCited || false),
+            displayBrandLabels: Array.isArray(result.displayBrandLabels) ? result.displayBrandLabels : [],
+            displayDomainLabel: typeof result.displayDomainLabel === 'string' ? result.displayDomainLabel : null,
           })
         }
       }
@@ -227,8 +241,10 @@ export default function AIVisibilitySection({
       resultsWithText.forEach((r) => {
         if (r.status === 'success' && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) {
           engines.add(r.engine)
-          if (r.mentioned) totalMentions++
-          if (r.targetCited) totalCitations++
+          // Summary counts must match the badges shown in the list — use the
+          // server-computed display values, not raw DB flags.
+          if (r.displayMentioned) totalMentions++
+          if (r.displayCited) totalCitations++
 
           const existing = engineMap.get(r.engine) || {
             engine: r.engine,
@@ -238,7 +254,7 @@ export default function AIVisibilitySection({
             rate: 0,
           }
           existing.scans++
-          if (r.mentioned) existing.mentions++
+          if (r.displayMentioned) existing.mentions++
           existing.citations += r.citationCount
           existing.rate = existing.scans > 0 ? Math.round((existing.mentions / existing.scans) * 100) : 0
           engineMap.set(r.engine, existing)
@@ -393,8 +409,8 @@ export default function AIVisibilitySection({
     for (const [pid, engineMap] of byPrompt) {
       const results = Array.from(engineMap.values())
       const totalEngines = results.length
-      const businessMentionEngines = results.filter((r) => r.mentioned).length
-      const targetCitedCount = results.filter((r) => r.targetCited).length
+      const businessMentionEngines = results.filter((r) => r.displayMentioned).length
+      const targetCitedCount = results.filter((r) => r.displayCited).length
       const mentionRate = totalEngines > 0
         ? Math.round((businessMentionEngines / totalEngines) * 100)
         : 0
@@ -540,8 +556,8 @@ export default function AIVisibilitySection({
     return allResults.filter((r) => {
       if (!(SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) return false
       if (filterEngine && r.engine !== filterEngine) return false
-      if (filterMentioned !== null && r.mentioned !== filterMentioned) return false
-      if (filterCited !== null && r.targetCited !== filterCited) return false
+      if (filterMentioned !== null && r.displayMentioned !== filterMentioned) return false
+      if (filterCited !== null && r.displayCited !== filterCited) return false
       if (searchQuery && !r.promptText.toLowerCase().includes(searchQuery.toLowerCase())) return false
       return true
     })
@@ -1177,14 +1193,16 @@ function RecommendationsCard({
     })
   }
 
-  // Rule 2: Weak questions — questions where business didn't appear in most/all engines
+  // Rule 2: Weak questions — questions where business didn't appear in most/all engines.
+  // Use the same display-effective count the badges and summary use, so a
+  // question flagged "weak" here matches what the user sees in the list.
   const questionStats = new Map<string | null, { total: number; mentions: number; promptText: string }>()
   for (const result of allResults) {
     if (result.status !== 'success') continue
     const key = result.promptId || `__noprompt__${result.id}`
     const existing = questionStats.get(key) || { total: 0, mentions: 0, promptText: result.promptText }
     existing.total++
-    if (result.mentioned) existing.mentions++
+    if (result.displayMentioned) existing.mentions++
     questionStats.set(key, existing)
   }
 
@@ -1612,7 +1630,10 @@ function ResultRowCard({
   t: T
 }) {
   const meta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
-  const { brandLabels, domainLabel, reMentioned, reCited } = findMatchedLabels(
+  // Prefer the server-computed display fields so the list is correct on first
+  // render. If the drawer has loaded responseText, re-evaluate live to pick up
+  // any additional labels (and for in-text highlighting parity).
+  const live = findMatchedLabels(
     result.responseText,
     brandVariants,
     targetDomain,
@@ -1620,6 +1641,10 @@ function ResultRowCard({
     result.targetCited,
     result.citations
   )
+  const brandLabels = result.responseText ? live.brandLabels : result.displayBrandLabels
+  const domainLabel = result.responseText ? live.domainLabel : result.displayDomainLabel
+  const reMentioned = result.responseText ? live.reMentioned : result.displayMentioned
+  const reCited = result.responseText ? live.reCited : result.displayCited
 
   const scannedAtStr = result.scannedAt ? formatShortDateTime(result.scannedAt, isHebrew) : null
 
@@ -1784,7 +1809,9 @@ function ResultDetailDrawer({
   if (!open) return null
 
   const engineMeta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
-  const { brandLabels, domainLabel, reMentioned, reCited } = findMatchedLabels(
+  // Same pattern as the list card: use server-computed values until the
+  // drawer's responseText load lets us re-evaluate live.
+  const live = findMatchedLabels(
     result.responseText,
     brandVariants,
     targetDomain,
@@ -1792,6 +1819,10 @@ function ResultDetailDrawer({
     result.targetCited,
     result.citations
   )
+  const brandLabels = result.responseText ? live.brandLabels : result.displayBrandLabels
+  const domainLabel = result.responseText ? live.domainLabel : result.displayDomainLabel
+  const reMentioned = result.responseText ? live.reMentioned : result.displayMentioned
+  const reCited = result.responseText ? live.reCited : result.displayCited
 
   function cleanResponseText(text: string): string {
     if (!text) return ''

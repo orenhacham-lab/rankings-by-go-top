@@ -12,6 +12,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { runAIVisibilityScan } from '@/lib/ai-visibility'
 import { isDomainMatch } from '@/lib/ai-visibility/matching/domain-normalize'
+import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
+import { computeDisplayMatches } from '@/lib/ai-visibility/display-classification'
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
@@ -308,16 +310,22 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient()
 
-  // Verify ownership
+  // Verify ownership and load project fields needed for display classification.
+  // target_domain + business_name drive the brand-variant list used to mirror
+  // the client's findMatchedLabels on the server. Read-only; no DB writes.
   const { data: project } = await admin
     .from('projects')
-    .select('id, user_id')
+    .select('id, user_id, target_domain, business_name')
     .eq('id', projectId)
     .single()
 
   if (!project || (project as { user_id?: string }).user_id !== user.id) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  const projectTargetDomain = (project as { target_domain?: string | null }).target_domain ?? null
+  const projectBusinessName = (project as { business_name?: string | null }).business_name ?? null
+  const brandVariants = getBrandVariants(projectBusinessName, projectTargetDomain)
 
   // Fetch recent runs
   const { data: runs, error: runsError } = await admin
@@ -336,16 +344,40 @@ export async function GET(request: Request) {
   if (runIds.length > 0) {
     const { data: resultRows } = await admin
       .from('ai_scan_results')
-      .select('id, run_id, engine, prompt_id, mentioned, target_cited, citation_count, credits_used, status, error_message, scanned_at')
+      .select('id, run_id, engine, prompt_id, mentioned, target_cited, citation_count, credits_used, status, error_message, scanned_at, response_text')
       .in('run_id', runIds)
     results = resultRows ?? []
+  }
+
+  // Fetch citations grouped by result_id so the server-side classifier can
+  // detect target citations even when the DB target_cited flag was set false
+  // at scan time. We only need minimal fields.
+  const resultIds = results.map((r) => r.id as string)
+  const citationsByResult = new Map<
+    string,
+    Array<{ domain: string | null; is_target_domain: boolean | null }>
+  >()
+  if (resultIds.length > 0) {
+    const { data: citationRows } = await admin
+      .from('ai_citations')
+      .select('result_id, domain, is_target_domain')
+      .in('result_id', resultIds)
+    for (const c of citationRows ?? []) {
+      const rid = c.result_id as string
+      const arr = citationsByResult.get(rid) ?? []
+      arr.push({
+        domain: (c.domain as string | null) ?? null,
+        is_target_domain: (c.is_target_domain as boolean | null) ?? null,
+      })
+      citationsByResult.set(rid, arr)
+    }
   }
 
   // Build prompt text lookup
   const promptIds = Array.from(
     new Set(results.map((r) => r.prompt_id).filter((v): v is string => !!v))
   )
-  let promptMap = new Map<string, string>()
+  const promptMap = new Map<string, string>()
   if (promptIds.length > 0) {
     const { data: promptRows } = await admin
       .from('ai_prompts')
@@ -378,11 +410,20 @@ export async function GET(request: Request) {
         errorMessage: run.error_message,
         results: runResults.map((r) => {
           const promptText = r.prompt_id ? promptMap.get(r.prompt_id as string) || null : null
+          const display = computeDisplayMatches({
+            responseText: (r.response_text as string | null) ?? null,
+            brandVariants,
+            targetDomain: projectTargetDomain,
+            mentioned: (r.mentioned as boolean | null) ?? false,
+            cited: (r.target_cited as boolean | null) ?? false,
+            citations: citationsByResult.get(r.id as string) ?? null,
+          })
           return {
             id: r.id,
             engine: r.engine,
             promptId: r.prompt_id ?? null,
             promptText,
+            // Raw DB values — preserved as-is, never overwritten.
             mentioned: r.mentioned,
             targetCited: r.target_cited,
             citationCount: r.citation_count,
@@ -390,6 +431,12 @@ export async function GET(request: Request) {
             status: r.status,
             errorMessage: r.error_message,
             scannedAt: r.scanned_at,
+            // Effective display values — what the UI should use for badges,
+            // counts, and labels. Stable across refreshes.
+            displayMentioned: display.displayMentioned,
+            displayCited: display.displayCited,
+            displayBrandLabels: display.displayBrandLabels,
+            displayDomainLabel: display.displayDomainLabel,
           }
         }),
       }
