@@ -145,6 +145,7 @@ export default function AIVisibilitySection({
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   const [scanningKey, setScanningKey] = useState<string | null>(null)
+  const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
   const [showAllPrompts, setShowAllPrompts] = useState(false)
   const [scanStatus, setScanStatus] = useState<string | null>(null)
@@ -440,8 +441,18 @@ export default function AIVisibilitySection({
     async (promptId: string, engine: string) => {
       const key = `${promptId}:${engine}`
       setScanningKey(key)
+      setScanProgress(8)
       setScanStatus(t('scan_in_progress'))
       setError(null)
+
+      // Animate fake progress from 8% to 90%
+      let progress = 8
+      const progressInterval = setInterval(() => {
+        progress += Math.random() * 15
+        if (progress > 90) progress = 90
+        setScanProgress(progress)
+      }, 300)
+
       try {
         const res = await fetch('/api/ai-visibility/runs', {
           method: 'POST',
@@ -449,10 +460,13 @@ export default function AIVisibilitySection({
           body: JSON.stringify({ projectId, promptId, engine }),
         })
         if (!res.ok) {
+          clearInterval(progressInterval)
           const body = await res.json().catch(() => ({}))
           throw new Error(body.error || `HTTP ${res.status}`)
         }
         const body = await res.json()
+        clearInterval(progressInterval)
+        setScanProgress(100)
         await loadAllResults()
         setScanStatus(t('scan_done'))
         setCurrentTab('results')
@@ -466,12 +480,17 @@ export default function AIVisibilitySection({
           }
         }, 250)
       } catch (e) {
+        clearInterval(progressInterval)
         setError(e instanceof Error ? e.message : 'Scan failed')
         setScanStatus(null)
       } finally {
         setScanningKey(null)
-        // Auto-dismiss success message after 3 seconds
-        setTimeout(() => setScanStatus(null), 3000)
+        // Reset progress after fade
+        setTimeout(() => {
+          setScanProgress(0)
+          // Auto-dismiss success message after 3 seconds
+          setTimeout(() => setScanStatus(null), 3000)
+        }, 500)
       }
     },
     [projectId, loadAllResults, allResults, openResultDrawer, t]
@@ -766,23 +785,31 @@ export default function AIVisibilitySection({
                         const scanned = scannedSet.has(key)
                         const scanning = scanningKey === key
                         return (
-                          <button
-                            key={engine}
-                            onClick={() => !scanning && !scanned && scanEngine(p.id, engine)}
-                            disabled={scanning || scanned}
-                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition ${
-                              scanned
-                                ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 cursor-default'
-                                : scanning
-                                ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-wait'
-                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
-                            }`}
-                          >
-                            {meta && <meta.Icon size={14} className={meta.accent} />}
-                            <span>{meta?.name || engine}</span>
-                            {scanned && <span className="text-emerald-600">✓</span>}
-                            {scanning && <span className="text-slate-400 animate-pulse">…</span>}
-                          </button>
+                          <div key={engine} className="relative inline-block">
+                            <button
+                              onClick={() => !scanning && !scanned && scanEngine(p.id, engine)}
+                              disabled={scanning || scanned}
+                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
+                                scanned
+                                  ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 cursor-default'
+                                  : scanning
+                                  ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
+                              }`}
+                            >
+                              {scanning && (
+                                <div
+                                  className="absolute inset-0 bg-indigo-200 dark:bg-indigo-700/40 transition-all"
+                                  style={{ width: `${scanProgress}%` }}
+                                />
+                              )}
+                              <span className="relative z-10">
+                                {meta && <meta.Icon size={14} className={meta.accent} />}
+                              </span>
+                              <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
+                              {scanned && <span className="relative z-10 text-emerald-600">✓</span>}
+                            </button>
+                          </div>
                         )
                       })}
                     </div>
@@ -851,7 +878,7 @@ export default function AIVisibilitySection({
         <>
           <CompetitorsPanel
             projectId={projectId}
-            defaultCollapsed={false}
+            defaultCollapsed={true}
             onCompetitorsChanged={() => setCompetitorsRefreshKey((k) => k + 1)}
           />
           <CompetitorAnalysisPanel projectId={projectId} refreshKey={competitorsRefreshKey} />
@@ -1450,9 +1477,25 @@ function findMatchedLabels(
   let reCited = cited
   if (responseText) {
     const lower = responseText.toLowerCase()
+    const matched: string[] = []
     for (const v of brandVariants) {
-      if (lower.includes(v.toLowerCase())) labels.push(v)
+      if (lower.includes(v.toLowerCase())) matched.push(v)
     }
+    // Filter to show only most specific matches (longer variants that contain shorter ones)
+    const filtered: string[] = []
+    for (const variant of matched) {
+      const variantLower = variant.toLowerCase()
+      const isShorterSubstring = matched.some(
+        (other) => other !== variant &&
+        other.toLowerCase().includes(variantLower) &&
+        other.length > variant.length
+      )
+      if (!isShorterSubstring) {
+        filtered.push(variant)
+      }
+    }
+    labels.push(...filtered)
+
     if (targetDomain) {
       const cleaned = targetDomain.toLowerCase()
       // Detect bare domain, www.domain, full URL, or markdown link
@@ -1468,9 +1511,6 @@ function findMatchedLabels(
     }
     // Re-evaluate mentioned flag based on actual content
     if (labels.length > 0) reMentioned = true
-  } else {
-    // Row preview without responseText loaded: show first brand variant as a hint.
-    if (mentioned && brandVariants[0]) labels.push(brandVariants[0])
   }
   if (reCited && targetDomain && !domainLabel) domainLabel = targetDomain
   return { brandLabels: Array.from(new Set(labels)), domainLabel, reMentioned, reCited }
