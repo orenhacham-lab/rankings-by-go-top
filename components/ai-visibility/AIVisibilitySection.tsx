@@ -2087,61 +2087,71 @@ function GeoOpportunityMappingSection({
     return meta?.name || engine
   }
 
-  const getPreliminaryPrefix = (sampleSize: number): string => {
-    if (sampleSize >= 3 && sampleSize <= 5) {
-      return t('geo_opp_preliminary_trend')
+  const isPreliminarySample = (sampleSize: number): boolean => sampleSize >= 3 && sampleSize <= 5
+
+  // Compose premium, concise insights (top 2-3 only, quality > quantity)
+  const contentSentences = mapping.contentSignals.slice(0, 3).map((s, idx) => {
+    const isPrelim = isPreliminarySample(s.totalWithSignal)
+    const strength = s.visibilityRate >= 70 ? 'חזק' : s.visibilityRate >= 50 ? 'בינוני' : 'חלש'
+    const note = isPrelim ? ' *' : ''
+    return {
+      text: isHebrew
+        ? `${signalShortLabel(s.signal)}: ${s.visibilityRate}% חשיפה (${s.successWithSignal}/${s.totalWithSignal})${note}`
+        : `${capitalize(signalShortLabel(s.signal))}: ${s.visibilityRate}% visibility (${s.successWithSignal}/${s.totalWithSignal})${note}`,
+      isFirst: idx === 0,
+      isPrelim,
     }
-    return ''
-  }
-
-  // Compose business-facing sentences from deterministic data with sample counts
-  const contentSentences = mapping.contentSignals.slice(0, 4).map((s) => {
-    const prefix = getPreliminaryPrefix(s.totalWithSignal)
-    return isHebrew
-      ? `${prefix}בסריקות שבהן הופיעו ${signalShortLabel(s.signal)}, העסק הופיע ב-${s.visibilityRate}% מהמקרים (${s.successWithSignal} מתוך ${s.totalWithSignal}).`
-      : `${prefix}When ${signalShortLabel(s.signal)} appeared, the business appeared in ${s.visibilityRate}% of cases (${s.successWithSignal} out of ${s.totalWithSignal}).`
   })
 
-  const citationSentences = mapping.citationTypes.slice(0, 4).map((c) => {
-    const prefix = getPreliminaryPrefix(c.totalWithType)
-    return isHebrew
-      ? `${prefix}כאשר העסק מופיע בתוך מקור מסוג ${citationShortLabel(c.type)}, הוא מופיע בתשובה ב-${c.visibilityRate}% מהמקרים (${c.successWithType} מתוך ${c.totalWithType}).`
-      : `${prefix}When sources of type ${citationShortLabel(c.type)} are present, the business appears in ${c.visibilityRate}% of cases (${c.successWithType} out of ${c.totalWithType}).`
+  const citationSentences = mapping.citationTypes.slice(0, 3).map((c, idx) => {
+    const isPrelim = isPreliminarySample(c.totalWithType)
+    const note = isPrelim ? ' *' : ''
+    return {
+      text: isHebrew
+        ? `${citationShortLabel(c.type)}: ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${note}`
+        : `${capitalize(citationShortLabel(c.type))}: ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${note}`,
+      isFirst: idx === 0,
+      isPrelim,
+    }
   })
 
-  const engineSentences = mapping.enginePatterns.slice(0, 4).map((e) => {
+  const engineSentences = mapping.enginePatterns.slice(0, 4).map((e, idx) => {
     const name = engineDisplayName(e.engine)
-    const signalsText = e.topSignals.map(signalShortLabel).join(isHebrew ? ', ' : ', ')
-    const citationsText = e.topCitationTypes.map(citationShortLabel).join(isHebrew ? ', ' : ', ')
     if (e.topSignals.length === 0 && e.topCitationTypes.length === 0) {
-      return isHebrew
-        ? `${name} הצליח ב-${e.totalSuccess} סריקות, ללא דפוס ברור.`
-        : `${name} succeeded in ${e.totalSuccess} scans, with no clear pattern.`
+      return {
+        text: isHebrew
+          ? `${name}: עדיין מעט סריקות לזיהוי דפוס ברור`
+          : `${name}: more scans needed to identify clear pattern`,
+        isFirst: idx === 0,
+        isEmpty: true,
+      }
     }
-    if (e.topSignals.length > 0 && e.topCitationTypes.length > 0) {
-      return isHebrew
-        ? `${name} מופיע בעדיפות עם ${signalsText}, בדרך כלל מתוך ${citationsText}.`
-        : `${name} appears when ${signalsText} are present, typically from ${citationsText}.`
+    const signals = e.topSignals.slice(0, 2).map(signalShortLabel)
+    const citations = e.topCitationTypes.slice(0, 2).map(citationShortLabel)
+    const parts: string[] = []
+    if (signals.length > 0) parts.push(signals.join(' + '))
+    if (citations.length > 0) parts.push(`מ${citations.join(' / ')}`)
+    return {
+      text: isHebrew
+        ? `${name}: ${parts.join(' ')} (${e.totalSuccess} סריקות)`
+        : `${name}: ${parts.join(' ')} (${e.totalSuccess} scans)`,
+      isFirst: idx === 0,
+      isEmpty: false,
     }
-    if (e.topSignals.length > 0) {
-      return isHebrew
-        ? `${name} מופיע בעדיפות עם ${signalsText}.`
-        : `${name} appears when ${signalsText} are present.`
-    }
-    return isHebrew
-      ? `${name} מסתמך בעיקר על ${citationsText}.`
-      : `${name} relies primarily on ${citationsText}.`
   })
 
-  const missingSentences = mapping.missingOpportunities.slice(0, 4).map((m) => {
+  const missingSentences = mapping.missingOpportunities.slice(0, 3).map((m, idx) => {
     const label = m.category === 'content'
       ? signalShortLabel(m.signal as ContentSignalKey)
       : m.signal === 'brand_site'
       ? 'אתר המותג'
       : citationShortLabel(m.signal as CitationType)
-    return isHebrew
-      ? `בתוצאות חלשות, ${label} חסר ב-${m.failureRate}% מהמקרים (${m.failureCount} מתוך ${mapping.totalFailed}).`
-      : `In failed results, ${label} is missing in ${m.failureRate}% of cases (${m.failureCount} out of ${mapping.totalFailed}).`
+    return {
+      text: isHebrew
+        ? `${label}: חסר ב-${m.failureRate}% תוצאות חלשות (${m.failureCount}/${mapping.totalFailed})`
+        : `${capitalize(label)}: missing in ${m.failureRate}% weak results (${m.failureCount}/${mapping.totalFailed})`,
+      isFirst: idx === 0,
+    }
   })
 
   return (
@@ -2174,28 +2184,28 @@ function GeoOpportunityMappingSection({
           title={t('geo_opp_card_content')}
           tone="emerald"
           icon={<BarChart3 className="w-5 h-5" />}
-          sentences={contentSentences}
+          sentences={contentSentences as any}
           emptyText={t('geo_opp_no_data_content')}
         />
         <OpportunityCard
           title={t('geo_opp_card_citations')}
           tone="blue"
           icon={<Link className="w-5 h-5" />}
-          sentences={citationSentences}
+          sentences={citationSentences as any}
           emptyText={t('geo_opp_no_data_citations')}
         />
         <OpportunityCard
           title={t('geo_opp_card_engines')}
           tone="indigo"
           icon={<Bot className="w-5 h-5" />}
-          sentences={engineSentences}
+          sentences={engineSentences as any}
           emptyText={t('geo_opp_no_data_engines')}
         />
         <OpportunityCard
           title={t('geo_opp_card_missing')}
           tone="amber"
           icon={<AlertTriangle className="w-5 h-5" />}
-          sentences={missingSentences}
+          sentences={missingSentences as any}
           emptyText={t('geo_opp_no_data_missing')}
         />
       </div>
@@ -2213,7 +2223,7 @@ function OpportunityCard({
   title: string
   tone: 'emerald' | 'blue' | 'indigo' | 'amber'
   icon: React.ReactNode
-  sentences: string[]
+  sentences: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }>
   emptyText: string
 }) {
   const accent =
@@ -2241,11 +2251,14 @@ function OpportunityCard({
         <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
       </div>
       {sentences.length > 0 ? (
-        <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-          {sentences.map((s, i) => (
+        <ul className="space-y-1.5 text-xs leading-relaxed">
+          {sentences.map((item, i) => (
             <li key={i} className="flex gap-1.5">
-              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
-              <span>{s}</span>
+              <span className={item.isFirst ? 'text-slate-400 dark:text-slate-500 flex-shrink-0' : 'text-slate-400 dark:text-slate-500 flex-shrink-0'}>•</span>
+              <span className={item.isFirst ? 'font-medium text-slate-800 dark:text-slate-200' : item.isEmpty ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-300'}>
+                {item.text}
+                {item.isPrelim && <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-1">(preliminary)</span>}
+              </span>
             </li>
           ))}
         </ul>
