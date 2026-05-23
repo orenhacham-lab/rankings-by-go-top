@@ -481,6 +481,13 @@ const STRINGS = {
   geo_content_signals: { he: 'דפוסי תוכן', en: 'Content patterns' },
   geo_none: { he: '—', en: '—' },
 
+  // GEO Explanations (Phase 1B — why this result happened)
+  geo_explanation_title: { he: 'למה זה קרה?', en: 'Why this result happened' },
+  geo_explanation_insufficient: {
+    he: 'אין מספיק אותות להסבר אמין בתוצאה הזו.',
+    en: 'Not enough signals to explain this result reliably.',
+  },
+
   // Query intents
   geo_intent_transactional: { he: 'מסחרי', en: 'Transactional' },
   geo_intent_informational: { he: 'מידע', en: 'Informational' },

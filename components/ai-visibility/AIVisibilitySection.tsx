@@ -39,6 +39,7 @@ import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile 
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
+import { generateGeoExplanation } from '@/lib/ai-visibility/geo-explanations'
 
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
@@ -1920,6 +1921,16 @@ function ResultDetailDrawer({
             )}
           </div>
 
+          <GeoExplanationSection
+            geoInsights={result.geoInsights}
+            displayMentioned={result.displayMentioned}
+            displayCited={result.displayCited}
+            displayBrandLabels={result.displayBrandLabels}
+            displayDomainLabel={result.displayDomainLabel}
+            isHebrew={brandVariants.some((v) => /[֐-׿]/.test(v))}
+            t={t}
+          />
+
           <GeoInsightsSection insights={result.geoInsights} t={t} />
 
           {result.citations.length > 0 && (
@@ -1978,6 +1989,59 @@ function ResultDetailDrawer({
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * GEO Explanation — Phase 1B human-readable explanation.
+ *
+ * Converts raw GEO Insights into 2–4 clear bullets explaining why
+ * this result appeared (or didn't) in the AI engine response.
+ */
+function GeoExplanationSection({
+  geoInsights,
+  displayMentioned,
+  displayCited,
+  displayBrandLabels,
+  displayDomainLabel,
+  isHebrew,
+  t,
+}: {
+  geoInsights: GeoInsights | null
+  displayMentioned: boolean
+  displayCited: boolean
+  displayBrandLabels: string[]
+  displayDomainLabel: string | null
+  isHebrew: boolean
+  t: T
+}) {
+  const explanation = generateGeoExplanation({
+    geoInsights,
+    displayMentioned,
+    displayCited,
+    displayBrandLabels,
+    displayDomainLabel,
+    isHebrew,
+  })
+
+  if (!explanation.hasSignals || explanation.bullets.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 p-4 space-y-2">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        {t('geo_explanation_title')}
+      </h3>
+      <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+        {explanation.bullets.map((bullet, i) => (
+          <li key={i} className="flex gap-2">
+            <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+            <span>{bullet}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
