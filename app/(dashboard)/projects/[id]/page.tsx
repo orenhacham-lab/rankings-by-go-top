@@ -15,6 +15,7 @@ import ProjectForm from '@/components/projects/ProjectForm'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
+import ProjectSwitcher from '@/components/projects/ProjectSwitcher'
 import Link from 'next/link'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
@@ -263,7 +264,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         title={project.name}
         subtitle={project.clients?.name}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <ProjectSwitcher currentProjectId={id} currentProjectName={project.name} />
             <Link href="/projects">
               <Button variant="outline" size="sm">{k.backToProjects}</Button>
             </Link>
