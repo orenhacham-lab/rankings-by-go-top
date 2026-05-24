@@ -2148,17 +2148,17 @@ function GeoOpportunityMappingSection({
     if (lang === 'he') {
       switch (signal) {
         case 'pricing':
-          return 'מידע על מחירים הופיע פחות כשהעסק לא הופיע. כדאי להציג טווחי מחיר, מה כלול בשירות ותנאי רכישה.'
+          return 'בשאלות שבהן העסק לא הופיע, היה פחות מידע מסחרי. כדאי להציג טווחי מחיר, מה כלול בשירות ותנאי רכישה.'
         case 'reviews':
-          return 'ביקורות ודירוגים הופיעו פחות כשהעסק לא הופיע. כדאי להבליט עדויות לקוחות והוכחות אמון באתר.'
+          return 'בשאלות שבהן העסק לא הופיע, חסרו הוכחות אמון. כדאי להבליט ביקורות, דירוגים ועדויות לקוחות.'
         case 'comparison':
-          return 'תוכן השוואתי הופיע פחות כשהעסק לא הופיע. כדאי להוסיף עמודים שמשווים בין שירותים, מוצרים או אפשרויות.'
+          return 'בשאלות שבהן העסק לא הופיע, חסרו השוואות ברורות. כדאי להוסיף עמודים שיעזרו ללקוח לבחור בין אפשרויות.'
         case 'list':
-          return 'תוכן מסודר לשאלות נפוצות הופיע פחות כשהעסק לא הופיע. כדאי להוסיף תשובות קצרות וברורות לשאלות מרכזיות.'
+          return 'בשאלות שבהן העסק לא הופיע, חסרו תשובות מסודרות. כדאי להוסיף שאלות נפוצות ותשובות קצרות לשאלות מרכזיות.'
         case 'recommendation':
-          return 'תוכן המלצה הופיע פחות כשהעסק לא הופיע. כדאי להוסיף תוכן שמכוון את הלקוח לבחירה הנכונה עבורו.'
+          return 'בשאלות שבהן העסק לא הופיע, חסר תוכן המלצה. כדאי להוסיף תוכן שמכוון את הלקוח לבחירה הנכונה עבורו.'
         case 'local':
-          return 'מידע מקומי הופיע פחות כשהעסק לא הופיע. כדאי להבליט אזורי שירות, כתובת וזמינות באתר.'
+          return 'בשאלות שבהן העסק לא הופיע, חסר מידע מקומי. כדאי להבליט אזורי שירות, כתובת וזמינות.'
       }
     }
     switch (signal) {
@@ -2354,8 +2354,8 @@ function GeoOpportunityMappingSection({
   }
 
   const fallbackText = isHebrew
-    ? 'הנתונים הנוכחיים לא מצביעים על חולשה ברורה. כדי לקבל מיפוי מדויק יותר, מומלץ להריץ עוד שאלות ומנועים.'
-    : 'The current data does not indicate any clear weakness. To get a more accurate mapping, it is recommended to run more questions and engines.'
+    ? 'כרגע לא זוהתה חולשה ברורה. כדי לקבל המלצות מדויקות יותר, מומלץ להריץ עוד שאלות ומנועים.'
+    : 'No clear weakness detected at the moment. To get more accurate recommendations, it is recommended to run more questions and engines.'
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
