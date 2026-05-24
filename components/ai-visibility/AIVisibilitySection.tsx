@@ -2566,11 +2566,11 @@ function GeoCompetitorIntelligenceSection({
     // Specific, actionable insights for each signal
     const signalInsights: Record<string, { he: string; en: string }> = {
       hasReviewLanguage: {
-        he: 'תשובות שכללו ביקורות ודירוגים הופיעו יותר במקרים שבהם העסק קיבל חשיפה.',
+        he: 'ביקורות ודירוגים חזרו יותר בתשובות שבהן העסק קיבל חשיפה.',
         en: 'Responses that included reviews and ratings appeared more often when the business was featured.',
       },
       hasPricingLanguage: {
-        he: 'מחירים ברורים חזרו בכמה תשובות עם כוונת קנייה.',
+        he: 'מחירים ברורים הופיעו יותר בתשובות לשאלות קנייה.',
         en: 'Clear pricing information recurred across responses with purchase intent.',
       },
       hasComparisonLanguage: {
@@ -2582,7 +2582,7 @@ function GeoCompetitorIntelligenceSection({
         en: 'Recommendation and preference language recurred in responses where the business appeared.',
       },
       hasList: {
-        he: 'תוכן שמסודר כרשימה או FAQ הופיע יותר בתשובות שקל לסרוק ולהבין.',
+        he: 'תוכן שמסודר כרשימה או שאלות נפוצות הופיע יותר בתשובות ברורות ומובנות.',
         en: 'List-formatted or FAQ content appeared more in responses that were easy to scan and understand.',
       },
       hasLocalLanguage: {
