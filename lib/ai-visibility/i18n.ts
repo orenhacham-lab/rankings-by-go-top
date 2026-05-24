@@ -134,6 +134,8 @@ const STRINGS = {
     he: 'לא נמצאו שאלות מומלצות חדשות כרגע.',
     en: 'No new suggested questions found right now.',
   },
+  refresh_suggestions: { he: 'רענן', en: 'Refresh' },
+  rescan: { he: 'סריקה מחדש', en: 'Rescan' },
   query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
   language_label: { he: 'שפה', en: 'Language' },

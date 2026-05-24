@@ -186,6 +186,7 @@ export default function AIVisibilitySection({
   const [searchQuery, setSearchQuery] = useState('')
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
+  const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
   const [scanningKey, setScanningKey] = useState<string | null>(null)
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
@@ -437,6 +438,29 @@ export default function AIVisibilitySection({
     return s
   }, [allResults])
 
+  // Map of prompt:engine -> scannedAt date for latest successful scan
+  const scannedDateMap = useMemo(() => {
+    const map = new Map<string, string>()
+    const resultsByKey = new Map<string, ResultRow>()
+    // Keep only the latest result for each prompt:engine
+    allResults.forEach((r) => {
+      if (r.promptId && r.status === 'success') {
+        const key = `${r.promptId}:${r.engine}`
+        const existing = resultsByKey.get(key)
+        if (!existing || (r.scannedAt || '') > (existing.scannedAt || '')) {
+          resultsByKey.set(key, r)
+        }
+      }
+    })
+    // Extract dates
+    resultsByKey.forEach((r, key) => {
+      if (r.scannedAt) {
+        map.set(key, r.scannedAt)
+      }
+    })
+    return map
+  }, [allResults])
+
   // Per-prompt insights: dedupe by (promptKey, engine) keeping latest result
   // per engine, then aggregate mentions/citations. Read-only over allResults.
   // Keying tries promptId first; falls back to normalized promptText when the
@@ -614,6 +638,28 @@ export default function AIVisibilitySection({
       setDeletePromptId(null)
     }
   }, [allPrompts, loadAllResults])
+
+  const refreshSuggestions = useCallback(async () => {
+    setRefreshingSuggestions(true)
+    setShowAllSmartQuestions(false)
+    try {
+      const refreshed = generatePromptSuggestions({
+        businessName: projectBrandName,
+        domain: projectDomain,
+        city: projectCity || null,
+        country: projectCountry,
+        language: projectLanguage,
+        keywords: projectKeywords,
+        manualProfile,
+        shuffle: true,
+      })
+      setSuggestedQuestions(refreshed)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to refresh suggestions')
+    } finally {
+      setRefreshingSuggestions(false)
+    }
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile])
 
   const filteredResults = useMemo(() => {
     return allResults.filter((r) => {
@@ -899,16 +945,29 @@ export default function AIVisibilitySection({
                         const key = `${p.id}:${engine}`
                         const scanned = scannedSet.has(key)
                         const scanning = scanningKey === key
+                        const scannedAt = scannedDateMap.get(key)
+                        const formatDate = (dateStr: string) => {
+                          try {
+                            const date = new Date(dateStr)
+                            const day = String(date.getDate()).padStart(2, '0')
+                            const month = String(date.getMonth() + 1).padStart(2, '0')
+                            const year = date.getFullYear()
+                            return `${day}.${month}.${year}`
+                          } catch {
+                            return dateStr
+                          }
+                        }
                         return (
-                          <div key={engine} className="relative inline-block">
+                          <div key={engine} className="inline-block">
                             <button
-                              onClick={() => !scanning && !scanned && scanEngine(p.id, engine)}
-                              disabled={scanning || scanned}
+                              onClick={() => !scanning && scanEngine(p.id, engine)}
+                              disabled={scanning}
+                              title={scanned && !scanning ? t('rescan') : scanning ? t('scanning') : undefined}
                               className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
-                                scanned
-                                  ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 cursor-default'
-                                  : scanning
+                                scanning
                                   ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'
+                                  : scanned
+                                  ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 cursor-pointer'
                                   : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
                               }`}
                             >
@@ -924,6 +983,11 @@ export default function AIVisibilitySection({
                               <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
                               {scanned && <span className="relative z-10 text-emerald-600">✓</span>}
                             </button>
+                            {scanned && scannedAt && (
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 text-center">
+                                {formatDate(scannedAt)}
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -951,13 +1015,27 @@ export default function AIVisibilitySection({
 
           {suggestedQuestions.length > 0 && (
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
-              <div className="mb-4">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
-                  {t('smart_questions_title')}
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  {t('smart_questions_subtitle')}
-                </p>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
+                    {t('smart_questions_title')}
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    {t('smart_questions_subtitle')}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refreshSuggestions}
+                  loading={refreshingSuggestions}
+                  disabled={refreshingSuggestions}
+                  className="shrink-0"
+                  title={t('refresh_suggestions')}
+                  aria-label={t('refresh_suggestions')}
+                >
+                  {t('refresh_suggestions')}
+                </Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {suggestedQuestions.slice(0, showAllSmartQuestions ? undefined : 4).map((q) => {
