@@ -520,7 +520,7 @@ const STRINGS = {
   ai_summary_action_fallback: { he: 'להריץ עוד שאלות ומנועים כדי לקבל המלצות מדויקות יותר.', en: 'Run more questions and engines to get more accurate recommendations.' },
 
   // GEO Opportunity Mapping (Phase 2A — project-level aggregated insights)
-  geo_opp_title: { he: 'מיפוי הזדמנויות GEO', en: 'GEO Opportunity Mapping' },
+  geo_opp_title: { he: 'המלצות לשיפור הנראות ב-AI', en: 'AI Visibility Improvement Recommendations' },
   geo_opp_subtitle: {
     he: 'המלצות לשיפור הנראות של העסק בתשובות AI',
     en: 'Recommendations to improve business visibility in AI answers',

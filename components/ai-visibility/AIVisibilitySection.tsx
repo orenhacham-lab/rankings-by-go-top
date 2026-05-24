@@ -2013,7 +2013,7 @@ function AIVisibilitySummarySection({
     return t('ai_summary_action_fallback')
   }
 
-  type Bullet = { text: string; isFirst?: boolean }
+  type Bullet = { text: string; isFirst?: boolean; isAction?: boolean }
   const bullets: Bullet[] = []
 
   // Insufficient data short-circuit — show only status + fallback action.
@@ -2021,6 +2021,7 @@ function AIVisibilitySummarySection({
     bullets.push({ text: t('ai_summary_status_insufficient'), isFirst: true })
     bullets.push({
       text: t('ai_summary_action_label') + t('ai_summary_action_fallback'),
+      isAction: true,
     })
   } else {
     // 1. Overall status bullet
@@ -2067,8 +2068,8 @@ function AIVisibilitySummarySection({
       bullets.push({ text })
     }
 
-    // 4. Recommended action
-    bullets.push({ text: t('ai_summary_action_label') + pickAction() })
+    // 4. Recommended action — marked as action for visual emphasis
+    bullets.push({ text: t('ai_summary_action_label') + pickAction(), isAction: true })
   }
 
   return (
@@ -2084,16 +2085,29 @@ function AIVisibilitySummarySection({
           </p>
         </div>
       </div>
-      <ul className="space-y-1.5 text-xs sm:text-sm leading-relaxed">
+      <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed">
         {bullets.map((b, i) => (
-          <li key={i} className="flex gap-1.5">
-            <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
-            <span className={b.isFirst ? 'font-medium text-slate-800 dark:text-slate-200' : 'text-slate-700 dark:text-slate-300'}>
-              {b.text}
-            </span>
-          </li>
+          <div key={i}>
+            {b.isAction && i > 0 && (
+              <div className="my-2 border-t border-slate-200 dark:border-slate-700" />
+            )}
+            <div className={`flex gap-1.5 ${b.isAction ? 'pt-1.5' : ''}`}>
+              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span
+                className={
+                  b.isFirst
+                    ? 'font-medium text-slate-800 dark:text-slate-200'
+                    : b.isAction
+                    ? 'font-semibold text-indigo-700 dark:text-indigo-300'
+                    : 'text-slate-700 dark:text-slate-300'
+                }
+              >
+                {b.text}
+              </span>
+            </div>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   )
 }
