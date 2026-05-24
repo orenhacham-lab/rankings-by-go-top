@@ -453,6 +453,11 @@ export default function PromptSuggestions({
                         {t('edit')}
                       </button>
                     </div>
+                    {'valueReason' in s && s.valueReason && (
+                      <p className="text-[12px] font-medium text-indigo-700 dark:text-indigo-300 mt-1.5">
+                        {s.valueReason}
+                      </p>
+                    )}
                     {s.reason && (
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2" title={s.reason}>
                         {s.reason}

@@ -698,6 +698,12 @@ const STRINGS = {
   chip_comparison_search: { he: 'חיפוש השוואתי', en: 'Comparison Search' },
   chip_brand_search: { he: 'חיפוש מותג', en: 'Brand Search' },
   chip_pre_purchase_search: { he: 'חיפוש לפני רכישה', en: 'Pre-Purchase Search' },
+  // Signal-based chips (added in signal-driven explanation pass)
+  chip_conversion_potential: { he: 'פוטנציאל המרה גבוה', en: 'High Conversion Potential' },
+  chip_commercial_phrase: { he: 'ביטוי מסחרי', en: 'Commercial Phrase' },
+  chip_competitor_gap: { he: 'פער מול מתחרים', en: 'Competitor Gap' },
+  chip_lead_opportunity: { he: 'הזדמנות לידים', en: 'Lead Opportunity' },
+  chip_regional_demand: { he: 'ביקוש גבוה באזור', en: 'High Regional Demand' },
 } as const
 
 type StringKey = keyof typeof STRINGS

@@ -87,7 +87,8 @@ export type PromptSuggestion = {
   qualityScore: number
   confidenceTier: 'high' | 'good' | 'medium' | 'opportunity' | 'experimental'
   reason: string
-  chips: string[] // e.g., 'chip_purchase_intent', 'chip_high_search_volume'
+  chips: string[] // signal-based, e.g. 'chip_commercial_phrase', 'chip_competitor_gap'
+  valueReason: string // localized 1-line explanation of business value
 }
 
 type TemplateContext = {
@@ -2703,7 +2704,11 @@ export function generatePromptSuggestions({
     })
   }
 
-  // Build result items with confidence tiers and chips
+  // Build result items with confidence tiers, signal chips, and value reason.
+  // Chip generator is SIGNAL-BASED (commercial language, regional demand,
+  // competitor gap, etc.), not just intent labels. valueReason is a 1-line
+  // localized business-value statement separate from `reason`.
+  const hasCity = !!ctx.city
   const unsequencedResult: PromptSuggestion[] = selectedSuggestions.map((item, idx) => {
     const score = Math.min(100, Math.round(item.score))
     return {
@@ -2716,7 +2721,8 @@ export function generatePromptSuggestions({
       qualityScore: score,
       confidenceTier: getConfidenceTier(score),
       reason: buildReason(item.def, category, ctx, item.themeMatched),
-      chips: generateExplanationChips(item.def.intent, score, lang as 'he' | 'en'),
+      chips: generateSignalChips(item.prompt, item.def.intent, score, lang as 'he' | 'en', hasCity),
+      valueReason: generateValueReason(item.def.intent, score, item.prompt, lang as 'he' | 'en', hasCity),
     }
   })
 
@@ -3238,18 +3244,35 @@ function selectDiverseSuggestions<
     commit(c)
   }
 
-  // Stage 2: fill remaining slots with looser-but-still-strict caps.
+  // Stage 2: fill remaining slots with looser-but-still-strict caps PLUS a
+  // dynamic family-repeat penalty applied to the effective score at each step.
+  // Rationale: hard caps alone left one family (e.g. "הליכון") taking the full
+  // familyCap in scoring order. The exponential-ish penalty (0, -8, -18, -35,
+  // -60) makes a same-family repeat lose to a fresh-family candidate even when
+  // the repeat's base score is several points higher.
   const familyCap = Math.max(2, Math.ceil(limit / 6))
   const phrasingCap = Math.max(2, Math.ceil(limit / 6))
   const intentCap = Math.max(3, Math.ceil(limit / 4))
 
-  for (const c of classified) {
-    if (selected.length >= limit) break
-    if (used.has(c.item)) continue
-    if ((familyCounts[c.family] || 0) >= familyCap) continue
-    if ((phrasingCounts[c.phrasing] || 0) >= phrasingCap) continue
-    if ((intentCounts[c.intent] || 0) >= intentCap) continue
-    commit(c)
+  while (selected.length < limit) {
+    let best: Classified | null = null
+    let bestEffective = -Infinity
+
+    for (const c of classified) {
+      if (used.has(c.item)) continue
+      if ((familyCounts[c.family] || 0) >= familyCap) continue
+      if ((phrasingCounts[c.phrasing] || 0) >= phrasingCap) continue
+      if ((intentCounts[c.intent] || 0) >= intentCap) continue
+      const penalty = familyRepeatPenalty(familyCounts[c.family] || 0)
+      const effective = c.item.score - penalty
+      if (effective > bestEffective) {
+        bestEffective = effective
+        best = c
+      }
+    }
+
+    if (!best) break
+    commit(best)
   }
 
   // NO score-only fallback. If diversity caps prevent filling `limit`, the
@@ -3270,44 +3293,200 @@ function getConfidenceTier(score: number): 'high' | 'good' | 'medium' | 'opportu
 }
 
 /**
- * Generate 1–3 explanation chips based on intent and score signals.
- * Chips explain WHY the question was suggested.
+ * Generate 1–3 SIGNAL-BASED explanation chips.
  *
- * Heuristic logic:
- *   - High-intent (transactional, recommendation, comparison) → purchase_intent or comparison_search
- *   - Score >= 85 (high confidence) → high_search_volume
- *   - Score 70-84 → lead_potential or pre_purchase_search
- *   - Score < 70 → opportunity or experimental variants
+ * Chips no longer just mirror the intent label — they describe real signals
+ * derived from the prompt text and scoring context. Each suggestion is
+ * guaranteed at least one "signal" chip (volume, visibility gap, commercial
+ * language, regional demand, competitor gap, etc.). Generic intent-only chips
+ * are filtered out unless paired with a stronger signal.
+ *
+ * Inputs:
+ *   - prompt: the rendered question (Hebrew or English)
+ *   - intent: classified intent of the underlying query def
+ *   - score: quality score (0-100), used as volume/confidence proxy
+ *   - hasCity: whether the project has a configured city (regional demand)
+ *
+ * Output: ordered list of chip i18n keys, max 3, deduped.
  */
-function generateExplanationChips(
+function generateSignalChips(
+  prompt: string,
   intent: PromptIntent,
   score: number,
-  lang: 'he' | 'en'
+  lang: 'he' | 'en',
+  hasCity: boolean
 ): string[] {
-  const chips: string[] = []
+  type Candidate = { chip: string; priority: number; isSignal: boolean }
+  const candidates: Candidate[] = []
 
-  // Primary intent-based chips (max 1)
+  // ---- Strong commercial signals (text-derived) ----
+  const isCommercialPhrase = lang === 'he'
+    ? /(מחיר|כמה\s+עולה|במבצע|בהנחה|לקנות|להזמין|זול|משתלם|טווח\s+מחירים|העלות)/.test(prompt)
+    : /(price|cost|how\s+much|to\s+buy|order|cheap|discount|affordable|price\s+range)/i.test(prompt)
+  if (isCommercialPhrase) {
+    candidates.push({ chip: 'chip_commercial_phrase', priority: 11, isSignal: true })
+  }
+
+  // ---- Volume / demand signal (score is the proxy) ----
+  if (score >= 88) {
+    candidates.push({ chip: 'chip_high_search_volume', priority: 10, isSignal: true })
+  }
+
+  // ---- Visibility gap signals ----
+  // Every suggestion implies "business not appearing here yet". Use for
+  // mid-to-high confidence so the chip carries weight.
+  if (score >= 75) {
+    candidates.push({ chip: 'chip_not_in_ai', priority: 6, isSignal: true })
+  } else if (score >= 50) {
+    // Lower-confidence suggestions = ranking opportunity in Google + AI
+    candidates.push({ chip: 'chip_low_google_rank', priority: 5, isSignal: true })
+  }
+
+  // ---- Purchase / commercial intent ----
   if (intent === 'transactional' || intent === 'commercial') {
-    chips.push('chip_purchase_intent')
-  } else if (intent === 'comparison' || intent === 'alternatives') {
-    chips.push('chip_comparison_search')
-  } else if (intent === 'brand') {
-    chips.push('chip_brand_search')
-  } else if (intent === 'recommendation') {
-    chips.push('chip_lead_potential')
-  } else if (intent === 'pre_purchase') {
-    chips.push('chip_pre_purchase_search')
-  } else if (intent === 'local') {
-    chips.push('chip_local_search')
+    candidates.push({ chip: 'chip_purchase_intent', priority: 9, isSignal: true })
+    if (score >= 80) {
+      candidates.push({ chip: 'chip_conversion_potential', priority: 9, isSignal: true })
+    }
   }
 
-  // Secondary confidence-based chips
-  if (score >= 85) {
-    chips.push('chip_high_search_volume')
+  // ---- Comparison / competitor gap ----
+  if (intent === 'comparison' || intent === 'alternatives') {
+    candidates.push({ chip: 'chip_comparison_search', priority: 8, isSignal: true })
+    candidates.push({ chip: 'chip_competitor_gap', priority: 7, isSignal: true })
   }
 
-  // Limit to 3 chips
-  return chips.slice(0, 3)
+  // ---- Brand → competitor pattern ----
+  if (intent === 'brand') {
+    candidates.push({ chip: 'chip_competitor_gap', priority: 8, isSignal: true })
+  }
+
+  // ---- Pre-purchase research ----
+  if (intent === 'pre_purchase') {
+    candidates.push({ chip: 'chip_pre_purchase_search', priority: 8, isSignal: true })
+  }
+
+  // ---- Local + regional demand ----
+  const hasLocationToken = lang === 'he'
+    ? /(תל\s+אביב|ירושלים|חיפה|ראשון|פתח\s+תקווה|רמת\s+גן|אילת|נתניה|רעננה|הרצליה|באר\s+שבע|כפר\s+סבא|בעיר\s+שלי|באזור)/.test(prompt)
+    : /(near\s+me|in\s+my\s+(?:city|area)|nearby)/i.test(prompt)
+  if (intent === 'local' || hasLocationToken) {
+    candidates.push({ chip: 'chip_local_search', priority: 8, isSignal: true })
+    if (hasCity || hasLocationToken) {
+      candidates.push({ chip: 'chip_regional_demand', priority: 7, isSignal: true })
+    }
+  }
+
+  // ---- Recommendation → lead opportunity ----
+  if (intent === 'recommendation') {
+    candidates.push({ chip: 'chip_lead_opportunity', priority: 7, isSignal: true })
+    if (score >= 85) {
+      candidates.push({ chip: 'chip_conversion_potential', priority: 8, isSignal: true })
+    }
+  }
+
+  // Sort by priority, dedupe, return top 3. Guarantee at least one signal chip
+  // (the candidates list already filters intent-only labels — all chips here
+  // ARE signals).
+  const seen = new Set<string>()
+  const sorted = candidates.sort((a, b) => b.priority - a.priority)
+  const chips: string[] = []
+  for (const c of sorted) {
+    if (seen.has(c.chip)) continue
+    seen.add(c.chip)
+    chips.push(c.chip)
+    if (chips.length >= 3) break
+  }
+
+  // Fallback: every suggestion gets at least one signal chip
+  if (chips.length === 0) {
+    chips.push('chip_not_in_ai')
+  }
+
+  return chips
+}
+
+/**
+ * One-line business-value reason. Different from `reason` (which describes
+ * WHY the question was generated). valueReason describes WHY tracking this
+ * question matters — what action it should drive.
+ *
+ * Signal-prioritized: commercial phrasing wins over generic intent class.
+ */
+function generateValueReason(
+  intent: PromptIntent,
+  score: number,
+  prompt: string,
+  lang: 'he' | 'en',
+  hasCity: boolean
+): string {
+  const isCommercial = lang === 'he'
+    ? /(מחיר|כמה\s+עולה|במבצע|בהנחה|לקנות|להזמין|זול|משתלם)/.test(prompt)
+    : /(price|cost|how\s+much|to\s+buy|order|cheap|discount)/i.test(prompt)
+  const hasLocation = lang === 'he'
+    ? /(תל\s+אביב|ירושלים|חיפה|ראשון|פתח\s+תקווה|רמת\s+גן|אילת|נתניה|רעננה|הרצליה|באר\s+שבע|בעיר\s+שלי|באזור)/.test(prompt)
+    : /(near\s+me|in\s+my\s+(?:city|area)|nearby)/i.test(prompt)
+
+  if (lang === 'he') {
+    if (isCommercial || intent === 'transactional' || intent === 'commercial') {
+      return 'משתמשים שמחפשים זאת קרובים לרכישה.'
+    }
+    if (intent === 'comparison' || intent === 'alternatives' || intent === 'brand') {
+      return 'מתחרים מופיעים כאן יותר מהעסק.'
+    }
+    if (intent === 'local' || hasLocation || hasCity) {
+      return 'הזדמנות לשיפור נראות מקומית.'
+    }
+    if (intent === 'pre_purchase') {
+      return 'החיפוש בעל כוונת רכישה גבוהה.'
+    }
+    if (intent === 'recommendation' && score >= 85) {
+      return 'הזדמנות טובה להגדלת לידים אורגניים.'
+    }
+    if (score >= 88) {
+      return 'השאלה נפוצה במנועי AI.'
+    }
+    return 'העסק כמעט לא מופיע בשאלות מהסוג הזה.'
+  }
+
+  if (isCommercial || intent === 'transactional' || intent === 'commercial') {
+    return 'Searchers here are close to purchasing.'
+  }
+  if (intent === 'comparison' || intent === 'alternatives' || intent === 'brand') {
+    return 'Competitors appear more often than the business here.'
+  }
+  if (intent === 'local' || hasLocation || hasCity) {
+    return 'Opportunity to improve local visibility.'
+  }
+  if (intent === 'pre_purchase') {
+    return 'High purchase intent in this search.'
+  }
+  if (intent === 'recommendation' && score >= 85) {
+    return 'Good opportunity for organic lead generation.'
+  }
+  if (score >= 88) {
+    return 'Common question across AI engines.'
+  }
+  return 'The business barely appears in this type of question.'
+}
+
+/**
+ * Exponential-ish penalty applied to the effective score during diversity
+ * selection. Stops one keyword family (e.g. "הליכון") from dominating the
+ * batch even when its candidates score highest.
+ *
+ *   usage 0 → 0     (first pick, no penalty)
+ *   usage 1 → 8     (second time same family is considered)
+ *   usage 2 → 18    (third time)
+ *   usage 3 → 35    (fourth)
+ *   usage 4+ → 60   (effectively suppressed)
+ */
+function familyRepeatPenalty(usage: number): number {
+  if (usage <= 0) return 0
+  if (usage === 1) return 8
+  if (usage === 2) return 18
+  if (usage === 3) return 35
+  return 60
 }
 
 /**
