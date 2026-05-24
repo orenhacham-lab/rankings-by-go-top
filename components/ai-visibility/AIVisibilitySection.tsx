@@ -2494,43 +2494,74 @@ function GeoCompetitorIntelligenceSection({
   const contentStructureCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-    // Whitelist of business-readable citation types. Anything else is
-    // dropped before aggregation — including 'unknown'.
-    // Labels are phrased in plain language; internal taxonomy terms like
-    // 'brand_site' / 'homepage' are never surfaced.
-    const CONTENT_TYPE_LABELS: Record<string, { he: string; en: string }> = {
-      review: { he: 'עמודים עם ביקורות ודירוגים', en: 'reviews and ratings' },
-      marketplace: { he: 'שווקים מקוונים', en: 'online marketplaces' },
-      comparison: { he: 'עמודים שמשווים בין מוצרים, שירותים או עסקים', en: 'comparison pages' },
-      category: { he: 'עמודי קטגוריות מוצרים', en: 'product category pages' },
-      product: { he: 'עמודי מוצר עם מידע ברור ומפורט', en: 'detailed product pages' },
-      forum: { he: 'דיוני פורומים', en: 'forum discussions' },
-      blog: { he: 'בלוגים וכתבות', en: 'blogs and articles' },
-      brand_site: { he: 'אתרים רשמיים של עסקים', en: 'official business websites' },
-      homepage: { he: 'עמודים כלליים של עסקים', en: 'business homepages' },
-      directory: { he: 'מדריכי עסקים', en: 'business directories' },
-    }
-
-    // Type-specific business insights explaining WHY each content type matters to AI.
-    // These descriptions focus on business value, not taxonomy categories.
-    const CONTENT_TYPE_INSIGHTS: Record<string, { he: string; en: string }> = {
-      homepage: { he: 'עמודים שמציגים בצורה ברורה מי העסק ומה הוא מציע', en: 'pages that clearly show who the business is and what it offers' },
-      brand_site: { he: 'אתרים רשמיים של עסקים בתחום', en: 'official business websites in the sector' },
-      category: { he: 'עמודים שמרכזים כמה מוצרים או שירותים מאותו תחום', en: 'pages aggregating multiple products or services in the field' },
-      review: { he: 'דעות של משתמשים ודירוגים על מוצרים ושירותים', en: 'user opinions and ratings on products and services' },
-      product: { he: 'עמודי מוצר עם מידע ברור ומפורט', en: 'detailed product pages' },
-      comparison: { he: 'עמודים שמשווים בין מוצרים, שירותים או עסקים', en: 'comparison pages' },
-      marketplace: { he: 'פלטפורמות שמרכזות כמה מוכרים או מוצרים', en: 'platforms aggregating multiple sellers or products' },
-      forum: { he: 'דיונים של משתמשים על חוויות וטיפים', en: 'user discussions about experiences and tips' },
-      blog: { he: 'מאמרים ובלוגים עם מידע רלוונטי', en: 'articles and blogs with relevant information' },
-      directory: { he: 'מדריכים שמרכזים רשימות של עסקים בתחום', en: 'directories listing businesses in the sector' },
+    // Business-focused content insights — describe TYPES OF INFORMATION
+    // that AI engines preferred, not URL/page taxonomy. Each insight is
+    // phrased so a business owner immediately understands what kind of
+    // content helped surface in AI responses (without internal jargon
+    // like 'brand_site', 'homepage', 'category page').
+    // Acts as a whitelist: types absent from this map (including 'unknown')
+    // are dropped before aggregation.
+    const CONTENT_TYPE_INSIGHTS: Record<
+      string,
+      { he: string; en: string; hePlural: boolean }
+    > = {
+      homepage: {
+        he: 'תוכן שמסביר את העסק ואת השירותים שלו',
+        en: 'content that explains the business and its services',
+        hePlural: false,
+      },
+      brand_site: {
+        he: 'תוכן שמסביר בבירור מה העסק מציע',
+        en: 'content that clearly explains what the business offers',
+        hePlural: false,
+      },
+      category: {
+        he: 'עמודים שמציגים מוצרים או שירותים בצורה מסודרת',
+        en: 'pages presenting products or services in a structured way',
+        hePlural: true,
+      },
+      review: {
+        he: 'תוכן עם דעות וביקורות של לקוחות',
+        en: 'content with customer opinions and reviews',
+        hePlural: false,
+      },
+      product: {
+        he: 'מידע ברור ומפורט על מוצרים',
+        en: 'clear, detailed information about products',
+        hePlural: false,
+      },
+      comparison: {
+        he: 'תוכן שעוזר ללקוח להשוות בין אפשרויות',
+        en: 'content that helps customers compare options',
+        hePlural: false,
+      },
+      marketplace: {
+        he: 'תוכן שמרכז מוצרים מכמה מוכרים במקום אחד',
+        en: 'content gathering products from multiple sellers in one place',
+        hePlural: false,
+      },
+      forum: {
+        he: 'תוכן עם חוויות וטיפים של משתמשים',
+        en: 'content with user experiences and tips',
+        hePlural: false,
+      },
+      blog: {
+        he: 'תוכן הסברי שעוזר להבין נושאים בתחום',
+        en: 'explanatory content that helps understand topics in the field',
+        hePlural: false,
+      },
+      directory: {
+        he: 'תוכן שמרכז עסקים בתחום במקום אחד',
+        en: 'content listing businesses in the field in one place',
+        hePlural: false,
+      },
     }
 
     // Collect citation types from trusted domains, skipping unmapped/unknown
     const typeFreq = new Map<string, number>()
     for (const d of intelligence.trustedDomains) {
       for (const t of d.citationTypes) {
-        if (!CONTENT_TYPE_LABELS[t]) continue // filter 'unknown' and anything else
+        if (!CONTENT_TYPE_INSIGHTS[t]) continue // filter 'unknown' and anything else
         typeFreq.set(t, (typeFreq.get(t) || 0) + 1)
       }
     }
@@ -2541,39 +2572,35 @@ function GeoCompetitorIntelligenceSection({
 
     if (topTypes.length === 0) return { lines, pills: [] }
 
-    const getInsight = (type: string): string =>
-      (CONTENT_TYPE_INSIGHTS[type] || CONTENT_TYPE_LABELS[type])[isHebrew ? 'he' : 'en']
-
-    const getLabel = (type: string): string =>
-      CONTENT_TYPE_LABELS[type][isHebrew ? 'he' : 'en']
+    // Hebrew verb conjugation helper — appends 'ו' for plural masculine.
+    const conjugate = (verb: string, plural: boolean): string =>
+      plural ? `${verb}ו` : verb
 
     const firstType = topTypes[0]
-    const firstInsight = getInsight(firstType)
+    const first = CONTENT_TYPE_INSIGHTS[firstType]
     lines.push({
       text: isHebrew
-        ? `מנועי AI הסתמכו בעיקר על ${firstInsight}.`
-        : `AI engines relied primarily on ${firstInsight}.`,
+        ? `${first.he} ${conjugate('הופיע', first.hePlural)} יותר בתשובות AI.`
+        : `${capitalize(first.en)} appeared more often in AI responses.`,
       isFirst: true,
     })
 
     if (topTypes.length >= 2) {
-      const secondType = topTypes[1]
-      const secondInsight = getInsight(secondType)
+      const second = CONTENT_TYPE_INSIGHTS[topTypes[1]]
       lines.push({
         text: isHebrew
-          ? `${secondInsight.charAt(0).toUpperCase()}${secondInsight.slice(1)} הופיעו לעיתים קרובות בתשובות AI.`
-          : `${capitalize(secondInsight)} also appeared frequently in AI responses.`,
+          ? `${second.he} ${conjugate('חזר', second.hePlural)} בכמה תוצאות.`
+          : `${capitalize(second.en)} recurred across multiple results.`,
         isFirst: false,
       })
     }
 
     if (topTypes.length >= 3) {
-      const thirdType = topTypes[2]
-      const thirdInsight = getInsight(thirdType)
+      const third = CONTENT_TYPE_INSIGHTS[topTypes[2]]
       lines.push({
         text: isHebrew
-          ? `${thirdInsight.charAt(0).toUpperCase()}${thirdInsight.slice(1)} הופיעו גם הם בתוצאות.`
-          : `${capitalize(thirdInsight)} also appeared in results.`,
+          ? `מנועי AI נטו להעדיף ${third.he}, ולא רק תיאור כללי של העסק.`
+          : `AI engines tended to favor ${third.en}, rather than just a generic business description.`,
         isFirst: false,
       })
     }
