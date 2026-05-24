@@ -2086,33 +2086,6 @@ function GeoOpportunityMappingSection({
     return null
   }
 
-  const signalShortLabel = (s: ContentSignalKey): string => {
-    switch (s) {
-      case 'pricing': return t('geo_opp_signal_pricing')
-      case 'reviews': return t('geo_opp_signal_reviews')
-      case 'comparison': return t('geo_opp_signal_comparison')
-      case 'list': return t('geo_opp_signal_list')
-      case 'recommendation': return t('geo_opp_signal_recommendation')
-      case 'local': return t('geo_opp_signal_local')
-    }
-  }
-
-  const citationShortLabel = (c: CitationType): string => {
-    switch (c) {
-      case 'homepage': return t('geo_opp_cite_homepage')
-      case 'category': return t('geo_opp_cite_category')
-      case 'product': return t('geo_opp_cite_product')
-      case 'comparison': return t('geo_opp_cite_comparison')
-      case 'review': return t('geo_opp_cite_review')
-      case 'blog': return t('geo_opp_cite_blog')
-      case 'marketplace': return t('geo_opp_cite_marketplace')
-      case 'forum': return t('geo_opp_cite_forum')
-      case 'directory': return t('geo_opp_cite_directory')
-      case 'brand_site': return t('geo_opp_cite_brand_site')
-      case 'unknown': return t('geo_citation_unknown')
-    }
-  }
-
   const engineDisplayName = (engine: string): string => {
     const meta = ENGINE_META[engine as keyof typeof ENGINE_META]
     return meta?.name || engine
@@ -2120,148 +2093,224 @@ function GeoOpportunityMappingSection({
 
   const isPreliminarySample = (sampleSize: number): boolean => sampleSize >= 3 && sampleSize <= 5
 
-  // Content Signals: first insight is data-driven, rest are qualitative
+  // ─────────────────────────────────────────────────────────────────────
+  // Business-interpretation phrasings — used by Content Signals + Citation +
+  // Missing cards. These are CONTEXT-AWARE templates, not raw labels.
+  // Each signal/citation gets natural Hebrew that explains what it MEANS,
+  // not what it IS.
+  // ─────────────────────────────────────────────────────────────────────
+  const contentInsightPhrase = (
+    signal: ContentSignalKey,
+    lang: 'he' | 'en',
+  ): string => {
+    if (lang === 'he') {
+      switch (signal) {
+        case 'pricing': return 'תוכן עם מחיר, יתרונות ופרטי רכישה'
+        case 'reviews': return 'תוכן עם ביקורות ודירוגים'
+        case 'comparison': return 'תוכן שמשווה בין אפשרויות'
+        case 'list': return 'תוכן בנוי כרשימה או שאלות נפוצות'
+        case 'recommendation': return 'תוכן עם המלצות והעדפות'
+        case 'local': return 'תוכן עם אזורי שירות, מיקום או זמינות'
+      }
+    }
+    switch (signal) {
+      case 'pricing': return 'content with pricing, benefits, and purchase details'
+      case 'reviews': return 'content with reviews and ratings'
+      case 'comparison': return 'content that compares options'
+      case 'list': return 'list-formatted or FAQ content'
+      case 'recommendation': return 'content with recommendations and preferences'
+      case 'local': return 'content with service areas, location, or availability'
+    }
+  }
+
+  const citationInsightPhrase = (
+    citation: CitationType,
+    lang: 'he' | 'en',
+  ): string => {
+    if (lang === 'he') {
+      switch (citation) {
+        case 'homepage': return 'תוכן כללי על עסקים'
+        case 'brand_site': return 'אתרים של עסקים'
+        case 'category': return 'עמודי קטגוריות'
+        case 'product': return 'עמודי מוצר'
+        case 'comparison': return 'עמודי השוואה'
+        case 'review': return 'אתרי ביקורות'
+        case 'blog': return 'כתבות ובלוגים'
+        case 'marketplace': return 'פלטפורמות מסחר'
+        case 'forum': return 'דיוני פורומים'
+        case 'directory': return 'מדריכי עסקים'
+        case 'unknown': return ''
+      }
+    }
+    switch (citation) {
+      case 'homepage': return 'general business pages'
+      case 'brand_site': return 'business websites'
+      case 'category': return 'category pages'
+      case 'product': return 'product pages'
+      case 'comparison': return 'comparison pages'
+      case 'review': return 'review sites'
+      case 'blog': return 'blogs and articles'
+      case 'marketplace': return 'marketplace platforms'
+      case 'forum': return 'forum discussions'
+      case 'directory': return 'business directories'
+      case 'unknown': return ''
+    }
+  }
+
+  // Strength thresholds: show only insights that genuinely correlate with success.
+  // < 40% → weak / noisy, hidden
+  // >= 40% → meaningful pattern (lead)
+  // >= 60% → strong (supporting)
+  const STRONG_RATE = 60
+  const MEANINGFUL_RATE = 40
+
+  // Card 1: Content Signals — business interpretation, not data description.
+  // Hide weak signals entirely.
   const contentSentences = (() => {
     const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
 
-    const all = mapping.contentSignals.slice(0, 3)
+    const meaningful = mapping.contentSignals.filter((s) => s.visibilityRate >= MEANINGFUL_RATE)
+    if (meaningful.length === 0) return []
 
-    // First: data-driven with percentages
-    if (all.length > 0) {
-      const s = all[0]
-      const isPrelim = isPreliminarySample(s.totalWithSignal)
+    // Lead: top signal — natural sentence with implied insight
+    const lead = meaningful[0]
+    const leadIsPrelim = isPreliminarySample(lead.totalWithSignal)
+    const leadPhrase = contentInsightPhrase(lead.signal, isHebrew ? 'he' : 'en')
+    lines.push({
+      text: isHebrew
+        ? `${leadPhrase} הופיע יותר בתשובות שבהן העסק קיבל חשיפה${leadIsPrelim ? ' *' : ''}.`
+        : `${capitalize(leadPhrase)} appeared more often in answers where the business was featured${leadIsPrelim ? ' *' : ''}.`,
+      isFirst: true,
+      isPrelim: leadIsPrelim,
+    })
+
+    // Supporting: only if visibilityRate is strong
+    const supporting = meaningful.slice(1, 3).filter((s) => s.visibilityRate >= STRONG_RATE)
+    for (const s of supporting) {
+      const phrase = contentInsightPhrase(s.signal, isHebrew ? 'he' : 'en')
       lines.push({
         text: isHebrew
-          ? `שיעור החשיפה הגבוה ביותר הופיע עם ${signalShortLabel(s.signal)} — ${s.visibilityRate}% (${s.successWithSignal}/${s.totalWithSignal})${isPrelim ? ' *' : ''}`
-          : `Highest visibility rate appeared with ${signalShortLabel(s.signal)} — ${s.visibilityRate}% (${s.successWithSignal}/${s.totalWithSignal})${isPrelim ? ' *' : ''}`,
-        isFirst: true,
-        isPrelim,
-      })
-    }
-
-    // Rest: qualitative insights without percentages
-    for (let i = 1; i < all.length; i++) {
-      const s = all[i]
-      lines.push({
-        text: isHebrew
-          ? `${capitalize(signalShortLabel(s.signal))} הופיעו לעיתים קרובות בתוצאות מוצלחות.`
-          : `${capitalize(signalShortLabel(s.signal))} appeared frequently in successful results.`,
+          ? `גם ${phrase} חזר בתשובות שבהן העסק הופיע.`
+          : `${capitalize(phrase)} also recurred in answers where the business appeared.`,
         isFirst: false,
       })
     }
 
-    return lines.length > 0 ? lines : []
+    return lines
   })()
 
-  // Citations: first is data-driven, rest are qualitative.
-  // Drop 'unknown' entries — never expose debug labels to users.
+  // Card 2: Citation Types — business interpretation about source patterns.
+  // Drop 'unknown' entries. Hide weak.
   const citationSentences = (() => {
     const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
 
-    const all = mapping.citationTypes.filter((c) => c.type !== 'unknown').slice(0, 3)
+    const meaningful = mapping.citationTypes
+      .filter((c) => c.type !== 'unknown' && c.visibilityRate >= MEANINGFUL_RATE)
+    if (meaningful.length === 0) return []
 
-    // First: data-driven with percentages
-    if (all.length > 0) {
-      const c = all[0]
-      const isPrelim = isPreliminarySample(c.totalWithType)
+    // Lead: dominant source pattern
+    const lead = meaningful[0]
+    const leadIsPrelim = isPreliminarySample(lead.totalWithType)
+    const leadPhrase = citationInsightPhrase(lead.type, isHebrew ? 'he' : 'en')
+    lines.push({
+      text: isHebrew
+        ? `מנועי AI הסתמכו בעיקר על ${leadPhrase} בתשובות שבהן העסק קיבל חשיפה${leadIsPrelim ? ' *' : ''}.`
+        : `AI engines relied mainly on ${leadPhrase} in answers where the business was featured${leadIsPrelim ? ' *' : ''}.`,
+      isFirst: true,
+      isPrelim: leadIsPrelim,
+    })
+
+    // Supporting: contrast or complement (only if strong)
+    const supporting = meaningful.slice(1, 3).filter((c) => c.visibilityRate >= STRONG_RATE)
+    for (const c of supporting) {
+      const phrase = citationInsightPhrase(c.type, isHebrew ? 'he' : 'en')
       lines.push({
         text: isHebrew
-          ? `המקור השכיח ביותר היה ${citationShortLabel(c.type)} — ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${isPrelim ? ' *' : ''}`
-          : `Most common source was ${citationShortLabel(c.type)} — ${c.visibilityRate}% (${c.successWithType}/${c.totalWithType})${isPrelim ? ' *' : ''}`,
-        isFirst: true,
-        isPrelim,
-      })
-    }
-
-    // Rest: qualitative
-    for (let i = 1; i < all.length; i++) {
-      const c = all[i]
-      lines.push({
-        text: isHebrew
-          ? `${capitalize(citationShortLabel(c.type))} הופיעו בתדירות גבוהה בתוצאות מוצלחות.`
-          : `${capitalize(citationShortLabel(c.type))} appeared frequently in successful results.`,
+          ? `גם ${phrase} בלטו בתוצאות מוצלחות.`
+          : `${capitalize(phrase)} also stood out in successful results.`,
         isFirst: false,
       })
     }
 
-    return lines.length > 0 ? lines : []
+    return lines
   })()
 
-  // Engine Patterns: qualitative, no percentages
-  const engineSentences = mapping.enginePatterns.slice(0, 4).map((e, idx) => {
-    const name = engineDisplayName(e.engine)
-    if (e.topSignals.length === 0 && e.topCitationTypes.length === 0) {
-      return {
-        text: isHebrew
-          ? `${name}: עדיין מעט סריקות לזיהוי העדפות`
-          : `${name}: more scans needed to identify preferences`,
-        isFirst: idx === 0,
-        isEmpty: true,
-      }
-    }
-    const signals = e.topSignals.slice(0, 2).map(signalShortLabel)
-    const citations = e.topCitationTypes.filter((c) => c !== 'unknown').slice(0, 1).map(citationShortLabel)
-
-    let preference = ''
-    if (signals.length > 0 && citations.length > 0) {
-      preference = isHebrew
-        ? `${name} הציע בעדיפות ${signals.join(' ו')} מתוך ${citations.join()}.`
-        : `${name} prefers ${signals.join(' and ')} from ${citations.join()}.`
-    } else if (signals.length > 0) {
-      preference = isHebrew
-        ? `${name} הציע בעדיפות תוכן עם ${signals.join(' ו')}.`
-        : `${name} prefers content with ${signals.join(' and ')}.`
-    } else {
-      preference = isHebrew
-        ? `${name} התבסס בעיקר על ${citations.join()}.`
-        : `${name} relied primarily on ${citations.join()}.`
-    }
-
-    return {
-      text: preference,
-      isFirst: idx === 0,
-      isEmpty: false,
-    }
-  })
-
-  // Missing Opportunities: reframe from negative to strategic
-  const missingSentences = (() => {
+  // Card 3: Engine Patterns — what each engine actually preferred.
+  // Skip engines with no clear preferences (no fallback placeholder).
+  const engineSentences = (() => {
     const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
 
-    const all = mapping.missingOpportunities.slice(0, 3)
+    const engines = mapping.enginePatterns
+      .filter((e) => e.topSignals.length > 0 || e.topCitationTypes.filter((c) => c !== 'unknown').length > 0)
+      .slice(0, 3)
 
-    for (const m of all) {
-      const label = m.category === 'content'
-        ? signalShortLabel(m.signal as ContentSignalKey)
-        : m.signal === 'brand_site'
-        ? 'האתר הרשמי'
-        : citationShortLabel(m.signal as CitationType)
+    if (engines.length === 0) return []
 
-      const isFirst = lines.length === 0
+    engines.forEach((e, idx) => {
+      const name = engineDisplayName(e.engine)
+      const signals = e.topSignals.slice(0, 2).map((s) => contentInsightPhrase(s, isHebrew ? 'he' : 'en'))
+      const citations = e.topCitationTypes
+        .filter((c) => c !== 'unknown')
+        .slice(0, 1)
+        .map((c) => citationInsightPhrase(c, isHebrew ? 'he' : 'en'))
 
-      // Strategic reframing instead of "missing"
       let text: string
-      if (isHebrew) {
-        if (m.category === 'content') {
-          text = `בתוצאות שבהן העסק לא הופיע, לא זוהו ${label} בתדירות גבוהה.`
-        } else {
-          text = `בהופעות חלשות, ${label} הופיעו בתדירות נמוכה בהשוואה לתוצאות מוצלחות.`
-        }
+      if (signals.length > 0 && citations.length > 0) {
+        text = isHebrew
+          ? `${name} העדיף ${signals.join(' ו')} — בעיקר מתוך ${citations.join()}.`
+          : `${capitalize(name)} favored ${signals.join(' and ')} — mostly from ${citations.join()}.`
+      } else if (signals.length > 0) {
+        text = isHebrew
+          ? `${name} העדיף תשובות עם ${signals.join(' ו')}.`
+          : `${capitalize(name)} favored answers with ${signals.join(' and ')}.`
       } else {
-        if (m.category === 'content') {
-          text = `In weak results, ${label} appeared less frequently than in successful ones.`
-        } else {
-          text = `Weak results tended to lack ${label} as a cited source.`
-        }
+        text = isHebrew
+          ? `${name} הסתמך בעיקר על ${citations.join()}.`
+          : `${capitalize(name)} relied mainly on ${citations.join()}.`
       }
 
       lines.push({
         text,
-        isFirst,
+        isFirst: idx === 0,
       })
-    }
+    })
 
-    return lines.length > 0 ? lines : []
+    return lines
+  })()
+
+  // Card 4: Missing Opportunities — natural "when visibility dropped" framing.
+  // Each insight tells what was ABSENT when business didn't appear.
+  const missingSentences = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
+
+    // Show only meaningful gaps (failureRate >= 50% means it's truly absent)
+    const meaningful = mapping.missingOpportunities
+      .filter((m) => m.failureRate >= 50)
+      .slice(0, 3)
+
+    if (meaningful.length === 0) return []
+
+    meaningful.forEach((m, idx) => {
+      let phrase: string
+      if (m.category === 'content') {
+        phrase = contentInsightPhrase(m.signal as ContentSignalKey, isHebrew ? 'he' : 'en')
+      } else {
+        // Skip 'unknown' citation types entirely
+        if (m.signal === 'unknown') return
+        phrase = citationInsightPhrase(m.signal as CitationType, isHebrew ? 'he' : 'en')
+      }
+
+      const text = isHebrew
+        ? `כשהעסק לא קיבל חשיפה, ${phrase} הופיע פחות.`
+        : `When the business wasn't featured, ${phrase} appeared less often.`
+
+      lines.push({
+        text,
+        isFirst: lines.length === 0,
+      })
+    })
+
+    return lines
   })()
 
   return (
