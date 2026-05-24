@@ -1944,6 +1944,33 @@ function SmartQuestionCard({
     )[question.intent] ||
     question.intent
 
+  // Confidence tier display (replaces numeric score)
+  const confidenceTierLabel = (tier: string): string => {
+    switch (tier) {
+      case 'high': return t('confidence_high')
+      case 'good': return t('confidence_good')
+      case 'medium': return t('confidence_medium')
+      case 'opportunity': return t('confidence_opportunity')
+      case 'experimental': return t('confidence_experimental')
+      default: return tier
+    }
+  }
+
+  const confidenceTierColor = (tier: string): 'success' | 'info' | 'warning' | 'neutral' | 'danger' => {
+    switch (tier) {
+      case 'high': return 'success'
+      case 'good': return 'info'
+      case 'medium': return 'warning'
+      case 'opportunity': return 'warning'
+      case 'experimental': return 'neutral'
+      default: return 'neutral'
+    }
+  }
+
+  const chipLabel = (chip: string): string => {
+    return t(chip as any) || chip
+  }
+
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:shadow-sm transition">
       <div className="flex-1 min-w-0">
@@ -1952,10 +1979,31 @@ function SmartQuestionCard({
           <Badge variant={intentTone[question.intent] || 'neutral'} className="!text-[9px]">
             {label}
           </Badge>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">{question.qualityScore}%</span>
+          {'confidenceTier' in question && (
+            <Badge variant={confidenceTierColor(question.confidenceTier)} className="!text-[9px]">
+              {confidenceTierLabel(question.confidenceTier)}
+            </Badge>
+          )}
         </div>
+        {'valueReason' in question && question.valueReason && (
+          <p className="text-[12px] font-medium text-indigo-700 dark:text-indigo-300 mb-1.5">
+            {question.valueReason}
+          </p>
+        )}
+        {'chips' in question && question.chips && question.chips.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {question.chips.map((chip) => (
+              <span
+                key={chip}
+                className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+              >
+                {chipLabel(chip)}
+              </span>
+            ))}
+          </div>
+        )}
         {question.reason && (
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2" title={question.reason}>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1">
             {question.reason}
           </p>
         )}
