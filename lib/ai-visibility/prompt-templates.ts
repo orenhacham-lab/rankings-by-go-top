@@ -1939,11 +1939,155 @@ function normalizeHebrewConstructState(phrase: string): string {
 }
 
 /**
+ * Generate AI questions directly from tracked keywords.
+ *
+ * This layer expands the suggestion pool by transforming each keyword
+ * into multiple intent-based questions (recommendation, price, pre-purchase, local, review).
+ *
+ * Returns a flat list of {prompt, score} that can be merged with template-based suggestions.
+ */
+function generateKeywordBasedQuestions({
+  keywords,
+  businessName,
+  city,
+  language,
+  trackedPrompts,
+}: {
+  keywords: string[]
+  businessName: string | null
+  city: string | null
+  language: string
+  trackedPrompts: string[]
+}): Array<{ prompt: string; score: number }> {
+  const results: Array<{ prompt: string; score: number }> = []
+  const isHebrew = language === 'he'
+
+  // Normalization helper
+  const normalize = (text: string): string =>
+    text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+
+  // Index tracked prompts for dedup
+  const trackedSet = new Set(trackedPrompts.map(normalize))
+  const generatedSet = new Set<string>()
+
+  // Filter keywords: skip very short, brand-only, or non-service keywords
+  const relevantKeywords = keywords.filter((kw) => {
+    if (!kw || kw.length < 3) return false
+    const normalized = normalize(kw)
+    if (normalized.length < 4) return false
+    // Skip if keyword is exactly the business name
+    if (businessName && normalize(kw) === normalize(businessName)) return false
+    return true
+  })
+
+  // For each keyword, generate multiple intent-based questions
+  for (const kw of relevantKeywords) {
+    const kwNorm = normalize(kw)
+
+    // Skip if this keyword is part of an already-tracked prompt (avoid sub-phrase dupes)
+    if (Array.from(trackedSet).some((tracked) => tracked.includes(kwNorm))) {
+      continue
+    }
+
+    const templates: string[] = []
+
+    // 1. Recommendation intent
+    if (isHebrew) {
+      templates.push(`איזו חברה מומלצת ל${kw}?`)
+      templates.push(`מי מומלץ עבור ${kw}?`)
+      templates.push(`איזה מומחה מתאים ל${kw}?`)
+    } else {
+      templates.push(`Which company is recommended for ${kw}?`)
+      templates.push(`Who is recommended for ${kw}?`)
+      templates.push(`Which expert suits ${kw}?`)
+    }
+
+    // 2. Price intent
+    if (isHebrew) {
+      templates.push(`כמה עולה ${kw}?`)
+      templates.push(`מה המחיר של ${kw}?`)
+    } else {
+      templates.push(`How much does ${kw} cost?`)
+      templates.push(`What is the price of ${kw}?`)
+    }
+
+    // 3. Pre-purchase intent
+    if (isHebrew) {
+      templates.push(`איך לבחור ספק ל${kw}?`)
+      templates.push(`מה חשוב לבדוק לפני בחירת ${kw}?`)
+    } else {
+      templates.push(`How to choose a provider for ${kw}?`)
+      templates.push(`What to check before choosing ${kw}?`)
+    }
+
+    // 4. Local intent (if city provided)
+    if (city) {
+      if (isHebrew) {
+        templates.push(`איזה מומחה מומלץ ל${kw} ב${city}?`)
+        templates.push(`איך לבחור ${kw} בעיר שלי?`)
+      } else {
+        templates.push(`Which expert is recommended for ${kw} in ${city}?`)
+        templates.push(`How to find ${kw} in ${city}?`)
+      }
+    }
+
+    // 5. Comparison intent (add generic alternatives)
+    if (isHebrew) {
+      templates.push(`מה עדיף — ${kw} או חלופות אחרות?`)
+    } else {
+      templates.push(`What's better — ${kw} or alternatives?`)
+    }
+
+    // 6. Review intent
+    if (isHebrew) {
+      templates.push(`חוות דעת על שירותי ${kw}`)
+      templates.push(`איך לבדוק אם שירות ${kw} אמין?`)
+    } else {
+      templates.push(`Reviews of ${kw} services`)
+      templates.push(`How to verify ${kw} service reliability?`)
+    }
+
+    // Score and dedupe each template
+    for (const template of templates) {
+      const normalized = normalize(template)
+
+      // Skip if already in tracked prompts
+      if (trackedSet.has(normalized)) continue
+
+      // Skip if already generated in this batch
+      if (generatedSet.has(normalized)) continue
+
+      // Base score: keyword-length (longer keywords = more specific, higher value)
+      let score = 10 + Math.min(kw.length / 2, 10)
+
+      // Boost for intent specificity
+      if (template.toLowerCase().includes('מחיר') || template.toLowerCase().includes('עלות') ||
+          template.toLowerCase().includes('cost') || template.toLowerCase().includes('price')) {
+        score += 3
+      }
+      if (template.toLowerCase().includes('בחור') || template.toLowerCase().includes('choose') ||
+          template.toLowerCase().includes('select')) {
+        score += 2
+      }
+      if (city && (template.includes(city))) {
+        score += 5
+      }
+
+      results.push({ prompt: template, score })
+      generatedSet.add(normalized)
+    }
+  }
+
+  // Sort by score (descending), keeping high-value keywords first
+  return results.sort((a, b) => b.score - a.score)
+}
+
+/**
  * Generate smart AI query suggestions, business-context driven.
  *
  * With optional business profile: weights offerings (70% primary, 20% local, 10% secondary).
  * @param ctx Project context: business, domain, city, country, language
- * @param keywords Tracked keywords used ONLY as theme signals
+ * @param keywords Tracked keywords used for both theme signals AND direct question generation
  * @param profile Optional business profile with offering preferences
  * @param manualProfile User-saved manual override. When `mode='manual'`, its
  *   primaryCategory wins over auto-detection, its secondaryCategories augment
@@ -2294,10 +2438,43 @@ export function generatePromptSuggestions({
     }
   }
 
+  // Generate keyword-based questions to expand the candidate pool
+  // This creates 5-7 questions per keyword using intent templates
+  const keywordBasedResults = generateKeywordBasedQuestions({
+    keywords,
+    businessName: business,
+    city,
+    language: lang as 'he' | 'en',
+    trackedPrompts: excludePrompts,
+  })
+
+  // Convert keyword-based results to Built type format
+  const keywordBasedQuestions: Built[] = []
+  for (const result of keywordBasedResults) {
+    if (lang === 'he' && !isReadableHebrew(result.prompt)) continue
+    if (lang === 'he' && isInvalidHebrewPhrase(result.prompt)) continue
+    if (isBadQuestion(result.prompt, business)) continue
+    if (textMatchesAny(result.prompt, effectiveProfile.excludedTopics || [])) continue
+
+    keywordBasedQuestions.push({
+      def: {
+        intent: 'recommendation' as const,
+        text: result.prompt,
+        score: result.score,
+        offering: 'primary',
+      },
+      prompt: result.prompt,
+      score: result.score,
+      themeMatched: [],
+      offering: 'primary',
+    })
+  }
+
   // When product_brand has specific product terms, defensively strip any
   // generic-brand prompts (e.g., "Apple products", "מוצרי Apple", "Apple vs
   // Samsung") that may have leaked from secondary pipelines.
   let mergedPool: Built[] = [
+    ...keywordBasedQuestions,
     ...built,
     ...productBrandQuestions,
     ...secondaryCategoryQuestions,
