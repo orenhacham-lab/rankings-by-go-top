@@ -136,6 +136,7 @@ const STRINGS = {
   },
   refresh_suggestions: { he: 'רענן', en: 'Refresh' },
   rescan: { he: 'סריקה מחדש', en: 'Rescan' },
+  scan_this_engine: { he: 'סרוק במנוע הזה', en: 'Scan this engine' },
   query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
   language_label: { he: 'שפה', en: 'Language' },

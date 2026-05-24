@@ -376,6 +376,7 @@ export default function AIVisibilitySection({
       keywords: projectKeywords,
       manualProfile,
       shuffle: false,
+      limit: 20,
     })
     // Keep all generated suggestions in state so the "Show more" button can
     // expand beyond the initial 4 visible. Render-time slicing handles
@@ -643,6 +644,9 @@ export default function AIVisibilitySection({
     setRefreshingSuggestions(true)
     setShowAllSmartQuestions(false)
     try {
+      // Small delay so the loading state is perceivable even when generation
+      // is synchronous — avoids a flash that the user can't see.
+      await new Promise((resolve) => setTimeout(resolve, 200))
       const refreshed = generatePromptSuggestions({
         businessName: projectBrandName,
         domain: projectDomain,
@@ -652,6 +656,7 @@ export default function AIVisibilitySection({
         keywords: projectKeywords,
         manualProfile,
         shuffle: true,
+        limit: 20,
       })
       setSuggestedQuestions(refreshed)
     } catch (e) {
@@ -898,6 +903,7 @@ export default function AIVisibilitySection({
                 keywords: projectKeywords,
                 manualProfile: profile,
                 shuffle: false,
+                limit: 20,
               })
               setSuggestedQuestions(refreshed)
             }}
@@ -957,12 +963,22 @@ export default function AIVisibilitySection({
                             return dateStr
                           }
                         }
+                        const tooltip = scanning
+                          ? t('scanning')
+                          : scanned
+                          ? t('rescan')
+                          : t('scan_this_engine')
                         return (
-                          <div key={engine} className="inline-block">
+                          <div
+                            key={engine}
+                            className="inline-flex flex-col items-center min-w-0"
+                            title={tooltip}
+                          >
                             <button
                               onClick={() => !scanning && scanEngine(p.id, engine)}
                               disabled={scanning}
-                              title={scanned && !scanning ? t('rescan') : scanning ? t('scanning') : undefined}
+                              title={tooltip}
+                              aria-label={tooltip}
                               className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
                                 scanning
                                   ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'
@@ -984,8 +1000,8 @@ export default function AIVisibilitySection({
                               {scanned && <span className="relative z-10 text-emerald-600">✓</span>}
                             </button>
                             {scanned && scannedAt && (
-                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 text-center">
-                                {formatDate(scannedAt)}
+                              <div className="text-[10px] leading-tight text-slate-500 dark:text-slate-400 mt-0.5 text-center whitespace-nowrap">
+                                {t('scanned_at')}: {formatDate(scannedAt)}
                               </div>
                             )}
                           </div>
@@ -1013,81 +1029,93 @@ export default function AIVisibilitySection({
             </div>
           )}
 
-          {suggestedQuestions.length > 0 && (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
-                    {t('smart_questions_title')}
-                  </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    {t('smart_questions_subtitle')}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={refreshSuggestions}
-                  loading={refreshingSuggestions}
-                  disabled={refreshingSuggestions}
-                  className="shrink-0"
-                  title={t('refresh_suggestions')}
-                  aria-label={t('refresh_suggestions')}
-                >
-                  {t('refresh_suggestions')}
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {suggestedQuestions.slice(0, showAllSmartQuestions ? undefined : 4).map((q) => {
-                  const normalizeText = (text: string): string =>
-                    text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
-                  const normalizedSuggestion = normalizeText(q.prompt)
-                  const alreadyTracked = allPrompts.some((p) => normalizeText(p.prompt || '') === normalizedSuggestion)
-
-                  return (
-                    <SmartQuestionCard
-                      key={q.id}
-                      question={q}
-                      isAlreadyTracked={alreadyTracked}
-                      allPrompts={allPrompts}
-                      onAdd={async () => {
-                        try {
-                          const res = await fetch('/api/ai-visibility/prompts', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              projectId,
-                              prompt: q.prompt,
-                              country: projectCountry,
-                              language: projectLanguage,
-                              targetDomain: projectDomain,
-                              targetBrandName: projectBrandName,
-                            }),
-                          })
-                          if (!res.ok) throw new Error('Failed to add')
-                          loadAllResults()
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : 'Failed to add question')
-                        }
-                      }}
-                      t={t}
-                    />
-                  )
-                })}
-              </div>
-              {suggestedQuestions.length > 4 && !showAllSmartQuestions && (
-                <div className="text-center mt-4">
+          {(() => {
+            const normalizeText = (text: string): string =>
+              text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+            const trackedSet = new Set(allPrompts.map((p) => normalizeText(p.prompt || '')))
+            const availableSuggestions = suggestedQuestions.filter(
+              (q) => !trackedSet.has(normalizeText(q.prompt))
+            )
+            const showPanel = refreshingSuggestions || availableSuggestions.length > 0
+            if (!showPanel) return null
+            return (
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
+                      {t('smart_questions_title')}
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {t('smart_questions_subtitle')}
+                    </p>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowAllSmartQuestions(true)}
+                    onClick={refreshSuggestions}
+                    loading={refreshingSuggestions}
+                    disabled={refreshingSuggestions}
+                    className="shrink-0"
+                    title={t('refresh_suggestions')}
+                    aria-label={t('refresh_suggestions')}
                   >
-                    {t('show_more')}
+                    {t('refresh_suggestions')}
                   </Button>
                 </div>
-              )}
-            </div>
-          )}
+                {refreshingSuggestions ? (
+                  <div className="flex items-center justify-center gap-3 py-8 text-sm text-slate-600 dark:text-slate-300">
+                    <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    <span>{t('loading_suggestions')}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {availableSuggestions.slice(0, showAllSmartQuestions ? undefined : 4).map((q) => (
+                        <SmartQuestionCard
+                          key={q.id}
+                          question={q}
+                          isAlreadyTracked={false}
+                          allPrompts={allPrompts}
+                          onAdd={async () => {
+                            try {
+                              const res = await fetch('/api/ai-visibility/prompts', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  projectId,
+                                  prompt: q.prompt,
+                                  country: projectCountry,
+                                  language: projectLanguage,
+                                  targetDomain: projectDomain,
+                                  targetBrandName: projectBrandName,
+                                }),
+                              })
+                              if (!res.ok) throw new Error('Failed to add')
+                              loadAllResults()
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : 'Failed to add question')
+                            }
+                          }}
+                          t={t}
+                        />
+                      ))}
+                    </div>
+                    {availableSuggestions.length > 4 && !showAllSmartQuestions && (
+                      <div className="text-center mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAllSmartQuestions(true)}
+                        >
+                          {t('show_more')}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          })()}
         </>
       )}
 
