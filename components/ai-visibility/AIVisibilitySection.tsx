@@ -2496,17 +2496,19 @@ function GeoCompetitorIntelligenceSection({
 
     // Whitelist of business-readable citation types. Anything else is
     // dropped before aggregation — including 'unknown'.
+    // Labels are phrased in plain language; internal taxonomy terms like
+    // 'brand_site' / 'homepage' are never surfaced.
     const CONTENT_TYPE_LABELS: Record<string, { he: string; en: string }> = {
       review: { he: 'ביקורות', en: 'reviews' },
-      marketplace: { he: 'דפי שווקים', en: 'marketplace pages' },
-      comparison: { he: 'דפי השוואה', en: 'comparison pages' },
-      category: { he: 'דפי קטגוריה', en: 'category pages' },
-      product: { he: 'דפי מוצר', en: 'product pages' },
+      marketplace: { he: 'שווקים מקוונים', en: 'online marketplaces' },
+      comparison: { he: 'עמודי השוואה', en: 'comparison pages' },
+      category: { he: 'עמודי קטגוריות מוצרים', en: 'product category pages' },
+      product: { he: 'עמודי מוצר', en: 'product pages' },
       forum: { he: 'דיוני פורומים', en: 'forum discussions' },
       blog: { he: 'בלוגים וכתבות', en: 'blogs and articles' },
-      brand_site: { he: 'אתרי מותג', en: 'brand sites' },
-      homepage: { he: 'דפי בית', en: 'homepages' },
-      directory: { he: 'ספריות עסקיות', en: 'business directories' },
+      brand_site: { he: 'אתרים רשמיים של עסקים', en: 'official business websites' },
+      homepage: { he: 'עמודים כלליים של עסקים', en: 'business homepages' },
+      directory: { he: 'מדריכי עסקים', en: 'business directories' },
     }
 
     // Collect citation types from trusted domains, skipping unmapped/unknown

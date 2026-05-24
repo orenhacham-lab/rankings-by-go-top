@@ -593,9 +593,10 @@ const STRINGS = {
   geo_opp_signal_recommendation: { he: 'המלצות', en: 'recommendations' },
   geo_opp_signal_local: { he: 'מידע מקומי', en: 'local information' },
 
-  // Citation type short labels
-  geo_opp_cite_homepage: { he: 'דפי בית', en: 'homepages' },
-  geo_opp_cite_category: { he: 'עמודי קטגוריה', en: 'category pages' },
+  // Citation type short labels — phrased in plain business language
+  // (no internal taxonomy terms surfaced to users).
+  geo_opp_cite_homepage: { he: 'עמודים כלליים של עסקים', en: 'business homepages' },
+  geo_opp_cite_category: { he: 'עמודי קטגוריות מוצרים', en: 'product category pages' },
   geo_opp_cite_product: { he: 'עמודי מוצר', en: 'product pages' },
   geo_opp_cite_comparison: { he: 'עמודי השוואה', en: 'comparison pages' },
   geo_opp_cite_review: { he: 'אתרי ביקורות', en: 'review sites' },
@@ -603,7 +604,7 @@ const STRINGS = {
   geo_opp_cite_marketplace: { he: 'שווקים מקוונים', en: 'marketplaces' },
   geo_opp_cite_forum: { he: 'פורומים', en: 'forums' },
   geo_opp_cite_directory: { he: 'מדריכי עסקים', en: 'directories' },
-  geo_opp_cite_brand_site: { he: 'אתרי מותג', en: 'brand websites' },
+  geo_opp_cite_brand_site: { he: 'אתרים רשמיים של עסקים', en: 'official business websites' },
 
   // Query intents
   geo_intent_transactional: { he: 'מסחרי', en: 'Transactional' },
@@ -613,17 +614,17 @@ const STRINGS = {
   geo_intent_local: { he: 'מקומי', en: 'Local' },
   geo_intent_navigational: { he: 'ניווט', en: 'Navigational' },
 
-  // Citation types
-  geo_citation_homepage: { he: 'דף בית', en: 'Homepage' },
-  geo_citation_category: { he: 'קטגוריה', en: 'Category' },
-  geo_citation_product: { he: 'מוצר', en: 'Product' },
-  geo_citation_comparison: { he: 'השוואה', en: 'Comparison' },
-  geo_citation_review: { he: 'ביקורת', en: 'Review' },
-  geo_citation_blog: { he: 'בלוג', en: 'Blog' },
+  // Citation types — plain business language (no internal taxonomy)
+  geo_citation_homepage: { he: 'עמוד כללי של עסק', en: 'Business homepage' },
+  geo_citation_category: { he: 'עמוד קטגוריות מוצרים', en: 'Product category page' },
+  geo_citation_product: { he: 'עמוד מוצר', en: 'Product page' },
+  geo_citation_comparison: { he: 'עמוד השוואה', en: 'Comparison page' },
+  geo_citation_review: { he: 'אתר ביקורות', en: 'Review site' },
+  geo_citation_blog: { he: 'בלוג / מאמר', en: 'Blog / Article' },
   geo_citation_marketplace: { he: 'שוק מקוון', en: 'Marketplace' },
   geo_citation_forum: { he: 'פורום', en: 'Forum' },
-  geo_citation_directory: { he: 'מדריך עסקים', en: 'Directory' },
-  geo_citation_brand_site: { he: 'אתר המותג', en: 'Brand site' },
+  geo_citation_directory: { he: 'מדריך עסקים', en: 'Business directory' },
+  geo_citation_brand_site: { he: 'אתר רשמי של עסק', en: 'Official business website' },
   geo_citation_unknown: { he: 'לא מסווג', en: 'Unknown' },
 
   // Content signals
