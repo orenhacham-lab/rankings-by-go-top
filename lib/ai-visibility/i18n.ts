@@ -517,35 +517,39 @@ const STRINGS = {
   geo_opp_no_data_engines: { he: 'ככל שיצטברו סריקות, דפוסים ייחודיים למנועים יופיעו כאן.', en: 'As scans accumulate, unique engine patterns will emerge here.' },
   geo_opp_no_data_missing: { he: 'פערים יתגלו ככל שיצטברו יותר תוצאות כושלות.', en: 'Gaps will become clear as more unsuccessful results accumulate.' },
 
-  // GEO Competitor Intelligence (Phase 2C — AI visibility market intelligence)
-  geo_comp_title: { he: 'תובנות תחרות ב-AI', en: 'AI Market Intelligence' },
+  // GEO Competitor Intelligence (Phase 2C/2D — sources + business mentions)
+  geo_comp_title: { he: 'מקורות ומתחרים בתשובות AI', en: 'Sources & competitors in AI answers' },
   geo_comp_subtitle: {
-    he: 'מבט על המקורות והמתחרים שדומיננטיים בתשובות מנועי AI',
-    en: 'An overview of the sources and competitors dominating AI engine answers',
+    he: 'מבט על האתרים, סוגי התוכן והעסקים שמופיעים בתשובות מנועי AI',
+    en: 'An overview of the sites, content types, and businesses appearing in AI answers',
   },
-  geo_comp_card_sources: { he: 'האתרים שחוזרים בתשובות AI', en: 'Websites that keep appearing' },
+  geo_comp_card_sources: { he: 'אתרים שחוזרים בתשובות AI', en: 'Websites that keep appearing' },
   geo_comp_card_content: { he: 'איזה תוכן מופיע יותר בתשובות AI', en: 'What content appears most in AI answers' },
   geo_comp_card_engines: { he: 'אילו מקורות בולטים בכל מנוע', en: 'Which sources stand out in each engine' },
-  geo_comp_card_loss: { he: 'מי מופיע כשהעסק לא מופיע', en: 'Who appears when your business doesn\'t' },
+  geo_comp_card_loss: { he: 'מתחרים שהופיעו כשהעסק לא הופיע', en: 'Competitors mentioned when your business wasn\'t' },
   geo_comp_pills_label: {
     he: 'דוגמאות לאתרים שחזרו בתוצאות:',
     en: 'Examples of recurring sites:',
+  },
+  geo_comp_pills_label_competitors: {
+    he: 'מתחרים שזוהו בתשובות:',
+    en: 'Competitors detected in answers:',
   },
   geo_comp_no_data_sources: {
     he: 'אין עדיין מספיק סריקות כדי לזהות אתרים שחוזרים על עצמם.',
     en: 'Not enough scans yet to identify recurring sites.',
   },
   geo_comp_no_data_content: {
-    he: 'עוד אין מספיק נתונים כדי לזהות סוגי תוכן בולטים.',
-    en: 'Not enough data yet to identify dominant content types.',
+    he: 'עדיין אין מספיק נתונים כדי לזהות אילו סוגי תוכן בולטים יותר בתשובות AI.',
+    en: 'Not enough data yet to identify which content types stand out.',
   },
   geo_comp_no_data_engines: {
     he: 'יידרשו עוד סריקות במגוון מנועים כדי לזהות העדפות.',
     en: 'More scans across engines needed to identify preferences.',
   },
   geo_comp_no_data_loss: {
-    he: 'כשיהיו תוצאות שבהן העסק לא הופיע, נראה כאן מה תפס את המקום.',
-    en: 'When the business is missing from results, what replaced it will appear here.',
+    he: 'לא זוהו מתחרים שהוגדרו מראש בתשובות שבהן העסק לא הופיע. הגדירו רשימת מתחרים או הריצו עוד סריקות.',
+    en: 'No listed competitors were detected when the business was absent. Define competitors or run more scans.',
   },
 
   // Category language (varied, not "ecosystem"-heavy)

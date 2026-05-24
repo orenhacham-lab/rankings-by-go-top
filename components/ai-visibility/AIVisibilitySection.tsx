@@ -54,6 +54,7 @@ import type {
   GeoCompetitorIntelligence,
   CompetitorCategory,
 } from '@/lib/ai-visibility/geo-competitor-intelligence'
+import type { BusinessMentionIntelligence } from '@/lib/ai-visibility/geo-business-mentions'
 
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
@@ -165,6 +166,7 @@ export default function AIVisibilitySection({
   const [engineMetrics, setEngineMetrics] = useState<Map<string, EngineMetrics>>(new Map())
   const [geoOpportunityMapping, setGeoOpportunityMapping] = useState<GeoOpportunityMapping | null>(null)
   const [geoCompetitorIntelligence, setGeoCompetitorIntelligence] = useState<GeoCompetitorIntelligence | null>(null)
+  const [businessMentionIntelligence, setBusinessMentionIntelligence] = useState<BusinessMentionIntelligence | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAllResults, setShowAllResults] = useState(false)
   const [seenPrompts, setSeenPrompts] = useState<Set<string>>(new Set())
@@ -237,6 +239,14 @@ export default function AIVisibilitySection({
       setGeoCompetitorIntelligence(
         runsData.geoCompetitorIntelligence
           ? (runsData.geoCompetitorIntelligence as GeoCompetitorIntelligence)
+          : null
+      )
+
+      // Business Mention Intelligence — server-computed, deterministic
+      // competitor mentions in response text (vs. source citations).
+      setBusinessMentionIntelligence(
+        runsData.businessMentionIntelligence
+          ? (runsData.businessMentionIntelligence as BusinessMentionIntelligence)
           : null
       )
 
@@ -791,9 +801,10 @@ export default function AIVisibilitySection({
             t={t}
           />
 
-          {/* GEO COMPETITOR INTELLIGENCE (Phase 2C) — AI search market intelligence */}
+          {/* GEO COMPETITOR INTELLIGENCE (Phase 2C+2D) — sources + business mentions */}
           <GeoCompetitorIntelligenceSection
             intelligence={geoCompetitorIntelligence}
+            businessMentions={businessMentionIntelligence}
             isHebrew={isHebrew}
             t={t}
           />
@@ -2141,11 +2152,12 @@ function GeoOpportunityMappingSection({
     return lines.length > 0 ? lines : []
   })()
 
-  // Citations: first is data-driven, rest are qualitative
+  // Citations: first is data-driven, rest are qualitative.
+  // Drop 'unknown' entries — never expose debug labels to users.
   const citationSentences = (() => {
     const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
 
-    const all = mapping.citationTypes.slice(0, 3)
+    const all = mapping.citationTypes.filter((c) => c.type !== 'unknown').slice(0, 3)
 
     // First: data-driven with percentages
     if (all.length > 0) {
@@ -2187,7 +2199,7 @@ function GeoOpportunityMappingSection({
       }
     }
     const signals = e.topSignals.slice(0, 2).map(signalShortLabel)
-    const citations = e.topCitationTypes.slice(0, 1).map(citationShortLabel)
+    const citations = e.topCitationTypes.filter((c) => c !== 'unknown').slice(0, 1).map(citationShortLabel)
 
     let preference = ''
     if (signals.length > 0 && citations.length > 0) {
@@ -2385,10 +2397,12 @@ function capitalize(s: string): string {
  */
 function GeoCompetitorIntelligenceSection({
   intelligence,
+  businessMentions,
   isHebrew,
   t,
 }: {
   intelligence: GeoCompetitorIntelligence | null
+  businessMentions: BusinessMentionIntelligence | null
   isHebrew: boolean
   t: T
 }) {
@@ -2397,11 +2411,13 @@ function GeoCompetitorIntelligenceSection({
   const hasAnyData =
     intelligence.trustedDomains.length > 0 ||
     intelligence.enginePreferences.length > 0 ||
-    intelligence.visibilityLossPatterns.dominantDomains.length > 0
+    intelligence.visibilityLossPatterns.dominantDomains.length > 0 ||
+    (businessMentions?.mentionedBusinesses.length ?? 0) > 0
 
   if (!hasAnyData) return null
 
-  const categoryLabel = (cat: CompetitorCategory): string => {
+  // Never expose 'unknown' to users. Returns null to signal "skip this".
+  const categoryLabel = (cat: CompetitorCategory): string | null => {
     switch (cat) {
       case 'review': return t('geo_comp_cat_review')
       case 'marketplace': return t('geo_comp_cat_marketplace')
@@ -2409,7 +2425,7 @@ function GeoCompetitorIntelligenceSection({
       case 'brand': return t('geo_comp_cat_brand')
       case 'editorial': return t('geo_comp_cat_editorial')
       case 'directory': return t('geo_comp_cat_directory')
-      default: return t('geo_comp_cat_unknown')
+      default: return null // 'unknown' or any other → hide entirely
     }
   }
 
@@ -2473,14 +2489,31 @@ function GeoCompetitorIntelligenceSection({
   // ─────────────────────────────────────────────────────────────────────
   // Card 2: Content types — what kind of content AI engines pick.
   // No domain names here. Sharp, specific sentences.
+  // Filters out 'unknown' / unmapped citation types — never shown to users.
   // ─────────────────────────────────────────────────────────────────────
   const contentStructureCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-    // Collect citation types from trusted domains to understand structure
+    // Whitelist of business-readable citation types. Anything else is
+    // dropped before aggregation — including 'unknown'.
+    const CONTENT_TYPE_LABELS: Record<string, { he: string; en: string }> = {
+      review: { he: 'ביקורות', en: 'reviews' },
+      marketplace: { he: 'דפי שווקים', en: 'marketplace pages' },
+      comparison: { he: 'דפי השוואה', en: 'comparison pages' },
+      category: { he: 'דפי קטגוריה', en: 'category pages' },
+      product: { he: 'דפי מוצר', en: 'product pages' },
+      forum: { he: 'דיוני פורומים', en: 'forum discussions' },
+      blog: { he: 'בלוגים וכתבות', en: 'blogs and articles' },
+      brand_site: { he: 'אתרי מותג', en: 'brand sites' },
+      homepage: { he: 'דפי בית', en: 'homepages' },
+      directory: { he: 'ספריות עסקיות', en: 'business directories' },
+    }
+
+    // Collect citation types from trusted domains, skipping unmapped/unknown
     const typeFreq = new Map<string, number>()
     for (const d of intelligence.trustedDomains) {
       for (const t of d.citationTypes) {
+        if (!CONTENT_TYPE_LABELS[t]) continue // filter 'unknown' and anything else
         typeFreq.set(t, (typeFreq.get(t) || 0) + 1)
       }
     }
@@ -2491,21 +2524,8 @@ function GeoCompetitorIntelligenceSection({
 
     if (topTypes.length === 0) return { lines, pills: [] }
 
-    const describeType = (type: string): string => {
-      const labels: Record<string, { he: string; en: string }> = {
-        review: { he: 'ביקורות', en: 'reviews' },
-        marketplace: { he: 'דפי שווקים', en: 'marketplace pages' },
-        comparison: { he: 'דפי השוואה', en: 'comparison pages' },
-        category: { he: 'דפי קטגוריה', en: 'category pages' },
-        product: { he: 'דפי מוצר', en: 'product pages' },
-        forum: { he: 'דיוני פורומים', en: 'forum discussions' },
-        blog: { he: 'בלוגים וכתבות', en: 'blogs and articles' },
-        brand_site: { he: 'אתרי מותג', en: 'brand sites' },
-        homepage: { he: 'דפי בית', en: 'homepages' },
-        directory: { he: 'ספריות עסקיות', en: 'business directories' },
-      }
-      return labels[type]?.[isHebrew ? 'he' : 'en'] || type
-    }
+    const describeType = (type: string): string =>
+      CONTENT_TYPE_LABELS[type][isHebrew ? 'he' : 'en']
 
     const first = describeType(topTypes[0])
     lines.push({
@@ -2562,11 +2582,13 @@ function GeoCompetitorIntelligenceSection({
       if (ep.topCompetitors.length === 0) continue
 
       // Aggregate categories across this engine's top competitors. Use
-      // trustedDomains as the lookup source. Pick the 1–2 most common.
+      // trustedDomains as the lookup source. Skip 'unknown' categories
+      // (categoryLabel returns null) so we never surface debug values.
       const catCount = new Map<CompetitorCategory, number>()
       for (const tc of ep.topCompetitors) {
         const td = intelligence.trustedDomains.find((d) => d.domain === tc.domain)
         if (!td) continue
+        if (categoryLabel(td.category) === null) continue // hide 'unknown'
         catCount.set(td.category, (catCount.get(td.category) || 0) + 1)
       }
 
@@ -2579,10 +2601,12 @@ function GeoCompetitorIntelligenceSection({
       if (sortedCats.length === 0) continue
 
       const cat1 = categoryLabel(sortedCats[0])
-      const text =
-        sortedCats.length >= 2
-          ? templates.two(name, cat1, categoryLabel(sortedCats[1]))
-          : templates.one(name, cat1)
+      const cat2 = sortedCats.length >= 2 ? categoryLabel(sortedCats[1]) : null
+      if (!cat1) continue // double-safety
+
+      const text = cat2
+        ? templates.two(name, cat1, cat2)
+        : templates.one(name, cat1)
 
       lines.push({ text, isFirst: !firstLineSet })
       firstLineSet = true
@@ -2592,68 +2616,59 @@ function GeoCompetitorIntelligenceSection({
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 4: Visibility loss — sharp, specific. Lead with the dominant
-  // domain that took the spot when relevant; otherwise lead with category.
+  // Card 4: Business mentions only — competitors detected in response text.
+  // NO citation domains here. If no business mentions, show a clear fallback
+  // (never fall back to domain pills, which would mix sources with
+  // competitors).
   // ─────────────────────────────────────────────────────────────────────
   const visibilityLossCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
-    const loss = intelligence.visibilityLossPatterns
+    const mentioned = businessMentions?.mentionedBusinesses ?? []
 
-    if (loss.dominantCategories.length === 0 && loss.dominantDomains.length === 0) {
+    if (mentioned.length === 0) {
       return { lines, pills: [] }
     }
 
-    // Lead: name the dominant replacement domain when available.
-    if (loss.dominantDomains.length > 0) {
-      const topDomain = loss.dominantDomains[0]
+    // Lead: name the most-mentioned competitor by name.
+    const top = mentioned[0]
+    if (top.engines.length >= 2) {
       lines.push({
         text: isHebrew
-          ? `${topDomain} הוא האתר שמופיע הכי הרבה בתשובות שבהן העסק נעדר.`
-          : `${topDomain} is the website appearing most often when the business is absent.`,
+          ? `${top.name} הוזכר ב-${top.mentionCount} תשובות, על פני ${top.engines.length} מנועי AI.`
+          : `${top.name} was mentioned in ${top.mentionCount} answers across ${top.engines.length} AI engines.`,
         isFirst: true,
       })
-    } else if (loss.dominantCategories.length > 0) {
-      const topLossCat = categoryLabel(loss.dominantCategories[0])
+    } else {
       lines.push({
         text: isHebrew
-          ? `${topLossCat} תופסים את המקום של העסק בתשובות.`
-          : `${capitalize(topLossCat)} are taking the business's spot in AI answers.`,
+          ? `${top.name} הוזכר ב-${top.mentionCount} תשובות בתוכן של מנועי AI.`
+          : `${top.name} was mentioned in ${top.mentionCount} AI answers.`,
         isFirst: true,
       })
     }
 
-    // Secondary: dominant category context if we led with a domain.
-    if (loss.dominantDomains.length > 0 && loss.dominantCategories.length > 0) {
-      const topLossCat = categoryLabel(loss.dominantCategories[0])
+    // Secondary: second competitor by name.
+    if (mentioned[1]) {
+      const second = mentioned[1]
       lines.push({
         text: isHebrew
-          ? `רוב התחליפים הם ${topLossCat}.`
-          : `Most replacements are ${topLossCat}.`,
+          ? `${second.name} גם הוא הוזכר במספר תשובות שונות.`
+          : `${second.name} was also mentioned in multiple answers.`,
         isFirst: false,
       })
     }
 
-    // Tertiary: concrete content-type insight.
-    if (loss.frequentCitationTypes.length > 0) {
-      const topLossType = loss.frequentCitationTypes[0].type
-      const typeDescriptions: Record<string, { he: string; en: string }> = {
-        review: { he: 'ביקורות צרכנים תופסות את המקום בתדירות גבוהה', en: 'consumer reviews fill the gap frequently' },
-        comparison: { he: 'דפי השוואה נכנסים במקום העסק בתשובות', en: 'comparison pages step in instead' },
-        marketplace: { he: 'דפי שווקים תופסים את המקום ברוב המקרים', en: 'marketplace pages take the spot most often' },
-        forum: { he: 'דיוני פורומים תופסים את המקום של העסק', en: 'forum discussions fill the gap' },
-        blog: { he: 'בלוגים וכתבות מערכתיות מחליפים את העסק', en: 'blogs and editorial articles replace the business' },
-        brand_site: { he: 'אתרי מותגים מתחרים נכנסים במקום העסק', en: 'competing brand sites step into the business\'s place' },
-      }
-      const desc = typeDescriptions[topLossType]
-      if (desc) {
-        lines.push({
-          text: desc[isHebrew ? 'he' : 'en'] + '.',
-          isFirst: false,
-        })
-      }
+    // Tertiary: total competitors detected
+    if (mentioned.length >= 3) {
+      lines.push({
+        text: isHebrew
+          ? `סך הכל ${mentioned.length} מתחרים מהרשימה הוזכרו בתשובות.`
+          : `In total, ${mentioned.length} listed competitors were mentioned in answers.`,
+        isFirst: false,
+      })
     }
 
-    const pills = loss.dominantDomains.slice(0, 3)
+    const pills = mentioned.slice(0, 3).map((b) => b.name)
     return { lines, pills }
   })()
 
@@ -2702,7 +2717,7 @@ function GeoCompetitorIntelligenceSection({
           icon={<TrendingDown className="w-5 h-5" />}
           lines={visibilityLossCard.lines}
           pills={visibilityLossCard.pills}
-          pillsLabel={t('geo_comp_pills_label')}
+          pillsLabel={t('geo_comp_pills_label_competitors')}
           emptyText={t('geo_comp_no_data_loss')}
         />
       </div>
@@ -3005,10 +3020,10 @@ function GeoInsightsCollapsible({
           </div>
         )}
 
-        {data.citationTypes.length > 0 && (
+        {data.citationTypes.filter((c) => c !== 'unknown').length > 0 && (
           <GeoChipRow
             label={t('geo_citation_types')}
-            chips={data.citationTypes.map((c) => citationLabel(c))}
+            chips={data.citationTypes.filter((c) => c !== 'unknown').map((c) => citationLabel(c))}
             tone="slate"
           />
         )}
