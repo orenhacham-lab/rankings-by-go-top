@@ -1922,6 +1922,131 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// Intent-bearing words that should be stripped from raw keywords before
+// they are injected into question templates. Keywords like "הליכון ביתי מומלץ"
+// or "מחיר הליכון" need to be cleaned to "הליכון ביתי" / "הליכון" so the
+// resulting question is natural ("כמה עולה הליכון?" not "כמה עולה מחיר הליכון?").
+const HE_KEYWORD_INTENT_WORDS = new Set([
+  'מומלץ', 'מומלצת', 'מומלצה', 'מומלצים', 'מומלצות',
+  'במבצע', 'מבצע', 'מבצעים', 'הנחה', 'בהנחה', 'הנחות',
+  'מחיר', 'מחירים', 'מחירון', 'עלות', 'עלויות', 'מחירי',
+  'זול', 'זולה', 'זולים', 'בזול', 'יקר', 'יקרה', 'יקרים',
+  'לקנייה', 'קנייה', 'לרכישה', 'רכישה', 'לקנות', 'לרכוש', 'לקניית',
+  'הטוב', 'הטובה', 'הטובים', 'הטובות', 'ביותר',
+  'ביקורת', 'ביקורות', 'דירוג', 'דירוגים',
+  'השוואה', 'השוואת', 'מול',
+])
+
+const HE_KEYWORD_INTENT_PHRASES = [
+  'חוות דעת',
+  'הכי טוב',
+  'הכי טובה',
+  'הכי טובים',
+  'הטוב ביותר',
+  'הטובה ביותר',
+]
+
+const EN_KEYWORD_INTENT_WORDS = new Set([
+  'recommended', 'best', 'top', 'cheap', 'cheapest', 'price', 'pricing',
+  'cost', 'costs', 'discount', 'discounted', 'reviews', 'review', 'rating',
+  'ratings', 'comparison', 'vs', 'versus',
+])
+
+const EN_KEYWORD_INTENT_PHRASES = ['on sale', 'for sale', 'best price']
+
+/**
+ * Clean a raw keyword for safe injection into question templates. Strips
+ * intent-bearing words/phrases that would either duplicate the template's own
+ * intent ("מחיר" inside "כמה עולה ${kw}") or produce awkward phrasing
+ * ("מומלץ" inside "איזה מומחה מומלץ ל${kw}").
+ *
+ * Returns empty string if nothing meaningful remains (caller should skip).
+ */
+function cleanKeywordForQuestion(keyword: string, lang: 'he' | 'en'): string {
+  if (!keyword) return ''
+  let cleaned = keyword.trim()
+
+  const phrases = lang === 'he' ? HE_KEYWORD_INTENT_PHRASES : EN_KEYWORD_INTENT_PHRASES
+  for (const phrase of phrases) {
+    cleaned = cleaned.replace(new RegExp(escapeRegex(phrase), 'gi'), ' ')
+  }
+
+  const stopSet = lang === 'he' ? HE_KEYWORD_INTENT_WORDS : EN_KEYWORD_INTENT_WORDS
+  const words = cleaned.split(/\s+/).filter((w) => {
+    if (!w) return false
+    const wl = lang === 'he' ? w : w.toLowerCase()
+    return !stopSet.has(wl)
+  })
+
+  return words.join(' ').replace(/\s+/g, ' ').trim()
+}
+
+const GIFT_CATEGORIES: BusinessCategory[] = ['gifts', 'florist', 'perfume']
+
+/**
+ * Detect awkward / unnatural questions that survive isBadQuestion. Catches
+ * keyword-stuffing artifacts, doubled intents (the keyword already mentioned
+ * "מחיר" and the template added "כמה עולה"), and category mismatches
+ * (a "מתנה" template firing for a fitness store).
+ *
+ * Run alongside isBadQuestion in every pipeline that produces candidate
+ * prompts. Returns true → reject.
+ */
+function isAwkwardQuestion(
+  question: string,
+  category: BusinessCategory,
+  lang: 'he' | 'en'
+): boolean {
+  const q = question.trim()
+  if (!q) return true
+
+  if (lang === 'he') {
+    // Doubled intent words (template added one + keyword carried another).
+    if (/מומלץ[\s\S]*מומלץ|מומלצת[\s\S]*מומלצת|מומלצים[\s\S]*מומלצים/.test(q)) return true
+    if (/מתאים[\s\S]*מתאים|מתאימה[\s\S]*מתאימה/.test(q)) return true
+    if (/(כמה\s+עולה[\s\S]*\bמחיר\b|\bמחיר\b[\s\S]*כמה\s+עולה|המחיר\s+של[\s\S]*\bמחיר\b)/.test(q))
+      return true
+    if (/חוות\s+דעת[\s\S]*חוות\s+דעת/.test(q)) return true
+    if (/השוואה[\s\S]*השוואה|השוואת[\s\S]*השוואת/.test(q)) return true
+    if (/\bזול\b[\s\S]*\bזול\b|\bבמבצע\b[\s\S]*\bבמבצע\b/.test(q)) return true
+
+    // Gift template firing for a non-gift business.
+    if (/\b(?:מתנה|מתנות|כמתנה|למתנה)\b/.test(q) && !GIFT_CATEGORIES.includes(category))
+      return true
+
+    // Bad slicing artifacts. "הליכון יד" comes from a keyword like
+    // "משקולות יד" leaking the "יד" suffix into a הליכון question.
+    if (/הליכון\s+יד\b/.test(q)) return true
+    if (/אופניים\s+יד\b/.test(q)) return true
+
+    // Too many stacked modifiers — feels like keyword stuffing.
+    const stackedModifiers = [
+      'מומלץ', 'מומלצת', 'איכותי', 'איכותית', 'הכי\\s+טוב', 'מתקפל', 'ביתי',
+      'במבצע', 'זול', 'מקצועי',
+    ]
+    const modifierCount = stackedModifiers.filter((m) => new RegExp(m).test(q)).length
+    if (modifierCount >= 3) return true
+  } else {
+    if (/\brecommended\b[\s\S]*\brecommended\b/i.test(q)) return true
+    if (/\bbest\b[\s\S]*\bbest\b/i.test(q)) return true
+    if (/(how\s+much[\s\S]*\bprice\b|\bprice\b[\s\S]*how\s+much)/i.test(q)) return true
+    if (/\breviews?\s+of\b[\s\S]*\breviews?\s+of\b/i.test(q)) return true
+    if (/\bcheap\b[\s\S]*\bcheap\b|\bon\s+sale\b[\s\S]*\bon\s+sale\b/i.test(q)) return true
+
+    if (/\bgifts?\b|\bpresents?\b/i.test(q) && !GIFT_CATEGORIES.includes(category)) return true
+
+    const stackedModifiers = [
+      'recommended', 'best', 'top', 'cheap', 'quality', 'foldable', 'home',
+      'on sale', 'discounted',
+    ]
+    const modifierCount = stackedModifiers.filter((m) => new RegExp(`\\b${m}\\b`, 'i').test(q))
+      .length
+    if (modifierCount >= 3) return true
+  }
+
+  return false
+}
+
 /**
  * Normalize common Hebrew construct-state mistakes.
  */
@@ -1981,7 +2106,11 @@ function generateKeywordBasedQuestions({
   })
 
   // For each keyword, generate multiple intent-based questions
-  for (const kw of relevantKeywords) {
+  for (const rawKw of relevantKeywords) {
+    // Strip intent words from the keyword BEFORE substituting into templates.
+    // Prevents "כמה עולה מחיר הליכון?" and "איזה מומחה מומלץ להליכון מומלץ?".
+    const kw = cleanKeywordForQuestion(rawKw, isHebrew ? 'he' : 'en')
+    if (!kw || kw.length < 3) continue
     const kwNorm = normalize(kw)
 
     // Skip if this keyword is part of an already-tracked prompt (avoid sub-phrase dupes)
@@ -2038,13 +2167,15 @@ function generateKeywordBasedQuestions({
       templates.push(`What's better — ${kw} or alternatives?`)
     }
 
-    // 6. Review intent
+    // 6. Review intent — drop "שירותי / services" prefix because it reads
+    // awkwardly for product keywords ("חוות דעת על שירותי הליכון"). Plain
+    // "חוות דעת על ${kw}" works for both products and services.
     if (isHebrew) {
-      templates.push(`חוות דעת על שירותי ${kw}`)
-      templates.push(`איך לבדוק אם שירות ${kw} אמין?`)
+      templates.push(`חוות דעת על ${kw}`)
+      templates.push(`מה אומרים על ${kw}?`)
     } else {
-      templates.push(`Reviews of ${kw} services`)
-      templates.push(`How to verify ${kw} service reliability?`)
+      templates.push(`Reviews of ${kw}`)
+      templates.push(`What do people say about ${kw}?`)
     }
 
     // Score and dedupe each template
@@ -2272,6 +2403,12 @@ export function generatePromptSuggestions({
       }
       continue
     }
+    if (isAwkwardQuestion(filled, category, lang as 'he' | 'en')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AI-Questions] REJECTED awkward (primary):', filled)
+      }
+      continue
+    }
 
     // Excluded-topic filter: drop any question that hits an excluded theme
     if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
@@ -2364,6 +2501,7 @@ export function generatePromptSuggestions({
           }
           continue
         }
+        if (isAwkwardQuestion(filled, category, lang as 'he' | 'en')) continue
 
         if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
         if (excludeSet.has(normalizePromptForCompare(filled))) continue
@@ -2404,6 +2542,7 @@ export function generatePromptSuggestions({
       const filled = pair.text.trim()
       if (lang === 'he' && !isReadableHebrew(filled)) continue
       if (isBadQuestion(filled, business)) continue
+      if (isAwkwardQuestion(filled, category, lang as 'he' | 'en')) continue
       if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
       brandComparisonQuestions.push({
         def: { intent: pair.intent, text: pair.text, score: pair.score, offering: 'primary' },
@@ -2426,6 +2565,7 @@ export function generatePromptSuggestions({
       if (lang === 'he' && !isReadableHebrew(filled)) continue
       if (lang === 'he' && isInvalidHebrewPhrase(filled)) continue
       if (isBadQuestion(filled, business)) continue
+      if (isAwkwardQuestion(filled, category, lang as 'he' | 'en')) continue
       if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
       if (excludeSet.has(normalizePromptForCompare(filled))) continue
       productBrandQuestions.push({
@@ -2454,6 +2594,7 @@ export function generatePromptSuggestions({
     if (lang === 'he' && !isReadableHebrew(result.prompt)) continue
     if (lang === 'he' && isInvalidHebrewPhrase(result.prompt)) continue
     if (isBadQuestion(result.prompt, business)) continue
+    if (isAwkwardQuestion(result.prompt, category, lang as 'he' | 'en')) continue
     if (textMatchesAny(result.prompt, effectiveProfile.excludedTopics || [])) continue
 
     keywordBasedQuestions.push({
