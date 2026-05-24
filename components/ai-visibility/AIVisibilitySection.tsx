@@ -2499,16 +2499,31 @@ function GeoCompetitorIntelligenceSection({
     // Labels are phrased in plain language; internal taxonomy terms like
     // 'brand_site' / 'homepage' are never surfaced.
     const CONTENT_TYPE_LABELS: Record<string, { he: string; en: string }> = {
-      review: { he: 'ביקורות', en: 'reviews' },
+      review: { he: 'עמודים עם ביקורות ודירוגים', en: 'reviews and ratings' },
       marketplace: { he: 'שווקים מקוונים', en: 'online marketplaces' },
-      comparison: { he: 'עמודי השוואה', en: 'comparison pages' },
+      comparison: { he: 'עמודים שמשווים בין מוצרים, שירותים או עסקים', en: 'comparison pages' },
       category: { he: 'עמודי קטגוריות מוצרים', en: 'product category pages' },
-      product: { he: 'עמודי מוצר', en: 'product pages' },
+      product: { he: 'עמודי מוצר עם מידע ברור ומפורט', en: 'detailed product pages' },
       forum: { he: 'דיוני פורומים', en: 'forum discussions' },
       blog: { he: 'בלוגים וכתבות', en: 'blogs and articles' },
       brand_site: { he: 'אתרים רשמיים של עסקים', en: 'official business websites' },
       homepage: { he: 'עמודים כלליים של עסקים', en: 'business homepages' },
       directory: { he: 'מדריכי עסקים', en: 'business directories' },
+    }
+
+    // Type-specific business insights explaining WHY each content type matters to AI.
+    // These descriptions focus on business value, not taxonomy categories.
+    const CONTENT_TYPE_INSIGHTS: Record<string, { he: string; en: string }> = {
+      homepage: { he: 'עמודים שמציגים בצורה ברורה מי העסק ומה הוא מציע', en: 'pages that clearly show who the business is and what it offers' },
+      brand_site: { he: 'אתרים רשמיים של עסקים בתחום', en: 'official business websites in the sector' },
+      category: { he: 'עמודים שמרכזים כמה מוצרים או שירותים מאותו תחום', en: 'pages aggregating multiple products or services in the field' },
+      review: { he: 'דעות של משתמשים ודירוגים על מוצרים ושירותים', en: 'user opinions and ratings on products and services' },
+      product: { he: 'עמודי מוצר עם מידע ברור ומפורט', en: 'detailed product pages' },
+      comparison: { he: 'עמודים שמשווים בין מוצרים, שירותים או עסקים', en: 'comparison pages' },
+      marketplace: { he: 'פלטפורמות שמרכזות כמה מוכרים או מוצרים', en: 'platforms aggregating multiple sellers or products' },
+      forum: { he: 'דיונים של משתמשים על חוויות וטיפים', en: 'user discussions about experiences and tips' },
+      blog: { he: 'מאמרים ובלוגים עם מידע רלוונטי', en: 'articles and blogs with relevant information' },
+      directory: { he: 'מדריכים שמרכזים רשימות של עסקים בתחום', en: 'directories listing businesses in the sector' },
     }
 
     // Collect citation types from trusted domains, skipping unmapped/unknown
@@ -2526,33 +2541,39 @@ function GeoCompetitorIntelligenceSection({
 
     if (topTypes.length === 0) return { lines, pills: [] }
 
-    const describeType = (type: string): string =>
+    const getInsight = (type: string): string =>
+      (CONTENT_TYPE_INSIGHTS[type] || CONTENT_TYPE_LABELS[type])[isHebrew ? 'he' : 'en']
+
+    const getLabel = (type: string): string =>
       CONTENT_TYPE_LABELS[type][isHebrew ? 'he' : 'en']
 
-    const first = describeType(topTypes[0])
+    const firstType = topTypes[0]
+    const firstInsight = getInsight(firstType)
     lines.push({
       text: isHebrew
-        ? `${first} הם סוג התוכן שמופיע הכי הרבה בתשובות AI.`
-        : `${capitalize(first)} are the content type AI surfaces most often.`,
+        ? `מנועי AI הסתמכו בעיקר על ${firstInsight}.`
+        : `AI engines relied primarily on ${firstInsight}.`,
       isFirst: true,
     })
 
     if (topTypes.length >= 2) {
-      const second = describeType(topTypes[1])
+      const secondType = topTypes[1]
+      const secondInsight = getInsight(secondType)
       lines.push({
         text: isHebrew
-          ? `מיד אחריהם — ${second}, גם הם חוזרים בתדירות גבוהה.`
-          : `Close behind — ${second}, which also recur frequently.`,
+          ? `${secondInsight.charAt(0).toUpperCase()}${secondInsight.slice(1)} הופיעו לעיתים קרובות בתשובות AI.`
+          : `${capitalize(secondInsight)} also appeared frequently in AI responses.`,
         isFirst: false,
       })
     }
 
     if (topTypes.length >= 3) {
-      const third = describeType(topTypes[2])
+      const thirdType = topTypes[2]
+      const thirdInsight = getInsight(thirdType)
       lines.push({
         text: isHebrew
-          ? `${third} מהווים את התוכן השלישי בחשיבותו.`
-          : `${capitalize(third)} round out the dominant content mix.`,
+          ? `${thirdInsight.charAt(0).toUpperCase()}${thirdInsight.slice(1)} הופיעו גם הם בתוצאות.`
+          : `${capitalize(thirdInsight)} also appeared in results.`,
         isFirst: false,
       })
     }
