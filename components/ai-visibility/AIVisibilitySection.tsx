@@ -805,6 +805,7 @@ export default function AIVisibilitySection({
           <GeoCompetitorIntelligenceSection
             intelligence={geoCompetitorIntelligence}
             businessMentions={businessMentionIntelligence}
+            results={allResults}
             isHebrew={isHebrew}
             t={t}
           />
@@ -2398,11 +2399,13 @@ function capitalize(s: string): string {
 function GeoCompetitorIntelligenceSection({
   intelligence,
   businessMentions,
+  results,
   isHebrew,
   t,
 }: {
   intelligence: GeoCompetitorIntelligence | null
   businessMentions: BusinessMentionIntelligence | null
+  results: ResultRow[]
   isHebrew: boolean
   t: T
 }) {
@@ -2487,121 +2490,132 @@ function GeoCompetitorIntelligenceSection({
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 2: Content types — what kind of content AI engines pick.
-  // No domain names here. Sharp, specific sentences.
-  // Filters out 'unknown' / unmapped citation types — never shown to users.
+  // Card 2: Content patterns — REAL signals about what content appears.
+  // Uses only contentSignals (hasList, hasReviewLanguage, etc) from actual
+  // geoInsights. Does NOT use citationTypes / URL taxonomy.
+  // Answers: "What KIND OF INFORMATION helped the business appear?"
+  // Not: "What kind of URL got cited?"
   // ─────────────────────────────────────────────────────────────────────
   const contentStructureCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-    // Business-focused content insights — describe TYPES OF INFORMATION
-    // that AI engines preferred, not URL/page taxonomy. Each insight is
-    // phrased so a business owner immediately understands what kind of
-    // content helped surface in AI responses (without internal jargon
-    // like 'brand_site', 'homepage', 'category page').
-    // Acts as a whitelist: types absent from this map (including 'unknown')
-    // are dropped before aggregation.
-    const CONTENT_TYPE_INSIGHTS: Record<
-      string,
-      { he: string; en: string; hePlural: boolean }
-    > = {
-      homepage: {
-        he: 'תוכן שמסביר את העסק ואת השירותים שלו',
-        en: 'content that explains the business and its services',
-        hePlural: false,
-      },
-      brand_site: {
-        he: 'תוכן שמסביר בבירור מה העסק מציע',
-        en: 'content that clearly explains what the business offers',
-        hePlural: false,
-      },
-      category: {
-        he: 'עמודים שמציגים מוצרים או שירותים בצורה מסודרת',
-        en: 'pages presenting products or services in a structured way',
-        hePlural: true,
-      },
-      review: {
-        he: 'תוכן עם דעות וביקורות של לקוחות',
-        en: 'content with customer opinions and reviews',
-        hePlural: false,
-      },
-      product: {
-        he: 'מידע ברור ומפורט על מוצרים',
-        en: 'clear, detailed information about products',
-        hePlural: false,
-      },
-      comparison: {
-        he: 'תוכן שעוזר ללקוח להשוות בין אפשרויות',
-        en: 'content that helps customers compare options',
-        hePlural: false,
-      },
-      marketplace: {
-        he: 'תוכן שמרכז מוצרים מכמה מוכרים במקום אחד',
-        en: 'content gathering products from multiple sellers in one place',
-        hePlural: false,
-      },
-      forum: {
-        he: 'תוכן עם חוויות וטיפים של משתמשים',
-        en: 'content with user experiences and tips',
-        hePlural: false,
-      },
-      blog: {
-        he: 'תוכן הסברי שעוזר להבין נושאים בתחום',
-        en: 'explanatory content that helps understand topics in the field',
-        hePlural: false,
-      },
-      directory: {
-        he: 'תוכן שמרכז עסקים בתחום במקום אחד',
-        en: 'content listing businesses in the field in one place',
-        hePlural: false,
-      },
+    // Aggregate content signals from all results with geoInsights
+    interface ContentSignalCount {
+      hasReviewLanguage: number
+      hasPricingLanguage: number
+      hasComparisonLanguage: number
+      hasRecommendationLanguage: number
+      hasList: number
+      hasLocalLanguage: number
     }
 
-    // Collect citation types from trusted domains, skipping unmapped/unknown
-    const typeFreq = new Map<string, number>()
-    for (const d of intelligence.trustedDomains) {
-      for (const t of d.citationTypes) {
-        if (!CONTENT_TYPE_INSIGHTS[t]) continue // filter 'unknown' and anything else
-        typeFreq.set(t, (typeFreq.get(t) || 0) + 1)
-      }
+    const signals: ContentSignalCount = {
+      hasReviewLanguage: 0,
+      hasPricingLanguage: 0,
+      hasComparisonLanguage: 0,
+      hasRecommendationLanguage: 0,
+      hasList: 0,
+      hasLocalLanguage: 0,
     }
-    const topTypes = Array.from(typeFreq.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([type]) => type)
 
-    if (topTypes.length === 0) return { lines, pills: [] }
+    let totalResultsWithSignals = 0
+    for (const result of results) {
+      if (!result.geoInsights?.contentSignals) continue
+      totalResultsWithSignals++
+      const cs = result.geoInsights.contentSignals
+      if (cs.hasReviewLanguage) signals.hasReviewLanguage++
+      if (cs.hasPricingLanguage) signals.hasPricingLanguage++
+      if (cs.hasComparisonLanguage) signals.hasComparisonLanguage++
+      if (cs.hasRecommendationLanguage) signals.hasRecommendationLanguage++
+      if (cs.hasList) signals.hasList++
+      if (cs.hasLocalLanguage) signals.hasLocalLanguage++
+    }
 
-    // Hebrew verb conjugation helper — appends 'ו' for plural masculine.
-    const conjugate = (verb: string, plural: boolean): string =>
-      plural ? `${verb}ו` : verb
-
-    const firstType = topTypes[0]
-    const first = CONTENT_TYPE_INSIGHTS[firstType]
-    lines.push({
-      text: isHebrew
-        ? `${first.he} ${conjugate('הופיע', first.hePlural)} יותר בתשובות AI.`
-        : `${capitalize(first.en)} appeared more often in AI responses.`,
-      isFirst: true,
-    })
-
-    if (topTypes.length >= 2) {
-      const second = CONTENT_TYPE_INSIGHTS[topTypes[1]]
+    // No data — fallback
+    if (totalResultsWithSignals === 0) {
       lines.push({
         text: isHebrew
-          ? `${second.he} ${conjugate('חזר', second.hePlural)} בכמה תוצאות.`
-          : `${capitalize(second.en)} recurred across multiple results.`,
-        isFirst: false,
+          ? 'עדיין אין מספיק דפוסי תוכן ברורים כדי לזהות מה עוזר לחשיפה בפרויקט הזה.'
+          : 'Not enough content patterns detected yet to identify what helps visibility for this project.',
+        isFirst: true,
       })
+      return { lines, pills: [] }
     }
 
-    if (topTypes.length >= 3) {
-      const third = CONTENT_TYPE_INSIGHTS[topTypes[2]]
+    // Rank signals by frequency
+    const rankedSignals = Object.entries(signals)
+      .map(([key, count]) => ({
+        key,
+        count,
+        percentage: (count / totalResultsWithSignals) * 100,
+      }))
+      .filter((s) => s.count > 0) // Only include signals that appeared at least once
+      .sort((a, b) => b.count - a.count)
+
+    // If no signals appeared at all, fallback
+    if (rankedSignals.length === 0) {
       lines.push({
         text: isHebrew
-          ? `מנועי AI נטו להעדיף ${third.he}, ולא רק תיאור כללי של העסק.`
-          : `AI engines tended to favor ${third.en}, rather than just a generic business description.`,
-        isFirst: false,
+          ? 'נדרשות עוד סריקות כדי להבין אילו סוגי תוכן חוזרים בתשובות שבהן העסק מופיע.'
+          : 'Need more scans to understand which content patterns recur in responses where the business appears.',
+        isFirst: true,
+      })
+      return { lines, pills: [] }
+    }
+
+    // Specific, actionable insights for each signal
+    const signalInsights: Record<string, { he: string; en: string }> = {
+      hasReviewLanguage: {
+        he: 'תשובות שכללו ביקורות ודירוגים הופיעו יותר במקרים שבהם העסק קיבל חשיפה.',
+        en: 'Responses that included reviews and ratings appeared more often when the business was featured.',
+      },
+      hasPricingLanguage: {
+        he: 'מחירים ברורים חזרו בכמה תשובות עם כוונת קנייה.',
+        en: 'Clear pricing information recurred across responses with purchase intent.',
+      },
+      hasComparisonLanguage: {
+        he: 'תוכן השוואתי הופיע בעיקר בשאלות שבהן המשתמש חיפש המלצה או בחירה בין אפשרויות.',
+        en: 'Comparative content appeared primarily in questions where the user sought recommendations or comparisons.',
+      },
+      hasRecommendationLanguage: {
+        he: 'ניסוחים של המלצה ובחירה חזרו בתשובות שבהן העסק קיבל חשיפה.',
+        en: 'Recommendation and preference language recurred in responses where the business appeared.',
+      },
+      hasList: {
+        he: 'תוכן שמסודר כרשימה או FAQ הופיע יותר בתשובות שקל לסרוק ולהבין.',
+        en: 'List-formatted or FAQ content appeared more in responses that were easy to scan and understand.',
+      },
+      hasLocalLanguage: {
+        he: 'מידע מקומי ברור הופיע יותר בשאלות עם כוונה אזורית.',
+        en: 'Clear local information appeared more often in queries with geographic intent.',
+      },
+    }
+
+    // Display top 3 signals, avoiding duplicates
+    const maxInsights = 3
+    let insightsDisplayed = 0
+
+    for (const signal of rankedSignals) {
+      if (insightsDisplayed >= maxInsights) break
+
+      const insight = signalInsights[signal.key]
+      if (!insight) continue // Safety: skip if no insight defined for this signal
+
+      lines.push({
+        text: isHebrew ? insight.he : insight.en,
+        isFirst: insightsDisplayed === 0,
+      })
+
+      insightsDisplayed++
+    }
+
+    // If no insights could be rendered, show fallback
+    if (insightsDisplayed === 0) {
+      lines.push({
+        text: isHebrew
+          ? 'נדרשות עוד סריקות כדי להבין אילו סוגי תוכן חוזרים בתשובות שבהן העסק מופיע.'
+          : 'Need more scans to understand which content patterns recur in responses where the business appears.',
+        isFirst: true,
       })
     }
 
