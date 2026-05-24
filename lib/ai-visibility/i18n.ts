@@ -115,10 +115,16 @@ const STRINGS = {
 
   // Smart AI questions modal
   smart_questions_title: { he: 'שאלות AI מומלצות', en: 'Recommended AI Questions' },
+  smart_questions_subtitle: {
+    he: 'שאלות שכדאי להוסיף למעקב כדי לבדוק עוד הזדמנויות נראות.',
+    en: 'Suggested questions to track for additional visibility opportunities.',
+  },
   smart_questions_help: {
     he: 'שאלות מוכנות מותאמות לעסק שלך. בחר מרובה, ערוך, או הוסף בודד.',
     en: 'Smart AI questions tailored to your business. Select multiple, edit, or add one-by-one.',
   },
+  add_question_label: { he: 'הוסף שאלה למעקב', en: 'Add question to tracking' },
+  already_tracked: { he: 'כבר במעקב', en: 'Already tracked' },
   all_added: { he: 'כל השאלות נוספו.', en: 'All questions added.' },
   query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
@@ -483,7 +489,7 @@ const STRINGS = {
   geo_none: { he: '—', en: '—' },
 
   // GEO Explanations (Phase 1B — why this result happened)
-  geo_explanation_title: { he: 'למה זה קרה?', en: 'Why this result happened' },
+  geo_explanation_title: { he: 'ניתוח התוצאה', en: 'Result Analysis' },
   geo_explanation_insufficient: {
     he: 'אין מספיק אותות להסבר אמין בתוצאה הזו.',
     en: 'Not enough signals to explain this result reliably.',

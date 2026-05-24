@@ -190,6 +190,7 @@ export default function AIVisibilitySection({
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
   const [showAllPrompts, setShowAllPrompts] = useState(false)
+  const [showAllSmartQuestions, setShowAllSmartQuestions] = useState(false)
   const [scanStatus, setScanStatus] = useState<string | null>(null)
   const [competitorsRefreshKey, setCompetitorsRefreshKey] = useState(0)
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysisData | null>(null)
@@ -947,38 +948,63 @@ export default function AIVisibilitySection({
 
           {suggestedQuestions.length > 0 && (
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-4">
-                {t('smart_questions_title')}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {suggestedQuestions.map((q) => (
-                  <SmartQuestionCard
-                    key={q.id}
-                    question={q}
-                    onAdd={async () => {
-                      try {
-                        const res = await fetch('/api/ai-visibility/prompts', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            projectId,
-                            prompt: q.prompt,
-                            country: projectCountry,
-                            language: projectLanguage,
-                            targetDomain: projectDomain,
-                            targetBrandName: projectBrandName,
-                          }),
-                        })
-                        if (!res.ok) throw new Error('Failed to add')
-                        loadAllResults()
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : 'Failed to add question')
-                      }
-                    }}
-                    t={t}
-                  />
-                ))}
+              <div className="mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
+                  {t('smart_questions_title')}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {t('smart_questions_subtitle')}
+                </p>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {suggestedQuestions.slice(0, showAllSmartQuestions ? undefined : 4).map((q) => {
+                  const normalizeText = (text: string): string =>
+                    text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+                  const normalizedSuggestion = normalizeText(q.prompt)
+                  const alreadyTracked = allPrompts.some((p) => normalizeText(p.prompt || '') === normalizedSuggestion)
+
+                  return (
+                    <SmartQuestionCard
+                      key={q.id}
+                      question={q}
+                      isAlreadyTracked={alreadyTracked}
+                      allPrompts={allPrompts}
+                      onAdd={async () => {
+                        try {
+                          const res = await fetch('/api/ai-visibility/prompts', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              projectId,
+                              prompt: q.prompt,
+                              country: projectCountry,
+                              language: projectLanguage,
+                              targetDomain: projectDomain,
+                              targetBrandName: projectBrandName,
+                            }),
+                          })
+                          if (!res.ok) throw new Error('Failed to add')
+                          loadAllResults()
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : 'Failed to add question')
+                        }
+                      }}
+                      t={t}
+                    />
+                  )
+                })}
+              </div>
+              {suggestedQuestions.length > 4 && !showAllSmartQuestions && (
+                <div className="text-center mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllSmartQuestions(true)}
+                  >
+                    {t('show_more')}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -1684,10 +1710,14 @@ function SmartQuestionCard({
   question,
   onAdd,
   t,
+  allPrompts,
+  isAlreadyTracked,
 }: {
   question: PromptSuggestion
   onAdd: () => void
   t: T
+  allPrompts?: PromptRow[]
+  isAlreadyTracked?: boolean
 }) {
   const intentTone: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
     brand: 'info',
@@ -1736,13 +1766,20 @@ function SmartQuestionCard({
           </p>
         )}
       </div>
-      <button
-        onClick={onAdd}
-        className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition flex items-center justify-center"
-        aria-label={t('add_to_queries_aria')}
-      >
-        +
-      </button>
+      {isAlreadyTracked ? (
+        <div className="shrink-0 px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-[9px] font-medium text-emerald-700 dark:text-emerald-300 whitespace-nowrap flex items-center">
+          {t('already_tracked')}
+        </div>
+      ) : (
+        <button
+          onClick={onAdd}
+          className="shrink-0 w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition flex items-center justify-center"
+          aria-label={t('add_question_label')}
+          title={t('add_question_label')}
+        >
+          +
+        </button>
+      )}
     </div>
   )
 }
