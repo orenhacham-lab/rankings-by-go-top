@@ -2032,15 +2032,25 @@ function AIVisibilitySummarySection({
     bullets.push({ text: statusText, isFirst: true })
 
     // 2. Strong engines (rate >= 60% AND at least 2 scans on that engine)
+    // Phrasing depends on overall visibility to avoid contradiction:
+    // If overall score < 40%, use moderate phrasing; otherwise, "strong visibility" is appropriate.
     const strong = Array.from(engineMetrics.values())
       .filter((em) => em.scans >= 2 && em.rate >= 60)
       .sort((a, b) => b.rate - a.rate)
       .slice(0, 3)
       .map((em) => engineDisplayName(em.engine))
     if (strong.length > 0) {
-      const text = isHebrew
-        ? `הנראות חזקה בעיקר ב־${joinNames(strong)}.`
-        : `Visibility is strong mainly on ${joinNames(strong)}.`
+      const score = metrics.mentionRate || 0
+      let text: string
+      if (isHebrew) {
+        text = score < 40
+          ? `העסק כן הופיע בעיקר ב־${joinNames(strong)}.`
+          : `הנראות חזקה בעיקר ב־${joinNames(strong)}.`
+      } else {
+        text = score < 40
+          ? `The business did appear mainly on ${joinNames(strong)}.`
+          : `Visibility is strong mainly on ${joinNames(strong)}.`
+      }
       bullets.push({ text })
     }
 
