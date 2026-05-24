@@ -2495,6 +2495,7 @@ function GeoCompetitorIntelligenceSection({
   // geoInsights. Does NOT use citationTypes / URL taxonomy.
   // Answers: "What KIND OF INFORMATION helped the business appear?"
   // Not: "What kind of URL got cited?"
+  // DYNAMIC: Shows only insights for signals that are actually strong in this project.
   // ─────────────────────────────────────────────────────────────────────
   const contentStructureCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
@@ -2531,12 +2532,12 @@ function GeoCompetitorIntelligenceSection({
       if (cs.hasLocalLanguage) signals.hasLocalLanguage++
     }
 
-    // No data — fallback
+    // Not enough data — fallback
     if (totalResultsWithSignals === 0) {
       lines.push({
         text: isHebrew
-          ? 'עדיין אין מספיק דפוסי תוכן ברורים כדי לזהות מה עוזר לחשיפה בפרויקט הזה.'
-          : 'Not enough content patterns detected yet to identify what helps visibility for this project.',
+          ? 'עדיין אין מספיק נתונים כדי לזהות איזה סוג תוכן עוזר לחשיפה בפרויקט הזה.'
+          : 'There is not enough data yet to identify which content types improve visibility for this project.',
         isFirst: true,
       })
       return { lines, pills: [] }
@@ -2556,65 +2557,88 @@ function GeoCompetitorIntelligenceSection({
     if (rankedSignals.length === 0) {
       lines.push({
         text: isHebrew
-          ? 'נדרשות עוד סריקות כדי להבין אילו סוגי תוכן חוזרים בתשובות שבהן העסק מופיע.'
-          : 'Need more scans to understand which content patterns recur in responses where the business appears.',
+          ? 'עדיין אין מספיק נתונים כדי לזהות איזה סוג תוכן עוזר לחשיפה בפרויקט הזה.'
+          : 'There is not enough data yet to identify which content types improve visibility for this project.',
         isFirst: true,
       })
       return { lines, pills: [] }
     }
 
-    // Specific, actionable insights for each signal
-    const signalInsights: Record<string, { he: string; en: string }> = {
-      hasReviewLanguage: {
-        he: 'ביקורות ודירוגים חזרו יותר בתשובות שבהן העסק קיבל חשיפה.',
-        en: 'Responses that included reviews and ratings appeared more often when the business was featured.',
-      },
-      hasPricingLanguage: {
-        he: 'מחירים ברורים הופיעו יותר בתשובות לשאלות קנייה.',
-        en: 'Clear pricing information recurred across responses with purchase intent.',
-      },
-      hasComparisonLanguage: {
-        he: 'תוכן השוואתי הופיע בעיקר בשאלות שבהן המשתמש חיפש המלצה או בחירה בין אפשרויות.',
-        en: 'Comparative content appeared primarily in questions where the user sought recommendations or comparisons.',
-      },
-      hasRecommendationLanguage: {
-        he: 'ניסוחים של המלצה ובחירה חזרו בתשובות שבהן העסק קיבל חשיפה.',
-        en: 'Recommendation and preference language recurred in responses where the business appeared.',
-      },
-      hasList: {
-        he: 'תוכן שמסודר כרשימה או שאלות נפוצות הופיע יותר בתשובות ברורות ומובנות.',
-        en: 'List-formatted or FAQ content appeared more in responses that were easy to scan and understand.',
-      },
-      hasLocalLanguage: {
-        he: 'מידע מקומי ברור הופיע יותר בשאלות עם כוונה אזורית.',
-        en: 'Clear local information appeared more often in queries with geographic intent.',
-      },
+    // Define signal groups — signals that share similar meaning get one message.
+    // A group is shown only if at least one signal in it is STRONG.
+    interface SignalGroup {
+      signalKeys: string[]
+      heMessage: string
+      enMessage: string
     }
 
-    // Display top 3 signals, avoiding duplicates
-    const maxInsights = 3
-    let insightsDisplayed = 0
+    const signalGroups: SignalGroup[] = [
+      {
+        signalKeys: ['hasList', 'hasComparisonLanguage'],
+        heMessage: 'תוכן שמסודר ברשימות, השוואות או שאלות נפוצות הופיע יותר מתוכן כללי.',
+        enMessage:
+          'List-formatted, comparison, or FAQ content appeared more than generic content.',
+      },
+      {
+        signalKeys: ['hasPricingLanguage'],
+        heMessage:
+          'בשאלות בנושאי קנייה או בחירת ספק, הופיעו יותר תשובות עם מחיר, יתרונות ופרטי רכישה.',
+        enMessage:
+          'In purchase or vendor-selection queries, answers with pricing, benefits, and purchase details appeared more often.',
+      },
+      {
+        signalKeys: ['hasReviewLanguage', 'hasRecommendationLanguage'],
+        heMessage: 'ביקורות, דירוגים והמלצות חזרו בתשובות שבהן העסק קיבל חשיפה.',
+        enMessage:
+          'Reviews, ratings, and recommendations recurred in answers where the business appeared.',
+      },
+      {
+        signalKeys: ['hasLocalLanguage'],
+        heMessage:
+          'בשאלות מקומיות, הופיעו יותר תשובות שכללו אזורי שירות, מיקום או זמינות.',
+        enMessage:
+          'In local queries, answers that included service areas, location, or availability appeared more often.',
+      },
+    ]
 
-    for (const signal of rankedSignals) {
-      if (insightsDisplayed >= maxInsights) break
+    // Determine which groups to show: a group is "strong" if at least one signal
+    // in it is strong. A signal is strong if: count >= 3, OR in top 3, OR percentage >= 25%.
+    const groupsToShow: SignalGroup[] = []
 
-      const insight = signalInsights[signal.key]
-      if (!insight) continue // Safety: skip if no insight defined for this signal
+    for (const group of signalGroups) {
+      const hasStrongSignal = group.signalKeys.some((signalKey) => {
+        const rankedPos = rankedSignals.findIndex((s) => s.key === signalKey)
+        if (rankedPos === -1) return false // Signal didn't appear
 
-      lines.push({
-        text: isHebrew ? insight.he : insight.en,
-        isFirst: insightsDisplayed === 0,
+        const signal = rankedSignals[rankedPos]
+        // Strong if: count >= 3, OR in top 3, OR percentage >= 25%
+        const isStrong =
+          signal.count >= 3 || rankedPos < 3 || signal.percentage >= 25
+
+        return isStrong
       })
 
-      insightsDisplayed++
+      if (hasStrongSignal) {
+        groupsToShow.push(group)
+      }
     }
 
-    // If no insights could be rendered, show fallback
-    if (insightsDisplayed === 0) {
+    // Display insights for strong groups (max 3)
+    const maxInsights = 3
+    for (let i = 0; i < groupsToShow.length && i < maxInsights; i++) {
+      const group = groupsToShow[i]
+      lines.push({
+        text: isHebrew ? group.heMessage : group.enMessage,
+        isFirst: i === 0,
+      })
+    }
+
+    // If no groups are strong enough to show, fallback
+    if (lines.length === 0) {
       lines.push({
         text: isHebrew
-          ? 'נדרשות עוד סריקות כדי להבין אילו סוגי תוכן חוזרים בתשובות שבהן העסק מופיע.'
-          : 'Need more scans to understand which content patterns recur in responses where the business appears.',
+          ? 'עדיין אין מספיק נתונים כדי לזהות איזה סוג תוכן עוזר לחשיפה בפרויקט הזה.'
+          : 'There is not enough data yet to identify which content types improve visibility for this project.',
         isFirst: true,
       })
     }
