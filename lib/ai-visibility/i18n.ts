@@ -135,6 +135,8 @@ const STRINGS = {
     en: 'No new suggested questions found right now.',
   },
   refresh_suggestions: { he: 'רענן', en: 'Refresh' },
+  generate_more_suggestions: { he: 'צור עוד שאלות', en: 'Generate more questions' },
+  generating_more: { he: 'יוצר שאלות נוספות...', en: 'Generating more questions...' },
   rescan: { he: 'סריקה מחדש', en: 'Rescan' },
   scan_this_engine: { he: 'סרוק במנוע הזה', en: 'Scan this engine' },
   query_label: { he: 'שאלת AI', en: 'AI Query' },

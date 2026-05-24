@@ -656,11 +656,11 @@ export default function AIVisibilitySection({
         keywords: projectKeywords,
         manualProfile,
         shuffle: true,
-        limit: 20,
+        limit: 40,
       })
       setSuggestedQuestions(refreshed)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to refresh suggestions')
+      setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
     } finally {
       setRefreshingSuggestions(false)
     }
@@ -1056,16 +1056,19 @@ export default function AIVisibilitySection({
                     loading={refreshingSuggestions}
                     disabled={refreshingSuggestions}
                     className="shrink-0"
-                    title={t('refresh_suggestions')}
-                    aria-label={t('refresh_suggestions')}
+                    title={t('generate_more_suggestions')}
+                    aria-label={t('generate_more_suggestions')}
                   >
-                    {t('refresh_suggestions')}
+                    <span className="hidden sm:inline">{t('generate_more_suggestions')}</span>
+                    <span className="sm:hidden">
+                      {isHebrew ? 'עוד שאלות' : 'More questions'}
+                    </span>
                   </Button>
                 </div>
                 {refreshingSuggestions ? (
                   <div className="flex items-center justify-center gap-3 py-8 text-sm text-slate-600 dark:text-slate-300">
                     <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                    <span>{t('loading_suggestions')}</span>
+                    <span>{t('generating_more')}</span>
                   </div>
                 ) : (
                   <>
