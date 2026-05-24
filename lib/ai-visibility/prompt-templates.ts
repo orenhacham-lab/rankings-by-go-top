@@ -2828,102 +2828,216 @@ function diversifiedPick(
 
 /**
  * Classify a prompt by its phrasing pattern (sentence template), not its topic.
- * Used by the diversity layer to prevent the result set from feeling repetitive
- * even when each candidate covers a different keyword. Two prompts with the
- * same phrasing ("איזו חברה מומלצת לX?" vs "איזו חברה מומלצת לY?") will share
- * the same phrasing key and the cap will throttle them.
+ * Patterns are intentionally COARSE — multiple surface variants collapse to one
+ * label so the diversity cap throttles all of them together. e.g. these all
+ * map to 'he_recommendation_provider':
+ *   "איזו חברה מומלצת ל..."
+ *   "מי מומלץ ל..."
+ *   "איזה מומחה מתאים ל..."
+ *   "איזה ספק מומלץ ל..."
+ *
+ * This is critical: previous fine-grained labels left "איזו חברה" and
+ * "מי מומלץ" in separate buckets, so the cap didn't actually throttle the
+ * "recommendation opener" feel.
  */
 function classifyPhrasingPattern(prompt: string, lang: 'he' | 'en'): string {
   const p = prompt.trim()
   if (lang === 'he') {
-    if (/^איזו\s+חברה\s+מומלצת/.test(p)) return 'he_company_recommended'
-    if (/^איזה\s+מומחה\s+(?:מומלץ|מתאים|כדאי)/.test(p)) return 'he_expert_recommended'
-    if (/^מי\s+(?:מומלץ|המומחה)/.test(p)) return 'he_who_recommended'
-    if (/^כמה\s+עולה/.test(p)) return 'he_price_how_much'
-    if (/^מה\s+המחיר/.test(p)) return 'he_price_what'
-    if (/^איך\s+לבחור\s+ספק/.test(p)) return 'he_choose_provider'
-    if (/^איך\s+לבחור/.test(p)) return 'he_choose_generic'
-    if (/^מה\s+חשוב\s+לבדוק/.test(p)) return 'he_check_before'
-    if (/^מה\s+עדיף/.test(p)) return 'he_comparison'
-    if (/^חוות\s+דעת/.test(p)) return 'he_reviews'
-    if (/^איך\s+לבדוק\s+אם/.test(p)) return 'he_verify_reliable'
-    if (/^איפה\s+(?:כדאי|אפשר|לקנות)/.test(p)) return 'he_where_to'
-    if (/^מה\s+ההבדל\s+בין/.test(p)) return 'he_difference_between'
-    if (/^איך\s+(?:למצוא|לקנות|להזמין)/.test(p)) return 'he_how_to_acquire'
-    if (/^מה\s+כדאי/.test(p)) return 'he_what_should'
+    // All recommendation/provider question variants → one bucket.
+    if (
+      /^(איזו?|איזה)\s+(?:חברה|מומחה|ספק|מותג|דגם|אפשרות|בית|חנות|אופציה)\s+(?:מומלץ|מומלצת|מומלצה|מתאים|מתאימה|מתאימת|כדאי|הכי\s+טוב)/.test(p) ||
+      /^מי\s+(?:מומלץ|המומחה|הספק|הכי\s+טוב)/.test(p) ||
+      /^איזה\s+\S+\s+(?:מומלץ|כדאי|הכי\s+טוב)/.test(p)
+    ) {
+      return 'he_recommendation_provider'
+    }
+    // All price/cost variants → one bucket.
+    if (
+      /^(כמה\s+(?:עולה|צריך\s+להשקיע|כסף\s+צריך|זה\s+עולה)|מה\s+(?:המחיר|טווח\s+המחירים|העלות))/.test(p)
+    ) {
+      return 'he_price'
+    }
+    // All pre-purchase / decision-making variants → one bucket.
+    if (
+      /^(איך\s+לבחור|מה\s+(?:חשוב\s+לבדוק|לבדוק\s+לפני|כדאי\s+לדעת|כדאי\s+לבחון|כדאי)|איך\s+(?:יודעים|להבחין|להעריך|להחליט))/.test(
+        p
+      )
+    ) {
+      return 'he_pre_purchase'
+    }
+    // Comparison (incl. "what's the difference between").
+    if (/^(מה\s+עדיף|מה\s+ההבדל\s+בין|מי\s+(?:יותר\s+טוב|עדיף))/.test(p)) {
+      return 'he_comparison'
+    }
+    // Reviews / verification / what people say.
+    if (/^(חוות\s+דעת|איך\s+לבדוק\s+אם|מה\s+אומרים\s+על)/.test(p)) {
+      return 'he_reviews'
+    }
+    // Where to / acquisition.
+    if (/^(איפה\s+(?:כדאי|אפשר|לקנות|להזמין)|איך\s+(?:למצוא|לקנות|להזמין))/.test(p)) {
+      return 'he_where_to'
+    }
     return 'he_other'
   } else {
-    if (/^which\s+company\s+is\s+recommended/i.test(p)) return 'en_company_recommended'
-    if (/^which\s+expert/i.test(p)) return 'en_expert_recommended'
-    if (/^who\s+is\s+recommended/i.test(p)) return 'en_who_recommended'
-    if (/^how\s+much\s+does/i.test(p)) return 'en_price_how_much'
-    if (/^what\s+is\s+the\s+price/i.test(p)) return 'en_price_what'
-    if (/^how\s+to\s+choose\s+a\s+provider/i.test(p)) return 'en_choose_provider'
-    if (/^how\s+to\s+choose/i.test(p)) return 'en_choose_generic'
-    if (/^what\s+to\s+check/i.test(p)) return 'en_check_before'
-    if (/^what(?:'|’|`)?s\s+better/i.test(p)) return 'en_comparison'
-    if (/^reviews?\s+of/i.test(p)) return 'en_reviews'
-    if (/^how\s+to\s+verify/i.test(p)) return 'en_verify_reliable'
-    if (/^where\s+(?:can|to)/i.test(p)) return 'en_where_to'
-    if (/^what(?:'|’|`)?s\s+the\s+difference/i.test(p)) return 'en_difference_between'
-    if (/^how\s+to\s+(?:find|buy|order|get)/i.test(p)) return 'en_how_to_acquire'
-    if (/^what\s+should/i.test(p)) return 'en_what_should'
+    if (
+      /^which\s+(?:company|expert|provider|brand|model|store|option|service)\s+(?:is\s+(?:recommended|best)|suits|fits)/i.test(
+        p
+      ) ||
+      /^who\s+is\s+(?:recommended|the\s+(?:best|expert|provider))/i.test(p) ||
+      /^which\s+\S+\s+is\s+(?:recommended|best|good)/i.test(p)
+    ) {
+      return 'en_recommendation_provider'
+    }
+    if (
+      /^(how\s+much\s+(?:does|to\s+(?:invest|pay))|what(?:'|’|`)?s\s+the\s+(?:price|cost|price\s+range))/i.test(
+        p
+      )
+    ) {
+      return 'en_price'
+    }
+    if (
+      /^(how\s+to\s+choose|what\s+to\s+(?:check\s+before|look\s+for|consider)|how\s+do\s+you\s+(?:know|tell))/i.test(
+        p
+      )
+    ) {
+      return 'en_pre_purchase'
+    }
+    if (/^(what(?:'|’|`)?s\s+(?:better|the\s+difference)|which\s+is\s+better)/i.test(p)) {
+      return 'en_comparison'
+    }
+    if (/^(reviews?\s+of|how\s+to\s+verify|what\s+do\s+people\s+say)/i.test(p)) {
+      return 'en_reviews'
+    }
+    if (/^(where\s+(?:can\s+i|to)|how\s+to\s+(?:find|buy|order|get))/i.test(p)) {
+      return 'en_where_to'
+    }
     return 'en_other'
   }
 }
 
+const HE_FAMILY_MODIFIERS = new Set([
+  // Common adjectives / descriptors
+  'ביתי', 'ביתית', 'הביתי', 'הביתית', 'מקצועי', 'מקצועית', 'מתקפל', 'מתקפלת',
+  'איכותי', 'איכותית', 'זול', 'זולה', 'יקר', 'יקרה', 'קטן', 'קטנה', 'גדול',
+  'גדולה', 'מהיר', 'מהירה', 'איטי', 'איטית', 'טוב', 'טובה', 'מומלץ', 'מומלצת',
+  'לבית', 'למשרד', 'לעסק', 'לשימוש', 'מודרני', 'מודרנית', 'קלאסי', 'קלאסית',
+  'חזק', 'חזקה', 'יציב', 'יציבה', 'נוח', 'נוחה', 'אמין', 'אמינה', 'חדש', 'חדשה',
+  'ישן', 'ישנה', 'הכי', 'הטוב', 'הטובה', 'משובח', 'משובחת', 'כושר',
+  // Transaction / action prefixes that leak through (קניית משקולות → משקולות)
+  'קניית', 'קנות', 'קנייה', 'רכישת', 'רכישה', 'הזמנת', 'הזמנה', 'מציאת',
+  'בחירת', 'בחירה', 'איתור', 'חיפוש', 'שירותי', 'שירות',
+])
+
+const EN_FAMILY_MODIFIERS = new Set([
+  'best', 'good', 'great', 'top', 'cheap', 'expensive', 'small', 'big', 'large',
+  'home', 'office', 'professional', 'commercial', 'residential', 'foldable',
+  'compact', 'modern', 'classic', 'new', 'old', 'reliable', 'fast', 'slow',
+  'quality', 'recommended', 'affordable', 'fitness', 'buying', 'purchase',
+  'purchasing', 'ordering', 'finding', 'choosing', 'service', 'services',
+])
+
 /**
- * Extract the keyword family from a prompt by stripping common template
- * wrappers (recommendation/price/comparison prefixes) and trailing location
- * suffixes (ב{city} / in {city}). Two prompts with the same family share the
- * same core topic — e.g. "X בתל אביב" and "X בפתח תקווה" both reduce to "X".
+ * Extract the keyword family from a prompt — the product/service ROOT.
  *
- * The family is a deterministic, normalized string used as a cap key by the
- * diversity layer. It does not have to be semantically perfect — only stable.
+ * Algorithm:
+ *   1. Strip the template wrapper (broader regex than before — catches
+ *      "איזה הליכון מומלץ", "איזה מומחה מומלץ ל...", etc.)
+ *   2. Strip trailing recommendation suffix ("...מומלץ?")
+ *   3. Strip trailing city ("...בתל אביב")
+ *   4. Strip "or alternatives" comparison tail
+ *   5. Strip leading prepositions
+ *   6. Remove common modifier words (ביתי / מתקפל / best / fitness ...)
+ *   7. Take the first 3 content words
+ *
+ * Examples (HE):
+ *   "איזה הליכון ביתי מומלץ?"           → "הליכון"
+ *   "כמה עולה הליכון מתקפל?"            → "הליכון"
+ *   "איך לבחור הליכון לבית קטן?"        → "הליכון"
+ *   "קידום אתרים בתל אביב"              → "קידום אתרים"
+ *   "קידום אתרים ברמת גן"               → "קידום אתרים"
+ *   "קידום אתרים לרופאים"               → "קידום אתרים לרופאים" (audience kept)
+ *
+ * The family is a deterministic cap key — it does not have to be semantically
+ * perfect, only stable enough that obvious variants collapse together.
  */
 function extractKeywordFamily(prompt: string, lang: 'he' | 'en'): string {
   let core = prompt.toLowerCase().trim()
 
   if (lang === 'he') {
+    // Strip broad template prefix — covers all our generation patterns plus
+    // bare "איזה X מומלץ" forms from curated banks.
+    // IMPORTANT: longer alternatives MUST come before shorter ones (regex
+    // alternation is left-to-right). e.g. "חשוב לבדוק לפני שקונים" before
+    // "חשוב לבדוק", otherwise the short one wins and leaves "לפני שקונים..."
+    // dangling in the family key.
     core = core.replace(
-      /^(איזו\s+חברה\s+מומלצת|איזה\s+מומחה\s+(?:מומלץ|מתאים|כדאי)|מי\s+מומלץ\s+עבור|מי\s+מומלץ|מי\s+המומחה|כמה\s+עולה|מה\s+המחיר\s+של|מה\s+המחיר|איך\s+לבחור\s+ספק\s+ל?|איך\s+לבחור\s+ל?|איך\s+לבחור|מה\s+חשוב\s+לבדוק\s+לפני\s+בחירת|מה\s+חשוב\s+לבדוק|מה\s+עדיף\s*[—\-–]?|חוות\s+דעת\s+על\s+שירותי|חוות\s+דעת\s+על|איך\s+לבדוק\s+אם\s+שירות|איך\s+לבדוק\s+אם|איפה\s+(?:כדאי|אפשר|לקנות|להזמין)\s*ל?|מה\s+ההבדל\s+בין|איך\s+(?:למצוא|לקנות|להזמין)\s*ל?|מה\s+כדאי\s+ל?)/u,
+      /^(איזו?\s+(?:חברה|מומחה|ספק|מותג|דגם|אפשרות|בית|חנות|אופציה)\s+(?:מומלץ|מומלצת|מומלצה|מתאים|מתאימה|מתאימת|כדאי|הכי\s+טוב)\s*(?:ל|עבור|של|ב)?\s*|מי\s+(?:מומלץ\s+עבור|מומלץ|המומחה|הספק|הכי\s+טוב)\s*(?:ל|עבור|של)?\s*|איזה\s+\S+\s+(?:מומלץ|כדאי|הכי\s+טוב)\s*(?:ל|עבור|של|ב)?\s*|איזה\s+|איזו\s+|כמה\s+(?:עולה|צריך\s+להשקיע\s+ב|כסף\s+צריך\s+ל|זה\s+עולה)\s*|מה\s+(?:המחיר|טווח\s+המחירים|העלות)\s+(?:של\s+)?|איך\s+(?:לבחור\s+ספק\s+ל?|לבחור\s+ל?|לבחור|למצוא|לקנות|להזמין|יודעים\s+ש|להבחין\s+בין|להעריך|להחליט|לבדוק\s+אם\s+שירות|לבדוק\s+אם)\s*|מה\s+(?:חשוב\s+לבדוק\s+לפני\s+(?:בחירת|שקונים|רוכשים|רכישת|קניית|הזמנת)\s*|חשוב\s+לבדוק\s*|לבדוק\s+לפני\s+שקונים\s*|עדיף\s*[—\-–]?\s*|כדאי\s+ל?\s*|ההבדל\s+בין\s*|אומרים\s+על\s*)|חוות\s+דעת\s+על(?:\s+שירותי)?\s*|איפה\s+(?:כדאי|אפשר)\s+(?:ל?(?:קנות|הזמין|מצוא))\s*|איפה\s+(?:כדאי|אפשר|לקנות|להזמין)\s*ל?\s*|איך\s+(?:למצוא|לקנות|להזמין)\s*ל?\s*|מי\s+(?:יותר\s+טוב|עדיף)\s+מ?\s*)/u,
       ''
     )
-    core = core.replace(/\sב[א-ת][א-ת\s\-־"׳']*$/u, '')
-    core = core.replace(/בעיר\s+שלי\s*\??$/u, '')
-    core = core.replace(/(או\s+(?:חלופות\s+אחרות|מתחרים|אחרים))/u, '')
-    core = core.replace(/^[\sל]+/u, '')
+    // Strip dangling pre-purchase tail words that survive the prefix strip.
+    // e.g. "מה חשוב לבדוק" → leaves "לפני שקונים X" → strip that too.
+    core = core.replace(/^(?:לפני\s+(?:שקונים|שרוכשים|שמזמינים|בחירת|רכישת|קניית|הזמנת)\s+)/u, '')
+    // Strip leading prepositions and ל.
+    core = core.replace(/^(?:של|עבור|את)\s+/u, '')
+    core = core.replace(/^ל/u, '')
+    // Strip trailing recommendation suffix ("...מומלץ?", "...כדאי?").
+    core = core.replace(
+      /\s+(?:מומלץ|מומלצת|טוב|טובה|כדאי|מתאים|מתאימה|הכי\s+(?:טוב|טובה))\s*\??\s*$/u,
+      ''
+    )
+    // Strip trailing comparison tail.
+    core = core.replace(/\s+או\s+(?:חלופות\s+אחרות|מתחרים|אחרים).*$/u, '')
+    // Strip trailing city / "in my city".
+    core = core.replace(/\s+ב[א-ת][א-ת\s\-־"׳']*\??$/u, '')
+    core = core.replace(/\s+בעיר\s+שלי\s*\??$/u, '')
+    // Strip punctuation.
     core = core.replace(/[?!.,;:'"״׳`\-–—]/g, '')
     core = core.replace(/\s+/g, ' ').trim()
+
+    // Remove modifier words so "הליכון ביתי" / "הליכון מתקפל" collapse to "הליכון".
+    const words = core.split(' ').filter((w) => w && !HE_FAMILY_MODIFIERS.has(w))
+    return words.slice(0, 3).join(' ')
   } else {
     core = core.replace(
-      /^(which\s+company\s+is\s+recommended\s+for|which\s+expert\s+is\s+recommended\s+for|which\s+expert\s+suits|who\s+is\s+recommended\s+for|who\s+is\s+recommended|how\s+much\s+does|what\s+is\s+the\s+price\s+of|how\s+to\s+choose\s+a\s+provider\s+for|how\s+to\s+choose|how\s+to\s+find|what\s+to\s+check\s+before\s+choosing|what\s+to\s+check|what(?:'|’|`)?s\s+better\s*[—\-–]?|reviews?\s+of|how\s+to\s+verify|where\s+can\s+i|where\s+to\s+(?:buy|order|find)|what(?:'|’|`)?s\s+the\s+difference\s+between|how\s+to\s+(?:buy|order|get))/i,
+      /^(which\s+(?:company|expert|provider|brand|model|store|option|service)\s+(?:is\s+(?:recommended|best)|suits|fits)\s+(?:for|of)?\s*|who\s+is\s+(?:recommended|the\s+(?:best|expert|provider))\s+(?:for|of)?\s*|which\s+\S+\s+is\s+(?:recommended|best|good)\s+for?\s*|how\s+much\s+(?:does|to\s+(?:invest|pay))\s*|what(?:'|’|`)?s\s+the\s+(?:price|cost|price\s+range)\s+(?:of\s+)?|how\s+to\s+(?:choose\s+a\s+provider\s+for|choose|find|buy|order|verify\s+if\s+a)\s*|what\s+to\s+(?:check\s+before(?:\s+choosing)?|look\s+for|consider)\s*|how\s+do\s+you\s+(?:know|tell)\s*|what(?:'|’|`)?s\s+(?:better\s*[—\-–]?|the\s+difference\s+between)\s*|which\s+is\s+better\s*|reviews?\s+of(?:\s+services?)?\s*|where\s+(?:can\s+i|to\s+(?:buy|order|find))\s*|how\s+to\s+(?:find|buy|order|get)\s*|what\s+do\s+people\s+say\s+about\s*)/i,
       ''
     )
+    core = core.replace(/^(?:the|a|an|to|for|of|by)\s+/i, '')
+    core = core.replace(/\s+is\s+(?:recommended|best|good)\s*\??\s*$/i, '')
+    core = core.replace(/\s+or\s+(?:alternatives|competitors|others).*$/i, '')
     core = core.replace(/\sin\s+[a-z][a-z\s\-]*$/i, '')
-    core = core.replace(/(\s(?:or\s+(?:alternatives|competitors|others))|\sin\s+my\s+city|\sservices?|\scost|\sreliability)/gi, '')
-    core = core.replace(/^(the|a|an|to|for|of|by)\s+/i, '')
+    core = core.replace(/\s+in\s+my\s+city\s*\??$/i, '')
+    core = core.replace(/\s+(?:services?|cost|reliability)\s*\??\s*$/i, '')
     core = core.replace(/[?!.,;:'"`\-–—]/g, '')
     core = core.replace(/\s+/g, ' ').trim()
-  }
 
-  // Use the first 3 words as the family key — keeps city-variant cousins together.
-  return core.split(/\s+/).slice(0, 3).join(' ')
+    const words = core.split(' ').filter((w) => w && !EN_FAMILY_MODIFIERS.has(w))
+    return words.slice(0, 3).join(' ')
+  }
 }
 
 /**
- * Diversity-aware selection. Picks `limit` items from `candidates` such that:
- *   - no intent bucket exceeds intentCap
- *   - no keyword family exceeds familyCap (city variants of the same topic
- *     don't crowd the result)
- *   - no phrasing pattern exceeds phrasingCap (avoids "איזו חברה מומלצת ל..."
- *     repeating with different tails)
+ * Diversity-aware selection. Picks AT MOST `limit` items from `candidates`,
+ * but is allowed to return fewer when the diversity caps prevent more.
  *
- * Three passes:
- *   1. Strict caps + weighted-random from top-5 eligible (keeps variety across
- *      regenerates while respecting score)
- *   2. Relaxed caps (1.5x) for any remaining slot
- *   3. Pure score fill — never returns fewer than `min(limit, candidates.length)`
+ * The previous implementation had a score-only fallback that filled the limit
+ * regardless of diversity — that defeated the purpose. Quality > quantity:
+ * if the candidate pool only supports 7 truly diverse suggestions, return 7.
+ *
+ * Two stages:
+ *   Stage 1 (first 4 items, the prominent batch):
+ *     - max 1 per keyword family
+ *     - max 1 per phrasing pattern
+ *     - max 2 per intent bucket
+ *   Stage 2 (remaining slots):
+ *     - max ceil(limit/6) per keyword family (≈2 for limit=12)
+ *     - max ceil(limit/6) per phrasing pattern
+ *     - max ceil(limit/4) per intent bucket (≈3 for limit=12)
+ *
+ * Both stages walk candidates in score order and pick the first that fits the
+ * current caps. No randomness inside the caps — randomness comes from the
+ * generator's pool-level shuffle and the excludePrompts ledger across
+ * regenerate calls.
  */
 function selectDiverseSuggestions<
   T extends {
@@ -2937,12 +3051,6 @@ function selectDiverseSuggestions<
   if (candidates.length === 0) return []
 
   const sorted = [...candidates].sort((a, b) => b.score - a.score)
-
-  // Caps scale with the requested limit so a 6-question batch stays varied
-  // while a 24-question batch can show more depth per category.
-  const intentCap = Math.max(2, Math.ceil(limit / 4))
-  const familyCap = Math.max(2, Math.ceil(limit / 4))
-  const phrasingCap = Math.max(2, Math.ceil(limit / 5))
 
   type Classified = { item: T; intent: IntentBucket; family: string; phrasing: string }
   const classified: Classified[] = sorted.map((item) => ({
@@ -2967,49 +3075,34 @@ function selectDiverseSuggestions<
     phrasingCounts[c.phrasing] = (phrasingCounts[c.phrasing] || 0) + 1
   }
 
-  const fits = (c: Classified, scale: number): boolean => {
-    return (
-      (intentCounts[c.intent] || 0) < Math.ceil(intentCap * scale) &&
-      (familyCounts[c.family] || 0) < Math.ceil(familyCap * scale) &&
-      (phrasingCounts[c.phrasing] || 0) < Math.ceil(phrasingCap * scale)
-    )
-  }
-
-  // Pass 1: strict caps, weighted-random pick from top-5 eligible to keep
-  // regenerates fresh while preserving relevance.
-  while (selected.length < limit) {
-    const eligible = classified.filter((c) => !used.has(c.item) && fits(c, 1))
-    if (eligible.length === 0) break
-    const top = eligible.slice(0, 5).map((c) => c.item)
-    const pick = weightedRandomPick(top) || top[0]
-    if (!pick) break
-    const c = classified.find((x) => x.item === pick)
-    if (!c) break
+  // Stage 1: first 4 items get the strictest caps so the most prominent
+  // suggestions are maximally varied.
+  const STAGE_1_SIZE = Math.min(4, limit)
+  for (const c of classified) {
+    if (selected.length >= STAGE_1_SIZE) break
+    if (used.has(c.item)) continue
+    if ((familyCounts[c.family] || 0) >= 1) continue
+    if ((phrasingCounts[c.phrasing] || 0) >= 1) continue
+    if ((intentCounts[c.intent] || 0) >= 2) continue
     commit(c)
   }
 
-  // Pass 2: relax caps to 1.5x so slots can still be filled when one intent
-  // dominates the candidate pool.
-  while (selected.length < limit) {
-    const eligible = classified.filter((c) => !used.has(c.item) && fits(c, 1.5))
-    if (eligible.length === 0) break
-    const top = eligible.slice(0, 5).map((c) => c.item)
-    const pick = weightedRandomPick(top) || top[0]
-    if (!pick) break
-    const c = classified.find((x) => x.item === pick)
-    if (!c) break
-    commit(c)
-  }
+  // Stage 2: fill remaining slots with looser-but-still-strict caps.
+  const familyCap = Math.max(2, Math.ceil(limit / 6))
+  const phrasingCap = Math.max(2, Math.ceil(limit / 6))
+  const intentCap = Math.max(3, Math.ceil(limit / 4))
 
-  // Fallback: fill any remaining slots with the best-scoring leftovers,
-  // regardless of caps. We never return fewer than limit when the pool is large
-  // enough.
   for (const c of classified) {
     if (selected.length >= limit) break
     if (used.has(c.item)) continue
+    if ((familyCounts[c.family] || 0) >= familyCap) continue
+    if ((phrasingCounts[c.phrasing] || 0) >= phrasingCap) continue
+    if ((intentCounts[c.intent] || 0) >= intentCap) continue
     commit(c)
   }
 
+  // NO score-only fallback. If diversity caps prevent filling `limit`, the
+  // caller renders fewer suggestions + a "no more diverse questions" hint.
   return selected
 }
 

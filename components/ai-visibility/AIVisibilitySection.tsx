@@ -694,6 +694,10 @@ export default function AIVisibilitySection({
       const seenKeys = new Set<string>(exclude.map(normalize))
       const trulyNew = refreshed.filter((q) => !seenKeys.has(normalize(q.prompt)))
 
+      // Diversity threshold: the generator now refuses to force-fill the limit
+      // with near-duplicates, so a small result (< 4) means the candidate pool
+      // truly ran out of diverse options. Surface the helper hint in that case.
+      const DIVERSITY_THRESHOLD = 4
       if (trulyNew.length === 0) {
         // No new candidates: keep the existing list visible and surface the
         // empty-state message inline. Don't wipe what the user is looking at.
@@ -707,6 +711,11 @@ export default function AIVisibilitySection({
           return next
         })
         setSuggestedQuestions(trulyNew)
+        // Show the hint even when we have some results, if the diversity layer
+        // returned noticeably fewer than the visible batch size.
+        if (trulyNew.length < DIVERSITY_THRESHOLD) {
+          setNoNewSuggestionsFound(true)
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
@@ -1184,7 +1193,7 @@ export default function AIVisibilitySection({
                     )}
                     {noNewSuggestionsFound && (
                       <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
-                        {t('no_new_suggestions')}
+                        {t('no_diverse_suggestions')}
                       </div>
                     )}
                   </>

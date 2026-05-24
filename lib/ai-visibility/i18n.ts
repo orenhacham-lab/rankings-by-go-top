@@ -134,6 +134,10 @@ const STRINGS = {
     he: 'לא נמצאו שאלות מומלצות חדשות כרגע.',
     en: 'No new suggested questions found right now.',
   },
+  no_diverse_suggestions: {
+    he: 'לא נמצאו כרגע עוד שאלות מגוונות. כדי לקבל עוד המלצות, הוסיפו מילות מפתח נוספות, שירותים או קטגוריות.',
+    en: 'No more diverse questions were found right now. Add more keywords, services, or categories to get more suggestions.',
+  },
   refresh_suggestions: { he: 'רענן', en: 'Refresh' },
   generate_more_suggestions: { he: 'צור עוד שאלות', en: 'Generate more questions' },
   generating_more: { he: 'יוצר שאלות נוספות...', en: 'Generating more questions...' },
