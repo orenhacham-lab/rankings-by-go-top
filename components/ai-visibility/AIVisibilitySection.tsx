@@ -2138,8 +2138,8 @@ function GeoOpportunityMappingSection({
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 4 templates: phrased as "in answers where the business didn't
-  // appear, less X content was found. Worth strengthening Y on the site."
+  // Card 4 templates: structured as "X appeared less when business
+  // didn't appear. Worth doing Y."
   // ─────────────────────────────────────────────────────────────────────
   const missingSignalRecommendation = (
     signal: ContentSignalKey,
@@ -2148,32 +2148,32 @@ function GeoOpportunityMappingSection({
     if (lang === 'he') {
       switch (signal) {
         case 'pricing':
-          return 'בתוצאות שבהן העסק לא הופיע, היה פחות מידע על מחירים או תנאי רכישה. כדאי להציג באתר מידע ברור יותר על עלויות ומה כלול.'
+          return 'מידע על מחירים הופיע פחות כשהעסק לא הופיע. כדאי להציג טווחי מחיר, מה כלול בשירות ותנאי רכישה.'
         case 'reviews':
-          return 'בתוצאות שבהן העסק לא הופיע, הופיעו פחות ביקורות ודירוגים. כדאי לחזק באתר עדויות לקוחות, דירוגים והוכחות אמון.'
+          return 'ביקורות ודירוגים הופיעו פחות כשהעסק לא הופיע. כדאי להבליט עדויות לקוחות והוכחות אמון באתר.'
         case 'comparison':
-          return 'בתוצאות שבהן העסק לא הופיע, היה פחות תוכן השוואתי. כדאי להוסיף עמודים שמשווים בין שירותים, מוצרים או אפשרויות.'
+          return 'תוכן השוואתי הופיע פחות כשהעסק לא הופיע. כדאי להוסיף עמודים שמשווים בין שירותים, מוצרים או אפשרויות.'
         case 'list':
-          return 'בתוצאות שבהן העסק לא הופיע, היה פחות תוכן מסודר לשאלות נפוצות. כדאי להוסיף תשובות קצרות וברורות לשאלות מרכזיות.'
+          return 'תוכן מסודר לשאלות נפוצות הופיע פחות כשהעסק לא הופיע. כדאי להוסיף תשובות קצרות וברורות לשאלות מרכזיות.'
         case 'recommendation':
-          return 'בתוצאות שבהן העסק לא הופיע, הופיע פחות תוכן המלצה. כדאי להוסיף באתר תוכן שמכוון את הלקוח לבחירה הנכונה עבורו.'
+          return 'תוכן המלצה הופיע פחות כשהעסק לא הופיע. כדאי להוסיף תוכן שמכוון את הלקוח לבחירה הנכונה עבורו.'
         case 'local':
-          return 'בתוצאות שבהן העסק לא הופיע, הופיע פחות מידע מקומי. כדאי להבליט באתר אזורי שירות, כתובת וזמינות.'
+          return 'מידע מקומי הופיע פחות כשהעסק לא הופיע. כדאי להבליט אזורי שירות, כתובת וזמינות באתר.'
       }
     }
     switch (signal) {
       case 'pricing':
-        return 'In answers where the business did not appear, there was less pricing or purchase information. Worth presenting clearer cost details and what is included.'
+        return 'Pricing information appeared less when the business did not appear. Worth displaying price ranges, what is included, and purchase terms.'
       case 'reviews':
-        return 'In answers where the business did not appear, fewer reviews and ratings were present. Worth strengthening testimonials, ratings, and trust signals.'
+        return 'Reviews and ratings appeared less when the business did not appear. Worth highlighting customer testimonials and trust signals.'
       case 'comparison':
-        return 'In answers where the business did not appear, less comparison content was present. Worth adding pages that compare services, products, or options.'
+        return 'Comparison content appeared less when the business did not appear. Worth adding pages that compare services, products, or options.'
       case 'list':
-        return 'In answers where the business did not appear, less structured FAQ content was present. Worth adding clear answers to key recurring questions.'
+        return 'FAQ and structured content appeared less when the business did not appear. Worth adding clear answers to key recurring questions.'
       case 'recommendation':
-        return 'In answers where the business did not appear, less recommendation content was present. Worth adding guidance content that helps customers choose.'
+        return 'Recommendation content appeared less when the business did not appear. Worth adding guidance that helps customers choose.'
       case 'local':
-        return 'In answers where the business did not appear, less local information was present. Worth highlighting service areas, address, and availability.'
+        return 'Local information appeared less when the business did not appear. Worth highlighting service areas, address, and availability.'
     }
   }
 
@@ -2240,13 +2240,12 @@ function GeoOpportunityMappingSection({
       const promptDisplay = p.promptText.length > 90
         ? p.promptText.slice(0, 90).trim() + '…'
         : p.promptText
+      const actionText = isHebrew
+        ? 'כדאי ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלה הזו.'
+        : 'Consider creating a content page or FAQ section that directly answers this question.'
       const text = isHebrew
-        ? p.success === 0
-          ? `העסק לא הופיע כלל בשאלה: "${promptDisplay}". כדאי לבנות תוכן ייעודי שעונה ישירות על השאלה הזו.`
-          : `העסק כמעט לא הופיע בשאלה: "${promptDisplay}" (${p.success} מתוך ${p.total} מנועים). כדאי לחזק תוכן רלוונטי באתר.`
-        : p.success === 0
-          ? `The business did not appear at all for: "${promptDisplay}". Worth building targeted content that directly answers this question.`
-          : `The business barely appeared for: "${promptDisplay}" (${p.success} of ${p.total} engines). Worth strengthening relevant content on the site.`
+        ? `העסק לא הופיע בשאלה: "${promptDisplay}"\n${actionText}`
+        : `The business did not appear for: "${promptDisplay}"\n${actionText}`
       lines.push({ text, isFirst: idx === 0 })
     })
     return lines
@@ -2355,8 +2354,8 @@ function GeoOpportunityMappingSection({
   }
 
   const fallbackText = isHebrew
-    ? 'לא זוהו כרגע הזדמנויות שיפור מובהקות. מומלץ להריץ עוד שאלות ומנועים כדי לקבל מיפוי מדויק יותר.'
-    : 'No clear improvement opportunities detected yet. Run more questions and engines to get a more accurate mapping.'
+    ? 'הנתונים הנוכחיים לא מצביעים על חולשה ברורה. כדי לקבל מיפוי מדויק יותר, מומלץ להריץ עוד שאלות ומנועים.'
+    : 'The current data does not indicate any clear weakness. To get a more accurate mapping, it is recommended to run more questions and engines.'
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
