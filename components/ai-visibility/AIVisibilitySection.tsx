@@ -797,6 +797,7 @@ export default function AIVisibilitySection({
           {/* GEO OPPORTUNITY MAPPING (Phase 2A) — project-level aggregated insights */}
           <GeoOpportunityMappingSection
             mapping={geoOpportunityMapping}
+            results={allResults}
             isHebrew={isHebrew}
             t={t}
           />
@@ -2062,27 +2063,27 @@ function ResultDetailDrawer({
 }
 
 /**
- * GEO Opportunity Mapping — Phase 2A project-level intelligence panel.
+ * GEO Opportunity Mapping — actionable recommendations panel.
  *
- * Refactored to provide ACTIONABLE RECOMMENDATIONS instead of analytics.
+ * Answers: "What should I improve on my website so AI engines show me more?"
  *
- * Answers the customer question: "What should I improve on my website
- * so AI engines show me more?"
+ * Dynamic card count: each card renders ONLY if it has a real opportunity.
+ * If no card has data, a single fallback message is shown.
  *
- * The 4 cards are:
- *   1. Content to Strengthen — which content types are weak, what to add
- *   2. Questions Where Weak   — which question types/engines underperform
- *   3. Engines to Strengthen  — which engines have room for improvement
- *   4. Missing vs Successful  — what distinguishes failed from successful results
- *
- * All recommendations are deterministic and tied to actual data.
+ * Possible cards (deterministic, data-driven, no inventions):
+ *   1. תוכן שכדאי לחזק — weak content signals to strengthen
+ *   2. שאלות שבהן העסק חלש — specific prompts where business is missing/weak
+ *   3. מנועים שכדאי לחזק — engines with significantly low visibility
+ *   4. מה חסר כשהעסק לא מופיע — content patterns missing from failed results
  */
 function GeoOpportunityMappingSection({
   mapping,
+  results,
   isHebrew,
   t,
 }: {
   mapping: GeoOpportunityMapping | null
+  results: ResultRow[]
   isHebrew: boolean
   t: T
 }) {
@@ -2096,214 +2097,266 @@ function GeoOpportunityMappingSection({
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // Actionable recommendation phrases for content signals.
-  // Maps weak signals to specific, actionable improvements.
+  // Card 1 templates: actionable instruction per weak content signal.
+  // Each phrase is the full sentence (no trailing fragment), so they
+  // read naturally on their own.
   // ─────────────────────────────────────────────────────────────────────
-  const contentActionPhrase = (
+  const weakSignalRecommendation = (
     signal: ContentSignalKey,
     lang: 'he' | 'en',
   ): string => {
     if (lang === 'he') {
       switch (signal) {
-        case 'pricing': return 'הצג מחירים, יתרונות וכל מה שצריך לקניה'
-        case 'reviews': return 'הוסף ביקורות וציוני דירוגים'
-        case 'comparison': return 'בנה עמודי השוואה בין אפשרויות'
-        case 'list': return 'יצור עמודי שאלות נפוצות ורשימות'
-        case 'recommendation': return 'הוסף המלצות וכיצד לבחור את הפתרון'
-        case 'local': return 'הדגש אזורי שירות, מיקומים וזמינות'
+        case 'pricing':
+          return 'להוסיף באתר מידע ברור על מחירים, טווחי מחיר ומה כלול בשירות.'
+        case 'reviews':
+          return 'להציג ביקורות, דירוגים ועדויות לקוחות באזורים בולטים באתר.'
+        case 'comparison':
+          return 'להוסיף עמודי השוואה שיעזרו ללקוח לבחור בין מוצרים, שירותים או אפשרויות.'
+        case 'list':
+          return 'להוסיף שאלות נפוצות, רשימות ותשובות קצרות לשאלות שחוזרות אצל לקוחות.'
+        case 'recommendation':
+          return 'להוסיף תוכן המלצה שמסביר ללקוח כיצד לבחור את הפתרון המתאים לו.'
+        case 'local':
+          return 'להבליט אזורי שירות, כתובת, זמינות ומידע מקומי רלוונטי.'
       }
     }
     switch (signal) {
-      case 'pricing': return 'display pricing, benefits, and purchase details'
-      case 'reviews': return 'add customer reviews and ratings'
-      case 'comparison': return 'create comparison pages between options'
-      case 'list': return 'build FAQ and list-formatted pages'
-      case 'recommendation': return 'add recommendations and selection guides'
-      case 'local': return 'highlight service areas, locations, and availability'
+      case 'pricing':
+        return 'Add clear pricing information, price ranges, and what is included.'
+      case 'reviews':
+        return 'Display reviews, ratings, and customer testimonials in prominent areas of the site.'
+      case 'comparison':
+        return 'Add comparison pages that help customers choose between products, services, or options.'
+      case 'list':
+        return 'Add FAQs, lists, and concise answers to recurring customer questions.'
+      case 'recommendation':
+        return 'Add recommendation content explaining how to choose the right solution.'
+      case 'local':
+        return 'Highlight service areas, address, availability, and relevant local information.'
     }
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 1: Content to Strengthen — show weak signals as opportunities.
-  // Signals with LOW visibility are candidates for improvement.
+  // Card 4 templates: phrased as "in answers where the business didn't
+  // appear, less X content was found. Worth strengthening Y on the site."
   // ─────────────────────────────────────────────────────────────────────
-  const contentStrengtheningCards = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean }> = []
-
-    // Find signals with weak-to-moderate visibility (opportunities for improvement)
-    const weak = mapping.contentSignals.filter((s) => s.visibilityRate < 60).slice(0, 3)
-
-    if (weak.length === 0) {
-      return []
+  const missingSignalRecommendation = (
+    signal: ContentSignalKey,
+    lang: 'he' | 'en',
+  ): string => {
+    if (lang === 'he') {
+      switch (signal) {
+        case 'pricing':
+          return 'בתוצאות שבהן העסק לא הופיע, היה פחות מידע על מחירים או תנאי רכישה. כדאי להציג באתר מידע ברור יותר על עלויות ומה כלול.'
+        case 'reviews':
+          return 'בתוצאות שבהן העסק לא הופיע, הופיעו פחות ביקורות ודירוגים. כדאי לחזק באתר עדויות לקוחות, דירוגים והוכחות אמון.'
+        case 'comparison':
+          return 'בתוצאות שבהן העסק לא הופיע, היה פחות תוכן השוואתי. כדאי להוסיף עמודים שמשווים בין שירותים, מוצרים או אפשרויות.'
+        case 'list':
+          return 'בתוצאות שבהן העסק לא הופיע, היה פחות תוכן מסודר לשאלות נפוצות. כדאי להוסיף תשובות קצרות וברורות לשאלות מרכזיות.'
+        case 'recommendation':
+          return 'בתוצאות שבהן העסק לא הופיע, הופיע פחות תוכן המלצה. כדאי להוסיף באתר תוכן שמכוון את הלקוח לבחירה הנכונה עבורו.'
+        case 'local':
+          return 'בתוצאות שבהן העסק לא הופיע, הופיע פחות מידע מקומי. כדאי להבליט באתר אזורי שירות, כתובת וזמינות.'
+      }
     }
+    switch (signal) {
+      case 'pricing':
+        return 'In answers where the business did not appear, there was less pricing or purchase information. Worth presenting clearer cost details and what is included.'
+      case 'reviews':
+        return 'In answers where the business did not appear, fewer reviews and ratings were present. Worth strengthening testimonials, ratings, and trust signals.'
+      case 'comparison':
+        return 'In answers where the business did not appear, less comparison content was present. Worth adding pages that compare services, products, or options.'
+      case 'list':
+        return 'In answers where the business did not appear, less structured FAQ content was present. Worth adding clear answers to key recurring questions.'
+      case 'recommendation':
+        return 'In answers where the business did not appear, less recommendation content was present. Worth adding guidance content that helps customers choose.'
+      case 'local':
+        return 'In answers where the business did not appear, less local information was present. Worth highlighting service areas, address, and availability.'
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 1: Content to strengthen — weak content signals only.
+  // A signal is "weak" if its visibilityRate is below 60% (genuinely
+  // underperforming in the project's successful answers).
+  // ─────────────────────────────────────────────────────────────────────
+  const contentStrengthCard = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
+    const weak = mapping.contentSignals
+      .filter((s) => s.visibilityRate < 60)
+      .sort((a, b) => a.visibilityRate - b.visibilityRate)
+      .slice(0, 3)
+
+    if (weak.length === 0) return []
 
     weak.forEach((signal, idx) => {
-      const action = contentActionPhrase(signal.signal, isHebrew ? 'he' : 'en')
-      const rate = signal.visibilityRate
-      const text = isHebrew
-        ? `${action}. כרגע זה מופיע רק ב-${rate}% מהתשובות שבהן אתה מופיע.`
-        : `${capitalize(action)}. Currently appears in only ${rate}% of answers where you're featured.`
-
       lines.push({
-        text,
+        text: weakSignalRecommendation(signal.signal, isHebrew ? 'he' : 'en'),
         isFirst: idx === 0,
       })
     })
-
     return lines
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 2: Questions Where Business is Weak — underperforming engines.
-  // Compare each engine's success rate to the overall average.
+  // Card 2: Specific prompts where business is missing or nearly missing.
+  // For each prompt, count how many engines featured the business vs.
+  // total engines scanned. Only show prompts where the business is in
+  // 0 engines OR at most 1 out of 3+ engines.
   // ─────────────────────────────────────────────────────────────────────
-  const weakEngineOpportunities = (() => {
+  const weakPromptsCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-    const avgSuccessRate = mapping.totalResults > 0
-      ? Math.round((mapping.totalSuccess / mapping.totalResults) * 100)
-      : 0
-
-    // Find engines below average
-    const weak = mapping.enginePatterns
-      .map((e) => ({
-        ...e,
-        successRate: e.totalScans > 0 ? Math.round((e.totalSuccess / e.totalScans) * 100) : 0,
-      }))
-      .filter((e) => e.successRate < avgSuccessRate)
-      .slice(0, 3)
-
-    if (weak.length === 0) {
-      return []
+    // Group results by prompt text (fallback to promptId if no text).
+    const byPrompt = new Map<string, { promptText: string; total: number; success: number }>()
+    for (const r of results) {
+      const key = r.promptText?.trim() || r.promptId || ''
+      if (!key) continue
+      const isSuccess = r.displayMentioned || r.displayCited
+      const entry = byPrompt.get(key) || { promptText: r.promptText || '', total: 0, success: 0 }
+      entry.total += 1
+      if (isSuccess) entry.success += 1
+      byPrompt.set(key, entry)
     }
 
-    weak.forEach((engine, idx) => {
-      const name = engineDisplayName(engine.engine)
-      const gap = avgSuccessRate - engine.successRate
+    // Only count prompts with enough engine coverage (at least 2 scans),
+    // so single-engine prompts don't pollute the list.
+    const weakPrompts = Array.from(byPrompt.values())
+      .filter((p) => p.total >= 2 && p.promptText)
+      .map((p) => ({
+        ...p,
+        rate: Math.round((p.success / p.total) * 100),
+      }))
+      .filter((p) => p.rate <= 25) // missing or near-missing
+      .sort((a, b) => a.rate - b.rate)
+      .slice(0, 3)
+
+    if (weakPrompts.length === 0) return []
+
+    weakPrompts.forEach((p, idx) => {
+      // Truncate long prompts so the card stays scannable.
+      const promptDisplay = p.promptText.length > 90
+        ? p.promptText.slice(0, 90).trim() + '…'
+        : p.promptText
       const text = isHebrew
-        ? `ב-${name} אתה מופיע רק ב-${engine.successRate}% מהשאלות. חזק את נוכחותך בו ב-${gap} נקודות.`
-        : `In ${capitalize(name)}, you appear in only ${engine.successRate}% of questions. Strengthen your presence by ${gap} points.`
-
-      lines.push({
-        text,
-        isFirst: idx === 0,
-      })
+        ? p.success === 0
+          ? `העסק לא הופיע כלל בשאלה: "${promptDisplay}". כדאי לבנות תוכן ייעודי שעונה ישירות על השאלה הזו.`
+          : `העסק כמעט לא הופיע בשאלה: "${promptDisplay}" (${p.success} מתוך ${p.total} מנועים). כדאי לחזק תוכן רלוונטי באתר.`
+        : p.success === 0
+          ? `The business did not appear at all for: "${promptDisplay}". Worth building targeted content that directly answers this question.`
+          : `The business barely appeared for: "${promptDisplay}" (${p.success} of ${p.total} engines). Worth strengthening relevant content on the site.`
+      lines.push({ text, isFirst: idx === 0 })
     })
-
     return lines
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 3: Engines to Strengthen — identify underperforming engines.
-  // Show engines with below-average success compared to overall.
+  // Card 3: Engines worth strengthening — engines where visibility is
+  // significantly low (rate < 50% AND clearly below the overall average).
   // ─────────────────────────────────────────────────────────────────────
-  const engineImprovementOpportunities = (() => {
+  const weakEnginesCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-    const avgSuccessRate = mapping.totalResults > 0
+    const avgRate = mapping.totalResults > 0
       ? Math.round((mapping.totalSuccess / mapping.totalResults) * 100)
       : 0
 
-    // Find engines performing below average
     const underperforming = mapping.enginePatterns
       .map((e) => ({
-        ...e,
-        successRate: e.totalScans > 0 ? Math.round((e.totalSuccess / e.totalScans) * 100) : 0,
+        engine: e.engine,
+        rate: e.totalScans > 0 ? Math.round((e.totalSuccess / e.totalScans) * 100) : 0,
       }))
-      .filter((e) => e.successRate < avgSuccessRate)
-      .sort((a, b) => a.successRate - b.successRate)
+      // Threshold: must be both <50% AND at least 10 points below average.
+      .filter((e) => e.rate < 50 && e.rate <= avgRate - 10)
+      .sort((a, b) => a.rate - b.rate)
       .slice(0, 3)
 
-    if (underperforming.length === 0) {
-      return []
-    }
+    if (underperforming.length === 0) return []
 
-    underperforming.forEach((engine, idx) => {
-      const name = engineDisplayName(engine.engine)
-      const rate = engine.successRate
+    underperforming.forEach((e, idx) => {
+      const name = engineDisplayName(e.engine)
       const text = isHebrew
-        ? `בנקודה הנוכחית, אתה מופיע ב-${rate}% מהשאלות ב-${name}. יש הרבה מקום לשיפור כאן.`
-        : `Currently, you appear in ${rate}% of questions on ${capitalize(name)}. There's significant room for improvement.`
-
-      lines.push({
-        text,
-        isFirst: idx === 0,
-      })
+        ? `ב-${name} העסק מופיע רק ב-${e.rate}% מהשאלות. כדאי להשקיע בחיזוק התוכן הרלוונטי למנוע הזה.`
+        : `On ${name}, the business appears in only ${e.rate}% of questions. Worth investing in strengthening relevant content for this engine.`
+      lines.push({ text, isFirst: idx === 0 })
     })
-
     return lines
   })()
 
   // ─────────────────────────────────────────────────────────────────────
-  // Card 4: Missing vs Successful Results — signals to add.
-  // Shows which content types are missing when we fail but present when we win.
+  // Card 4: What's missing when the business doesn't appear.
+  // Uses mapping.missingOpportunities. Dedupes by signal — each content
+  // signal yields a unique sentence, so no repetition.
   // ─────────────────────────────────────────────────────────────────────
-  const missingSignalOpportunities = (() => {
+  const missingGapsCard = (() => {
     const lines: Array<{ text: string; isFirst?: boolean }> = []
+    const seen = new Set<string>()
 
-    // Show only high-impact missing signals (failureRate >= 50%)
     const impactful = mapping.missingOpportunities
-      .filter((m) => m.failureRate >= 50)
-      .slice(0, 3)
+      .filter((m) => m.category === 'content' && m.failureRate >= 50)
 
-    if (impactful.length === 0) {
-      return []
-    }
-
-    impactful.forEach((miss, idx) => {
-      let action: string
-      if (miss.category === 'content') {
-        action = contentActionPhrase(miss.signal as ContentSignalKey, isHebrew ? 'he' : 'en')
-      } else {
-        // For citation types, provide general guidance
-        action = isHebrew
-          ? `שפר את נוכחותך בסוג זה של מקור`
-          : `strengthen your presence in this source type`
-      }
-
-      const text = isHebrew
-        ? `כשאתה לא מופיע, ${action}. זה חסר ב-${miss.failureRate}% מהתשובות שבהן לא הופעת.`
-        : `When you don't appear, ${action}. It's missing from ${miss.failureRate}% of unsuccessful results.`
-
+    for (const miss of impactful) {
+      const key = String(miss.signal)
+      if (seen.has(key)) continue
+      seen.add(key)
       lines.push({
-        text,
-        isFirst: idx === 0,
+        text: missingSignalRecommendation(miss.signal as ContentSignalKey, isHebrew ? 'he' : 'en'),
+        isFirst: lines.length === 0,
       })
-    })
-
+      if (lines.length >= 3) break
+    }
     return lines
   })()
 
-  // Fallback message when insufficient data across all cards
-  const hasAnyData = contentStrengtheningCards.length > 0
-    || weakEngineOpportunities.length > 0
-    || engineImprovementOpportunities.length > 0
-    || missingSignalOpportunities.length > 0
-
-  if (!hasAnyData) {
-    const fallbackText = isHebrew
-      ? 'עדיין אין מספיק נתונים כדי להציג הזדמנויות שיפור אמינות. הריצו עוד שאלות ומנועים כדי לקבל המלצות מדויקות יותר.'
-      : 'Not yet enough data to show improvement opportunities. Run more questions and engines to get more accurate recommendations.'
-
-    return (
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              {t('geo_opp_title')}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {t('geo_opp_subtitle')}
-            </p>
-          </div>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-            {mapping.totalSuccess}/{mapping.totalResults}
-          </span>
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{fallbackText}</p>
-      </div>
-    )
+  // ─────────────────────────────────────────────────────────────────────
+  // Build the visible card list. Only cards with real opportunities
+  // are rendered; otherwise the section shows a single fallback.
+  // ─────────────────────────────────────────────────────────────────────
+  type CardSpec = {
+    title: string
+    tone: 'emerald' | 'blue' | 'indigo' | 'amber'
+    icon: React.ReactNode
+    sentences: Array<{ text: string; isFirst?: boolean }>
   }
+  const cards: CardSpec[] = []
+  if (contentStrengthCard.length > 0) {
+    cards.push({
+      title: isHebrew ? 'תוכן שכדאי לחזק' : 'Content to strengthen',
+      tone: 'emerald',
+      icon: <BarChart3 className="w-5 h-5" />,
+      sentences: contentStrengthCard,
+    })
+  }
+  if (weakPromptsCard.length > 0) {
+    cards.push({
+      title: isHebrew ? 'שאלות שבהן העסק חלש' : 'Questions where the business is weak',
+      tone: 'blue',
+      icon: <TrendingDown className="w-5 h-5" />,
+      sentences: weakPromptsCard,
+    })
+  }
+  if (weakEnginesCard.length > 0) {
+    cards.push({
+      title: isHebrew ? 'מנועים שכדאי לחזק' : 'Engines worth strengthening',
+      tone: 'indigo',
+      icon: <Cpu className="w-5 h-5" />,
+      sentences: weakEnginesCard,
+    })
+  }
+  if (missingGapsCard.length > 0) {
+    cards.push({
+      title: isHebrew ? 'מה חסר כשהעסק לא מופיע' : 'What is missing when the business does not appear',
+      tone: 'amber',
+      icon: <Award className="w-5 h-5" />,
+      sentences: missingGapsCard,
+    })
+  }
+
+  const fallbackText = isHebrew
+    ? 'לא זוהו כרגע הזדמנויות שיפור מובהקות. מומלץ להריץ עוד שאלות ומנועים כדי לקבל מיפוי מדויק יותר.'
+    : 'No clear improvement opportunities detected yet. Run more questions and engines to get a more accurate mapping.'
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
@@ -2330,36 +2383,22 @@ function GeoOpportunityMappingSection({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <OpportunityCard
-          title={isHebrew ? 'תוכן שכדאי לחזק' : 'Content to strengthen'}
-          tone="emerald"
-          icon={<BarChart3 className="w-5 h-5" />}
-          sentences={contentStrengtheningCards as any}
-          emptyText={isHebrew ? 'האתר שלך כבר חזק בכל סוגי התוכן הדרושים.' : 'Your site is already strong across all needed content types.'}
-        />
-        <OpportunityCard
-          title={isHebrew ? 'שאלות שבהן העסק חלש' : 'Questions where business is weak'}
-          tone="blue"
-          icon={<TrendingDown className="w-5 h-5" />}
-          sentences={weakEngineOpportunities as any}
-          emptyText={isHebrew ? 'אתה חזק בכל השאלות שנוסו.' : 'You\'re strong across all tested questions.'}
-        />
-        <OpportunityCard
-          title={isHebrew ? 'מנועים שכדאי לחזק בהם נראות' : 'Engines to strengthen visibility in'}
-          tone="indigo"
-          icon={<Cpu className="w-5 h-5" />}
-          sentences={engineImprovementOpportunities as any}
-          emptyText={isHebrew ? 'אתה בעל נראות שלוה בכל המנועים.' : 'You have consistent visibility across all engines.'}
-        />
-        <OpportunityCard
-          title={isHebrew ? 'מה חסר לעומת תוצאות חזקות' : 'What\'s missing vs successful results'}
-          tone="amber"
-          icon={<Award className="w-5 h-5" />}
-          sentences={missingSignalOpportunities as any}
-          emptyText={isHebrew ? 'אין הבדלים ברורים בין תוצאות חזקות לחלשות.' : 'No clear differences between successful and unsuccessful results.'}
-        />
-      </div>
+      {cards.length === 0 ? (
+        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{fallbackText}</p>
+      ) : (
+        <div className={`grid grid-cols-1 ${cards.length > 1 ? 'md:grid-cols-2' : ''} gap-3`}>
+          {cards.map((card, i) => (
+            <OpportunityCard
+              key={i}
+              title={card.title}
+              tone={card.tone}
+              icon={card.icon}
+              sentences={card.sentences}
+              emptyText=""
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2405,10 +2444,9 @@ function OpportunityCard({
         <ul className="space-y-1.5 text-xs leading-relaxed">
           {sentences.map((item, i) => (
             <li key={i} className="flex gap-1.5">
-              <span className={item.isFirst ? 'text-slate-400 dark:text-slate-500 flex-shrink-0' : 'text-slate-400 dark:text-slate-500 flex-shrink-0'}>•</span>
-              <span className={item.isFirst ? 'font-medium text-slate-800 dark:text-slate-200' : item.isEmpty ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-300'}>
+              <span className="text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span className={item.isFirst ? 'font-medium text-slate-800 dark:text-slate-200' : 'text-slate-700 dark:text-slate-300'}>
                 {item.text}
-                {item.isPrelim && <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-1">(preliminary)</span>}
               </span>
             </li>
           ))}
