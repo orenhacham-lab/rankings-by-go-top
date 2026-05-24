@@ -376,7 +376,10 @@ export default function AIVisibilitySection({
       manualProfile,
       shuffle: false,
     })
-    setSuggestedQuestions(suggestions.slice(0, 4))
+    // Keep all generated suggestions in state so the "Show more" button can
+    // expand beyond the initial 4 visible. Render-time slicing handles
+    // pagination based on showAllSmartQuestions.
+    setSuggestedQuestions(suggestions)
   }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile])
 
   useEffect(() => {
@@ -850,7 +853,7 @@ export default function AIVisibilitySection({
                 manualProfile: profile,
                 shuffle: false,
               })
-              setSuggestedQuestions(refreshed.slice(0, 4))
+              setSuggestedQuestions(refreshed)
             }}
           />
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">

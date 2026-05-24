@@ -83,6 +83,13 @@ export default function PromptSuggestions({
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Initial-load tracker — separate from `regenerating`. Distinguishes
+  // "still loading suggestions" from "loaded with zero results" so the
+  // "all added" empty state never shows during the initial fetch.
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  // Show-more pagination — start with 4 items, expand on click.
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false)
+  const INITIAL_SUGGESTIONS = 4
 
   // Session memory: every prompt shown in any past regenerate (avoid repeats),
   // the *last* shown set (never echo the previous set exactly),
@@ -160,6 +167,9 @@ export default function PromptSuggestions({
       recentlyUsedSecondaryRef.current = new Set()
       alreadyAddedPromptsRef.current = new Set()
       setError(null)
+      setIsLoadingSuggestions(true)
+      setShowAllSuggestions(false)
+      setSuggestions([])
 
       // Fetch already-added prompts first
       fetchAlreadyAdded().then(() => {
@@ -178,6 +188,7 @@ export default function PromptSuggestions({
         })
         recordAndSet(produced, 6)
         setSelectedIds(new Set())
+        setIsLoadingSuggestions(false)
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -209,6 +220,7 @@ export default function PromptSuggestions({
     })
     recordAndSet(produced, 6)
     setSelectedIds(new Set())
+    setShowAllSuggestions(false)
     setRegenerating(false)
   }
 
@@ -327,29 +339,37 @@ export default function PromptSuggestions({
           </div>
         )}
 
-        {regenerating ? (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 animate-pulse">
-                <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 mt-1" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />
-                  <div className="h-3 w-20 bg-slate-100 dark:bg-slate-800 rounded-full" />
+        {isLoadingSuggestions || regenerating ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <span>{t('loading_suggestions')}</span>
+            </div>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 animate-pulse">
+                  <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 mt-1" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />
+                    <div className="h-3 w-20 bg-slate-100 dark:bg-slate-800 rounded-full" />
+                  </div>
+                  <div className="w-12 h-7 bg-slate-100 dark:bg-slate-800 rounded" />
                 </div>
-                <div className="w-12 h-7 bg-slate-100 dark:bg-slate-800 rounded" />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : suggestions.length === 0 ? (
           <div className="text-center py-10 text-slate-500 dark:text-slate-400">
-            <div className="text-sm mb-3">{t('all_added')}</div>
+            <div className="text-sm mb-3">
+              {alreadyAddedPromptsRef.current.size > 0 ? t('all_added') : t('no_new_suggestions')}
+            </div>
             <Button size="sm" variant="outline" onClick={regenerate}>
               {t('generate_again')}
             </Button>
           </div>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-            {suggestions.map((s) => {
+            {(showAllSuggestions ? suggestions : suggestions.slice(0, INITIAL_SUGGESTIONS)).map((s) => {
               const checked = selectedIds.has(s.id)
               const isEditing = editingId === s.id
               return (
@@ -419,6 +439,17 @@ export default function PromptSuggestions({
                 </div>
               )
             })}
+            {!showAllSuggestions && suggestions.length > INITIAL_SUGGESTIONS && (
+              <div className="text-center pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllSuggestions(true)}
+                >
+                  {t('show_more')}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

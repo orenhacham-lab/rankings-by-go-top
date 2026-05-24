@@ -125,7 +125,15 @@ const STRINGS = {
   },
   add_question_label: { he: 'הוסף שאלה למעקב', en: 'Add question to tracking' },
   already_tracked: { he: 'כבר במעקב', en: 'Already tracked' },
-  all_added: { he: 'כל השאלות נוספו.', en: 'All questions added.' },
+  all_added: { he: 'כל השאלות נוספו', en: 'All questions were added' },
+  loading_suggestions: {
+    he: 'טוען שאלות מומלצות...',
+    en: 'Loading suggested questions...',
+  },
+  no_new_suggestions: {
+    he: 'לא נמצאו שאלות מומלצות חדשות כרגע.',
+    en: 'No new suggested questions found right now.',
+  },
   query_label: { he: 'שאלת AI', en: 'AI Query' },
   country_label: { he: 'מדינה (ISO)', en: 'Country (ISO)' },
   language_label: { he: 'שפה', en: 'Language' },
