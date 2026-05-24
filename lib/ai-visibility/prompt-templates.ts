@@ -2051,6 +2051,84 @@ function isAwkwardQuestion(
 }
 
 /**
+ * Detect questions that READ as AI-generated padding rather than something a
+ * real user would type into Google/ChatGPT/Gemini. These are filtered out
+ * post-isAwkwardQuestion, regardless of confidence score — quality > quantity.
+ *
+ * Patterns caught:
+ *   • Abstract comparisons with no real entity:
+ *       "מה עדיף — הליכון או חלופות אחרות?"
+ *       "What's better — treadmill or alternatives?"
+ *   • Generic "expert / provider / company for X" when X is a product keyword:
+ *       "איך לבחור ספק להליכון?"
+ *       "איזה מומחה מתאים להליכון?"
+ *   • Vague openers a real user almost never uses:
+ *       "מי מומלץ עבור הליכון?"
+ *
+ * Returns true → reject the question.
+ */
+const SERVICE_LIKE_CATEGORIES: BusinessCategory[] = [
+  'agency',
+  'cleaning',
+  'saas',
+  'local_service',
+  'home_improvement_service',
+  'healthcare',
+  'legal',
+  'real_estate',
+  'fitness',
+  'beauty',
+  'education',
+]
+
+function isUnnaturalQuestion(
+  question: string,
+  category: BusinessCategory,
+  lang: 'he' | 'en'
+): boolean {
+  const q = question.trim()
+  if (!q) return true
+
+  const isServiceCategory = SERVICE_LIKE_CATEGORIES.includes(category)
+
+  if (lang === 'he') {
+    // Abstract comparison — almost never sounds like a real query.
+    // (JS \b does not fire between Hebrew characters, so use whitespace
+    // anchors via (?:^|\s) / (?=\s|$|[?.,!]) instead.)
+    if (/(?:^|\s)או\s+(?:חלופות\s+אחרות|פתרונות\s+אחרים|אפשרויות\s+אחרות|מתחרים\s+אחרים)/.test(q)) {
+      return true
+    }
+    // Vague opener "מי מומלץ עבור X" — too abstract.
+    if (/^מי\s+מומלץ\s+(?:עבור|ל)/.test(q)) {
+      return true
+    }
+    // "ספק" / "מומחה" / "חברה" for product categories — feels AI-generated.
+    if (!isServiceCategory) {
+      if (/(?:^|\s)ספק\s+ל/.test(q)) return true
+      if (/(?:^|\s)מומחה\s+(?:ל|מתאים|מומלץ)/.test(q)) return true
+      if (/(?:^|\s)חברה\s+מומלצת\s+ל/.test(q)) return true
+    }
+    // "איך לבחור X בעיר שלי" — awkward phrasing.
+    if (/איך\s+לבחור\s+\S+\s+בעיר\s+שלי/.test(q)) return true
+  } else {
+    if (/\b(?:or\s+alternatives|or\s+other\s+(?:solutions|options|providers))\b/i.test(q)) {
+      return true
+    }
+    if (/^who\s+is\s+recommended\s+for\b/i.test(q)) {
+      return true
+    }
+    if (!isServiceCategory) {
+      if (/\bprovider\s+for\b/i.test(q)) return true
+      if (/\bexpert\s+(?:for|suits|recommended)\b/i.test(q)) return true
+      if (/\bcompany\s+(?:recommended|is\s+recommended)\b/i.test(q)) return true
+    }
+    if (/how\s+to\s+(?:find|choose)\s+\S+\s+in\s+my\s+(?:city|area)/i.test(q)) return true
+  }
+
+  return false
+}
+
+/**
  * Normalize common Hebrew construct-state mistakes.
  */
 function normalizeHebrewConstructState(phrase: string): string {
@@ -2080,15 +2158,18 @@ function generateKeywordBasedQuestions({
   city,
   language,
   trackedPrompts,
+  category,
 }: {
   keywords: string[]
   businessName: string | null
   city: string | null
   language: string
   trackedPrompts: string[]
-}): Array<{ prompt: string; score: number }> {
-  const results: Array<{ prompt: string; score: number }> = []
+  category: BusinessCategory
+}): Array<{ prompt: string; score: number; intentBucket: string }> {
+  const results: Array<{ prompt: string; score: number; intentBucket: string }> = []
   const isHebrew = language === 'he'
+  const isService = SERVICE_LIKE_CATEGORIES.includes(category)
 
   // Normalization helper
   const normalize = (text: string): string =>
@@ -2108,7 +2189,12 @@ function generateKeywordBasedQuestions({
     return true
   })
 
-  // For each keyword, generate multiple intent-based questions
+  // Per-keyword saturation: at most ONE template per intent bucket. This
+  // stops the same keyword from feeding 6+ variants into the pool when only
+  // 3 of those buckets are actually natural for the category.
+  const MAX_INTENTS_PER_KEYWORD = 3
+
+  // For each keyword, generate one template per intent bucket (saturation-aware)
   for (const rawKw of relevantKeywords) {
     // Strip intent words from the keyword BEFORE substituting into templates.
     // Prevents "כמה עולה מחיר הליכון?" and "איזה מומחה מומלץ להליכון מומלץ?".
@@ -2121,98 +2207,108 @@ function generateKeywordBasedQuestions({
       continue
     }
 
-    const templates: string[] = []
+    // Build candidates: [intent_bucket, template, baseScore]. Each bucket
+    // contributes at MOST one prompt per keyword. Buckets are ordered by
+    // natural-search likelihood — price + reviews + recommendation are the
+    // common ones, comparison is dropped entirely (always abstract).
+    const candidates: Array<{ bucket: string; prompt: string; score: number }> = []
 
-    // 1. Recommendation intent
+    // PRICE — universally natural, high priority
     if (isHebrew) {
-      templates.push(`איזו חברה מומלצת ל${kw}?`)
-      templates.push(`מי מומלץ עבור ${kw}?`)
-      templates.push(`איזה מומחה מתאים ל${kw}?`)
+      candidates.push({ bucket: 'price', prompt: `כמה עולה ${kw}?`, score: 16 })
     } else {
-      templates.push(`Which company is recommended for ${kw}?`)
-      templates.push(`Who is recommended for ${kw}?`)
-      templates.push(`Which expert suits ${kw}?`)
+      candidates.push({ bucket: 'price', prompt: `How much does ${kw} cost?`, score: 16 })
     }
 
-    // 2. Price intent
+    // REVIEW — natural for any keyword
     if (isHebrew) {
-      templates.push(`כמה עולה ${kw}?`)
-      templates.push(`מה המחיר של ${kw}?`)
+      candidates.push({ bucket: 'review', prompt: `חוות דעת על ${kw}`, score: 14 })
     } else {
-      templates.push(`How much does ${kw} cost?`)
-      templates.push(`What is the price of ${kw}?`)
+      candidates.push({ bucket: 'review', prompt: `Reviews of ${kw}`, score: 14 })
     }
 
-    // 3. Pre-purchase intent
+    // PRE-PURCHASE — natural for any keyword
     if (isHebrew) {
-      templates.push(`איך לבחור ספק ל${kw}?`)
-      templates.push(`מה חשוב לבדוק לפני בחירת ${kw}?`)
+      candidates.push({
+        bucket: 'pre_purchase',
+        prompt: `מה חשוב לבדוק לפני בחירת ${kw}?`,
+        score: 13,
+      })
     } else {
-      templates.push(`How to choose a provider for ${kw}?`)
-      templates.push(`What to check before choosing ${kw}?`)
+      candidates.push({
+        bucket: 'pre_purchase',
+        prompt: `What to check before choosing ${kw}?`,
+        score: 13,
+      })
     }
 
-    // 4. Local intent (if city provided)
-    if (city) {
+    // RECOMMENDATION — only for SERVICE categories. For products, the bank
+    // already produces natural "איזה X מומלץ?" via curated templates; the
+    // generic "איזו חברה מומלצת ל-X" feels AI-generated for products.
+    if (isService) {
       if (isHebrew) {
-        templates.push(`איזה מומחה מומלץ ל${kw} ב${city}?`)
-        templates.push(`איך לבחור ${kw} בעיר שלי?`)
+        candidates.push({
+          bucket: 'recommendation',
+          prompt: `איזה ספק מומלץ ל${kw}?`,
+          score: 12,
+        })
       } else {
-        templates.push(`Which expert is recommended for ${kw} in ${city}?`)
-        templates.push(`How to find ${kw} in ${city}?`)
+        candidates.push({
+          bucket: 'recommendation',
+          prompt: `Which provider is recommended for ${kw}?`,
+          score: 12,
+        })
       }
     }
 
-    // 5. Comparison intent (add generic alternatives)
-    if (isHebrew) {
-      templates.push(`מה עדיף — ${kw} או חלופות אחרות?`)
-    } else {
-      templates.push(`What's better — ${kw} or alternatives?`)
+    // LOCAL — only if city is set AND it's a service or has a real local need
+    if (city && isService) {
+      if (isHebrew) {
+        candidates.push({
+          bucket: 'local',
+          prompt: `איזה ספק מומלץ ל${kw} ב${city}?`,
+          score: 15,
+        })
+      } else {
+        candidates.push({
+          bucket: 'local',
+          prompt: `Which provider is recommended for ${kw} in ${city}?`,
+          score: 15,
+        })
+      }
     }
 
-    // 6. Review intent — drop "שירותי / services" prefix because it reads
-    // awkwardly for product keywords ("חוות דעת על שירותי הליכון"). Plain
-    // "חוות דעת על ${kw}" works for both products and services.
-    if (isHebrew) {
-      templates.push(`חוות דעת על ${kw}`)
-      templates.push(`מה אומרים על ${kw}?`)
-    } else {
-      templates.push(`Reviews of ${kw}`)
-      templates.push(`What do people say about ${kw}?`)
-    }
+    // Drop these buckets entirely (always feel AI-generated when generic):
+    //   - "מי מומלץ עבור X" (vague opener)
+    //   - "איזה מומחה מתאים ל-X" (only fits very specific service contexts)
+    //   - "מה עדיף — X או חלופות אחרות" (abstract comparison)
+    //   - "איך לבחור ספק ל-X" (overlaps with pre_purchase but more abstract)
+    //   - "איזו חנות מומלצת ל-X" / "איפה אפשר לקנות X" (curated bank handles
+    //     where-to-buy with better entity context)
 
-    // Score and dedupe each template
-    for (const template of templates) {
-      const normalized = normalize(template)
+    // Saturation: pick the top N candidates by score and stop.
+    candidates.sort((a, b) => b.score - a.score)
+    const seenBuckets = new Set<string>()
+    let added = 0
+    for (const c of candidates) {
+      if (added >= MAX_INTENTS_PER_KEYWORD) break
+      if (seenBuckets.has(c.bucket)) continue
+      seenBuckets.add(c.bucket)
 
-      // Skip if already in tracked prompts
+      const normalized = normalize(c.prompt)
       if (trackedSet.has(normalized)) continue
-
-      // Skip if already generated in this batch
       if (generatedSet.has(normalized)) continue
 
-      // Base score: keyword-length (longer keywords = more specific, higher value)
-      let score = 10 + Math.min(kw.length / 2, 10)
+      // Keyword-length specificity boost (longer = more specific = more natural)
+      let score = c.score + Math.min(kw.length / 2, 10)
+      if (city && c.prompt.includes(city)) score += 3
 
-      // Boost for intent specificity
-      if (template.toLowerCase().includes('מחיר') || template.toLowerCase().includes('עלות') ||
-          template.toLowerCase().includes('cost') || template.toLowerCase().includes('price')) {
-        score += 3
-      }
-      if (template.toLowerCase().includes('בחור') || template.toLowerCase().includes('choose') ||
-          template.toLowerCase().includes('select')) {
-        score += 2
-      }
-      if (city && (template.includes(city))) {
-        score += 5
-      }
-
-      results.push({ prompt: template, score })
+      results.push({ prompt: c.prompt, score, intentBucket: c.bucket })
       generatedSet.add(normalized)
+      added += 1
     }
   }
 
-  // Sort by score (descending), keeping high-value keywords first
   return results.sort((a, b) => b.score - a.score)
 }
 
@@ -2412,6 +2508,12 @@ export function generatePromptSuggestions({
       }
       continue
     }
+    if (isUnnaturalQuestion(filled, category, lang as 'he' | 'en')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AI-Questions] REJECTED unnatural (primary):', filled)
+      }
+      continue
+    }
 
     // Excluded-topic filter: drop any question that hits an excluded theme
     if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
@@ -2505,6 +2607,7 @@ export function generatePromptSuggestions({
           continue
         }
         if (isAwkwardQuestion(filled, category, lang as 'he' | 'en')) continue
+        if (isUnnaturalQuestion(filled, category, lang as 'he' | 'en')) continue
 
         if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
         if (excludeSet.has(normalizePromptForCompare(filled))) continue
@@ -2546,6 +2649,7 @@ export function generatePromptSuggestions({
       if (lang === 'he' && !isReadableHebrew(filled)) continue
       if (isBadQuestion(filled, business)) continue
       if (isAwkwardQuestion(filled, category, lang as 'he' | 'en')) continue
+      if (isUnnaturalQuestion(filled, category, lang as 'he' | 'en')) continue
       if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
       brandComparisonQuestions.push({
         def: { intent: pair.intent, text: pair.text, score: pair.score, offering: 'primary' },
@@ -2569,6 +2673,7 @@ export function generatePromptSuggestions({
       if (lang === 'he' && isInvalidHebrewPhrase(filled)) continue
       if (isBadQuestion(filled, business)) continue
       if (isAwkwardQuestion(filled, category, lang as 'he' | 'en')) continue
+      if (isUnnaturalQuestion(filled, category, lang as 'he' | 'en')) continue
       if (textMatchesAny(filled, effectiveProfile.excludedTopics || [])) continue
       if (excludeSet.has(normalizePromptForCompare(filled))) continue
       productBrandQuestions.push({
@@ -2581,28 +2686,43 @@ export function generatePromptSuggestions({
     }
   }
 
-  // Generate keyword-based questions to expand the candidate pool
-  // This creates 5-7 questions per keyword using intent templates
+  // Generate keyword-based questions to expand the candidate pool.
+  // Category-aware: drops abstract provider/expert templates for product
+  // categories and drops "or alternatives" comparisons entirely.
+  // Per-keyword saturation: at most 3 natural intents per keyword.
   const keywordBasedResults = generateKeywordBasedQuestions({
     keywords,
     businessName: business,
     city,
     language: lang as 'he' | 'en',
     trackedPrompts: excludePrompts,
+    category,
   })
 
-  // Convert keyword-based results to Built type format
+  // Convert keyword-based results to Built type format, applying every quality
+  // filter — including the new isUnnaturalQuestion check.
   const keywordBasedQuestions: Built[] = []
   for (const result of keywordBasedResults) {
     if (lang === 'he' && !isReadableHebrew(result.prompt)) continue
     if (lang === 'he' && isInvalidHebrewPhrase(result.prompt)) continue
     if (isBadQuestion(result.prompt, business)) continue
     if (isAwkwardQuestion(result.prompt, category, lang as 'he' | 'en')) continue
+    if (isUnnaturalQuestion(result.prompt, category, lang as 'he' | 'en')) continue
     if (textMatchesAny(result.prompt, effectiveProfile.excludedTopics || [])) continue
+
+    // Map intent bucket to PromptIntent for downstream chip/value-reason logic.
+    const intentMap: Record<string, PromptIntent> = {
+      price: 'transactional',
+      review: 'informational',
+      pre_purchase: 'pre_purchase',
+      recommendation: 'recommendation',
+      local: 'local',
+    }
+    const mappedIntent = intentMap[result.intentBucket] || 'recommendation'
 
     keywordBasedQuestions.push({
       def: {
-        intent: 'recommendation' as const,
+        intent: mappedIntent,
         text: result.prompt,
         score: result.score,
         offering: 'primary',
