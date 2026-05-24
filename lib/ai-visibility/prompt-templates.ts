@@ -85,7 +85,9 @@ export type PromptSuggestion = {
   category: BusinessCategory
   language: string
   qualityScore: number
+  confidenceTier: 'high' | 'good' | 'medium' | 'opportunity' | 'experimental'
   reason: string
+  chips: string[] // e.g., 'chip_purchase_intent', 'chip_high_search_volume'
 }
 
 type TemplateContext = {
@@ -2674,7 +2676,7 @@ export function generatePromptSuggestions({
   // varied result set (no 6 "איזו חברה מומלצת..." in a row, no 4 city variants
   // of the same keyword). Falls back to offering-weighted pick when caller
   // explicitly opts out of diversity.
-  const suggestions: Built[] = diversify
+  const selectedSuggestions: Built[] = diversify
     ? selectDiverseSuggestions(pool, limit, lang as 'he' | 'en')
     : weightByOffering(pool, limit)
 
@@ -2692,7 +2694,7 @@ export function generatePromptSuggestions({
       dedupedCount: kept.length,
       poolAfterExclude: poolAfterExclude.length,
       finalPool: pool.length,
-      selectedCount: suggestions.length,
+      selectedCount: selectedSuggestions.length,
       seenPromptsCount: excludePrompts.length,
       previousSetCount: previousSet.length,
       diversify,
@@ -2701,26 +2703,34 @@ export function generatePromptSuggestions({
     })
   }
 
-  // Build final suggestions
-  const result: PromptSuggestion[] = suggestions.map((item, idx) => ({
-    id: `q-${idx}-${Math.random().toString(36).slice(2, 8)}`,
-    prompt: item.prompt,
-    intent: item.def.intent,
-    intentLabel: intentLabels[item.def.intent],
-    category,
-    language: lang,
-    qualityScore: Math.min(100, Math.round(item.score)),
-    reason: buildReason(item.def, category, ctx, item.themeMatched),
-  }))
+  // Build result items with confidence tiers and chips
+  const unsequencedResult: PromptSuggestion[] = selectedSuggestions.map((item, idx) => {
+    const score = Math.min(100, Math.round(item.score))
+    return {
+      id: `q-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+      prompt: item.prompt,
+      intent: item.def.intent,
+      intentLabel: intentLabels[item.def.intent],
+      category,
+      language: lang,
+      qualityScore: score,
+      confidenceTier: getConfidenceTier(score),
+      reason: buildReason(item.def, category, ctx, item.themeMatched),
+      chips: generateExplanationChips(item.def.intent, score, lang as 'he' | 'en'),
+    }
+  })
+
+  // Sequence for visual variety: reorder to avoid adjacent same families/intents/phrasings
+  const sequencedResult = sequenceSuggestionsForDisplay(unsequencedResult, lang as 'he' | 'en')
 
   if (shuffle && !diversify) {
-    for (let i = result.length - 1; i > 0; i--) {
+    for (let i = sequencedResult.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
-      ;[result[i], result[j]] = [result[j], result[i]]
+      ;[sequencedResult[i], sequencedResult[j]] = [sequencedResult[j], sequencedResult[i]]
     }
   }
 
-  return result.slice(0, limit)
+  return sequencedResult.slice(0, limit)
 }
 
 /**
@@ -3245,6 +3255,136 @@ function selectDiverseSuggestions<
   // NO score-only fallback. If diversity caps prevent filling `limit`, the
   // caller renders fewer suggestions + a "no more diverse questions" hint.
   return selected
+}
+
+/**
+ * Map a quality score to a confidence tier.
+ * 90-100: High, 75-89: Good, 50-74: Medium, 30-49: Opportunity, 0-29: Experimental
+ */
+function getConfidenceTier(score: number): 'high' | 'good' | 'medium' | 'opportunity' | 'experimental' {
+  if (score >= 90) return 'high'
+  if (score >= 75) return 'good'
+  if (score >= 50) return 'medium'
+  if (score >= 30) return 'opportunity'
+  return 'experimental'
+}
+
+/**
+ * Generate 1–3 explanation chips based on intent and score signals.
+ * Chips explain WHY the question was suggested.
+ *
+ * Heuristic logic:
+ *   - High-intent (transactional, recommendation, comparison) → purchase_intent or comparison_search
+ *   - Score >= 85 (high confidence) → high_search_volume
+ *   - Score 70-84 → lead_potential or pre_purchase_search
+ *   - Score < 70 → opportunity or experimental variants
+ */
+function generateExplanationChips(
+  intent: PromptIntent,
+  score: number,
+  lang: 'he' | 'en'
+): string[] {
+  const chips: string[] = []
+
+  // Primary intent-based chips (max 1)
+  if (intent === 'transactional' || intent === 'commercial') {
+    chips.push('chip_purchase_intent')
+  } else if (intent === 'comparison' || intent === 'alternatives') {
+    chips.push('chip_comparison_search')
+  } else if (intent === 'brand') {
+    chips.push('chip_brand_search')
+  } else if (intent === 'recommendation') {
+    chips.push('chip_lead_potential')
+  } else if (intent === 'pre_purchase') {
+    chips.push('chip_pre_purchase_search')
+  } else if (intent === 'local') {
+    chips.push('chip_local_search')
+  }
+
+  // Secondary confidence-based chips
+  if (score >= 85) {
+    chips.push('chip_high_search_volume')
+  }
+
+  // Limit to 3 chips
+  return chips.slice(0, 3)
+}
+
+/**
+ * Reorder suggestions post-selection to avoid adjacent repetition of keyword families,
+ * intents, and phrasing patterns. Uses greedy algorithm: pick next item with fewest
+ * conflicts with the previous item. Priority: family > intent > phrasing > score.
+ *
+ * Result: visual variety improves even though diversity caps are already enforced.
+ */
+function sequenceSuggestionsForDisplay<
+  T extends {
+    prompt: string
+    intent: PromptIntent
+    qualityScore: number
+  }
+>(items: T[], lang: 'he' | 'en'): T[] {
+  if (items.length <= 1) return items
+
+  type Classified = {
+    item: T
+    intent: PromptIntent
+    family: string
+    phrasing: string
+  }
+  const classified = items.map((item) => ({
+    item,
+    intent: item.intent,
+    family: extractKeywordFamily(item.prompt, lang),
+    phrasing: classifyPhrasingPattern(item.prompt, lang),
+  }))
+
+  const result: T[] = []
+  const remaining = new Set(classified)
+
+  // Pick first item (highest score)
+  const first = [...classified].sort((a, b) => b.item.qualityScore - a.item.qualityScore)[0]
+  if (first) {
+    result.push(first.item)
+    remaining.delete(first)
+  }
+
+  // Greedy: for each step, pick the item with fewest conflicts with previous
+  while (remaining.size > 0) {
+    const prev = classified.find((c) => c.item === result[result.length - 1])!
+    let bestCandidate: (typeof classified)[0] | null = null
+    let bestScore = -Infinity
+
+    for (const candidate of remaining) {
+      // Count conflicts: family match, intent match, phrasing match
+      const familyConflict = candidate.family === prev.family ? 1 : 0
+      const intentConflict = candidate.intent === prev.intent ? 1 : 0
+      const phrasingConflict = candidate.phrasing === prev.phrasing ? 1 : 0
+
+      // Prefer items with fewer conflicts. Tiebreak by quality score.
+      const conflictScore = -(familyConflict * 100 + intentConflict * 10 + phrasingConflict)
+      const totalScore = conflictScore + candidate.item.qualityScore * 0.01
+
+      if (totalScore > bestScore) {
+        bestScore = totalScore
+        bestCandidate = candidate
+      }
+    }
+
+    if (bestCandidate) {
+      result.push(bestCandidate.item)
+      remaining.delete(bestCandidate)
+    } else {
+      // Shouldn't happen, but fallback: pick any remaining
+      const next = remaining.values().next().value
+      if (next) {
+        result.push(next.item)
+        remaining.delete(next)
+      }
+    }
+  }
+
+  return result
 }
 
 /**

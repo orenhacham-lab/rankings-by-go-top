@@ -678,6 +678,26 @@ const STRINGS = {
   geo_signal_review: { he: 'ביקורות', en: 'Reviews' },
   geo_signal_local: { he: 'מקומי', en: 'Local' },
   geo_signal_recommendation: { he: 'המלצה', en: 'Recommendation' },
+
+  // Confidence tiers
+  confidence_high: { he: 'גבוה', en: 'High' },
+  confidence_good: { he: 'טוב', en: 'Good' },
+  confidence_medium: { he: 'בינוני', en: 'Medium' },
+  confidence_opportunity: { he: 'הזדמנות', en: 'Opportunity' },
+  confidence_experimental: { he: 'ניסיוני', en: 'Experimental' },
+
+  // Explanation chips
+  chip_purchase_intent: { he: 'כוונת רכישה', en: 'Purchase Intent' },
+  chip_high_search_volume: { he: 'נפח חיפוש גבוה', en: 'High Search Volume' },
+  chip_not_in_ai: { he: 'העסק לא מופיע ב-AI', en: 'Business Not in AI' },
+  chip_low_google_rank: { he: 'דירוג נמוך בגוגל', en: 'Low Google Rank' },
+  chip_lead_potential: { he: 'פוטנציאל לידים', en: 'Lead Potential' },
+  chip_competitor_pattern: { he: 'נושא שחוזר אצל מתחרים', en: 'Competitor Pattern' },
+  chip_local_search: { he: 'חיפוש מקומי', en: 'Local Search' },
+  chip_high_cpc: { he: 'CPC גבוה', en: 'High CPC' },
+  chip_comparison_search: { he: 'חיפוש השוואתי', en: 'Comparison Search' },
+  chip_brand_search: { he: 'חיפוש מותג', en: 'Brand Search' },
+  chip_pre_purchase_search: { he: 'חיפוש לפני רכישה', en: 'Pre-Purchase Search' },
 } as const
 
 type StringKey = keyof typeof STRINGS
