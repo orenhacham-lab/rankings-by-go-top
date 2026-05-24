@@ -187,6 +187,13 @@ export default function AIVisibilitySection({
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
+  // Tracks normalized prompt text of every suggestion shown across all batches
+  // in this session. Used as exclusion input to the generator on "Generate more"
+  // so the same questions never reappear.
+  const [excludedSuggestionKeys, setExcludedSuggestionKeys] = useState<Set<string>>(new Set())
+  // Set to true when "Generate more" produced zero new suggestions. Cleared
+  // when the profile changes or another generate-more attempt is made.
+  const [noNewSuggestionsFound, setNoNewSuggestionsFound] = useState(false)
   const [scanningKey, setScanningKey] = useState<string | null>(null)
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
@@ -382,6 +389,10 @@ export default function AIVisibilitySection({
     // expand beyond the initial 4 visible. Render-time slicing handles
     // pagination based on showAllSmartQuestions.
     setSuggestedQuestions(suggestions)
+    // Fresh profile context — wipe the exclusion ledger and "no new" flag so
+    // the user can start a new generation cycle.
+    setExcludedSuggestionKeys(new Set())
+    setNoNewSuggestionsFound(false)
   }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile])
 
   useEffect(() => {
@@ -643,10 +654,26 @@ export default function AIVisibilitySection({
   const refreshSuggestions = useCallback(async () => {
     setRefreshingSuggestions(true)
     setShowAllSmartQuestions(false)
+    setNoNewSuggestionsFound(false)
     try {
       // Small delay so the loading state is perceivable even when generation
       // is synchronous — avoids a flash that the user can't see.
       await new Promise((resolve) => setTimeout(resolve, 200))
+
+      const normalize = (text: string): string =>
+        text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+
+      // Build the exclusion ledger: every prompt the user has ever seen in this
+      // session OR already tracks. The generator dedupes against this internally
+      // (see prompt-templates.ts: excludePrompts + previousSet → onlyPrevious set).
+      const currentlyShown = suggestedQuestions.map((q) => q.prompt)
+      const trackedPrompts = allPrompts.map((p) => p.prompt || '').filter(Boolean)
+      const exclude = [
+        ...currentlyShown,
+        ...trackedPrompts,
+        ...Array.from(excludedSuggestionKeys),
+      ]
+
       const refreshed = generatePromptSuggestions({
         businessName: projectBrandName,
         domain: projectDomain,
@@ -656,15 +683,48 @@ export default function AIVisibilitySection({
         keywords: projectKeywords,
         manualProfile,
         shuffle: true,
+        diversify: true,
         limit: 40,
+        excludePrompts: exclude,
+        previousSet: currentlyShown,
       })
-      setSuggestedQuestions(refreshed)
+
+      // Defense in depth: even with excludePrompts the generator can return
+      // overlap if the pool is exhausted. Filter again client-side.
+      const seenKeys = new Set<string>(exclude.map(normalize))
+      const trulyNew = refreshed.filter((q) => !seenKeys.has(normalize(q.prompt)))
+
+      if (trulyNew.length === 0) {
+        // No new candidates: keep the existing list visible and surface the
+        // empty-state message inline. Don't wipe what the user is looking at.
+        setNoNewSuggestionsFound(true)
+      } else {
+        // Add the previous batch keys to the ledger so the next generate-more
+        // call avoids them. The new batch keys will be added on the NEXT click.
+        setExcludedSuggestionKeys((prev) => {
+          const next = new Set(prev)
+          currentlyShown.forEach((p) => next.add(normalize(p)))
+          return next
+        })
+        setSuggestedQuestions(trulyNew)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
     } finally {
       setRefreshingSuggestions(false)
     }
-  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile])
+  }, [
+    projectBrandName,
+    projectDomain,
+    projectCity,
+    projectCountry,
+    projectLanguage,
+    projectKeywords,
+    manualProfile,
+    suggestedQuestions,
+    allPrompts,
+    excludedSuggestionKeys,
+  ])
 
   const filteredResults = useMemo(() => {
     return allResults.filter((r) => {
@@ -972,33 +1032,41 @@ export default function AIVisibilitySection({
                           <div
                             key={engine}
                             className="inline-flex flex-col items-center min-w-0"
-                            title={tooltip}
                           >
-                            <button
-                              onClick={() => !scanning && scanEngine(p.id, engine)}
-                              disabled={scanning}
-                              title={tooltip}
-                              aria-label={tooltip}
-                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
-                                scanning
-                                  ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'
-                                  : scanned
-                                  ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 cursor-pointer'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
-                              }`}
-                            >
-                              {scanning && (
-                                <div
-                                  className="absolute inset-0 bg-indigo-200 dark:bg-indigo-700/40 transition-all"
-                                  style={{ width: `${scanProgress}%` }}
-                                />
-                              )}
-                              <span className="relative z-10">
-                                {meta && <meta.Icon size={14} className={meta.accent} />}
+                            <div className="relative group">
+                              <button
+                                onClick={() => !scanning && scanEngine(p.id, engine)}
+                                disabled={scanning}
+                                title={tooltip}
+                                aria-label={tooltip}
+                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition relative overflow-hidden ${
+                                  scanning
+                                    ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 cursor-wait'
+                                    : scanned
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 cursor-pointer'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer'
+                                }`}
+                              >
+                                {scanning && (
+                                  <div
+                                    className="absolute inset-0 bg-indigo-200 dark:bg-indigo-700/40 transition-all"
+                                    style={{ width: `${scanProgress}%` }}
+                                  />
+                                )}
+                                <span className="relative z-10">
+                                  {meta && <meta.Icon size={14} className={meta.accent} />}
+                                </span>
+                                <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
+                                {scanned && <span className="relative z-10 text-emerald-600">✓</span>}
+                              </button>
+                              {/* Custom CSS tooltip — appears instantly on hover/focus, not delayed like native title */}
+                              <span
+                                role="tooltip"
+                                className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-900 dark:bg-slate-700 text-white text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md"
+                              >
+                                {tooltip}
                               </span>
-                              <span className="relative z-10">{scanning ? t('scanning') : meta?.name || engine}</span>
-                              {scanned && <span className="relative z-10 text-emerald-600">✓</span>}
-                            </button>
+                            </div>
                             {scanned && scannedAt && (
                               <div className="text-[10px] leading-tight text-slate-500 dark:text-slate-400 mt-0.5 text-center whitespace-nowrap">
                                 {t('scanned_at')}: {formatDate(scannedAt)}
@@ -1112,6 +1180,11 @@ export default function AIVisibilitySection({
                         >
                           {t('show_more')}
                         </Button>
+                      </div>
+                    )}
+                    {noNewSuggestionsFound && (
+                      <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
+                        {t('no_new_suggestions')}
                       </div>
                     )}
                   </>
