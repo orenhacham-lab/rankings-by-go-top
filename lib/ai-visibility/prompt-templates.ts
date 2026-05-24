@@ -2528,9 +2528,13 @@ export function generatePromptSuggestions({
     if (pool.length < limit) pool = kept
   }
 
-  // Pick suggestions: diversified pool-random when requested, deterministic otherwise.
+  // Pick suggestions: diversity-aware selection enforces intent + keyword
+  // family + phrasing-pattern caps so a large candidate pool still produces a
+  // varied result set (no 6 "איזו חברה מומלצת..." in a row, no 4 city variants
+  // of the same keyword). Falls back to offering-weighted pick when caller
+  // explicitly opts out of diversity.
   const suggestions: Built[] = diversify
-    ? diversifiedPick(pool, limit)
+    ? selectDiverseSuggestions(pool, limit, lang as 'he' | 'en')
     : weightByOffering(pool, limit)
 
   // Debug logging (dev only)
@@ -2820,6 +2824,193 @@ function diversifiedPick(
   }
 
   return result
+}
+
+/**
+ * Classify a prompt by its phrasing pattern (sentence template), not its topic.
+ * Used by the diversity layer to prevent the result set from feeling repetitive
+ * even when each candidate covers a different keyword. Two prompts with the
+ * same phrasing ("איזו חברה מומלצת לX?" vs "איזו חברה מומלצת לY?") will share
+ * the same phrasing key and the cap will throttle them.
+ */
+function classifyPhrasingPattern(prompt: string, lang: 'he' | 'en'): string {
+  const p = prompt.trim()
+  if (lang === 'he') {
+    if (/^איזו\s+חברה\s+מומלצת/.test(p)) return 'he_company_recommended'
+    if (/^איזה\s+מומחה\s+(?:מומלץ|מתאים|כדאי)/.test(p)) return 'he_expert_recommended'
+    if (/^מי\s+(?:מומלץ|המומחה)/.test(p)) return 'he_who_recommended'
+    if (/^כמה\s+עולה/.test(p)) return 'he_price_how_much'
+    if (/^מה\s+המחיר/.test(p)) return 'he_price_what'
+    if (/^איך\s+לבחור\s+ספק/.test(p)) return 'he_choose_provider'
+    if (/^איך\s+לבחור/.test(p)) return 'he_choose_generic'
+    if (/^מה\s+חשוב\s+לבדוק/.test(p)) return 'he_check_before'
+    if (/^מה\s+עדיף/.test(p)) return 'he_comparison'
+    if (/^חוות\s+דעת/.test(p)) return 'he_reviews'
+    if (/^איך\s+לבדוק\s+אם/.test(p)) return 'he_verify_reliable'
+    if (/^איפה\s+(?:כדאי|אפשר|לקנות)/.test(p)) return 'he_where_to'
+    if (/^מה\s+ההבדל\s+בין/.test(p)) return 'he_difference_between'
+    if (/^איך\s+(?:למצוא|לקנות|להזמין)/.test(p)) return 'he_how_to_acquire'
+    if (/^מה\s+כדאי/.test(p)) return 'he_what_should'
+    return 'he_other'
+  } else {
+    if (/^which\s+company\s+is\s+recommended/i.test(p)) return 'en_company_recommended'
+    if (/^which\s+expert/i.test(p)) return 'en_expert_recommended'
+    if (/^who\s+is\s+recommended/i.test(p)) return 'en_who_recommended'
+    if (/^how\s+much\s+does/i.test(p)) return 'en_price_how_much'
+    if (/^what\s+is\s+the\s+price/i.test(p)) return 'en_price_what'
+    if (/^how\s+to\s+choose\s+a\s+provider/i.test(p)) return 'en_choose_provider'
+    if (/^how\s+to\s+choose/i.test(p)) return 'en_choose_generic'
+    if (/^what\s+to\s+check/i.test(p)) return 'en_check_before'
+    if (/^what(?:'|’|`)?s\s+better/i.test(p)) return 'en_comparison'
+    if (/^reviews?\s+of/i.test(p)) return 'en_reviews'
+    if (/^how\s+to\s+verify/i.test(p)) return 'en_verify_reliable'
+    if (/^where\s+(?:can|to)/i.test(p)) return 'en_where_to'
+    if (/^what(?:'|’|`)?s\s+the\s+difference/i.test(p)) return 'en_difference_between'
+    if (/^how\s+to\s+(?:find|buy|order|get)/i.test(p)) return 'en_how_to_acquire'
+    if (/^what\s+should/i.test(p)) return 'en_what_should'
+    return 'en_other'
+  }
+}
+
+/**
+ * Extract the keyword family from a prompt by stripping common template
+ * wrappers (recommendation/price/comparison prefixes) and trailing location
+ * suffixes (ב{city} / in {city}). Two prompts with the same family share the
+ * same core topic — e.g. "X בתל אביב" and "X בפתח תקווה" both reduce to "X".
+ *
+ * The family is a deterministic, normalized string used as a cap key by the
+ * diversity layer. It does not have to be semantically perfect — only stable.
+ */
+function extractKeywordFamily(prompt: string, lang: 'he' | 'en'): string {
+  let core = prompt.toLowerCase().trim()
+
+  if (lang === 'he') {
+    core = core.replace(
+      /^(איזו\s+חברה\s+מומלצת|איזה\s+מומחה\s+(?:מומלץ|מתאים|כדאי)|מי\s+מומלץ\s+עבור|מי\s+מומלץ|מי\s+המומחה|כמה\s+עולה|מה\s+המחיר\s+של|מה\s+המחיר|איך\s+לבחור\s+ספק\s+ל?|איך\s+לבחור\s+ל?|איך\s+לבחור|מה\s+חשוב\s+לבדוק\s+לפני\s+בחירת|מה\s+חשוב\s+לבדוק|מה\s+עדיף\s*[—\-–]?|חוות\s+דעת\s+על\s+שירותי|חוות\s+דעת\s+על|איך\s+לבדוק\s+אם\s+שירות|איך\s+לבדוק\s+אם|איפה\s+(?:כדאי|אפשר|לקנות|להזמין)\s*ל?|מה\s+ההבדל\s+בין|איך\s+(?:למצוא|לקנות|להזמין)\s*ל?|מה\s+כדאי\s+ל?)/u,
+      ''
+    )
+    core = core.replace(/\sב[א-ת][א-ת\s\-־"׳']*$/u, '')
+    core = core.replace(/בעיר\s+שלי\s*\??$/u, '')
+    core = core.replace(/(או\s+(?:חלופות\s+אחרות|מתחרים|אחרים))/u, '')
+    core = core.replace(/^[\sל]+/u, '')
+    core = core.replace(/[?!.,;:'"״׳`\-–—]/g, '')
+    core = core.replace(/\s+/g, ' ').trim()
+  } else {
+    core = core.replace(
+      /^(which\s+company\s+is\s+recommended\s+for|which\s+expert\s+is\s+recommended\s+for|which\s+expert\s+suits|who\s+is\s+recommended\s+for|who\s+is\s+recommended|how\s+much\s+does|what\s+is\s+the\s+price\s+of|how\s+to\s+choose\s+a\s+provider\s+for|how\s+to\s+choose|how\s+to\s+find|what\s+to\s+check\s+before\s+choosing|what\s+to\s+check|what(?:'|’|`)?s\s+better\s*[—\-–]?|reviews?\s+of|how\s+to\s+verify|where\s+can\s+i|where\s+to\s+(?:buy|order|find)|what(?:'|’|`)?s\s+the\s+difference\s+between|how\s+to\s+(?:buy|order|get))/i,
+      ''
+    )
+    core = core.replace(/\sin\s+[a-z][a-z\s\-]*$/i, '')
+    core = core.replace(/(\s(?:or\s+(?:alternatives|competitors|others))|\sin\s+my\s+city|\sservices?|\scost|\sreliability)/gi, '')
+    core = core.replace(/^(the|a|an|to|for|of|by)\s+/i, '')
+    core = core.replace(/[?!.,;:'"`\-–—]/g, '')
+    core = core.replace(/\s+/g, ' ').trim()
+  }
+
+  // Use the first 3 words as the family key — keeps city-variant cousins together.
+  return core.split(/\s+/).slice(0, 3).join(' ')
+}
+
+/**
+ * Diversity-aware selection. Picks `limit` items from `candidates` such that:
+ *   - no intent bucket exceeds intentCap
+ *   - no keyword family exceeds familyCap (city variants of the same topic
+ *     don't crowd the result)
+ *   - no phrasing pattern exceeds phrasingCap (avoids "איזו חברה מומלצת ל..."
+ *     repeating with different tails)
+ *
+ * Three passes:
+ *   1. Strict caps + weighted-random from top-5 eligible (keeps variety across
+ *      regenerates while respecting score)
+ *   2. Relaxed caps (1.5x) for any remaining slot
+ *   3. Pure score fill — never returns fewer than `min(limit, candidates.length)`
+ */
+function selectDiverseSuggestions<
+  T extends {
+    def: QueryDef
+    prompt: string
+    score: number
+    themeMatched: Array<keyof KeywordThemes>
+    offering: string
+  }
+>(candidates: T[], limit: number, lang: 'he' | 'en'): T[] {
+  if (candidates.length === 0) return []
+
+  const sorted = [...candidates].sort((a, b) => b.score - a.score)
+
+  // Caps scale with the requested limit so a 6-question batch stays varied
+  // while a 24-question batch can show more depth per category.
+  const intentCap = Math.max(2, Math.ceil(limit / 4))
+  const familyCap = Math.max(2, Math.ceil(limit / 4))
+  const phrasingCap = Math.max(2, Math.ceil(limit / 5))
+
+  type Classified = { item: T; intent: IntentBucket; family: string; phrasing: string }
+  const classified: Classified[] = sorted.map((item) => ({
+    item,
+    intent: getIntentBucket(item.prompt, item.def, item.offering),
+    family: extractKeywordFamily(item.prompt, lang),
+    phrasing: classifyPhrasingPattern(item.prompt, lang),
+  }))
+
+  const intentCounts: Record<string, number> = {}
+  const familyCounts: Record<string, number> = {}
+  const phrasingCounts: Record<string, number> = {}
+
+  const selected: T[] = []
+  const used = new Set<T>()
+
+  const commit = (c: Classified) => {
+    selected.push(c.item)
+    used.add(c.item)
+    intentCounts[c.intent] = (intentCounts[c.intent] || 0) + 1
+    familyCounts[c.family] = (familyCounts[c.family] || 0) + 1
+    phrasingCounts[c.phrasing] = (phrasingCounts[c.phrasing] || 0) + 1
+  }
+
+  const fits = (c: Classified, scale: number): boolean => {
+    return (
+      (intentCounts[c.intent] || 0) < Math.ceil(intentCap * scale) &&
+      (familyCounts[c.family] || 0) < Math.ceil(familyCap * scale) &&
+      (phrasingCounts[c.phrasing] || 0) < Math.ceil(phrasingCap * scale)
+    )
+  }
+
+  // Pass 1: strict caps, weighted-random pick from top-5 eligible to keep
+  // regenerates fresh while preserving relevance.
+  while (selected.length < limit) {
+    const eligible = classified.filter((c) => !used.has(c.item) && fits(c, 1))
+    if (eligible.length === 0) break
+    const top = eligible.slice(0, 5).map((c) => c.item)
+    const pick = weightedRandomPick(top) || top[0]
+    if (!pick) break
+    const c = classified.find((x) => x.item === pick)
+    if (!c) break
+    commit(c)
+  }
+
+  // Pass 2: relax caps to 1.5x so slots can still be filled when one intent
+  // dominates the candidate pool.
+  while (selected.length < limit) {
+    const eligible = classified.filter((c) => !used.has(c.item) && fits(c, 1.5))
+    if (eligible.length === 0) break
+    const top = eligible.slice(0, 5).map((c) => c.item)
+    const pick = weightedRandomPick(top) || top[0]
+    if (!pick) break
+    const c = classified.find((x) => x.item === pick)
+    if (!c) break
+    commit(c)
+  }
+
+  // Fallback: fill any remaining slots with the best-scoring leftovers,
+  // regardless of caps. We never return fewer than limit when the pool is large
+  // enough.
+  for (const c of classified) {
+    if (selected.length >= limit) break
+    if (used.has(c.item)) continue
+    commit(c)
+  }
+
+  return selected
 }
 
 /**
