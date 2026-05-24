@@ -171,6 +171,7 @@ const STRINGS = {
   tab_overview: { he: 'סקירה', en: 'Overview' },
   tab_results: { he: 'תוצאות', en: 'Results' },
   tab_queries: { he: 'שאלות AI', en: 'AI Queries' },
+  tab_insights: { he: 'תובנות והמלצות', en: 'Insights & Recommendations' },
   tab_competitors: { he: 'מתחרים', en: 'Competitors' },
   showing_results: { he: 'מציג {count} תוצאות', en: 'Showing {count} results' },
   mentions_by_engine: { he: 'אזכורים לפי מנוע AI', en: 'Mentions by AI Engine' },
@@ -497,6 +498,26 @@ const STRINGS = {
 
   // GEO Insights collapsible label (Phase 1C — technical details)
   geo_technical_details: { he: 'פרטים טכניים', en: 'Technical details' },
+
+  // AI Visibility Summary (Insights tab — high-level snapshot + next action)
+  ai_summary_title: { he: 'תקציר נראות AI', en: 'AI Visibility Summary' },
+  ai_summary_subtitle: {
+    he: 'תמונת מצב קצרה והפעולה המומלצת הבאה',
+    en: 'A short overview and the next recommended action',
+  },
+  ai_summary_status_high: { he: 'העסק מופיע ברוב התוצאות שנבדקו.', en: 'The business appears in most of the tested results.' },
+  ai_summary_status_medium: { he: 'העסק מופיע בחלק מהתוצאות, אבל יש עדיין מקום לשיפור.', en: 'The business appears in some results, but there is still room for improvement.' },
+  ai_summary_status_low: { he: 'העסק כמעט לא מופיע בתשובות AI שנבדקו.', en: 'The business barely appears in the tested AI answers.' },
+  ai_summary_status_insufficient: { he: 'עדיין אין מספיק סריקות כדי להציג תקציר מדויק.', en: 'Not enough scans yet to display an accurate summary.' },
+  ai_summary_action_label: { he: 'הפעולה המומלצת: ', en: 'Recommended action: ' },
+  ai_summary_action_weak_questions: { he: 'ליצור תוכן שעונה ישירות על השאלות שבהן העסק לא הופיע.', en: 'Create content that directly answers the questions where the business did not appear.' },
+  ai_summary_action_reviews: { he: 'לחזק ביקורות, דירוגים ועדויות לקוחות באתר.', en: 'Strengthen reviews, ratings, and customer testimonials on the site.' },
+  ai_summary_action_comparison: { he: 'להוסיף עמודי השוואה שיעזרו ללקוחות לבחור בין אפשרויות.', en: 'Add comparison pages that help customers choose between options.' },
+  ai_summary_action_pricing: { he: 'להציג מידע ברור יותר על מחירים, טווחי מחיר ומה כלול בשירות.', en: 'Display clearer information about pricing, price ranges, and what is included.' },
+  ai_summary_action_list: { he: 'להוסיף שאלות נפוצות ותשובות קצרות לשאלות מרכזיות.', en: 'Add FAQs and concise answers to key questions.' },
+  ai_summary_action_local: { he: 'להבליט אזורי שירות, כתובת וזמינות באתר.', en: 'Highlight service areas, address, and availability on the site.' },
+  ai_summary_action_recommendation: { he: 'להוסיף תוכן שמכוון את הלקוח לבחירה הנכונה עבורו.', en: 'Add content that guides customers toward the right choice for them.' },
+  ai_summary_action_fallback: { he: 'להריץ עוד שאלות ומנועים כדי לקבל המלצות מדויקות יותר.', en: 'Run more questions and engines to get more accurate recommendations.' },
 
   // GEO Opportunity Mapping (Phase 2A — project-level aggregated insights)
   geo_opp_title: { he: 'מיפוי הזדמנויות GEO', en: 'GEO Opportunity Mapping' },
