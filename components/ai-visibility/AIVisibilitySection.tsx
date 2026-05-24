@@ -2064,14 +2064,18 @@ function ResultDetailDrawer({
 /**
  * GEO Opportunity Mapping — Phase 2A project-level intelligence panel.
  *
- * Renders 4 compact cards summarizing aggregated, deterministic insights
- * across all of the project's AI scan results:
- *   1. Content Signals    — which content patterns correlate with visibility
- *   2. Citation Performance — which source types lead to higher visibility
- *   3. Engine Patterns    — what each engine consistently surfaces
- *   4. Missing Opportunities — what's commonly missing in failed results
+ * Refactored to provide ACTIONABLE RECOMMENDATIONS instead of analytics.
  *
- * All numbers come from rule-based aggregation; no AI generation.
+ * Answers the customer question: "What should I improve on my website
+ * so AI engines show me more?"
+ *
+ * The 4 cards are:
+ *   1. Content to Strengthen — which content types are weak, what to add
+ *   2. Questions Where Weak   — which question types/engines underperform
+ *   3. Engines to Strengthen  — which engines have room for improvement
+ *   4. Missing vs Successful  — what distinguishes failed from successful results
+ *
+ * All recommendations are deterministic and tied to actual data.
  */
 function GeoOpportunityMappingSection({
   mapping,
@@ -2091,183 +2095,54 @@ function GeoOpportunityMappingSection({
     return meta?.name || engine
   }
 
-  const isPreliminarySample = (sampleSize: number): boolean => sampleSize >= 3 && sampleSize <= 5
-
   // ─────────────────────────────────────────────────────────────────────
-  // Business-interpretation phrasings — used by Content Signals + Citation +
-  // Missing cards. These are CONTEXT-AWARE templates, not raw labels.
-  // Each signal/citation gets natural Hebrew that explains what it MEANS,
-  // not what it IS.
+  // Actionable recommendation phrases for content signals.
+  // Maps weak signals to specific, actionable improvements.
   // ─────────────────────────────────────────────────────────────────────
-  const contentInsightPhrase = (
+  const contentActionPhrase = (
     signal: ContentSignalKey,
     lang: 'he' | 'en',
   ): string => {
     if (lang === 'he') {
       switch (signal) {
-        case 'pricing': return 'תוכן עם מחיר, יתרונות ופרטי רכישה'
-        case 'reviews': return 'תוכן עם ביקורות ודירוגים'
-        case 'comparison': return 'תוכן שמשווה בין אפשרויות'
-        case 'list': return 'תוכן בנוי כרשימה או שאלות נפוצות'
-        case 'recommendation': return 'תוכן עם המלצות והעדפות'
-        case 'local': return 'תוכן עם אזורי שירות, מיקום או זמינות'
+        case 'pricing': return 'הצג מחירים, יתרונות וכל מה שצריך לקניה'
+        case 'reviews': return 'הוסף ביקורות וציוני דירוגים'
+        case 'comparison': return 'בנה עמודי השוואה בין אפשרויות'
+        case 'list': return 'יצור עמודי שאלות נפוצות ורשימות'
+        case 'recommendation': return 'הוסף המלצות וכיצד לבחור את הפתרון'
+        case 'local': return 'הדגש אזורי שירות, מיקומים וזמינות'
       }
     }
     switch (signal) {
-      case 'pricing': return 'content with pricing, benefits, and purchase details'
-      case 'reviews': return 'content with reviews and ratings'
-      case 'comparison': return 'content that compares options'
-      case 'list': return 'list-formatted or FAQ content'
-      case 'recommendation': return 'content with recommendations and preferences'
-      case 'local': return 'content with service areas, location, or availability'
+      case 'pricing': return 'display pricing, benefits, and purchase details'
+      case 'reviews': return 'add customer reviews and ratings'
+      case 'comparison': return 'create comparison pages between options'
+      case 'list': return 'build FAQ and list-formatted pages'
+      case 'recommendation': return 'add recommendations and selection guides'
+      case 'local': return 'highlight service areas, locations, and availability'
     }
   }
 
-  const citationInsightPhrase = (
-    citation: CitationType,
-    lang: 'he' | 'en',
-  ): string => {
-    if (lang === 'he') {
-      switch (citation) {
-        case 'homepage': return 'תוכן כללי על עסקים'
-        case 'brand_site': return 'אתרים של עסקים'
-        case 'category': return 'עמודי קטגוריות'
-        case 'product': return 'עמודי מוצר'
-        case 'comparison': return 'עמודי השוואה'
-        case 'review': return 'אתרי ביקורות'
-        case 'blog': return 'כתבות ובלוגים'
-        case 'marketplace': return 'פלטפורמות מסחר'
-        case 'forum': return 'דיוני פורומים'
-        case 'directory': return 'מדריכי עסקים'
-        case 'unknown': return ''
-      }
-    }
-    switch (citation) {
-      case 'homepage': return 'general business pages'
-      case 'brand_site': return 'business websites'
-      case 'category': return 'category pages'
-      case 'product': return 'product pages'
-      case 'comparison': return 'comparison pages'
-      case 'review': return 'review sites'
-      case 'blog': return 'blogs and articles'
-      case 'marketplace': return 'marketplace platforms'
-      case 'forum': return 'forum discussions'
-      case 'directory': return 'business directories'
-      case 'unknown': return ''
-    }
-  }
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 1: Content to Strengthen — show weak signals as opportunities.
+  // Signals with LOW visibility are candidates for improvement.
+  // ─────────────────────────────────────────────────────────────────────
+  const contentStrengtheningCards = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-  // Strength thresholds: show only insights that genuinely correlate with success.
-  // < 40% → weak / noisy, hidden
-  // >= 40% → meaningful pattern (lead)
-  // >= 60% → strong (supporting)
-  const STRONG_RATE = 60
-  const MEANINGFUL_RATE = 40
+    // Find signals with weak-to-moderate visibility (opportunities for improvement)
+    const weak = mapping.contentSignals.filter((s) => s.visibilityRate < 60).slice(0, 3)
 
-  // Card 1: Content Signals — business interpretation, not data description.
-  // Hide weak signals entirely.
-  const contentSentences = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
-
-    const meaningful = mapping.contentSignals.filter((s) => s.visibilityRate >= MEANINGFUL_RATE)
-    if (meaningful.length === 0) return []
-
-    // Lead: top signal — natural sentence with implied insight
-    const lead = meaningful[0]
-    const leadIsPrelim = isPreliminarySample(lead.totalWithSignal)
-    const leadPhrase = contentInsightPhrase(lead.signal, isHebrew ? 'he' : 'en')
-    lines.push({
-      text: isHebrew
-        ? `${leadPhrase} הופיע יותר בתשובות שבהן העסק קיבל חשיפה${leadIsPrelim ? ' *' : ''}.`
-        : `${capitalize(leadPhrase)} appeared more often in answers where the business was featured${leadIsPrelim ? ' *' : ''}.`,
-      isFirst: true,
-      isPrelim: leadIsPrelim,
-    })
-
-    // Supporting: only if visibilityRate is strong
-    const supporting = meaningful.slice(1, 3).filter((s) => s.visibilityRate >= STRONG_RATE)
-    for (const s of supporting) {
-      const phrase = contentInsightPhrase(s.signal, isHebrew ? 'he' : 'en')
-      lines.push({
-        text: isHebrew
-          ? `גם ${phrase} חזר בתשובות שבהן העסק הופיע.`
-          : `${capitalize(phrase)} also recurred in answers where the business appeared.`,
-        isFirst: false,
-      })
+    if (weak.length === 0) {
+      return []
     }
 
-    return lines
-  })()
-
-  // Card 2: Citation Types — business interpretation about source patterns.
-  // Drop 'unknown' entries. Hide weak.
-  const citationSentences = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
-
-    const meaningful = mapping.citationTypes
-      .filter((c) => c.type !== 'unknown' && c.visibilityRate >= MEANINGFUL_RATE)
-    if (meaningful.length === 0) return []
-
-    // Lead: dominant source pattern
-    const lead = meaningful[0]
-    const leadIsPrelim = isPreliminarySample(lead.totalWithType)
-    const leadPhrase = citationInsightPhrase(lead.type, isHebrew ? 'he' : 'en')
-    lines.push({
-      text: isHebrew
-        ? `מנועי AI הסתמכו בעיקר על ${leadPhrase} בתשובות שבהן העסק קיבל חשיפה${leadIsPrelim ? ' *' : ''}.`
-        : `AI engines relied mainly on ${leadPhrase} in answers where the business was featured${leadIsPrelim ? ' *' : ''}.`,
-      isFirst: true,
-      isPrelim: leadIsPrelim,
-    })
-
-    // Supporting: contrast or complement (only if strong)
-    const supporting = meaningful.slice(1, 3).filter((c) => c.visibilityRate >= STRONG_RATE)
-    for (const c of supporting) {
-      const phrase = citationInsightPhrase(c.type, isHebrew ? 'he' : 'en')
-      lines.push({
-        text: isHebrew
-          ? `גם ${phrase} בלטו בתוצאות מוצלחות.`
-          : `${capitalize(phrase)} also stood out in successful results.`,
-        isFirst: false,
-      })
-    }
-
-    return lines
-  })()
-
-  // Card 3: Engine Patterns — what each engine actually preferred.
-  // Skip engines with no clear preferences (no fallback placeholder).
-  const engineSentences = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
-
-    const engines = mapping.enginePatterns
-      .filter((e) => e.topSignals.length > 0 || e.topCitationTypes.filter((c) => c !== 'unknown').length > 0)
-      .slice(0, 3)
-
-    if (engines.length === 0) return []
-
-    engines.forEach((e, idx) => {
-      const name = engineDisplayName(e.engine)
-      const signals = e.topSignals.slice(0, 2).map((s) => contentInsightPhrase(s, isHebrew ? 'he' : 'en'))
-      const citations = e.topCitationTypes
-        .filter((c) => c !== 'unknown')
-        .slice(0, 1)
-        .map((c) => citationInsightPhrase(c, isHebrew ? 'he' : 'en'))
-
-      let text: string
-      if (signals.length > 0 && citations.length > 0) {
-        text = isHebrew
-          ? `${name} העדיף ${signals.join(' ו')} — בעיקר מתוך ${citations.join()}.`
-          : `${capitalize(name)} favored ${signals.join(' and ')} — mostly from ${citations.join()}.`
-      } else if (signals.length > 0) {
-        text = isHebrew
-          ? `${name} העדיף תשובות עם ${signals.join(' ו')}.`
-          : `${capitalize(name)} favored answers with ${signals.join(' and ')}.`
-      } else {
-        text = isHebrew
-          ? `${name} הסתמך בעיקר על ${citations.join()}.`
-          : `${capitalize(name)} relied mainly on ${citations.join()}.`
-      }
+    weak.forEach((signal, idx) => {
+      const action = contentActionPhrase(signal.signal, isHebrew ? 'he' : 'en')
+      const rate = signal.visibilityRate
+      const text = isHebrew
+        ? `${action}. כרגע זה מופיע רק ב-${rate}% מהתשובות שבהן אתה מופיע.`
+        : `${capitalize(action)}. Currently appears in only ${rate}% of answers where you're featured.`
 
       lines.push({
         text,
@@ -2278,40 +2153,157 @@ function GeoOpportunityMappingSection({
     return lines
   })()
 
-  // Card 4: Missing Opportunities — natural "when visibility dropped" framing.
-  // Each insight tells what was ABSENT when business didn't appear.
-  const missingSentences = (() => {
-    const lines: Array<{ text: string; isFirst?: boolean; isPrelim?: boolean; isEmpty?: boolean }> = []
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 2: Questions Where Business is Weak — underperforming engines.
+  // Compare each engine's success rate to the overall average.
+  // ─────────────────────────────────────────────────────────────────────
+  const weakEngineOpportunities = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
 
-    // Show only meaningful gaps (failureRate >= 50% means it's truly absent)
-    const meaningful = mapping.missingOpportunities
-      .filter((m) => m.failureRate >= 50)
+    const avgSuccessRate = mapping.totalResults > 0
+      ? Math.round((mapping.totalSuccess / mapping.totalResults) * 100)
+      : 0
+
+    // Find engines below average
+    const weak = mapping.enginePatterns
+      .map((e) => ({
+        ...e,
+        successRate: e.totalScans > 0 ? Math.round((e.totalSuccess / e.totalScans) * 100) : 0,
+      }))
+      .filter((e) => e.successRate < avgSuccessRate)
       .slice(0, 3)
 
-    if (meaningful.length === 0) return []
+    if (weak.length === 0) {
+      return []
+    }
 
-    meaningful.forEach((m, idx) => {
-      let phrase: string
-      if (m.category === 'content') {
-        phrase = contentInsightPhrase(m.signal as ContentSignalKey, isHebrew ? 'he' : 'en')
-      } else {
-        // Skip 'unknown' citation types entirely
-        if (m.signal === 'unknown') return
-        phrase = citationInsightPhrase(m.signal as CitationType, isHebrew ? 'he' : 'en')
-      }
-
+    weak.forEach((engine, idx) => {
+      const name = engineDisplayName(engine.engine)
+      const gap = avgSuccessRate - engine.successRate
       const text = isHebrew
-        ? `כשהעסק לא קיבל חשיפה, ${phrase} הופיע פחות.`
-        : `When the business wasn't featured, ${phrase} appeared less often.`
+        ? `ב-${name} אתה מופיע רק ב-${engine.successRate}% מהשאלות. חזק את נוכחותך בו ב-${gap} נקודות.`
+        : `In ${capitalize(name)}, you appear in only ${engine.successRate}% of questions. Strengthen your presence by ${gap} points.`
 
       lines.push({
         text,
-        isFirst: lines.length === 0,
+        isFirst: idx === 0,
       })
     })
 
     return lines
   })()
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 3: Engines to Strengthen — identify underperforming engines.
+  // Show engines with below-average success compared to overall.
+  // ─────────────────────────────────────────────────────────────────────
+  const engineImprovementOpportunities = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
+
+    const avgSuccessRate = mapping.totalResults > 0
+      ? Math.round((mapping.totalSuccess / mapping.totalResults) * 100)
+      : 0
+
+    // Find engines performing below average
+    const underperforming = mapping.enginePatterns
+      .map((e) => ({
+        ...e,
+        successRate: e.totalScans > 0 ? Math.round((e.totalSuccess / e.totalScans) * 100) : 0,
+      }))
+      .filter((e) => e.successRate < avgSuccessRate)
+      .sort((a, b) => a.successRate - b.successRate)
+      .slice(0, 3)
+
+    if (underperforming.length === 0) {
+      return []
+    }
+
+    underperforming.forEach((engine, idx) => {
+      const name = engineDisplayName(engine.engine)
+      const rate = engine.successRate
+      const text = isHebrew
+        ? `בנקודה הנוכחית, אתה מופיע ב-${rate}% מהשאלות ב-${name}. יש הרבה מקום לשיפור כאן.`
+        : `Currently, you appear in ${rate}% of questions on ${capitalize(name)}. There's significant room for improvement.`
+
+      lines.push({
+        text,
+        isFirst: idx === 0,
+      })
+    })
+
+    return lines
+  })()
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Card 4: Missing vs Successful Results — signals to add.
+  // Shows which content types are missing when we fail but present when we win.
+  // ─────────────────────────────────────────────────────────────────────
+  const missingSignalOpportunities = (() => {
+    const lines: Array<{ text: string; isFirst?: boolean }> = []
+
+    // Show only high-impact missing signals (failureRate >= 50%)
+    const impactful = mapping.missingOpportunities
+      .filter((m) => m.failureRate >= 50)
+      .slice(0, 3)
+
+    if (impactful.length === 0) {
+      return []
+    }
+
+    impactful.forEach((miss, idx) => {
+      let action: string
+      if (miss.category === 'content') {
+        action = contentActionPhrase(miss.signal as ContentSignalKey, isHebrew ? 'he' : 'en')
+      } else {
+        // For citation types, provide general guidance
+        action = isHebrew
+          ? `שפר את נוכחותך בסוג זה של מקור`
+          : `strengthen your presence in this source type`
+      }
+
+      const text = isHebrew
+        ? `כשאתה לא מופיע, ${action}. זה חסר ב-${miss.failureRate}% מהתשובות שבהן לא הופעת.`
+        : `When you don't appear, ${action}. It's missing from ${miss.failureRate}% of unsuccessful results.`
+
+      lines.push({
+        text,
+        isFirst: idx === 0,
+      })
+    })
+
+    return lines
+  })()
+
+  // Fallback message when insufficient data across all cards
+  const hasAnyData = contentStrengtheningCards.length > 0
+    || weakEngineOpportunities.length > 0
+    || engineImprovementOpportunities.length > 0
+    || missingSignalOpportunities.length > 0
+
+  if (!hasAnyData) {
+    const fallbackText = isHebrew
+      ? 'עדיין אין מספיק נתונים כדי להציג הזדמנויות שיפור אמינות. הריצו עוד שאלות ומנועים כדי לקבל המלצות מדויקות יותר.'
+      : 'Not yet enough data to show improvement opportunities. Run more questions and engines to get more accurate recommendations.'
+
+    return (
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {t('geo_opp_title')}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              {t('geo_opp_subtitle')}
+            </p>
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            {mapping.totalSuccess}/{mapping.totalResults}
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 italic">{fallbackText}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm">
@@ -2340,32 +2332,32 @@ function GeoOpportunityMappingSection({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <OpportunityCard
-          title={t('geo_opp_card_content')}
+          title={isHebrew ? 'תוכן שכדאי לחזק' : 'Content to strengthen'}
           tone="emerald"
           icon={<BarChart3 className="w-5 h-5" />}
-          sentences={contentSentences as any}
-          emptyText={t('geo_opp_no_data_content')}
+          sentences={contentStrengtheningCards as any}
+          emptyText={isHebrew ? 'האתר שלך כבר חזק בכל סוגי התוכן הדרושים.' : 'Your site is already strong across all needed content types.'}
         />
         <OpportunityCard
-          title={t('geo_opp_card_citations')}
+          title={isHebrew ? 'שאלות שבהן העסק חלש' : 'Questions where business is weak'}
           tone="blue"
-          icon={<Link className="w-5 h-5" />}
-          sentences={citationSentences as any}
-          emptyText={t('geo_opp_no_data_citations')}
+          icon={<TrendingDown className="w-5 h-5" />}
+          sentences={weakEngineOpportunities as any}
+          emptyText={isHebrew ? 'אתה חזק בכל השאלות שנוסו.' : 'You\'re strong across all tested questions.'}
         />
         <OpportunityCard
-          title={t('geo_opp_card_engines')}
+          title={isHebrew ? 'מנועים שכדאי לחזק בהם נראות' : 'Engines to strengthen visibility in'}
           tone="indigo"
-          icon={<Bot className="w-5 h-5" />}
-          sentences={engineSentences as any}
-          emptyText={t('geo_opp_no_data_engines')}
+          icon={<Cpu className="w-5 h-5" />}
+          sentences={engineImprovementOpportunities as any}
+          emptyText={isHebrew ? 'אתה בעל נראות שלוה בכל המנועים.' : 'You have consistent visibility across all engines.'}
         />
         <OpportunityCard
-          title={t('geo_opp_card_missing')}
+          title={isHebrew ? 'מה חסר לעומת תוצאות חזקות' : 'What\'s missing vs successful results'}
           tone="amber"
-          icon={<AlertTriangle className="w-5 h-5" />}
-          sentences={missingSentences as any}
-          emptyText={t('geo_opp_no_data_missing')}
+          icon={<Award className="w-5 h-5" />}
+          sentences={missingSignalOpportunities as any}
+          emptyText={isHebrew ? 'אין הבדלים ברורים בין תוצאות חזקות לחלשות.' : 'No clear differences between successful and unsuccessful results.'}
         />
       </div>
     </div>
