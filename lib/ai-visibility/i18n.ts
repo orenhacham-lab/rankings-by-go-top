@@ -407,11 +407,11 @@ const STRINGS = {
   score_medium: { he: 'בינוני', en: 'Medium' },
   score_high: { he: 'גבוה', en: 'High' },
 
-  // Recommendations card
-  recommendations_title: { he: 'המלצות לשיפור נראות AI', en: 'Recommendations to improve AI visibility' },
+  // Competitive Gaps card (formerly Recommendations card; now only competitor_leading alerts)
+  recommendations_title: { he: 'פערים מול מתחרים', en: 'Competitive Gaps' },
   recommendations_desc: {
-    he: 'המלצות מבוססות על תוצאות הסריקה הנוכחית, ללא סריקות נוספות.',
-    en: 'Recommendations are based on the current scan results, without running additional scans.',
+    he: 'התראות על מתחרים שמופיעים יותר מהעסק בתשובות AI',
+    en: 'Alerts for competitors that appear more often than the business in AI answers',
   },
   recommendations_none: {
     he: 'לא נמצאו המלצות דחופות כרגע. המשיכו לעקוב אחרי הסריקות הבאות.',

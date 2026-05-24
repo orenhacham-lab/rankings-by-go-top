@@ -817,17 +817,12 @@ export default function AIVisibilitySection({
             t={t}
           />
 
-          {/* DETAILED RECOMMENDATIONS — deep recommendation rules */}
-          {globalMetrics && (
-            <RecommendationsCard
-              metrics={globalMetrics}
-              engineMetrics={engineMetrics}
-              allResults={allResults}
-              competitorAnalysis={competitorAnalysis}
-              t={t}
-              isRTL={isHebrew}
-            />
-          )}
+          {/* COMPETITIVE GAPS — only renders when a competitor leads in mentions */}
+          <RecommendationsCard
+            competitorAnalysis={competitorAnalysis}
+            t={t}
+            isRTL={isHebrew}
+          />
         </>
       )}
 
@@ -1195,7 +1190,7 @@ function OverviewSummaryStrip({
 
 interface Recommendation {
   id: string
-  type: 'weak_engines' | 'weak_questions' | 'competitor_leading'
+  type: 'competitor_leading'
   severity: 'high' | 'medium' | 'low'
   titleKey: string
   bodyKey: string
@@ -1204,27 +1199,22 @@ interface Recommendation {
 }
 
 function RecommendationsCard({
-  metrics,
-  engineMetrics,
-  allResults,
   competitorAnalysis,
   t,
   isRTL,
 }: {
-  metrics: GlobalMetrics
-  engineMetrics: Map<string, EngineMetrics>
-  allResults: ResultRow[]
   competitorAnalysis: CompetitorAnalysisData | null
   t: T
   isRTL: boolean
 }) {
   const recommendations: Recommendation[] = []
 
-  // Rule 0: Competitor leading — a competitor has more mentions than the
-  // project. Highest priority because it shows real competitive risk.
+  // Competitor leading — a competitor has more mentions than the project.
+  // This is the ONLY recommendation type retained here. weak_engines and
+  // weak_questions are already covered by GEO Opportunity Mapping with
+  // richer context, so they were removed to eliminate duplication.
   if (competitorAnalysis && competitorAnalysis.project && competitorAnalysis.competitors.length > 0) {
     const projectMentions = competitorAnalysis.project.mentionsCount
-    // Find the competitor with the largest positive gap over the project
     let leadingCompetitor: { name: string; gap: number } | null = null
     for (const comp of competitorAnalysis.competitors) {
       const gap = comp.mentionsCount - projectMentions
@@ -1248,141 +1238,10 @@ function RecommendationsCard({
     }
   }
 
-  // Rule 1: Weak engines — engines with scans but no mentions
-  const allWeakEngines = Array.from(engineMetrics.values())
-    .filter((em) => em.scans > 0 && em.mentions === 0)
-    .map((em) => ENGINE_META[em.engine as keyof typeof ENGINE_META]?.name || em.engine)
-
-  if (allWeakEngines.length > 0) {
-    const displayEngines = allWeakEngines.slice(0, 3)
-    const moreCount = allWeakEngines.length > 3 ? allWeakEngines.length - 3 : 0
-    const andConjunction = isRTL ? 'ו' : 'and'
-
-    // Format the list of engine names. When a "+more" suffix is needed,
-    // separate displayed engines with commas only — the "and ..." conjunction
-    // comes from the suffix itself. Without a suffix, use "and" before the
-    // last item for natural reading.
-    let engineNames: string
-    if (moreCount > 0) {
-      engineNames = displayEngines.join(', ')
-      const moreLabel = isRTL
-        ? (moreCount === 1 ? 'ועוד מנוע אחד' : `ועוד ${moreCount} מנועים`)
-        : (moreCount === 1 ? 'and 1 more engine' : `and ${moreCount} more engines`)
-      engineNames = `${engineNames} ${moreLabel}`
-    } else if (displayEngines.length === 1) {
-      engineNames = displayEngines[0]
-    } else if (displayEngines.length === 2) {
-      engineNames = `${displayEngines[0]} ${andConjunction} ${displayEngines[1]}`
-    } else {
-      engineNames = `${displayEngines[0]}, ${displayEngines[1]} ${andConjunction} ${displayEngines[2]}`
-    }
-
-    const bodyText = t('rec_weak_engines_body').replace('{engines}', engineNames)
-
-    recommendations.push({
-      id: 'weak_engines',
-      type: 'weak_engines',
-      severity: 'high',
-      titleKey: 'rec_weak_engines_title',
-      body: bodyText,
-      bodyKey: 'rec_weak_engines_body',
-      priority: 3,
-    })
-  }
-
-  // Rule 2: Weak questions — questions where business didn't appear in most/all engines.
-  // Use the same display-effective count the badges and summary use, so a
-  // question flagged "weak" here matches what the user sees in the list.
-  const questionStats = new Map<string | null, { total: number; mentions: number; promptText: string }>()
-  for (const result of allResults) {
-    if (result.status !== 'success') continue
-    const key = result.promptId || `__noprompt__${result.id}`
-    const existing = questionStats.get(key) || { total: 0, mentions: 0, promptText: result.promptText }
-    existing.total++
-    if (result.displayMentioned) existing.mentions++
-    questionStats.set(key, existing)
-  }
-
-  // Normalize prompt text for dedupe: trim, lowercase, collapse whitespace,
-  // and strip trailing punctuation (?, ., !, Hebrew/Arabic equivalents).
-  const normalizeQuestion = (text: string): string =>
-    text
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .replace(/[?.!,;؟،]+\s*$/u, '')
-      .trim()
-
-  const weakQuestionsMap = new Map<string, { text: string; mentionRate: number; mentions: number }>()
-  for (const stat of questionStats.values()) {
-    const rate = stat.total > 0 ? stat.mentions / stat.total : 0
-    if (rate >= 0.25) continue
-    if (!stat.promptText || stat.promptText.length === 0) continue
-    const normalized = normalizeQuestion(stat.promptText)
-    if (!normalized) continue
-    // Keep the lowest mention rate when duplicates collide
-    const existing = weakQuestionsMap.get(normalized)
-    if (!existing || rate < existing.mentionRate) {
-      weakQuestionsMap.set(normalized, { text: stat.promptText.trim(), mentionRate: rate, mentions: stat.mentions })
-    }
-  }
-  const allWeakQuestions = Array.from(weakQuestionsMap.values())
-
-  // Separate into zero mentions (did not appear) and weak mentions (barely appeared)
-  const zeroMentionQuestions = allWeakQuestions.filter((q) => q.mentions === 0).sort((a, b) => a.mentionRate - b.mentionRate)
-  const weakMentionQuestions = allWeakQuestions.filter((q) => q.mentions > 0).sort((a, b) => a.mentionRate - b.mentionRate)
-
-  // Prefer zero mentions if available; otherwise use weak mentions
-  const questionGroup = zeroMentionQuestions.length > 0 ? zeroMentionQuestions : weakMentionQuestions
-  const isZeroMentions = zeroMentionQuestions.length > 0
-
-  if (questionGroup.length > 0) {
-    const topQuestions = questionGroup.slice(0, 2)
-    let bodyText: string
-    let bodyKey: string
-
-    if (topQuestions.length === 1) {
-      bodyKey = isZeroMentions ? 'rec_weak_questions_zero_single' : 'rec_weak_questions_weak_single'
-      bodyText = t(bodyKey as any).replace('{question}', `"${topQuestions[0].text}"`)
-    } else {
-      bodyKey = isZeroMentions ? 'rec_weak_questions_zero_multi' : 'rec_weak_questions_weak_multi'
-      // Put each question on its own line so the body reads as a list
-      const questionsBlock = topQuestions.map((q) => `"${q.text}"`).join('\n')
-      bodyText = t(bodyKey as any).replace('{questions}', questionsBlock)
-    }
-
-    recommendations.push({
-      id: 'weak_questions',
-      type: 'weak_questions',
-      severity: 'high',
-      titleKey: 'rec_weak_questions_title',
-      body: bodyText,
-      bodyKey,
-      priority: 2,
-    })
-  }
-
-  // Sort by severity (high → medium → low) then by priority
-  const severityOrder = { high: 0, medium: 1, low: 2 }
-  const sorted = [...recommendations].sort((a, b) => {
-    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
-    if (severityDiff !== 0) return severityDiff
-    return a.priority - b.priority
-  })
-
-  // Take top 3
-  const topThree = sorted.slice(0, 3)
-
-  if (topThree.length === 0) {
-    return (
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 mt-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-          {t('recommendations_title')}
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t('recommendations_desc')}</p>
-        <p className="text-sm text-slate-600 dark:text-slate-300 italic">{t('recommendations_none_specific')}</p>
-      </div>
-    )
+  // Hide section entirely when there is no competitor_leading alert.
+  // No fallback, no "all good" message — the section simply disappears.
+  if (recommendations.length === 0) {
+    return null
   }
 
   return (
@@ -1392,7 +1251,7 @@ function RecommendationsCard({
       </h3>
       <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('recommendations_desc')}</p>
       <div className="space-y-2">
-        {topThree.map((rec) => (
+        {recommendations.map((rec) => (
           <RecommendationItem key={rec.id} rec={rec} t={t} isRTL={isRTL} />
         ))}
       </div>
