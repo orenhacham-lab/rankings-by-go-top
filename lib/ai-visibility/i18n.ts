@@ -501,8 +501,8 @@ const STRINGS = {
   // GEO Opportunity Mapping (Phase 2A — project-level aggregated insights)
   geo_opp_title: { he: 'מיפוי הזדמנויות GEO', en: 'GEO Opportunity Mapping' },
   geo_opp_subtitle: {
-    he: 'תובנות מצטברות מכל סריקות ה-AI של הפרויקט',
-    en: 'Aggregated intelligence across all AI scan results for this project',
+    he: 'המלצות לשיפור הנראות של העסק בתשובות AI',
+    en: 'Recommendations to improve business visibility in AI answers',
   },
   geo_opp_empty: {
     he: 'אין עדיין מספיק סריקות להפקת תובנות מצטברות. הריצו עוד סריקות כדי לקבל מיפוי מלא.',
