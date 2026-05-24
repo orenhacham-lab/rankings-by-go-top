@@ -76,6 +76,32 @@ export default function PromptSuggestions({
     }
   }
 
+  const confidenceTierLabel = (tier: string): string => {
+    switch (tier) {
+      case 'high': return t('confidence_high')
+      case 'good': return t('confidence_good')
+      case 'medium': return t('confidence_medium')
+      case 'opportunity': return t('confidence_opportunity')
+      case 'experimental': return t('confidence_experimental')
+      default: return tier
+    }
+  }
+
+  const confidenceTierColor = (tier: string): 'success' | 'info' | 'warning' | 'neutral' | 'danger' => {
+    switch (tier) {
+      case 'high': return 'success'
+      case 'good': return 'info'
+      case 'medium': return 'warning'
+      case 'opportunity': return 'warning'
+      case 'experimental': return 'neutral'
+      default: return 'neutral'
+    }
+  }
+
+  const chipLabel = (chip: string): string => {
+    return t(chip as any) || chip
+  }
+
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -414,6 +440,11 @@ export default function PromptSuggestions({
                       <Badge variant={INTENT_TONE[s.intent] || 'neutral'}>
                         {intentLabel(s.intent)}
                       </Badge>
+                      {'confidenceTier' in s && (
+                        <Badge variant={confidenceTierColor(s.confidenceTier)}>
+                          {confidenceTierLabel(s.confidenceTier)}
+                        </Badge>
+                      )}
                       <button
                         onClick={() => startEdit(s.id, s.prompt)}
                         className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
@@ -426,6 +457,18 @@ export default function PromptSuggestions({
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2" title={s.reason}>
                         {s.reason}
                       </p>
+                    )}
+                    {'chips' in s && s.chips && s.chips.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {s.chips.map((chip) => (
+                          <span
+                            key={chip}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                          >
+                            {chipLabel(chip)}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <Button
