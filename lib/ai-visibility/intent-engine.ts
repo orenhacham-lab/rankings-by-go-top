@@ -742,13 +742,13 @@ const RESIDENTIAL_CLEANING_SEEDS_HE: QuestionSeed[] = [
 // ----------------------------------------------------------------------------
 const PERFUME_SEEDS_HE: QuestionSeed[] = [
   {
-    text: () => 'כמה עולה בושם איכותי?',
+    text: () => 'כמה עולה בשם איכותי?',
     intent: 'commercial',
     categories: ['perfume'],
     score: 90,
   },
   {
-    text: () => 'איך לבחור בושם שמתאים לי?',
+    text: () => 'איך לבחור בשם שמתאים לי?',
     intent: 'pre_purchase',
     categories: ['perfume'],
     score: 88,
@@ -760,19 +760,19 @@ const PERFUME_SEEDS_HE: QuestionSeed[] = [
     score: 86,
   },
   {
-    text: () => 'אילו בושמים מומלצים לנשים?',
+    text: () => 'אילו בשמים מומלצים לנשים?',
     intent: 'recommendation',
     categories: ['perfume'],
     score: 85,
   },
   {
-    text: () => 'איך לדעת אם בושם אמיתי או מזויף?',
+    text: () => 'איך לדעת אם בשם אמיתי או מזויף?',
     intent: 'informational',
     categories: ['perfume'],
     score: 84,
   },
   {
-    text: (ctx) => ctx.city ? `איפה אפשר לקנות בושם מקורי ב${ctx.city}?` : null,
+    text: (ctx) => ctx.city ? `איפה אפשר לקנות בשם מקורי ב${ctx.city}?` : null,
     intent: 'local',
     requiresLocation: true,
     categories: ['perfume'],
