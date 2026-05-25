@@ -98,10 +98,11 @@ interface QuestionSeed {
 
 interface SeedContext {
   businessName: string | null
-  city: string | null
+  city: string | null       // profileCity — business location, never overwritten
   country: string
   language: 'he' | 'en'
   topics: Set<TopicCluster>
+  targetCity: string | null // pilot: agency-only, extracted from tracked keywords
 }
 
 // ----------------------------------------------------------------------------
@@ -264,6 +265,21 @@ const AGENCY_SEEDS_HE: QuestionSeed[] = [
     intent: 'local',
     requiresAnyTopic: ['seo'],
     requiresLocation: true,
+    categories: ['agency'],
+    score: 84,
+  },
+  {
+    // Phase 2 pilot: target-city recommendation from tracked keywords.
+    // Fires only when a tracked keyword matched a strong SEO+city pattern AND
+    // profileCity is not set. If profileCity is present, the seed above handles it.
+    // PILOT LIMITATION: In a future phase, profileCity and targetCity may both be
+    // shown with dedicated ranking/UX logic. For now, profileCity wins.
+    text: (ctx) =>
+      ctx.targetCity && !ctx.city
+        ? `אילו חברות SEO מומלצות ב${ctx.targetCity}?`
+        : null,
+    intent: 'local',
+    requiresAnyTopic: ['seo'],
     categories: ['agency'],
     score: 84,
   },
@@ -1136,6 +1152,10 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
     country: ctx.country || 'IL',
     language,
     topics,
+    targetCity:
+      ctx.businessCategory === 'agency'
+        ? extractTargetCityForAgency(ctx.keywords || [])
+        : null,
   }
 
   const results: IntentEngineQuestion[] = []
@@ -1218,6 +1238,99 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
  */
 export function debugInferTopics(keywords: string[]): TopicCluster[] {
   return Array.from(inferTopicClusters(keywords))
+}
+
+// ============================================================================
+// Phase 2 pilot: agency targetCity extraction
+// Scope: agency / SEO only. Do not expand to other categories yet.
+// ============================================================================
+
+/**
+ * High-confidence agency/SEO+city patterns.
+ * Each pattern must anchor at start (^) and have exactly one capture group
+ * that captures the city text that follows the "ב" preposition.
+ * Only patterns that unambiguously signal SEO/local-SEO intent are allowed.
+ */
+const AGENCY_CITY_PATTERNS: RegExp[] = [
+  /^קידום\s+אתרים\s+ב(.+)$/i,
+  /^חברת\s+קידום\s+אתרים\s+ב(.+)$/i,
+  /^חברת\s+seo\s+ב(.+)$/i,
+  /^seo\s+ב(.+)$/i,
+  /^קידום\s+בגוגל\s+מפות\s+ב(.+)$/i,
+]
+
+/**
+ * Known Hebrew words that appear after "ב" in SEO keyword phrases but are NOT cities.
+ * Prevents false positives like "קידום אתרים בגוגל" → "גוגל".
+ */
+const KNOWN_NON_CITY_WORDS = new Set([
+  'גוגל',       // Google
+  'פייסבוק',    // Facebook
+  'אינסטגרם',   // Instagram
+  'יוטיוב',     // YouTube
+  'ווצאפ',      // WhatsApp
+  'טיקטוק',     // TikTok
+  'ביינג',       // Bing
+  'ישראל',      // too broad — not a target city
+  'אונליין',    // online
+  'אינטרנט',    // internet
+])
+
+/**
+ * Validate and normalize a candidate city string extracted from a keyword.
+ * Returns the trimmed string or null if the value looks malformed or is a known non-city.
+ */
+function normalizeCity(raw: string): string | null {
+  const s = raw.trim().replace(/\s+/g, ' ')
+  if (s.length < 2 || s.length > 30) return null     // too short or suspiciously long
+  if (/\d/.test(s)) return null                       // no digits in a city name
+  if (/^[a-zA-Z\s]+$/.test(s)) return null            // purely English — likely a misparse
+  if (KNOWN_NON_CITY_WORDS.has(s)) return null        // reject known non-city words
+  return s
+}
+
+/**
+ * Extract the single best target city for an agency project from its tracked keywords.
+ *
+ * Rules:
+ * - Only high-confidence SEO+city patterns are matched (AGENCY_CITY_PATTERNS).
+ * - City text is validated/normalized before being counted.
+ * - The most-frequent city wins. On a tie the first occurrence (by keyword array order) wins.
+ * - Returns exactly one city or null — never a list.
+ *
+ * PILOT LIMITATION (Phase 2): only called for agency category.
+ * In a future phase, other local-service categories will get their own extractors.
+ */
+export function extractTargetCityForAgency(keywords: string[]): string | null {
+  // Map<normalizedCity, { count, firstIndex }>
+  const freq = new Map<string, { count: number; firstIndex: number }>()
+
+  for (let i = 0; i < keywords.length; i++) {
+    const kw = keywords[i].trim()
+    for (const pattern of AGENCY_CITY_PATTERNS) {
+      const match = kw.match(pattern)
+      if (!match) continue
+      const city = normalizeCity(match[1])
+      if (!city) continue
+      const existing = freq.get(city)
+      if (existing) {
+        existing.count++
+      } else {
+        freq.set(city, { count: 1, firstIndex: i })
+      }
+      break // first matching pattern wins for this keyword
+    }
+  }
+
+  if (freq.size === 0) return null
+
+  // Sort: descending frequency, tie-break by ascending firstIndex
+  const sorted = Array.from(freq.entries()).sort((a, b) => {
+    const byFreq = b[1].count - a[1].count
+    return byFreq !== 0 ? byFreq : a[1].firstIndex - b[1].firstIndex
+  })
+
+  return sorted[0][0]
 }
 
 /**
