@@ -1219,3 +1219,18 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
 export function debugInferTopics(keywords: string[]): TopicCluster[] {
   return Array.from(inferTopicClusters(keywords))
 }
+
+/**
+ * Analyzes the richness of a project profile based on keyword count and inferred topics.
+ * Returns metadata used by UI to show contextually appropriate empty-state messages.
+ */
+export function analyzeSmartQuestionContext(keywords: string[]): {
+  isRichProject: boolean
+  keywordCount: number
+  topicCount: number
+} {
+  const keywordCount = keywords.length
+  const topicCount = inferTopicClusters(keywords).size
+  const isRichProject = keywordCount >= 15 || topicCount >= 3
+  return { isRichProject, keywordCount, topicCount }
+}

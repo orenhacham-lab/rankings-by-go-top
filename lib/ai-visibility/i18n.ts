@@ -138,6 +138,14 @@ const STRINGS = {
     he: 'לא נמצאו כרגע עוד שאלות מגוונות. כדי לקבל עוד המלצות, הוסיפו מילות מפתח נוספות, שירותים או קטגוריות.',
     en: 'No more diverse questions were found right now. Add more keywords, services, or categories to get more suggestions.',
   },
+  pool_exhausted_rich: {
+    he: 'כל השאלות האיכותיות הזמינות כבר מוצגות. ניתן להוסיף שאלות ידנית או להרחיב את קטגוריות השירות בפרופיל.',
+    en: 'All available high-quality questions are already displayed. You can add questions manually or expand service categories in the profile.',
+  },
+  pool_exhausted_thin: {
+    he: 'כדי לקבל עוד שאלות, הוסיפו מילות מפתח, שירותים או קטגוריות בפרופיל.',
+    en: 'To get more questions, add keywords, services, or categories to the profile.',
+  },
   refresh_suggestions: { he: 'רענן', en: 'Refresh' },
   generate_more_suggestions: { he: 'צור עוד שאלות', en: 'Generate more questions' },
   generating_more: { he: 'יוצר שאלות נוספות...', en: 'Generating more questions...' },

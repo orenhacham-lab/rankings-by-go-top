@@ -37,6 +37,7 @@ import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
@@ -212,6 +213,11 @@ export default function AIVisibilitySection({
   const normalizedTargetDomain = useMemo(
     () => (projectDomain ? normalizeDomain(projectDomain) : null),
     [projectDomain]
+  )
+
+  const isRichProject = useMemo(
+    () => analyzeSmartQuestionContext(projectKeywords || []).isRichProject,
+    [projectKeywords]
   )
 
   // Load both scan results AND prompts in parallel
@@ -1193,7 +1199,7 @@ export default function AIVisibilitySection({
                     )}
                     {noNewSuggestionsFound && (
                       <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
-                        {t('no_diverse_suggestions')}
+                        {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
                       </div>
                     )}
                   </>
