@@ -297,6 +297,36 @@ const ECOMMERCE_SEEDS_HE: QuestionSeed[] = [
     categories: ['ecommerce', 'product_brand', 'perfume', 'appliance_store', 'gifts'],
     score: 82,
   },
+  {
+    text: () => 'איך יודעים אם אתר קניות אמין?',
+    intent: 'pre_purchase',
+    categories: ['ecommerce'],
+    score: 88,
+  },
+  {
+    text: () => 'איפה כדאי לקנות אונליין?',
+    intent: 'recommendation',
+    categories: ['ecommerce'],
+    score: 87,
+  },
+  {
+    text: () => 'איך לבחור חנות אונליין אמינה?',
+    intent: 'pre_purchase',
+    categories: ['ecommerce'],
+    score: 86,
+  },
+  {
+    text: () => 'כמה זמן לוקח משלוח מהחנות?',
+    intent: 'informational',
+    categories: ['ecommerce'],
+    score: 84,
+  },
+  {
+    text: () => 'האם כדאי להזמין מהחנות הזו?',
+    intent: 'pre_purchase',
+    categories: ['ecommerce'],
+    score: 83,
+  },
 ]
 
 // ----------------------------------------------------------------------------
@@ -809,41 +839,35 @@ const SAAS_SEEDS_HE: QuestionSeed[] = [
 // ----------------------------------------------------------------------------
 const SECOND_HAND_FASHION_SEEDS_HE: QuestionSeed[] = [
   {
-    text: () => 'איך לדעת אם ביגוד יד שנייה במצב טוב?',
-    intent: 'pre_purchase',
+    text: () => 'איפה כדאי לקנות בגדי יד שנייה?',
+    intent: 'recommendation',
     categories: ['second_hand_fashion'],
     score: 88,
   },
   {
-    text: () => 'מה המקומות הטובים לקנות בגדים משומשים?',
-    intent: 'recommendation',
+    text: () => 'איך יודעים אם בגד יד שנייה במצב טוב?',
+    intent: 'pre_purchase',
+    categories: ['second_hand_fashion'],
+    score: 87,
+  },
+  {
+    text: () => 'מה המחירים בחנויות יד שנייה?',
+    intent: 'commercial',
     categories: ['second_hand_fashion'],
     score: 86,
   },
   {
-    text: () => 'איך לקנות מעילים איכותיים בזול?',
-    intent: 'pre_purchase',
+    text: () => 'האם משתלם לקנות בגדי יד שנייה?',
+    intent: 'informational',
     categories: ['second_hand_fashion'],
     score: 85,
   },
   {
-    text: () => 'כמה אפשר לעלות בחנות בגדים משומשת?',
-    intent: 'commercial',
-    categories: ['second_hand_fashion'],
-    score: 84,
-  },
-  {
-    text: () => 'איך לדעת אם בגד מעצמאות לפני קנייה?',
-    intent: 'informational',
-    categories: ['second_hand_fashion'],
-    score: 82,
-  },
-  {
-    text: (ctx) => ctx.city ? `איפה אפשר למכור ביגוד משומש ב${ctx.city}?` : null,
+    text: (ctx) => ctx.city ? `איפה כדאי לקנות בגדי יד שנייה ב${ctx.city}?` : null,
     intent: 'local',
     requiresLocation: true,
     categories: ['second_hand_fashion'],
-    score: 85,
+    score: 84,
   },
   {
     text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
