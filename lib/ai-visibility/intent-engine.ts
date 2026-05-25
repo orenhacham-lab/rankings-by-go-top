@@ -40,6 +40,9 @@ export type TopicCluster =
   | 'email_marketing'
   | 'price_sensitive'
   | 'fashion'
+  | 'office_cleaning'
+  | 'building_cleaning'
+  | 'residential_cleaning'
 
 interface TopicSignal {
   cluster: TopicCluster
@@ -65,6 +68,10 @@ const TOPIC_SIGNALS: TopicSignal[] = [
   // Phase 3: ecommerce fashion pilot — explicit garment/clothing terms only.
   // Intentionally excludes "נעלי" to avoid overlap with sports_store category.
   { cluster: 'fashion', patterns: /(אופנה|בגדים|ביגוד|הלבשה|שמלה|חולצה|מכנסיים|ג'ינס|מעיל|חצאית|fashion|clothing|apparel)/i },
+  // Phase 4: cleaning category specialization — office/building/residential separation
+  { cluster: 'office_cleaning', patterns: /ניקיון\s+(משרדים?|עסקי|מסחרי|לעסקים?|חנויות?)|office\s+cleaning|commercial\s+cleaning/i },
+  { cluster: 'building_cleaning', patterns: /ניקיון\s+(בניינים?|מבנים?|מבנה|חדר\s+מדרגות|לובי)|building\s+cleaning|property\s+cleaning/i },
+  { cluster: 'residential_cleaning', patterns: /ניקיון\s+(דירו?ת?|בית|בתים|לבית|דיור|מגורים)|home\s+cleaning|residential\s+cleaning/i },
 ]
 
 function inferTopicClusters(keywords: string[]): Set<TopicCluster> {
@@ -592,9 +599,10 @@ const AGENCY_FALLBACK_SEEDS_HE: QuestionSeed[] = [
 // ----------------------------------------------------------------------------
 // Cleaning services seeds
 // ----------------------------------------------------------------------------
+// Core cleaning seeds — neutral, apply to all cleaning specializations (office/building/residential)
 const CLEANING_SEEDS_HE: QuestionSeed[] = [
   {
-    text: () => 'כמה עולה שירות ניקיון לדירה?',
+    text: () => 'כמה עולה שירות ניקיון מקצועי?',
     intent: 'commercial',
     categories: ['cleaning'],
     score: 90,
@@ -606,16 +614,16 @@ const CLEANING_SEEDS_HE: QuestionSeed[] = [
     score: 88,
   },
   {
-    text: () => 'כמה זמן לוקח ניקיון דירה בגודל בינוני?',
+    text: () => 'איך לבחור חברת ניקיון מקצועית?',
+    intent: 'pre_purchase',
+    categories: ['cleaning'],
+    score: 87,
+  },
+  {
+    text: () => 'מה ההבדל בין ניקיון שוטף לניקיון יסודי?',
     intent: 'informational',
     categories: ['cleaning'],
     score: 85,
-  },
-  {
-    text: () => 'מה כלול בשירות ניקיון עמוק?',
-    intent: 'informational',
-    categories: ['cleaning'],
-    score: 84,
   },
   {
     text: (ctx) => ctx.city ? `איפה למצוא חברת ניקיון טובה ב${ctx.city}?` : null,
@@ -630,6 +638,102 @@ const CLEANING_SEEDS_HE: QuestionSeed[] = [
     requiresBusinessName: true,
     categories: ['cleaning'],
     score: 78,
+  },
+]
+
+// Office/commercial cleaning seeds — triggered by office_cleaning topic signal
+const OFFICE_CLEANING_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה ניקיון משרדים?',
+    intent: 'commercial',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['office_cleaning'],
+    score: 92,
+  },
+  {
+    text: () => 'מה כולל שירות ניקיון משרדים?',
+    intent: 'informational',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['office_cleaning'],
+    score: 88,
+  },
+  {
+    text: () => 'איך לבחור חברת ניקיון משרדים?',
+    intent: 'pre_purchase',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['office_cleaning'],
+    score: 87,
+  },
+  {
+    text: () => 'כמה פעמים בשבוע צריך ניקיון משרד?',
+    intent: 'informational',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['office_cleaning'],
+    score: 85,
+  },
+  {
+    text: () => 'אילו חברות ניקיון מומלצות לעסקים?',
+    intent: 'recommendation',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['office_cleaning'],
+    score: 82,
+  },
+]
+
+// Building/property cleaning seeds — triggered by building_cleaning topic signal
+const BUILDING_CLEANING_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה ניקיון בניינים?',
+    intent: 'commercial',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['building_cleaning'],
+    score: 91,
+  },
+  {
+    text: () => 'מה כולל שירות ניקיון בניינים?',
+    intent: 'informational',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['building_cleaning'],
+    score: 87,
+  },
+  {
+    text: () => 'איך לבחור חברת ניקיון מבנים?',
+    intent: 'pre_purchase',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['building_cleaning'],
+    score: 86,
+  },
+  {
+    text: () => 'מי מומלץ לניקיון מבנים משותפים?',
+    intent: 'recommendation',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['building_cleaning'],
+    score: 83,
+  },
+]
+
+// Residential cleaning seeds — triggered by residential_cleaning topic signal
+const RESIDENTIAL_CLEANING_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה ניקיון דירה?',
+    intent: 'commercial',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['residential_cleaning'],
+    score: 90,
+  },
+  {
+    text: () => 'כמה זמן לוקח ניקיון דירה?',
+    intent: 'informational',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['residential_cleaning'],
+    score: 85,
+  },
+  {
+    text: () => 'מה כולל ניקיון דירה יסודי?',
+    intent: 'informational',
+    categories: ['cleaning'],
+    requiresAnyTopic: ['residential_cleaning'],
+    score: 84,
   },
 ]
 
@@ -1118,6 +1222,9 @@ const ALL_SEEDS_HE: QuestionSeed[] = [
   ...LEGAL_SEEDS_HE,
   ...HEALTHCARE_SEEDS_HE,
   ...CLEANING_SEEDS_HE,
+  ...OFFICE_CLEANING_SEEDS_HE,
+  ...BUILDING_CLEANING_SEEDS_HE,
+  ...RESIDENTIAL_CLEANING_SEEDS_HE,
   ...PERFUME_SEEDS_HE,
   ...GIFT_SHOP_SEEDS_HE,
   ...APPLIANCE_STORE_SEEDS_HE,
