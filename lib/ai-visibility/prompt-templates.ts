@@ -2471,6 +2471,245 @@ function generateKeywordBasedQuestions({
  *   pool grouped by intent bucket. This produces a meaningfully different set
  *   each call. Set to false to get deterministic top-N by score.
  */
+// ============================================================================
+// SAFE MODE: Curated-only generation
+// Feature flag to disable aggressive keyword wrapping from v2 generator
+// ============================================================================
+
+const USE_SAFE_SMART_QUESTIONS = true // Set to false to re-enable v2 keyword expansion
+
+interface SafeCuratedPrompt {
+  text: string
+  intent: PromptIntent
+  category: BusinessCategory
+  requiresLocation?: boolean
+  requiresBusinessName?: boolean
+}
+
+/**
+ * Generate safe, curated suggestions only.
+ * Blocks all keyword-to-question wrapping.
+ * Returns only high-confidence templates that work across contexts.
+ */
+function generateSafeCuratedSuggestions({
+  businessName,
+  city,
+  language,
+  category,
+  excludePrompts,
+}: {
+  businessName: string | null
+  city: string | null
+  language: string
+  category: BusinessCategory
+  excludePrompts: string[]
+}): PromptSuggestion[] {
+  const lang = language === 'en' ? 'en' : 'he'
+  const isService = SERVICE_LIKE_CATEGORIES.includes(category)
+  const hasLocation = !!city
+  const hasBusinessName = !!businessName && businessName.length > 2
+  const results: PromptSuggestion[] = []
+  const excludeSet = new Set(excludePrompts.map(p => normalizePromptForCompare(p)))
+
+  // Define safe curated templates
+  const templates: SafeCuratedPrompt[] = []
+
+  if (lang === 'he') {
+    // Universal commercial questions (work for all business types)
+    templates.push({
+      text: `כמה עולה ${category === 'saas' ? 'מנוי' : 'שירות'} כזה?`,
+      intent: 'commercial',
+      category,
+    })
+
+    // How to choose (only for services, not generic)
+    if (isService) {
+      templates.push({
+        text: `איך לבחור חברת ${getCategoryLabel(category, lang)}?`,
+        intent: 'pre_purchase',
+        category,
+      })
+    }
+
+    // Brand mention if business name exists
+    if (hasBusinessName) {
+      templates.push({
+        text: `חוות דעת על ${businessName}`,
+        intent: 'brand',
+        category,
+        requiresBusinessName: true,
+      })
+    }
+
+    // Local recommendation only if business is actually local
+    if (hasLocation && isService) {
+      templates.push({
+        text: `אילו חברות ${getCategoryLabel(category, lang)} מומלצות ב${city}?`,
+        intent: 'local',
+        category,
+        requiresLocation: true,
+      })
+    }
+
+    // High-confidence commercial comparison (for ecommerce/products only)
+    if (['ecommerce', 'product_brand'].includes(category)) {
+      templates.push({
+        text: `מה הביקורות על ${category === 'product_brand' ? 'המוצר הזה' : 'מוצר זה'}?`,
+        intent: 'pre_purchase',
+        category,
+      })
+    }
+  } else {
+    // English safe templates
+    templates.push({
+      text: `How much does ${isService ? 'this service' : 'a service like this'} cost?`,
+      intent: 'commercial',
+      category,
+    })
+
+    if (isService) {
+      templates.push({
+        text: `How do I choose a ${getCategoryLabel(category, lang)}?`,
+        intent: 'pre_purchase',
+        category,
+      })
+    }
+
+    if (hasBusinessName) {
+      templates.push({
+        text: `Reviews of ${businessName}`,
+        intent: 'brand',
+        category,
+        requiresBusinessName: true,
+      })
+    }
+
+    if (hasLocation && isService) {
+      templates.push({
+        text: `Top ${getCategoryLabel(category, lang)} in ${city}`,
+        intent: 'local',
+        category,
+        requiresLocation: true,
+      })
+    }
+  }
+
+  // Process templates, filtering out excluded ones
+  for (const template of templates) {
+    const normalized = normalizePromptForCompare(template.text)
+    if (excludeSet.has(normalized)) continue
+
+    // Respect requirements
+    if (template.requiresBusinessName && !hasBusinessName) continue
+    if (template.requiresLocation && !hasLocation) continue
+
+    const score = 85 // Safe curated templates get good confidence
+    results.push({
+      id: `safe-${Math.random().toString(36).slice(2, 8)}`,
+      prompt: template.text,
+      intent: template.intent,
+      intentLabel: getIntentLabel(template.intent, lang),
+      category,
+      language: lang,
+      qualityScore: score,
+      confidenceTier: getConfidenceTier(score),
+      reason: '[Safe Mode] Curated business template',
+      chips: generateSignalChips(template.text, template.intent, score, lang as 'he' | 'en', hasLocation),
+      valueReason: generateValueReason(template.intent, score, template.text, lang as 'he' | 'en', hasLocation),
+    })
+  }
+
+  return results
+}
+
+function getCategoryLabel(category: BusinessCategory, lang: string): string {
+  const heLabels: Record<BusinessCategory, string> = {
+    saas: 'תוכנה',
+    agency: 'סוכנות',
+    ecommerce: 'חנות',
+    local_service: 'שירות',
+    fitness: 'מתחם כושר',
+    restaurant: 'מסעדה',
+    beauty: 'סלון יופי',
+    florist: 'חנות פרחים',
+    legal: 'משרד עורכי דין',
+    healthcare: 'קליניקה',
+    real_estate: 'משרדון',
+    product_brand: 'מוצר',
+    cleaning: 'שירות ניקיון',
+    home_improvement_service: 'שרות תיקון בית',
+    sports_store: 'חנות ספורט',
+    perfume: 'בושם',
+    appliance_store: 'חנות מכשירים',
+    gifts: 'מתנות',
+    education: 'חינוך',
+    second_hand_fashion: 'ביגוד יד שנייה',
+    generic: 'עסק',
+  }
+
+  const enLabels: Record<BusinessCategory, string> = {
+    saas: 'software',
+    agency: 'agency',
+    ecommerce: 'shop',
+    local_service: 'service',
+    fitness: 'gym',
+    restaurant: 'restaurant',
+    beauty: 'salon',
+    florist: 'florist',
+    legal: 'law firm',
+    healthcare: 'clinic',
+    real_estate: 'real estate',
+    product_brand: 'brand',
+    cleaning: 'cleaning service',
+    home_improvement_service: 'home service',
+    sports_store: 'sports shop',
+    perfume: 'perfume',
+    appliance_store: 'appliance store',
+    gifts: 'gifts',
+    education: 'education',
+    second_hand_fashion: 'fashion',
+    generic: 'business',
+  }
+
+  const labels = lang === 'he' ? heLabels : enLabels
+  return labels[category] || 'business'
+}
+
+function getIntentLabel(intent: PromptIntent, lang: string): string {
+  const heLabels: Record<PromptIntent, string> = {
+    recommendation: 'המלצה',
+    comparison: 'השוואה',
+    commercial: 'מחיר',
+    pre_purchase: 'מידע לפני רכישה',
+    transactional: 'בחירה',
+    local: 'מקומי',
+    brand: 'מותג',
+    informational: 'מידע',
+    alternatives: 'אלטרנטיבות',
+    gift: 'מתנה',
+  }
+
+  const enLabels: Record<PromptIntent, string> = {
+    recommendation: 'Recommendation',
+    comparison: 'Comparison',
+    commercial: 'Price',
+    pre_purchase: 'Pre-purchase',
+    transactional: 'Selection',
+    local: 'Local',
+    brand: 'Brand',
+    informational: 'Info',
+    alternatives: 'Alternatives',
+    gift: 'Gift',
+  }
+
+  const labels = lang === 'he' ? heLabels : enLabels
+  return labels[intent] || intent
+}
+
+// ============================================================================
+// ORIGINAL GENERATION PATH
+// ============================================================================
+
 export function generatePromptSuggestions({
   businessName,
   domain,
@@ -2513,6 +2752,21 @@ export function generatePromptSuggestions({
   const autoProfile = profile ?? inferBusinessProfile({
     businessName, domain, keywords, city, country,
   })
+
+  // ========================================================================
+  // SAFE MODE: Skip aggressive keyword-based generation
+  // ========================================================================
+  if (USE_SAFE_SMART_QUESTIONS) {
+    const categoryForSafe = (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+    const safeSuggestions = generateSafeCuratedSuggestions({
+      businessName,
+      city,
+      language: lang,
+      category: categoryForSafe,
+      excludePrompts,
+    })
+    return safeSuggestions.slice(0, limit)
+  }
 
   // If a manual profile is active, its primaryCategory overrides auto-detection
   // and its excludedTopics/secondaryCategories augment the auto-inferred profile.
