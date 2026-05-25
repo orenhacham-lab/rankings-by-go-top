@@ -267,6 +267,12 @@ export function detectCategory(
   // Gift signals — checked AFTER florist so flowers aren't misclassified as gifts.
   if (/(matnot|מתנ|gift shop|gifts|presents|מתנות)/.test(text)) return 'gifts'
 
+  // Apparel/fashion keywords → ecommerce (conservative pattern, excludes shoes/accessories
+  // which may overlap with sports_store or other retail). Checked after sports_store
+  // so "נעלי ריצה" is properly caught as sports, not fashion ecommerce.
+  if (/(אופנה|בגדים|ביגוד|הלבשה|שמלה|שמלות|חולצה|חולצות|מכנסיים|ג'ינס|ג׳ינס|מעיל|חצאית|fashion|clothing|apparel|dress|shirt|jeans)/.test(text))
+    return 'ecommerce'
+
   if (/(appliance|מקרר|מכונת כביסה|תנור|מוצרי חשמל|חשמל ביתי|electrolux|whirlpool)/.test(text)) return 'appliance_store'
   if (/\b(saas|software)\b/.test(text)) return 'saas'
   if (/(restaurant|cafe|food|bistro|מסעדה|קפה|אוכל|פיצה)/.test(text)) return 'restaurant'
