@@ -54,7 +54,7 @@ const TOPIC_SIGNALS: TopicSignal[] = [
   { cluster: 'web_dev', patterns: /(בניית\s*אתר|בניית\s*אתרים|פיתוח\s*אתר|web\s*dev|website\s*build)/i },
   { cluster: 'ecommerce', patterns: /(חנות\s*אונליין|ecommerce|e-commerce|מסחר\s*אלקטרוני|חנות\s*וירטואלית)/i },
   { cluster: 'shopify', patterns: /(שופיפיי|shopify)/i },
-  { cluster: 'local_seo', patterns: /(קידום\s*מקומי|local\s*seo|local\s*business)/i },
+  { cluster: 'local_seo', patterns: /(קידום\s*מקומי|local\s*seo|local\s*business|גוגל\s*מפות|google\s*maps|קידום\s*(ב)?גוגל\s*מפות|לוקאל)/i },
   { cluster: 'doctors', patterns: /(רופא|רופאים|דנטל|רפואי|doctors?|dental)/i },
   { cluster: 'lawyers', patterns: /(עורכי?\s*דין|משפט|lawyers?|legal)/i },
   { cluster: 'small_business', patterns: /(עסק\s*קטן|small\s*business|smb)/i },
@@ -106,41 +106,13 @@ interface SeedContext {
 // SEO Agency seeds
 // ----------------------------------------------------------------------------
 const AGENCY_SEEDS_HE: QuestionSeed[] = [
+  // ── Tier 1: high-intent selection and pricing (92–90) ────────────────────
   {
     text: () => 'איך לבחור חברת SEO?',
     intent: 'pre_purchase',
     requiresAnyTopic: ['seo'],
     categories: ['agency'],
     score: 92,
-  },
-  {
-    text: () => 'כמה עולה קידום אתרים בישראל?',
-    intent: 'commercial',
-    requiresAnyTopic: ['seo'],
-    categories: ['agency'],
-    score: 90,
-  },
-  {
-    text: () => 'כמה זמן לוקח לראות תוצאות מ-SEO?',
-    intent: 'informational',
-    requiresAnyTopic: ['seo'],
-    categories: ['agency'],
-    score: 88,
-  },
-  {
-    text: () => 'אילו חברות SEO מומלצות בישראל?',
-    intent: 'recommendation',
-    requiresAnyTopic: ['seo'],
-    categories: ['agency'],
-    score: 90,
-  },
-  {
-    text: (ctx) => ctx.city ? `אילו חברות SEO מומלצות ב${ctx.city}?` : null,
-    intent: 'local',
-    requiresAnyTopic: ['seo'],
-    requiresLocation: true,
-    categories: ['agency'],
-    score: 88,
   },
   {
     text: () => 'כמה עולה ניהול Google Ads?',
@@ -150,12 +122,14 @@ const AGENCY_SEEDS_HE: QuestionSeed[] = [
     score: 92,
   },
   {
-    text: () => 'איך לבחור חברה לניהול Google Ads?',
-    intent: 'pre_purchase',
-    requiresAnyTopic: ['google_ads'],
+    // "לעסק" is more conversational than "בישראל" — business owners search this way
+    text: () => 'כמה עולה קידום אתרים לעסק?',
+    intent: 'commercial',
+    requiresAnyTopic: ['seo'],
     categories: ['agency'],
-    score: 88,
+    score: 90,
   },
+  // ── Tier 2: comparison and vertical selection (89) ────────────────────────
   {
     text: () => 'מה עדיף — SEO או Google Ads?',
     intent: 'comparison',
@@ -164,25 +138,12 @@ const AGENCY_SEEDS_HE: QuestionSeed[] = [
     score: 89,
   },
   {
-    text: () => 'כמה עולה קמפיין לידים בפייסבוק?',
-    intent: 'commercial',
-    requiresAnyTopic: ['facebook_ads'],
-    categories: ['agency'],
-    score: 88,
-  },
-  {
-    text: () => 'איך לבחור חברה לקידום אתרים לעסק קטן?',
-    intent: 'pre_purchase',
-    requiresAnyTopic: ['seo', 'small_business'],
-    categories: ['agency'],
-    score: 86,
-  },
-  {
-    text: () => 'איך לבחור חברה לבניית אתרי ecommerce?',
+    // Natural Hebrew for ecommerce/Shopify signal — avoids hybrid "ecommerce" phrasing
+    text: () => 'איך לבחור חברה לקידום חנות אונליין?',
     intent: 'pre_purchase',
     requiresAnyTopic: ['ecommerce', 'shopify'],
     categories: ['agency'],
-    score: 87,
+    score: 89,
   },
   {
     text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
@@ -190,6 +151,67 @@ const AGENCY_SEEDS_HE: QuestionSeed[] = [
     requiresBusinessName: true,
     categories: ['agency'],
     score: 89,
+  },
+  // ── Tier 3: specialized selection — Google Maps, freelancer (88–87) ───────
+  {
+    // Activated by explicit Google Maps / local SEO keyword signal
+    text: () => 'איך לבחור חברה לקידום בגוגל מפות?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['local_seo'],
+    categories: ['agency'],
+    score: 88,
+  },
+  {
+    // Real business-owner question — freelancer vs. full agency
+    text: () => 'האם עדיף פרילנסר SEO או חברת קידום?',
+    intent: 'comparison',
+    requiresAnyTopic: ['seo'],
+    categories: ['agency'],
+    score: 87,
+  },
+  // ── Tier 4: acceptable alternatives — shown when pool is thin (84–82) ────
+  {
+    text: () => 'אילו חברות SEO מומלצות בישראל?',
+    intent: 'recommendation',
+    requiresAnyTopic: ['seo'],
+    categories: ['agency'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.city ? `אילו חברות SEO מומלצות ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresAnyTopic: ['seo'],
+    requiresLocation: true,
+    categories: ['agency'],
+    score: 84,
+  },
+  {
+    text: () => 'איך לבחור חברה לניהול Google Ads?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['google_ads'],
+    categories: ['agency'],
+    score: 84,
+  },
+  {
+    text: () => 'כמה עולה קמפיין לידים בפייסבוק?',
+    intent: 'commercial',
+    requiresAnyTopic: ['facebook_ads'],
+    categories: ['agency'],
+    score: 83,
+  },
+  {
+    text: () => 'איך לבחור חברה לקידום אתרים לעסק קטן?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['seo', 'small_business'],
+    categories: ['agency'],
+    score: 84,
+  },
+  {
+    text: () => 'כמה זמן לוקח לראות תוצאות מ-SEO?',
+    intent: 'informational',
+    requiresAnyTopic: ['seo'],
+    categories: ['agency'],
+    score: 82,
   },
 ]
 
