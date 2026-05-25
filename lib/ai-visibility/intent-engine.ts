@@ -467,14 +467,6 @@ const ECOMMERCE_SEEDS_HE: QuestionSeed[] = [
     categories: ['ecommerce', 'product_brand', 'perfume', 'appliance_store', 'gifts'],
     score: 82,
   },
-  {
-    // Demoted: too vague to be a primary recommendation. Shows only when pool is otherwise thin.
-    text: () => 'האם כדאי להזמין מהחנות הזו?',
-    intent: 'pre_purchase',
-    categories: ['ecommerce'],
-    fallbackOnly: true,
-    score: 70,
-  },
 ]
 
 // ----------------------------------------------------------------------------
