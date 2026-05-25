@@ -51,7 +51,7 @@ export function classifyKeywordMode(
   // These keywords already ARE search intents. Don't wrap them.
 
   const isAlreadyQuestion =
-    /^(כמה|מה|איך|למה|איפה|מי|הגם|או|אם|האם)\b/.test(kwTrimmed)
+    /^(כמה|מה|איך|למה|איפה|מי|הגם|או|אם|האם)(?:\s|$)/.test(kwTrimmed)
 
   const hasSearchIntent =
     /(כמה עול|מחיר|עלות|בחיר|בחירת|מומלץ|הצעה|הצעות|מתי|לפי|בהשוואה|משכנתא|הלוואה|עלויות|משכנתא|ריבית|מס|ביטוח|פוליסה)/i.test(
