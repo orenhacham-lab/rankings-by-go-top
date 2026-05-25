@@ -24,6 +24,11 @@ import {
   chooseTemplatesByObjectType,
   type SearchObject,
 } from './search-object-classifier'
+import {
+  generateHumanLikeSmartQuestions,
+  convertToPromptSuggestions,
+  type GeneratorContext,
+} from './semantic-generator-v2'
 
 export type PromptIntent =
   | 'brand'
@@ -2145,12 +2150,130 @@ function normalizeHebrewConstructState(phrase: string): string {
 }
 
 /**
- * Generate AI questions directly from tracked keywords.
+ * Generate keyword-based questions using v2 (semantic) first, with v1 (template) fallback.
+ *
+ * v2 returns only high-quality, realistic questions (might be 2-4 per keyword).
+ * If v2 produces too few questions, fill remaining slots carefully from v1
+ * but only after strict semantic validation.
+ *
+ * Returns a flat list of {prompt, score, intentBucket} that can be merged with
+ * template-based suggestions.
+ */
+function generateKeywordBasedQuestionsWithFallback({
+  keywords,
+  businessName,
+  city,
+  language,
+  trackedPrompts,
+  category,
+}: {
+  keywords: string[]
+  businessName: string | null
+  city: string | null
+  language: string
+  trackedPrompts: string[]
+  category: BusinessCategory
+}): Array<{ prompt: string; score: number; intentBucket: string }> {
+  const isHebrew = language === 'he'
+  const results: Array<{ prompt: string; score: number; intentBucket: string }> = []
+
+  // Normalize tracked prompts for dedup
+  const normalizeForDedup = (text: string): string =>
+    text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+  const trackedSet = new Set(trackedPrompts.map(normalizeForDedup))
+  const generatedSet = new Set<string>()
+
+  // Try v2 first for each keyword
+  for (const keyword of keywords) {
+    if (!keyword || keyword.length < 3) continue
+
+    const v2Ctx: GeneratorContext = {
+      keyword,
+      businessName: businessName || null,
+      city: city || null,
+      businessCategory: category,
+      language,
+    }
+
+    // Generate using semantic understanding
+    const v2Questions = generateHumanLikeSmartQuestions(v2Ctx)
+
+    // Add v2 questions that passed validation
+    for (const q of v2Questions) {
+      const normalized = normalizeForDedup(q.prompt)
+      if (trackedSet.has(normalized) || generatedSet.has(normalized)) continue
+
+      // Map v2 intent to intentBucket for downstream processing
+      const intentBucketMap: Record<PromptIntent, string> = {
+        commercial: 'price',
+        pre_purchase: 'pre_purchase',
+        informational: 'review',
+        recommendation: 'recommendation',
+        local: 'local',
+        brand: 'recommendation',
+        comparison: 'recommendation',
+        transactional: 'pre_purchase',
+        alternatives: 'recommendation',
+        gift: 'recommendation',
+      }
+
+      results.push({
+        prompt: q.prompt,
+        score: q.score,
+        intentBucket: intentBucketMap[q.intent] || 'recommendation',
+      })
+
+      generatedSet.add(normalized)
+    }
+  }
+
+  // If v2 produced reasonable questions, return them. Otherwise, fall back to v1
+  // with strict validation. The threshold is: if we have >= 3 questions, return them.
+  // If fewer, carefully supplement from v1.
+  if (results.length >= 3) {
+    return results.sort((a, b) => b.score - a.score)
+  }
+
+  // Fallback: generate from v1 (template-based) with strict validation
+  const v1Results = generateKeywordBasedQuestions({
+    keywords,
+    businessName,
+    city,
+    language,
+    trackedPrompts,
+    category,
+  })
+
+  // Add v1 questions but apply extra strict filtering: only top-scoring ones,
+  // and skip any that sound templated
+  const v1Strict = v1Results
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(3, 12 - results.length)) // Fill up to ~6 total
+    .filter((q) => {
+      // Skip if already present
+      const normalized = normalizeForDedup(q.prompt)
+      if (trackedSet.has(normalized) || generatedSet.has(normalized)) return false
+
+      // Apply semantic validation: question must sound natural
+      if (language === 'he' && isUnnaturalQuestion(q.prompt, category, language as 'he' | 'en')) {
+        return false
+      }
+
+      return true
+    })
+
+  return [...results, ...v1Strict].sort((a, b) => b.score - a.score)
+}
+
+/**
+ * Generate AI questions directly from tracked keywords (v1, template-based).
  *
  * This layer expands the suggestion pool by transforming each keyword
  * into multiple intent-based questions (recommendation, price, pre-purchase, local, review).
  *
  * Returns a flat list of {prompt, score} that can be merged with template-based suggestions.
+ *
+ * NOTE: This is now used as a FALLBACK only. Primary generation uses v2 (semantic).
  */
 function generateKeywordBasedQuestions({
   keywords,
@@ -2687,10 +2810,9 @@ export function generatePromptSuggestions({
   }
 
   // Generate keyword-based questions to expand the candidate pool.
-  // Category-aware: drops abstract provider/expert templates for product
-  // categories and drops "or alternatives" comparisons entirely.
-  // Per-keyword saturation: at most 3 natural intents per keyword.
-  const keywordBasedResults = generateKeywordBasedQuestions({
+  // Primary: v2 (semantic understanding) for realistic human search behavior.
+  // Fallback: v1 (template-based) if v2 produces too few questions.
+  const keywordBasedResults = generateKeywordBasedQuestionsWithFallback({
     keywords,
     businessName: business,
     city,
@@ -3404,7 +3526,7 @@ function selectDiverseSuggestions<
  * Map a quality score to a confidence tier.
  * 90-100: High, 75-89: Good, 50-74: Medium, 30-49: Opportunity, 0-29: Experimental
  */
-function getConfidenceTier(score: number): 'high' | 'good' | 'medium' | 'opportunity' | 'experimental' {
+export function getConfidenceTier(score: number): 'high' | 'good' | 'medium' | 'opportunity' | 'experimental' {
   if (score >= 90) return 'high'
   if (score >= 75) return 'good'
   if (score >= 50) return 'medium'
@@ -3429,7 +3551,7 @@ function getConfidenceTier(score: number): 'high' | 'good' | 'medium' | 'opportu
  *
  * Output: ordered list of chip i18n keys, max 3, deduped.
  */
-function generateSignalChips(
+export function generateSignalChips(
   prompt: string,
   intent: PromptIntent,
   score: number,
@@ -3533,7 +3655,7 @@ function generateSignalChips(
  *
  * Signal-prioritized: commercial phrasing wins over generic intent class.
  */
-function generateValueReason(
+export function generateValueReason(
   intent: PromptIntent,
   score: number,
   prompt: string,
