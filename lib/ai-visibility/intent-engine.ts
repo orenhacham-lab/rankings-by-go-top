@@ -152,12 +152,20 @@ const AGENCY_SEEDS_HE: QuestionSeed[] = [
     categories: ['agency'],
     score: 89,
   },
-  // ── Tier 3: specialized selection — Google Maps, freelancer (88–87) ───────
+  // ── Tier 3: specialized selection, evaluation, recommendation (88–87) ────
   {
     // Activated by explicit Google Maps / local SEO keyword signal
     text: () => 'איך לבחור חברה לקידום בגוגל מפות?',
     intent: 'pre_purchase',
     requiresAnyTopic: ['local_seo'],
+    categories: ['agency'],
+    score: 88,
+  },
+  {
+    // Shopify-specific recommendation — fires when shopify topic is detected
+    text: () => 'מי מומלץ לקידום אתר שופיפיי?',
+    intent: 'recommendation',
+    requiresAnyTopic: ['shopify'],
     categories: ['agency'],
     score: 88,
   },
@@ -169,7 +177,79 @@ const AGENCY_SEEDS_HE: QuestionSeed[] = [
     categories: ['agency'],
     score: 87,
   },
-  // ── Tier 4: acceptable alternatives — shown when pool is thin (84–82) ────
+  {
+    // Campaign selection — "קמפיינים" phrasing targets campaign-focused projects
+    text: () => 'איך לבחור חברה לניהול קמפיינים בגוגל?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['google_ads'],
+    categories: ['agency'],
+    score: 87,
+  },
+  {
+    // Google Maps optimization — how to improve (not just who to hire)
+    text: () => 'איך משפרים דירוג בגוגל מפות?',
+    intent: 'informational',
+    requiresAnyTopic: ['local_seo'],
+    categories: ['agency'],
+    score: 87,
+  },
+  {
+    // Facebook campaign selection — mirrors Google Ads selection
+    text: () => 'איך לבחור חברה לניהול קמפיינים בפייסבוק?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['facebook_ads'],
+    categories: ['agency'],
+    score: 87,
+  },
+  {
+    // SEO quality evaluation — business owner checking existing agency's performance
+    text: () => 'איך יודעים אם חברת SEO עושה עבודה טובה?',
+    intent: 'informational',
+    requiresAnyTopic: ['seo'],
+    categories: ['agency'],
+    score: 86,
+  },
+  {
+    // Ecommerce optimization — "אתר מכירות" is natural Hebrew for sales site
+    text: () => 'איך מקדמים אתר מכירות בגוגל?',
+    intent: 'informational',
+    requiresAnyTopic: ['ecommerce', 'shopify'],
+    categories: ['agency'],
+    score: 86,
+  },
+  // ── Tier 4: acceptable alternatives — shown when pool is thin (85–82) ────
+  {
+    // Google Maps diagnostic — frustration-driven search, maps to informational intent
+    text: () => 'למה העסק לא מופיע בגוגל מפות?',
+    intent: 'informational',
+    requiresAnyTopic: ['local_seo'],
+    categories: ['agency'],
+    score: 85,
+  },
+  {
+    // Google Ads minimum budget — pricing question for new advertisers
+    text: () => 'מה תקציב מינימלי לקמפיין Google Ads?',
+    intent: 'commercial',
+    requiresAnyTopic: ['google_ads'],
+    categories: ['agency'],
+    score: 85,
+  },
+  {
+    // Ecommerce pricing — "כמה עולה" for online store promotion
+    text: () => 'כמה עולה קידום חנות אונליין?',
+    intent: 'commercial',
+    requiresAnyTopic: ['ecommerce', 'shopify'],
+    categories: ['agency'],
+    score: 85,
+  },
+  {
+    // Cross-channel comparison — requires both ads signals to fire
+    text: () => 'מה עדיף לעסק — פרסום בגוגל או בפייסבוק?',
+    intent: 'comparison',
+    requiresAllTopics: ['google_ads', 'facebook_ads'],
+    categories: ['agency'],
+    score: 85,
+  },
   {
     text: () => 'אילו חברות SEO מומלצות בישראל?',
     intent: 'recommendation',
@@ -189,6 +269,14 @@ const AGENCY_SEEDS_HE: QuestionSeed[] = [
     text: () => 'איך לבחור חברה לניהול Google Ads?',
     intent: 'pre_purchase',
     requiresAnyTopic: ['google_ads'],
+    categories: ['agency'],
+    score: 84,
+  },
+  {
+    // Local SEO broad — "עסק מקומי" (local business) is natural phrasing
+    text: () => 'איך מקדמים עסק מקומי בגוגל?',
+    intent: 'informational',
+    requiresAnyTopic: ['local_seo'],
     categories: ['agency'],
     score: 84,
   },
