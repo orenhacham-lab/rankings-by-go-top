@@ -39,6 +39,7 @@ export type TopicCluster =
   | 'content_marketing'
   | 'email_marketing'
   | 'price_sensitive'
+  | 'fashion'
 
 interface TopicSignal {
   cluster: TopicCluster
@@ -61,6 +62,9 @@ const TOPIC_SIGNALS: TopicSignal[] = [
   { cluster: 'content_marketing', patterns: /(שיווק\s*תוכן|content\s*marketing|בלוג)/i },
   { cluster: 'email_marketing', patterns: /(שיווק\s*במייל|email\s*marketing|דיוור)/i },
   { cluster: 'price_sensitive', patterns: /(כמה\s*עולה|מחיר|עלות|תקציב|זול|הצעת\s*מחיר)/i },
+  // Phase 3: ecommerce fashion pilot — explicit garment/clothing terms only.
+  // Intentionally excludes "נעלי" to avoid overlap with sports_store category.
+  { cluster: 'fashion', patterns: /(אופנה|בגדים|ביגוד|הלבשה|שמלה|חולצה|מכנסיים|ג'ינס|מעיל|חצאית|fashion|clothing|apparel)/i },
 ]
 
 function inferTopicClusters(keywords: string[]): Set<TopicCluster> {
@@ -416,8 +420,46 @@ const FLORIST_SEEDS_HE: QuestionSeed[] = [
 
 // ----------------------------------------------------------------------------
 // Generic ecommerce seeds (for product-focused businesses)
+// Phase 3: expanded from 6 → 7 strong core seeds. All positive/discovery-oriented.
+// No negative, complaint, legal, or problem-style questions.
 // ----------------------------------------------------------------------------
 const ECOMMERCE_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'איך יודעים אם אתר קניות אמין?',
+    intent: 'pre_purchase',
+    categories: ['ecommerce'],
+    score: 92,
+  },
+  {
+    text: () => 'אילו חנויות אונליין מומלצות בישראל?',
+    intent: 'recommendation',
+    categories: ['ecommerce'],
+    score: 90,
+  },
+  {
+    text: () => 'איך בודקים שחנות אונליין בטוחה לתשלום?',
+    intent: 'pre_purchase',
+    categories: ['ecommerce'],
+    score: 89,
+  },
+  {
+    text: () => 'איך לבחור חנות אונליין אמינה?',
+    intent: 'pre_purchase',
+    categories: ['ecommerce'],
+    score: 88,
+  },
+  {
+    text: () => 'איפה כדאי לקנות אונליין במחיר טוב?',
+    intent: 'commercial',
+    categories: ['ecommerce'],
+    score: 87,
+  },
+  {
+    text: () => 'כמה זמן לוקח משלוח מחנות אונליין?',
+    intent: 'informational',
+    categories: ['ecommerce'],
+    score: 83,
+  },
   {
     text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
     intent: 'brand',
@@ -426,34 +468,49 @@ const ECOMMERCE_SEEDS_HE: QuestionSeed[] = [
     score: 82,
   },
   {
-    text: () => 'איך יודעים אם אתר קניות אמין?',
+    // Demoted: too vague to be a primary recommendation. Shows only when pool is otherwise thin.
+    text: () => 'האם כדאי להזמין מהחנות הזו?',
     intent: 'pre_purchase',
+    categories: ['ecommerce'],
+    fallbackOnly: true,
+    score: 70,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Fashion ecommerce seeds — Phase 3 pilot
+// Fires only when tracked keywords trigger the 'fashion' topic cluster.
+// Ecommerce category only. All questions are positive/discovery-oriented.
+// No negative, returns/refund, or complaint-style questions.
+// ----------------------------------------------------------------------------
+const FASHION_ECOMMERCE_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'איפה כדאי לקנות בגדים אונליין בישראל?',
+    intent: 'recommendation',
+    requiresAnyTopic: ['fashion'],
     categories: ['ecommerce'],
     score: 88,
   },
   {
-    text: () => 'איפה כדאי לקנות אונליין?',
-    intent: 'recommendation',
+    text: () => 'איך בוחרים מידה בבגדים שקונים אונליין?',
+    intent: 'informational',
+    requiresAnyTopic: ['fashion'],
     categories: ['ecommerce'],
     score: 87,
   },
   {
-    text: () => 'איך לבחור חנות אונליין אמינה?',
-    intent: 'pre_purchase',
+    text: () => 'איפה קונים בגדי מותגים אונליין במחיר טוב?',
+    intent: 'commercial',
+    requiresAnyTopic: ['fashion'],
     categories: ['ecommerce'],
     score: 86,
   },
   {
-    text: () => 'כמה זמן לוקח משלוח מהחנות?',
-    intent: 'informational',
+    text: () => 'האם כדאי לקנות אופנה אונליין?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['fashion'],
     categories: ['ecommerce'],
     score: 84,
-  },
-  {
-    text: () => 'האם כדאי להזמין מהחנות הזו?',
-    intent: 'pre_purchase',
-    categories: ['ecommerce'],
-    score: 83,
   },
 ]
 
@@ -1065,6 +1122,7 @@ const ALL_SEEDS_HE: QuestionSeed[] = [
   ...SPORTS_STORE_SEEDS_HE,
   ...FLORIST_SEEDS_HE,
   ...ECOMMERCE_SEEDS_HE,
+  ...FASHION_ECOMMERCE_SEEDS_HE,
   ...LEGAL_SEEDS_HE,
   ...HEALTHCARE_SEEDS_HE,
   ...CLEANING_SEEDS_HE,
