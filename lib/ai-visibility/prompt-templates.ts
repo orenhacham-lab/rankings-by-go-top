@@ -30,6 +30,7 @@ import {
   convertToPromptSuggestions,
   type GeneratorContext,
 } from './semantic-generator-v2'
+import { generateIntentQuestions } from './intent-engine'
 
 export type PromptIntent =
   | 'brand'
@@ -2476,7 +2477,13 @@ function generateKeywordBasedQuestions({
 // Feature flag to disable aggressive keyword wrapping from v2 generator
 // ============================================================================
 
-const USE_SAFE_SMART_QUESTIONS = true // Set to false to re-enable v2 keyword expansion
+// Smart Questions vNext: intent recommendation engine.
+// When true, all live UI suggestions come from lib/ai-visibility/intent-engine.ts.
+// Bypasses safe mode placeholders, semantic-generator-v2, v1 fallback mutation,
+// and aggressive template generation.
+const USE_SMART_QUESTIONS_VNEXT = true
+// Legacy fallback flag (kept for emergency rollback). Only consulted if vNext is off.
+const USE_SAFE_SMART_QUESTIONS = false
 
 interface SafeCuratedPrompt {
   text: string
@@ -2754,19 +2761,57 @@ export function generatePromptSuggestions({
   })
 
   // ========================================================================
-  // SAFE MODE: Skip aggressive keyword-based generation
+  // SMART QUESTIONS vNEXT — intent recommendation engine
+  // Keywords are signals for topic inference only, never source for wrapping.
+  // Bypasses semantic-generator-v2, safe mode placeholders, fallback mutation,
+  // and aggressive template generation.
   // ========================================================================
-  if (USE_SAFE_SMART_QUESTIONS) {
-    const categoryForSafe = (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
-    const safeSuggestions = generateSafeCuratedSuggestions({
+  if (USE_SMART_QUESTIONS_VNEXT) {
+    // Resolve category the same way the legacy path does, so manual profile
+    // overrides apply consistently.
+    const hasManualEarly = manualProfile && manualProfile.mode === 'manual'
+    let resolvedCategory: BusinessCategory
+    if (hasManualEarly && manualProfile.primaryCategory) {
+      const r = resolveManualPrimaryCategory(manualProfile.primaryCategory)
+      resolvedCategory = r || (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+    } else {
+      resolvedCategory = (autoProfile as { primaryCategory: BusinessCategory }).primaryCategory
+    }
+
+    const excludeNormalized = new Set(excludePrompts.map((p) => normalizePromptForCompare(p)))
+    const engineQuestions = generateIntentQuestions({
       businessName,
+      businessCategory: resolvedCategory,
+      language: lang as 'he' | 'en',
+      country,
       city,
-      language: lang,
-      category: categoryForSafe,
-      excludePrompts,
+      keywords,
     })
-    return safeSuggestions.slice(0, limit)
+
+    const intentLabels = lang === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
+    const result: PromptSuggestion[] = []
+    for (const q of engineQuestions) {
+      if (excludeNormalized.has(normalizePromptForCompare(q.prompt))) continue
+      // vNext focuses on output quality. Chips/valueReason/confidenceTier are
+      // not computed in this phase — provide neutral defaults so the existing
+      // UI contract is preserved without hallucinated signals.
+      result.push({
+        id: `vnext-${Math.random().toString(36).slice(2, 8)}`,
+        prompt: q.prompt,
+        intent: q.intent,
+        intentLabel: intentLabels[q.intent],
+        category: resolvedCategory,
+        language: lang,
+        qualityScore: q.score,
+        confidenceTier: getConfidenceTier(q.score),
+        reason: '',
+        chips: [],
+        valueReason: '',
+      })
+    }
+    return result
   }
+  // ========================================================================
 
   // If a manual profile is active, its primaryCategory overrides auto-detection
   // and its excludedTopics/secondaryCategories augment the auto-inferred profile.
