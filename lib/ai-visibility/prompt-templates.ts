@@ -2809,7 +2809,7 @@ export function generatePromptSuggestions({
         valueReason: '',
       })
     }
-    return result
+    return result.slice(0, limit)
   }
   // ========================================================================
 

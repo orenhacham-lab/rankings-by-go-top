@@ -1082,9 +1082,11 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
     results.push({ prompt: text, intent: seed.intent, score: seed.score })
   }
 
-  // Sort by score descending, cap at 8
+  // Sort by score descending, return up to 20 so callers have a larger
+  // candidate pool (e.g. for "generate more" refresh cycles).
+  // Display truncation is enforced by the caller via the limit parameter.
   results.sort((a, b) => b.score - a.score)
-  return results.slice(0, 8)
+  return results.slice(0, 20)
 }
 
 /**

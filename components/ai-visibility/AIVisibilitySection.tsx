@@ -383,7 +383,7 @@ export default function AIVisibilitySection({
       keywords: projectKeywords,
       manualProfile,
       shuffle: false,
-      limit: 20,
+      limit: 8,
     })
     // Keep all generated suggestions in state so the "Show more" button can
     // expand beyond the initial 4 visible. Render-time slicing handles
