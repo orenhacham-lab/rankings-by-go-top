@@ -1137,7 +1137,7 @@ export default function AIVisibilitySection({
                     size="sm"
                     onClick={refreshSuggestions}
                     loading={refreshingSuggestions}
-                    disabled={refreshingSuggestions}
+                    disabled={refreshingSuggestions || noNewSuggestionsFound}
                     className="shrink-0"
                     title={t('generate_more_suggestions')}
                     aria-label={t('generate_more_suggestions')}
