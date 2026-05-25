@@ -2714,6 +2714,90 @@ function getIntentLabel(intent: PromptIntent, lang: string): string {
 }
 
 // ============================================================================
+// UNWANTED TOPICS FILTERING — Smart Questions vNext
+// ============================================================================
+//
+// Applied AFTER intent-engine candidates are mapped to PromptSuggestion[] and
+// AFTER excludePrompts filtering. Uses exact phrase matching plus a curated set
+// of simple Hebrew morphological variants. No semantic expansion — only
+// predictable string-containment checks.
+//
+// Source: manualProfile.excludedTopics (same field the legacy path uses for
+// template-level exclusions; here we apply it to vNext intent-engine output).
+
+/**
+ * Curated morphological variants for common Hebrew topics that appear in
+ * manual profile excludedTopics lists. Keys are lowercase, no nikud.
+ * Extend this map when new categories introduce additional unwanted topics.
+ */
+const UNWANTED_TOPIC_VARIANTS: Record<string, readonly string[]> = {
+  'דירה': ['דירה', 'דירות', 'לדירה', 'בדירה', 'מדירה'],
+  'בית':  ['בית',  'ביתי',  'לבית',  'בבית',  'מבית',  'בתים'],
+}
+
+/**
+ * Commercial compound phrases that begin with a word that may also appear as
+ * an unwanted residential topic. When one of these safe compounds is found in a
+ * suggestion prompt, the matched root word does NOT count as a block trigger.
+ *
+ * Implementation: safe compounds are neutralised (replaced with a null-byte
+ * placeholder) BEFORE the variant-containment scan — the "replace-then-scan"
+ * technique — so "בית עסק" is never caught by a "בית" unwanted topic.
+ */
+const SAFE_COMPOUNDS_HE: readonly string[] = [
+  'בית עסק', 'בתי עסק',
+  'בית מלון', 'בתי מלון',
+  'בית ספר', 'בתי ספר',
+  'בית חולים', 'בתי חולים',
+  'בית דין', 'בית משפט', 'בית כנסת',
+]
+
+/**
+ * Filter a PromptSuggestion[] array, removing any suggestion whose prompt
+ * contains a variant of a topic listed in `unwantedTopics`.
+ *
+ * Algorithm:
+ *   1. Expand each unwanted topic to its curated variant list (or itself as
+ *      a single-item list when no curated entry exists).
+ *   2. For each suggestion, neutralise known safe commercial compounds in the
+ *      prompt so they cannot trigger a false-positive block.
+ *   3. If any blocked variant still appears in the sanitised prompt → discard.
+ *
+ * @param suggestions    Candidate list (already excludePrompts-filtered).
+ * @param unwantedTopics From manualProfile.excludedTopics.
+ */
+function filterSuggestionsByUnwantedTopics(
+  suggestions: PromptSuggestion[],
+  unwantedTopics: readonly string[],
+): PromptSuggestion[] {
+  if (!unwantedTopics || unwantedTopics.length === 0) return suggestions
+
+  // Build the flat list of lowercase variant strings to block.
+  const blockedVariants: string[] = []
+  for (const topic of unwantedTopics) {
+    const key = topic.trim().toLowerCase()
+    const variants = UNWANTED_TOPIC_VARIANTS[key] ?? [key]
+    for (const v of variants) blockedVariants.push(v.toLowerCase())
+  }
+  if (blockedVariants.length === 0) return suggestions
+
+  const safeCompoundsLower = SAFE_COMPOUNDS_HE.map((c) => c.toLowerCase())
+
+  return suggestions.filter((s) => {
+    // Step 1: neutralise safe commercial compounds (replace with placeholder)
+    // so they cannot match a single-word unwanted-topic variant.
+    let promptLower = s.prompt.toLowerCase()
+    for (const safe of safeCompoundsLower) {
+      if (promptLower.includes(safe)) {
+        promptLower = promptLower.split(safe).join('\x00')
+      }
+    }
+    // Step 2: block if any unwanted variant is found in the sanitised prompt.
+    return !blockedVariants.some((v) => promptLower.includes(v))
+  })
+}
+
+// ============================================================================
 // ORIGINAL GENERATION PATH
 // ============================================================================
 
@@ -2809,7 +2893,12 @@ export function generatePromptSuggestions({
         valueReason: '',
       })
     }
-    return result.slice(0, limit)
+    // Apply unwantedTopics filtering: remove any suggestion whose prompt
+    // contains a morphological variant of a topic from manualProfile.excludedTopics.
+    // This is a no-op when excludedTopics is empty (Go Top, ecommerce, etc.).
+    const vNextUnwanted: readonly string[] = manualProfile?.excludedTopics ?? []
+    const filtered = filterSuggestionsByUnwantedTopics(result, vNextUnwanted)
+    return filtered.slice(0, limit)
   }
   // ========================================================================
 
