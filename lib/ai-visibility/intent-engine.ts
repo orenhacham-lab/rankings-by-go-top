@@ -357,16 +357,571 @@ const HEALTHCARE_SEEDS_HE: QuestionSeed[] = [
   },
 ]
 
+// Add fallback seeds to agency that don't require topics
+const AGENCY_FALLBACK_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'איך לבחור חברת דיגיטל מומלצת?',
+    intent: 'pre_purchase',
+    categories: ['agency'],
+    score: 85,
+  },
+  {
+    text: () => 'כמה עולה שירות דיגיטל לעסק קטן?',
+    intent: 'commercial',
+    categories: ['agency'],
+    score: 83,
+  },
+  {
+    text: () => 'מה השירותים שחברת דיגיטל אמורה להציע?',
+    intent: 'informational',
+    categories: ['agency'],
+    score: 81,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Cleaning services seeds
+// ----------------------------------------------------------------------------
+const CLEANING_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה שירות ניקיון לדירה?',
+    intent: 'commercial',
+    categories: ['cleaning'],
+    score: 90,
+  },
+  {
+    text: () => 'איך לבחור חברת ניקיון אמינה?',
+    intent: 'pre_purchase',
+    categories: ['cleaning'],
+    score: 88,
+  },
+  {
+    text: () => 'כמה זמן לוקח ניקיון דירה בגודל בינוני?',
+    intent: 'informational',
+    categories: ['cleaning'],
+    score: 85,
+  },
+  {
+    text: () => 'מה כלול בשירות ניקיון עמוק?',
+    intent: 'informational',
+    categories: ['cleaning'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה למצוא חברת ניקיון טובה ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['cleaning'],
+    score: 86,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['cleaning'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Perfume shop seeds
+// ----------------------------------------------------------------------------
+const PERFUME_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה בושם איכותי?',
+    intent: 'commercial',
+    categories: ['perfume'],
+    score: 90,
+  },
+  {
+    text: () => 'איך לבחור בושם שמתאים לי?',
+    intent: 'pre_purchase',
+    categories: ['perfume'],
+    score: 88,
+  },
+  {
+    text: () => 'מה ההבדל בין EDP ל-EDT?',
+    intent: 'informational',
+    categories: ['perfume'],
+    score: 86,
+  },
+  {
+    text: () => 'אילו בושמים מומלצים לנשים?',
+    intent: 'recommendation',
+    categories: ['perfume'],
+    score: 85,
+  },
+  {
+    text: () => 'איך לדעת אם בושם אמיתי או מזויף?',
+    intent: 'informational',
+    categories: ['perfume'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה אפשר לקנות בושם מקורי ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['perfume'],
+    score: 86,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['perfume'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Gift shop seeds
+// ----------------------------------------------------------------------------
+const GIFT_SHOP_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה מתנה טובה לחברה?',
+    intent: 'commercial',
+    categories: ['gifts'],
+    score: 90,
+  },
+  {
+    text: () => 'איזו מתנה מתאימה לגברים?',
+    intent: 'recommendation',
+    categories: ['gifts'],
+    score: 87,
+  },
+  {
+    text: () => 'מה מתנות טובות ליום הולדת?',
+    intent: 'recommendation',
+    categories: ['gifts'],
+    score: 86,
+  },
+  {
+    text: () => 'איך לבחור מתנה למי שיש לו הכל?',
+    intent: 'pre_purchase',
+    categories: ['gifts'],
+    score: 85,
+  },
+  {
+    text: () => 'איפה למצוא מתנה מקורית וטובה?',
+    intent: 'informational',
+    categories: ['gifts'],
+    score: 83,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה אפשר לקנות מתנות ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['gifts'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['gifts'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Appliance store seeds
+// ----------------------------------------------------------------------------
+const APPLIANCE_STORE_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה מכונת כביסה טובה?',
+    intent: 'commercial',
+    categories: ['appliance_store'],
+    score: 90,
+  },
+  {
+    text: () => 'איזו מכונת כביסה כדאי לקנות?',
+    intent: 'recommendation',
+    categories: ['appliance_store'],
+    score: 88,
+  },
+  {
+    text: () => 'מה ההבדל בין טופלודר לחזיתית?',
+    intent: 'comparison',
+    categories: ['appliance_store'],
+    score: 86,
+  },
+  {
+    text: () => 'איך לבחור דודי שמש איכותי?',
+    intent: 'pre_purchase',
+    categories: ['appliance_store'],
+    score: 85,
+  },
+  {
+    text: () => 'מה קירור האוויר הטוב ביותר?',
+    intent: 'recommendation',
+    categories: ['appliance_store'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה אפשר לקנות מכשירי חשמל ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['appliance_store'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['appliance_store'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Restaurant seeds
+// ----------------------------------------------------------------------------
+const RESTAURANT_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה ארוחת ערב באיכות?',
+    intent: 'commercial',
+    categories: ['restaurant'],
+    score: 90,
+  },
+  {
+    text: () => 'מה מסעדות מומלצות לאירוע?',
+    intent: 'recommendation',
+    categories: ['restaurant'],
+    score: 88,
+  },
+  {
+    text: () => 'איך לבחור מסעדה לתאריך רומנטי?',
+    intent: 'pre_purchase',
+    categories: ['restaurant'],
+    score: 86,
+  },
+  {
+    text: () => 'כמה זמן מחכים על שולחן במסעדה?',
+    intent: 'informational',
+    categories: ['restaurant'],
+    score: 83,
+  },
+  {
+    text: () => 'איפה המסעדה הכשרה הטובה ביותר?',
+    intent: 'local',
+    categories: ['restaurant'],
+    score: 85,
+  },
+  {
+    text: (ctx) => ctx.city ? `מסעדות כשרות טובות ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['restaurant'],
+    score: 86,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['restaurant'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Beauty salon seeds
+// ----------------------------------------------------------------------------
+const BEAUTY_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה טיפול פנים במקום טוב?',
+    intent: 'commercial',
+    categories: ['beauty'],
+    score: 90,
+  },
+  {
+    text: () => 'איך לבחור מכון יופי אמין?',
+    intent: 'pre_purchase',
+    categories: ['beauty'],
+    score: 88,
+  },
+  {
+    text: () => 'מה קרם הלילה הטוב ביותר לעור בעייתי?',
+    intent: 'recommendation',
+    categories: ['beauty'],
+    score: 86,
+  },
+  {
+    text: () => 'מה ההבדל בין קריומורזיה וחוטים?',
+    intent: 'informational',
+    categories: ['beauty'],
+    score: 85,
+  },
+  {
+    text: () => 'איזו טיפול הוא הטוב ביותר לעור?',
+    intent: 'comparison',
+    categories: ['beauty'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה אפשר לעשות בוטוקס ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['beauty'],
+    score: 86,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['beauty'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Local service professional seeds (consultants, advisors, etc.)
+// ----------------------------------------------------------------------------
+const LOCAL_SERVICE_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה יעוץ עסקי?',
+    intent: 'commercial',
+    categories: ['local_service'],
+    score: 88,
+  },
+  {
+    text: () => 'איך לבחור יועץ טוב?',
+    intent: 'pre_purchase',
+    categories: ['local_service'],
+    score: 88,
+  },
+  {
+    text: () => 'מה השירותים של יועץ עסקי?',
+    intent: 'informational',
+    categories: ['local_service'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה למצוא יועץ טוב ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['local_service'],
+    score: 85,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['local_service'],
+    score: 80,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Home improvement service seeds
+// ----------------------------------------------------------------------------
+const HOME_IMPROVEMENT_SERVICE_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה שיפוץ דירה?',
+    intent: 'commercial',
+    categories: ['home_improvement_service'],
+    score: 90,
+  },
+  {
+    text: () => 'איך לבחור קבלן בנייה אמין?',
+    intent: 'pre_purchase',
+    categories: ['home_improvement_service'],
+    score: 88,
+  },
+  {
+    text: () => 'מה הצעות קבלנים מומלצות?',
+    intent: 'recommendation',
+    categories: ['home_improvement_service'],
+    score: 86,
+  },
+  {
+    text: () => 'איך לתכנן שיפוץ דירה כראוי?',
+    intent: 'informational',
+    categories: ['home_improvement_service'],
+    score: 84,
+  },
+  {
+    text: () => 'כמה זמן לוקח שיפוץ דירה?',
+    intent: 'informational',
+    categories: ['home_improvement_service'],
+    score: 82,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה למצוא קבלנים טובים ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['home_improvement_service'],
+    score: 85,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['home_improvement_service'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// SaaS/Software seeds
+// ----------------------------------------------------------------------------
+const SAAS_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'כמה עולה SaaS טובה?',
+    intent: 'commercial',
+    categories: ['saas'],
+    score: 88,
+  },
+  {
+    text: () => 'איזו SaaS בוחרים חברות ישראליות?',
+    intent: 'recommendation',
+    categories: ['saas'],
+    score: 86,
+  },
+  {
+    text: () => 'מה עדיף — SaaS או תוכנה מותקנת?',
+    intent: 'comparison',
+    categories: ['saas'],
+    score: 85,
+  },
+  {
+    text: () => 'איך לבחור כלי SaaS לעסק?',
+    intent: 'pre_purchase',
+    categories: ['saas'],
+    score: 85,
+  },
+  {
+    text: () => 'מה היתרונות של SaaS?',
+    intent: 'informational',
+    categories: ['saas'],
+    score: 82,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['saas'],
+    score: 80,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Second-hand fashion seeds
+// ----------------------------------------------------------------------------
+const SECOND_HAND_FASHION_SEEDS_HE: QuestionSeed[] = [
+  {
+    text: () => 'איך לדעת אם ביגוד יד שנייה במצב טוב?',
+    intent: 'pre_purchase',
+    categories: ['second_hand_fashion'],
+    score: 88,
+  },
+  {
+    text: () => 'מה המקומות הטובים לקנות בגדים משומשים?',
+    intent: 'recommendation',
+    categories: ['second_hand_fashion'],
+    score: 86,
+  },
+  {
+    text: () => 'איך לקנות מעילים איכותיים בזול?',
+    intent: 'pre_purchase',
+    categories: ['second_hand_fashion'],
+    score: 85,
+  },
+  {
+    text: () => 'כמה אפשר לעלות בחנות בגדים משומשת?',
+    intent: 'commercial',
+    categories: ['second_hand_fashion'],
+    score: 84,
+  },
+  {
+    text: () => 'איך לדעת אם בגד מעצמאות לפני קנייה?',
+    intent: 'informational',
+    categories: ['second_hand_fashion'],
+    score: 82,
+  },
+  {
+    text: (ctx) => ctx.city ? `איפה אפשר למכור ביגוד משומש ב${ctx.city}?` : null,
+    intent: 'local',
+    requiresLocation: true,
+    categories: ['second_hand_fashion'],
+    score: 85,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `חוות דעת על ${ctx.businessName}` : null,
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['second_hand_fashion'],
+    score: 78,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// English agency seeds (simple, curated)
+// ----------------------------------------------------------------------------
+const AGENCY_SEEDS_EN: QuestionSeed[] = [
+  {
+    text: () => 'How to choose an SEO agency?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['seo'],
+    categories: ['agency'],
+    score: 90,
+  },
+  {
+    text: () => 'How much does SEO cost?',
+    intent: 'commercial',
+    requiresAnyTopic: ['seo'],
+    categories: ['agency'],
+    score: 88,
+  },
+  {
+    text: () => 'How long does SEO take to show results?',
+    intent: 'informational',
+    requiresAnyTopic: ['seo'],
+    categories: ['agency'],
+    score: 86,
+  },
+  {
+    text: () => 'How much does Google Ads management cost?',
+    intent: 'commercial',
+    requiresAnyTopic: ['google_ads'],
+    categories: ['agency'],
+    score: 88,
+  },
+  {
+    text: () => 'How to choose a Google Ads agency?',
+    intent: 'pre_purchase',
+    requiresAnyTopic: ['google_ads'],
+    categories: ['agency'],
+    score: 86,
+  },
+  {
+    text: () => 'What is a digital marketing agency?',
+    intent: 'informational',
+    categories: ['agency'],
+    score: 84,
+  },
+]
+
 // ----------------------------------------------------------------------------
 // All Hebrew seeds combined
 // ----------------------------------------------------------------------------
 const ALL_SEEDS_HE: QuestionSeed[] = [
   ...AGENCY_SEEDS_HE,
+  ...AGENCY_FALLBACK_SEEDS_HE,
   ...SPORTS_STORE_SEEDS_HE,
   ...FLORIST_SEEDS_HE,
   ...ECOMMERCE_SEEDS_HE,
   ...LEGAL_SEEDS_HE,
   ...HEALTHCARE_SEEDS_HE,
+  ...CLEANING_SEEDS_HE,
+  ...PERFUME_SEEDS_HE,
+  ...GIFT_SHOP_SEEDS_HE,
+  ...APPLIANCE_STORE_SEEDS_HE,
+  ...RESTAURANT_SEEDS_HE,
+  ...BEAUTY_SEEDS_HE,
+  ...LOCAL_SERVICE_SEEDS_HE,
+  ...HOME_IMPROVEMENT_SERVICE_SEEDS_HE,
+  ...SAAS_SEEDS_HE,
+  ...SECOND_HAND_FASHION_SEEDS_HE,
 ]
 
 // ============================================================================
@@ -434,9 +989,6 @@ export interface IntentEngineQuestion {
 export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQuestion[] {
   const language = ctx.language === 'en' ? 'en' : 'he'
 
-  // Currently English seeds are not curated. Return empty until seeded.
-  if (language === 'en') return []
-
   const topics = inferTopicClusters(ctx.keywords || [])
 
   const seedCtx: SeedContext = {
@@ -450,7 +1002,10 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
   const results: IntentEngineQuestion[] = []
   const seenNormalized = new Set<string>()
 
-  for (const seed of ALL_SEEDS_HE) {
+  // Select seed pool based on language
+  const seedPool = language === 'en' ? AGENCY_SEEDS_EN : ALL_SEEDS_HE
+
+  for (const seed of seedPool) {
     // Category filter
     if (seed.categories && !seed.categories.includes(ctx.businessCategory)) continue
 
