@@ -248,9 +248,9 @@ export function detectCategory(
 
   // SaaS / software tools (must come BEFORE agency so SEO/SEM tools don't get
   // classified as marketing agencies)
-  if (/(rank tracker|rank tracking|seo software|seo tool|tracking software|seo platform|seo saas|rank checker|rank monitor|visibility tool|visibility tracking|gotopseo|seoclarity|semrush|ahrefs|moz)/.test(text))
+  if (/(rank tracker|rank tracking|seo software|seo tool|tracking software|seo platform|seo saas|rank checker|rank monitor|visibility tool|visibility tracking|\b(seoclarity|semrush|ahrefs|moz)\b)/.test(text))
     return 'saas'
-  if (/(saas|software as a service|cloud platform|\.io|\.ai|api platform|developer tool|monitoring tool|analytics platform|business intelligence)/.test(text)) return 'saas'
+  if (/(saas|software as a service|cloud platform|api platform|developer tool|monitoring tool|analytics platform|business intelligence)/.test(text)) return 'saas'
 
   if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text))
     return 'agency'
@@ -268,7 +268,7 @@ export function detectCategory(
   if (/(matnot|מתנ|gift shop|gifts|presents|מתנות)/.test(text)) return 'gifts'
 
   if (/(appliance|מקרר|מכונת כביסה|תנור|מוצרי חשמל|חשמל ביתי|electrolux|whirlpool)/.test(text)) return 'appliance_store'
-  if (/(saas|app|software|cloud|platform|api|\.io|\.ai)/.test(text)) return 'saas'
+  if (/\b(saas|software)\b/.test(text)) return 'saas'
   if (/(restaurant|cafe|food|bistro|מסעדה|קפה|אוכל|פיצה)/.test(text)) return 'restaurant'
   if (/(clinic|hospital|medical|doctor|dental|מרפאה|רופא|רפואה|שיניים)/.test(text)) return 'healthcare'
   if (/(law|legal|attorney|lawyer|עורך דין|עורכי דין|משפט)/.test(text)) return 'legal'
