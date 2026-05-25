@@ -14,6 +14,7 @@
 
 import type { PromptIntent, BusinessCategory, PromptSuggestion } from './prompt-templates'
 import { getConfidenceTier, generateSignalChips, generateValueReason } from './prompt-templates'
+import { classifyKeywordMode, type KeywordMode, type KeywordClassification } from './keyword-classifier'
 
 // ============================================================================
 // ENTITY UNDERSTANDING
@@ -113,7 +114,11 @@ function comprehendEntity(keyword: string, businessName: string | null, business
 // 2. INFER REAL USER NEEDS
 // ============================================================================
 
-function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNeed[] {
+function inferRealUserNeeds(
+  entity: EntityProfile,
+  city: string | null,
+  allowedIntents?: Set<string>
+): UserNeed[] {
   const needs: UserNeed[] = []
   const { entityType } = entity
 
@@ -209,8 +214,14 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
     })
   }
 
+  // Filter by allowed intents (from keyword classification)
+  let filtered = needs
+  if (allowedIntents && allowedIntents.size > 0) {
+    filtered = needs.filter((n) => allowedIntents.has(n.intent))
+  }
+
   // Sort by likelihood
-  return needs.sort((a, b) => {
+  return filtered.sort((a, b) => {
     const order = { high: 0, medium: 1, low: 2 }
     return order[a.likelihood] - order[b.likelihood]
   })
@@ -568,6 +579,7 @@ export interface GenerationResult {
   questions: GeneratedQuestion[]
   rejected: Array<{ prompt: string; reasons: string[] }>
   entityProfile: EntityProfile
+  classification?: KeywordClassification
 }
 
 export function generateHumanLikeSmartQuestions(ctx: GeneratorContext): GeneratedQuestion[] {
@@ -584,11 +596,24 @@ export function generateHumanLikeSmartQuestionsDebug(ctx: GeneratorContext): Gen
   const questions: GeneratedQuestion[] = []
   const rejected: Array<{ prompt: string; reasons: string[] }> = []
 
+  // Step 0: Classify keyword mode
+  const classification = classifyKeywordMode(keyword, businessName, businessCategory)
+
+  // If this is a complete query, skip generation entirely
+  if (classification.shouldSkip) {
+    return {
+      questions: [],
+      rejected: [],
+      entityProfile: {} as EntityProfile,
+      classification,
+    }
+  }
+
   // Step 1: Understand the entity
   const entity = comprehendEntity(keyword, businessName, businessCategory)
 
   // Step 2: Infer realistic user needs
-  const needs = inferRealUserNeeds(entity, city)
+  const needs = inferRealUserNeeds(entity, city, classification.allowedIntents)
 
   // Step 3 & 4: Generate and validate questions
   for (const need of needs) {
@@ -631,6 +656,7 @@ export function generateHumanLikeSmartQuestionsDebug(ctx: GeneratorContext): Gen
     questions: questions.sort((a, b) => b.score - a.score),
     rejected,
     entityProfile: entity,
+    classification,
   }
 }
 

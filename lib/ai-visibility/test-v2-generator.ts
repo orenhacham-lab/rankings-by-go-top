@@ -77,6 +77,10 @@ function runTests() {
 
     const result = generateHumanLikeSmartQuestionsDebug(ctx)
 
+    if (result.classification) {
+      output.push(`  [Classification] mode=${result.classification.mode} | shouldSkip=${result.classification.shouldSkip}`)
+      output.push(`                   allowedIntents=[${Array.from(result.classification.allowedIntents).join(', ')}]`)
+    }
     output.push(`  Entity type: ${result.entityProfile.entityType}`)
     output.push(`  Generated: ${result.questions.length} | Rejected: ${result.rejected.length}`)
 

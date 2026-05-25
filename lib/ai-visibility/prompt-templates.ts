@@ -3630,7 +3630,8 @@ export function generateSignalChips(
     : /(near\s+me|in\s+my\s+(?:city|area)|nearby)/i.test(prompt)
   if (intent === 'local' || hasLocationToken) {
     candidates.push({ chip: 'chip_local_search', priority: 8, isSignal: true })
-    if (hasCity || hasLocationToken) {
+    // Only show regional demand chip if there's actual location evidence, not just hasCity
+    if (hasLocationToken) {
       candidates.push({ chip: 'chip_regional_demand', priority: 7, isSignal: true })
     }
   }
@@ -3692,7 +3693,9 @@ export function generateValueReason(
     if (intent === 'comparison' || intent === 'alternatives' || intent === 'brand') {
       return 'מתחרים מופיעים כאן יותר מהעסק.'
     }
-    if (intent === 'local' || hasLocation || hasCity) {
+    // Only show local opportunity if intent is local OR if there's a location token in the prompt.
+    // Don't infer from hasCity alone — that's hallucination.
+    if (intent === 'local' || hasLocation) {
       return 'הזדמנות לשיפור נראות מקומית.'
     }
     if (intent === 'pre_purchase') {
@@ -3713,7 +3716,9 @@ export function generateValueReason(
   if (intent === 'comparison' || intent === 'alternatives' || intent === 'brand') {
     return 'Competitors appear more often than the business here.'
   }
-  if (intent === 'local' || hasLocation || hasCity) {
+  // Only show local opportunity if intent is local OR if there's a location token in the prompt.
+  // Don't infer from hasCity alone — that's hallucination.
+  if (intent === 'local' || hasLocation) {
     return 'Opportunity to improve local visibility.'
   }
   if (intent === 'pre_purchase') {
