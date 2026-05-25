@@ -91,6 +91,8 @@ interface QuestionSeed {
   requiresBusinessName?: boolean
   // Categories this seed applies to. Empty = all.
   categories?: BusinessCategory[]
+  // If true, this seed only appears when no topic-specific seeds matched
+  fallbackOnly?: boolean
   score: number
 }
 
@@ -503,18 +505,21 @@ const AGENCY_FALLBACK_SEEDS_HE: QuestionSeed[] = [
     text: () => 'איך לבחור חברת דיגיטל מומלצת?',
     intent: 'pre_purchase',
     categories: ['agency'],
+    fallbackOnly: true,
     score: 85,
   },
   {
     text: () => 'כמה עולה שירות דיגיטל לעסק קטן?',
     intent: 'commercial',
     categories: ['agency'],
+    fallbackOnly: true,
     score: 83,
   },
   {
     text: () => 'מה השירותים שחברת דיגיטל אמורה להציע?',
     intent: 'informational',
     categories: ['agency'],
+    fallbackOnly: true,
     score: 81,
   },
 ]
@@ -1134,6 +1139,9 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
   }
 
   const results: IntentEngineQuestion[] = []
+  const topicSeedMatches: IntentEngineQuestion[] = []  // seeds with topic requirements
+  const otherMatches: IntentEngineQuestion[] = []      // seeds without topic requirements
+  const fallbackMatches: IntentEngineQuestion[] = []   // fallback-only seeds
   const seenNormalized = new Set<string>()
 
   // Select seed pool based on language
@@ -1148,6 +1156,9 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
     if (seed.requiresLocation && !seedCtx.city) continue
 
     // Topic requirements
+    const hasTopicRequirements = (seed.requiresAnyTopic && seed.requiresAnyTopic.length > 0) ||
+                                  (seed.requiresAllTopics && seed.requiresAllTopics.length > 0)
+
     if (seed.requiresAnyTopic && seed.requiresAnyTopic.length > 0) {
       const hasAny = seed.requiresAnyTopic.some((t) => topics.has(t))
       if (!hasAny) continue
@@ -1167,7 +1178,31 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
     if (seenNormalized.has(normalized)) continue
     seenNormalized.add(normalized)
 
-    results.push({ prompt: text, intent: seed.intent, score: seed.score })
+    const question = { prompt: text, intent: seed.intent, score: seed.score }
+
+    if (seed.fallbackOnly === true) {
+      fallbackMatches.push(question)
+    } else if (hasTopicRequirements) {
+      topicSeedMatches.push(question)
+    } else {
+      otherMatches.push(question)
+    }
+  }
+
+  // Fallback seeds only appear when no meaningful topics were inferred from keywords.
+  // If any seed with explicit topic requirements matched, the project has meaningful signals.
+  // If no topics were inferred, show fallback seeds even if other seeds (like brand review) matched.
+  const hasInferredTopics = topics.size > 0
+
+  if (topicSeedMatches.length > 0) {
+    // Topics detected: use topic-specific seeds plus other non-fallback seeds
+    results.push(...topicSeedMatches, ...otherMatches)
+  } else if (!hasInferredTopics && fallbackMatches.length > 0) {
+    // No topics detected: include fallback seeds
+    results.push(...otherMatches, ...fallbackMatches)
+  } else {
+    // No topics, but fallback seeds unavailable: use other matches (e.g. brand review)
+    results.push(...otherMatches)
   }
 
   // Sort by score descending, return up to 20 so callers have a larger
