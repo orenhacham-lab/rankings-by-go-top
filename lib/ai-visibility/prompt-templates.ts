@@ -26,6 +26,7 @@ import {
 } from './search-object-classifier'
 import {
   generateHumanLikeSmartQuestions,
+  validateHumanSearchQuery,
   convertToPromptSuggestions,
   type GeneratorContext,
 } from './semantic-generator-v2'
@@ -2227,14 +2228,14 @@ function generateKeywordBasedQuestionsWithFallback({
     }
   }
 
-  // If v2 produced reasonable questions, return them. Otherwise, fall back to v1
-  // with strict validation. The threshold is: if we have >= 3 questions, return them.
-  // If fewer, carefully supplement from v1.
-  if (results.length >= 3) {
-    return results.sort((a, b) => b.score - a.score)
-  }
+  // Quality > quantity. v2 returns however many realistic questions exist.
+  // v1 fallback ONLY supplements with candidates that ALSO pass the strict
+  // validateHumanSearchQuery validator. If no v1 candidate passes, we return
+  // only what v2 produced — even if that's 0, 1, or 2 questions.
+  //
+  // We never pad with weak questions just to hit a count.
 
-  // Fallback: generate from v1 (template-based) with strict validation
+  // Run v1 generation only to find supplemental candidates
   const v1Results = generateKeywordBasedQuestions({
     keywords,
     businessName,
@@ -2244,25 +2245,40 @@ function generateKeywordBasedQuestionsWithFallback({
     category,
   })
 
-  // Add v1 questions but apply extra strict filtering: only top-scoring ones,
-  // and skip any that sound templated
-  const v1Strict = v1Results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, Math.max(3, 12 - results.length)) // Fill up to ~6 total
-    .filter((q) => {
-      // Skip if already present
-      const normalized = normalizeForDedup(q.prompt)
-      if (trackedSet.has(normalized) || generatedSet.has(normalized)) return false
+  // Apply STRICT validation to each v1 candidate (same standard as v2)
+  for (const v1q of v1Results) {
+    const normalized = normalizeForDedup(v1q.prompt)
+    if (trackedSet.has(normalized) || generatedSet.has(normalized)) continue
 
-      // Apply semantic validation: question must sound natural
-      if (language === 'he' && isUnnaturalQuestion(q.prompt, category, language as 'he' | 'en')) {
-        return false
+    // Find which keyword this v1 question was generated from (for validation)
+    // The v1 keyword-based generator puts the keyword in the prompt, so we find
+    // the longest matching keyword
+    let matchedKeyword = ''
+    for (const kw of keywords) {
+      if (v1q.prompt.toLowerCase().includes(kw.toLowerCase()) && kw.length > matchedKeyword.length) {
+        matchedKeyword = kw
       }
+    }
+    if (!matchedKeyword) continue
 
-      return true
+    // Apply the SAME strict validator that v2 uses
+    const validation = validateHumanSearchQuery(v1q.prompt, matchedKeyword, language)
+    if (!validation.isValid) continue
+
+    // Also apply legacy filters as additional safety
+    if (language === 'he' && isUnnaturalQuestion(v1q.prompt, category, language as 'he' | 'en')) {
+      continue
+    }
+
+    results.push({
+      prompt: v1q.prompt,
+      score: Math.min(v1q.score, validation.score), // v1 capped at validator score
+      intentBucket: v1q.intentBucket,
     })
+    generatedSet.add(normalized)
+  }
 
-  return [...results, ...v1Strict].sort((a, b) => b.score - a.score)
+  return results.sort((a, b) => b.score - a.score)
 }
 
 /**

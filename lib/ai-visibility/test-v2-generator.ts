@@ -1,124 +1,158 @@
 /**
  * Test file for semantic generator v2.
- * Compares v1 (template-based) vs v2 (semantic) for 20 real keywords.
+ * Runs v2 on real test cases and prints a structured report.
  *
- * Usage: npx ts-node lib/ai-visibility/test-v2-generator.ts
- * Or import and run in a test environment.
+ * Usage: npx tsx lib/ai-visibility/test-v2-generator.ts
  */
 
-import { generatePromptSuggestions, type BusinessCategory } from './prompt-templates'
+import {
+  generateHumanLikeSmartQuestionsDebug,
+  validateHumanSearchQuery,
+  type GeneratorContext,
+} from './semantic-generator-v2'
+import type { BusinessCategory } from './prompt-templates'
 
 interface TestCase {
   keyword: string
   businessName: string
   category: BusinessCategory
   city?: string
+  groupLabel: string
 }
 
 const TEST_CASES: TestCase[] = [
-  // SEO/Marketing Agency
-  { keyword: 'קידום אתרים', businessName: 'Go Top', category: 'agency' },
-  { keyword: 'קידום אתרים בחינם', businessName: 'Go Top', category: 'agency' },
+  // 1. Sports Store
+  { keyword: 'הליכון ביתי', businessName: 'חנות ספורט', category: 'sports_store', groupLabel: 'חנות ספורט' },
+  { keyword: 'אופני כושר', businessName: 'חנות ספורט', category: 'sports_store', groupLabel: 'חנות ספורט' },
+  { keyword: 'משקולות יד', businessName: 'חנות ספורט', category: 'sports_store', groupLabel: 'חנות ספורט' },
+  { keyword: 'ציוד כושר ביתי', businessName: 'חנות ספורט', category: 'sports_store', groupLabel: 'חנות ספורט' },
 
-  // Sports Store
-  { keyword: 'הליכון', businessName: 'חנות ספורט', category: 'sports_store' },
-  { keyword: 'משקולות', businessName: 'חנות ספורט', category: 'sports_store', city: 'תל אביב' },
-  { keyword: 'ציוד כושר', businessName: 'חנות ספורט', category: 'sports_store' },
+  // 2. SEO Agency
+  { keyword: 'קידום אתרים ברמת גן', businessName: 'Go Top', category: 'agency', city: 'רמת גן', groupLabel: 'סוכנות SEO' },
+  { keyword: 'קידום אתרים לרופאים', businessName: 'Go Top', category: 'agency', groupLabel: 'סוכנות SEO' },
+  { keyword: 'קידום אתר שופיפיי', businessName: 'Go Top', category: 'agency', groupLabel: 'סוכנות SEO' },
+  { keyword: 'פרסום ממומן בגוגל', businessName: 'Go Top', category: 'agency', groupLabel: 'סוכנות SEO' },
+  { keyword: 'קמפיין לידים בפייסבוק', businessName: 'Go Top', category: 'agency', groupLabel: 'סוכנות SEO' },
+  { keyword: 'Go Top', businessName: 'Go Top', category: 'agency', groupLabel: 'סוכנות SEO' },
 
-  // Florist
-  { keyword: 'זר פרחים', businessName: 'חנות פרחים', category: 'florist', city: 'ירושלים' },
-  { keyword: 'משלוח פרחים ביום', businessName: 'חנות פרחים', category: 'florist', city: 'תל אביב' },
-
-  // Perfume Store
-  { keyword: 'בושם', businessName: 'חנות בשמים', category: 'perfume' },
-  { keyword: 'בושם לנשים', businessName: 'חנות בשמים', category: 'perfume' },
-  { keyword: 'או דה פרפיום', businessName: 'חנות בשמים', category: 'perfume' },
-
-  // Cleaning Service
-  { keyword: 'ניקיון דירה', businessName: 'חברת ניקיון', category: 'cleaning', city: 'תל אביב' },
-  { keyword: 'ניקיון משרדים', businessName: 'חברת ניקיון', category: 'cleaning' },
-
-  // Legal Service
-  { keyword: 'עורך דין', businessName: 'משרד עורכי דין', category: 'legal' },
-  { keyword: 'ייעוץ משפטי', businessName: 'משרד עורכי דין', category: 'legal' },
-
-  // Fitness
-  { keyword: 'חדר כושר', businessName: 'ג\'ים', category: 'fitness', city: 'תל אביב' },
-  { keyword: 'אימון אישי', businessName: 'ג\'ים', category: 'fitness' },
-
-  // Restaurant
-  { keyword: 'מסעדה', businessName: 'מסעדה XXX', category: 'restaurant', city: 'תל אביב' },
-  { keyword: 'מאכלים בריאים', businessName: 'מסעדה XXX', category: 'restaurant' },
-
-  // Product Brand (e.g., luxury brand)
-  { keyword: 'שנילי אופנה יד שנייה', businessName: 'חנות בגדים', category: 'second_hand_fashion' },
+  // 3. Gifts / Florist
+  { keyword: 'משלוח פרחים בירושלים', businessName: 'חנות פרחים', category: 'florist', city: 'ירושלים', groupLabel: 'מתנות/פרחים' },
+  { keyword: 'מתנה ליולדת', businessName: 'חנות פרחים', category: 'florist', groupLabel: 'מתנות/פרחים' },
+  { keyword: 'זר ורדים', businessName: 'חנות פרחים', category: 'florist', groupLabel: 'מתנות/פרחים' },
+  { keyword: 'משלוח מתנה ליום הולדת', businessName: 'חנות פרחים', category: 'florist', groupLabel: 'מתנות/פרחים' },
 ]
 
-export function testGeneratorV2() {
-  console.log('='.repeat(80))
-  console.log('SEMANTIC GENERATOR V2 TEST REPORT')
-  console.log('='.repeat(80))
-  console.log()
+function runTests() {
+  const output: string[] = []
+  output.push('='.repeat(100))
+  output.push('SEMANTIC GENERATOR V2 — REAL TEST RESULTS')
+  output.push('='.repeat(100))
 
-  let totalQuestions = 0
-  let totalTests = TEST_CASES.length
+  let currentGroup = ''
+  let totalGenerated = 0
+  let totalRejected = 0
+  let totalKeywords = 0
 
-  for (const testCase of TEST_CASES) {
-    console.log(`\n[TEST] Keyword: "${testCase.keyword}"`)
-    console.log(`       Business: ${testCase.businessName} | Category: ${testCase.category}`)
-    if (testCase.city) console.log(`       City: ${testCase.city}`)
-    console.log('-'.repeat(80))
+  for (const tc of TEST_CASES) {
+    if (tc.groupLabel !== currentGroup) {
+      currentGroup = tc.groupLabel
+      output.push('')
+      output.push('▼'.repeat(100))
+      output.push(`GROUP: ${currentGroup}`)
+      output.push('▼'.repeat(100))
+    }
 
-    const suggestions = generatePromptSuggestions({
-      businessName: testCase.businessName,
-      domain: 'example.com',
-      city: testCase.city || null,
+    output.push('')
+    output.push(`[KEYWORD] "${tc.keyword}"`)
+    output.push(`  Business: ${tc.businessName} | Category: ${tc.category}${tc.city ? ` | City: ${tc.city}` : ''}`)
+    output.push('  ' + '-'.repeat(96))
+
+    const ctx: GeneratorContext = {
+      keyword: tc.keyword,
+      businessName: tc.businessName,
+      city: tc.city || null,
+      businessCategory: tc.category,
       language: 'he',
-      keywords: [testCase.keyword],
-      limit: 12,
-    })
+    }
 
-    // Filter to only show questions that came from keyword-based generation
-    // (look for v2 marker in reason or check confidence tier patterns)
-    const keywordBasedQuestions = suggestions.filter(
-      (s) => s.reason?.includes('v2') || s.reason?.includes('Semantic')
-    )
+    const result = generateHumanLikeSmartQuestionsDebug(ctx)
 
-    if (keywordBasedQuestions.length === 0) {
-      console.log(`⚠️  No v2 questions found. Total suggestions: ${suggestions.length}`)
+    output.push(`  Entity type: ${result.entityProfile.entityType}`)
+    output.push(`  Generated: ${result.questions.length} | Rejected: ${result.rejected.length}`)
+
+    if (result.questions.length === 0) {
+      output.push('  ⚠️  NO REALISTIC QUESTIONS GENERATED (this is OK if entity is too vague)')
     } else {
-      console.log(`✓ v2 Questions: ${keywordBasedQuestions.length}`)
+      output.push('  ✓ Generated questions:')
+      for (const q of result.questions) {
+        output.push(`    • "${q.prompt}"`)
+        output.push(`      intent=${q.intent} | score=${q.score.toFixed(0)} | behavior=${q.debug?.behavior} | validation_score=${q.validation.score}`)
+      }
     }
 
-    // Show all suggestions
-    for (let i = 0; i < Math.min(suggestions.length, 6); i++) {
-      const s = suggestions[i]
-      const marker = keywordBasedQuestions.includes(s) ? '[v2]' : '[bank]'
-      console.log(
-        `  ${i + 1}. ${marker} ${s.prompt} (${s.confidenceTier} | ${s.intent})`
-      )
+    if (result.rejected.length > 0) {
+      output.push('  ✗ Rejected questions:')
+      for (const r of result.rejected) {
+        output.push(`    • "${r.prompt}"`)
+        output.push(`      reasons: ${r.reasons.join(', ')}`)
+      }
     }
 
-    totalQuestions += suggestions.length
+    totalGenerated += result.questions.length
+    totalRejected += result.rejected.length
+    totalKeywords += 1
   }
 
-  console.log()
-  console.log('='.repeat(80))
-  console.log('SUMMARY')
-  console.log('='.repeat(80))
-  console.log(`Total test cases: ${totalTests}`)
-  console.log(`Total suggestions generated: ${totalQuestions}`)
-  console.log(`Average per keyword: ${(totalQuestions / totalTests).toFixed(1)}`)
-  console.log()
-  console.log('✓ Test completed. Check for:')
-  console.log('  - Questions that sound natural in Hebrew')
-  console.log('  - No template-like patterns (e.g., "או חלופות אחרות")')
-  console.log('  - Appropriate intent types (recommendation for services, price for products)')
-  console.log('  - Reasonable quantity (4-6 questions per keyword, not 12+)')
-  console.log()
+  output.push('')
+  output.push('='.repeat(100))
+  output.push('SUMMARY')
+  output.push('='.repeat(100))
+  output.push(`Total keywords tested: ${totalKeywords}`)
+  output.push(`Total questions generated: ${totalGenerated}`)
+  output.push(`Total questions rejected: ${totalRejected}`)
+  output.push(`Avg generated per keyword: ${(totalGenerated / totalKeywords).toFixed(2)}`)
+  output.push(`Rejection rate: ${((totalRejected / (totalGenerated + totalRejected)) * 100).toFixed(1)}%`)
+
+  // ===========================================
+  // Validator regression tests (banned phrasings)
+  // ===========================================
+  output.push('')
+  output.push('='.repeat(100))
+  output.push('VALIDATOR REGRESSION TESTS — Banned Hebrew phrasings')
+  output.push('='.repeat(100))
+
+  const validatorTests = [
+    { input: 'מה דעות על הליכון?', keyword: 'הליכון', expectInvalid: true },
+    { input: 'איזה דעות על הליכון?', keyword: 'הליכון', expectInvalid: true },
+    { input: 'מה הדעה על הליכון?', keyword: 'הליכון', expectInvalid: true },
+    { input: 'מה היכולות של הליכון?', keyword: 'הליכון', expectInvalid: true },
+    { input: 'מה חלופות טובות להליכון?', keyword: 'הליכון', expectInvalid: true },
+    { input: 'מי מומלץ עבור הליכון?', keyword: 'הליכון', expectInvalid: true },
+    { input: 'איך לבחור ספק להליכון?', keyword: 'הליכון', expectInvalid: true },
+    { input: 'מה עדיף הליכון או חלופות אחרות?', keyword: 'הליכון', expectInvalid: true },
+    // These should PASS
+    { input: 'חוות דעת על הליכון', keyword: 'הליכון', expectInvalid: false },
+    { input: 'כמה עולה הליכון?', keyword: 'הליכון', expectInvalid: false },
+    { input: 'איזה ספק מומלץ לקידום אתרים?', keyword: 'קידום אתרים', expectInvalid: false },
+  ]
+
+  let passed = 0
+  let failed = 0
+  for (const test of validatorTests) {
+    const result = validateHumanSearchQuery(test.input, test.keyword, 'he')
+    const isCorrect = result.isValid !== test.expectInvalid
+    const marker = isCorrect ? '✓' : '✗'
+    output.push(
+      `  ${marker} "${test.input}" → ${result.isValid ? 'VALID' : 'REJECTED'} ${test.expectInvalid ? '(expected REJECTED)' : '(expected VALID)'} ${result.reasons.length > 0 ? `[${result.reasons.join(', ')}]` : ''}`
+    )
+    if (isCorrect) passed += 1
+    else failed += 1
+  }
+
+  output.push('')
+  output.push(`Validator tests: ${passed} passed, ${failed} failed (of ${validatorTests.length})`)
+
+  console.log(output.join('\n'))
 }
 
-// If running directly
-if (require.main === module) {
-  testGeneratorV2()
-}
+runTests()

@@ -7,13 +7,13 @@
  * Flow:
  * 1. comprehendEntity() - identify entity type & characteristics
  * 2. inferRealUserNeeds() - what would real humans search?
- * 3. phraseNaturalHebrewQuestion() - create natural Hebrew query
- * 4. validateHumanSearchQuery() - check semantic realism
- * 5. return only validated questions (might be 2, 3, 4, etc. — no quota)
+ * 3. phraseNaturalHebrewQuestion() - create natural Hebrew query (or null if can't)
+ * 4. validateHumanSearchQuery() - strict semantic + Hebrew naturalness validation
+ * 5. return only validated questions (might be 0, 2, 3, etc. — no quota)
  */
 
 import type { PromptIntent, BusinessCategory, PromptSuggestion } from './prompt-templates'
-import { detectCategory, getConfidenceTier, generateSignalChips, generateValueReason } from './prompt-templates'
+import { getConfidenceTier, generateSignalChips, generateValueReason } from './prompt-templates'
 
 // ============================================================================
 // ENTITY UNDERSTANDING
@@ -34,7 +34,7 @@ interface EntityProfile {
 interface UserNeed {
   intent: PromptIntent
   behavior: string // e.g., "price_discovery", "quality_assurance", "provider_selection"
-  naturalPhrase: string // e.g., "cost", "reliability", "local availability"
+  naturalPhrase: string // human-readable description of what they're looking for
   likelihood: 'high' | 'medium' | 'low'
 }
 
@@ -44,42 +44,57 @@ interface UserNeed {
 
 function comprehendEntity(keyword: string, businessName: string | null, businessCategory: BusinessCategory): EntityProfile {
   const kwLower = keyword.toLowerCase()
-  const bnLower = (businessName || '').toLowerCase()
 
   // Entity type detection
   let entityType: EntityProfile['entityType'] = 'product'
 
-  // Heuristics for entity type classification
-  const isBrandKeyword = keyword.length > 2 && /^[A-Z]|[א-ת]{2,}$/.test(keyword)
   const isAbstractService = /שירות|service|platform|tool|software|app/i.test(kwLower)
   const isTopical = /איך|how to|עצות|טיפים|דרך|שיטה|תרגול/i.test(kwLower)
-  const isComparison = /vs|אלו|which|איזה|מה ההבדל|comparison/i.test(kwLower)
 
-  // SERVICE-LIKE categories should be treated as service_category
-  const SERVICE_LIKE = ['local_service', 'cleaning', 'home_improvement_service', 'healthcare', 'legal', 'beauty', 'fitness', 'restaurant', 'florist']
-  const isServiceCategory = SERVICE_LIKE.includes(businessCategory)
+  // SERVICE-LIKE categories (where users search for providers, not products)
+  // NOTE: florist is mixed — "משלוח פרחים" is a service, but "זר ורדים" is a product.
+  // We detect this from the keyword itself, not from the category alone.
+  const PURE_SERVICE = ['local_service', 'cleaning', 'home_improvement_service', 'healthcare', 'legal', 'fitness', 'agency']
+  const MIXED_CATEGORIES = ['florist', 'beauty', 'restaurant'] // can be product OR service depending on keyword
 
-  if (isServiceCategory || isAbstractService) {
+  // Service indicators in the keyword take PRIORITY over product indicators.
+  // "משלוח מתנה" → service (it's about the delivery), not product.
+  // "התקנת מזגן" → service, not product.
+  const isServiceKeyword = /(משלוח|התקנה|שיפוץ|תיקון|ניקיון|ייעוץ|delivery|installation|service|consultation|repair)/i.test(kwLower)
+
+  // Product indicators in the keyword (for mixed categories like florist)
+  const isProductKeyword = /(זר|זרים|מתנה|מתנות|בקבוק|חבילה|פריט|תיק|נעלי|טבעת|שעון|gift|bouquet|item|package)/i.test(kwLower)
+
+  const isPureService = PURE_SERVICE.includes(businessCategory)
+  const isMixed = MIXED_CATEGORIES.includes(businessCategory)
+
+  if (isPureService || isAbstractService) {
     entityType = 'service_category'
-  } else if (isBrandKeyword) {
-    entityType = 'brand'
+  } else if (isServiceKeyword) {
+    // Service keyword wins regardless of category
+    entityType = 'service_category'
+  } else if (isMixed && !isProductKeyword) {
+    // Mixed category without explicit product indicator → service
+    entityType = 'service_category'
   } else if (isTopical) {
     entityType = 'topic'
-  } else if (/platform|tool|software|app|saas/i.test(businessCategory)) {
+  } else if (businessCategory === 'saas') {
     entityType = 'platform'
+  } else if (businessCategory === 'product_brand') {
+    entityType = 'brand'
   }
 
   // Determine what people actually search about this entity
-  const isPriceRelevant = ['ecommerce', 'perfume', 'sports_store', 'appliance_store', 'gift', 'restaurant'].includes(businessCategory) ||
-                          /מחיר|price|עלות|cost|כמה|how much|expenses/i.test(kwLower)
+  const isPriceRelevant = ['ecommerce', 'perfume', 'sports_store', 'appliance_store', 'gifts', 'restaurant', 'florist'].includes(businessCategory) ||
+                          /מחיר|price|עלות|cost|כמה|how much/i.test(kwLower)
 
   const isReviewRelevant = true // people review almost everything
 
-  const isComparisonRelevant = !isServiceCategory && (businessCategory === 'product_brand' || businessCategory === 'saas')
+  const isComparisonRelevant = entityType !== 'service_category' && (businessCategory === 'product_brand' || businessCategory === 'saas')
 
-  const isLocalRelevant = isServiceCategory || /מקומי|local|בקרבת|near|עיר|city/i.test(kwLower)
+  const isLocalRelevant = entityType === 'service_category' || /מקומי|local|בקרבת|near|ב.*עיר|in.*city/i.test(kwLower)
 
-  const hasLocation = /ב|in|near|close|קרוב|עיר|city|location/i.test(kwLower)
+  const hasLocation = /\bב[א-ת]+\s*$|בעיר|in city|local/i.test(kwLower)
 
   return {
     keyword,
@@ -100,11 +115,10 @@ function comprehendEntity(keyword: string, businessName: string | null, business
 
 function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNeed[] {
   const needs: UserNeed[] = []
-  const { entityType, businessCategory } = entity
+  const { entityType } = entity
 
   // Service category: users search for provider selection, pricing, reviews, local availability
   if (entityType === 'service_category') {
-    // Provider recommendation is ALWAYS high-likelihood for services
     needs.push({
       intent: 'recommendation',
       behavior: 'provider_selection',
@@ -112,7 +126,6 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
       likelihood: 'high',
     })
 
-    // Local availability is high if city is available
     if (city) {
       needs.push({
         intent: 'local',
@@ -122,10 +135,9 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
       })
     }
 
-    // Reviews and pricing are always natural
     needs.push({
       intent: 'pre_purchase',
-      behavior: 'quality_assurance',
+      behavior: 'quality_assurance_service',
       naturalPhrase: 'quality and reliability factors',
       likelihood: 'high',
     })
@@ -139,17 +151,20 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
       })
     }
   }
-  // Product or brand: users search for specifications, reviews, alternatives, pricing
+  // Product or brand: users search for reviews, alternatives, pricing.
+  // NOTE: We deliberately do NOT include "איזה X מומלץ?" because Hebrew
+  // grammatical agreement (singular/plural, masc/fem) is too fragile.
+  // The curated bank handles product recommendation via category-specific
+  // phrasings ("איזה בושם מומלץ לאישה?") with correct grammar.
   else if (entityType === 'product' || entityType === 'brand') {
-    // Reviews are universal
+    // Reviews ("חוות דעת על X") — always grammatically safe
     needs.push({
       intent: 'pre_purchase',
-      behavior: 'quality_assurance',
+      behavior: 'product_reviews',
       naturalPhrase: 'reviews and feedback',
       likelihood: 'high',
     })
 
-    // Price for products/brands
     if (entity.isPriceRelevant) {
       needs.push({
         intent: 'commercial',
@@ -159,7 +174,6 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
       })
     }
 
-    // Comparison for products that have real alternatives
     if (entity.isComparisonRelevant) {
       needs.push({
         intent: 'comparison',
@@ -169,19 +183,12 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
       })
     }
   }
-  // Platform/SaaS: users search for pricing, integrations, alternatives, use cases
+  // Platform/SaaS
   else if (entityType === 'platform') {
     needs.push({
       intent: 'commercial',
       behavior: 'pricing_plans',
       naturalPhrase: 'pricing and plans',
-      likelihood: 'high',
-    })
-
-    needs.push({
-      intent: 'pre_purchase',
-      behavior: 'feature_discovery',
-      naturalPhrase: 'features and capabilities',
       likelihood: 'high',
     })
 
@@ -192,7 +199,7 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
       likelihood: 'medium',
     })
   }
-  // Topic: users search for how-to, explanations, best practices
+  // Topic
   else if (entityType === 'topic') {
     needs.push({
       intent: 'informational',
@@ -202,15 +209,8 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
     })
   }
 
-  // Filter duplicates and sort by likelihood
-  const seen = new Set<string>()
-  const unique = needs.filter((n) => {
-    if (seen.has(n.intent)) return false
-    seen.add(n.intent)
-    return true
-  })
-
-  return unique.sort((a, b) => {
+  // Sort by likelihood
+  return needs.sort((a, b) => {
     const order = { high: 0, medium: 1, low: 2 }
     return order[a.likelihood] - order[b.likelihood]
   })
@@ -220,79 +220,133 @@ function inferRealUserNeeds(entity: EntityProfile, city: string | null): UserNee
 // 3. PHRASE NATURAL HEBREW QUESTION
 // ============================================================================
 
+/**
+ * Generate a natural Hebrew question for a given user need + entity.
+ * Returns null if no natural phrasing is possible (do NOT force).
+ *
+ * Uses ONLY phrasings that sound like real Israeli searches:
+ * - "כמה עולה X?" — price (universal)
+ * - "חוות דעת על X" — reviews (universal, natural)
+ * - "איזה X מומלץ?" — product recommendation (natural)
+ * - "האם X מומלץ?" — yes/no recommendation (natural)
+ * - "איזה ספק מומלץ ל-X" — service provider (services only)
+ * - "מה חשוב לבדוק לפני X" — quality checks (services)
+ * - "אילו חלופות יש ל-X" — alternatives
+ *
+ * BANNED phrasings (sound like AI/translation):
+ * - "מה דעות על X" (literal translation from English "what are opinions about")
+ * - "איזה דעות על X"
+ * - "מה הדעה על X" (unless X is a specific brand name)
+ * - "מה היכולות של X" (corporate/AI-sounding)
+ * - "מה חלופות טובות ל-X" (awkward, "טובות" feels forced)
+ */
+/**
+ * Check if keyword contains a city or location reference.
+ * Used to avoid adding city twice (e.g., "ברמת גן ברמת גן").
+ */
+function keywordContainsCity(keyword: string, city: string | null): boolean {
+  if (!city) return false
+  return keyword.toLowerCase().includes(city.toLowerCase())
+}
+
+/**
+ * Smart connector for Hebrew "ל" prefix.
+ * - "ל" + Hebrew word: "לקידום"
+ * - "ל-" + English word: "ל-Go Top" (with hyphen for readability)
+ */
+function connectorL(word: string): string {
+  const firstChar = word.trim().charAt(0)
+  // English / Latin character: add hyphen
+  if (/[a-zA-Z]/.test(firstChar)) {
+    return `ל-${word}`
+  }
+  return `ל${word}`
+}
+
+/**
+ * Smart connector for Hebrew "ב" prefix (same logic).
+ */
+function connectorB(word: string): string {
+  const firstChar = word.trim().charAt(0)
+  if (/[a-zA-Z]/.test(firstChar)) {
+    return `ב-${word}`
+  }
+  return `ב${word}`
+}
+
+/**
+ * Check if keyword IS the business name (entity searching for itself doesn't make sense).
+ */
+function isKeywordBusinessName(keyword: string, businessName: string): boolean {
+  if (!businessName) return false
+  const kwNorm = keyword.trim().toLowerCase()
+  const bnNorm = businessName.trim().toLowerCase()
+  return kwNorm === bnNorm || kwNorm.includes(bnNorm) || bnNorm.includes(kwNorm)
+}
+
 function phraseNaturalHebrewQuestion(
   need: UserNeed,
   entity: EntityProfile,
-  city: string | null,
-  language: string
+  city: string | null
 ): string | null {
-  const { keyword, entityType, businessCategory } = entity
-  const isHebrew = language === 'he'
+  const { keyword, entityType, businessName } = entity
 
-  if (!isHebrew) {
-    return phraseNaturalEnglishQuestion(need, entity, city)
+  // CRITICAL: If keyword IS the business name, don't generate questions about
+  // it as a "category". The business name should appear in curated bank questions,
+  // not in generic keyword-based templates.
+  if (isKeywordBusinessName(keyword, businessName)) {
+    return null
   }
 
-  // Price discovery
-  if (need.behavior === 'price_discovery') {
-    // For services: "כמה עולה שירות ניקיון?"
-    // For products: "כמה עולה iPhone?"
-    if (entityType === 'service_category') {
-      return `כמה עולה ${keyword}?`
-    } else if (entityType === 'product' || entityType === 'brand') {
-      return `כמה עולה ${keyword}?`
-    }
+  const cleanKw = keyword.trim()
+  const cityInKw = keywordContainsCity(cleanKw, city)
+
+  // PRICE — universal natural phrasing
+  if (need.behavior === 'price_discovery' || need.behavior === 'pricing_plans') {
+    return `כמה עולה ${cleanKw}?`
   }
 
-  // Provider recommendation (ONLY for services)
+  // PROVIDER SELECTION — services only
   if (need.behavior === 'provider_selection') {
-    if (entityType === 'service_category') {
-      if (city) {
-        return `איזה ספק מומלץ ל${keyword} ב${city}?`
-      } else {
-        return `איזה ספק מומלץ ל${keyword}?`
-      }
+    if (entityType !== 'service_category') return null
+
+    const lKw = connectorL(cleanKw)
+    // Don't add city if it's already in the keyword
+    if (city && !cityInKw) {
+      return `איזה ספק מומלץ ${lKw} ב${city}?`
     }
+    return `איזה ספק מומלץ ${lKw}?`
   }
 
-  // Local availability
+  // PRODUCT REVIEWS — "חוות דעת על X" (natural, never "מה דעות על")
+  if (need.behavior === 'product_reviews') {
+    if (entityType !== 'product' && entityType !== 'brand') return null
+    return `חוות דעת על ${cleanKw}`
+  }
+
+  // LOCAL AVAILABILITY — only if city is set AND not already in keyword
   if (need.behavior === 'local_availability') {
-    if (city) {
-      return `איפה אפשר למצוא ${keyword} ב${city}?`
-    }
+    if (!city || cityInKw) return null
+    return `איפה כדאי לקבל ${cleanKw} ב${city}?`
   }
 
-  // Quality assurance / reviews
-  if (need.behavior === 'quality_assurance') {
-    if (entityType === 'service_category') {
-      return `מה צריך לבדוק בעת בחירת ${keyword}?`
-    } else if (entityType === 'product' || entityType === 'brand') {
-      return `מה דעות על ${keyword}?`
-    }
+  // QUALITY ASSURANCE FOR SERVICES
+  if (need.behavior === 'quality_assurance_service') {
+    if (entityType !== 'service_category') return null
+    return `מה חשוב לבדוק לפני בחירת ${cleanKw}?`
   }
 
-  // Feature discovery (for platforms)
-  if (need.behavior === 'feature_discovery') {
-    return `מה היכולות של ${keyword}?`
-  }
-
-  // Pricing plans (for platforms)
-  if (need.behavior === 'pricing_plans') {
-    return `כמה עולה ${keyword}?`
-  }
-
-  // Alternative evaluation
+  // ALTERNATIVE EVALUATION
   if (need.behavior === 'alternative_evaluation') {
-    if (entityType === 'product' || entityType === 'brand') {
-      return `מה חלופות טובות ל${keyword}?`
-    } else if (entityType === 'platform') {
-      return `מה חלופות ל${keyword}?`
-    }
+    if (entityType !== 'product' && entityType !== 'brand' && entityType !== 'platform') return null
+    const lKw = connectorL(cleanKw)
+    return `אילו חלופות יש ${lKw}?`
   }
 
-  // Explanation / how-to
+  // EXPLANATION / HOW-TO
   if (need.behavior === 'explanation') {
-    return `איך משתמשים ב${keyword}?`
+    const bKw = connectorB(cleanKw)
+    return `איך משתמשים ${bKw}?`
   }
 
   return null
@@ -305,38 +359,42 @@ function phraseNaturalEnglishQuestion(
 ): string | null {
   const { keyword, entityType } = entity
 
-  if (need.behavior === 'price_discovery') {
+  if (need.behavior === 'price_discovery' || need.behavior === 'pricing_plans') {
     return `How much does ${keyword} cost?`
   }
 
   if (need.behavior === 'provider_selection') {
-    if (city) {
-      return `Best providers for ${keyword} in ${city}`
-    } else {
+    if (entityType === 'service_category') {
+      if (city) return `Best providers for ${keyword} in ${city}`
       return `Best providers for ${keyword}`
     }
+    return null
+  }
+
+  if (need.behavior === 'product_recommendation') {
+    if (entityType === 'product' || entityType === 'brand') {
+      return `Which ${keyword} is recommended?`
+    }
+    return null
+  }
+
+  if (need.behavior === 'product_reviews') {
+    if (entityType === 'product' || entityType === 'brand') {
+      return `Reviews of ${keyword}`
+    }
+    return null
   }
 
   if (need.behavior === 'local_availability') {
-    if (city) {
-      return `Where to find ${keyword} in ${city}`
-    }
+    if (city) return `Where to find ${keyword} in ${city}`
+    return null
   }
 
-  if (need.behavior === 'quality_assurance') {
+  if (need.behavior === 'quality_assurance_service') {
     if (entityType === 'service_category') {
       return `What to look for when choosing ${keyword}`
-    } else {
-      return `Reviews of ${keyword}`
     }
-  }
-
-  if (need.behavior === 'feature_discovery') {
-    return `Features of ${keyword}`
-  }
-
-  if (need.behavior === 'pricing_plans') {
-    return `${keyword} pricing`
+    return null
   }
 
   if (need.behavior === 'alternative_evaluation') {
@@ -351,83 +409,130 @@ function phraseNaturalEnglishQuestion(
 }
 
 // ============================================================================
-// 4. VALIDATE HUMAN SEARCH QUERY
+// 4. VALIDATE HUMAN SEARCH QUERY (STRICT)
 // ============================================================================
 
-function validateHumanSearchQuery(
+/**
+ * Strict validation: any question failing ANY check is rejected.
+ * No "partial credit" - either it sounds like a real search or it doesn't.
+ *
+ * This validator is exported for use by v1 fallback path too.
+ * Same standards apply to both v2 and v1 candidates.
+ */
+export function validateHumanSearchQuery(
   question: string,
-  entity: EntityProfile,
+  keyword: string,
   language: string
 ): { isValid: boolean; score: number; reasons: string[] } {
   const reasons: string[] = []
   let score = 100
 
-  // Hebrew-specific validation
-  if (language === 'he') {
-    // Check for naturalness markers
-
-    // Template patterns that sound AI-generated
-    const aiPatterns = [
-      /או חלופות אחרות/,
-      /בבחירת [^?]+\?/,
-      /איך לבחור/,
-      /מי המומלץ/,
-      /מה הטוב ביותר/,
-      /מה ה\w+\s+שלם/,
-    ]
-
-    for (const pattern of aiPatterns) {
-      if (pattern.test(question)) {
-        reasons.push('generic_template_pattern')
-        score -= 15
-        break
-      }
-    }
-
-    // Check for awkward phrasing
-    if (/\s{2,}/.test(question)) {
-      reasons.push('double_spaces')
-      score -= 5
-    }
-
-    if (question.length < 5) {
-      reasons.push('too_short')
-      score -= 20
-    }
-
-    if (question.length > 120) {
-      reasons.push('too_long')
-      score -= 10
-    }
+  // Universal: empty or near-empty
+  if (!question || question.trim().length < 5) {
+    reasons.push('too_short')
+    return { isValid: false, score: 0, reasons }
   }
 
-  // English-specific validation
-  if (language === 'en') {
-    if (question.length < 5) {
-      reasons.push('too_short')
-      score -= 20
-    }
-
-    if (question.length > 100) {
-      reasons.push('too_long')
-      score -= 10
-    }
-  }
-
-  // Universal: check if question actually relates to the entity
-  const kwLower = entity.keyword.toLowerCase()
-  if (!question.toLowerCase().includes(kwLower)) {
-    reasons.push('entity_not_referenced')
+  if (question.length > 120) {
+    reasons.push('too_long')
     score -= 20
   }
 
-  // Universal: no unfinished constructions
-  if (question.endsWith(' ') || question.endsWith('-')) {
+  // Universal: unfinished phrasing
+  if (/\s[ולבכמ]\s*$/u.test(question) || question.endsWith('-') || question.endsWith(' ')) {
     reasons.push('unfinished_construction')
-    score -= 25
+    return { isValid: false, score: 0, reasons: ['unfinished_construction'] }
   }
 
-  const isValid = score >= 70
+  // Universal: keyword must appear
+  if (!question.toLowerCase().includes(keyword.toLowerCase())) {
+    reasons.push('entity_not_referenced')
+    return { isValid: false, score: 0, reasons: ['entity_not_referenced'] }
+  }
+
+  // Universal: double spaces / formatting
+  if (/\s{2,}/.test(question)) {
+    reasons.push('double_spaces')
+    score -= 10
+  }
+
+  // Hebrew-specific naturalness checks
+  if (language === 'he') {
+    // BANNED phrasings — these sound like AI translations or unnatural Hebrew
+
+    // "מה דעות על X" - literal translation from English, sounds wrong
+    if (/מה\s+דעות\s+על/.test(question)) {
+      reasons.push('unnatural_phrasing: "מה דעות על" (use "חוות דעת על" instead)')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // "איזה דעות על X" - same problem
+    if (/איזה\s+דעות\s+על/.test(question)) {
+      reasons.push('unnatural_phrasing: "איזה דעות על"')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // "מה הדעה על" - awkward for generic products
+    if (/מה\s+הדעה\s+על/.test(question)) {
+      reasons.push('unnatural_phrasing: "מה הדעה על"')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // "מה היכולות של" - corporate/AI-sounding, real users don't ask this
+    if (/מה\s+היכולות\s+של/.test(question)) {
+      reasons.push('unnatural_phrasing: "מה היכולות של"')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // "מה חלופות טובות ל" - awkward construction; "טובות" feels forced
+    if (/מה\s+חלופות\s+טובות\s+ל/.test(question)) {
+      reasons.push('unnatural_phrasing: "מה חלופות טובות ל"')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // "מי מומלץ עבור" - vague, sounds AI-generated
+    if (/מי\s+מומלץ\s+עבור/.test(question)) {
+      reasons.push('unnatural_phrasing: "מי מומלץ עבור"')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // "מה עדיף X או חלופות אחרות" - abstract comparison
+    if (/או\s+חלופות\s+אחרות/.test(question)) {
+      reasons.push('unnatural_phrasing: "או חלופות אחרות"')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // "איך לבחור ספק ל" - overlaps awkwardly with other templates
+    if (/איך\s+לבחור\s+ספק\s+ל/.test(question)) {
+      reasons.push('unnatural_phrasing: "איך לבחור ספק ל"')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // Generic abstract comparison
+    if (/מה\s+עדיף\s+[^?]+\s+או\s+/.test(question)) {
+      reasons.push('unnatural_phrasing: abstract comparison')
+      return { isValid: false, score: 0, reasons }
+    }
+
+    // Check minimum Hebrew character density
+    const hebrewChars = (question.match(/[א-ת]/g) || []).length
+    const totalChars = question.replace(/\s/g, '').length
+    if (totalChars > 5 && hebrewChars / totalChars < 0.3) {
+      reasons.push('insufficient_hebrew')
+      score -= 30
+    }
+  }
+
+  // English-specific
+  if (language === 'en') {
+    // BANNED: AI-sounding patterns
+    if (/^what is the difference between/i.test(question) && !/[A-Z][a-z]+\s+(vs|versus)\s+[A-Z][a-z]+/i.test(question)) {
+      reasons.push('unnatural_phrasing: abstract difference')
+      return { isValid: false, score: 0, reasons }
+    }
+  }
+
+  const isValid = score >= 80
   return { isValid, score, reasons }
 }
 
@@ -452,12 +557,32 @@ export interface GeneratedQuestion {
     score: number
     reasons: string[]
   }
+  debug?: {
+    entityType: string
+    behavior: string
+    likelihood: string
+  }
+}
+
+export interface GenerationResult {
+  questions: GeneratedQuestion[]
+  rejected: Array<{ prompt: string; reasons: string[] }>
+  entityProfile: EntityProfile
 }
 
 export function generateHumanLikeSmartQuestions(ctx: GeneratorContext): GeneratedQuestion[] {
+  const result = generateHumanLikeSmartQuestionsDebug(ctx)
+  return result.questions
+}
+
+/**
+ * Debug version: returns both generated and rejected questions for inspection.
+ */
+export function generateHumanLikeSmartQuestionsDebug(ctx: GeneratorContext): GenerationResult {
   const { keyword, businessName, city, businessCategory, language } = ctx
 
   const questions: GeneratedQuestion[] = []
+  const rejected: Array<{ prompt: string; reasons: string[] }> = []
 
   // Step 1: Understand the entity
   const entity = comprehendEntity(keyword, businessName, businessCategory)
@@ -469,33 +594,44 @@ export function generateHumanLikeSmartQuestions(ctx: GeneratorContext): Generate
   for (const need of needs) {
     // Generate natural phrasing
     const phrase = language === 'he'
-      ? phraseNaturalHebrewQuestion(need, entity, city, language)
+      ? phraseNaturalHebrewQuestion(need, entity, city)
       : phraseNaturalEnglishQuestion(need, entity, city)
 
-    if (!phrase) continue
-
-    // Validate semantic realism
-    const validation = validateHumanSearchQuery(phrase, entity, language)
-
-    if (!validation.isValid) {
-      // Skip questions that fail validation
+    if (!phrase) {
+      // Couldn't phrase naturally - skip silently (this is OK, not an error)
       continue
     }
 
-    // Calculate final score: base intent score + validation bonus
-    const baseScore = need.likelihood === 'high' ? 85 : need.likelihood === 'medium' ? 70 : 55
-    const finalScore = baseScore + (validation.score - 100) * 0.5 // validation can add/subtract
+    // Validate semantic realism
+    const validation = validateHumanSearchQuery(phrase, keyword, language)
+
+    if (!validation.isValid) {
+      rejected.push({ prompt: phrase, reasons: validation.reasons })
+      continue
+    }
+
+    // Calculate final score
+    const baseScore = need.likelihood === 'high' ? 85 : need.likelihood === 'medium' ? 72 : 60
+    const finalScore = Math.min(100, baseScore + (validation.score - 80) * 0.3)
 
     questions.push({
       prompt: phrase,
       intent: need.intent,
-      score: Math.max(40, Math.min(100, finalScore)),
+      score: finalScore,
       validation,
+      debug: {
+        entityType: entity.entityType,
+        behavior: need.behavior,
+        likelihood: need.likelihood,
+      },
     })
   }
 
-  // Return only questions that passed validation (no forced quota)
-  return questions.sort((a, b) => b.score - a.score)
+  return {
+    questions: questions.sort((a, b) => b.score - a.score),
+    rejected,
+    entityProfile: entity,
+  }
 }
 
 // ============================================================================
