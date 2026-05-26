@@ -1209,6 +1209,85 @@ const AGENCY_SEEDS_EN: QuestionSeed[] = [
   },
 ]
 
+const HOME_IMPROVEMENT_SERVICE_SEEDS_EN: QuestionSeed[] = [
+  {
+    text: () => 'How do I choose a remodeling contractor?',
+    intent: 'pre_purchase',
+    categories: ['home_improvement_service'],
+    score: 90,
+  },
+  {
+    text: () => 'How much does kitchen remodeling cost?',
+    intent: 'commercial',
+    categories: ['home_improvement_service'],
+    score: 88,
+  },
+  {
+    text: () => 'How much does bathroom remodeling cost?',
+    intent: 'commercial',
+    categories: ['home_improvement_service'],
+    score: 88,
+  },
+  {
+    text: () => 'How do I choose a kitchen remodeling contractor?',
+    intent: 'pre_purchase',
+    categories: ['home_improvement_service'],
+    score: 85,
+  },
+  {
+    text: () => 'How do I choose a bathroom remodeling contractor?',
+    intent: 'pre_purchase',
+    categories: ['home_improvement_service'],
+    score: 85,
+  },
+  {
+    text: () => 'Which remodeling companies are recommended near me?',
+    intent: 'informational',
+    categories: ['home_improvement_service'],
+    score: 82,
+  },
+  {
+    text: (ctx) => ctx.businessName ? `Reviews for ${ctx.businessName}` : 'Read customer reviews',
+    intent: 'brand',
+    requiresBusinessName: true,
+    categories: ['home_improvement_service'],
+    score: 88,
+  },
+  {
+    text: () => 'How long does a bathroom remodel usually take?',
+    intent: 'informational',
+    categories: ['home_improvement_service'],
+    score: 82,
+  },
+  {
+    text: () => 'How long does a kitchen remodel usually take?',
+    intent: 'informational',
+    categories: ['home_improvement_service'],
+    score: 82,
+  },
+  {
+    text: () => 'What should I look for in a remodeling company?',
+    intent: 'informational',
+    categories: ['home_improvement_service'],
+    score: 84,
+  },
+  {
+    text: (ctx) => ctx.city ? `Which remodeling companies are recommended in ${ctx.city}?` : null,
+    intent: 'informational',
+    requiresLocation: true,
+    categories: ['home_improvement_service'],
+    score: 85,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// All English seeds combined
+// ----------------------------------------------------------------------------
+const ALL_SEEDS_EN: QuestionSeed[] = [
+  ...AGENCY_SEEDS_EN,
+  ...HOME_IMPROVEMENT_SERVICE_SEEDS_EN,
+]
+
 // ----------------------------------------------------------------------------
 // All Hebrew seeds combined
 // ----------------------------------------------------------------------------
@@ -1322,7 +1401,7 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
   const seenNormalized = new Set<string>()
 
   // Select seed pool based on language
-  const seedPool = language === 'en' ? AGENCY_SEEDS_EN : ALL_SEEDS_HE
+  const seedPool = language === 'en' ? ALL_SEEDS_EN : ALL_SEEDS_HE
 
   for (const seed of seedPool) {
     // Category filter
