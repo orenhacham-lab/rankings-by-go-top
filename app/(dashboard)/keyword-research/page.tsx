@@ -5,8 +5,9 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
-import { generateIntentQuestions, debugInferTopics } from '@/lib/ai-visibility/intent-engine'
 import { detectCategory } from '@/lib/ai-visibility/prompt-templates'
+import { analyzeSelectedKeywordSignals } from '@/lib/ai-visibility/keyword-analysis'
+import { generateKeywordResearchQuestions, toGeneratedQuestions } from '@/lib/ai-visibility/keyword-research-question-generator'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal from '@/components/keyword-research/TrendModal'
 import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
@@ -526,84 +527,48 @@ export default function KeywordResearchPage() {
       return
     }
 
-    // Step 1: Infer category from keywords alone (no project bias)
-    const keywordCategory = detectCategory('', '', keywordsList)
-
-    // Step 2: Infer category from project alone (no keyword bias)
+    // Resolve project category from project metadata (business name + domain).
+    // Passed to the keyword analysis layer as context for the relevance gate.
     const projectCategory = detectCategory(
       project.business_name || '',
       project.target_domain || '',
       []
     )
 
-    // Step 3: Relevance gate — if both sides have clear, conflicting categories → mismatch
-    const keywordSpecific = keywordCategory !== 'generic'
-    const projectSpecific = projectCategory !== 'generic'
-    if (keywordSpecific && projectSpecific && keywordCategory !== projectCategory) {
-      const mismatchMessage = language === 'he'
-        ? 'הביטויים שנבחרו לא תואמים לפרויקט שנבחר. בחרו ביטויים רלוונטיים יותר לפרויקט.'
-        : 'The selected keywords do not match the selected project. Try selecting more relevant keywords.'
-      setAIQuestionsError(mismatchMessage)
-      return
-    }
-
-    // Step 4: Determine businessCategory to use.
-    // Prefer project category when known; fall back to keyword category.
-    const businessCategory = projectSpecific ? projectCategory : keywordCategory
-
-    // Step 5: Infer strict topics from selected keyword signals (focus filter).
-    // Only passed when non-empty — when empty, generation falls back to normal category pool.
-    const selectedTopics = debugInferTopics(keywordsList)
-
-    // Step 6: Generate curated questions with vNext infrastructure + strict topic mode
-    const intentQuestions = generateIntentQuestions({
-      businessName: project.business_name,
-      businessCategory: businessCategory,
+    // Phase 3 pipeline:
+    //   analyzeSelectedKeywordSignals → generateKeywordResearchQuestions → toGeneratedQuestions
+    const analyses = analyzeSelectedKeywordSignals({
+      selectedKeywords: keywordsList,
+      projectCategory,
       language: language as 'he' | 'en',
-      country: country || 'IL',
-      keywords: keywordsList,
-      strictTopics: selectedTopics.length > 0 ? selectedTopics : undefined,
     })
 
-    if (intentQuestions.length === 0) {
-      const emptyMessage = language === 'he'
-        ? 'לא נמצאו שאלות AI איכותיות מהביטויים שנבחרו. נסו לבחור ביטויים מסחריים ורלוונטיים יותר.'
-        : 'No high-quality AI questions found for the selected keywords. Try selecting more commercial or relevant phrases.'
+    const krQuestions = generateKeywordResearchQuestions(
+      analyses,
+      language as 'he' | 'en',
+      country || undefined,
+    )
+
+    if (krQuestions.length === 0) {
+      // Distinguish mismatch from general quality failure for the user message
+      const allMismatch = analyses.length > 0 && analyses.every(a => a.relevance === 'mismatch')
+      const emptyMessage = allMismatch
+        ? (language === 'he'
+            ? 'הביטויים שנבחרו לא תואמים לפרויקט שנבחר. בחרו ביטויים רלוונטיים יותר לפרויקט.'
+            : 'The selected keywords do not match the selected project. Try selecting more relevant keywords.')
+        : (language === 'he'
+            ? 'לא נמצאו שאלות AI איכותיות מהביטויים שנבחרו. נסו לבחור ביטויים מסחריים ורלוונטיים יותר.'
+            : 'No high-quality AI questions found for the selected keywords. Try selecting more commercial or relevant phrases.')
       setAIQuestionsError(emptyMessage)
       return
     }
 
-    // Adapt IntentEngineQuestion to GeneratedQuestion format (modal unchanged)
-    const adapted: GeneratedQuestion[] = intentQuestions.map((q) => ({
-      question: q.prompt,
-      sourceKeyword: language === 'he' ? 'נוצר לפי הקשר הפרויקט' : 'Generated from project context',
-      type: intentToType(q.intent),
-    }))
-
+    // Convert to GeneratedQuestion[] — modal interface is unchanged
+    const adapted = toGeneratedQuestions(krQuestions)
     setGeneratedAIQuestions(adapted)
     setAIQuestionsOpen(true)
     setAIQuestionsError('')
     setAIQuestionsMessage('')
-  }
-
-  const intentToType = (intent: string): 'recommendation' | 'price' | 'comparison' | 'info' => {
-    switch (intent) {
-      case 'commercial':
-      case 'transactional':
-      case 'pre_purchase':
-        return 'price'
-      case 'recommendation':
-        return 'recommendation'
-      case 'comparison':
-      case 'alternatives':
-        return 'comparison'
-      case 'brand':
-      case 'informational':
-      case 'local':
-      case 'gift':
-      default:
-        return 'info'
-    }
   }
 
   const handleAddAIQuestions = async (questions: GeneratedQuestion[]) => {
