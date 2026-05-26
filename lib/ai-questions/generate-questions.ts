@@ -1,5 +1,13 @@
 /**
- * Generate natural language AI questions from keywords
+ * @deprecated — Do not use for production question generation.
+ *
+ * This module uses raw keyword template wrapping which produces semantically
+ * incorrect questions (e.g. "האם כדאי לקנות קידום אתרים אורגני?" for a service
+ * keyword). The GeneratedQuestion interface is still used as the adapter type
+ * for the AIQuestionsModal component, but question generation is handled by
+ * generateIntentQuestions() in lib/ai-visibility/intent-engine.ts.
+ *
+ * Original: Generate natural language AI questions from keywords
  * Supports both English and Hebrew
  */
 

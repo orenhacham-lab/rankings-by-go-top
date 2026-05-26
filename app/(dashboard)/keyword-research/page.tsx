@@ -5,7 +5,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
-import { generateIntentQuestions } from '@/lib/ai-visibility/intent-engine'
+import { generateIntentQuestions, debugInferTopics } from '@/lib/ai-visibility/intent-engine'
 import { detectCategory } from '@/lib/ai-visibility/prompt-templates'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal from '@/components/keyword-research/TrendModal'
@@ -327,6 +327,7 @@ export default function KeywordResearchPage() {
 
   const toggleKeyword = (kw: string) => {
     clearAddToProjectSuccess()
+    setAIQuestionsError('')
     const newSelected = new Set(selectedKeywords)
     if (newSelected.has(kw)) {
       newSelected.delete(kw)
@@ -338,11 +339,13 @@ export default function KeywordResearchPage() {
 
   const selectAll = () => {
     clearAddToProjectSuccess()
+    setAIQuestionsError('')
     setSelectedKeywords(new Set(results.map((r) => r.keyword)))
   }
 
   const deselectAll = () => {
     clearAddToProjectSuccess()
+    setAIQuestionsError('')
     setSelectedKeywords(new Set())
   }
 
@@ -523,20 +526,43 @@ export default function KeywordResearchPage() {
       return
     }
 
-    // Detect category from project business context + selected keywords
-    const category = detectCategory(
+    // Step 1: Infer category from keywords alone (no project bias)
+    const keywordCategory = detectCategory('', '', keywordsList)
+
+    // Step 2: Infer category from project alone (no keyword bias)
+    const projectCategory = detectCategory(
       project.business_name || '',
       project.target_domain || '',
-      keywordsList
+      []
     )
 
-    // Generate curated questions using vNext infrastructure
+    // Step 3: Relevance gate — if both sides have clear, conflicting categories → mismatch
+    const keywordSpecific = keywordCategory !== 'generic'
+    const projectSpecific = projectCategory !== 'generic'
+    if (keywordSpecific && projectSpecific && keywordCategory !== projectCategory) {
+      const mismatchMessage = language === 'he'
+        ? 'הביטויים שנבחרו לא תואמים לפרויקט שנבחר. בחרו ביטויים רלוונטיים יותר לפרויקט.'
+        : 'The selected keywords do not match the selected project. Try selecting more relevant keywords.'
+      setAIQuestionsError(mismatchMessage)
+      return
+    }
+
+    // Step 4: Determine businessCategory to use.
+    // Prefer project category when known; fall back to keyword category.
+    const businessCategory = projectSpecific ? projectCategory : keywordCategory
+
+    // Step 5: Infer strict topics from selected keyword signals (focus filter).
+    // Only passed when non-empty — when empty, generation falls back to normal category pool.
+    const selectedTopics = debugInferTopics(keywordsList)
+
+    // Step 6: Generate curated questions with vNext infrastructure + strict topic mode
     const intentQuestions = generateIntentQuestions({
       businessName: project.business_name,
-      businessCategory: category,
+      businessCategory: businessCategory,
       language: language as 'he' | 'en',
       country: country || 'IL',
       keywords: keywordsList,
+      strictTopics: selectedTopics.length > 0 ? selectedTopics : undefined,
     })
 
     if (intentQuestions.length === 0) {
@@ -547,7 +573,7 @@ export default function KeywordResearchPage() {
       return
     }
 
-    // Adapt IntentEngineQuestion to GeneratedQuestion format
+    // Adapt IntentEngineQuestion to GeneratedQuestion format (modal unchanged)
     const adapted: GeneratedQuestion[] = intentQuestions.map((q) => ({
       question: q.prompt,
       sourceKeyword: language === 'he' ? 'נוצר לפי הקשר הפרויקט' : 'Generated from project context',
@@ -986,6 +1012,21 @@ export default function KeywordResearchPage() {
               )}
             </div>
           </div>
+
+          {/* AI Questions feedback — mismatch / empty state (neutral info, not error) */}
+          {aiQuestionsError && (
+            <div className={`flex items-start justify-between gap-3 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+              <span>{aiQuestionsError}</span>
+              <button
+                type="button"
+                onClick={() => setAIQuestionsError('')}
+                className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                aria-label={language === 'he' ? 'סגירה' : 'Dismiss'}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Add to Project Section — visible whenever at least one keyword is selected,
               OR a success/error message is still showing from the last action. */}

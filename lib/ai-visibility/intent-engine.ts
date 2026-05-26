@@ -51,7 +51,7 @@ interface TopicSignal {
 
 const TOPIC_SIGNALS: TopicSignal[] = [
   { cluster: 'seo', patterns: /(קידום\s*אתר|קידום\s*אורגני|seo|אורגני)/i },
-  { cluster: 'google_ads', patterns: /(google\s*ads|גוגל\s*אדס|פרסום\s*ממומן\s*בגוגל|adwords|ניהול\s*קמפיינים)/i },
+  { cluster: 'google_ads', patterns: /(google\s*ads|גוגל\s*אדס|פרסום\s*ממומן(\s*בגוגל)?|פרסום\s*בגוגל|adwords|ניהול\s*קמפיינים)/i },
   { cluster: 'facebook_ads', patterns: /(פייסבוק|facebook\s*ads|קמפיין\s*בפייסבוק|לידים\s*בפייסבוק)/i },
   { cluster: 'instagram_ads', patterns: /(אינסטגרם|instagram|insta)/i },
   { cluster: 'social_media', patterns: /(סושיאל|רשתות\s*חברתיות|social\s*media)/i },
@@ -1363,6 +1363,14 @@ export interface IntentEngineContext {
   country?: string | null
   city?: string | null
   keywords?: string[]
+  /**
+   * Strict topic mode — keyword research context only.
+   * When provided and non-empty, only seeds whose requiresAnyTopic /
+   * requiresAllTopics overlap with these topics will fire. Seeds with no
+   * topic requirement (brand review, generic fallback, etc.) are skipped.
+   * This field is NOT used by the Smart Questions tab.
+   */
+  strictTopics?: TopicCluster[]
 }
 
 export interface IntentEngineQuestion {
@@ -1406,6 +1414,21 @@ export function generateIntentQuestions(ctx: IntentEngineContext): IntentEngineQ
   for (const seed of seedPool) {
     // Category filter
     if (seed.categories && !seed.categories.includes(ctx.businessCategory)) continue
+
+    // Strict topic mode (keyword research path only).
+    // When ctx.strictTopics is provided, skip seeds that have no explicit topic
+    // requirement or whose topic requirements don't overlap with the selected
+    // keyword signals. This blocks brand-review, generic-category, and fallback
+    // seeds from firing when the user chose specific keyword research terms.
+    if (ctx.strictTopics && ctx.strictTopics.length > 0) {
+      const seedTopics: TopicCluster[] = [
+        ...(seed.requiresAnyTopic || []),
+        ...(seed.requiresAllTopics || []),
+      ]
+      if (seedTopics.length === 0) continue  // no topic req → skip in strict mode
+      const hasOverlap = seedTopics.some((t) => (ctx.strictTopics as TopicCluster[]).includes(t))
+      if (!hasOverlap) continue              // no overlap with selected signals → skip
+    }
 
     // Requirements
     if (seed.requiresBusinessName && !seedCtx.businessName) continue
