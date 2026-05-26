@@ -225,18 +225,17 @@ runCase(
   },
 )
 
-// ── Test 9: Perfume + בושם לגבר — singular with modifier (was broken due to regex)
+// ── Test 9: Perfume + בושם לגבר — singular: should use "כמה עולה" not "מה המחירים"
 runCase(
-  'Test 9 — Perfume + בושם לגבר → classified as product, safe Hebrew',
+  'Test 9 — Perfume + בושם לגבר → singular form → כמה עולה בושם לגבר?',
   ['בושם לגבר'],
   'perfume',
   'he',
   {
     minCount: 2,
-    // Must use safe price template
-    containsAll: ['מה המחירים של בושם לגבר'],
-    // Must NOT produce "כמה עולה בושם לגבר?" (singular-verb form)
-    containsNone: ['כמה עולה בושם לגבר', 'מתאים', 'איכותי'],
+    // "בושם לגבר" is singular → helper returns false → natural singular template
+    containsAll: ['כמה עולה בושם לגבר'],
+    containsNone: ['מה המחירים של בושם לגבר', 'מתאים', 'איכותי'],
   },
 )
 
@@ -255,13 +254,15 @@ runCase(
 
 // ── Test 10: Appliance store + מכונת כביסה — singular product label
 runCase(
-  'Test 10 — Appliance store + מכונת כביסה → product questions',
+  'Test 10 — Appliance store + מכונת כביסה → singular form → כמה עולה מכונת כביסה?',
   ['מכונת כביסה'],
   'appliance_store',
   'he',
   {
     minCount: 2,
-    containsAll: ['מה המחירים של'],
+    // "מכונת כביסה" is singular feminine construct → natural singular price template
+    containsAll: ['כמה עולה מכונת כביסה'],
+    containsNone: ['מה המחירים של מכונת כביסה'],
   },
 )
 

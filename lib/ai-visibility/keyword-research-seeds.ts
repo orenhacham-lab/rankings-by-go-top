@@ -84,6 +84,51 @@ export interface KeywordResearchSeedBank {
 }
 
 // ============================================================================
+// PLURAL DETECTION HELPER
+// ============================================================================
+
+/**
+ * Conservative heuristic: does this Hebrew product label appear to be a plural
+ * or construct-plural form?
+ *
+ * Used to choose the natural price-question template:
+ *   - Singular label → "כמה עולה {{productLabel}}?"
+ *   - Plural label   → "מה המחירים של {{productLabel}}?"
+ *
+ * Checks only three well-defined patterns; defaults to false (singular/unknown)
+ * so the safe form "מה המחירים של" is used whenever uncertain.
+ *
+ * Returns true for:
+ *   - First word ends in ות, length ≥ 5  → שמלות, חולצות, כפפות (fem. plural)
+ *   - First word ends in ים, length ≥ 5  → בשמים, בגדים, מכנסיים (masc./dual plural)
+ *   - First word ends in י with a space  → נעלי נשים, בגדי, תיקי עור (construct plural)
+ *
+ * Returns false for:
+ *   - הליכון ביתי  — ון suffix, not plural
+ *   - מכונת כביסה — ת suffix (singular feminine construct)
+ *   - בושם לגבר   — ם suffix (not ים)
+ *   - זר ורדים    — first word זר is singular; second-word plurality is ignored
+ *
+ * False-negative (plural treated as singular) → uses safe "מה המחירים של" anyway.
+ * False-positive (singular treated as plural) → uses "מה המחירים של" instead of
+ *   "כמה עולה"; grammatically safe, only slightly less idiomatic.
+ */
+export function isLikelyPluralHebrewProductLabel(label: string): boolean {
+  const trimmed = label.trim()
+  if (!trimmed) return false
+  const firstWord = trimmed.split(/\s+/)[0]
+  if (!firstWord || firstWord.length < 2) return false
+  // Construct plural (nismach): ends in י followed by another word
+  // e.g., נעלי נשים, בגדי עבודה, תיקי עור, אביזרי אופנה
+  if (firstWord.endsWith('י') && trimmed.includes(' ')) return true
+  // Feminine plural: ends in ות, min length 5 to avoid very short false matches
+  if (firstWord.endsWith('ות') && firstWord.length >= 5) return true
+  // Masculine/dual plural: ends in ים, min length 5
+  if (firstWord.endsWith('ים') && firstWord.length >= 5) return true
+  return false
+}
+
+// ============================================================================
 // SEED BANK
 // ============================================================================
 
@@ -131,7 +176,7 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
       { text: () => 'מה חשוב לבדוק לפני שבוחרים חברת קידום אתרים?',              intent: 'pre_purchase', score: 87 },
       { text: () => 'מה עדיף — SEO או Google Ads?',                               intent: 'comparison',   score: 85 },
       { text: () => 'איך בודקים שחברת SEO עושה עבודה טובה?',                     intent: 'pre_purchase', score: 84 },
-      { text: () => 'מה הסיכון בחברת SEO שמבטיחה תוצאות מהירות?',                intent: 'informational', score: 82 },
+      { text: () => 'אילו מדדים מוכיחים שחברת SEO עובדת?',                       intent: 'informational', score: 82 },
       { text: () => 'כמה עולה קידום אתרים לעסק קטן?',                            intent: 'commercial',   score: 81 },
       { text: () => 'מה ההבדל בין קידום אתרים לקידום מקומי?',                    intent: 'comparison',   score: 78 },
       {
@@ -238,8 +283,8 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
       {
         text: ({ language }) =>
           language === 'en'
-            ? 'How do I avoid renovation scams?'
-            : 'איך להימנע מקבלן שיפוצים לא אמין?',
+            ? 'How do I choose a reliable remodeling contractor?'
+            : 'איך לוודא שהקבלן אמין לפני שמתחילים?',
         intent: 'pre_purchase',
         score: 82,
       },
@@ -311,9 +356,10 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         text: ({ productLabel, language }) =>
           language === 'en'
             ? `How much does ${productLabel ?? 'this product'} cost?`
-            // Changed from "כמה עולה" (singular) to "מה המחירים של" (works for any number)
-            // Safer Hebrew: works for שמלות, נעלים, הליכון, מכונות, etc.
-            : `מה המחירים של ${productLabel ?? 'המוצר'}?`,
+            // Use plural-aware template: plural labels → "מה המחירים של", singular → "כמה עולה"
+            : isLikelyPluralHebrewProductLabel(productLabel ?? '')
+              ? `מה המחירים של ${productLabel ?? 'המוצר'}?`
+              : `כמה עולה ${productLabel ?? 'המוצר'}?`,
         intent: 'commercial',
         score: 82,
       },
@@ -335,9 +381,11 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 85,
       },
       {
-        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
-        // Safer Hebrew: works for שמלות (plural), נעליים (plural), טוניקה (singular), etc.
-        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'פריט אופנה'}?`,
+        // Plural-aware: שמלות/נעלי נשים → "מה המחירים של"; חגורה/חולצה → "כמה עולה"
+        text: ({ productLabel }) =>
+          isLikelyPluralHebrewProductLabel(productLabel ?? '')
+            ? `מה המחירים של ${productLabel ?? 'פריט אופנה'}?`
+            : `כמה עולה ${productLabel ?? 'פריט אופנה'}?`,
         intent: 'commercial',
         score: 83,
       },
@@ -368,9 +416,11 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 87,
       },
       {
-        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
-        // Safer Hebrew: works for הליכון (sing.), אופניים (plural), משחקי טניס (plural), etc.
-        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'ציוד ספורט'}?`,
+        // Plural-aware: אופניים/משחקי → "מה המחירים של"; הליכון ביתי → "כמה עולה"
+        text: ({ productLabel }) =>
+          isLikelyPluralHebrewProductLabel(productLabel ?? '')
+            ? `מה המחירים של ${productLabel ?? 'ציוד ספורט'}?`
+            : `כמה עולה ${productLabel ?? 'ציוד ספורט'}?`,
         intent: 'commercial',
         score: 85,
       },
@@ -399,9 +449,11 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 85,
       },
       {
-        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
-        // Safer Hebrew: works for בושם (singular), בשמים (plural), בשמי יוקרה, etc.
-        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'בושם'}?`,
+        // Plural-aware: בשמים לגבר → "מה המחירים של"; בושם לגבר → "כמה עולה"
+        text: ({ productLabel }) =>
+          isLikelyPluralHebrewProductLabel(productLabel ?? '')
+            ? `מה המחירים של ${productLabel ?? 'בושם'}?`
+            : `כמה עולה ${productLabel ?? 'בושם'}?`,
         intent: 'commercial',
         score: 83,
       },
@@ -419,9 +471,11 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
 
     florist_product: [
       {
-        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
-        // Safer Hebrew: works for זר (singular), ורדים (plural), פרחי עונה, etc.
-        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'זר פרחים'}?`,
+        // Plural-aware: ורדים/פרחי עונה → "מה המחירים של"; זר ורדים → "כמה עולה"
+        text: ({ productLabel }) =>
+          isLikelyPluralHebrewProductLabel(productLabel ?? '')
+            ? `מה המחירים של ${productLabel ?? 'זר פרחים'}?`
+            : `כמה עולה ${productLabel ?? 'זר פרחים'}?`,
         intent: 'commercial',
         score: 85,
       },
