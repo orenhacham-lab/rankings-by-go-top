@@ -1125,8 +1125,26 @@ export default function AIVisibilitySection({
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1 flex items-center gap-1.5">
                       {t('smart_questions_title')}
+                      <span className="relative group inline-flex items-center">
+                        <span
+                          className="cursor-help text-indigo-400 dark:text-indigo-500 flex-shrink-0"
+                          tabIndex={0}
+                          aria-label="מה המשמעות של גבוה/טוב?"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 16v-4M12 8h.01"/>
+                          </svg>
+                        </span>
+                        <span
+                          role="tooltip"
+                          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1.5 rounded bg-slate-900 dark:bg-slate-700 text-white text-[10px] font-medium normal-case tracking-normal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md w-max max-w-[200px] text-center"
+                        >
+                          גבוה/טוב = עדיפות למעקב, לא ציון תוצאה.
+                        </span>
+                      </span>
                     </h3>
                     <p className="text-xs text-slate-600 dark:text-slate-400">
                       {t('smart_questions_subtitle')}
