@@ -580,12 +580,23 @@ function computeRelevance(
   const projectDomain = CATEGORY_TO_DOMAIN[projectCategory] ?? 'generic'
   const keywordDomain = topicsToDomain(keywordTopics, keywordType)
 
-  // Marketing/agency projects: match with any marketing service or channel keyword
+  // Marketing/agency projects: accept any marketing service, channel, or info keyword.
+  // A user doing keyword research for a digital agency will reasonably select
+  // SEO, Google Ads, or Instagram ads terms.
   if (projectDomain === 'marketing') {
     if (keywordType === 'marketing_channel' || keywordType === 'service') return 'matched'
     if (keywordType === 'brand' || keywordType === 'professional_topic' || keywordType === 'informational') return 'matched'
-    // Products shown to a marketing agency might be irrelevant — uncertain, not mismatch
+    // Products for a marketing agency — unusual but not a hard block
     return 'uncertain'
+  }
+
+  // Cross-domain: non-marketing projects + marketing keywords.
+  // Example: cleaning company + קידום אתרים → their CUSTOMERS don't search for SEO.
+  // The keyword research modal is about customer-facing search terms, not the
+  // business owner's own marketing. So we treat this as a mismatch.
+  // Exception: new projects are lenient (we can't trust their category yet).
+  if (keywordDomain === 'marketing') {
+    return isNewProject ? 'uncertain' : 'mismatch'
   }
 
   if (isHardMismatch(keywordDomain, projectDomain)) return 'mismatch'

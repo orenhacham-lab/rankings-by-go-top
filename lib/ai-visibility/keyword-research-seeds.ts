@@ -100,7 +100,9 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         text: ({ serviceLabel, language }) =>
           language === 'en'
             ? `How do I choose a ${serviceLabel ?? 'service provider'}?`
-            : `איך לבחור ${serviceLabel ?? 'ספק שירות'} מקצועי?`,
+            // "מקצועי" dropped — it would need to agree with the gender of serviceLabel
+            // which we can't infer. Reworded as "חברה ל..." (חברה is always fem. singular).
+            : `איך לבחור חברה ל${serviceLabel ?? 'שירות זה'}?`,
         intent: 'pre_purchase',
         score: 75,
       },
@@ -300,7 +302,8 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         text: ({ productLabel, language }) =>
           language === 'en'
             ? `How do I choose the right ${productLabel ?? 'product'}?`
-            : `איך לבחור ${productLabel ?? 'מוצר'} מתאים?`,
+            // "מתאים" removed — it requires gender/number agreement we can't infer
+            : `איך לבחור ${productLabel ?? 'מוצר'}?`,
         intent: 'pre_purchase',
         score: 80,
       },
@@ -324,12 +327,14 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
 
     fashion: [
       {
-        text: ({ productLabel }) => `איך לבחור ${productLabel ?? 'פריט לבוש'} מתאים?`,
+        // "מתאים" removed — singular masculine, clashes with plural labels (שמלות, נעליים)
+        text: ({ productLabel }) => `איך לבחור ${productLabel ?? 'פריט לבוש'}?`,
         intent: 'pre_purchase',
         score: 85,
       },
       {
-        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'פריט אופנה'} איכותי?`,
+        // "איכותי" removed — needs agreement: שמלות→איכותיות, נעליים→איכותיות, חולצה→איכותית
+        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'פריט אופנה'}?`,
         intent: 'commercial',
         score: 83,
       },
@@ -339,7 +344,8 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 82,
       },
       {
-        text: ({ productLabel }) => `אילו מותגים מציעים ${productLabel ?? 'בגדים'} איכותיים?`,
+        // "איכותיים" removed — masc. plural adjective, wrong for שמלות (fem.) / נעלי נשים
+        text: ({ productLabel }) => `אילו מותגים מציעים ${productLabel ?? 'בגדים'}?`,
         intent: 'comparison',
         score: 80,
       },
@@ -352,12 +358,15 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
 
     sports_product: [
       {
-        text: ({ productLabel }) => `איך לבחור ${productLabel ?? 'ציוד ספורט'} לבית?`,
+        // "לבית" removed — creates redundancy when productLabel already contains "ביתי"
+        // e.g., "הליכון ביתי לבית" → awkward. Bare label is cleaner.
+        text: ({ productLabel }) => `איך לבחור ${productLabel ?? 'ציוד ספורט'}?`,
         intent: 'pre_purchase',
         score: 87,
       },
       {
-        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'ציוד ספורט'} איכותי?`,
+        // "איכותי" removed — masculine singular, clashes with e.g. "אופניים" (plural)
+        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'ציוד ספורט'}?`,
         intent: 'commercial',
         score: 85,
       },
@@ -380,12 +389,14 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
 
     perfume_product: [
       {
-        text: ({ productLabel }) => `איך לבחור ${productLabel ?? 'בושם'} מתאים?`,
+        // "מתאים" removed — masculine singular, wrong for e.g. "בשמים" (plural)
+        text: ({ productLabel }) => `איך לבחור ${productLabel ?? 'בושם'}?`,
         intent: 'pre_purchase',
         score: 85,
       },
       {
-        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'בושם'} איכותי?`,
+        // "איכותי" removed — needs gender agreement we cannot infer from label
+        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'בושם'}?`,
         intent: 'commercial',
         score: 83,
       },
@@ -408,7 +419,8 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 85,
       },
       {
-        text: ({ productLabel }) => `איזה ${productLabel ?? 'פרחים'} מתאים ליום הולדת?`,
+        // Reworded to avoid "מתאים" which is masc. singular — might clash with e.g. "ורדים"
+        text: ({ productLabel }) => `איזה ${productLabel ?? 'פרחים'} לשלוח ליום הולדת?`,
         intent: 'pre_purchase',
         score: 83,
       },
