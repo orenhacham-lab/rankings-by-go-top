@@ -115,7 +115,7 @@ const SERVICE_GENERIC    = /(ניהול|שירות|חברת|ספק|סוכנות|
 // ── Products ───────────────────────────────────────────────────────────────
 const PRODUCT_FASHION    = /(שמלה|שמלות|חולצה|חולצות|מכנסיים|ג'ינס|מעיל|מעילים|חצאית|חצאיות|נעל|נעלים|נעלי\s*\w+|תיק|תיקים|אביזרי\s*אופנה|fashion|clothing|apparel)/i
 const PRODUCT_SPORTS     = /(הליכון|אופניים|כדורגל|כדורסל|ציוד\s*ספורט|חדר\s*כושר|אימון|treadmill|bicycle|gym|sports?\s*equipment)/i
-const PRODUCT_PERFUME    = /(בושם|ניחוח|עליות\s*בושם|parfum|perfume|cologne|fragrance)/i
+const PRODUCT_PERFUME    = /(בשמ|ניחוח|עליות\s*בושם|parfum|perfume|cologne|fragrance)/i
 const PRODUCT_APPLIANCE  = /(מכונת\s*כביסה|מקרר|מדיח|תנור|מיקרוגל|מזגן|dishwasher|washing\s*machine|fridge|appliance)/i
 const PRODUCT_FLOWERS    = /(זר\s*ורד|זר\s*פרחים|בוקה|bouquet|flower\s*arrangement)/i
 

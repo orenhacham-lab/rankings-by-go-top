@@ -225,9 +225,35 @@ runCase(
   },
 )
 
-// ── Test 10: Cleaning company + קידום אתרים — mismatch
+// ── Test 9: Perfume store + בשמים — plural product label
 runCase(
-  'Test 10 — Cleaning company + קידום אתרים אורגני → 0 questions (mismatch)',
+  'Test 9 — Perfume + בשמים → perfume product questions, safe Hebrew',
+  ['בשמים'],
+  'perfume',
+  'he',
+  {
+    minCount: 2,
+    // Must use safe price template that works with plural "בשמים"
+    containsAll: ['מה המחירים של'],
+    containsNone: ['כמה עולה בשמים', 'מתאים', 'איכותי'],
+  },
+)
+
+// ── Test 10: Appliance store + מכונת כביסה — singular product label
+runCase(
+  'Test 10 — Appliance store + מכונת כביסה → product questions',
+  ['מכונת כביסה'],
+  'appliance_store',
+  'he',
+  {
+    minCount: 2,
+    containsAll: ['מה המחירים של'],
+  },
+)
+
+// ── Test 11: Cleaning company + קידום אתרים — mismatch
+runCase(
+  'Test 11 — Cleaning company + קידום אתרים אורגני → 0 questions (mismatch)',
   ['קידום אתרים אורגני'],
   'cleaning',
   'he',
@@ -235,6 +261,17 @@ runCase(
     questionsShouldBe: 0,
     // No cleaning questions should appear as fallback
     containsNone: ['ניקיון', 'חברת ניקיון'],
+  },
+)
+
+// ── Test 12: Irrelevant keyword — no questions
+runCase(
+  'Test 12 — איראן → 0 questions (irrelevant)',
+  ['איראן'],
+  'agency',
+  'he',
+  {
+    questionsShouldBe: 0,
   },
 )
 

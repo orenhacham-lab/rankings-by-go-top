@@ -311,7 +311,9 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         text: ({ productLabel, language }) =>
           language === 'en'
             ? `How much does ${productLabel ?? 'this product'} cost?`
-            : `כמה עולה ${productLabel ?? 'המוצר הזה'}?`,
+            // Changed from "כמה עולה" (singular) to "מה המחירים של" (works for any number)
+            // Safer Hebrew: works for שמלות, נעלים, הליכון, מכונות, etc.
+            : `מה המחירים של ${productLabel ?? 'המוצר'}?`,
         intent: 'commercial',
         score: 82,
       },
@@ -333,8 +335,9 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 85,
       },
       {
-        // "איכותי" removed — needs agreement: שמלות→איכותיות, נעליים→איכותיות, חולצה→איכותית
-        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'פריט אופנה'}?`,
+        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
+        // Safer Hebrew: works for שמלות (plural), נעליים (plural), טוניקה (singular), etc.
+        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'פריט אופנה'}?`,
         intent: 'commercial',
         score: 83,
       },
@@ -365,8 +368,9 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 87,
       },
       {
-        // "איכותי" removed — masculine singular, clashes with e.g. "אופניים" (plural)
-        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'ציוד ספורט'}?`,
+        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
+        // Safer Hebrew: works for הליכון (sing.), אופניים (plural), משחקי טניס (plural), etc.
+        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'ציוד ספורט'}?`,
         intent: 'commercial',
         score: 85,
       },
@@ -395,8 +399,9 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
         score: 85,
       },
       {
-        // "איכותי" removed — needs gender agreement we cannot infer from label
-        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'בושם'}?`,
+        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
+        // Safer Hebrew: works for בושם (singular), בשמים (plural), בשמי יוקרה, etc.
+        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'בושם'}?`,
         intent: 'commercial',
         score: 83,
       },
@@ -414,7 +419,9 @@ export const keywordResearchSeeds: KeywordResearchSeedBank = {
 
     florist_product: [
       {
-        text: ({ productLabel }) => `כמה עולה ${productLabel ?? 'זר פרחים'}?`,
+        // Changed from "כמה עולה" (singular verb) to "מה המחירים של" (works for any number)
+        // Safer Hebrew: works for זר (singular), ורדים (plural), פרחי עונה, etc.
+        text: ({ productLabel }) => `מה המחירים של ${productLabel ?? 'זר פרחים'}?`,
         intent: 'commercial',
         score: 85,
       },
