@@ -225,16 +225,30 @@ runCase(
   },
 )
 
-// ── Test 9: Perfume store + בשמים — plural product label
+// ── Test 9: Perfume + בושם לגבר — singular with modifier (was broken due to regex)
 runCase(
-  'Test 9 — Perfume + בשמים → perfume product questions, safe Hebrew',
-  ['בשמים'],
+  'Test 9 — Perfume + בושם לגבר → classified as product, safe Hebrew',
+  ['בושם לגבר'],
   'perfume',
   'he',
   {
     minCount: 2,
-    // Must use safe price template that works with plural "בשמים"
-    containsAll: ['מה המחירים של'],
+    // Must use safe price template
+    containsAll: ['מה המחירים של בושם לגבר'],
+    // Must NOT produce "כמה עולה בושם לגבר?" (singular-verb form)
+    containsNone: ['כמה עולה בושם לגבר', 'מתאים', 'איכותי'],
+  },
+)
+
+// ── Test 9b: Perfume + בשמים לנשים — plural with modifier
+runCase(
+  'Test 9b — Perfume + בשמים לנשים → classified as product, safe Hebrew',
+  ['בשמים לנשים'],
+  'perfume',
+  'he',
+  {
+    minCount: 2,
+    containsAll: ['מה המחירים של בשמים לנשים'],
     containsNone: ['כמה עולה בשמים', 'מתאים', 'איכותי'],
   },
 )
