@@ -51,7 +51,7 @@ interface TopicSignal {
 
 const TOPIC_SIGNALS: TopicSignal[] = [
   { cluster: 'seo', patterns: /(קידום\s*אתר|קידום\s*אורגני|seo|אורגני)/i },
-  { cluster: 'google_ads', patterns: /(google\s*ads|גוגל\s*אדס|פרסום\s*ממומן(\s*בגוגל)?|פרסום\s*בגוגל|adwords|ניהול\s*קמפיינים)/i },
+  { cluster: 'google_ads', patterns: /(google\s*ads|גוגל\s*אדס|פרסום\s*ממומן\s*בגוגל|פרסום\s*בגוגל|adwords|ניהול\s*קמפיינים\s*בגוגל|קמפיין\s*בגוגל)/i },
   { cluster: 'facebook_ads', patterns: /(פייסבוק|facebook\s*ads|קמפיין\s*בפייסבוק|לידים\s*בפייסבוק)/i },
   { cluster: 'instagram_ads', patterns: /(אינסטגרם|instagram|insta)/i },
   { cluster: 'social_media', patterns: /(סושיאל|רשתות\s*חברתיות|social\s*media)/i },
