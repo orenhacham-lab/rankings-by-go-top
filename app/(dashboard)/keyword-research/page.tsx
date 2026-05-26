@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
-import { generateQuestionsFromKeywords, GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
+import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
+import { generateIntentQuestions } from '@/lib/ai-visibility/intent-engine'
+import { detectCategory } from '@/lib/ai-visibility/prompt-templates'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal from '@/components/keyword-research/TrendModal'
 import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
@@ -22,6 +24,8 @@ interface KeywordIdeaResult {
 interface Project {
   id: string
   name: string
+  business_name: string | null
+  target_domain: string | null
 }
 
 type BadgeKey = 'lowCompetition' | 'commercial' | 'highVolume' | 'mediumPotential'
@@ -512,11 +516,68 @@ export default function KeywordResearchPage() {
     }
 
     const keywordsList = Array.from(selectedKeywords)
-    const generated = generateQuestionsFromKeywords(keywordsList, language as 'he' | 'en')
-    setGeneratedAIQuestions(generated)
+    const project = projects.find((p) => p.id === selectedProject)
+
+    if (!project) {
+      setAIQuestionsError(t.addToProject.errorSelectProject)
+      return
+    }
+
+    // Detect category from project business context + selected keywords
+    const category = detectCategory(
+      project.business_name || '',
+      project.target_domain || '',
+      keywordsList
+    )
+
+    // Generate curated questions using vNext infrastructure
+    const intentQuestions = generateIntentQuestions({
+      businessName: project.business_name,
+      businessCategory: category,
+      language: language as 'he' | 'en',
+      country: country || 'IL',
+      keywords: keywordsList,
+    })
+
+    if (intentQuestions.length === 0) {
+      const emptyMessage = language === 'he'
+        ? 'לא נמצאו שאלות AI איכותיות מהביטויים שנבחרו. נסו לבחור ביטויים מסחריים ורלוונטיים יותר.'
+        : 'No high-quality AI questions found for the selected keywords. Try selecting more commercial or relevant phrases.'
+      setAIQuestionsError(emptyMessage)
+      return
+    }
+
+    // Adapt IntentEngineQuestion to GeneratedQuestion format
+    const adapted: GeneratedQuestion[] = intentQuestions.map((q) => ({
+      question: q.prompt,
+      sourceKeyword: language === 'he' ? 'נוצר לפי הקשר הפרויקט' : 'Generated from project context',
+      type: intentToType(q.intent),
+    }))
+
+    setGeneratedAIQuestions(adapted)
     setAIQuestionsOpen(true)
     setAIQuestionsError('')
     setAIQuestionsMessage('')
+  }
+
+  const intentToType = (intent: string): 'recommendation' | 'price' | 'comparison' | 'info' => {
+    switch (intent) {
+      case 'commercial':
+      case 'transactional':
+      case 'pre_purchase':
+        return 'price'
+      case 'recommendation':
+        return 'recommendation'
+      case 'comparison':
+      case 'alternatives':
+        return 'comparison'
+      case 'brand':
+      case 'informational':
+      case 'local':
+      case 'gift':
+      default:
+        return 'info'
+    }
   }
 
   const handleAddAIQuestions = async (questions: GeneratedQuestion[]) => {
