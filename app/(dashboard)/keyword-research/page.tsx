@@ -258,6 +258,9 @@ export default function KeywordResearchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           researchType,
+          // Send both for backward compatibility with partially deployed backends:
+          // New backend uses keywords[]; old backend falls back to keyword string.
+          keyword: parsedKeywords[0] ?? keyword.trim(),
           keywords: parsedKeywords,
           url: trimmedUrl,
           country,

@@ -58,6 +58,29 @@ async function getGoogleAdsAccessToken(): Promise<string> {
 
   if (!response.ok || !tokenData.access_token) {
     const desc = tokenData.error_description || tokenData.error || ''
+
+    // Safe diagnostic log — no secrets. Surfaces real Google OAuth error in production logs.
+    console.error('[keyword-ideas] OAuth token fetch failed', {
+      stage: 'oauth',
+      timestamp: new Date().toISOString(),
+      httpStatus: response.status,
+      httpOk: response.ok,
+      hasAccessToken: Boolean(tokenData.access_token),
+      // Google OAuth error codes (not secrets):
+      oauthError: tokenData.error ?? null,
+      oauthErrorDescription: tokenData.error_description ?? null,
+      // Classified error type:
+      classification:
+        /invalid_grant/i.test(desc) ? 'refresh_token_invalid' :
+        /invalid_client/i.test(desc) ? 'client_credentials_invalid' :
+        /unauthorized_client/i.test(desc) ? 'unauthorized_client' :
+        /temporarily_unavailable/i.test(desc) ? 'temporarily_unavailable' :
+        /access_denied/i.test(desc) ? 'access_denied' :
+        response.status >= 500 ? 'google_server_error' :
+        response.status === 0 ? 'network_error' :
+        'unknown',
+    })
+
     if (/invalid_grant/i.test(desc)) {
       throw new Error('refresh_token_invalid')
     } else if (/invalid_client/i.test(desc)) {
