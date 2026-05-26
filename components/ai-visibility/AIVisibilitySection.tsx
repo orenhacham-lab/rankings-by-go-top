@@ -1142,7 +1142,7 @@ export default function AIVisibilitySection({
                           role="tooltip"
                           className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1.5 rounded bg-slate-900 dark:bg-slate-700 text-white text-[10px] font-medium normal-case tracking-normal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-100 z-50 shadow-md w-max max-w-[200px] text-center"
                         >
-                          גבוה/טוב = עדיפות למעקב, לא ציון תוצאה.
+                          התגית מציינת עדיפות למעקב, לא ציון הסריקה.
                         </span>
                       </span>
                     </h3>
