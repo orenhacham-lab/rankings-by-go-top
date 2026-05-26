@@ -95,7 +95,6 @@ export async function POST(request: Request) {
       )
     }
 
-    const keywordRaw = typeof body.keyword === 'string' ? body.keyword.trim() : ''
     const country = typeof body.country === 'string' ? body.country : 'IL'
     const language = typeof body.language === 'string' ? body.language : 'he'
     const urlRaw = typeof body.url === 'string' ? body.url.trim() : ''
@@ -113,6 +112,36 @@ export async function POST(request: Request) {
     const resultsLimit: 100 | 250 = (ALLOWED_RESULT_LIMITS as readonly number[]).includes(resultsLimitRaw)
       ? (resultsLimitRaw as 100 | 250)
       : 100
+
+    // Parse keywords: support both keywords[] (new) and keyword string (backward compat)
+    let parsedKeywords: string[] = []
+    if (Array.isArray(body.keywords)) {
+      // New multi-keyword format
+      parsedKeywords = (body.keywords as unknown[])
+        .filter((k) => typeof k === 'string')
+        .map((k) => (k as string).trim())
+        .filter((k) => k.length > 0)
+    } else if (typeof body.keyword === 'string') {
+      // Backward compat: single keyword string
+      const kw = body.keyword.trim()
+      if (kw) {
+        parsedKeywords = [kw]
+      }
+    }
+
+    // Deduplicate keywords (case-insensitive)
+    const seen = new Set<string>()
+    const dedupedKeywords: string[] = []
+    for (const k of parsedKeywords) {
+      const lower = k.toLowerCase()
+      if (!seen.has(lower)) {
+        seen.add(lower)
+        dedupedKeywords.push(k)
+      }
+    }
+
+    // Cap at 20 keywords
+    const seedKeywordsArray = dedupedKeywords.slice(0, 20)
 
     if (!isValidCountry(country)) {
       return Response.json(
@@ -168,7 +197,7 @@ export async function POST(request: Request) {
 
     // Validate keyword when the research type requires it.
     if (researchType === 'keyword' || researchType === 'keyword_url') {
-      if (!keywordRaw) {
+      if (seedKeywordsArray.length === 0) {
         return Response.json(
           { success: false, stage: 'validation', error: 'Keyword is required' },
           { status: 400 }
@@ -235,19 +264,16 @@ export async function POST(request: Request) {
 
     let seed: SeedField
     let seedType: 'keywordSeed' | 'urlSeed' | 'keywordAndUrlSeed'
-    let seedKeywords: string[] = []
 
     if (researchType === 'url') {
       seedType = 'urlSeed'
       seed = { urlSeed: { url: validUrl! } }
     } else if (researchType === 'keyword_url') {
       seedType = 'keywordAndUrlSeed'
-      seedKeywords = [keywordRaw]
-      seed = { keywordAndUrlSeed: { url: validUrl!, keywords: seedKeywords } }
+      seed = { keywordAndUrlSeed: { url: validUrl!, keywords: seedKeywordsArray } }
     } else {
       seedType = 'keywordSeed'
-      seedKeywords = [keywordRaw]
-      seed = { keywordSeed: { keywords: seedKeywords } }
+      seed = { keywordSeed: { keywords: seedKeywordsArray } }
     }
 
     const requestBody = {
@@ -268,7 +294,7 @@ export async function POST(request: Request) {
       geoTarget: `geoTargetConstants/${geoTargetId}`,
       languageConstant: `languageConstants/${languageId}`,
       seedType,
-      seedKeywords,
+      seedKeywords: seedKeywordsArray,
       hasUrl: Boolean(validUrl),
       customerIdPresent: Boolean(customerId),
       loginCustomerIdPresent: Boolean(loginCustomerId),
@@ -295,7 +321,7 @@ export async function POST(request: Request) {
         console.log('[keyword-ideas] first page request body', {
           bodyKeys: Object.keys(pageRequestBody),
           seedType,
-          seedKeywords,
+          seedKeywords: seedKeywordsArray,
           hasPageToken: Boolean(nextPageToken),
         })
       }
@@ -468,11 +494,11 @@ export async function POST(request: Request) {
       minMonthlySearches,
       researchType,
       seedType,
-      seedKeywords,
+      seedKeywords: seedKeywordsArray,
       pagesFetched: pageCount,
       hasNextPageToken,
       apiVersionUsed: GOOGLE_ADS_API_VERSION,
-      keyword: keywordRaw,
+      keywordCount: seedKeywordsArray.length,
     })
 
     const debugNote =
@@ -488,7 +514,7 @@ export async function POST(request: Request) {
         apiVersionUsed: GOOGLE_ADS_API_VERSION,
         researchType,
         requestBodySentToGoogle: requestBody,
-        seedKeywords,
+        seedKeywords: seedKeywordsArray,
         seedType,
         pageSizeSentToGoogle: requestBody.pageSize,
         maxPages: MAX_PAGES,

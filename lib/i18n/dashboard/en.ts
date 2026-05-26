@@ -493,7 +493,7 @@ export const dashboardEn = {
     subtitle: 'Discover keyword ideas, search volume, competition, and estimated CPC data from Google Ads.',
     form: {
       keyword: 'Keyword',
-      keywordPlaceholder: 'e.g. flowers in Jerusalem',
+      keywordPlaceholder: 'Enter one keyword or multiple phrases separated by commas',
       country: 'Country',
       language: 'Language',
       url: 'Website / URL',

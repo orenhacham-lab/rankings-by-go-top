@@ -192,6 +192,25 @@ export default function KeywordResearchPage() {
     }
   }
 
+  // Parse multiple keywords from comma/semicolon/newline separated input
+  const parseKeywords = (input: string): string[] => {
+    const raw = input
+      .split(/[,;\n]+/)
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0)
+    // Remove duplicates (case-insensitive)
+    const seen = new Set<string>()
+    const deduplicated: string[] = []
+    for (const k of raw) {
+      const lower = k.toLowerCase()
+      if (!seen.has(lower)) {
+        seen.add(lower)
+        deduplicated.push(k)
+      }
+    }
+    return deduplicated
+  }
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -205,10 +224,10 @@ export default function KeywordResearchPage() {
     setLastAddedProjectId('')
 
     // Validate by research type
-    const trimmedKeyword = keyword.trim()
     const trimmedUrl = url.trim()
+    const parsedKeywords = parseKeywords(keyword)
 
-    if (researchType === 'keyword' && !trimmedKeyword) {
+    if (researchType === 'keyword' && parsedKeywords.length === 0) {
       setError(t.states.empty)
       return
     }
@@ -216,12 +235,18 @@ export default function KeywordResearchPage() {
       setError(t.form.errorInvalidUrl)
       return
     }
-    if (researchType === 'keyword_url' && (!trimmedKeyword || !trimmedUrl)) {
-      if (!trimmedKeyword) {
+    if (researchType === 'keyword_url' && (parsedKeywords.length === 0 || !trimmedUrl)) {
+      if (parsedKeywords.length === 0) {
         setError(t.states.empty)
       } else {
         setError(t.form.errorInvalidUrl)
       }
+      return
+    }
+
+    // Check keyword limit
+    if (parsedKeywords.length > 20) {
+      setError(isRTL ? 'ניתן להזין עד 20 ביטויים בכל מחקר' : 'Maximum 20 keywords per research')
       return
     }
 
@@ -233,7 +258,7 @@ export default function KeywordResearchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           researchType,
-          keyword: trimmedKeyword,
+          keywords: parsedKeywords,
           url: trimmedUrl,
           country,
           language: selectedLanguage,

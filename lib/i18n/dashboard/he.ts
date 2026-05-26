@@ -491,7 +491,7 @@ export const dashboardHe = {
     subtitle: 'גלו רעיונות לביטויים, נפחי חיפוש, תחרות ועלויות משוערות לפי נתוני Google Ads.',
     form: {
       keyword: 'מילת מפתח',
-      keywordPlaceholder: 'לדוגמה: פרחים בירושלים',
+      keywordPlaceholder: 'הזן מילת מפתח אחת או כמה ביטויים מופרדים בפסיקים',
       country: 'מדינה',
       language: 'שפה',
       url: 'כתובת אתר',
