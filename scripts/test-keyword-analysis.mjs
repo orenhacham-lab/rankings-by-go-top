@@ -24,7 +24,7 @@ const SERVICE_WEB_DEV    = /(בניית\s*אתר|פיתוח\s*אתר|web\s*dev(e
 const SERVICE_HOME_IMP   = /(שיפוץ|שיפוצים|renovation|remodel|carpent|נגרות|אינסטלציה|חשמלאי|צבעי|kitchen\s*remodel|bathroom\s*remodel|home\s*improvement)/i
 const SERVICE_CLEANING   = /(ניקיון|cleaning|ניקוי|חברת\s*ניקיון)/i
 
-const PRODUCT_FASHION    = /(שמלה|שמלות|חולצה|מכנסיים|ג'ינס|מעיל|חצאית|נעל|נעלים|נעלי\s*\w+|תיק|אביזרי\s*אופנה|fashion|clothing|apparel)/i
+const PRODUCT_FASHION    = /(שמלה|שמלות|חולצה|מכנסיים|ג'ינס|מעיל|חצאית|בגד|בגדים|נעל|נעלים|נעלי\s*\w+|תיק|אביזרי\s*אופנה|fashion|clothing|apparel)/i
 const PRODUCT_SPORTS     = /(הליכון|אופניים|כדורגל|כדורסל|ציוד\s*ספורט|treadmill|bicycle|gym|sports?\s*equipment)/i
 const PRODUCT_PERFUME    = /(בושם|ניחוח|parfum|perfume|cologne|fragrance)/i
 const PRODUCT_APPLIANCE  = /(מכונת\s*כביסה|מקרר|מדיח|תנור|מיקרוגל|מזגן|dishwasher|washing\s*machine|fridge|appliance)/i
@@ -244,6 +244,12 @@ test('ניקיון משרדים → service, cleaning',
 
 test('home cleaning (English) → service, cleaning',
   'home cleaning', { type: 'service', topics: ['cleaning'] })
+
+test('בגדים לאישה → product, fashion',
+  'בגדים לאישה', { type: 'product', topics: ['fashion'], conf: 'high' })
+
+test('בגד ים → product, fashion',
+  'בגד ים', { type: 'product', topics: ['fashion'], conf: 'high' })
 
 test('בושם לגבר → product, perfume',
   'בושם לגבר', { type: 'product', topics: ['perfume_product'] })

@@ -290,6 +290,73 @@ runCase(
   },
 )
 
+// ════════════════════════════════════════════════════════════════════
+// Domain Group Gate Tests (required by mismatch gate redesign)
+// ════════════════════════════════════════════════════════════════════
+
+console.log(`${C.bold}── Domain Gate Tests ──${C.reset}\n`)
+
+// ── Gate 1: Retail project + fashion keyword → generate (same domain)
+runCase(
+  'Gate 1 — second_hand_fashion + בגדים לאישה → generate (retail_apparel match)',
+  ['בגדים לאישה'],
+  'second_hand_fashion',
+  'he',
+  { minCount: 1 },
+)
+
+// ── Gate 2: Retail project + marketing keyword → do NOT hard-block
+runCase(
+  'Gate 2 — second_hand_fashion + קידום אתרים אורגני → generate (retail + marketing: allowed)',
+  ['קידום אתרים אורגני'],
+  'second_hand_fashion',
+  'he',
+  { minCount: 1 },
+)
+
+// ── Gate 3: Cleaning + fashion keyword → mismatch / 0
+runCase(
+  'Gate 3 — cleaning + שמלות → 0 questions (cleaning ↔ retail_apparel mismatch)',
+  ['שמלות'],
+  'cleaning',
+  'he',
+  {
+    questionsShouldBe: 0,
+    containsNone: ['שמלות', 'ניקיון'],
+  },
+)
+
+// ── Gate 4: Sports store + perfume keyword → mismatch / 0
+runCase(
+  'Gate 4 — sports_store + בושם לגבר → 0 questions (retail_sports ↔ retail_beauty mismatch)',
+  ['בושם לגבר'],
+  'sports_store',
+  'he',
+  {
+    questionsShouldBe: 0,
+  },
+)
+
+// ── Gate 5: Perfume store + sports keyword → mismatch / 0
+runCase(
+  'Gate 5 — perfume + הליכון ביתי → 0 questions (retail_beauty ↔ retail_sports mismatch)',
+  ['הליכון ביתי'],
+  'perfume',
+  'he',
+  {
+    questionsShouldBe: 0,
+  },
+)
+
+// ── Gate 6: Sports store + fashion keyword → generate (athletic wear overlap)
+runCase(
+  'Gate 6 — sports_store + נעלי נשים → generate (retail_sports + retail_apparel: allowed)',
+  ['נעלי נשים'],
+  'sports_store',
+  'he',
+  { minCount: 1 },
+)
+
 // ── Bonus: multiple keywords in one batch
 console.log(`${C.bold}── Bonus: Multi-keyword batch ──${C.reset}\n`)
 runCase(

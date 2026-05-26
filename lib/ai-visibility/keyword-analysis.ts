@@ -113,7 +113,7 @@ const SERVICE_SOCIAL_MGT = /(ניהול\s*(רשתות|פרופיל|עמוד)|com
 const SERVICE_GENERIC    = /(ניהול|שירות|חברת|ספק|סוכנות|agency|management\s*service)/i
 
 // ── Products ───────────────────────────────────────────────────────────────
-const PRODUCT_FASHION    = /(שמלה|שמלות|חולצה|חולצות|מכנסיים|ג'ינס|מעיל|מעילים|חצאית|חצאיות|נעל|נעלים|נעלי\s*\w+|תיק|תיקים|אביזרי\s*אופנה|fashion|clothing|apparel)/i
+const PRODUCT_FASHION    = /(שמלה|שמלות|חולצה|חולצות|מכנסיים|ג'ינס|מעיל|מעילים|חצאית|חצאיות|בגד|בגדים|נעל|נעלים|נעלי\s*\w+|תיק|תיקים|אביזרי\s*אופנה|fashion|clothing|apparel)/i
 const PRODUCT_SPORTS     = /(הליכון|אופניים|כדורגל|כדורסל|ציוד\s*ספורט|חדר\s*כושר|אימון|treadmill|bicycle|gym|sports?\s*equipment)/i
 const PRODUCT_PERFUME    = /(בושם|בשמ|ניחוח|עליות\s*בושם|parfum|perfume|cologne|fragrance)/i
 const PRODUCT_APPLIANCE  = /(מכונת\s*כביסה|מקרר|מדיח|תנור|מיקרוגל|מזגן|dishwasher|washing\s*machine|fridge|appliance)/i
@@ -132,94 +132,177 @@ const IRRELEVANT         = /(^(איראן|ישראל|פוליטיקה|חדשות
 const IS_MARKETING_CHANNEL = /(פרסום|קמפיין|ads?\b|marketing|performance|paid|ממומן|קידום\s*ממומן|google\s*ads|facebook\s*ads|instagram\s*ads)/i
 
 // ============================================================================
-// PROJECT CATEGORY → DOMAIN SET
-// Used to detect cross-industry mismatches conservatively.
+// PROJECT CATEGORY → BROAD DOMAIN GROUP
+//
+// Design principle: default permissive.
+// Hard-block only when both project and keyword belong to clearly unrelated
+// business domains and both sides are high-confidence/specific.
+//
+// Generic on either side → never block.
+// Marketing keywords do NOT block retail projects (a store may research SEO).
+// Only marketing + physical-service industries are blocked (cleaning, home_services).
 // ============================================================================
 
-type DomainBucket =
-  | 'marketing'        // agency, SEO, ads, digital marketing
-  | 'retail_fashion'   // fashion ecommerce, apparel
-  | 'retail_sports'    // sports store, equipment
-  | 'retail_generic'   // general ecommerce
-  | 'cleaning'         // cleaning services
-  | 'home_improvement' // renovation, carpentry
-  | 'florist'          // flowers, gifts
-  | 'legal'
-  | 'medical'
-  | 'food'
-  | 'tech'
-  | 'generic'          // no category detected
+/**
+ * Broad industry domain group.
+ * Coarser than BusinessCategory — used only for mismatch detection.
+ */
+type BroadDomain =
+  | 'marketing'      // agency, SEO, ads, digital marketing services
+  | 'retail_apparel' // fashion, clothing, second-hand, shoes
+  | 'retail_sports'  // sports store, gym equipment, fitness
+  | 'retail_beauty'  // perfume, cosmetics, beauty products
+  | 'retail_home'    // appliances, home goods
+  | 'retail_gifts'   // gifts, specialty retail
+  | 'home_services'  // renovation, carpentry, local trades
+  | 'cleaning'       // cleaning company
+  | 'florist'        // flower delivery, florist
+  | 'food'           // restaurant, catering
+  | 'professional'   // legal, medical, healthcare
+  | 'tech'           // SaaS, software, education
+  | 'generic'        // unknown / too broad to classify → always permissive
 
-const CATEGORY_TO_DOMAIN: Partial<Record<BusinessCategory, DomainBucket>> = {
+const CATEGORY_TO_BROAD_DOMAIN: Partial<Record<BusinessCategory, BroadDomain>> = {
   agency:                   'marketing',
   saas:                     'tech',
-  ecommerce:                'retail_generic',
-  perfume:                  'retail_generic',
-  sports_store:             'retail_sports',
-  second_hand_fashion:      'retail_fashion',
-  gifts:                    'retail_generic',
-  appliance_store:          'retail_generic',
-  product_brand:            'retail_generic',
-  cleaning:                 'cleaning',
-  florist:                  'florist',
-  local_service:            'home_improvement',
-  home_improvement_service: 'home_improvement',
-  legal:                    'legal',
-  healthcare:               'medical',
-  restaurant:               'food',
-  fitness:                  'retail_sports',
-  beauty:                   'retail_generic',
   education:                'tech',
+  ecommerce:                'generic',    // general ecommerce → permissive
+  product_brand:            'generic',
   real_estate:              'generic',
   generic:                  'generic',
+  perfume:                  'retail_beauty',
+  beauty:                   'retail_beauty',
+  second_hand_fashion:      'retail_apparel',
+  sports_store:             'retail_sports',
+  fitness:                  'retail_sports',
+  appliance_store:          'retail_home',
+  gifts:                    'retail_gifts',
+  florist:                  'florist',
+  cleaning:                 'cleaning',
+  local_service:            'home_services',
+  home_improvement_service: 'home_services',
+  legal:                    'professional',
+  healthcare:               'professional',
+  restaurant:               'food',
 }
 
-/** Keyword topic domains — what industry does a keyword belong to? */
-type KeywordDomainBucket = DomainBucket | 'any'
+/** Keyword domain — what industry does this keyword signal? */
+type KeywordDomain = BroadDomain | 'any'
 
-function topicsToDomain(topics: KeywordTopic[], keywordType: KeywordType): KeywordDomainBucket {
+/**
+ * Map keyword classification to a broad domain group.
+ * Returns 'any' when the keyword is domain-agnostic (brand, info, generic service).
+ */
+function topicsToBroadDomain(topics: KeywordTopic[], keywordType: KeywordType): KeywordDomain {
   if (keywordType === 'marketing_channel') return 'marketing'
+
   if (keywordType === 'service') {
-    if (topics.some(t => ['seo', 'google_ads', 'facebook_ads', 'instagram_ads', 'social_media', 'local_seo', 'content_marketing', 'email_marketing', 'web_dev'].includes(t))) return 'marketing'
-    if (topics.includes('office_cleaning') || topics.includes('building_cleaning') || topics.includes('residential_cleaning')) return 'cleaning'
-    if (topics.includes('home_improvement')) return 'home_improvement'
+    // Marketing services
+    if (topics.some(t => [
+      'seo', 'google_ads', 'facebook_ads', 'instagram_ads', 'paid_ads',
+      'social_media', 'local_seo', 'content_marketing', 'email_marketing', 'web_dev',
+    ].includes(t))) return 'marketing'
+    // Physical service industries
+    if (topics.some(t => ['office_cleaning', 'building_cleaning', 'residential_cleaning'].includes(t))) return 'cleaning'
+    if (topics.includes('home_improvement')) return 'home_services'
     if (topics.includes('florist_product')) return 'florist'
+    if (topics.includes('lawyers')) return 'professional'
+    if (topics.includes('doctors')) return 'professional'
+    // Generic service (no specific industry signal)
+    return 'any'
   }
+
   if (keywordType === 'product') {
-    if (topics.includes('fashion')) return 'retail_fashion'
-    if (topics.includes('sports_product')) return 'retail_sports'
+    if (topics.includes('fashion'))         return 'retail_apparel'
+    if (topics.includes('sports_product'))  return 'retail_sports'
+    if (topics.includes('perfume_product')) return 'retail_beauty'
     if (topics.includes('florist_product')) return 'florist'
-    if (topics.includes('perfume_product')) return 'retail_generic'
-    return 'retail_generic'
+    // Appliances and other products without a specific topic → generic
+    return 'generic'
   }
+
+  // brand / professional_topic / informational → domain-agnostic
   return 'any'
 }
 
 /**
- * Returns true when a keyword domain and project domain are clearly incompatible.
- * Be CONSERVATIVE — only return true when we are very confident it's a mismatch.
+ * Cross-domain conflict table.
+ * An entry `A: [B, C]` means: a keyword in domain A is clearly mismatched
+ * with a project in domain B or C.
+ *
+ * Key rules:
+ *  - marketing does NOT conflict with retail domains
+ *    (a fashion/sports/beauty store may legitimately research SEO or ads)
+ *  - retail_sports ↔ retail_beauty block each other (sports equipment vs perfume)
+ *  - retail_apparel does NOT block retail_sports (athletic wear / shoes overlap)
+ *  - generic on either side → handled before this table (always permissive)
  */
-function isHardMismatch(keywordDomain: KeywordDomainBucket, projectDomain: DomainBucket): boolean {
-  if (keywordDomain === 'any') return false   // can't tell → not a mismatch
-  if (projectDomain === 'generic') return false
+const CROSS_DOMAIN_CONFLICTS: Partial<Record<BroadDomain, BroadDomain[]>> = {
+  // Marketing keywords only conflict with physical-service industries
+  marketing: ['cleaning', 'home_services'],
+
+  // Retail apparel: blocks service/food/professional — NOT retail_sports (overlap)
+  retail_apparel: ['cleaning', 'home_services', 'food', 'professional'],
+
+  // Retail sports: additionally blocks retail_beauty (perfume ↔ sports = clear mismatch)
+  retail_sports: ['cleaning', 'home_services', 'food', 'professional', 'retail_beauty'],
+
+  // Retail beauty: symmetric with retail_sports
+  retail_beauty: ['cleaning', 'home_services', 'food', 'professional', 'retail_sports'],
+
+  // Retail home (appliances, etc.): blocks service/food/professional
+  retail_home: ['cleaning', 'food', 'professional'],
+
+  // Retail gifts: permissive — gifts can span many product domains
+  retail_gifts: ['cleaning', 'home_services', 'food', 'professional'],
+
+  // Florist: blocks service/food/professional
+  florist: ['cleaning', 'home_services', 'food', 'professional'],
+
+  // Cleaning: incompatible with all retail, other services, food, professional
+  cleaning: [
+    'marketing', 'retail_apparel', 'retail_sports', 'retail_beauty',
+    'retail_home', 'retail_gifts', 'home_services', 'food', 'professional', 'florist',
+  ],
+
+  // Home services (renovation): incompatible with retail, food, professional
+  home_services: [
+    'marketing', 'retail_apparel', 'retail_sports', 'retail_beauty',
+    'retail_gifts', 'food', 'professional', 'florist', 'cleaning',
+  ],
+
+  // Food: incompatible with retail, cleaning, home_services, professional
+  food: [
+    'retail_apparel', 'retail_sports', 'retail_beauty',
+    'retail_home', 'retail_gifts', 'cleaning', 'home_services', 'professional', 'florist',
+  ],
+
+  // Professional (legal/medical): incompatible with retail, cleaning, home_services, food
+  professional: [
+    'retail_apparel', 'retail_sports', 'retail_beauty',
+    'retail_home', 'retail_gifts', 'cleaning', 'home_services', 'food', 'florist',
+  ],
+
+  // Tech is fully permissive
+  tech: [],
+}
+
+/**
+ * Returns true only when a keyword domain and project domain are clearly
+ * from unrelated industries and both sides are specific (not generic/any).
+ *
+ * Conservative by design — unknown or generic domains always return false.
+ */
+function areKeywordAndProjectClearlyConflicting(
+  keywordDomain: KeywordDomain,
+  projectDomain: BroadDomain,
+): boolean {
+  // Permissive escape hatches — never block when information is incomplete
+  if (keywordDomain === 'any') return false
+  if (keywordDomain === 'generic' || projectDomain === 'generic') return false
   if (keywordDomain === projectDomain) return false
 
-  // Marketing services (SEO, Google Ads, etc.) are NOT mismatched with any project
-  // — any project might reasonably want to learn about marketing for their own business
-  if (keywordDomain === 'marketing') return false
-
-  const HARD_CONFLICTS: Partial<Record<DomainBucket, DomainBucket[]>> = {
-    cleaning:         ['retail_fashion', 'retail_sports', 'retail_generic', 'food', 'legal', 'medical'],
-    home_improvement: ['retail_fashion', 'retail_sports', 'retail_generic', 'food', 'legal', 'medical', 'cleaning'],
-    retail_fashion:   ['cleaning', 'home_improvement', 'food', 'legal', 'medical'],
-    retail_sports:    ['cleaning', 'retail_fashion', 'home_improvement', 'food', 'legal', 'medical'],
-    retail_generic:   ['cleaning', 'home_improvement', 'legal', 'medical'],
-    florist:          ['cleaning', 'home_improvement', 'legal', 'medical', 'retail_sports'],
-    legal:            ['cleaning', 'home_improvement', 'retail_fashion', 'retail_sports', 'retail_generic', 'florist', 'food'],
-    medical:          ['cleaning', 'home_improvement', 'retail_fashion', 'retail_sports', 'retail_generic', 'florist', 'food'],
-  }
-
-  return HARD_CONFLICTS[keywordDomain]?.includes(projectDomain) === true
+  return CROSS_DOMAIN_CONFLICTS[keywordDomain]?.includes(projectDomain) ?? false
 }
 
 // ============================================================================
@@ -566,40 +649,19 @@ function computeRelevance(
   projectCategory: BusinessCategory | null | undefined,
   isNewProject: boolean,
 ): RelevanceResult {
-  // Irrelevant keywords never match
+  // Irrelevant keywords never match anything
   if (keywordType === 'irrelevant') return 'mismatch'
 
-  // No project category — can't determine relevance
-  if (!projectCategory || projectCategory === 'generic') {
-    return 'uncertain'
-  }
+  // No project category — cannot determine relevance, generate conservatively
+  if (!projectCategory || projectCategory === 'generic') return 'uncertain'
 
-  // New projects: be lenient (we can't trust category detection yet)
+  // New projects: be lenient — category detection may not be reliable yet
   if (isNewProject) return 'uncertain'
 
-  const projectDomain = CATEGORY_TO_DOMAIN[projectCategory] ?? 'generic'
-  const keywordDomain = topicsToDomain(keywordTopics, keywordType)
+  const projectDomain = CATEGORY_TO_BROAD_DOMAIN[projectCategory] ?? 'generic'
+  const keywordDomain = topicsToBroadDomain(keywordTopics, keywordType)
 
-  // Marketing/agency projects: accept any marketing service, channel, or info keyword.
-  // A user doing keyword research for a digital agency will reasonably select
-  // SEO, Google Ads, or Instagram ads terms.
-  if (projectDomain === 'marketing') {
-    if (keywordType === 'marketing_channel' || keywordType === 'service') return 'matched'
-    if (keywordType === 'brand' || keywordType === 'professional_topic' || keywordType === 'informational') return 'matched'
-    // Products for a marketing agency — unusual but not a hard block
-    return 'uncertain'
-  }
-
-  // Cross-domain: non-marketing projects + marketing keywords.
-  // Example: cleaning company + קידום אתרים → their CUSTOMERS don't search for SEO.
-  // The keyword research modal is about customer-facing search terms, not the
-  // business owner's own marketing. So we treat this as a mismatch.
-  // Exception: new projects are lenient (we can't trust their category yet).
-  if (keywordDomain === 'marketing') {
-    return isNewProject ? 'uncertain' : 'mismatch'
-  }
-
-  if (isHardMismatch(keywordDomain, projectDomain)) return 'mismatch'
+  if (areKeywordAndProjectClearlyConflicting(keywordDomain, projectDomain)) return 'mismatch'
 
   return 'matched'
 }
