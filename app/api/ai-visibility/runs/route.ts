@@ -67,11 +67,15 @@ export async function POST(request: Request) {
   // Verify user owns the project
   const { data: project, error: projectError } = await admin
     .from('projects')
-    .select('id, user_id, target_domain, business_name, country, language, competitors')
+    .select('id, user_id, target_domain, business_name, country, language')
     .eq('id', projectId)
     .single()
 
   if (projectError || !project) {
+    console.error('[AI Visibility Runs] Project lookup failed', {
+      projectId,
+      projectError: projectError?.message,
+    })
     return Response.json({ error: 'Project not found' }, { status: 404 })
   }
   if ((project as { user_id?: string }).user_id !== user.id) {
