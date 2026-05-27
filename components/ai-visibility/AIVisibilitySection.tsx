@@ -2801,7 +2801,7 @@ function GeoOpportunityMappingSection({
         ? 'צרו עמוד תוכן או FAQ שעונה לשאלה הזו.'
         : 'Consider creating a content page or FAQ section that directly answers this question.'
       const text = isHebrew
-        ? `העסק לא הופיע בשאלה: "${promptDisplay}"\n${actionText}`
+        ? `בשאלה הזו העסק לא הופיע, וכדאי ליצור עמוד תוכן או FAQ שעונה לה ישירות.`
         : `The business did not appear for: "${promptDisplay}"\n${actionText}`
       lines.push({ text, isFirst: idx === 0 })
     })
@@ -2887,7 +2887,7 @@ function GeoOpportunityMappingSection({
   }
   if (weakPromptsCard.length > 0) {
     cards.push({
-      title: isHebrew ? 'שאלות שבהן העסק חלש' : 'Questions where the business is weak',
+      title: isHebrew ? 'שאלות שבהן העסק לא הופיע' : 'Questions where the business is weak',
       tone: 'blue',
       icon: <TrendingDown className="w-5 h-5" />,
       sentences: weakPromptsCard,
