@@ -90,6 +90,94 @@ function mapIntentType(krType: string): PromptIntent {
   }
 }
 
+/** Normalize intent for dedup purposes: treat commercial/transactional as equivalent */
+function normalizeIntentForDedupe(intent: PromptIntent): string {
+  switch (intent) {
+    case 'commercial':
+    case 'transactional':
+      return 'commercial_or_transactional'
+    case 'pre_purchase':
+    case 'recommendation':
+      return intent
+    case 'comparison':
+    case 'informational':
+    case 'brand':
+      return intent
+    case 'local':
+    case 'alternatives':
+    case 'gift':
+      return intent
+    default:
+      return intent
+  }
+}
+
+/**
+ * Extract stable business nouns / product/service roots from text for dedup.
+ * Conservative approach: only extract known entity patterns.
+ */
+function extractDedupeEntities(text: string, language: 'he' | 'en'): string[] {
+  const entities: string[] = []
+  const normalized = normalizePrompt(text)
+
+  if (language === 'he') {
+    // Hebrew entity extraction patterns
+    const hebrewPatterns = [
+      // Fashion/apparel
+      { pattern: /בושם|בשמים/, entity: 'בושם' },
+      { pattern: /שמלה|שמלות/, entity: 'שמלה' },
+      { pattern: /נעל|נעלי|נעליים/, entity: 'נעל' },
+      { pattern: /בגד|בגדים/, entity: 'בגד' },
+      // Equipment/fitness
+      { pattern: /הליכון/, entity: 'הליכון' },
+      { pattern: /אופניים/, entity: 'אופניים' },
+      { pattern: /ציוד ספורט|ציוד כושר/, entity: 'ציוד ספורט' },
+      // Services
+      { pattern: /ניקיון|ניקוי/, entity: 'ניקיון' },
+      { pattern: /קידום אתרים|seo|קידום/, entity: 'קידום אתרים' },
+      { pattern: /פרסום|advertising/, entity: 'פרסום' },
+      { pattern: /אינסטגרם|instagram/, entity: 'אינסטגרם' },
+      { pattern: /גוגל|google/, entity: 'גוגל' },
+    ]
+
+    for (const { pattern, entity } of hebrewPatterns) {
+      if (pattern.test(normalized)) {
+        entities.push(entity)
+      }
+    }
+  } else {
+    // English entity extraction patterns
+    const englishPatterns = [
+      // Fashion/apparel
+      { pattern: /fragrance|perfume|cologne/, entity: 'fragrance' },
+      { pattern: /dress|dresses|clothing|garment/, entity: 'dress' },
+      { pattern: /shoe|shoes|footwear/, entity: 'shoe' },
+      { pattern: /clothes|garments|apparel/, entity: 'clothing' },
+      // Equipment/fitness
+      { pattern: /treadmill|treadmills/, entity: 'treadmill' },
+      { pattern: /bicycle|bikes|cycling/, entity: 'bicycle' },
+      { pattern: /equipment|gear/, entity: 'equipment' },
+      // Services
+      { pattern: /clean|cleaning|janitorial/, entity: 'cleaning' },
+      { pattern: /seo|optimization|promotion/, entity: 'seo' },
+      { pattern: /advertis|ads|advertising/, entity: 'advertising' },
+      { pattern: /instagram/, entity: 'instagram' },
+      { pattern: /google|goog/, entity: 'google' },
+      // Home improvement
+      { pattern: /renovation|remodel|construction/, entity: 'renovation' },
+      { pattern: /contractor|contractor/, entity: 'contractor' },
+    ]
+
+    for (const { pattern, entity } of englishPatterns) {
+      if (pattern.test(normalized)) {
+        entities.push(entity)
+      }
+    }
+  }
+
+  return entities.length > 0 ? entities : [normalized.substring(0, 20)] // fallback to text prefix
+}
+
 /** Localized intent labels */
 const INTENT_LABELS: Record<PromptIntent, Record<string, string>> = {
   brand: { he: 'מיתוג', en: 'Brand' },
@@ -266,21 +354,26 @@ export function generateSmartQuestionKeywordEnrichment({
 
   // ========================================================================
   // STEP 4: Build dedup set from existing suggestions + saved + shown
-  //         Including topic+intent dedup for near-duplicate detection
+  //         Including normalized-intent + entity overlap detection
   // ========================================================================
 
   const existingNormalized = new Set<string>()
-  const existingIntentTexts = new Map<PromptIntent, Set<string>>()
+  // Map from normalized intent → Set of entity sets (each entry is a stringified entity set)
+  const existingIntentEntities = new Map<string, Set<string>>()
   const existingIntentCounts = new Map<PromptIntent, number>()
 
   for (const s of existingSuggestions) {
     const normalizedText = normalizePrompt(s.prompt)
     existingNormalized.add(normalizedText)
 
-    if (!existingIntentTexts.has(s.intent)) {
-      existingIntentTexts.set(s.intent, new Set())
+    const normalizedIntent = normalizeIntentForDedupe(s.intent)
+    const entities = extractDedupeEntities(s.prompt, language)
+    const entitiesKey = entities.sort().join('|')
+
+    if (!existingIntentEntities.has(normalizedIntent)) {
+      existingIntentEntities.set(normalizedIntent, new Set())
     }
-    existingIntentTexts.get(s.intent)!.add(normalizedText)
+    existingIntentEntities.get(normalizedIntent)!.add(entitiesKey)
 
     existingIntentCounts.set(s.intent, (existingIntentCounts.get(s.intent) ?? 0) + 1)
   }
@@ -331,32 +424,30 @@ export function generateSmartQuestionKeywordEnrichment({
     // Map intent
     const intent = mapIntentType(krQuestion.type)
 
-    // Check topic+intent near-duplicate detection
-    // If vNext already has this intent, check if the enrichment's topic/keyword overlaps
-    const vnextQuestionsWithIntent = existingIntentTexts.get(intent)
-    if (vnextQuestionsWithIntent && vnextQuestionsWithIntent.size > 0) {
-      const sourceKeywordNorm = normalizePrompt(krQuestion.sourceKeyword)
-      const topicNorm = krQuestion.topic ? normalizePrompt(krQuestion.topic) : ''
+    // Check entity+intent near-duplicate detection
+    // Reject if vNext already has the same normalized intent + overlapping entities
+    const normalizedIntent = normalizeIntentForDedupe(intent)
+    const enrichmentEntities = extractDedupeEntities(krQuestion.question, language)
+    const enrichmentEntitiesKey = enrichmentEntities.sort().join('|')
 
-      let foundTopicIntentOverlap = false
-      for (const vnextQuestion of vnextQuestionsWithIntent) {
-        // Check if the source keyword or topic appears in the vNext question
-        // This indicates they're covering the same topic with the same intent
-        if (
-          vnextQuestion.includes(sourceKeywordNorm) ||
-          (topicNorm && vnextQuestion.includes(topicNorm)) ||
-          // Also check if they share similar semantic keywords
-          (sourceKeywordNorm.length > 3 && vnextQuestion.includes(sourceKeywordNorm.substring(0, sourceKeywordNorm.length - 1)))
-        ) {
-          foundTopicIntentOverlap = true
+    const vnextEntitiesForIntent = existingIntentEntities.get(normalizedIntent)
+    if (vnextEntitiesForIntent && vnextEntitiesForIntent.size > 0) {
+      let foundEntityIntentOverlap = false
+
+      for (const vnextEntitiesKey of vnextEntitiesForIntent) {
+        const vnextEntities = vnextEntitiesKey.split('|')
+        // Check if any entity overlaps
+        const hasOverlap = enrichmentEntities.some(e => vnextEntities.includes(e))
+        if (hasOverlap) {
+          foundEntityIntentOverlap = true
           break
         }
       }
 
-      if (foundTopicIntentOverlap) {
+      if (foundEntityIntentOverlap) {
         debug.rejectedByTopicIntent++
         debug.details.push(
-          `  ✗ topic_intent_duplicate: "${krQuestion.question}" (intent: ${intent}, topic: ${krQuestion.topic}, sourceKeyword: ${krQuestion.sourceKeyword})`
+          `  ✗ entity_intent_duplicate: "${krQuestion.question}" (intent: ${intent}, entities: ${enrichmentEntities.join(', ')}, sourceKeyword: ${krQuestion.sourceKeyword})`
         )
         continue
       }

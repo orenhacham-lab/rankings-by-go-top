@@ -172,8 +172,9 @@ async function main() {
       category: 'agency',
       language: 'he',
       businessName: 'Digital Agency Co.',
-      expectMinCandidates: 1,
-      expectMaxCandidates: 3,
+      expectMinCandidates: 0,
+      expectMaxCandidates: 0,
+      expectNoKeywords: ['כמה עולה קידום אתרים אורגני'],  // pricing duplicate should be rejected
     },
 
     {
@@ -182,8 +183,8 @@ async function main() {
       category: 'agency',
       language: 'he',
       businessName: 'Social Media Agency',
-      expectMinCandidates: 0,
-      expectMaxCandidates: 3,
+      expectMinCandidates: 2,
+      expectMaxCandidates: 2,
     },
 
     {
@@ -193,7 +194,7 @@ async function main() {
       language: 'he',
       businessName: 'Fashion Boutique',
       expectMinCandidates: 1,
-      expectMaxCandidates: 3,
+      expectMaxCandidates: 1,
     },
 
     {
@@ -203,7 +204,8 @@ async function main() {
       language: 'he',
       businessName: 'Professional Cleaning',
       expectMinCandidates: 0,
-      expectMaxCandidates: 3,
+      expectMaxCandidates: 0,
+      expectNoKeywords: ['ניקיון'],  // all cleaning candidates should be rejected as duplicates
     },
 
     {
@@ -212,8 +214,9 @@ async function main() {
       category: 'sports_store',
       language: 'he',
       businessName: 'Sports Equipment Store',
-      expectMinCandidates: 1,
-      expectMaxCandidates: 3,
+      expectMinCandidates: 0,
+      expectMaxCandidates: 0,
+      expectNoKeywords: ['הליכון', 'אופניים'],  // entity duplicates rejected
     },
 
     {
@@ -223,7 +226,8 @@ async function main() {
       language: 'en',
       businessName: 'Remodeling Contractors',
       expectMinCandidates: 0,
-      expectMaxCandidates: 3,
+      expectMaxCandidates: 0,
+      expectNoKeywords: ['renovation'],  // entity duplicates rejected
     },
 
     {
@@ -232,8 +236,9 @@ async function main() {
       category: 'perfume',
       language: 'he',
       businessName: 'Perfume Boutique',
-      expectMinCandidates: 0,
-      expectMaxCandidates: 3,
+      expectMinCandidates: 1,
+      expectMaxCandidates: 1,
+      expectNoKeywords: ['איך לבחור בושם לגבר'],  // selection duplicate rejected, technical question kept
     },
 
     {
@@ -243,8 +248,8 @@ async function main() {
       language: 'he',
       businessName: 'Agency',
       expectMinCandidates: 0,
-      expectMaxCandidates: 3,
-      expectNoKeywords: ['איראן', 'weather', 'politics'],
+      expectMaxCandidates: 0,
+      expectNoKeywords: ['איראן', 'weather', 'politics', 'קידום אתרים'],
     },
 
     {
