@@ -1058,6 +1058,7 @@ export default function AIVisibilitySection({
                     isHebrew={isHebrew}
                     onRowClick={openResultDrawer}
                     onArchiveToggle={handleArchiveResult}
+                    onRetry={() => r.promptId && scanEngine(r.promptId, r.engine)}
                     t={t}
                   />
                 ))}
@@ -1987,6 +1988,7 @@ function ResultRowCard({
   isHebrew,
   onRowClick,
   onArchiveToggle,
+  onRetry,
   t,
 }: {
   result: ResultRow
@@ -1996,9 +1998,11 @@ function ResultRowCard({
   isHebrew: boolean
   onRowClick: (r: ResultRow) => void
   onArchiveToggle: (resultId: string, newExcludedState: boolean) => void
+  onRetry: () => void
   t: T
 }) {
   const [isTogglingArchive, setIsTogglingArchive] = React.useState(false)
+  const [isRetrying, setIsRetrying] = React.useState(false)
 
   const meta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
   // Prefer the server-computed display fields so the list is correct on first
@@ -2024,6 +2028,55 @@ function ResultRowCard({
     setIsTogglingArchive(true)
     await onArchiveToggle(result.id, !result.excludedFromScore)
     setIsTogglingArchive(false)
+  }
+
+  const handleRetry = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsRetrying(true)
+    await onRetry()
+    setIsRetrying(false)
+  }
+
+  // Show error state when scan failed/timed out
+  if (result.status === 'error') {
+    return (
+      <div
+        className={`rounded-lg border bg-red-50 dark:bg-red-950/30 p-4 hover:shadow-md transition ${
+          highlighted ? 'border-red-300 ring-2 ring-red-200 dark:ring-red-700' : 'border-red-200 dark:border-red-800'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium line-clamp-2 text-red-900 dark:text-red-100">
+              {result.promptText}
+            </p>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {meta && <meta.Icon size={16} className={meta.accent} />}
+              <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                {meta?.name || result.engine}
+              </span>
+              <Badge variant="danger" className="!text-xs">
+                {isHebrew ? 'סריקה נכשלה' : 'Scan failed'}
+              </Badge>
+            </div>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+              {isHebrew ? 'הסריקה נכשלה זמנית. אפשר לנסות שוב.' : 'Scan failed temporarily. You can retry.'}
+            </p>
+          </div>
+          <button
+            onClick={handleRetry}
+            disabled={isRetrying}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition whitespace-nowrap ${
+              isRetrying
+                ? 'bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-200 opacity-50 cursor-wait'
+                : 'bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-200 hover:bg-red-300 dark:hover:bg-red-700'
+            }`}
+          >
+            {isHebrew ? 'נסה שוב' : 'Retry'}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

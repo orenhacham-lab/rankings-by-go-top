@@ -34,7 +34,7 @@ import {
   countAIScansTrialLifetime,
 } from '@/lib/quota'
 
-const SCRAPELLM_TIMEOUT_MS = 300_000
+const SCRAPELLM_TIMEOUT_MS = 60_000 // 60s — within Vercel/Next.js limits, avoids user-perceived stuck state
 
 export async function POST(request: Request) {
   if (process.env.ENABLE_AI_VISIBILITY !== 'true') {

@@ -23,7 +23,7 @@ import { detectMention } from '../matching/mention-detector'
 import { detectTargetCited } from '../matching/target-citation-detector'
 
 const SCRAPELLM_BASE_URL = 'https://api.scrapellm.com'
-const SCRAPELLM_TIMEOUT_MS = 300_000 // 300s per docs
+const SCRAPELLM_TIMEOUT_MS = 60_000 // 60s — within Vercel/Next.js limits, avoids user-perceived stuck state
 
 // Maps our internal engine IDs to ScrapeLLM scraper path segments
 const ENGINE_TO_SCRAPER: Record<string, string> = {
