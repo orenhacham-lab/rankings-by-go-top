@@ -308,6 +308,9 @@ export default function AIVisibilitySection({
       setAllResults(resultsWithText)
       setAllPrompts(promptsArr)
 
+      // Score calculation must exclude archived results, regardless of display filter
+      const scoreResults = resultsWithText.filter((r) => r.excludedFromScore !== true)
+
       const engines = new Set<string>()
       const engineMap = new Map<string, EngineMetrics>()
       let totalMentions = 0
@@ -317,7 +320,7 @@ export default function AIVisibilitySection({
         engineMap.set(engine, { engine, scans: 0, mentions: 0, citations: 0, rate: 0 })
       })
 
-      resultsWithText.forEach((r) => {
+      scoreResults.forEach((r) => {
         if (r.status === 'success' && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) {
           engines.add(r.engine)
           // Summary counts must match the badges shown in the list — use the
@@ -340,7 +343,7 @@ export default function AIVisibilitySection({
         }
       })
 
-      const successfulScans = resultsWithText.filter((r) => r.status === 'success').length
+      const successfulScans = scoreResults.filter((r) => r.status === 'success').length
 
       // Count engines that have at least one mention
       let enginesWithMentions = 0
