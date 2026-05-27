@@ -114,7 +114,7 @@ const SERVICE_GENERIC    = /(ניהול|שירות|חברת|ספק|סוכנות|
 
 // ── Products ───────────────────────────────────────────────────────────────
 const PRODUCT_FASHION    = /(שמלה|שמלות|חולצה|חולצות|מכנסיים|ג'ינס|מעיל|מעילים|חצאית|חצאיות|בגד|בגדים|נעל|נעלים|נעלי\s*\w+|תיק|תיקים|אביזרי\s*אופנה|fashion|clothing|apparel)/i
-const PRODUCT_SPORTS     = /(הליכון|אופניים|כדורגל|כדורסל|ציוד\s*ספורט|חדר\s*כושר|אימון|treadmill|bicycle|gym|sports?\s*equipment)/i
+const PRODUCT_SPORTS     = /(הליכון|אופניים|כדורגל|כדורסל|ציוד\s*ספורט|ציוד\s*כושר|חדר\s*כושר|אימון|יוגה|מזרן|מזרני|ציוד\s*יוגה|אביזרי\s*יוגה|פילאטיס|ציוד\s*פילאטיס|משקולות|ספורט|כושר|אביזרי\s*כושר|treadmill|bicycle|yoga|mat|gym|sports?\s*equipment|fitness)/i
 const PRODUCT_PERFUME    = /(בושם|בשמ|ניחוח|עליות\s*בושם|parfum|perfume|cologne|fragrance)/i
 const PRODUCT_APPLIANCE  = /(מכונת\s*כביסה|מקרר|מדיח|תנור|מיקרוגל|מזגן|dishwasher|washing\s*machine|fridge|appliance)/i
 const PRODUCT_FLOWERS    = /(זר\s*ורד|זר\s*פרחים|בוקה|bouquet|flower\s*arrangement)/i
@@ -628,14 +628,37 @@ function classifyKeyword(
     }
   }
 
-  // ── 9. Fallback: uncertain ────────────────────────────────────────────────
-  rules.push('fallback_uncertain')
-  return {
-    keywordType: 'irrelevant',
-    topics: [],
-    confidence: 'low',
-    normalizedLabel: null,
-    debugRules: rules,
+  // ── 9. Fallback: treat as product if it looks commercial ────────────────────
+  // Soften the mismatch gate per product decision:
+  // "If keyword is understandable and business-relevant, prefer generating questions."
+  //
+  // Only mark as irrelevant if truly nonsensical. Otherwise, treat as product
+  // with medium confidence to allow Keyword Research modal to attempt generation.
+  rules.push('fallback_product')
+
+  // Conservative approach: unless clearly junk, assume it could be a product/service.
+  // This prevents false positives like "מזרני יוגה" being blocked for sports stores.
+  const looksCommercial = kw.length > 2 && wordCount <= 5
+
+  if (looksCommercial) {
+    // Treat as product with medium confidence
+    // May generate questions if it doesn't conflict with project domain
+    return {
+      keywordType: 'product',
+      topics: [],
+      confidence: 'medium',
+      normalizedLabel: kw,
+      debugRules: rules,
+    }
+  } else {
+    // Only mark truly irrelevant if it's too short, too long, or clearly junk
+    return {
+      keywordType: 'irrelevant',
+      topics: [],
+      confidence: 'low',
+      normalizedLabel: null,
+      debugRules: rules,
+    }
   }
 }
 
@@ -649,7 +672,7 @@ function computeRelevance(
   projectCategory: BusinessCategory | null | undefined,
   isNewProject: boolean,
 ): RelevanceResult {
-  // Irrelevant keywords never match anything
+  // Only truly irrelevant keywords (clearly nonsensical) → hard block
   if (keywordType === 'irrelevant') return 'mismatch'
 
   // No project category — cannot determine relevance, generate conservatively
@@ -661,7 +684,13 @@ function computeRelevance(
   const projectDomain = CATEGORY_TO_BROAD_DOMAIN[projectCategory] ?? 'generic'
   const keywordDomain = topicsToBroadDomain(keywordTopics, keywordType)
 
+  // Only hard-block on clear, symmetric conflicts.
+  // Otherwise, default to 'uncertain' → allow generation with conservative messaging.
   if (areKeywordAndProjectClearlyConflicting(keywordDomain, projectDomain)) return 'mismatch'
+
+  // For products/services without a specific topic, default to 'matched'
+  // even if there's some ambiguity. The Keyword Research modal is forgiving by design.
+  if (keywordType === 'product' || keywordType === 'service') return 'matched'
 
   return 'matched'
 }
