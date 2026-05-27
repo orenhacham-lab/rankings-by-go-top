@@ -2552,7 +2552,7 @@ function AIVisibilitySummarySection({
       let text: string
       if (isHebrew) {
         text = score < 40
-          ? `העסק כן הופיע בעיקר ב־${joinNames(strong)}.`
+          ? `העסק הופיע בעיקר ב־${joinNames(strong)}.`
           : `הנראות חזקה בעיקר ב־${joinNames(strong)}.`
       } else {
         text = score < 40
@@ -2798,7 +2798,7 @@ function GeoOpportunityMappingSection({
         ? p.promptText.slice(0, 90).trim() + '…'
         : p.promptText
       const actionText = isHebrew
-        ? 'כדאי ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלה הזו.'
+        ? 'צרו עמוד תוכן או FAQ שעונה לשאלה הזו.'
         : 'Consider creating a content page or FAQ section that directly answers this question.'
       const text = isHebrew
         ? `העסק לא הופיע בשאלה: "${promptDisplay}"\n${actionText}`
@@ -2834,7 +2834,7 @@ function GeoOpportunityMappingSection({
     underperforming.forEach((e, idx) => {
       const name = engineDisplayName(e.engine)
       const text = isHebrew
-        ? `ב-${name} העסק מופיע רק ב-${e.rate}% מהשאלות. כדאי להשקיע בחיזוק התוכן הרלוונטי למנוע הזה.`
+        ? `${name}: העסק מופיע רק ב-${e.rate}% מהשאלות. חזקו את התוכן שמתאים למנוע הזה.`
         : `On ${name}, the business appears in only ${e.rate}% of questions. Worth investing in strengthening relevant content for this engine.`
       lines.push({ text, isFirst: idx === 0 })
     })
@@ -3087,14 +3087,14 @@ function GeoCompetitorIntelligenceSection({
       if (topDomain.uniqueEngineCount >= 3) {
         lines.push({
           text: isHebrew
-            ? `${topDomain.domain} חזר על עצמו ב-${topDomain.uniqueEngineCount} מנועי AI שונים.`
+            ? `${topDomain.domain} הופיע ב-${topDomain.uniqueEngineCount} מנועים שונים.`
             : `${topDomain.domain} recurred across ${topDomain.uniqueEngineCount} different AI engines.`,
           isFirst: true,
         })
       } else {
         lines.push({
           text: isHebrew
-            ? `${topDomain.domain} בלט בנוכחות חוזרת בתשובות מנועי AI.`
+            ? `${topDomain.domain} הופיע בעקביות בתוצאות AI.`
             : `${topDomain.domain} stood out with consistent presence across AI answers.`,
           isFirst: true,
         })
@@ -3210,7 +3210,7 @@ function GeoCompetitorIntelligenceSection({
     const signalGroups: SignalGroup[] = [
       {
         signalKeys: ['hasList', 'hasComparisonLanguage'],
-        heMessage: 'תוכן שמסודר ברשימות, השוואות או שאלות נפוצות הופיע יותר מתוכן כללי.',
+        heMessage: 'רשימות, השוואות ו-FAQ הופיעו יותר בתוצאות מוצלחות.',
         enMessage:
           'List-formatted, comparison, or FAQ content appeared more than generic content.',
       },
