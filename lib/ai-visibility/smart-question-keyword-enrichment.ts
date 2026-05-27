@@ -178,6 +178,55 @@ function extractDedupeEntities(text: string, language: 'he' | 'en'): string[] {
   return entities.length > 0 ? entities : [normalized.substring(0, 20)] // fallback to text prefix
 }
 
+/**
+ * Detect if text represents a business entity (store, website, company, brand)
+ * rather than a priceable product or service.
+ *
+ * Used to block invalid price questions like:
+ * - "כמה עולה חנות בגדי יד שנייה?" (store is not priceable)
+ * - "כמה עולה חברת SEO?" (company is not priceable)
+ *
+ * But allow:
+ * - "כמה עולה ניקיון משרדים?" (service is priceable)
+ * - "כמה עולה בושם לגבר?" (product is priceable)
+ * - "איך לבחור חברת SEO?" (provider selection, not a price question)
+ */
+function isNonPriceableBusinessEntity(text: string, language: 'he' | 'en'): boolean {
+  const normalized = normalizePrompt(text)
+
+  if (language === 'he') {
+    // Hebrew business entity indicators that are NOT priceable products/services
+    const nonPriceablePatterns = [
+      /\bחנות\b/,          // store
+      /\bאתר\b/,           // website
+      /\bעסק\b/,           // business
+      /\bחברה\b/,          // company
+      /\bמותג\b/,          // brand
+      /\bקטגוריה\b/,       // category
+      /\bספק\b/,           // supplier
+      /\bמשרד\b/,          // office
+    ]
+    return nonPriceablePatterns.some((p) => p.test(normalized))
+  } else {
+    // English business entity indicators
+    const nonPriceablePatterns = [
+      /\bstore\b/i,
+      /\bshop\b/i,
+      /\bwebsite\b/i,
+      /\bsite\b/i,
+      /\bbusiness\b/i,
+      /\bcompany\b/i,
+      /\bfirm\b/i,
+      /\bbrand\b/i,
+      /\bcategory\b/i,
+      /\bprovider\b/i,
+      /\bagency\b/i,
+      /\boffice\b/i,
+    ]
+    return nonPriceablePatterns.some((p) => p.test(normalized))
+  }
+}
+
 /** Localized intent labels */
 const INTENT_LABELS: Record<PromptIntent, Record<string, string>> = {
   brand: { he: 'מיתוג', en: 'Brand' },
@@ -453,6 +502,20 @@ export function generateSmartQuestionKeywordEnrichment({
       }
     }
 
+    // Check if price question targets a non-priceable business entity
+    // (e.g., "כמה עולה חנות בגדי יד שנייה?" — stores are not priceable products)
+    if (
+      (intent === 'commercial' || intent === 'transactional') &&
+      (isNonPriceableBusinessEntity(krQuestion.question, language) ||
+        isNonPriceableBusinessEntity(krQuestion.sourceKeyword, language))
+    ) {
+      debug.rejectedByQuality++
+      debug.details.push(
+        `  ✗ invalid_price_target: "${krQuestion.question}" (prices a non-priceable business entity, sourceKeyword: ${krQuestion.sourceKeyword})`
+      )
+      continue
+    }
+
     // Ensure confidence is properly typed
     const confidence = (krQuestion.confidence === 'high' ||
       krQuestion.confidence === 'medium' ||
@@ -469,7 +532,7 @@ export function generateSmartQuestionKeywordEnrichment({
       intent,
       intentLabel: INTENT_LABELS[intent][language] || intent,
       confidence,
-      reason: `Enrichment from keyword: ${krQuestion.sourceKeyword} (${krQuestion.sourceType})`,
+      reason: '',  // no user-visible reason text for enrichment candidates
     }
 
     filtered.push(candidate)
