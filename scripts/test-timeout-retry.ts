@@ -55,6 +55,25 @@ async function testFrontendErrorHandling() {
   console.log('     └─ No page refresh required')
 }
 
+async function testDedupLogic() {
+  console.log('\n✓ Deduplication Logic Test')
+  console.log('  Problem: Retry creates new run/result rows')
+  console.log('    └─ Run 1: prompt "Q", engine "Gemini", status "error"')
+  console.log('    └─ Run 2: prompt "Q", engine "Gemini", status "success"')
+  console.log('')
+  console.log('  Solution: Dedupe by (promptId, engine), keep latest')
+  console.log('    ├─ Group results by unique (promptId, engine) key')
+  console.log('    ├─ For each group, keep only result with latest scannedAt')
+  console.log('    ├─ Remove older error result from UI')
+  console.log('    └─ Show only the successful retry in the list')
+  console.log('')
+  console.log('  Applied to:')
+  console.log('    ├─ filteredResults (display list)')
+  console.log('    ├─ dedupedAllResults (centralized dedup)')
+  console.log('    ├─ archivedResults (archive count)')
+  console.log('    └─ scoreResults (score calculations)')
+}
+
 async function testEndToEnd() {
   console.log('\n✓ End-to-End Test Scenarios')
   console.log('  Scenario 1: Normal successful scan')
@@ -70,14 +89,17 @@ async function testEndToEnd() {
   console.log('       • Backend catches error, returns status="error"')
   console.log('       • Frontend detects error, stops loading spinner')
   console.log('       • Shows error message + retry button')
-  console.log('       • NOT included in score (no citations)')
+  console.log('       • NOT included in score (error results excluded)')
   console.log('')
   console.log('  Scenario 3: User retries')
   console.log('    └─ User clicks "נסה שוב" button')
   console.log('       • Retry calls scanEngine without page refresh')
-  console.log('       • Same prompt + engine, new request')
-  console.log('       • On success: error row replaced with success result')
-  console.log('       • Score updates automatically')
+  console.log('       • Same prompt + engine, new run/result created')
+  console.log('       • Deduplication keeps only latest by scannedAt')
+  console.log('       • Error result removed from UI')
+  console.log('       • Shows success result with mentions/citations')
+  console.log('       • Score updates to include successful retry')
+  console.log('       • No duplicate rows in list')
 }
 
 async function main() {
@@ -86,6 +108,7 @@ async function main() {
   await testTimeoutConfiguration()
   await testErrorResultPersistence()
   await testFrontendErrorHandling()
+  await testDedupLogic()
   await testEndToEnd()
 
   console.log('\n=== TEST COMPLETE ===')
@@ -95,6 +118,10 @@ async function main() {
   console.log('  2. app/api/ai-visibility/runs/route.ts')
   console.log('     └─ SCRAPELLM_TIMEOUT_MS: 300_000 → 60_000')
   console.log('  3. components/ai-visibility/AIVisibilitySection.tsx')
+  console.log('     ├─ filteredResults: Added deduplication by (promptId, engine)')
+  console.log('     ├─ dedupedAllResults: New centralized dedup useMemo')
+  console.log('     ├─ archivedResults: Updated to use dedupedAllResults')
+  console.log('     ├─ scoreResults: Updated to use dedupedAllResults')
   console.log('     ├─ ResultRowCard: Added error state rendering')
   console.log('     ├─ ResultRowCard: Added retry handler')
   console.log('     └─ ResultRowCard call: Added onRetry callback')

@@ -821,7 +821,20 @@ export default function AIVisibilitySection({
   ])
 
   const filteredResults = useMemo(() => {
-    return allResults.filter((r) => {
+    // First, deduplicate: for each (promptId, engine) pair, keep only the latest result.
+    // This prevents showing both a failed retry and its successful follow-up scan.
+    const deduped = new Map<string, ResultRow>()
+    for (const r of allResults) {
+      const key = `${r.promptId}:${r.engine}`
+      const existing = deduped.get(key)
+      if (!existing || (r.scannedAt && existing.scannedAt && r.scannedAt > existing.scannedAt)) {
+        deduped.set(key, r)
+      }
+    }
+    const dedupedResults = Array.from(deduped.values())
+
+    // Then apply all existing filters
+    return dedupedResults.filter((r) => {
       if (!(SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) return false
       // Filter: exclude archived results by default (unless showArchive is enabled)
       if (!showArchive && r.excludedFromScore) return false
@@ -833,13 +846,26 @@ export default function AIVisibilitySection({
     })
   }, [allResults, filterEngine, filterMentioned, filterCited, searchQuery, showArchive])
 
-  const archivedResults = useMemo(() => {
-    return allResults.filter((r) => r.excludedFromScore && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine))
+  const dedupedAllResults = useMemo(() => {
+    // Deduplicate: for each (promptId, engine) pair, keep only the latest result.
+    const deduped = new Map<string, ResultRow>()
+    for (const r of allResults) {
+      const key = `${r.promptId}:${r.engine}`
+      const existing = deduped.get(key)
+      if (!existing || (r.scannedAt && existing.scannedAt && r.scannedAt > existing.scannedAt)) {
+        deduped.set(key, r)
+      }
+    }
+    return Array.from(deduped.values())
   }, [allResults])
 
+  const archivedResults = useMemo(() => {
+    return dedupedAllResults.filter((r) => r.excludedFromScore && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine))
+  }, [dedupedAllResults])
+
   const scoreResults = useMemo(() => {
-    return allResults.filter((r) => !r.excludedFromScore && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine))
-  }, [allResults])
+    return dedupedAllResults.filter((r) => !r.excludedFromScore && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine))
+  }, [dedupedAllResults])
 
   const handleArchiveResult = useCallback(
     async (resultId: string, newExcludedState: boolean) => {
