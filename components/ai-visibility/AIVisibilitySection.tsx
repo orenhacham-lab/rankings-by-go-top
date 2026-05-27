@@ -2801,7 +2801,7 @@ function GeoOpportunityMappingSection({
         ? 'צרו עמוד תוכן או FAQ שעונה לשאלה הזו.'
         : 'Consider creating a content page or FAQ section that directly answers this question.'
       const text = isHebrew
-        ? `בשאלה הזו העסק לא הופיע, וכדאי ליצור עמוד תוכן או FAQ שעונה לה ישירות.`
+        ? `בשאלה "${promptDisplay}" העסק לא הופיע. מומלץ ליצור עמוד תוכן או FAQ שעונה לה ישירות.`
         : `The business did not appear for: "${promptDisplay}"\n${actionText}`
       lines.push({ text, isFirst: idx === 0 })
     })
