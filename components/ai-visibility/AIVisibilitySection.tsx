@@ -837,6 +837,10 @@ export default function AIVisibilitySection({
     return allResults.filter((r) => r.excludedFromScore && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine))
   }, [allResults])
 
+  const scoreResults = useMemo(() => {
+    return allResults.filter((r) => !r.excludedFromScore && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine))
+  }, [allResults])
+
   const handleArchiveResult = useCallback(
     async (resultId: string, newExcludedState: boolean) => {
       try {
@@ -971,7 +975,7 @@ export default function AIVisibilitySection({
             <AIVisibilityScoreCard score={globalMetrics.mentionRate} t={t} isRTL={isHebrew} />
           )}
           {globalMetrics && (
-            <OverviewSummaryStrip metrics={globalMetrics} totalResults={allResults.length} t={t} />
+            <OverviewSummaryStrip metrics={globalMetrics} totalResults={scoreResults.length} t={t} />
           )}
           <EngineMentionCards metrics={engineMetrics} t={t} />
 
@@ -1030,6 +1034,12 @@ export default function AIVisibilitySection({
               </button>
             )}
           </div>
+
+          {archivedResults.length > 0 && (
+            <div className="text-xs text-slate-500 dark:text-slate-400 italic">
+              {isHebrew ? 'תוצאות בארכיון אינן נכללות בחישוב הציון.' : 'Archived results are not included in score calculations.'}
+            </div>
+          )}
 
           <div className="text-sm text-slate-600 dark:text-slate-300">
             {t('showing_results').replace('{count}', String(showAllResults ? filteredResults.length : Math.min(3, filteredResults.length)))}
