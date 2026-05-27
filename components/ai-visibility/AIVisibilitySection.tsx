@@ -75,6 +75,7 @@ type ResultRow = {
   scannedAt: string | null
   citations: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }>
   responseText: string | null
+  excludedFromScore: boolean
   // Server-computed display values — present from /api/ai-visibility/runs;
   // used everywhere the UI counts or labels mentions/citations.
   displayMentioned: boolean
@@ -285,6 +286,7 @@ export default function AIVisibilitySection({
             scannedAt: run.completedAt || result.scannedAt,
             citations: [],
             responseText: null,
+            excludedFromScore: result.excludedFromScore || false,
             runId: run.id,
             displayMentioned: hasDisplay ? result.displayMentioned : (result.mentioned || false),
             displayCited: hasDisplay ? result.displayCited : (result.targetCited || false),
@@ -1902,6 +1904,9 @@ function ResultRowCard({
   onRowClick: (r: ResultRow) => void
   t: T
 }) {
+  const [isTogglingExclusion, setIsTogglingExclusion] = React.useState(false)
+  const [localExcluded, setLocalExcluded] = React.useState(result.excludedFromScore)
+
   const meta = ENGINE_META[result.engine as keyof typeof ENGINE_META]
   // Prefer the server-computed display fields so the list is correct on first
   // render. If the drawer has loaded responseText, re-evaluate live to pick up
@@ -1921,43 +1926,80 @@ function ResultRowCard({
 
   const scannedAtStr = result.scannedAt ? formatShortDateTime(result.scannedAt, isHebrew) : null
 
+  const toggleExclusion = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsTogglingExclusion(true)
+    try {
+      const res = await fetch(`/api/ai-visibility/results/${result.id}/exclusion`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ excluded: !localExcluded }),
+      })
+      if (!res.ok) {
+        console.error('Failed to toggle exclusion')
+        setIsTogglingExclusion(false)
+        return
+      }
+      setLocalExcluded(!localExcluded)
+      result.excludedFromScore = !localExcluded
+    } catch (err) {
+      console.error('Error toggling exclusion:', err)
+    } finally {
+      setIsTogglingExclusion(false)
+    }
+  }
+
   return (
     <div
       onClick={() => onRowClick(result)}
       className={`rounded-lg border bg-white dark:bg-slate-900 p-4 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition cursor-pointer ${
         highlighted ? 'border-indigo-300 ring-2 ring-indigo-200 dark:ring-indigo-700' : 'border-slate-200 dark:border-slate-700'
-      }`}
+      } ${localExcluded ? 'opacity-60' : ''}`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Row 1: query text */}
-          <p className="text-sm font-medium text-slate-900 dark:text-slate-100 line-clamp-2">{result.promptText}</p>
+          <p className={`text-sm font-medium line-clamp-2 ${localExcluded ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-slate-100'}`}>
+            {result.promptText}
+          </p>
 
-          {/* Row 2: engine + status badges + scan time */}
+          {/* Row 2: engine + status badges + scan time + exclusion label */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {meta && <meta.Icon size={16} className={meta.accent} />}
-            <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{meta?.name || result.engine}</span>
+            <span className={`text-xs font-medium ${localExcluded ? 'text-slate-500 dark:text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
+              {meta?.name || result.engine}
+            </span>
 
-            {reMentioned ? (
-              <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>
-            ) : (
-              <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>
+            {localExcluded && (
+              <Badge variant="neutral" className="!text-xs !bg-slate-100 dark:!bg-slate-800">
+                {isHebrew ? 'לא נכלל בציון' : 'Not in score'}
+              </Badge>
             )}
-            {reCited ? (
-              <Badge variant="info" className="!text-xs">{t('target_cited')}</Badge>
-            ) : (
-              <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>
+
+            {!localExcluded && (
+              <>
+                {reMentioned ? (
+                  <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>
+                ) : (
+                  <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>
+                )}
+                {reCited ? (
+                  <Badge variant="info" className="!text-xs">{t('target_cited')}</Badge>
+                ) : (
+                  <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>
+                )}
+              </>
             )}
 
             {scannedAtStr && (
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              <span className={`text-[11px] ${localExcluded ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
                 · {t('scanned_at')} {scannedAtStr}
               </span>
             )}
           </div>
 
-          {/* Row 3: matched variants — only when something was matched */}
-          {(brandLabels.length > 0 || domainLabel) && (
+          {/* Row 3: matched variants — only when something was matched and not excluded */}
+          {!localExcluded && (brandLabels.length > 0 || domainLabel) && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
               {brandLabels.length > 0 && (
                 <div className="inline-flex items-center gap-1.5 flex-wrap">
@@ -1985,12 +2027,24 @@ function ResultRowCard({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          {result.citationCount > 0 && (
+          {!localExcluded && result.citationCount > 0 && (
             <Badge variant="info" className="!text-xs">
               {result.citationCount} {t('citations')}
             </Badge>
           )}
-          <ExternalLinkIcon size={16} className="text-slate-400 dark:text-slate-500" />
+          <button
+            onClick={toggleExclusion}
+            disabled={isTogglingExclusion}
+            title={localExcluded ? (isHebrew ? 'החזר לציון' : 'Restore to score') : (isHebrew ? 'החרג מהציון' : 'Exclude from score')}
+            className={`px-2 py-1 rounded text-xs font-medium transition ${
+              localExcluded
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+            } ${isTogglingExclusion ? 'opacity-50 cursor-wait' : ''}`}
+          >
+            {localExcluded ? (isHebrew ? 'החזר' : 'Restore') : (isHebrew ? 'החרג' : 'Exclude')}
+          </button>
+          <ExternalLinkIcon size={16} className={`${localExcluded ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500'}`} />
         </div>
       </div>
     </div>

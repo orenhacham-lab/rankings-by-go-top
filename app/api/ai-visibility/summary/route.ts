@@ -106,6 +106,7 @@ export async function GET() {
       .from('ai_scan_results')
       .select('run_id, mentioned, citation_count, status, scanned_at')
       .in('run_id', runIds)
+      .eq('excluded_from_score', false)
 
     for (const r of results ?? []) {
       const projectId = projectByRunId.get(r.run_id as string)

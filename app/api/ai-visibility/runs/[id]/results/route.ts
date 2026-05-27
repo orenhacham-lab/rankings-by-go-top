@@ -52,7 +52,7 @@ export async function GET(
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Fetch results for this run
+  // Fetch results for this run (including excluded ones, which get marked in response)
   const { data: results, error: resultsError } = await admin
     .from('ai_scan_results')
     .select('*')
@@ -125,6 +125,7 @@ export async function GET(
       status: r.status,
       errorMessage: r.error_message,
       scannedAt: r.scanned_at,
+      excludedFromScore: r.excluded_from_score,
       citations: citationsByResult.get(r.id) ?? [],
     })),
   })

@@ -136,6 +136,7 @@ export async function GET(
     .select('id, prompt_id, engine, mentioned, target_cited, status, scanned_at')
     .eq('project_id', projectId)
     .eq('status', 'success')
+    .eq('excluded_from_score', false)
     .order('scanned_at', { ascending: false })
 
   if (resultsError) {
