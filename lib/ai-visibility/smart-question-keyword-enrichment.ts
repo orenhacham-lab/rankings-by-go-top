@@ -196,15 +196,37 @@ function isNonPriceableBusinessEntity(text: string, language: 'he' | 'en'): bool
 
   if (language === 'he') {
     // Hebrew business entity indicators that are NOT priceable products/services
+    // Note: Account for Hebrew morphology (construct state, plurals, etc.)
+    // E.g., "חברה" -> "חברה", "חברת", "חברות"
+
+    // First check: is there a service term that makes this priceable?
+    // Services with location/type qualifiers are priceable
+    // E.g., "ניקיון משרדים" (office cleaning) is priceable
+    const servicePattern = /ניקיון|שיפוץ|תיקון|ייעוץ|פרסום|שירות|התקנה|משלוח/
+    if (servicePattern.test(normalized)) {
+      // If there's a service, only the standalone business entities (חנות, אתר, עסק, חברה, מותג, ספק)
+      // are non-priceable. Location/type qualifiers (משרד, קטגוריה) are OK with services.
+      const standaloneNonPriceablePatterns = [
+        /חנו/,                // חנות, חנויות (store)
+        /אתר/,                // אתר, אתרים (website)
+        /עסק/,                // עסק, עסקים (business) - only when it's the main subject
+        /חבר/,                // חברה, חברת, חברות (company)
+        /מותג/,               // מותג, מותגים (brand)
+        /ספק/,                // ספק, ספקים (supplier/provider)
+      ]
+      return standaloneNonPriceablePatterns.some((p) => p.test(normalized))
+    }
+
+    // Without a service, check all non-priceable patterns
     const nonPriceablePatterns = [
-      /\bחנות\b/,          // store
-      /\bאתר\b/,           // website
-      /\bעסק\b/,           // business
-      /\bחברה\b/,          // company
-      /\bמותג\b/,          // brand
-      /\bקטגוריה\b/,       // category
-      /\bספק\b/,           // supplier
-      /\bמשרד\b/,          // office
+      /חנו/,                // חנות, חנויות
+      /אתר/,                // אתר, אתרים
+      /עסק/,                // עסק, עסקים
+      /חבר/,                // חברה, חברת, חברות
+      /מותג/,               // מותג, מותגים
+      /קטגוריה|קטגוריות/,  // קטגוריה, קטגוריות
+      /ספק/,                // ספק, ספקים
+      /משרד/,               // משרד, משרדים
     ]
     return nonPriceablePatterns.some((p) => p.test(normalized))
   } else {
@@ -225,6 +247,74 @@ function isNonPriceableBusinessEntity(text: string, language: 'he' | 'en'): bool
     ]
     return nonPriceablePatterns.some((p) => p.test(normalized))
   }
+}
+
+/**
+ * Display-level safety filter: Check if a question is asking for a price
+ * about a non-priceable business entity (store, company, brand, website, etc).
+ *
+ * Applied at the UI rendering stage to all suggestions from all sources
+ * (vNext, enrichment, etc.) before they are shown to users.
+ *
+ * Allows:
+ *   - "כמה עולה בושם לגבר?" (product price — priceable)
+ *   - "כמה עולה ניקיון משרדים?" (service price — priceable)
+ *   - "כמה עולה פרסום באינסטגרם?" (service price — priceable)
+ *   - "איך לבחור חברת SEO?" (provider selection — not a price question)
+ *
+ * Blocks:
+ *   - "כמה עולה חנות בגדי יד שנייה?" (store price — not priceable)
+ *   - "כמה עולה חברת SEO?" (company price — not priceable)
+ *   - "How much does a company cost?" (company price — not priceable)
+ */
+export function isInvalidPriceQuestion(prompt: string, language: 'he' | 'en'): boolean {
+  // Only check price questions
+  const isPriceQuestion =
+    language === 'he'
+      ? /כמה\s*עולה/i.test(prompt)
+      : /how\s+much\s+(does|is|cost)/i.test(prompt)
+
+  if (!isPriceQuestion) return false
+
+  // Check if this is a non-priceable entity
+  const hasNonPriceableEntity = isNonPriceableBusinessEntity(prompt, language)
+  if (!hasNonPriceableEntity) return false
+
+  // Exception: If asking about a SERVICE that happens to contain non-priceable
+  // entity words, it's still priceable.
+  // E.g., "office cleaning", "cleaning service" are services and priceable.
+  // But "cleaning company" is asking for price of a company (non-priceable).
+
+  // Check if it mentions company/firm/agency/brand without a service context
+  const mentionsBusinessType =
+    language === 'he'
+      ? /חברה|משרד|ספק|עסק|מותג|אתר|קטגוריה/i.test(prompt)
+      : /company|firm|agency|brand|business|store|website|site|category|office/i.test(prompt)
+
+  // Check if it mentions a service
+  const mentionsService =
+    language === 'he'
+      ? /ניקיון|שיפוץ|תיקון|ייעוץ|פרסום|שירות|התקנה|משלוח/i.test(prompt)
+      : /cleaning|repair|fix|consultation|advertising|service|installation|delivery/i.test(prompt)
+
+  // If it mentions business type but NOT service, it's invalid
+  if (mentionsBusinessType && !mentionsService) return true
+
+  // If it mentions both, the service must be the main subject, not a modifier
+  // Valid: "כמה עולה ניקיון משרדים" (office cleaning is the subject)
+  // Invalid: "כמה עולה חברת ניקיון" (company is the subject, cleaning is just what they do)
+
+  // Pattern: service term should come immediately/directly after the price phrasing,
+  // possibly with location/type modifiers, but NOT company/business words
+  const serviceDirectPattern =
+    language === 'he'
+      ? /כמה\s*עולה\s+[\w\s]*(ניקיון|שיפוץ|תיקון|ייעוץ|פרסום|שירות|התקנה|משלוח)(?!\s+(חברה|חברת|משרד|ספק|עסק))/i
+      : /how\s+much\s+(?:does|is|cost)\s+(?:a\s+)?[\w\s]*(cleaning|repair|fix|consultation|advertising|service|installation|delivery)(?!\s+(company|firm|business|provider|agency|brand))/i
+
+  if (serviceDirectPattern.test(prompt)) return false
+
+  // Business-type-first patterns like "cleaning company" are invalid
+  return true
 }
 
 /** Localized intent labels */

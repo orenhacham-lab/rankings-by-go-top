@@ -39,7 +39,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { USE_KEYWORD_ENRICHMENT_SMART_QUESTIONS } from '@/lib/ai-visibility/enrichment-feature-flag'
-import { generateSmartQuestionKeywordEnrichment } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
+import { generateSmartQuestionKeywordEnrichment, isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
@@ -393,10 +393,16 @@ export default function AIVisibilitySection({
       shuffle: false,
       limit: 8,
     })
+    // Apply display-level safety filter: block invalid price questions
+    // (e.g., asking for price of a store, company, brand, website)
+    const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
+    const filtered = suggestions.filter(
+      (q) => !isInvalidPriceQuestion(q.prompt, lang)
+    )
     // Keep all generated suggestions in state so the "Show more" button can
     // expand beyond the initial 4 visible. Render-time slicing handles
     // pagination based on showAllSmartQuestions.
-    setSuggestedQuestions(suggestions)
+    setSuggestedQuestions(filtered)
     // Fresh profile context — wipe the exclusion ledger and "no new" flag so
     // the user can start a new generation cycle.
     setExcludedSuggestionKeys(new Set())
@@ -764,8 +770,14 @@ export default function AIVisibilitySection({
         trulyNew = [...trulyNew, ...enriched]
       }
       // ──────────────────────────────────────────────────────────────────────
+      // Apply display-level safety filter: block invalid price questions
+      // (e.g., asking for price of a store, company, brand, website)
+      const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
+      const filtered = trulyNew.filter(
+        (q) => !isInvalidPriceQuestion(q.prompt, lang)
+      )
 
-      if (trulyNew.length === 0) {
+      if (filtered.length === 0) {
         // No new candidates: keep the existing list visible and surface the
         // empty-state message inline. Don't wipe what the user is looking at.
         setNoNewSuggestionsFound(true)
@@ -777,10 +789,10 @@ export default function AIVisibilitySection({
           currentlyShown.forEach((p) => next.add(normalize(p)))
           return next
         })
-        setSuggestedQuestions(trulyNew)
+        setSuggestedQuestions(filtered)
         // Show the hint even when we have some results, if the diversity layer
         // returned noticeably fewer than the visible batch size.
-        if (trulyNew.length < DIVERSITY_THRESHOLD) {
+        if (filtered.length < DIVERSITY_THRESHOLD) {
           setNoNewSuggestionsFound(true)
         }
       }
