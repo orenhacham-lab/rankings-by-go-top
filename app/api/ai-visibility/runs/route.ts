@@ -361,7 +361,7 @@ export async function GET(request: Request) {
   if (runIds.length > 0) {
     const { data: resultRows } = await admin
       .from('ai_scan_results')
-      .select('id, run_id, engine, prompt_id, mentioned, target_cited, citation_count, credits_used, status, error_message, scanned_at, response_text')
+      .select('id, run_id, engine, prompt_id, mentioned, target_cited, citation_count, credits_used, status, error_message, scanned_at, response_text, excluded_from_score')
       .in('run_id', runIds)
     results = resultRows ?? []
   }
@@ -499,6 +499,7 @@ export async function GET(request: Request) {
           status: r.status,
           errorMessage: r.error_message,
           scannedAt: r.scanned_at,
+          excludedFromScore: (r.excluded_from_score as boolean | null) === true,
           // Effective display values — what the UI should use for badges,
           // counts, and labels. Stable across refreshes.
           displayMentioned: display.displayMentioned,
