@@ -820,21 +820,30 @@ export default function AIVisibilitySection({
     excludedSuggestionKeys,
   ])
 
-  const filteredResults = useMemo(() => {
-    // First, deduplicate: for each (promptId, engine) pair, keep only the latest result.
-    // This prevents showing both a failed retry and its successful follow-up scan.
+  const dedupedAllResults = useMemo(() => {
+    // Deduplicate: for each (promptId, engine) pair, keep only the latest result by scannedAt.
+    // Safe comparison: ISO strings compare correctly lexicographically; null → empty string (sorts first).
     const deduped = new Map<string, ResultRow>()
     for (const r of allResults) {
       const key = `${r.promptId}:${r.engine}`
       const existing = deduped.get(key)
-      if (!existing || (r.scannedAt && existing.scannedAt && r.scannedAt > existing.scannedAt)) {
+      if (!existing) {
         deduped.set(key, r)
+      } else {
+        // Compare dates: if new has a more recent timestamp, use it. ISO strings are lexicographically comparable.
+        const newTime = r.scannedAt ?? ''
+        const existingTime = existing.scannedAt ?? ''
+        if (newTime > existingTime) {
+          deduped.set(key, r)
+        }
       }
     }
-    const dedupedResults = Array.from(deduped.values())
+    return Array.from(deduped.values())
+  }, [allResults])
 
-    // Then apply all existing filters
-    return dedupedResults.filter((r) => {
+  const filteredResults = useMemo(() => {
+    // Apply all existing filters to the deduplicated results
+    return dedupedAllResults.filter((r) => {
       if (!(SUPPORTED_ENGINES as readonly string[]).includes(r.engine)) return false
       // Filter: exclude archived results by default (unless showArchive is enabled)
       if (!showArchive && r.excludedFromScore) return false
@@ -844,20 +853,7 @@ export default function AIVisibilitySection({
       if (searchQuery && !r.promptText.toLowerCase().includes(searchQuery.toLowerCase())) return false
       return true
     })
-  }, [allResults, filterEngine, filterMentioned, filterCited, searchQuery, showArchive])
-
-  const dedupedAllResults = useMemo(() => {
-    // Deduplicate: for each (promptId, engine) pair, keep only the latest result.
-    const deduped = new Map<string, ResultRow>()
-    for (const r of allResults) {
-      const key = `${r.promptId}:${r.engine}`
-      const existing = deduped.get(key)
-      if (!existing || (r.scannedAt && existing.scannedAt && r.scannedAt > existing.scannedAt)) {
-        deduped.set(key, r)
-      }
-    }
-    return Array.from(deduped.values())
-  }, [allResults])
+  }, [dedupedAllResults, filterEngine, filterMentioned, filterCited, searchQuery, showArchive])
 
   const archivedResults = useMemo(() => {
     return dedupedAllResults.filter((r) => r.excludedFromScore && (SUPPORTED_ENGINES as readonly string[]).includes(r.engine))
