@@ -49,8 +49,11 @@ export interface EnrichmentDebug {
   rejectedByMismatch: number
   rejectedByDuplicate: number
   rejectedByQuality: number
-  rejectedByTopic: number
+  rejectedByTopicIntent: number
+  rejectedByCapExceeded: number
   finalCount: number
+  dynamicLimit: number
+  intendedPlacement: 'refresh_only'
   details: string[]
 }
 
@@ -157,7 +160,7 @@ export function generateSmartQuestionKeywordEnrichment({
   existingSuggestions,
   savedQuestions,
   alreadyShownQuestions = [],
-  limit = 3,
+  limit,
 }: {
   projectKeywords: string[]
   language: 'he' | 'en'
@@ -169,6 +172,10 @@ export function generateSmartQuestionKeywordEnrichment({
   alreadyShownQuestions?: string[]
   limit?: number
 }): EnrichmentResult {
+  // Calculate dynamic limit based on existing Smart Questions vNext baseline
+  const existingCount = existingSuggestions.length
+  const dynamicLimit = existingCount <= 3 ? 2 : 1
+
   const debug: EnrichmentDebug = {
     inputKeywordsCount: projectKeywords.length,
     analyzedKeywordsCount: 0,
@@ -177,10 +184,16 @@ export function generateSmartQuestionKeywordEnrichment({
     rejectedByMismatch: 0,
     rejectedByDuplicate: 0,
     rejectedByQuality: 0,
-    rejectedByTopic: 0,
+    rejectedByTopicIntent: 0,
+    rejectedByCapExceeded: 0,
     finalCount: 0,
+    dynamicLimit,
+    intendedPlacement: 'refresh_only',
     details: [],
   }
+
+  debug.details.push(`vNext baseline: ${existingCount} question(s) → dynamic limit: ${dynamicLimit}`)
+  debug.details.push(`Enrichment intended for: refresh-only (צור עוד שאלות)`)
 
   // ========================================================================
   // STEP 1: Analyze project keywords
@@ -246,21 +259,30 @@ export function generateSmartQuestionKeywordEnrichment({
     generable,
     language,
     country,
-    limit * 3, // ask for more to allow filtering
+    dynamicLimit * 3, // ask for more to allow filtering
   )
 
   debug.details.push(`Generated: ${krQuestions.length} candidate question(s)`)
 
   // ========================================================================
   // STEP 4: Build dedup set from existing suggestions + saved + shown
+  //         Including topic+intent dedup for near-duplicate detection
   // ========================================================================
 
   const existingNormalized = new Set<string>()
-  const existingIntents = new Set<string>()
+  const existingIntentTexts = new Map<PromptIntent, Set<string>>()
+  const existingIntentCounts = new Map<PromptIntent, number>()
 
   for (const s of existingSuggestions) {
-    existingNormalized.add(normalizePrompt(s.prompt))
-    existingIntents.add(`${s.intent}`)
+    const normalizedText = normalizePrompt(s.prompt)
+    existingNormalized.add(normalizedText)
+
+    if (!existingIntentTexts.has(s.intent)) {
+      existingIntentTexts.set(s.intent, new Set())
+    }
+    existingIntentTexts.get(s.intent)!.add(normalizedText)
+
+    existingIntentCounts.set(s.intent, (existingIntentCounts.get(s.intent) ?? 0) + 1)
   }
 
   for (const q of savedQuestions) {
@@ -274,32 +296,71 @@ export function generateSmartQuestionKeywordEnrichment({
   debug.details.push(
     `Dedup set: ${existingNormalized.size} unique existing question(s)`,
   )
+  debug.details.push(`Intent breakdown: ${Array.from(existingIntentCounts.entries()).map(([intent, count]) => `${intent}=${count}`).join(', ')}`)
 
   // ========================================================================
-  // STEP 5: Filter candidates through quality gates
+  // STEP 5: Filter candidates through quality gates (with topic+intent dedup)
   // ========================================================================
 
   const filtered: EnrichmentCandidate[] = []
 
   for (const krQuestion of krQuestions) {
-    if (filtered.length >= limit) break
+    // Check if we've reached the dynamic cap
+    if (filtered.length >= dynamicLimit) {
+      debug.rejectedByCapExceeded++
+      debug.details.push(`  ✗ cap_exceeded: "${krQuestion.question}" (limit: ${dynamicLimit})`)
+      continue
+    }
+
+    const normalizedQuestion = normalizePrompt(krQuestion.question)
 
     // Check exact text duplicate
-    if (existingNormalized.has(normalizePrompt(krQuestion.question))) {
+    if (existingNormalized.has(normalizedQuestion)) {
       debug.rejectedByDuplicate++
-      debug.details.push(`  ✗ duplicate: "${krQuestion.question}"`)
+      debug.details.push(`  ✗ exact_duplicate: "${krQuestion.question}"`)
       continue
     }
 
     // Check quality (length, Hebrew safety, etc.)
     if (!isAcceptableEnrichment(krQuestion.question, language)) {
       debug.rejectedByQuality++
-      debug.details.push(`  ✗ quality: "${krQuestion.question}" (too short/unsafe/awkward)`)
+      debug.details.push(`  ✗ failed_quality: "${krQuestion.question}" (too short/unsafe/awkward)`)
       continue
     }
 
     // Map intent
     const intent = mapIntentType(krQuestion.type)
+
+    // Check topic+intent near-duplicate detection
+    // If vNext already has this intent, check if the enrichment's topic/keyword overlaps
+    const vnextQuestionsWithIntent = existingIntentTexts.get(intent)
+    if (vnextQuestionsWithIntent && vnextQuestionsWithIntent.size > 0) {
+      const sourceKeywordNorm = normalizePrompt(krQuestion.sourceKeyword)
+      const topicNorm = krQuestion.topic ? normalizePrompt(krQuestion.topic) : ''
+
+      let foundTopicIntentOverlap = false
+      for (const vnextQuestion of vnextQuestionsWithIntent) {
+        // Check if the source keyword or topic appears in the vNext question
+        // This indicates they're covering the same topic with the same intent
+        if (
+          vnextQuestion.includes(sourceKeywordNorm) ||
+          (topicNorm && vnextQuestion.includes(topicNorm)) ||
+          // Also check if they share similar semantic keywords
+          (sourceKeywordNorm.length > 3 && vnextQuestion.includes(sourceKeywordNorm.substring(0, sourceKeywordNorm.length - 1)))
+        ) {
+          foundTopicIntentOverlap = true
+          break
+        }
+      }
+
+      if (foundTopicIntentOverlap) {
+        debug.rejectedByTopicIntent++
+        debug.details.push(
+          `  ✗ topic_intent_duplicate: "${krQuestion.question}" (intent: ${intent}, topic: ${krQuestion.topic}, sourceKeyword: ${krQuestion.sourceKeyword})`
+        )
+        continue
+      }
+    }
 
     // Ensure confidence is properly typed
     const confidence = (krQuestion.confidence === 'high' ||
@@ -321,14 +382,14 @@ export function generateSmartQuestionKeywordEnrichment({
     }
 
     filtered.push(candidate)
-    debug.details.push(`  ✓ included: "${candidate.question}"`)
+    debug.details.push(`  ✓ included: "${candidate.question}" (intent: ${intent}, topic: ${krQuestion.topic})`)
   }
 
   debug.finalCount = filtered.length
-  debug.details.push(`Final: ${debug.finalCount} candidate(s) after all filters`)
+  debug.details.push(`Final: ${debug.finalCount} genuine candidate(s) after all filters`)
 
   return {
-    candidates: filtered.slice(0, limit),
+    candidates: filtered,
     debug,
   }
 }

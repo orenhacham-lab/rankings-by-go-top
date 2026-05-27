@@ -104,9 +104,13 @@ async function runTest(testCase: TestCase): Promise<TestResult> {
     `    Analyzed: ${debug.analyzedKeywordsCount} | Generable: ${debug.generableKeywordsCount}`,
   )
   console.log(
-    `    Rejections: conf=${debug.rejectedByConfidence} mismatch=${debug.rejectedByMismatch} dup=${debug.rejectedByDuplicate} quality=${debug.rejectedByQuality}`,
+    `    vNext baseline: ${existingSuggestions.length} | Dynamic limit: ${debug.dynamicLimit}`,
+  )
+  console.log(
+    `    Rejections: exact_dup=${debug.rejectedByDuplicate} topic_intent=${debug.rejectedByTopicIntent} quality=${debug.rejectedByQuality} cap=${debug.rejectedByCapExceeded}`,
   )
   console.log(`    Final: ${debug.finalCount}`)
+  console.log(`    Intended placement: ${debug.intendedPlacement}`)
 
   // Check expectations
   let passed = true
