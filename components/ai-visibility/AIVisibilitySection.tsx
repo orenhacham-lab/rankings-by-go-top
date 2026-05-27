@@ -668,6 +668,19 @@ export default function AIVisibilitySection({
       // is synchronous — avoids a flash that the user can't see.
       await new Promise((resolve) => setTimeout(resolve, 200))
 
+      // ════════════════════════════════════════════════════════════════════
+      // TEMPORARY DIAGNOSTIC LOGS — remove after diagnosis complete
+      // ════════════════════════════════════════════════════════════════════
+      console.info(
+        '[ENRICHMENT DIAGNOSIS] refreshSuggestions started',
+        {
+          flagEnabled: USE_KEYWORD_ENRICHMENT_SMART_QUESTIONS,
+          keywordsLength: projectKeywords?.length ?? 0,
+          keywords: projectKeywords || [],
+        },
+      )
+      // ════════════════════════════════════════════════════════════════════
+
       const normalize = (text: string): string =>
         text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
 
@@ -697,10 +710,30 @@ export default function AIVisibilitySection({
         previousSet: currentlyShown,
       })
 
+      // ════════════════════════════════════════════════════════════════════
+      // TEMPORARY DIAGNOSTIC: vNext output
+      // ════════════════════════════════════════════════════════════════════
+      console.info('[ENRICHMENT DIAGNOSIS] vNext generation', {
+        refreshedCount: refreshed.length,
+        currentlyShownCount: currentlyShown.length,
+        trackedCount: trackedPrompts.length,
+        excludeCount: exclude.length,
+      })
+      // ════════════════════════════════════════════════════════════════════
+
       // Defense in depth: even with excludePrompts the generator can return
       // overlap if the pool is exhausted. Filter again client-side.
       const seenKeys = new Set<string>(exclude.map(normalize))
       let trulyNew = refreshed.filter((q) => !seenKeys.has(normalize(q.prompt)))
+
+      // ════════════════════════════════════════════════════════════════════
+      // TEMPORARY DIAGNOSTIC: after initial dedup
+      // ════════════════════════════════════════════════════════════════════
+      console.info('[ENRICHMENT DIAGNOSIS] after vNext dedup', {
+        trulyNewCount: trulyNew.length,
+        seenKeysCount: seenKeys.size,
+      })
+      // ════════════════════════════════════════════════════════════════════
 
       // Diversity threshold: the generator now refuses to force-fill the limit
       // with near-duplicates, so a small result (< 4) means the candidate pool
@@ -715,12 +748,30 @@ export default function AIVisibilitySection({
       //      (i.e., the pool is thin or exhausted for this context).
       // This block is completely inert when the flag is false — no code path
       // inside it is reachable, preserving identical behavior to today.
+
+      // ════════════════════════════════════════════════════════════════════
+      // TEMPORARY DIAGNOSTIC: pre-enrichment condition check
+      // ════════════════════════════════════════════════════════════════════
+      console.info('[ENRICHMENT DIAGNOSIS] enrichment block conditions', {
+        condition1_flagEnabled: USE_KEYWORD_ENRICHMENT_SMART_QUESTIONS,
+        condition2_hasKeywords: !!(projectKeywords && projectKeywords.length > 0),
+        condition3_trulyNewUnderThreshold: trulyNew.length < DIVERSITY_THRESHOLD,
+        allConditionsMet:
+          USE_KEYWORD_ENRICHMENT_SMART_QUESTIONS &&
+          projectKeywords &&
+          projectKeywords.length > 0 &&
+          trulyNew.length < DIVERSITY_THRESHOLD,
+      })
+      // ════════════════════════════════════════════════════════════════════
+
       if (
         USE_KEYWORD_ENRICHMENT_SMART_QUESTIONS &&
         projectKeywords &&
         projectKeywords.length > 0 &&
         trulyNew.length < DIVERSITY_THRESHOLD
       ) {
+        console.info('[ENRICHMENT DIAGNOSIS] → ENTERING enrichment block')
+
         const lang: 'he' | 'en' = projectLanguage === 'he' ? 'he' : 'en'
 
         const enrichmentResult = generateSmartQuestionKeywordEnrichment({
@@ -733,6 +784,28 @@ export default function AIVisibilitySection({
           savedQuestions: allPrompts.map((p) => p.prompt || '').filter(Boolean),
           alreadyShownQuestions: exclude,
         })
+
+        // ════════════════════════════════════════════════════════════════════
+        // TEMPORARY DIAGNOSTIC: enrichment generation result
+        // ════════════════════════════════════════════════════════════════════
+        console.info('[ENRICHMENT DIAGNOSIS] enrichment generation result', {
+          candidatesCount: enrichmentResult.candidates.length,
+          debugSummary: {
+            analyzedKeywords: enrichmentResult.debug.analyzedKeywordsCount,
+            generable: enrichmentResult.debug.generableKeywordsCount,
+            rejectedByDuplicate: enrichmentResult.debug.rejectedByDuplicate,
+            rejectedByQuality: enrichmentResult.debug.rejectedByQuality,
+            rejectedByTopicIntent: enrichmentResult.debug.rejectedByTopicIntent,
+            rejectedByCapExceeded: enrichmentResult.debug.rejectedByCapExceeded,
+            finalCount: enrichmentResult.debug.finalCount,
+          },
+          candidates: enrichmentResult.candidates.map((c) => ({
+            question: c.question,
+            intent: c.intent,
+            sourceKeyword: c.sourceKeyword,
+          })),
+        })
+        // ════════════════════════════════════════════════════════════════════
 
         // Convert EnrichmentCandidate → PromptSuggestion, with a final text
         // dedup pass to guarantee no overlap with anything already in seenKeys.
@@ -760,7 +833,25 @@ export default function AIVisibilitySection({
             valueReason: '',
           }))
 
+        // ════════════════════════════════════════════════════════════════════
+        // TEMPORARY DIAGNOSTIC: after conversion and final dedup
+        // ════════════════════════════════════════════════════════════════════
+        console.info('[ENRICHMENT DIAGNOSIS] enrichment after conversion+dedup', {
+          countBeforeFinalDedup: enrichmentResult.candidates.length,
+          countAfterFinalDedup: enriched.length,
+          finalEnrichedQuestions: enriched.map((q) => q.prompt),
+        })
+        // ════════════════════════════════════════════════════════════════════
+
         trulyNew = [...trulyNew, ...enriched]
+
+        console.info('[ENRICHMENT DIAGNOSIS] trulyNew after enrichment appended', {
+          totalCount: trulyNew.length,
+          vNextCount: trulyNew.filter((q) => !q.id?.startsWith('enrichment-')).length,
+          enrichmentCount: trulyNew.filter((q) => q.id?.startsWith('enrichment-')).length,
+        })
+      } else {
+        console.info('[ENRICHMENT DIAGNOSIS] → SKIPPING enrichment block (conditions not met)')
       }
       // ──────────────────────────────────────────────────────────────────────
 
@@ -776,6 +867,20 @@ export default function AIVisibilitySection({
           currentlyShown.forEach((p) => next.add(normalize(p)))
           return next
         })
+
+        // ════════════════════════════════════════════════════════════════════
+        // TEMPORARY DIAGNOSTIC: final state before setSuggestedQuestions
+        // ════════════════════════════════════════════════════════════════════
+        console.info('[ENRICHMENT DIAGNOSIS] final state before setSuggestedQuestions', {
+          trulyNewCount: trulyNew.length,
+          trulyNewQuestions: trulyNew.map((q) => ({
+            prompt: q.prompt,
+            id: q.id,
+            isEnrichment: q.id?.startsWith('enrichment-'),
+          })),
+        })
+        // ════════════════════════════════════════════════════════════════════
+
         setSuggestedQuestions(trulyNew)
         // Show the hint even when we have some results, if the diversity layer
         // returned noticeably fewer than the visible batch size.
