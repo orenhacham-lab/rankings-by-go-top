@@ -20,6 +20,7 @@
 import type { KeywordAnalysis, KeywordType, KeywordTopic } from './keyword-analysis'
 import { resolveSeedsForKeyword, type KRSeedContext } from './keyword-research-seeds'
 import type { GeneratedQuestion } from '../ai-questions/generate-questions'
+import { detectEntityType, isQuestionCompatibleWithEntityType } from './keyword-entity-classifier'
 
 // ============================================================================
 // OUTPUT TYPE
@@ -168,6 +169,13 @@ export function generateKeywordResearchQuestions(
     for (const { text, intent } of resolved) {
       if (result.length >= limit) break
       if (!isAcceptable(text, language)) continue
+
+      // Phase 1: Entity classifier safety filter
+      // Detect entity type and check semantic compatibility
+      const entityType = detectEntityType(analysis.keyword, language)
+      if (!isQuestionCompatibleWithEntityType(text, analysis.keyword, entityType, language)) {
+        continue
+      }
 
       const key = text.trim().toLowerCase()
       if (seen.has(key)) continue
