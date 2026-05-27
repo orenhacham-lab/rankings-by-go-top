@@ -438,26 +438,20 @@ export function isQuestionCompatibleWithEntityType(
   }
 
   // =========================================================================
-  // BRAND
+  // BRAND (TIGHTENED - Phase 1)
   // =========================================================================
   if (entityType === 'brand') {
-    // Brands support reviews, comparison, recommendation
-    // Block direct pricing unless it's a product brand with clear context
-    // For now, generally permissive
-    return true
-  }
-
-  // =========================================================================
-  // CATEGORY_OR_TOPIC
-  // =========================================================================
-  if (entityType === 'category_or_topic') {
-    // Block direct pricing/buying of abstract topics
+    // Block direct pricing of brand itself (כמה עולה Apple?)
+    // Allow only if specific product/model context is clear
+    // Otherwise block (no price/buy for brand name alone)
     if (language === 'he') {
       const blockedPatterns = [
         'כמה עולה',
         'מה המחיר',
-        'איך לבחור',
         'איפה כדאי לקנות',
+        'איפה קונים',
+        'איך לבחור',
+        'האם כדאי לקנות',
       ]
       if (blockedPatterns.some(p => lower.includes(p.toLowerCase()))) {
         return false
@@ -466,14 +460,53 @@ export function isQuestionCompatibleWithEntityType(
       const blockedPatterns = [
         'how much does',
         'what does it cost',
-        'how to choose',
         'where to buy',
+        'how to buy',
+        'how to choose',
+        'should i buy',
       ]
       if (blockedPatterns.some(p => lower.includes(p.toLowerCase()))) {
         return false
       }
     }
-    // Allow informational questions
+    // Allow reviews, comparisons, recommendations
+    return true
+  }
+
+  // =========================================================================
+  // CATEGORY_OR_TOPIC (TIGHTENED - Phase 1)
+  // =========================================================================
+  if (entityType === 'category_or_topic') {
+    // Block all price/buy/choose templates for abstract topics
+    if (language === 'he') {
+      const blockedPatterns = [
+        'כמה עולה',
+        'מה המחיר',
+        'איפה כדאי לקנות',
+        'איפה קונים',
+        'איך לבחור',
+        'האם כדאי לקנות',
+      ]
+      if (blockedPatterns.some(p => lower.includes(p.toLowerCase()))) {
+        return false
+      }
+    } else {
+      const blockedPatterns = [
+        'how much does',
+        'what does it cost',
+        'where to buy',
+        'how to buy',
+        'how to choose',
+        'should i buy',
+      ]
+      if (blockedPatterns.some(p => lower.includes(p.toLowerCase()))) {
+        return false
+      }
+    }
+    // Allow only natural informational questions
+    // Examples: "מה חשוב לדעת על", "איך מתחילים עם", "אילו טעויות נפוצות"
+    // If question doesn't clearly indicate informational intent, still allow it
+    // (the question text should indicate if it's natural informational)
     return true
   }
 

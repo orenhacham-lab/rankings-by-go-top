@@ -403,3 +403,111 @@ describe('Integration: entity detection + compatibility', () => {
     expect(isCompatible).toBe(true)
   })
 })
+
+describe('Category/Topic tightened compatibility', () => {
+  it('should block price questions for topics', () => {
+    const entityType = detectEntityType('יוגה', 'he')
+    expect(entityType).toBe('category_or_topic')
+
+    expect(
+      isQuestionCompatibleWithEntityType('כמה עולה יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(false)
+
+    expect(
+      isQuestionCompatibleWithEntityType('מה המחיר של יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(false)
+  })
+
+  it('should block buy questions for topics', () => {
+    const entityType = detectEntityType('יוגה', 'he')
+    expect(entityType).toBe('category_or_topic')
+
+    expect(
+      isQuestionCompatibleWithEntityType('איפה כדאי לקנות יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(false)
+
+    expect(
+      isQuestionCompatibleWithEntityType('איפה קונים יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(false)
+  })
+
+  it('should block choose questions for topics', () => {
+    const entityType = detectEntityType('יוגה', 'he')
+    expect(entityType).toBe('category_or_topic')
+
+    expect(
+      isQuestionCompatibleWithEntityType('איך לבחור יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(false)
+
+    expect(
+      isQuestionCompatibleWithEntityType('האם כדאי לקנות יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(false)
+  })
+
+  it('should allow natural informational questions for topics', () => {
+    const entityType = detectEntityType('יוגה', 'he')
+    expect(entityType).toBe('category_or_topic')
+
+    expect(
+      isQuestionCompatibleWithEntityType('מה חשוב לדעת על יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(true)
+
+    expect(
+      isQuestionCompatibleWithEntityType('איך מתחילים עם יוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(true)
+
+    expect(
+      isQuestionCompatibleWithEntityType('אילו טעויות נפוצות יש ביוגה?', 'יוגה', entityType, 'he'),
+    ).toBe(true)
+  })
+})
+
+describe('Brand tightened compatibility', () => {
+  it('should block price questions for brands', () => {
+    const entityType = detectEntityType('Apple', 'en')
+    expect(entityType).toBe('brand')
+
+    expect(
+      isQuestionCompatibleWithEntityType('How much does Apple cost?', 'Apple', entityType, 'en'),
+    ).toBe(false)
+
+    expect(
+      isQuestionCompatibleWithEntityType('What does Apple cost?', 'Apple', entityType, 'en'),
+    ).toBe(false)
+  })
+
+  it('should block buy questions for brands', () => {
+    const entityType = detectEntityType('Nike', 'en')
+    expect(entityType).toBe('brand')
+
+    expect(
+      isQuestionCompatibleWithEntityType('Where to buy Nike?', 'Nike', entityType, 'en'),
+    ).toBe(false)
+
+    expect(
+      isQuestionCompatibleWithEntityType('How to buy Nike?', 'Nike', entityType, 'en'),
+    ).toBe(false)
+  })
+
+  it('should block choose questions for brands', () => {
+    const entityType = detectEntityType('Samsung', 'en')
+    expect(entityType).toBe('brand')
+
+    expect(
+      isQuestionCompatibleWithEntityType('How to choose Samsung?', 'Samsung', entityType, 'en'),
+    ).toBe(false)
+  })
+
+  it('should allow review/comparison questions for brands', () => {
+    const entityType = detectEntityType('Apple', 'en')
+    expect(entityType).toBe('brand')
+
+    expect(
+      isQuestionCompatibleWithEntityType('Is Apple recommended?', 'Apple', entityType, 'en'),
+    ).toBe(true)
+
+    expect(
+      isQuestionCompatibleWithEntityType('What is the difference between Apple and other brands?', 'Apple', entityType, 'en'),
+    ).toBe(true)
+  })
+})
