@@ -5,9 +5,6 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
-import { detectCategory } from '@/lib/ai-visibility/prompt-templates'
-import { analyzeSelectedKeywordSignals } from '@/lib/ai-visibility/keyword-analysis'
-import { generateKeywordResearchQuestions, toGeneratedQuestions } from '@/lib/ai-visibility/keyword-research-question-generator'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal from '@/components/keyword-research/TrendModal'
 import { Copy, Loader2, CheckCircle, Sparkles, TrendingUp } from 'lucide-react'
@@ -159,6 +156,7 @@ export default function KeywordResearchPage() {
   // AI Questions state
   const [aiQuestionsOpen, setAIQuestionsOpen] = useState(false)
   const [generatedAIQuestions, setGeneratedAIQuestions] = useState<GeneratedQuestion[]>([])
+  const [generatingAIQuestions, setGeneratingAIQuestions] = useState(false)
   const [addingAIQuestions, setAddingAIQuestions] = useState(false)
   const [aiQuestionsMessage, setAIQuestionsMessage] = useState('')
   const [aiQuestionsError, setAIQuestionsError] = useState('')
@@ -508,7 +506,7 @@ export default function KeywordResearchPage() {
     }
   }
 
-  const handleGenerateAIQuestions = () => {
+  const handleGenerateAIQuestions = async () => {
     if (!selectedProject) {
       setAIQuestionsError(t.addToProject.errorSelectProject)
       return
@@ -527,48 +525,60 @@ export default function KeywordResearchPage() {
       return
     }
 
-    // Resolve project category from project metadata (business name + domain).
-    // Passed to the keyword analysis layer as context for the relevance gate.
-    const projectCategory = detectCategory(
-      project.business_name || '',
-      project.target_domain || '',
-      []
-    )
-
-    // Phase 3 pipeline:
-    //   analyzeSelectedKeywordSignals → generateKeywordResearchQuestions → toGeneratedQuestions
-    const analyses = analyzeSelectedKeywordSignals({
-      selectedKeywords: keywordsList,
-      projectCategory,
-      language: language as 'he' | 'en',
-    })
-
-    const krQuestions = generateKeywordResearchQuestions(
-      analyses,
-      language as 'he' | 'en',
-      country || undefined,
-    )
-
-    if (krQuestions.length === 0) {
-      // Distinguish mismatch from general quality failure for the user message
-      const allMismatch = analyses.length > 0 && analyses.every(a => a.relevance === 'mismatch')
-      const emptyMessage = allMismatch
-        ? (language === 'he'
-            ? 'הביטויים שנבחרו לא תואמים לפרויקט שנבחר. בחרו ביטויים רלוונטיים יותר לפרויקט.'
-            : 'The selected keywords do not match the selected project. Try selecting more relevant keywords.')
-        : (language === 'he'
-            ? 'לא נמצאו שאלות AI איכותיות מהביטויים שנבחרו. נסו לבחור ביטויים מסחריים ורלוונטיים יותר.'
-            : 'No high-quality AI questions found for the selected keywords. Try selecting more commercial or relevant phrases.')
-      setAIQuestionsError(emptyMessage)
-      return
-    }
-
-    // Convert to GeneratedQuestion[] — modal interface is unchanged
-    const adapted = toGeneratedQuestions(krQuestions)
-    setGeneratedAIQuestions(adapted)
-    setAIQuestionsOpen(true)
+    setGeneratingAIQuestions(true)
     setAIQuestionsError('')
     setAIQuestionsMessage('')
+
+    try {
+      const response = await fetch('/api/keyword-research/generate-ai-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          selectedKeywords: keywordsList,
+          projectId: selectedProject,
+          projectBusinessName: project.business_name,
+          projectTargetDomain: project.target_domain,
+          language: language as 'he' | 'en',
+          country: country || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        setAIQuestionsError(
+          errorData.message ||
+          (language === 'he'
+            ? 'שגיאה בהפקת שאלות AI'
+            : 'Error generating AI questions')
+        )
+        return
+      }
+
+      const result = await response.json()
+
+      if (!result.questions || result.questions.length === 0) {
+        const emptyMessage = result.message || (language === 'he'
+          ? 'לא נמצאו שאלות AI איכותיות מהביטויים שנבחרו. נסו לבחור ביטויים מסחריים ורלוונטיים יותר.'
+          : 'No high-quality AI questions found for the selected keywords. Try selecting more commercial or relevant phrases.')
+        setAIQuestionsError(emptyMessage)
+        return
+      }
+
+      setGeneratedAIQuestions(result.questions)
+      setAIQuestionsOpen(true)
+      setAIQuestionsError('')
+      setAIQuestionsMessage('')
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      console.error('Error generating AI questions:', errorMsg)
+      setAIQuestionsError(
+        language === 'he'
+          ? 'שגיאה בהפקת שאלות AI. נסו שוב.'
+          : 'Error generating AI questions. Please try again.'
+      )
+    } finally {
+      setGeneratingAIQuestions(false)
+    }
   }
 
   const handleAddAIQuestions = async (questions: GeneratedQuestion[]) => {
@@ -966,11 +976,15 @@ export default function KeywordResearchPage() {
                   </button>
                   <button
                     onClick={handleGenerateAIQuestions}
-                    disabled={!selectedProject}
+                    disabled={!selectedProject || generatingAIQuestions}
                     className="text-xs px-3 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 transition-colors flex items-center gap-1"
                     title={!selectedProject ? t.addToProject.errorSelectProject : ''}
                   >
-                    <Sparkles size={14} />
+                    {generatingAIQuestions ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={14} />
+                    )}
                     {language === 'he' ? 'יצירת שאלות AI' : 'Create AI questions'}
                   </button>
                 </>
