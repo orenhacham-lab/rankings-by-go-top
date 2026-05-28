@@ -1,21 +1,23 @@
 /**
- * Server-side API route for generating AI questions with Gemini fallback
+ * Server-side API route for generating AI questions with Gemini semantic review
  *
  * Pipeline (single keyword):
- * 1. Validate request
- * 2. Analyze keyword signals (deterministic)
- * 3. Generate questions from templates
- * 4. If questions found, return them (do NOT call Gemini)
- * 5. If 0 questions, call Gemini as fallback (max 3 questions)
- * 6. Validate Gemini questions semantically
- * 7. Return safe questions or 0
+ * 1. Validate request and single keyword
+ * 2. Run normal generator for candidate questions
+ * 3. Send keyword + candidates to Gemini for semantic review + repair
+ * 4. Gemini returns max 3 final questions (can be valid candidates, repaired, or generated)
+ * 5. Validate final questions semantically
+ * 6. Return safe questions or 0
+ *
+ * Key: Gemini is NOT fallback-only. It reviews ALL candidates.
+ * This catches semantically bad questions like "כמה עולה מיקרוגל מחסני חשמל?"
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { analyzeSelectedKeywordSignals } from '@/lib/ai-visibility/keyword-analysis'
 import { generateKeywordResearchQuestions, toGeneratedQuestions, type GeneratedKRQuestion } from '@/lib/ai-visibility/keyword-research-question-generator'
 import { detectCategory } from '@/lib/ai-visibility/prompt-templates'
-import { classifyKeywordsWithGemini, isQuestionSemanticallyValid, generateFallbackQuestions, type FallbackQuestionResponse } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { classifyKeywordsWithGemini, isQuestionSemanticallyValid, reviewAndRepairQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 interface RequestBody {
   keyword: string
@@ -30,7 +32,7 @@ interface RequestBody {
  * POST /api/keyword-research/generate-ai-questions
  *
  * Generates AI research questions for a single keyword.
- * Uses normal generator first, Gemini fallback only if normal generator returns 0.
+ * Uses normal generator to create candidates, then Gemini reviews + repairs.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -65,42 +67,21 @@ export async function POST(request: NextRequest) {
       []
     )
 
-    // Step 1: Analyze keyword signals (deterministic)
+    // Step 1: Analyze keyword signals
     const analyses = analyzeSelectedKeywordSignals({
       selectedKeywords: [keyword],
       projectCategory,
       language,
     })
 
-    // Step 2: Generate questions using existing generator
+    // Step 2: Generate candidate questions using normal generator
     const krQuestions = generateKeywordResearchQuestions(
       analyses,
       language,
       country
     )
 
-    // Step 3: Convert to GeneratedQuestion format
-    let generatedQuestions = toGeneratedQuestions(krQuestions)
-
-    // Step 4: If normal generator found questions, return them (do NOT call Gemini)
-    if (generatedQuestions.length > 0) {
-      console.log(
-        `[Keyword Research API] Generated ${generatedQuestions.length} questions from templates for "${keyword}"`
-      )
-
-      return NextResponse.json({
-        questions: generatedQuestions,
-        count: generatedQuestions.length,
-        source: 'templates',
-      })
-    }
-
-    // Step 5: No templates found, try Gemini fallback
-    console.log(
-      `[Keyword Research API] No template questions for "${keyword}", trying Gemini fallback...`
-    )
-
-    // Get semantic classification for this keyword
+    // Step 3: Get semantic classification for this keyword
     const semanticMap = await classifyKeywordsWithGemini([keyword], language)
     const semantic = semanticMap.get(keyword)
 
@@ -113,15 +94,26 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Call Gemini to generate fallback questions
-    const fallbackResponses = await generateFallbackQuestions(
+    // Step 4: Send candidates to Gemini for semantic review + repair
+    const normalCandidates = krQuestions.map((q) => ({
+      question: q.question,
+      intent: intentFromType(q.type),
+      source: 'normal_generator' as const,
+    }))
+
+    console.log(
+      `[Keyword Research API] Sending ${normalCandidates.length} candidates to Gemini for review: "${keyword}"`
+    )
+
+    const finalQuestionResponses = await reviewAndRepairQuestions(
       keyword,
       semantic,
+      normalCandidates,
       language,
       country
     )
 
-    if (!fallbackResponses || fallbackResponses.length === 0) {
+    if (!finalQuestionResponses || finalQuestionResponses.length === 0) {
       return NextResponse.json({
         questions: [],
         message: language === 'he'
@@ -130,7 +122,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Step 6: Validate Gemini questions semantically and convert to GeneratedKRQuestion
+    // Step 5: Validate final questions semantically and convert to GeneratedKRQuestion
     const analysis = analyses[0]
     const intentToType = (intent: string): 'price' | 'recommendation' | 'comparison' | 'info' => {
       switch (intent) {
@@ -139,15 +131,16 @@ export async function POST(request: NextRequest) {
         case 'comparison': return 'comparison'
         case 'brand': return 'recommendation'
         case 'informational':
+        case 'local':
         default: return 'info'
       }
     }
 
     const krQuestionList: GeneratedKRQuestion[] = []
-    for (const fallbackResponse of fallbackResponses) {
+    for (const finalResponse of finalQuestionResponses) {
       // Validate before including
       const isValid = isQuestionSemanticallyValid(
-        fallbackResponse.question,
+        finalResponse.question,
         keyword,
         semantic,
         language
@@ -155,8 +148,8 @@ export async function POST(request: NextRequest) {
 
       if (isValid) {
         krQuestionList.push({
-          question: fallbackResponse.question,
-          type: intentToType(fallbackResponse.intent),
+          question: finalResponse.question,
+          type: intentToType(finalResponse.intent),
           sourceKeyword: keyword,
           sourceType: analysis?.keywordType || 'informational',
           topic: null,
@@ -174,17 +167,16 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Convert to GeneratedQuestion format
-    generatedQuestions = toGeneratedQuestions(krQuestionList)
+    // Convert to GeneratedQuestion format for modal
+    const generatedQuestions = toGeneratedQuestions(krQuestionList)
 
     console.log(
-      `[Keyword Research API] Generated ${generatedQuestions.length} fallback questions for "${keyword}" via Gemini`
+      `[Keyword Research API] Generated ${generatedQuestions.length} reviewed questions for "${keyword}"`
     )
 
     return NextResponse.json({
       questions: generatedQuestions,
       count: generatedQuestions.length,
-      source: 'gemini-fallback',
     })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
@@ -197,5 +189,18 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
+  }
+}
+
+/**
+ * Convert GeneratedKRQuestion type to intent string
+ */
+function intentFromType(type: 'price' | 'recommendation' | 'comparison' | 'info'): string {
+  switch (type) {
+    case 'price': return 'commercial'
+    case 'recommendation': return 'pre_purchase'
+    case 'comparison': return 'comparison'
+    case 'info':
+    default: return 'informational'
   }
 }
