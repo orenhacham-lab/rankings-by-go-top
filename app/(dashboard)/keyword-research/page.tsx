@@ -517,7 +517,17 @@ export default function KeywordResearchPage() {
       return
     }
 
-    const keywordsList = Array.from(selectedKeywords)
+    // Only allow exactly one keyword for generation
+    if (selectedKeywords.size > 1) {
+      setAIQuestionsError(
+        language === 'he'
+          ? 'בחרו ביטוי אחד בלבד ליצירת שאלות AI.'
+          : 'Select exactly one keyword to generate AI questions.'
+      )
+      return
+    }
+
+    const keyword = Array.from(selectedKeywords)[0]
     const project = projects.find((p) => p.id === selectedProject)
 
     if (!project) {
@@ -534,7 +544,7 @@ export default function KeywordResearchPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          selectedKeywords: keywordsList,
+          keyword,
           projectId: selectedProject,
           projectBusinessName: project.business_name,
           projectTargetDomain: project.target_domain,
@@ -558,8 +568,8 @@ export default function KeywordResearchPage() {
 
       if (!result.questions || result.questions.length === 0) {
         const emptyMessage = result.message || (language === 'he'
-          ? 'לא נמצאו שאלות AI איכותיות מהביטויים שנבחרו. נסו לבחור ביטויים מסחריים ורלוונטיים יותר.'
-          : 'No high-quality AI questions found for the selected keywords. Try selecting more commercial or relevant phrases.')
+          ? 'לא נמצאו שאלות AI איכותיות לביטוי זה. נסו ביטוי אחר.'
+          : 'No high-quality AI questions found for this keyword. Try a different keyword.')
         setAIQuestionsError(emptyMessage)
         return
       }

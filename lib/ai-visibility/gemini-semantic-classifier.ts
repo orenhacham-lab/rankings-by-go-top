@@ -404,3 +404,171 @@ function inferQuestionFamily(question: string, language: 'he' | 'en'): QuestionF
 
   return 'neutral_info'
 }
+
+/**
+ * Generate fallback questions for a keyword when normal templates don't work
+ *
+ * Called only when normal generator returns 0 questions.
+ * Returns maximum 3 raw questions that must pass semantic validation.
+ */
+export interface FallbackQuestionResponse {
+  question: string
+  intent: string
+  reason: string
+}
+
+export async function generateFallbackQuestions(
+  keyword: string,
+  semantic: SemanticClassification,
+  language: 'he' | 'en',
+  country?: string,
+): Promise<FallbackQuestionResponse[]> {
+  const client = getGeminiClient()
+  if (!client) {
+    console.warn('[Gemini Fallback] API unavailable, returning empty')
+    return []
+  }
+
+  const model = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
+
+  const prompt = buildFallbackPrompt(keyword, semantic, language, country)
+
+  try {
+    const genAI = client
+    const modelInstance = genAI.getGenerativeModel({ model })
+
+    const result = await modelInstance.generateContent(prompt)
+    const responseText = result.response.text()
+
+    // Parse JSON response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.warn('[Gemini Fallback] Response did not contain valid JSON')
+      return []
+    }
+
+    const parsed = JSON.parse(jsonMatch[0])
+    if (!parsed.questions || !Array.isArray(parsed.questions)) {
+      console.warn('[Gemini Fallback] Response missing questions array')
+      return []
+    }
+
+    // Return raw questions (will be validated by caller)
+    const questions = parsed.questions.slice(0, 3) as FallbackQuestionResponse[]
+
+    console.log(
+      `[Gemini Fallback] Generated ${questions.length} questions for "${keyword}" (model: ${model})`
+    )
+
+    return questions
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.warn(`[Gemini Fallback] Generation failed: ${errorMsg}`)
+    return []
+  }
+}
+
+/**
+ * Build Gemini prompt for fallback question generation
+ */
+function buildFallbackPrompt(
+  keyword: string,
+  semantic: SemanticClassification,
+  language: 'he' | 'en',
+  country?: string,
+): string {
+  const entityTypeText = semantic.entityType.replace(/_/g, ' ')
+
+  const systemPrompt =
+    language === 'he'
+      ? `אתה יוצר שאלות חיפוש איכותיות לכמנוע חיפוש.
+
+המילה-מפתח: "${keyword}"
+סוג הישות: ${entityTypeText}
+
+רשימת הכללים:
+
+PRODUCT / SERVICE: אפשר לשאול כמה עולה, איפה לקנות, איך לבחור.
+
+PROVIDER/PROFESSIONAL:
+- אל תשאל כמה עולה [המילה-מפתח ישירות]
+- אם צריך שאלה על מחיר, השתמש ב"שירות" בהקשר. למשל:
+  - מנעולן → "כמה עולה שירות מנעולן?"
+  - עורך דין → "כמה עולה ייעוץ משפטי?"
+
+LOCATION: אל תשאל כמה עולה הערים או מדינות ישירות.
+רק שאלות תיירות טבעיות:
+- "כמה עולה טיסה ליפן?"
+- "מה כדאי לבקר בו בפריז?"
+
+MEDICAL: אל תשאל כמה עולות מחלות.
+רק שאלות בטוח מדעיות:
+- "מה גורם לכאבי גב?"
+- "מתי כדאי לראות רופא?"
+
+BRAND: אל תשאל כמה עולה Apple.
+אפשר חוות דעת והשוואה.
+
+CATEGORY/TOPIC: אל תשאל כמה עולה יוגה.
+רק שאלות מידע טבעיות:
+- "איך מתחילים ביוגה?"
+- "מה ההבדל בין יוגה לפילאטיס?"
+
+צור 2-3 שאלות טבעיות באנגלית בלבד אם אין כללים מיוחדים.`
+      : `You are a quality search question generator for search engines.
+
+Keyword: "${keyword}"
+Entity type: ${entityTypeText}
+
+Rules:
+
+PRODUCT / SERVICE: Can ask price, where to buy, how to choose.
+
+PROVIDER/PROFESSIONAL:
+- Do NOT ask "How much does [raw keyword]?"
+- If asking about price, use service context:
+  - locksmith → "How much does locksmith service cost?"
+  - lawyer → "How much does legal consultation cost?"
+
+LOCATION: Do NOT ask "How much does Japan cost?"
+Only natural travel questions:
+- "How much does a flight to Japan cost?"
+- "What should I visit in Paris?"
+
+MEDICAL: Do NOT ask "How much does back pain cost?"
+Only safe science-based questions:
+- "What causes back pain?"
+- "When should I see a doctor for back pain?"
+
+BRAND: Do NOT ask "How much does Apple cost?"
+Allow reviews and comparisons.
+
+CATEGORY/TOPIC: Do NOT ask "How much does yoga cost?"
+Only natural informational questions:
+- "How to start yoga?"
+- "What is the difference between yoga and Pilates?"
+
+Generate 2-3 natural questions in English only unless special rules apply.`
+
+  const userPrompt = `Generate 2-3 high-quality search questions for the keyword "${keyword}" (${entityTypeText}).
+
+${semantic.allowedQuestionFamilies.length > 0 ? `Allowed question types: ${semantic.allowedQuestionFamilies.join(', ')}` : ''}
+${semantic.safePriceSubject ? `If price question is needed, use this context: "${semantic.safePriceSubject}"` : ''}
+${country ? `Country context: ${country}` : ''}
+
+Return ONLY valid JSON (no other text):
+
+{
+  "questions": [
+    {
+      "question": "natural question in ${language === 'he' ? 'Hebrew' : 'English'}",
+      "intent": "commercial|pre_purchase|informational|comparison|recommendation|brand",
+      "reason": "brief reason"
+    }
+  ]
+}
+
+Be strict. Avoid embarrassing questions. Maximum 3 questions.`
+
+  return `${systemPrompt}\n\n${userPrompt}`
+}
