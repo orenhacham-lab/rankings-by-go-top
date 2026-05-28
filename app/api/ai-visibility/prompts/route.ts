@@ -70,6 +70,7 @@ export async function POST(request: Request) {
     targetBrandName?: string | null
     country?: string | null
     language?: string | null
+    sourceSuggestionId?: string
   }
   try {
     body = await request.json()
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { projectId, prompt, targetDomain, targetBrandName, country, language } = body
+  const { projectId, prompt, targetDomain, targetBrandName, country, language, sourceSuggestionId } = body
   if (!projectId || !prompt || !prompt.trim()) {
     return Response.json({ error: 'projectId and prompt are required' }, { status: 400 })
   }
@@ -98,6 +99,17 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (existing) {
+    // If sourceSuggestionId provided, mark cache as accepted even if prompt already existed
+    if (sourceSuggestionId) {
+      await result.admin
+        .from('ai_question_suggestion_cache')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString()
+        })
+        .eq('id', sourceSuggestionId)
+        .eq('project_id', projectId)
+    }
     return Response.json({ prompt: existing, duplicate: true })
   }
 
@@ -117,6 +129,18 @@ export async function POST(request: Request) {
 
   if (error || !row) {
     return Response.json({ error: `Failed to create prompt: ${error?.message}` }, { status: 500 })
+  }
+
+  // If sourceSuggestionId provided, mark cache as accepted
+  if (sourceSuggestionId) {
+    await result.admin
+      .from('ai_question_suggestion_cache')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString()
+      })
+      .eq('id', sourceSuggestionId)
+      .eq('project_id', projectId)
   }
 
   return Response.json({ prompt: row })
