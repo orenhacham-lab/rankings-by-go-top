@@ -937,6 +937,16 @@ export default function AIVisibilitySection({
         })
         .map((q) => ({ ...q, _apiSource: 'vnext' as const }))
 
+      // DEBUG: Check vNextFiltered initial state
+      console.log('[AIVisibility-refreshSuggestions] VNEXT_FILTERED_INITIAL', {
+        count: vNextFiltered.length,
+        sample: vNextFiltered[0] ? {
+          prompt: (vNextFiltered[0] as any).prompt?.substring(0, 60),
+          hasApiSource: '_apiSource' in vNextFiltered[0],
+          apiSourceValue: (vNextFiltered[0] as any)._apiSource,
+        } : null,
+      })
+
       // ── Gemini-powered enrichment via persistent cache layer ──────────────
       try {
         const enrichResponse = await fetch('/api/ai-visibility/enriched-suggestions', {
@@ -1040,6 +1050,15 @@ export default function AIVisibilitySection({
 
           vNextFiltered = [...vNextFiltered, ...apiFiltered]
 
+          // DEBUG: Check vNextFiltered after API merge
+          console.log('[AIVisibility-refreshSuggestions] VNEXT_FILTERED_AFTER_API_MERGE', {
+            count: vNextFiltered.length,
+            vnextItemCount: vNextFiltered.filter((q: any) => (q as any)._apiSource === 'vnext').length,
+            cacheItemCount: vNextFiltered.filter((q: any) => (q as any)._apiSource === 'cache').length,
+            geminiItemCount: vNextFiltered.filter((q: any) => (q as any)._apiSource === 'gemini').length,
+            unknownItemCount: vNextFiltered.filter((q: any) => !(q as any)._apiSource).length,
+          })
+
           // Log dedup breakdown using dedupedQuestions as source of truth
           console.log('[AIVisibility-refreshSuggestions] Server dedup breakdown', {
             apiDedupedCount: apiDedupedQuestions.length,
@@ -1060,6 +1079,17 @@ export default function AIVisibilitySection({
       // Apply display-level safety filter: block invalid price questions
       const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
       const filtered = vNextFiltered.filter((q) => !isInvalidPriceQuestion(q.prompt, lang))
+
+      // DEBUG: Check filtered items have _apiSource
+      console.log('[AIVisibility-refreshSuggestions] FILTERED_SOURCE_DEBUG', {
+        filteredCount: filtered.length,
+        samples: filtered.slice(0, 2).map((q: any) => ({
+          prompt: q.prompt?.substring(0, 60),
+          hasApiSource: '_apiSource' in q,
+          apiSourceValue: (q as any)._apiSource,
+          keys: Object.keys(q).slice(0, 5),
+        })),
+      })
 
       if (filtered.length === 0) {
         // No new candidates from this batch
@@ -1082,6 +1112,20 @@ export default function AIVisibilitySection({
           const qText = q?.prompt ?? ''
           const normalized = typeof qText === 'string' ? normalizeLightDedup(qText) : ''
           return normalized && !prevNormSet.has(normalized)
+        })
+
+        // DEBUG: Log the actual source field on newItems before counting
+        console.log('[AIVisibility-refreshSuggestions] NEW_ITEMS_SOURCE_DEBUG', {
+          newItemsCount: newItems.length,
+          samples: newItems.slice(0, 3).map((q: any) => ({
+            prompt: q.prompt?.substring(0, 60),
+            source: (q as any).source,
+            _apiSource: (q as any)._apiSource,
+            origin: (q as any).origin,
+            metadataSource: (q as any).metadata?.source,
+            keys: Object.keys(q).join(','),
+            normalizedSource: normalizeSuggestionSource(q),
+          })),
         })
 
         duplicatesRemovedCount = filtered.length - newItems.length
