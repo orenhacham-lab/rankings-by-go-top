@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     language?: 'he' | 'en'
     country?: string | null
     businessCategory?: string | null
+    cacheOnly?: boolean
   }
   try {
     body = await request.json()
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { projectId, language = 'he', country, businessCategory } = body
+  const { projectId, language = 'he', country, businessCategory, cacheOnly = false } = body
 
   if (!projectId || !language) {
     return Response.json({ error: 'projectId and language are required' }, { status: 400 })
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
 
     // Filter cached suggestions by business scope
     const filteredCachedLogs: Array<{ question: string; reason: string }> = []
-    const cachedSuggestions = filterSuggestionsByBusinessScope(
+    let cachedSuggestions = filterSuggestionsByBusinessScope(
       rawCachedSuggestions,
       businessScope,
       (question, reason) => {
@@ -163,6 +164,18 @@ export async function POST(request: Request) {
       filtered: filteredCachedLogs.length,
       examples: filteredCachedLogs.slice(0, 3),
     })
+
+    // Apply Hebrew quality filter to cached suggestions — removes stale/bad entries
+    if (language === 'he') {
+      const beforeQuality = cachedSuggestions.length
+      cachedSuggestions = cachedSuggestions.filter(q => !containsUnnaturalorBrokenHebrew(q.question))
+      const rejectedByQuality = beforeQuality - cachedSuggestions.length
+      if (rejectedByQuality > 0) {
+        console.log('[enriched-suggestions] Removed stale cached suggestions via Hebrew quality filter', {
+          count: rejectedByQuality,
+        })
+      }
+    }
 
     const cachedSet = new Set(cachedSuggestions.map(q => strongNormalize(q.question)))
 
@@ -181,8 +194,15 @@ export async function POST(request: Request) {
     let source: 'vNext' | 'vNext+cache' | 'vNext+cache+gemini' = 'vNext'
     let geminiWasCalled = false
 
-    if (uniqueCount < QUALITY_THRESHOLD) {
-      source = cachedSuggestions.length > 0 ? 'vNext+cache+gemini' : 'vNext+cache+gemini'
+    if (cacheOnly) {
+      source = cachedSuggestions.length > 0 ? 'vNext+cache' : 'vNext'
+      console.log('[enriched-suggestions] Skipping Gemini (cacheOnly mode)', {
+        cacheOnly,
+        uniqueCount,
+        cachedCount: cachedSuggestions.length,
+      })
+    } else if (uniqueCount < QUALITY_THRESHOLD) {
+      source = 'vNext+cache+gemini'
       geminiWasCalled = true
 
       // Convert country code to display name for Gemini
@@ -403,6 +423,7 @@ export async function POST(request: Request) {
 
     // CACHE VERIFICATION LOGGING for debugging
     console.log('[enriched-suggestions] CACHE VERIFICATION', {
+      cacheOnly,
       vNextCount: vNextQuestions.length,
       cachedLoadedRaw: rawCachedSuggestions.length,
       cachedAfterScopeFilter: cachedSuggestions.length,
@@ -412,7 +433,7 @@ export async function POST(request: Request) {
       uniqueCountBefore: uniqueCount,
       uniqueCountAfter: dedupedQuestions.length,
       threshold: QUALITY_THRESHOLD,
-      geminiNotCalledReason: geminiWasCalled ? 'N/A' : 'threshold met or >= 20 unique',
+      geminiNotCalledReason: geminiWasCalled ? 'N/A' : cacheOnly ? 'cacheOnly mode' : 'threshold met or >= 20 unique',
     })
 
     return Response.json({

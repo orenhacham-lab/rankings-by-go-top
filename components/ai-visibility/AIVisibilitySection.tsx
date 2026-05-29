@@ -57,7 +57,9 @@ import type {
   CompetitorCategory,
 } from '@/lib/ai-visibility/geo-competitor-intelligence'
 import type { BusinessMentionIntelligence } from '@/lib/ai-visibility/geo-business-mentions'
-import { dedupClientSide, strongNormalize } from '@/lib/ai-visibility/suggestion-dedup'
+import { dedupClientSide, applyDiversityFilter } from '@/lib/ai-visibility/suggestion-dedup'
+
+const MAX_SUGGESTIONS = 40
 
 const SUPPORTED_ENGINES = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode'] as const
 
@@ -388,6 +390,8 @@ export default function AIVisibilitySection({
   }, [projectId])
 
   useEffect(() => {
+    let cancelled = false
+
     const suggestions = generatePromptSuggestions({
       businessName: projectBrandName,
       domain: projectDomain,
@@ -399,21 +403,116 @@ export default function AIVisibilitySection({
       shuffle: false,
       limit: 8,
     })
-    // Apply display-level safety filter: block invalid price questions
-    // (e.g., asking for price of a store, company, brand, website)
     const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
-    const filtered = suggestions.filter(
-      (q) => !isInvalidPriceQuestion(q.prompt, lang)
-    )
-    // Keep all generated suggestions in state so the "Show more" button can
-    // expand beyond the initial 4 visible. Render-time slicing handles
-    // pagination based on showAllSmartQuestions.
-    setSuggestedQuestions(filtered)
-    // Fresh profile context — wipe the exclusion ledger and "no new" flag so
-    // the user can start a new generation cycle.
+    const vNextFiltered = suggestions.filter((q) => !isInvalidPriceQuestion(q.prompt, lang))
+
+    // Show vNext immediately — cached suggestions arrive in the background
+    setSuggestedQuestions(vNextFiltered)
     setExcludedSuggestionKeys(new Set())
     setNoNewSuggestionsFound(false)
-  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile])
+
+    // Background: load cached Gemini suggestions without calling Gemini API
+    ;(async () => {
+      try {
+        const response = await fetch('/api/ai-visibility/enriched-suggestions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            language: lang,
+            country: projectCountry || undefined,
+            businessCategory: null,
+            cacheOnly: true,
+          }),
+        })
+
+        if (cancelled) return
+        if (!response.ok) return
+
+        const data = await response.json()
+        if (cancelled) return
+
+        const cachedRaw: Array<{ id?: string; question: string; intent?: string }> = data.cachedSuggestions || []
+
+        if (cachedRaw.length === 0) {
+          console.log('[AIVisibility-initialLoad] No cached suggestions found', {
+            vNextCount: vNextFiltered.length,
+            cachedLoadedRaw: 0,
+            geminiWasCalled: false,
+          })
+          return
+        }
+
+        const normalizeText = (t?: string | null): string => {
+          if (!t || typeof t !== 'string') return ''
+          return t.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+        }
+
+        // Dedup: vNext as "previous", cached as "new additions"
+        const dedupResult = dedupClientSide(
+          vNextFiltered.map((q) => ({ prompt: q.prompt, intent: q.intent })),
+          cachedRaw.map((q) => ({ question: q.question, intent: q.intent }))
+        )
+
+        // Diversity filter on the full merged pool (nothing pre-existing)
+        const { filtered: diversePool, removedCount: diversityRemoved } = applyDiversityFilter(dedupResult.deduped)
+
+        // Cap at MAX_SUGGESTIONS
+        const capped = diversePool.slice(0, MAX_SUGGESTIONS)
+
+        // Convert back to PromptSuggestion[], reusing existing objects where possible
+        const intentToLabel = (s: string): string =>
+          s === 'commercial' ? 'Commercial'
+          : s === 'informational' ? 'Informational'
+          : s === 'pre_purchase' ? 'Pre-purchase'
+          : s === 'comparison' ? 'Comparison'
+          : s === 'recommendation' ? 'Recommendation'
+          : s === 'brand' ? 'Brand'
+          : s === 'local' ? 'Local'
+          : 'Other'
+
+        const merged: PromptSuggestion[] = capped.map((q) => {
+          const fromVNext = vNextFiltered.find((v) => normalizeText(v.prompt) === normalizeText(q.prompt))
+          if (fromVNext) return fromVNext
+          const fromCached = cachedRaw.find((c) => normalizeText(c.question) === normalizeText(q.prompt))
+          const intentStr = fromCached?.intent || 'other'
+          return {
+            id: `gemini-${fromCached?.id || Math.random().toString(36).slice(2, 8)}`,
+            prompt: q.prompt,
+            intent: intentStr as any,
+            intentLabel: intentToLabel(intentStr),
+            category: 'generic',
+            language: projectLanguage ?? 'he',
+            qualityScore: 75,
+            confidenceTier: 'good' as const,
+            reason: '',
+            chips: [],
+            valueReason: '',
+          }
+        })
+
+        console.log('[AIVisibility-initialLoad] Merged vNext + cached', {
+          vNextCount: vNextFiltered.length,
+          cachedLoadedRaw: cachedRaw.length,
+          cachedAfterValidation: cachedRaw.length,
+          duplicatesRemovedByDedup: dedupResult.removed,
+          diversityFiltered: diversityRemoved,
+          finalInitialVisibleCount: merged.length,
+          geminiWasCalled: false,
+        })
+
+        if (!cancelled) {
+          setSuggestedQuestions(merged)
+        }
+      } catch (e) {
+        console.debug('[AIVisibility-initialLoad] Cache load failed, showing vNext only:', e)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [projectBrandName, projectDomain, projectCity, projectCountry, projectLanguage, projectKeywords, manualProfile, projectId])
 
   useEffect(() => {
     loadAllResults()
@@ -689,7 +788,15 @@ export default function AIVisibilitySection({
       let newGeminiCount = 0
       let cachedLoadedCount = 0
       let duplicatesRemovedCount = 0
+      let diversityFilteredCount = 0
       let emptyStateReason = ''
+
+      // Pool is already at the hard cap — no need to call API
+      if (visibleBefore >= MAX_SUGGESTIONS) {
+        emptyStateReason = 'pool_full'
+        setNoNewSuggestionsFound(true)
+        return
+      }
 
       // Build the exclusion ledger: every prompt the user has ever seen in this session OR already tracks
       const currentlyShown = suggestedQuestions.map((q) => q.prompt)
@@ -795,47 +902,58 @@ export default function AIVisibilitySection({
         emptyStateReason = 'no_new_candidates'
         setNoNewSuggestionsFound(true)
       } else {
-        // Build the FINAL merged array: previous visible + new batch
-        const finalMerged = [...suggestedQuestions, ...filtered]
-
-        // Run FINAL semantic dedup on the complete list
+        // Run semantic dedup: previous visible as base, new batch as candidates
+        const prevQuestions = suggestedQuestions.map((q) => ({ prompt: q.prompt, intent: q.intent }))
         const dedupResult = dedupClientSide(
-          suggestedQuestions.map((q) => ({ prompt: q.prompt, intent: q.intent })), // Previous visible suggestions
-          filtered.map((q) => ({ question: q.prompt, intent: q.intent })) // New suggestions as objects
+          prevQuestions,
+          filtered.map((q) => ({ question: q.prompt, intent: q.intent }))
         )
-        const dedupedQuestions = dedupResult.deduped.map((q) => ({ question: q.prompt, intent: q.intent }))
         const duplicateCount = dedupResult.removed
-
         duplicatesRemovedCount = duplicateCount
 
-        console.log('[AIVisibility-refreshSuggestions] Final merge dedup', {
-          beforeDedup: finalMerged.length,
-          afterDedup: dedupedQuestions.length,
-          duplicatesRemoved: duplicateCount,
+        // Split existing vs new by normalized text membership (robust vs position-based slice)
+        const prevNormSet = new Set(prevQuestions.map((q) => normalize(q.prompt)))
+        const existingPart = dedupResult.deduped.filter((q) => prevNormSet.has(normalize(q.prompt)))
+        const newPart = dedupResult.deduped.filter((q) => !prevNormSet.has(normalize(q.prompt)))
+
+        // Diversity filter: apply only to new suggestions, accounting for existing bucket counts
+        const { filtered: diverseNew, removedCount: diversityRemoved } = applyDiversityFilter(newPart, existingPart)
+        diversityFilteredCount = diversityRemoved
+
+        // Combine and apply hard pool cap
+        const totalAvailable = [...existingPart, ...diverseNew]
+        const capped = totalAvailable.slice(0, MAX_SUGGESTIONS)
+
+        console.log('[AIVisibility-refreshSuggestions] Final merge dedup + diversity', {
           visibleBefore,
-          visibleAfter: dedupedQuestions.length,
+          afterDedup: totalAvailable.length,
+          duplicatesRemoved: duplicateCount,
+          diversityFiltered: diversityRemoved,
+          afterCap: capped.length,
+          poolMax: MAX_SUGGESTIONS,
         })
 
-        // Convert deduped back to PromptSuggestion format
-        const finalDeduped: PromptSuggestion[] = dedupedQuestions.map((q) => {
-          const existing = finalMerged.find((fm) => normalize(fm.prompt) === normalize(q.question))
-          if (existing) {
-            return existing
-          }
+        const intentToLabel = (s: string): string =>
+          s === 'commercial' ? 'Commercial'
+          : s === 'informational' ? 'Informational'
+          : s === 'pre_purchase' ? 'Pre-purchase'
+          : s === 'comparison' ? 'Comparison'
+          : s === 'recommendation' ? 'Recommendation'
+          : s === 'brand' ? 'Brand'
+          : s === 'local' ? 'Local'
+          : 'Other'
+
+        // Convert back to PromptSuggestion[], reusing existing objects where possible
+        const finalMerged = [...suggestedQuestions, ...filtered]
+        const finalDeduped: PromptSuggestion[] = capped.map((q) => {
+          const fromExisting = finalMerged.find((fm) => normalize(fm.prompt) === normalize(q.prompt))
+          if (fromExisting) return fromExisting
           const intentStr = q.intent || 'other'
-          const intentLabel = intentStr === 'commercial' ? 'Commercial'
-                           : intentStr === 'informational' ? 'Informational'
-                           : intentStr === 'pre_purchase' ? 'Pre-purchase'
-                           : intentStr === 'comparison' ? 'Comparison'
-                           : intentStr === 'recommendation' ? 'Recommendation'
-                           : intentStr === 'brand' ? 'Brand'
-                           : intentStr === 'local' ? 'Local'
-                           : 'Other'
           return {
             id: `final-${Math.random().toString(36).slice(2, 8)}`,
-            prompt: q.question,
+            prompt: q.prompt,
             intent: intentStr as any,
-            intentLabel,
+            intentLabel: intentToLabel(intentStr),
             category: 'generic',
             language: projectLanguage ?? 'he',
             qualityScore: 75,
@@ -849,13 +967,6 @@ export default function AIVisibilitySection({
         const visibleAfter = finalDeduped.length
         const growth = visibleAfter - visibleBefore
 
-        console.log('[AIVisibility-refreshSuggestions] Growth metrics', {
-          visibleBefore,
-          visibleAfter,
-          growth,
-          targetCount: 20,
-        })
-
         // Update exclusion ledger
         setExcludedSuggestionKeys((prev) => {
           const next = new Set(prev)
@@ -863,13 +974,12 @@ export default function AIVisibilitySection({
           return next
         })
 
-        // Set the final deduped list
         setSuggestedQuestions(finalDeduped)
 
-        // Only show empty-state if:
-        // 1. This batch added zero new visible questions after dedup
-        // 2. AND we either didn't call Gemini OR Gemini returned nothing valid
-        if (growth === 0) {
+        if (visibleAfter >= MAX_SUGGESTIONS) {
+          emptyStateReason = 'pool_full_after_merge'
+          setNoNewSuggestionsFound(true)
+        } else if (growth === 0) {
           if (!geminiWasCalled) {
             emptyStateReason = 'pool_exhausted_no_gemini'
           } else if (newGeminiCount === 0) {
@@ -890,8 +1000,10 @@ export default function AIVisibilitySection({
         cachedLoadedCount,
         newGeminiCount,
         duplicatesRemovedCount,
+        diversityFilteredCount,
         finalVisibleCount: suggestedQuestions.length,
         geminiWasCalled,
+        poolMax: MAX_SUGGESTIONS,
         emptyStateReason,
       })
     } catch (e) {

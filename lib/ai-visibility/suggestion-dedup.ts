@@ -236,3 +236,109 @@ export function dedupClientSide(
 
   return { deduped, removed: removedCount }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DIVERSITY FILTER
+// Limits how many questions from the same narrow theme appear in the final pool.
+// Operates on Hebrew keyword signals; questions in other languages fall into
+// the 'other' bucket which has a generous cap.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type DiversityBucket =
+  | 'price_delivery_location'
+  | 'occasion_bouquet'
+  | 'woman_mom'
+  | 'review_trust'
+  | 'delivery_location'
+  | 'other'
+
+const DIVERSITY_CAPS: Record<DiversityBucket, number> = {
+  price_delivery_location: 3,
+  occasion_bouquet: 3,
+  woman_mom: 2,
+  review_trust: 2,
+  delivery_location: 2,
+  other: 999,
+}
+
+function classifyIntoDiversityBucket(question: string): DiversityBucket {
+  const lower = question.toLowerCase()
+  const hasPriceWord = /כמה|מחיר|עולה|עלות/.test(lower)
+  const hasDelivery = /משלוח/.test(lower)
+  const hasCity = /ירושלים|תל\s*אביב|הרצלי|פתח\s*תקו|בת\s*ים|נתניה|חיפה|ראשון|גבעת|אשדוד/.test(lower)
+  const hasOccasion = /חתונה|יום\s*הולדת|בר\s*מצווה|בת\s*מצווה|חגיגה|הנצחה|שבעה|אזכרה|נישואין/.test(lower)
+  const hasWomanMom = /\bאישה\b|\bאמא\b/.test(lower)
+  const hasReview = /חוות\s*דעת|ביקורות|מוניטין|מהימן|אמין/.test(lower)
+
+  if (hasPriceWord && (hasDelivery || hasCity)) return 'price_delivery_location'
+  if (hasDelivery && hasCity) return 'delivery_location'
+  if (hasOccasion) return 'occasion_bouquet'
+  if (hasWomanMom) return 'woman_mom'
+  if (hasReview) return 'review_trust'
+  return 'other'
+}
+
+const OCCASION_WORDS = ['חתונה', 'יום הולדת', 'בר מצווה', 'בת מצווה', 'נישואין', 'הנצחה', 'שבעה'] as const
+
+/**
+ * Filters suggestions to enforce per-theme diversity caps.
+ * Pass `existing` to pre-load bucket counts from already-shown suggestions.
+ * Only `suggestions` are filtered; `existing` are never removed.
+ */
+export function applyDiversityFilter(
+  suggestions: Array<{ prompt: string; intent?: string }>,
+  existing: Array<{ prompt: string; intent?: string }> = []
+): { filtered: Array<{ prompt: string; intent?: string }>; removedCount: number } {
+  const bucketCounts: Record<DiversityBucket, number> = {
+    price_delivery_location: 0,
+    occasion_bouquet: 0,
+    woman_mom: 0,
+    review_trust: 0,
+    delivery_location: 0,
+    other: 0,
+  }
+
+  // Pre-load bucket counts from already-shown suggestions
+  const occasionIntentSeen = new Set<string>()
+  for (const s of existing) {
+    const bucket = classifyIntoDiversityBucket(s.prompt)
+    bucketCounts[bucket]++
+    if (bucket === 'occasion_bouquet' && s.intent) {
+      const lower = s.prompt.toLowerCase()
+      const matched = OCCASION_WORDS.find((w) => lower.includes(w))
+      if (matched) occasionIntentSeen.add(`${matched}:${s.intent}`)
+    }
+  }
+
+  const filtered: Array<{ prompt: string; intent?: string }> = []
+  let removedCount = 0
+
+  for (const suggestion of suggestions) {
+    const bucket = classifyIntoDiversityBucket(suggestion.prompt)
+    const cap = DIVERSITY_CAPS[bucket]
+
+    if (bucketCounts[bucket] >= cap) {
+      removedCount++
+      continue
+    }
+
+    // Enforce max 1 per exact occasion+intent combination
+    if (bucket === 'occasion_bouquet' && suggestion.intent) {
+      const lower = suggestion.prompt.toLowerCase()
+      const matched = OCCASION_WORDS.find((w) => lower.includes(w))
+      if (matched) {
+        const key = `${matched}:${suggestion.intent}`
+        if (occasionIntentSeen.has(key)) {
+          removedCount++
+          continue
+        }
+        occasionIntentSeen.add(key)
+      }
+    }
+
+    bucketCounts[bucket]++
+    filtered.push(suggestion)
+  }
+
+  return { filtered, removedCount }
+}

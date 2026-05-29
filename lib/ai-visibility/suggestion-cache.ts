@@ -853,6 +853,8 @@ export function containsUnnaturalorBrokenHebrew(question: string): boolean {
     /עם\s+משלוח\s+בהתאם/i, // awkward with delivery according
     /לפי\s+\[.*?\]/i, // template with bracketed placeholder
     /של\s+\[.*?\]/i, // template with bracketed placeholder
+    /מה\s+המחיר\s+של\s+חבילה/i, // "what's the price of a package" - ambiguous/unclear reference
+    /כמה\s+עולה\s+חבילה/i, // "how much does a package cost" - ambiguous/unclear reference
   ]
 
   for (const pattern of unnatternalPatterns) {
