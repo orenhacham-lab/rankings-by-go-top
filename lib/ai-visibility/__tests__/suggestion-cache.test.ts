@@ -1,9 +1,9 @@
 /**
  * Tests for suggestion cache utilities
- * Covers: normalization, hashing, deduplication
+ * Covers: normalization, hashing, deduplication, semantic dedup gates
  */
 
-import { computeContextHash, computeQuestionHash, normalizeQuestion, deduplicateSuggestions } from '../suggestion-cache'
+import { computeContextHash, computeQuestionHash, normalizeQuestion, deduplicateSuggestions, areSemanticDuplicates } from '../suggestion-cache'
 
 describe('Suggestion cache utilities', () => {
   describe('normalizeQuestion', () => {
@@ -186,5 +186,65 @@ describe('Suggestion cache utilities', () => {
       const result = deduplicateSuggestions([q1], [{ question: q2.question }], [], [])
       expect(result).toHaveLength(0)
     })
+  })
+})
+
+// ============================================================
+// Semantic dedup gate tests
+// These verify the occasion + location hard gates added to
+// areSemanticDuplicates so that distinct questions are preserved
+// even when they share broad topic keywords.
+// ============================================================
+describe('areSemanticDuplicates — occasion and location hard gates', () => {
+  // ── Should NOT be duplicates ─────────────────────────────
+  it('price vs delivery-time: "כמה עולה" vs "כמה זמן לוקח" same-day delivery', () => {
+    // Before fix: both triggered מחיר action via shared 'כמה' → incorrectly deduped
+    const q1 = { question: 'כמה עולה משלוח פרחים לירושלים באותו היום?', intent: 'commercial' }
+    const q2 = { question: 'כמה זמן לוקח משלוח פרחים לבית?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  it('price vs delivery-time: Jerusalem price vs home delivery time', () => {
+    const q1 = { question: 'כמה עולה משלוח פרחים לירושלים?', intent: 'commercial' }
+    const q2 = { question: 'כמה זמן לוקח משלוח פרחים לבית?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  it('price+occasion vs delivery-time+home: occasion-based price vs time', () => {
+    const q1 = { question: 'כמה עולה משלוח פרחים ליום נישואין?', intent: 'commercial' }
+    const q2 = { question: 'כמה זמן לוקח משלוח פרחים לבית?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  it('birth vs wedding occasion: "ללידה" vs "לחתונת שישי"', () => {
+    // Before fix: occasion field existed but was never checked → incorrectly deduped
+    const q1 = { question: 'איזה פרחים מתאימים ללידה?', intent: 'pre_purchase' }
+    const q2 = { question: 'איזה פרחים מתאימים לחתונת שישי?', intent: 'pre_purchase' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  it('anniversary vs birthday: "ליום נישואין" vs "ליום הולדת 50"', () => {
+    const q1 = { question: 'איזה סוג זר פרחים מתאים ליום נישואין?', intent: 'pre_purchase' }
+    const q2 = { question: 'איזה זר פרחים מתאים ליום הולדת 50?', intent: 'pre_purchase' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  // ── Should be duplicates ─────────────────────────────────
+  it('same price+location different phrasing: "כמה עולה" vs "מה המחיר" same city', () => {
+    const q1 = { question: 'כמה עולה משלוח פרחים לירושלים?', intent: 'commercial' }
+    const q2 = { question: 'מה המחיר של משלוח פרחים בירושלים?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(true)
+  })
+
+  it('same anniversary occasion, "סוג" vs no "סוג": near-identical', () => {
+    const q1 = { question: 'איזה זר פרחים מתאים ליום נישואין?', intent: 'pre_purchase' }
+    const q2 = { question: 'איזה סוג זר פרחים מתאים ליום נישואין?', intent: 'pre_purchase' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(true)
+  })
+
+  it('same price intent, same product: "כמה עולה זר ורדים" vs "מה המחיר של זר ורדים"', () => {
+    const q1 = { question: 'כמה עולה זר ורדים?', intent: 'commercial' }
+    const q2 = { question: 'מה המחיר של זר ורדים?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(true)
   })
 })

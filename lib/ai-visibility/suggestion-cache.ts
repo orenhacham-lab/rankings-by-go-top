@@ -146,7 +146,10 @@ export function generateSemanticSignature(question: string, intent?: string): {
   const actionPatterns: Record<string, string[]> = {
     משלוח: ['משלוח', 'דליברי', 'משלח'],
     קנייה: ['קונים', 'לקנות', 'קונה', 'קניה', 'קנה'],
-    מחיר: ['עולה', 'כמה', 'מחיר', 'עלות'],
+    // 'כמה' removed — it is a generic question word ("how much/how long") not a price signal.
+    // "כמה זמן לוקח" (delivery time) and "כמה עולה" (price) both contain "כמה",
+    // causing them to share the מחיר action and be incorrectly treated as duplicates.
+    מחיר: ['עולה', 'מחיר', 'עלות'],
     בחירה: ['בוחרים', 'מתאים', 'בחירה', 'כיצד לבחור'],
   }
 
@@ -156,12 +159,14 @@ export function generateSemanticSignature(question: string, intent?: string): {
     }
   }
 
-  // Extract occasion
+  // Extract occasion — ordered most-specific first so "יום הולדת" wins over generic "מתנה"
   const occasionPatterns: Record<string, string[]> = {
-    'יום הולדת': ['יום הולדת', 'יום יום'],
-    'חתונה': ['חתונה', 'חתן', 'כלה'],
-    'הנצחה': ['הנצחה', 'הנצחי', 'זיכרון'],
-    'מתנה': ['מתנה', 'מתנות', 'מתנה'],
+    'יום הולדת': ['יום הולדת'],
+    'יום נישואין': ['יום נישואין', 'יום נישואים'],
+    'חתונה': ['חתונה', 'חתן', 'כלה', 'חתונת'],  // 'חתונת' = construct form (e.g. "לחתונת שישי")
+    'לידה': ['לידה', 'תינוק', 'תינוקת', 'ברית', 'נולד'],
+    'הנצחה': ['הנצחה', 'זיכרון', 'ניחומים', 'אבל'],
+    'מתנה': ['מתנה', 'מתנות'],
   }
   let occasion = ''
   for (const [occ, keywords] of Object.entries(occasionPatterns)) {
@@ -209,6 +214,18 @@ export function areSemanticDuplicates(
     return false
   }
 
+  // HARD GATE — occasion: if either question has a recognized occasion and they differ, keep both.
+  // "ללידה" vs "לחתונת שישי", "ליום נישואין" vs "ליום הולדת" must never collapse.
+  if ((sig1.occasion || sig2.occasion) && sig1.occasion !== sig2.occasion) {
+    return false
+  }
+
+  // HARD GATE — location: if either question names a city and they differ, keep both.
+  // "לירושלים" vs "לבית" are different delivery contexts.
+  if ((sig1.location || sig2.location) && sig1.location !== sig2.location) {
+    return false
+  }
+
   // Main entity must match (primary topic)
   if (sig1.mainEntity !== sig2.mainEntity && sig1.mainEntity !== 'unknown' && sig2.mainEntity !== 'unknown') {
     return false
@@ -219,9 +236,13 @@ export function areSemanticDuplicates(
   const actionUnion = new Set([...sig1.actions, ...sig2.actions])
   const actionSimilarity = actionUnion.size === 0 ? 1 : actionIntersection.size / actionUnion.size
 
-  // Check overall topic similarity as fallback
+  // Check overall topic similarity.
+  // Inject the extracted location into the keyword sets so that
+  // "לירושלים" and "בירושלים" — both mapping to location "ירושלים" — are treated as the same token.
   const topics1 = extractTopicKeywords(q1.question)
   const topics2 = extractTopicKeywords(q2.question)
+  if (sig1.location) topics1.add(sig1.location)
+  if (sig2.location) topics2.add(sig2.location)
 
   if (topics1.size < 2 || topics2.size < 2) {
     return false
@@ -236,7 +257,9 @@ export function areSemanticDuplicates(
   // whose actual topics differ — that over-aggressive rule was shrinking the
   // legitimately diverse pool. Action similarity only counts when the questions
   // also share meaningful topic overlap.
-  const SECONDARY_TOPIC_GATE = 0.3
+  // 0.25 (not 0.3): short questions like "כמה עולה זר ורדים?" vs "מה המחיר של זר ורדים?"
+  // share only "ורדים" (because "זר" is 2 chars and filtered), giving tS=0.25 exactly.
+  const SECONDARY_TOPIC_GATE = 0.25
   const isSemanticallyDuplicate =
     topicSimilarity >= similarityThreshold ||
     (actionSimilarity >= similarityThreshold && topicSimilarity >= SECONDARY_TOPIC_GATE)
