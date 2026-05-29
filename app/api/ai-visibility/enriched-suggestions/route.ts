@@ -199,12 +199,13 @@ export async function POST(request: Request) {
     })
 
     // Step 4: Gemini fill policy.
-    // QUALITY_THRESHOLD is the default visible target; MAX_POOL is the hard cap
-    // for how many persisted unique suggestions we accumulate per context.
-    // We call Gemini whenever the unique pool is below MAX_POOL so the cache can
-    // grow across multiple "צור עוד שאלות" clicks and persist after refresh.
+    // QUALITY_THRESHOLD is for logging; MAX_POOL is the true hard cap (40).
+    // We fill to MAX_POOL by requesting appropriate candidate counts from Gemini.
+    // With ~50% surviving validation, we ask for 2-3x the missing amount.
     const QUALITY_THRESHOLD = 20
     const MAX_POOL = 40
+    const MIN_GEMINI_REQUEST = 15
+    const MAX_GEMINI_REQUEST = 30
     let newSuggestions: Array<{ question: string; intent: string; model_used?: string }> = []
     let source: 'vNext' | 'vNext+cache' | 'vNext+cache+gemini' = 'vNext'
     let geminiWasCalled = false
@@ -220,14 +221,24 @@ export async function POST(request: Request) {
         cachedCount: cachedSuggestions.length,
       })
     } else if (uniqueCount < MAX_POOL) {
+      // Scale Gemini request based on how far we are from MAX_POOL.
+      // Need 28 more? Ask for ~2.5x (70), capped between 15–30.
+      const needed = MAX_POOL - uniqueCount
+      const candidateCount = Math.min(
+        MAX_GEMINI_REQUEST,
+        Math.max(MIN_GEMINI_REQUEST, Math.ceil(needed * 2.5))
+      )
+
       source = 'vNext+cache+gemini'
       geminiWasCalled = true
 
       // Convert country code to display name for Gemini
       const countryForGemini = country ? getCountryDisplayName(country) : undefined
 
-      console.log('[enriched-suggestions] Calling Gemini (threshold not met)', {
+      console.log('[enriched-suggestions] Calling Gemini (pool below MAX_POOL)', {
         uniqueCount,
+        needed,
+        candidateRequest: candidateCount,
         threshold: QUALITY_THRESHOLD,
         projectName: project.business_name || '(empty)',
         projectDomain: project.target_domain || '(empty)',
@@ -245,11 +256,13 @@ export async function POST(request: Request) {
           language,
           countryForGemini, // Pass display name, not code
           allowedLocations,
-          businessScope
+          businessScope,
+          candidateCount // Pass the scaled candidate count
         )
 
         console.log('[enriched-suggestions] Gemini returned', {
           count: geminiSuggestions.length,
+          requestedCandidates: candidateCount,
           model: process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite',
         })
       } catch (geminiErr) {

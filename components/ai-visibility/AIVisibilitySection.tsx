@@ -916,58 +916,29 @@ export default function AIVisibilitySection({
         emptyStateReason = 'no_new_candidates'
         setNoNewSuggestionsFound(true)
       } else {
-        // Run semantic dedup: previous visible as base, new batch as candidates
-        const prevQuestions = suggestedQuestions.map((q) => ({ prompt: q.prompt, intent: q.intent }))
-        const dedupResult = dedupClientSide(
-          prevQuestions,
-          filtered.map((q) => ({ question: q.prompt, intent: q.intent }))
-        )
-        const duplicateCount = dedupResult.removed
-        duplicatesRemovedCount = duplicateCount
+        // Light client-side dedup: only remove exact normalized matches against currently visible.
+        // The API already ran strong dedup, so we trust its work and don't re-dedup semantically here.
+        const prevNormSet = new Set(suggestedQuestions.map((q) => normalize(q.prompt)))
+        const newItems = filtered.filter((q) => !prevNormSet.has(normalize(q.prompt)))
 
-        // Split existing vs new by normalized text membership (robust vs position-based slice)
-        const prevNormSet = new Set(prevQuestions.map((q) => normalize(q.prompt)))
-        const existingPart = dedupResult.deduped.filter((q) => prevNormSet.has(normalize(q.prompt)))
-        const newPart = dedupResult.deduped.filter((q) => !prevNormSet.has(normalize(q.prompt)))
+        duplicatesRemovedCount = filtered.length - newItems.length
+        diversityFilteredCount = 0
 
-        // Diversity filter: apply only to new suggestions, accounting for existing bucket counts
-        const { filtered: diverseNew, removedCount: diversityRemoved } = applyDiversityFilter(newPart, existingPart)
-        diversityFilteredCount = diversityRemoved
-
-        // Combine and apply hard pool cap
-        const totalAvailable = [...existingPart, ...diverseNew]
+        // Combine existing + new (no additional diversity filter—trust API's dedup)
+        const totalAvailable = [...suggestedQuestions, ...newItems]
         const capped = totalAvailable.slice(0, MAX_SUGGESTIONS)
 
-        console.log('[AIVisibility-refreshSuggestions] Final merge dedup + diversity', {
+        console.log('[AIVisibility-refreshSuggestions] Final merge (light dedup)', {
           visibleBefore,
-          afterDedup: totalAvailable.length,
-          duplicatesRemoved: duplicateCount,
-          diversityFiltered: diversityRemoved,
+          newItemsAdded: newItems.length,
+          duplicateExactMatches: duplicatesRemovedCount,
+          diversityFiltered: 0, // Not applied here (trust API dedup)
           afterCap: capped.length,
           poolMax: MAX_SUGGESTIONS,
         })
 
-        // Convert back to PromptSuggestion[], reusing existing objects where possible.
-        // New items get proper intent + deterministic quality tier for correct labels.
-        const finalMerged = [...suggestedQuestions, ...filtered]
-        const finalDeduped: PromptSuggestion[] = capped.map((q) => {
-          const fromExisting = finalMerged.find((fm) => normalize(fm.prompt) === normalize(q.prompt))
-          if (fromExisting) return fromExisting
-          const meta = deriveSuggestionMeta(q.intent)
-          return {
-            id: `final-${Math.random().toString(36).slice(2, 8)}`,
-            prompt: q.prompt,
-            intent: meta.intent,
-            intentLabel: meta.intent,
-            category: 'generic',
-            language: projectLanguage ?? 'he',
-            qualityScore: meta.qualityScore,
-            confidenceTier: meta.confidenceTier,
-            reason: '',
-            chips: [],
-            valueReason: '',
-          }
-        })
+        // capped already contains the right PromptSuggestion objects with intent/labels from API
+        const finalDeduped: PromptSuggestion[] = capped
 
         const visibleAfter = finalDeduped.length
         const growth = visibleAfter - visibleBefore
@@ -980,6 +951,35 @@ export default function AIVisibilitySection({
         })
 
         setSuggestedQuestions(finalDeduped)
+
+        // Log comprehensive metrics for debugging stop-at-12 issue
+        const stoppedReason =
+          visibleAfter >= MAX_SUGGESTIONS ? 'reached_max_40' :
+          (newGeminiCount === 0 && cachedLoadedCount === 0) ? 'no_new_valid_suggestions' :
+          (geminiWasCalled && newGeminiCount > 0 && duplicatesRemovedCount === newGeminiCount) ? 'all_gemini_were_duplicates' :
+          (growth === 0 && !geminiWasCalled && cachedLoadedCount === 0) ? 'cache_and_vnext_exhausted' :
+          (growth === 0) ? 'no_growth_this_batch' :
+          'empty_state_unknown'
+
+        console.log('[AIVisibility-refreshSuggestions] Full cycle metrics', {
+          maxExpandedPool: MAX_SUGGESTIONS,
+          visibleBefore,
+          neededToReachMax: MAX_SUGGESTIONS - visibleBefore,
+          cachedLoadedRaw: cachedLoadedCount,
+          cachedValidUnused: newItems.filter((q: any) => cachedFromApi.some((c) => normalize(c.question) === normalize(q.prompt))).length,
+          afterCacheMergeCount: visibleBefore + cachedLoadedCount,
+          geminiWasCalled,
+          geminiRequestedCandidateCount: geminiWasCalled ? refreshed.length : 0,
+          geminiRawCount: newGeminiCount,
+          geminiAfterValidation: filtered.filter((q) => q.id.startsWith('gemini-')).length,
+          rejectedByValidationCount: newGeminiCount > 0 ? newGeminiCount : 0,
+          rejectedByDedupCount: duplicatesRemovedCount,
+          rejectedByDiversityCount: diversityFilteredCount,
+          acceptedNewCount: newItems.length,
+          finalPoolAfter: visibleAfter,
+          growth,
+          stoppedReason,
+        })
 
         if (visibleAfter >= MAX_SUGGESTIONS) {
           emptyStateReason = 'pool_full_after_merge'
@@ -995,29 +995,6 @@ export default function AIVisibilitySection({
           setNoNewSuggestionsFound(true)
         }
       }
-
-      // Log comprehensive metrics
-      console.log('[AIVisibility-refreshSuggestions] Full cycle metrics', {
-        projectId,
-        contextHash: contextHash || '(not returned)',
-        visibleBefore,
-        trackedPromptsCount: trackedPrompts.length,
-        vNextCount: refreshed.length,
-        vNextAfterFilter: vNextFiltered.length,
-        cachedLoadedRaw: cachedLoadedCount,
-        cachedAfterValidation: cachedLoadedCount,
-        finalPoolBefore: visibleBefore,
-        poolMax: MAX_SUGGESTIONS,
-        geminiWasCalled,
-        geminiCallReason: geminiWasCalled ? 'cache_plus_vnext_below_max' : '',
-        geminiNotCalledReason: geminiWasCalled ? '' : geminiNotCalledReason,
-        newGeminiRawCount: newGeminiCount,
-        newGeminiAcceptedCount: newGeminiCount,
-        duplicatesRemoved: duplicatesRemovedCount,
-        diversityFilteredCount,
-        finalPoolAfter: suggestedQuestions.length,
-        emptyStateReason,
-      })
     } catch (e) {
       // On failure: keep existing suggestions visible
       setError(e instanceof Error ? e.message : 'Failed to generate suggestions')

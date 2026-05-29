@@ -427,7 +427,8 @@ export async function generateProjectEnrichmentQuestions(
   language: 'he' | 'en',
   countryDisplay?: string, // Display name (e.g., "ישראל"), NOT ISO code (e.g., "IL")
   allowedLocations?: string[],
-  businessScope?: { allowedTopics: string[]; excludedTerms: string[]; businessCategory: string | null }
+  businessScope?: { allowedTopics: string[]; excludedTerms: string[]; businessCategory: string | null },
+  candidateCount: number = 5, // How many candidate questions to generate (scales based on need)
 ): Promise<FallbackQuestionResponse[]> {
   const client = getGeminiClient()
   if (!client) {
@@ -535,13 +536,13 @@ Do not use example locations from instructions.`)
 
     const userPrompt =
       language === 'he'
-        ? `בנה עבור "${projectName}" בדיוק 5 שאלות בעברית טבעית.
+        ? `בנה עבור "${projectName}" בדיוק ${candidateCount} שאלות בעברית טבעית.
 
 בחר מגוון:
-• 2 שאלות עם כוונה מסחרית (מחיר, משלוח, הזמנה, זמינות)
-• 1 שאלה "איזה" או "מה" (בחירה / התאמה אישית)
-• 1 שאלה השוואה או המלצה ("מי הטוב", "מומלץ")
-• 1 שאלה על בעיה או צורך ("איפה", "האם אפשר")
+• ${Math.ceil(candidateCount * 0.4)} שאלות עם כוונה מסחרית (מחיר, משלוח, הזמנה, זמינות)
+• ${Math.ceil(candidateCount * 0.2)} שאלות "איזה" או "מה" (בחירה / התאמה אישית)
+• ${Math.ceil(candidateCount * 0.2)} שאלות השוואה או המלצה ("מי הטוב", "מומלץ")
+• ${Math.floor(candidateCount * 0.2)} שאלות על בעיה או צורך ("איפה", "האם אפשר")
 
 ${locationRules}
 
@@ -556,13 +557,13 @@ ${locationRules}
     }
   ]
 }`
-        : `Create exactly 5 natural English questions for "${projectName}".
+        : `Create exactly ${candidateCount} natural English questions for "${projectName}".
 
 Choose variety:
-• 2 questions with commercial intent (price, delivery, ordering, availability)
-• 1 "which" or "what" question (choice / personalization)
-• 1 comparison or recommendation question ("which is best", "recommended")
-• 1 problem or need question ("where", "can I")
+• ${Math.ceil(candidateCount * 0.4)} questions with commercial intent (price, delivery, ordering, availability)
+• ${Math.ceil(candidateCount * 0.2)} "which" or "what" questions (choice / personalization)
+• ${Math.ceil(candidateCount * 0.2)} comparison or recommendation questions ("which is best", "recommended")
+• ${Math.floor(candidateCount * 0.2)} problem or need questions ("where", "can I")
 
 ${locationRules}
 
@@ -583,6 +584,7 @@ Return ONLY JSON (no other text):
       domain: domain || '(empty)',
       language,
       countryDisplay: countryDisplay || '(not specified)',
+      candidateCount,
       allowedLocations: allowedLocations && allowedLocations.length > 0 ? allowedLocations : '(none)',
       allowedTopics: businessScope?.allowedTopics.length ? businessScope.allowedTopics : '(none)',
       excludedTerms: businessScope?.excludedTerms.length ? businessScope.excludedTerms : '(none)',
@@ -607,7 +609,7 @@ Return ONLY JSON (no other text):
       return []
     }
 
-    const questions = parsed.questions.slice(0, 5) as FallbackQuestionResponse[]
+    const questions = parsed.questions.slice(0, candidateCount) as FallbackQuestionResponse[]
 
     console.log(
       `[Gemini Enrichment] Generated ${questions.length} enrichment questions for "${projectName}" (model: ${model})`
