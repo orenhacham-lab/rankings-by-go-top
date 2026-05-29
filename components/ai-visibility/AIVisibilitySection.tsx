@@ -672,7 +672,6 @@ export default function AIVisibilitySection({
 
   const refreshSuggestions = useCallback(async () => {
     setRefreshingSuggestions(true)
-    setShowAllSmartQuestions(false)
     setNoNewSuggestionsFound(false)
     try {
       // Small delay so the loading state is perceivable even when generation
@@ -797,7 +796,13 @@ export default function AIVisibilitySection({
           currentlyShown.forEach((p) => next.add(normalize(p)))
           return next
         })
-        setSuggestedQuestions(filtered)
+        // Merge new suggestions into the existing list instead of replacing.
+        // This keeps the existing suggestions visible while adding new ones at the end.
+        setSuggestedQuestions((prev) => {
+          const prevKeys = new Set(prev.map((q) => normalize(q.prompt)))
+          const trulyAdded = filtered.filter((q) => !prevKeys.has(normalize(q.prompt)))
+          return [...prev, ...trulyAdded]
+        })
         // Show the hint even when we have some results, if the diversity layer
         // returned noticeably fewer than the visible batch size.
         if (filtered.length < DIVERSITY_THRESHOLD) {
@@ -805,6 +810,7 @@ export default function AIVisibilitySection({
         }
       }
     } catch (e) {
+      // On failure: keep existing suggestions visible. Just surface the error.
       setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
     } finally {
       setRefreshingSuggestions(false)
@@ -1358,61 +1364,60 @@ export default function AIVisibilitySection({
                     </span>
                   </Button>
                 </div>
-                {refreshingSuggestions ? (
-                  <div className="flex items-center justify-center gap-3 py-8 text-sm text-slate-600 dark:text-slate-300">
-                    <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                {/* Inline loading indicator — shown above the grid, never replaces it */}
+                {refreshingSuggestions && (
+                  <div className="flex items-center gap-2 mb-3 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                     <span>{t('generating_more')}</span>
                   </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {availableSuggestions.slice(0, showAllSmartQuestions ? undefined : 4).map((q) => (
-                        <SmartQuestionCard
-                          key={q.id}
-                          question={q}
-                          isAlreadyTracked={false}
-                          allPrompts={allPrompts}
-                          onAdd={async () => {
-                            try {
-                              const res = await fetch('/api/ai-visibility/prompts', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  projectId,
-                                  prompt: q.prompt,
-                                  country: projectCountry,
-                                  language: projectLanguage,
-                                  targetDomain: projectDomain,
-                                  targetBrandName: projectBrandName,
-                                }),
-                              })
-                              if (!res.ok) throw new Error('Failed to add')
-                              loadAllResults()
-                            } catch (e) {
-                              setError(e instanceof Error ? e.message : 'Failed to add question')
-                            }
-                          }}
-                          t={t}
-                        />
-                      ))}
-                    </div>
-                    {availableSuggestions.length > 4 && !showAllSmartQuestions && (
-                      <div className="text-center mt-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowAllSmartQuestions(true)}
-                        >
-                          {t('show_more')}
-                        </Button>
-                      </div>
-                    )}
-                    {noNewSuggestionsFound && (
-                      <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
-                        {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
-                      </div>
-                    )}
-                  </>
+                )}
+                {/* Questions grid is always visible — even while loading */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {availableSuggestions.slice(0, showAllSmartQuestions ? undefined : 4).map((q) => (
+                    <SmartQuestionCard
+                      key={q.id}
+                      question={q}
+                      isAlreadyTracked={false}
+                      allPrompts={allPrompts}
+                      onAdd={async () => {
+                        try {
+                          const res = await fetch('/api/ai-visibility/prompts', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              projectId,
+                              prompt: q.prompt,
+                              country: projectCountry,
+                              language: projectLanguage,
+                              targetDomain: projectDomain,
+                              targetBrandName: projectBrandName,
+                            }),
+                          })
+                          if (!res.ok) throw new Error('Failed to add')
+                          loadAllResults()
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : 'Failed to add question')
+                        }
+                      }}
+                      t={t}
+                    />
+                  ))}
+                </div>
+                {availableSuggestions.length > 4 && !showAllSmartQuestions && (
+                  <div className="text-center mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAllSmartQuestions(true)}
+                    >
+                      {t('show_more')}
+                    </Button>
+                  </div>
+                )}
+                {noNewSuggestionsFound && (
+                  <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
+                    {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
+                  </div>
                 )}
               </div>
             )
