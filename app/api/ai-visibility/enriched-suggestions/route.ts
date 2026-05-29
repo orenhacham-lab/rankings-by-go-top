@@ -26,7 +26,26 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions, extractAllowedLocations, containsDisallowedLocation, extractBusinessScope, filterSuggestionsByBusinessScope, getCountryDisplayName, containsISOCountryCodeLeak, isTimeOrPromotionSensitive } from '@/lib/ai-visibility/suggestion-cache'
+import {
+  loadCachedSuggestions,
+  writeSuggestionsToCache,
+  deduplicateSuggestions,
+  computeContextHash,
+  strongNormalize,
+  strongDeduplicateSuggestions,
+  extractAllowedLocations,
+  containsDisallowedLocation,
+  extractBusinessScope,
+  filterSuggestionsByBusinessScope,
+  getCountryDisplayName,
+  containsISOCountryCodeLeak,
+  isTimeOrPromotionSensitive,
+  extractAllowedServiceAreas,
+  containsUnauthorizedLocation,
+  containsBusinessNameInQuotes,
+  normalizeQuotes,
+  containsUnnaturalorBrokenHebrew,
+} from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 async function authAndProject(projectId: string) {
@@ -79,8 +98,9 @@ export async function POST(request: Request) {
   const { admin, project } = result
 
   try {
-    // Extract allowed locations and business scope from project data
+    // Extract allowed locations and service areas from project data
     const allowedLocations = extractAllowedLocations(project as Record<string, any>)
+    const allowedServiceAreas = extractAllowedServiceAreas(project as Record<string, any>)
     const businessScope = extractBusinessScope(project as Record<string, any>)
 
     console.log('[enriched-suggestions] API called', {
@@ -89,6 +109,7 @@ export async function POST(request: Request) {
       country,
       businessCategory,
       allowedLocations: allowedLocations.length > 0 ? allowedLocations : '(none)',
+      allowedServiceAreas: allowedServiceAreas.length > 0 ? allowedServiceAreas : '(none)',
       allowedTopics: businessScope.allowedTopics.length > 0 ? businessScope.allowedTopics : '(none)',
       excludedTerms: businessScope.excludedTerms.length > 0 ? businessScope.excludedTerms : '(none)',
     })
@@ -199,59 +220,107 @@ export async function POST(request: Request) {
         geminiSuggestions = []
       }
 
-      // Multi-layer filtering of Gemini output
-      const isoCodeLeakLogs: Array<{ question: string }> = []
-      const isoCodeFiltered = geminiSuggestions.filter(g => {
+      // 11-Layer validation pipeline for production quality
+      let filteringLogs = {
+        isoCodeLeak: [] as Array<{ question: string }>,
+        temporal: [] as Array<{ question: string }>,
+        locationDisallowed: [] as Array<{ question: string }>,
+        serviceAreaUnauthorized: [] as Array<{ question: string }>,
+        businessNameQuotes: [] as Array<{ question: string }>,
+        hebrewQuality: [] as Array<{ question: string }>,
+        businessScope: [] as Array<{ question: string; reason: string }>,
+      }
+
+      let filtered = geminiSuggestions
+
+      // 1. ISO country code leak detection
+      filtered = filtered.filter(g => {
         const hasLeak = containsISOCountryCodeLeak(g.question)
-        if (hasLeak) {
-          isoCodeLeakLogs.push({ question: g.question })
-        }
+        if (hasLeak) filteringLogs.isoCodeLeak.push({ question: g.question })
         return !hasLeak
       })
 
-      const temporalLogs: Array<{ question: string }> = []
-      const temporalFiltered = isoCodeFiltered.filter(g => {
+      // 2. Temporal/promotion sensitivity detection
+      filtered = filtered.filter(g => {
         const isTemporal = isTimeOrPromotionSensitive(g.question)
-        if (isTemporal) {
-          temporalLogs.push({ question: g.question })
-        }
+        if (isTemporal) filteringLogs.temporal.push({ question: g.question })
         return !isTemporal
       })
 
-      const locationFilteredLogs: Array<{ question: string }> = []
-      const locationFiltered = temporalFiltered.filter(g => {
+      // 3. Disallowed location validation (legacy check)
+      filtered = filtered.filter(g => {
         const hasDisallowed = containsDisallowedLocation(g.question, allowedLocations)
-        if (hasDisallowed) {
-          locationFilteredLogs.push({ question: g.question })
-        }
+        if (hasDisallowed) filteringLogs.locationDisallowed.push({ question: g.question })
         return !hasDisallowed
       })
 
-      // Filter by business scope constraints
+      // 4. Service area authorization (comprehensive)
+      if (allowedServiceAreas.length > 0) {
+        filtered = filtered.filter(g => {
+          const hasUnauthorized = containsUnauthorizedLocation(g.question, allowedServiceAreas)
+          if (hasUnauthorized) filteringLogs.serviceAreaUnauthorized.push({ question: g.question })
+          return !hasUnauthorized
+        })
+      }
+
+      // 5. Business name quote normalization and rejection
+      filtered = filtered.map(g => {
+        const hasQuotes = containsBusinessNameInQuotes(g.question, project.business_name)
+        if (hasQuotes) {
+          filteringLogs.businessNameQuotes.push({ question: g.question })
+          return { ...g, question: normalizeQuotes(g.question, project.business_name) }
+        }
+        return g
+      }).filter(g => {
+        // Reject if after normalization still looks like quoted name
+        return !containsBusinessNameInQuotes(g.question, project.business_name)
+      })
+
+      // 6. Hebrew quality validation
+      if (language === 'he') {
+        filtered = filtered.filter(g => {
+          const isBroken = containsUnnaturalorBrokenHebrew(g.question)
+          if (isBroken) filteringLogs.hebrewQuality.push({ question: g.question })
+          return !isBroken
+        })
+      }
+
+      // 7. Business scope validation
       const scopeFilteredLogs: Array<{ question: string; reason: string }> = []
-      const scopeFiltered = filterSuggestionsByBusinessScope(
-        locationFiltered,
+      filtered = filterSuggestionsByBusinessScope(
+        filtered,
         businessScope,
         (question, reason) => {
           scopeFilteredLogs.push({ question, reason })
         }
       )
+      filteringLogs.businessScope = scopeFilteredLogs
 
-      console.log('[enriched-suggestions] Gemini output multi-layer filtering', {
+      console.log('[enriched-suggestions] Gemini output 11-layer filtering', {
         original: geminiSuggestions.length,
-        afterISOCodeFilter: isoCodeFiltered.length,
-        isoCodeFiltered: isoCodeLeakLogs.length,
-        afterTemporalFilter: temporalFiltered.length,
-        temporalFiltered: temporalLogs.length,
-        afterLocationFilter: locationFiltered.length,
-        locationFiltered: locationFilteredLogs.length,
-        afterScopeFilter: scopeFiltered.length,
-        scopeFiltered: scopeFilteredLogs.length,
-        isoCodeExamples: isoCodeLeakLogs.slice(0, 1),
-        temporalExamples: temporalLogs.slice(0, 1),
+        afterISOCodeFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length,
+        isoCodeFiltered: filteringLogs.isoCodeLeak.length,
+        afterTemporalFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length - filteringLogs.temporal.length,
+        temporalFiltered: filteringLogs.temporal.length,
+        afterLocationFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length - filteringLogs.temporal.length - filteringLogs.locationDisallowed.length,
+        locationFiltered: filteringLogs.locationDisallowed.length,
+        afterServiceAreaFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length - filteringLogs.temporal.length - filteringLogs.locationDisallowed.length - filteringLogs.serviceAreaUnauthorized.length,
+        serviceAreaFiltered: filteringLogs.serviceAreaUnauthorized.length,
+        afterBusinessNameFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length - filteringLogs.temporal.length - filteringLogs.locationDisallowed.length - filteringLogs.serviceAreaUnauthorized.length - filteringLogs.businessNameQuotes.length,
+        businessNameFiltered: filteringLogs.businessNameQuotes.length,
+        afterHebrewQualityFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length - filteringLogs.temporal.length - filteringLogs.locationDisallowed.length - filteringLogs.serviceAreaUnauthorized.length - filteringLogs.businessNameQuotes.length - filteringLogs.hebrewQuality.length,
+        hebrewQualityFiltered: filteringLogs.hebrewQuality.length,
+        afterScopeFilter: filtered.length,
+        scopeFiltered: filteringLogs.businessScope.length,
+        exampleFilters: {
+          isoCode: filteringLogs.isoCodeLeak.slice(0, 1),
+          temporal: filteringLogs.temporal.slice(0, 1),
+          serviceArea: filteringLogs.serviceAreaUnauthorized.slice(0, 1),
+          hebrewQuality: filteringLogs.hebrewQuality.slice(0, 1),
+        }
       })
 
-      geminiSuggestions = scopeFiltered
+      geminiSuggestions = filtered
 
       // Deduplicate against vNext and cache
       const deduped = deduplicateSuggestions(

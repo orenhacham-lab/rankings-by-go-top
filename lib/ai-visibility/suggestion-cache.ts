@@ -113,7 +113,80 @@ export function extractTopicKeywords(question: string): Set<string> {
 }
 
 /**
- * Check if two questions are semantic duplicates (same intent + similar topics)
+ * Generate semantic signature for a question for stronger dedup
+ * Signature captures: intent, main entity, action, occasion, location
+ */
+export function generateSemanticSignature(question: string, intent?: string): {
+  intent: string
+  mainEntity: string // e.g., "זר פרחים", "הליכון"
+  actions: Set<string> // e.g., {"משלוח", "קנייה"}
+  occasion: string // e.g., "יום הולדת", "חתונה"
+  location: string // e.g., "ירושלים"
+} {
+  const lower = question.toLowerCase()
+
+  // Extract main entity (main topic)
+  const entityPatterns = [
+    /זר\s+פרחים|פרחים|זר/i,
+    /הליכון|אופני כושר|מכשיר כושר/i,
+    /משפחה|בית|דירה/i,
+  ]
+  let mainEntity = 'unknown'
+  for (const pattern of entityPatterns) {
+    const match = lower.match(pattern)
+    if (match) {
+      mainEntity = match[0].toLowerCase()
+      break
+    }
+  }
+
+  // Extract actions
+  const actions = new Set<string>()
+  const actionPatterns: Record<string, string[]> = {
+    משלוח: ['משלוח', 'דליברי', 'משלח'],
+    קנייה: ['קונים', 'לקנות', 'קונה', 'קניה', 'קנה'],
+    מחיר: ['עולה', 'כמה', 'מחיר', 'עלות'],
+    בחירה: ['בוחרים', 'מתאים', 'בחירה', 'כיצד לבחור'],
+  }
+
+  for (const [action, keywords] of Object.entries(actionPatterns)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      actions.add(action)
+    }
+  }
+
+  // Extract occasion
+  const occasionPatterns: Record<string, string[]> = {
+    'יום הולדת': ['יום הולדת', 'יום יום'],
+    'חתונה': ['חתונה', 'חתן', 'כלה'],
+    'הנצחה': ['הנצחה', 'הנצחי', 'זיכרון'],
+    'מתנה': ['מתנה', 'מתנות', 'מתנה'],
+  }
+  let occasion = ''
+  for (const [occ, keywords] of Object.entries(occasionPatterns)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      occasion = occ
+      break
+    }
+  }
+
+  // Extract location
+  const locationPattern = /(ירושלים|תל אביב|הרצליה|פתח תקווה|בת ים|נתניה|ראשון לציון|גבעתיים|עמק רפאים)/
+  const locationMatch = lower.match(locationPattern)
+  const location = locationMatch ? locationMatch[0] : ''
+
+  return {
+    intent: intent || 'unknown',
+    mainEntity,
+    actions,
+    occasion,
+    location,
+  }
+}
+
+/**
+ * Check if two questions are semantic duplicates
+ * Uses semantic signature (intent + entity + actions + occasion + location)
  * Returns true if they should be considered duplicates
  */
 export function areSemanticDuplicates(
@@ -126,21 +199,42 @@ export function areSemanticDuplicates(
     return false
   }
 
-  // Extract topics
+  // Generate semantic signatures
+  const sig1 = generateSemanticSignature(q1.question, q1.intent)
+  const sig2 = generateSemanticSignature(q2.question, q2.intent)
+
+  // Intent must match (already checked above, but included in signature)
+  if (sig1.intent !== sig2.intent) {
+    return false
+  }
+
+  // Main entity must match (primary topic)
+  if (sig1.mainEntity !== sig2.mainEntity && sig1.mainEntity !== 'unknown' && sig2.mainEntity !== 'unknown') {
+    return false
+  }
+
+  // Check action similarity
+  const actionIntersection = new Set([...sig1.actions].filter(a => sig2.actions.has(a)))
+  const actionUnion = new Set([...sig1.actions, ...sig2.actions])
+  const actionSimilarity = actionUnion.size === 0 ? 1 : actionIntersection.size / actionUnion.size
+
+  // Check overall topic similarity as fallback
   const topics1 = extractTopicKeywords(q1.question)
   const topics2 = extractTopicKeywords(q2.question)
 
-  // Need at least 2 keywords in each
   if (topics1.size < 2 || topics2.size < 2) {
     return false
   }
 
-  // Calculate overlap
-  const intersection = new Set([...topics1].filter(x => topics2.has(x)))
-  const union = new Set([...topics1, ...topics2])
+  const topicIntersection = new Set([...topics1].filter(x => topics2.has(x)))
+  const topicUnion = new Set([...topics1, ...topics2])
+  const topicSimilarity = topicUnion.size === 0 ? 0 : topicIntersection.size / topicUnion.size
 
-  const similarity = intersection.size / union.size
-  return similarity >= similarityThreshold
+  // Duplicates if: same intent + same entity + good action/topic overlap
+  const isSemanticallyDuplicate =
+    actionSimilarity >= similarityThreshold || topicSimilarity >= similarityThreshold
+
+  return isSemanticallyDuplicate
 }
 
 /**
@@ -588,6 +682,200 @@ export function isWithinBusinessScope(
 
   // If we get here: question mentions something specific that's not in allowed topics
   // This is likely out of scope, so reject it
+  return false
+}
+
+/**
+ * Extract allowed service areas from project data
+ * More comprehensive than allowedLocations - includes keywords and saved content
+ */
+export function extractAllowedServiceAreas(projectData: Record<string, any>): string[] {
+  const areas = new Set<string>()
+
+  // 1. Project city (primary location)
+  if (projectData.city && typeof projectData.city === 'string') {
+    const trimmed = projectData.city.trim().toLowerCase()
+    if (trimmed) areas.add(trimmed)
+  }
+
+  // 2. Service areas from business profile
+  if (projectData.ai_business_profile && typeof projectData.ai_business_profile === 'object') {
+    const profile = projectData.ai_business_profile
+    if (Array.isArray(profile.serviceAreas)) {
+      profile.serviceAreas.forEach((area: any) => {
+        if (typeof area === 'string') {
+          const trimmed = area.trim().toLowerCase()
+          if (trimmed) areas.add(trimmed)
+        }
+      })
+    }
+    // Also check if service areas mentioned in description
+    if (typeof profile.description === 'string') {
+      // Extract location-like words from description
+      const locationMatches = profile.description.match(/ב(ירושלים|תל אביב|הרצליה|פתח תקווה|בת ים|נתניה|ראשון לציון|גבעתיים|עמק רפאים|הדסה|שערי צדק)/g)
+      if (locationMatches) {
+        locationMatches.forEach((match: string) => {
+          const city = match.replace(/^ב/, '').toLowerCase()
+          if (city) areas.add(city)
+        })
+      }
+    }
+  }
+
+  // 3. Location terms in keywords
+  if (Array.isArray(projectData.keywords)) {
+    projectData.keywords.forEach((kw: any) => {
+      if (typeof kw === 'string') {
+        const lower = kw.toLowerCase()
+        // Check if keyword looks like a location (Hebrew cities)
+        const locationPattern = /(ירושלים|תל אביב|הרצליה|פתח תקווה|בת ים|נתניה|ראשון לציון|גבעתיים|עמק רפאים|הדסה|שערי צדק|חיפה|באר שבע|אשדוד|אשקלון)/
+        const matches = lower.match(locationPattern)
+        if (matches) {
+          areas.add(matches[0].toLowerCase())
+        }
+      }
+    })
+  }
+
+  // 4. Explicitly NOT supported: inferred regions or nearby cities
+  // Do not add "אזור המרכז" or "קו הדרום" unless explicitly mentioned
+
+  return Array.from(areas)
+}
+
+/**
+ * Validate if a question mentions only allowed service areas
+ * Rejects questions mentioning unauthorized locations
+ */
+export function containsUnauthorizedLocation(
+  question: string,
+  allowedServiceAreas: string[]
+): boolean {
+  if (!question) return false
+
+  const lowerQuestion = question.toLowerCase()
+
+  // All known Israeli cities/regions (comprehensive list)
+  const allCities = [
+    'ירושלים', 'תל אביב', 'הרצליה', 'פתח תקווה', 'בת ים', 'נתניה', 'ראשון לציון',
+    'גבעתיים', 'עמק רפאים', 'הדסה', 'שערי צדק', 'חיפה', 'באר שבע', 'אשדוד',
+    'אשקלון', 'לוד', 'רמלה', 'יפו', 'בת ים', 'רמת גן', 'בני ברק', 'גני תקווה',
+    'הרצליה פיתוח', 'כפר סבא', 'קדימה', 'רמת השרון', 'צור יצחק', 'עמק עברים',
+  ]
+
+  const normalizedAllowed = allowedServiceAreas.map(a => a.toLowerCase())
+
+  // Check if question mentions any city
+  for (const city of allCities) {
+    if (lowerQuestion.includes(city)) {
+      // City is mentioned - check if it's allowed
+      if (!normalizedAllowed.some(allowed => city.includes(allowed) || allowed.includes(city))) {
+        return true // Unauthorized city found
+      }
+    }
+  }
+
+  // Check for region references that should not be inferred
+  const unauthorizedRegions = ['אזור המרכז', 'קו הדרום', 'הצפון', 'הדרום', 'המרכז']
+  for (const region of unauthorizedRegions) {
+    if (lowerQuestion.includes(region.toLowerCase())) {
+      // Region mentioned but not explicitly in allowed areas - reject
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Check if a question contains business name in quotation marks
+ * Returns true if question should be rejected/normalized
+ */
+export function containsBusinessNameInQuotes(
+  question: string,
+  businessName: string | null | undefined
+): boolean {
+  if (!question || !businessName) return false
+
+  const lowerQuestion = question.toLowerCase()
+  const lowerBusiness = businessName.toLowerCase()
+
+  // Check for quotes around business name: "חנות פרחים" or ״חנות פרחים״
+  const quotePatterns = [
+    `"${lowerBusiness}"`,
+    `״${lowerBusiness}״`,
+    `'${lowerBusiness}'`,
+    `\`${lowerBusiness}\``,
+  ]
+
+  return quotePatterns.some(pattern => lowerQuestion.includes(pattern))
+}
+
+/**
+ * Remove unnecessary quotes from questions
+ */
+export function normalizeQuotes(question: string, businessName?: string | null): string {
+  if (!question) return question
+
+  let normalized = question
+
+  // Remove quotes around business name
+  if (businessName) {
+    const lowerBusiness = businessName.toLowerCase()
+    // Match various quote styles
+    normalized = normalized.replace(new RegExp(`[״"']${lowerBusiness}[״"']`, 'gi'), businessName)
+  }
+
+  // Remove other weird quote patterns
+  normalized = normalized.replace(/["״"'`]+(\w+)["״"'`]+/g, '$1')
+
+  return normalized
+}
+
+/**
+ * Check if Hebrew text contains unnatural/broken phrases
+ * Returns true if question should be rejected
+ */
+export function containsUnnaturalorBrokenHebrew(question: string): boolean {
+  if (!question) return false
+
+  // Unnatural Hebrew patterns to reject
+  const unnatternalPatterns = [
+    /בהרגעת\s+(הבוקר|הערב|היום)/i, // "in soothing the morning" - nonsense
+    /בהגעת\s+/i, // "in arrival of" - weird phrasing unless clearly about arriving at location
+    /משלוח\s+ל-[A-Z]{2}/i, // delivery to ISO code
+    /עם\s+משלוח\s+ל-[A-Z]{2}/i, // with delivery to ISO code
+    /בעיר\s+מרכזית/i, // "in a central city" - vague unless city is specified
+    /חנות\s+אמינה\s+שעושה\s+משלוחים\s+מהירים/i, // awkward phrasing
+    /כיצד\s+ניתן/i, // "how can one" - explicitly blocked pattern
+    /מהן\s+האפשרויות/i, // "what are the options" - explicitly blocked
+    /איפה\s+ניתן\s+למצוא/i, // "where can one find" - explicitly blocked
+    /עם\s+משלוח\s+בהתאם/i, // awkward with delivery according
+    /לפי\s+\[.*?\]/i, // template with bracketed placeholder
+    /של\s+\[.*?\]/i, // template with bracketed placeholder
+  ]
+
+  for (const pattern of unnatternalPatterns) {
+    if (pattern.test(question)) {
+      return true
+    }
+  }
+
+  // Check for suspicious quote patterns (broken HTML entities, etc.)
+  if (question.includes('&quot;') || question.includes('&#') || question.includes('&#39;')) {
+    return true
+  }
+
+  // Very short questions might be incomplete
+  if (question.length < 10) {
+    return true
+  }
+
+  // Question should end with question mark
+  if (!question.trim().endsWith('?') && !question.trim().endsWith('?‍')) {
+    return true
+  }
+
   return false
 }
 
