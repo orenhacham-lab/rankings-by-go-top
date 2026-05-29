@@ -18,21 +18,93 @@ export interface CacheLookupParams {
 }
 
 /**
- * Normalize question for deduplication
- * Defensively handles null/undefined/empty strings
+ * Strong normalization for deduplication
+ * Handles: trim, lowercase, quotes, dashes, question marks, double spaces, Hebrew basics
  */
-export function normalizeQuestion(question?: string | null): string {
-  if (!question || typeof question !== 'string') {
+export function strongNormalize(text?: string | null): string {
+  if (!text || typeof text !== 'string') {
     return ''
   }
-  return question.toLowerCase().trim()
+
+  return (
+    text
+      .trim()
+      .toLowerCase()
+      // Remove question marks, exclamation marks at end
+      .replace(/[?!]+\s*$/, '')
+      // Normalize quotes: ״ / " / ' → "
+      .replace(/[״"']/g, '"')
+      // Normalize dashes: – / — / − → -
+      .replace(/[–—−]/g, '-')
+      // Remove double/triple spaces
+      .replace(/\s+/g, ' ')
+      // Hebrew: normalize nikud (diacritics) if possible, otherwise just trim
+      .trim()
+  )
+}
+
+/**
+ * Strong deduplication across all sources
+ * Finds near-duplicates and exact matches
+ * Returns: (questions, duplicatesRemoved count)
+ */
+export function strongDeduplicateSuggestions(
+  vNextQuestions: Array<{ question?: string | null; prompt?: string | null }>,
+  cachedSuggestions: Array<{ question?: string | null }>,
+  newGeminiSuggestions: Array<{ question?: string | null; intent?: string }>
+): {
+  dedupedQuestions: Array<{ question: string; intent?: string; source: string }>
+  duplicateCount: number
+} {
+  const seen = new Map<string, { question: string; source: string; intent?: string }>()
+  let duplicateCount = 0
+
+  // Helper to add question to seen map
+  const addQuestion = (question: string | null | undefined, source: string, intent?: string) => {
+    if (!question) return
+    const norm = strongNormalize(question)
+    if (!norm) return
+
+    if (seen.has(norm)) {
+      duplicateCount++
+      return
+    }
+
+    seen.set(norm, {
+      question,
+      source,
+      intent: intent || undefined,
+    })
+  }
+
+  // Add vNext questions
+  vNextQuestions.forEach((q) => {
+    addQuestion(q.prompt || q.question, 'vNext')
+  })
+
+  // Add cached suggestions
+  cachedSuggestions.forEach((q) => {
+    addQuestion(q.question, 'cached')
+  })
+
+  // Add new Gemini suggestions
+  newGeminiSuggestions.forEach((q) => {
+    addQuestion(q.question, 'gemini', q.intent)
+  })
+
+  const dedupedQuestions = Array.from(seen.values())
+
+  return {
+    dedupedQuestions,
+    duplicateCount,
+  }
 }
 
 /**
  * Compute stable question hash (SHA256 of normalized question)
  */
 export function computeQuestionHash(question: string): string {
-  const normalized = normalizeQuestion(question)
+  const normalized = strongNormalize(question)
   return crypto.createHash('sha256').update(normalized).digest('hex')
 }
 
@@ -129,7 +201,7 @@ export async function writeSuggestionsToCache(
     keywords_hash: params.keywordsHash || null,
     context_hash: contextHash,
     question: s.question,
-    normalized_question: normalizeQuestion(s.question),
+    normalized_question: strongNormalize(s.question),
     question_hash: computeQuestionHash(s.question),
     intent: s.intent,
     source: 'gemini' as const,
@@ -223,7 +295,7 @@ export function deduplicateSuggestions(
   // Populate with vNext questions
   vNextQuestions.forEach((q) => {
     if (q.question) {
-      const norm = normalizeQuestion(q.question)
+      const norm = strongNormalize(q.question)
       if (norm) {
         existingQuestions.add(norm)
         existingIntents.set(norm, 'vNext')
@@ -234,7 +306,7 @@ export function deduplicateSuggestions(
   // Populate with cached questions
   cachedQuestions.forEach((q) => {
     if (q.question) {
-      const norm = normalizeQuestion(q.question)
+      const norm = strongNormalize(q.question)
       if (norm) {
         existingQuestions.add(norm)
         if (!existingIntents.has(norm)) {
@@ -247,7 +319,7 @@ export function deduplicateSuggestions(
   // Populate with saved prompts
   savedPromptQuestions.forEach((q) => {
     if (q.text) {
-      const norm = normalizeQuestion(q.text)
+      const norm = strongNormalize(q.text)
       if (norm) {
         existingQuestions.add(norm)
         if (!existingIntents.has(norm)) {
@@ -260,7 +332,7 @@ export function deduplicateSuggestions(
   // Filter new suggestions
   return newSuggestions.filter((suggestion) => {
     if (!suggestion.question) return false
-    const norm = normalizeQuestion(suggestion.question)
+    const norm = strongNormalize(suggestion.question)
     return norm && !existingQuestions.has(norm)
   })
 }

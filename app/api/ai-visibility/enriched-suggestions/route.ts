@@ -26,7 +26,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, normalizeQuestion } from '@/lib/ai-visibility/suggestion-cache'
+import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 async function authAndProject(projectId: string) {
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     const vNextSet = new Set(
       vNextQuestions
         .filter(q => q.prompt) // Filter out null/empty prompts
-        .map(q => normalizeQuestion(q.prompt))
+        .map(q => strongNormalize(q.prompt))
     )
 
     console.log('[enriched-suggestions] vNext questions loaded', {
@@ -119,14 +119,14 @@ export async function POST(request: Request) {
       count: cachedSuggestions.length,
     })
 
-    const cachedSet = new Set(cachedSuggestions.map(q => normalizeQuestion(q.question)))
+    const cachedSet = new Set(cachedSuggestions.map(q => strongNormalize(q.question)))
 
     // Step 3: Count unique questions so far
-    const uniqueCount = vNextSet.size + (cachedSuggestions.length - Array.from(cachedSuggestions).filter(c => vNextSet.has(normalizeQuestion(c.question))).length)
+    const uniqueCount = vNextSet.size + (cachedSuggestions.length - Array.from(cachedSuggestions).filter(c => vNextSet.has(strongNormalize(c.question))).length)
 
     console.log('[enriched-suggestions] Unique count', {
       vNextUnique: vNextSet.size,
-      cachedUnique: cachedSuggestions.length - Array.from(cachedSuggestions).filter(c => vNextSet.has(normalizeQuestion(c.question))).length,
+      cachedUnique: cachedSuggestions.length - Array.from(cachedSuggestions).filter(c => vNextSet.has(strongNormalize(c.question))).length,
       totalUnique: uniqueCount,
     })
 
@@ -222,23 +222,41 @@ export async function POST(request: Request) {
       })
     }
 
-    const finalTotal = vNextQuestions.length + cachedSuggestions.filter(c => !vNextSet.has(normalizeQuestion(c.question))).length
+    // Step 5: STRONG DEDUPLICATION across all sources
+    // Apply strong normalization: quotes, dashes, spaces, case, punctuation
+    const { dedupedQuestions, duplicateCount } = strongDeduplicateSuggestions(
+      vNextQuestions,
+      cachedSuggestions,
+      newSuggestions
+    )
 
-    console.log('[enriched-suggestions] API response', {
-      vNextCount: vNextQuestions.length,
-      cachedCount: cachedSuggestions.length,
-      newCount: newSuggestions.length,
-      finalTotal,
-      source,
-      geminiWasCalled,
+    console.log('[enriched-suggestions] Strong dedup results', {
+      beforeDedup: vNextQuestions.length + cachedSuggestions.length + newSuggestions.length,
+      afterDedup: dedupedQuestions.length,
+      duplicatesRemoved: duplicateCount,
+      bySource: {
+        vNext: dedupedQuestions.filter(q => q.source === 'vNext').length,
+        cached: dedupedQuestions.filter(q => q.source === 'cached').length,
+        gemini: dedupedQuestions.filter(q => q.source === 'gemini').length,
+      },
+    })
+
+    // Sample top questions for logging
+    const sampleQuestions = dedupedQuestions.slice(0, 3).map(q => `"${q.question}" (${q.source})`)
+    console.log('[enriched-suggestions] Top deduplicated questions', {
+      count: dedupedQuestions.length,
+      samples: sampleQuestions,
     })
 
     return Response.json({
       vNextQuestions,
       cachedSuggestions,
       newSuggestions,
-      total: finalTotal,
-      source
+      dedupedQuestions,
+      total: dedupedQuestions.length,
+      duplicatesRemoved: duplicateCount,
+      source,
+      geminiWasCalled,
     })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)

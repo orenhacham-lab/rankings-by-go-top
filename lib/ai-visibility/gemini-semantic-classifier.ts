@@ -438,56 +438,91 @@ export async function generateProjectEnrichmentQuestions(
   try {
     const systemPrompt =
       language === 'he'
-        ? `אתה יוצר שאלות חיפוש איכותיות ומגוונות עבור עסק.
+        ? `אתה יוצר שאלות חיפוש בעברית לאנשים המחפשים עיסוקים, שירותים או מוצרים.
+השאלות צריכות להיות אמיתיות — משהו שאדם באמת היה שואל ב־ChatGPT או מנוע חיפוש לפני שהוא קונה, בוחר, או מנהל עסק.
 
-שם העסק: "${projectName}"
-תחום: ${domain || 'כללי'}
+שם העסק/הביטוי: "${projectName}"
+התחום או URL: ${domain || 'כללי'}
+${country ? `מדינה/עיר: ${country}` : ''}
 
-צור שאלות חיפוש טבעיות שעשויות להעניין לקוחות פוטנציאליים:
-- שאלות מתוך סקרנות (מה, איך, למה)
-- שאלות משוואה (טוב, זול, איכות)
-- שאלות בחירה (איפה, איזה, כמה עולה)
-- שאלות קשורות לעסק`
-        : `You are a quality search question generator for a business.
+חשוב: אל תנסח כל שאלה עם "כיצד ניתן", "מהן האפשרויות", "איפה ניתן למצוא".
+הנסח טבעי בעברית: "איזה", "כמה", "איפה אפשר", "מה חשוב", "למי כדאי".
 
-Business: "${projectName}"
-Domain: ${domain || 'General'}
+סוגי שאלות שיוצרות ערך:
+1. מקוריות + מסחרי: "איזה זר מתאים ליום הולדת רומנטי?" or "כמה עולה משלוח אותו יום בירושלים?"
+2. בעיה שצריך לפתור: "איפה אפשר לקבל עצה מהיום למחר?"
+3. השוואה של ספקים: "מי בעמק רפאים עושה משלוח במהירות?"
+4. מאפיינים של מוצר/שירות: "איזו חנות מומלצת לקנות פרחים טריים?"
+5. מחירים ותנאים: "כמה עולה זר פרחים גדול עם משלוח?"
 
-Generate diverse, natural search questions that potential customers might ask:
-- Curiosity questions (what, how, why)
-- Comparison questions (good, cheap, quality)
-- Choice questions (where, which, how much)
-- Business-related questions`
+תוצאה צריכה להיות:
+- אדם אמיתי שואל אותה
+- יש כוונה מסחרית או בחירה
+- הניסוח טבעי בעברית
+- לא תבנית סטריאוטיפית`
+        : `You write real search questions that people ask in ChatGPT or search engines before buying, choosing, or hiring.
+
+Business/Product: "${projectName}"
+Domain or URL: ${domain || 'General'}
+${country ? `Country/City: ${country}` : ''}
+
+IMPORTANT: Avoid "How can one", "What are the options", "Where can one find".
+Use natural English: "What is", "How much", "Which", "Is there a", "Should I".
+
+Value-creating question types:
+1. Purchase intent + specificity: "What flowers are best for a romantic birthday?" or "How much does same-day delivery cost?"
+2. Problem solving: "Where can I get emergency delivery today?"
+3. Provider comparison: "Which florist in Jerusalem has the fastest delivery?"
+4. Product features: "What makes a good bouquet for a hospital visit?"
+5. Pricing & terms: "How much does a large flower arrangement cost with delivery?"
+
+Result should be:
+- Something a real person would ask
+- Has commercial or decision intent
+- Natural phrasing
+- Not a template`
 
     const userPrompt =
       language === 'he'
-        ? `צור 3-5 שאלות חיפוש איכותיות ומגוונות עבור "${projectName}"${country ? ` (${country})` : ''}
+        ? `בנה עבור "${projectName}"${country ? ` ב${country}` : ''} בדיוק 5 שאלות בעברית טבעית.
 
-עדיף שונות בכוונה: סקרנות, השוואה, בחירה, מידע.
+בחר מגוון:
+• 2 שאלות עם כוונה מסחרית (מחיר, משלוח, הזמנה, זמינות)
+• 1 שאלה "איזה" או "מה" (בחירה / התאמה אישית)
+• 1 שאלה השוואה או המלצה ("מי הטוב", "מומלץ")
+• 1 שאלה על בעיה או צורך ("איפה", "האם אפשר")
 
-החזר ONLY JSON תקין (ללא טקסט אחר):
+אם יש עיר בירושלים/תל אביב/חיפה - עשה את השאלה מקומית עם שם העיר או השכונה.
+
+חזור ONLY JSON (ללא טקסט אחר):
 
 {
   "questions": [
     {
-      "question": "שאלה טבעית בעברית",
-      "intent": "commercial|pre_purchase|informational|comparison|recommendation",
-      "reason": "סיבה קצרה"
+      "question": "שאלה בעברית טבעית",
+      "intent": "commercial|pre_purchase|informational",
+      "reason": "why this is valuable"
     }
   ]
 }`
-        : `Generate 3-5 diverse, high-quality search questions for "${projectName}"${country ? ` (${country})` : ''}
+        : `Create exactly 5 natural English questions for "${projectName}"${country ? ` in ${country}` : ''}.
 
-Prefer variety: curiosity, comparison, choice, information.
+Choose variety:
+• 2 questions with commercial intent (price, delivery, ordering, availability)
+• 1 "which" or "what" question (choice / personalization)
+• 1 comparison or recommendation question ("which is best", "recommended")
+• 1 problem or need question ("where", "can I")
 
-Return ONLY valid JSON (no other text):
+If there is a city mentioned — make the question location-specific with the city or neighborhood name.
+
+Return ONLY JSON (no other text):
 
 {
   "questions": [
     {
       "question": "natural question in English",
-      "intent": "commercial|pre_purchase|informational|comparison|recommendation",
-      "reason": "brief reason"
+      "intent": "commercial|pre_purchase|informational",
+      "reason": "why this is valuable"
     }
   ]
 }`
