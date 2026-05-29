@@ -26,7 +26,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions, extractAllowedLocations, containsDisallowedLocation, extractBusinessScope, filterSuggestionsByBusinessScope } from '@/lib/ai-visibility/suggestion-cache'
+import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions, extractAllowedLocations, containsDisallowedLocation, extractBusinessScope, filterSuggestionsByBusinessScope, getCountryDisplayName, containsISOCountryCodeLeak, isTimeOrPromotionSensitive } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 async function authAndProject(projectId: string) {
@@ -164,13 +164,17 @@ export async function POST(request: Request) {
       source = cachedSuggestions.length > 0 ? 'vNext+cache+gemini' : 'vNext+cache+gemini'
       geminiWasCalled = true
 
+      // Convert country code to display name for Gemini
+      const countryForGemini = country ? getCountryDisplayName(country) : undefined
+
       console.log('[enriched-suggestions] Calling Gemini (threshold not met)', {
         uniqueCount,
         threshold: QUALITY_THRESHOLD,
         projectName: project.business_name || '(empty)',
         projectDomain: project.target_domain || '(empty)',
         language,
-        country: country || '(not specified)',
+        countryCode: country || '(not specified)',
+        countryDisplay: countryForGemini || '(not specified)',
       })
 
       // Generate new suggestions from Gemini based on project profile
@@ -180,7 +184,7 @@ export async function POST(request: Request) {
           project.business_name || 'Project',
           project.target_domain || '',
           language,
-          country || undefined,
+          countryForGemini, // Pass display name, not code
           allowedLocations,
           businessScope
         )
@@ -195,9 +199,27 @@ export async function POST(request: Request) {
         geminiSuggestions = []
       }
 
-      // Filter by location constraints
+      // Multi-layer filtering of Gemini output
+      const isoCodeLeakLogs: Array<{ question: string }> = []
+      const isoCodeFiltered = geminiSuggestions.filter(g => {
+        const hasLeak = containsISOCountryCodeLeak(g.question)
+        if (hasLeak) {
+          isoCodeLeakLogs.push({ question: g.question })
+        }
+        return !hasLeak
+      })
+
+      const temporalLogs: Array<{ question: string }> = []
+      const temporalFiltered = isoCodeFiltered.filter(g => {
+        const isTemporal = isTimeOrPromotionSensitive(g.question)
+        if (isTemporal) {
+          temporalLogs.push({ question: g.question })
+        }
+        return !isTemporal
+      })
+
       const locationFilteredLogs: Array<{ question: string }> = []
-      const locationFiltered = geminiSuggestions.filter(g => {
+      const locationFiltered = temporalFiltered.filter(g => {
         const hasDisallowed = containsDisallowedLocation(g.question, allowedLocations)
         if (hasDisallowed) {
           locationFilteredLogs.push({ question: g.question })
@@ -215,13 +237,18 @@ export async function POST(request: Request) {
         }
       )
 
-      console.log('[enriched-suggestions] Gemini output filtering', {
+      console.log('[enriched-suggestions] Gemini output multi-layer filtering', {
         original: geminiSuggestions.length,
+        afterISOCodeFilter: isoCodeFiltered.length,
+        isoCodeFiltered: isoCodeLeakLogs.length,
+        afterTemporalFilter: temporalFiltered.length,
+        temporalFiltered: temporalLogs.length,
         afterLocationFilter: locationFiltered.length,
         locationFiltered: locationFilteredLogs.length,
         afterScopeFilter: scopeFiltered.length,
         scopeFiltered: scopeFilteredLogs.length,
-        scopeFilterExamples: scopeFilteredLogs.slice(0, 2),
+        isoCodeExamples: isoCodeLeakLogs.slice(0, 1),
+        temporalExamples: temporalLogs.slice(0, 1),
       })
 
       geminiSuggestions = scopeFiltered
@@ -303,6 +330,20 @@ export async function POST(request: Request) {
     console.log('[enriched-suggestions] Top deduplicated questions', {
       count: dedupedQuestions.length,
       samples: sampleQuestions,
+    })
+
+    // CACHE VERIFICATION LOGGING for debugging
+    console.log('[enriched-suggestions] CACHE VERIFICATION', {
+      vNextCount: vNextQuestions.length,
+      cachedLoadedRaw: rawCachedSuggestions.length,
+      cachedAfterScopeFilter: cachedSuggestions.length,
+      cachedFiltered: filteredCachedLogs.length,
+      newGeminiSuggestions: newSuggestions.length,
+      geminiWasCalled,
+      uniqueCountBefore: uniqueCount,
+      uniqueCountAfter: dedupedQuestions.length,
+      threshold: QUALITY_THRESHOLD,
+      geminiNotCalledReason: geminiWasCalled ? 'N/A' : 'threshold met or >= 20 unique',
     })
 
     return Response.json({

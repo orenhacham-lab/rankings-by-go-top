@@ -425,7 +425,7 @@ export async function generateProjectEnrichmentQuestions(
   projectName: string,
   domain: string,
   language: 'he' | 'en',
-  country?: string,
+  countryDisplay?: string, // Display name (e.g., "ישראל"), NOT ISO code (e.g., "IL")
   allowedLocations?: string[],
   businessScope?: { allowedTopics: string[]; excludedTerms: string[]; businessCategory: string | null }
 ): Promise<FallbackQuestionResponse[]> {
@@ -468,7 +468,10 @@ If unsure, return fewer questions rather than more.`)
 
 שם העסק/הביטוי: "${projectName}"
 התחום או URL: ${domain || 'כללי'}
-${country ? `מדינה: ${country}` : ''}
+${countryDisplay ? `מדינה: ${countryDisplay}` : ''}
+
+חשוב: אל תשתמש בקודי ISO ארצות (IL, US, GB, וכו').
+אם אתה זקוק לאזכור מדינה, השתמש בשם הטבעי של המדינה.
 
 ${scopeConstraint}
 
@@ -491,7 +494,10 @@ ${scopeConstraint}
 
 Business/Product: "${projectName}"
 Domain or URL: ${domain || 'General'}
-${country ? `Country: ${country}` : ''}
+${countryDisplay ? `Country: ${countryDisplay}` : ''}
+
+IMPORTANT: Never use ISO country codes (IL, US, GB, etc.) in questions.
+If you need to mention a country, use its full natural name.
 
 ${scopeConstraint}
 
@@ -576,7 +582,7 @@ Return ONLY JSON (no other text):
       projectName,
       domain: domain || '(empty)',
       language,
-      country: country || '(not specified)',
+      countryDisplay: countryDisplay || '(not specified)',
       allowedLocations: allowedLocations && allowedLocations.length > 0 ? allowedLocations : '(none)',
       allowedTopics: businessScope?.allowedTopics.length ? businessScope.allowedTopics : '(none)',
       excludedTerms: businessScope?.excludedTerms.length ? businessScope.excludedTerms : '(none)',

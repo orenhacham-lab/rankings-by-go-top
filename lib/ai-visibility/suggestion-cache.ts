@@ -279,6 +279,75 @@ export async function dismissSuggestedQuestion(
 }
 
 /**
+ * Map ISO country codes to display names for user-facing content
+ */
+const COUNTRY_CODE_TO_DISPLAY_NAME: Record<string, string> = {
+  'il': 'ישראל',
+  'us': 'United States',
+  'gb': 'United Kingdom',
+  'uk': 'United Kingdom',
+  'gr': 'Greece',
+  'cy': 'Cyprus',
+  'de': 'Germany',
+  'fr': 'France',
+  'it': 'Italy',
+  'es': 'Spain',
+  'pt': 'Portugal',
+  'nl': 'Netherlands',
+  'be': 'Belgium',
+  'ch': 'Switzerland',
+  'at': 'Austria',
+  'cz': 'Czech Republic',
+  'pl': 'Poland',
+  'ca': 'Canada',
+  'mx': 'Mexico',
+  'br': 'Brazil',
+  'ar': 'Argentina',
+  'au': 'Australia',
+  'nz': 'New Zealand',
+  'jp': 'Japan',
+  'cn': 'China',
+  'in': 'India',
+  'sg': 'Singapore',
+  'hk': 'Hong Kong',
+}
+
+/**
+ * Convert ISO country code to display-friendly name
+ * Returns the display name if mapped, otherwise returns the input unchanged
+ */
+export function getCountryDisplayName(countryCode?: string | null): string | undefined {
+  if (!countryCode) return undefined
+  const code = countryCode.toLowerCase().trim()
+  return COUNTRY_CODE_TO_DISPLAY_NAME[code] || code
+}
+
+/**
+ * Check if a question contains raw ISO country codes that leaked from internal processing
+ * Returns true if question should be rejected (contains ISO code)
+ */
+export function containsISOCountryCodeLeak(question: string): boolean {
+  if (!question) return false
+
+  const lowerQuestion = question.toLowerCase()
+
+  // List of ISO codes that should never appear in user-facing questions
+  const isoCodePatterns = [
+    /\b(il|us|uk|gb|gr|cy|de|fr|it|es|pt|nl|be|ch|at|cz|pl|ca|mx|br|ar|au|nz|jp|cn|in|sg|hk)\b/gi,
+    /ל-(il|us|uk|gb|gr|cy)/gi, // "ל-IL", "ל-US" in Hebrew
+    /to-(il|us|uk|gb|gr|cy)/gi, // "to-IL", "to-US" in English
+  ]
+
+  for (const pattern of isoCodePatterns) {
+    if (pattern.test(lowerQuestion)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
  * Business scope info for validating question relevance
  */
 export interface BusinessScope {
@@ -535,6 +604,38 @@ export function containsDisallowedLocation(
   }
 
   return false
+}
+
+/**
+ * Check if a question is time-sensitive/promotional
+ * Returns true if question should be rejected (assumes current promotions without evidence)
+ */
+export function isTimeOrPromotionSensitive(question: string): boolean {
+  if (!question) return false
+
+  const lowerQuestion = question.toLowerCase()
+
+  // Time/promotion sensitive patterns
+  const temporalPatterns = [
+    /עד\s+סוף\s+ה(חודש|שבוע)/i, // until end of month/week in Hebrew
+    /ב(חודש|שבוע)\s+ה/i, // in the current month/week
+    /חודש\s+ז/i, // this month
+    /שבוע\s+ז/i, // this week
+    /מבצע/i, // sale/campaign
+    /הנחה/i, // discount
+    /קופון/i, // coupon
+    /סייל/i, // sale
+    /לתקופה\s+מוגבלת/i, // for limited time
+    /עכשיו\s+בלבד/i, // only now
+    /today only/i,
+    /this month only/i,
+    /this week only/i,
+    /limited time/i,
+    /special promotion/i,
+    /current sale/i,
+  ]
+
+  return temporalPatterns.some(pattern => pattern.test(lowerQuestion))
 }
 
 /**
