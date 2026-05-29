@@ -464,17 +464,65 @@ export default function AIVisibilitySection({
           return t.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
         }
 
+        // Track rejection reasons for each cached suggestion
+        const cachedFilteringLog: Array<{
+          question: string
+          intent?: string
+          displayed: boolean
+          rejectedReason?: string
+        }> = []
+
         // Dedup: vNext as "previous", cached as "new additions"
         const dedupResult = dedupClientSide(
           vNextFiltered.map((q) => ({ prompt: q.prompt, intent: q.intent })),
           cachedRaw.map((q) => ({ question: q.question, intent: q.intent }))
         )
 
+        // Map normalized text -> original cached item
+        const cachedByNorm = new Map<string, { id?: string; question: string; intent?: string }>()
+        cachedRaw.forEach((c) => {
+          const norm = normalizeText(c.question)
+          cachedByNorm.set(norm, c)
+        })
+
+        // Identify which cached items were removed by dedup
+        const dedupedNorms = new Set(dedupResult.deduped.map((q) => normalizeText(q.prompt || '')))
+        cachedRaw.forEach((c) => {
+          const norm = normalizeText(c.question)
+          const displayedByDedup = dedupedNorms.has(norm)
+          cachedFilteringLog.push({
+            question: c.question,
+            intent: c.intent,
+            displayed: displayedByDedup,
+            rejectedReason: displayedByDedup ? undefined : 'duplicate',
+          })
+        })
+
         // Diversity filter on the full merged pool (nothing pre-existing)
         const { filtered: diversePool, removedCount: diversityRemoved } = applyDiversityFilter(dedupResult.deduped)
 
+        // Update filtering log for diversity rejections
+        const diverseNorms = new Set(diversePool.map((q) => normalizeText(q.prompt || '')))
+        cachedFilteringLog.forEach((log) => {
+          const norm = normalizeText(log.question)
+          if (log.displayed && !diverseNorms.has(norm)) {
+            log.displayed = false
+            log.rejectedReason = 'diversity_filter'
+          }
+        })
+
         // Cap at MAX_SUGGESTIONS
         const capped = diversePool.slice(0, MAX_SUGGESTIONS)
+
+        // Update filtering log for MAX_SUGGESTIONS cap
+        const cappedNorms = new Set(capped.map((q) => normalizeText(q.prompt || '')))
+        cachedFilteringLog.forEach((log) => {
+          const norm = normalizeText(log.question)
+          if (log.displayed && !cappedNorms.has(norm)) {
+            log.displayed = false
+            log.rejectedReason = 'exceeded_max_suggestions'
+          }
+        })
 
         // Convert back to PromptSuggestion[], reusing existing objects where possible.
         // Cached/Gemini items get proper intent + deterministic quality tier so they
@@ -499,19 +547,34 @@ export default function AIVisibilitySection({
           }
         })
 
+        const cachedDisplayedCount = merged.filter((m) => m.id.startsWith('gemini-')).length
+        const cachedFilteredOut = cachedFilteringLog.filter((log) => !log.displayed)
+
         console.log('[AIVisibility-initialLoad] Merged vNext + cached', {
           projectId,
           contextHash: data.contextHash || '(not returned)',
           vNextCount: vNextFiltered.length,
           cachedLoadedRaw: cachedRaw.length,
-          cachedAfterValidation: cachedRaw.length,
-          cachedRejectedCount: 0,
+          cachedDisplayedCount,
+          cachedFilteredOut: cachedFilteredOut.length,
           duplicatesRemovedByDedup: dedupResult.removed,
           diversityFiltered: diversityRemoved,
-          cachedDisplayedCount: merged.filter((m) => m.id.startsWith('gemini-')).length,
           finalInitialVisibleCount: merged.length,
           geminiWasCalled: false,
         })
+
+        // Log detailed rejection reasons for each filtered cached suggestion
+        if (cachedFilteredOut.length > 0) {
+          console.log('[AIVisibility-initialLoad] Cached suggestions filtered during merge:', {
+            projectId,
+            contextHash: data.contextHash || '(not returned)',
+            filteredDetails: cachedFilteredOut.map((log) => ({
+              question: log.question,
+              intent: log.intent,
+              rejectedReason: log.rejectedReason,
+            })),
+          })
+        }
 
         if (!cancelled) {
           setSuggestedQuestions(merged)

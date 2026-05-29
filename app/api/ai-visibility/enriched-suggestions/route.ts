@@ -159,6 +159,28 @@ export async function POST(request: Request) {
       count: rawCachedSuggestions.length,
     })
 
+    // Track detailed rejection reasons for cached suggestions
+    const cachedRejectionLog: Array<{
+      question: string
+      id?: string
+      source?: string
+      status?: string
+      rejectionReasons: string[]
+      displayed: boolean
+    }> = []
+
+    // Initialize with all loaded cached rows
+    rawCachedSuggestions.forEach((row: any) => {
+      cachedRejectionLog.push({
+        question: row.question,
+        id: row.id,
+        source: row.source,
+        status: row.status,
+        rejectionReasons: [],
+        displayed: true,
+      })
+    })
+
     // Filter cached suggestions by business scope
     const filteredCachedLogs: Array<{ question: string; reason: string }> = []
     let cachedSuggestions = filterSuggestionsByBusinessScope(
@@ -166,6 +188,11 @@ export async function POST(request: Request) {
       businessScope,
       (question, reason) => {
         filteredCachedLogs.push({ question, reason })
+        const logEntry = cachedRejectionLog.find(l => l.question === question)
+        if (logEntry) {
+          logEntry.rejectionReasons.push(`business_scope: ${reason}`)
+          logEntry.displayed = false
+        }
       }
     )
 
@@ -179,23 +206,68 @@ export async function POST(request: Request) {
     // Apply Hebrew quality filter to cached suggestions — removes stale/bad entries
     if (language === 'he') {
       const beforeQuality = cachedSuggestions.length
-      cachedSuggestions = cachedSuggestions.filter(q => !containsUnnaturalorBrokenHebrew(q.question))
-      const rejectedByQuality = beforeQuality - cachedSuggestions.length
-      if (rejectedByQuality > 0) {
+      const rejectedByQuality: string[] = []
+      cachedSuggestions = cachedSuggestions.filter(q => {
+        const isBroken = containsUnnaturalorBrokenHebrew(q.question)
+        if (isBroken) {
+          rejectedByQuality.push(q.question)
+          const logEntry = cachedRejectionLog.find(l => l.question === q.question && l.displayed)
+          if (logEntry) {
+            logEntry.rejectionReasons.push('bad_hebrew')
+            logEntry.displayed = false
+          }
+        }
+        return !isBroken
+      })
+      const rejectedCount = beforeQuality - cachedSuggestions.length
+      if (rejectedCount > 0) {
         console.log('[enriched-suggestions] Removed stale cached suggestions via Hebrew quality filter', {
-          count: rejectedByQuality,
+          count: rejectedCount,
+          examples: rejectedByQuality.slice(0, 2),
         })
       }
 
       // Also strip stale direct-address cached entries ("שלכם", "אצלכם", ...)
       const beforeDirect = cachedSuggestions.length
-      cachedSuggestions = cachedSuggestions.filter(q => !containsDirectAddress(q.question, project.business_name))
-      const rejectedByDirect = beforeDirect - cachedSuggestions.length
-      if (rejectedByDirect > 0) {
+      const rejectedByDirect: string[] = []
+      cachedSuggestions = cachedSuggestions.filter(q => {
+        const isDirect = containsDirectAddress(q.question, project.business_name)
+        if (isDirect) {
+          rejectedByDirect.push(q.question)
+          const logEntry = cachedRejectionLog.find(l => l.question === q.question && l.displayed)
+          if (logEntry) {
+            logEntry.rejectionReasons.push('direct_address')
+            logEntry.displayed = false
+          }
+        }
+        return !isDirect
+      })
+      const rejectedCount2 = beforeDirect - cachedSuggestions.length
+      if (rejectedCount2 > 0) {
         console.log('[enriched-suggestions] Removed stale cached suggestions via direct-address filter', {
-          count: rejectedByDirect,
+          count: rejectedCount2,
+          examples: rejectedByDirect.slice(0, 2),
         })
       }
+    }
+
+    // Log detailed rejection reasons for all cached rows that were filtered
+    const cachedFiltered = cachedRejectionLog.filter(log => !log.displayed)
+    if (cachedFiltered.length > 0) {
+      console.log('[enriched-suggestions] CACHED SUGGESTION REJECTION DETAILS', {
+        projectId,
+        contextHash: contextHashForLoad,
+        totalLoaded: rawCachedSuggestions.length,
+        totalFiltered: cachedFiltered.length,
+        totalDisplayed: cachedRejectionLog.filter(log => log.displayed).length,
+        filteredDetails: cachedFiltered.map(log => ({
+          question: log.question,
+          id: log.id,
+          source: log.source,
+          status: log.status,
+          rejectionReasons: log.rejectionReasons.length > 0 ? log.rejectionReasons : ['unknown'],
+        })),
+      })
     }
 
     const cachedSet = new Set(cachedSuggestions.map(q => strongNormalize(q.question)))

@@ -366,7 +366,7 @@ export async function loadCachedSuggestions(
 
   const { data, error } = await supabase
     .from('ai_question_suggestion_cache')
-    .select('id, question, intent, model_used, created_at')
+    .select('id, question, intent, model_used, created_at, status, source, question_hash, context_hash')
     .eq('project_id', params.projectId)
     .eq('context_hash', contextHash)
     .eq('status', 'suggested')
@@ -383,7 +383,27 @@ export async function loadCachedSuggestions(
     return []
   }
 
-  return data || []
+  const loaded = data || []
+
+  // Log comprehensive details for each cached row
+  console.log('[loadCachedSuggestions] Detailed row tracking', {
+    projectId: params.projectId,
+    contextHash,
+    loadedCount: loaded.length,
+    freshnessCutoff: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    rows: loaded.map((row: any) => ({
+      id: row.id,
+      question: row.question,
+      question_hash: row.question_hash,
+      source: row.source,
+      status: row.status,
+      intent: row.intent,
+      created_at: row.created_at,
+      displayedFlag: true, // Will be marked false if filtered later
+    })),
+  })
+
+  return loaded
 }
 
 export interface CacheWriteResult {
