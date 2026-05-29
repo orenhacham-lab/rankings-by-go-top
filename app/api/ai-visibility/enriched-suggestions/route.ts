@@ -197,20 +197,27 @@ export async function POST(request: Request) {
       totalUnique: uniqueCount,
     })
 
-    // Step 4: If <20 total unique, call Gemini for new suggestions
+    // Step 4: Gemini fill policy.
+    // QUALITY_THRESHOLD is the default visible target; MAX_POOL is the hard cap
+    // for how many persisted unique suggestions we accumulate per context.
+    // We call Gemini whenever the unique pool is below MAX_POOL so the cache can
+    // grow across multiple "צור עוד שאלות" clicks and persist after refresh.
     const QUALITY_THRESHOLD = 20
+    const MAX_POOL = 40
     let newSuggestions: Array<{ question: string; intent: string; model_used?: string }> = []
     let source: 'vNext' | 'vNext+cache' | 'vNext+cache+gemini' = 'vNext'
     let geminiWasCalled = false
+    let geminiNotCalledReason = ''
 
     if (cacheOnly) {
       source = cachedSuggestions.length > 0 ? 'vNext+cache' : 'vNext'
+      geminiNotCalledReason = 'cache_only_mode'
       console.log('[enriched-suggestions] Skipping Gemini (cacheOnly mode)', {
         cacheOnly,
         uniqueCount,
         cachedCount: cachedSuggestions.length,
       })
-    } else if (uniqueCount < QUALITY_THRESHOLD) {
+    } else if (uniqueCount < MAX_POOL) {
       source = 'vNext+cache+gemini'
       geminiWasCalled = true
 
@@ -359,8 +366,9 @@ export async function POST(request: Request) {
         []
       )
 
-      // Cap at reasonable number to fill threshold
-      const maxToAdd = Math.max(3, QUALITY_THRESHOLD - uniqueCount)
+      // Cap so total unique persisted suggestions approaches MAX_POOL (40),
+      // letting the cache accumulate a large expanded pool across clicks.
+      const maxToAdd = Math.max(3, MAX_POOL - uniqueCount)
       newSuggestions = deduped.slice(0, maxToAdd).map(s => ({
         question: s.question,
         intent: s.intent,
@@ -381,14 +389,15 @@ export async function POST(request: Request) {
           { projectId, language, country, businessCategory }
         )
 
-        console.log('[enriched-suggestions] Cache write', {
+        console.log('[enriched-suggestions] Cache write (Gemini → DB)', {
           contextHash: contextHashForWrite,
           projectId,
           language,
           country: country || '(none)',
           businessCategory: businessCategory || '(none)',
-          success: writeSuccess,
-          count: newSuggestions.length,
+          insertSuccess: writeSuccess,
+          insertedCount: writeSuccess ? newSuggestions.length : 0,
+          insertedQuestionHashesCount: newSuggestions.length,
           questions: newSuggestions.slice(0, 3).map(q => `"${q.question.substring(0, 60)}..."`),
         })
 
@@ -405,9 +414,11 @@ export async function POST(request: Request) {
       }
     } else {
       source = cachedSuggestions.length > 0 ? 'vNext+cache' : 'vNext'
-      console.log('[enriched-suggestions] Gemini not called (threshold met)', {
+      geminiNotCalledReason = 'pool_full_max_reached'
+      console.log('[enriched-suggestions] Gemini not called (pool at MAX_POOL)', {
         uniqueCount,
-        threshold: QUALITY_THRESHOLD,
+        target: QUALITY_THRESHOLD,
+        maxPool: MAX_POOL,
       })
     }
 
@@ -440,16 +451,20 @@ export async function POST(request: Request) {
     // CACHE VERIFICATION LOGGING for debugging
     console.log('[enriched-suggestions] CACHE VERIFICATION', {
       cacheOnly,
+      contextHash: contextHashForLoad,
       vNextCount: vNextQuestions.length,
       cachedLoadedRaw: rawCachedSuggestions.length,
       cachedAfterScopeFilter: cachedSuggestions.length,
+      cachedRejectedCount: rawCachedSuggestions.length - cachedSuggestions.length,
       cachedFiltered: filteredCachedLogs.length,
+      cachedRejectedReasons: filteredCachedLogs.slice(0, 5).map(f => f.reason),
       newGeminiSuggestions: newSuggestions.length,
       geminiWasCalled,
       uniqueCountBefore: uniqueCount,
       uniqueCountAfter: dedupedQuestions.length,
-      threshold: QUALITY_THRESHOLD,
-      geminiNotCalledReason: geminiWasCalled ? 'N/A' : cacheOnly ? 'cacheOnly mode' : 'threshold met or >= 20 unique',
+      target: QUALITY_THRESHOLD,
+      maxPool: MAX_POOL,
+      geminiNotCalledReason: geminiWasCalled ? 'N/A' : geminiNotCalledReason,
     })
 
     return Response.json({
@@ -461,6 +476,8 @@ export async function POST(request: Request) {
       duplicatesRemoved: duplicateCount,
       source,
       geminiWasCalled,
+      geminiNotCalledReason: geminiWasCalled ? null : geminiNotCalledReason,
+      contextHash: contextHashForLoad,
     })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)

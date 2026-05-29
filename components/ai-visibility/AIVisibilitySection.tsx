@@ -57,7 +57,7 @@ import type {
   CompetitorCategory,
 } from '@/lib/ai-visibility/geo-competitor-intelligence'
 import type { BusinessMentionIntelligence } from '@/lib/ai-visibility/geo-business-mentions'
-import { dedupClientSide, applyDiversityFilter } from '@/lib/ai-visibility/suggestion-dedup'
+import { dedupClientSide, applyDiversityFilter, deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
 
 const MAX_SUGGESTIONS = 40
 
@@ -476,31 +476,23 @@ export default function AIVisibilitySection({
         // Cap at MAX_SUGGESTIONS
         const capped = diversePool.slice(0, MAX_SUGGESTIONS)
 
-        // Convert back to PromptSuggestion[], reusing existing objects where possible
-        const intentToLabel = (s: string): string =>
-          s === 'commercial' ? 'Commercial'
-          : s === 'informational' ? 'Informational'
-          : s === 'pre_purchase' ? 'Pre-purchase'
-          : s === 'comparison' ? 'Comparison'
-          : s === 'recommendation' ? 'Recommendation'
-          : s === 'brand' ? 'Brand'
-          : s === 'local' ? 'Local'
-          : 'Other'
-
+        // Convert back to PromptSuggestion[], reusing existing objects where possible.
+        // Cached/Gemini items get proper intent + deterministic quality tier so they
+        // render with the same label structure as built-in vNext suggestions.
         const merged: PromptSuggestion[] = capped.map((q) => {
           const fromVNext = vNextFiltered.find((v) => normalizeText(v.prompt) === normalizeText(q.prompt))
           if (fromVNext) return fromVNext
           const fromCached = cachedRaw.find((c) => normalizeText(c.question) === normalizeText(q.prompt))
-          const intentStr = fromCached?.intent || 'other'
+          const meta = deriveSuggestionMeta(fromCached?.intent ?? q.intent)
           return {
             id: `gemini-${fromCached?.id || Math.random().toString(36).slice(2, 8)}`,
             prompt: q.prompt,
-            intent: intentStr as any,
-            intentLabel: intentToLabel(intentStr),
+            intent: meta.intent,
+            intentLabel: meta.intent,
             category: 'generic',
             language: projectLanguage ?? 'he',
-            qualityScore: 75,
-            confidenceTier: 'good' as const,
+            qualityScore: meta.qualityScore,
+            confidenceTier: meta.confidenceTier,
             reason: '',
             chips: [],
             valueReason: '',
@@ -508,11 +500,15 @@ export default function AIVisibilitySection({
         })
 
         console.log('[AIVisibility-initialLoad] Merged vNext + cached', {
+          projectId,
+          contextHash: data.contextHash || '(not returned)',
           vNextCount: vNextFiltered.length,
           cachedLoadedRaw: cachedRaw.length,
           cachedAfterValidation: cachedRaw.length,
+          cachedRejectedCount: 0,
           duplicatesRemovedByDedup: dedupResult.removed,
           diversityFiltered: diversityRemoved,
+          cachedDisplayedCount: merged.filter((m) => m.id.startsWith('gemini-')).length,
           finalInitialVisibleCount: merged.length,
           geminiWasCalled: false,
         })
@@ -801,6 +797,8 @@ export default function AIVisibilitySection({
       const visibleBefore = suggestedQuestions.length
       const trackedPrompts = allPrompts.map((p) => p.prompt || '').filter(Boolean)
       let geminiWasCalled = false
+      let geminiNotCalledReason = ''
+      let contextHash = ''
       let newGeminiCount = 0
       let cachedLoadedCount = 0
       let duplicatesRemovedCount = 0
@@ -865,6 +863,8 @@ export default function AIVisibilitySection({
           cachedFromApi = enrichData.cachedSuggestions || []
           newFromGemini = enrichData.newSuggestions || []
           geminiWasCalled = enrichData.geminiWasCalled || false
+          geminiNotCalledReason = enrichData.geminiNotCalledReason || ''
+          contextHash = enrichData.contextHash || ''
           newGeminiCount = newFromGemini.length
           cachedLoadedCount = cachedFromApi.length
 
@@ -877,29 +877,27 @@ export default function AIVisibilitySection({
             duplicatesRemovedByApi: enrichData.duplicatesRemoved || 0,
           })
 
-          // Filter deduplicated API suggestions against vNext exclusions one more time
+          // Filter deduplicated API suggestions against vNext exclusions one more time.
+          // Each item gets proper intent + deterministic quality tier so it renders
+          // with the same label structure as built-in vNext suggestions.
           const apiFiltered = apiDedupedQuestions
             .filter((q: any) => q.question && !seenKeys.has(normalize(q.question)))
-            .map((q: any): PromptSuggestion => ({
-              id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
-              prompt: q.question,
-              intent: q.intent,
-              intentLabel: q.intent === 'commercial' ? 'Commercial'
-                         : q.intent === 'informational' ? 'Informational'
-                         : q.intent === 'pre_purchase' ? 'Pre-purchase'
-                         : q.intent === 'comparison' ? 'Comparison'
-                         : q.intent === 'recommendation' ? 'Recommendation'
-                         : q.intent === 'brand' ? 'Brand'
-                         : q.intent === 'local' ? 'Local'
-                         : 'Other',
-              category: 'generic',
-              language: projectLanguage ?? 'he',
-              qualityScore: 75,
-              confidenceTier: 'good',
-              reason: '',
-              chips: [],
-              valueReason: '',
-            }))
+            .map((q: any): PromptSuggestion => {
+              const meta = deriveSuggestionMeta(q.intent)
+              return {
+                id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
+                prompt: q.question,
+                intent: meta.intent,
+                intentLabel: meta.intent,
+                category: 'generic',
+                language: projectLanguage ?? 'he',
+                qualityScore: meta.qualityScore,
+                confidenceTier: meta.confidenceTier,
+                reason: '',
+                chips: [],
+                valueReason: '',
+              }
+            })
 
           vNextFiltered = [...vNextFiltered, ...apiFiltered]
         }
@@ -949,31 +947,22 @@ export default function AIVisibilitySection({
           poolMax: MAX_SUGGESTIONS,
         })
 
-        const intentToLabel = (s: string): string =>
-          s === 'commercial' ? 'Commercial'
-          : s === 'informational' ? 'Informational'
-          : s === 'pre_purchase' ? 'Pre-purchase'
-          : s === 'comparison' ? 'Comparison'
-          : s === 'recommendation' ? 'Recommendation'
-          : s === 'brand' ? 'Brand'
-          : s === 'local' ? 'Local'
-          : 'Other'
-
-        // Convert back to PromptSuggestion[], reusing existing objects where possible
+        // Convert back to PromptSuggestion[], reusing existing objects where possible.
+        // New items get proper intent + deterministic quality tier for correct labels.
         const finalMerged = [...suggestedQuestions, ...filtered]
         const finalDeduped: PromptSuggestion[] = capped.map((q) => {
           const fromExisting = finalMerged.find((fm) => normalize(fm.prompt) === normalize(q.prompt))
           if (fromExisting) return fromExisting
-          const intentStr = q.intent || 'other'
+          const meta = deriveSuggestionMeta(q.intent)
           return {
             id: `final-${Math.random().toString(36).slice(2, 8)}`,
             prompt: q.prompt,
-            intent: intentStr as any,
-            intentLabel: intentToLabel(intentStr),
+            intent: meta.intent,
+            intentLabel: meta.intent,
             category: 'generic',
             language: projectLanguage ?? 'he',
-            qualityScore: 75,
-            confidenceTier: 'good',
+            qualityScore: meta.qualityScore,
+            confidenceTier: meta.confidenceTier,
             reason: '',
             chips: [],
             valueReason: '',
@@ -1009,17 +998,24 @@ export default function AIVisibilitySection({
 
       // Log comprehensive metrics
       console.log('[AIVisibility-refreshSuggestions] Full cycle metrics', {
+        projectId,
+        contextHash: contextHash || '(not returned)',
         visibleBefore,
         trackedPromptsCount: trackedPrompts.length,
         vNextCount: refreshed.length,
         vNextAfterFilter: vNextFiltered.length,
-        cachedLoadedCount,
-        newGeminiCount,
-        duplicatesRemovedCount,
-        diversityFilteredCount,
-        finalVisibleCount: suggestedQuestions.length,
-        geminiWasCalled,
+        cachedLoadedRaw: cachedLoadedCount,
+        cachedAfterValidation: cachedLoadedCount,
+        finalPoolBefore: visibleBefore,
         poolMax: MAX_SUGGESTIONS,
+        geminiWasCalled,
+        geminiCallReason: geminiWasCalled ? 'cache_plus_vnext_below_max' : '',
+        geminiNotCalledReason: geminiWasCalled ? '' : geminiNotCalledReason,
+        newGeminiRawCount: newGeminiCount,
+        newGeminiAcceptedCount: newGeminiCount,
+        duplicatesRemoved: duplicatesRemovedCount,
+        diversityFilteredCount,
+        finalPoolAfter: suggestedQuestions.length,
         emptyStateReason,
       })
     } catch (e) {

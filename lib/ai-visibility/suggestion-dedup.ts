@@ -3,6 +3,89 @@
  * Does NOT depend on server modules
  */
 
+import type { PromptIntent } from './prompt-templates'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUGGESTION META DERIVATION
+// Maps a raw Gemini/cached intent string to a valid PromptIntent and computes a
+// deterministic quality tier + score. Used so cached/Gemini suggestions render
+// with the SAME label structure as built-in vNext suggestions (intent badge +
+// quality badge) instead of always defaulting to "good"/"טוב".
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VALID_INTENTS: ReadonlySet<string> = new Set<PromptIntent>([
+  'brand',
+  'comparison',
+  'local',
+  'transactional',
+  'recommendation',
+  'informational',
+  'commercial',
+  'alternatives',
+  'pre_purchase',
+  'gift',
+])
+
+// Map common alias intents that Gemini may emit onto the canonical PromptIntent set.
+const INTENT_ALIASES: Record<string, PromptIntent> = {
+  price: 'commercial',
+  pricing: 'commercial',
+  purchase: 'commercial',
+  buy: 'commercial',
+  review: 'brand',
+  reviews: 'brand',
+  reputation: 'brand',
+  info: 'informational',
+  information: 'informational',
+  location: 'local',
+  geo: 'local',
+  prepurchase: 'pre_purchase',
+  'pre-purchase': 'pre_purchase',
+  recommend: 'recommendation',
+  compare: 'comparison',
+}
+
+// Deterministic quality tier by intent. Produces a spread of גבוה/טוב/בינוני
+// rather than every suggestion showing "טוב".
+const INTENT_QUALITY: Record<PromptIntent, { tier: 'high' | 'good' | 'medium'; score: number }> = {
+  commercial: { tier: 'high', score: 90 },
+  recommendation: { tier: 'high', score: 88 },
+  local: { tier: 'high', score: 86 },
+  transactional: { tier: 'high', score: 85 },
+  comparison: { tier: 'good', score: 80 },
+  pre_purchase: { tier: 'good', score: 80 },
+  brand: { tier: 'good', score: 76 },
+  gift: { tier: 'good', score: 75 },
+  alternatives: { tier: 'good', score: 74 },
+  informational: { tier: 'medium', score: 70 },
+}
+
+export function normalizeIntent(rawIntent?: string | null): PromptIntent {
+  if (!rawIntent || typeof rawIntent !== 'string') return 'informational'
+  const lower = rawIntent.trim().toLowerCase()
+  if (VALID_INTENTS.has(lower)) return lower as PromptIntent
+  if (INTENT_ALIASES[lower]) return INTENT_ALIASES[lower]
+  return 'informational'
+}
+
+/**
+ * Derives a valid intent + deterministic quality tier/score for a
+ * cached or Gemini-generated suggestion, so it renders proper labels.
+ */
+export function deriveSuggestionMeta(rawIntent?: string | null): {
+  intent: PromptIntent
+  confidenceTier: 'high' | 'good' | 'medium'
+  qualityScore: number
+} {
+  const intent = normalizeIntent(rawIntent)
+  const quality = INTENT_QUALITY[intent] ?? { tier: 'good' as const, score: 75 }
+  return {
+    intent,
+    confidenceTier: quality.tier,
+    qualityScore: quality.score,
+  }
+}
+
 export function strongNormalize(text?: string | null): string {
   if (!text || typeof text !== 'string') {
     return ''
@@ -171,8 +254,15 @@ export function areSemanticDuplicates(
   const topicUnion = new Set([...topics1, ...topics2])
   const topicSimilarity = topicUnion.size === 0 ? 0 : topicIntersection.size / topicUnion.size
 
+  // Topic overlap is the primary signal. A shared generic action verb alone
+  // (e.g. both contain "מתאים" → action "בחירה") must NOT collapse two questions
+  // whose actual topics differ — that over-aggressive rule was shrinking the
+  // legitimately diverse pool. Action similarity only counts when the questions
+  // also share meaningful topic overlap.
+  const SECONDARY_TOPIC_GATE = 0.3
   const isSemanticallyDuplicate =
-    actionSimilarity >= similarityThreshold || topicSimilarity >= similarityThreshold
+    topicSimilarity >= similarityThreshold ||
+    (actionSimilarity >= similarityThreshold && topicSimilarity >= SECONDARY_TOPIC_GATE)
 
   return isSemanticallyDuplicate
 }

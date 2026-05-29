@@ -230,9 +230,15 @@ export function areSemanticDuplicates(
   const topicUnion = new Set([...topics1, ...topics2])
   const topicSimilarity = topicUnion.size === 0 ? 0 : topicIntersection.size / topicUnion.size
 
-  // Duplicates if: same intent + same entity + good action/topic overlap
+  // Topic overlap is the primary signal. A shared generic action verb alone
+  // (e.g. both contain "מתאים" → action "בחירה") must NOT collapse two questions
+  // whose actual topics differ — that over-aggressive rule was shrinking the
+  // legitimately diverse pool. Action similarity only counts when the questions
+  // also share meaningful topic overlap.
+  const SECONDARY_TOPIC_GATE = 0.3
   const isSemanticallyDuplicate =
-    actionSimilarity >= similarityThreshold || topicSimilarity >= similarityThreshold
+    topicSimilarity >= similarityThreshold ||
+    (actionSimilarity >= similarityThreshold && topicSimilarity >= SECONDARY_TOPIC_GATE)
 
   return isSemanticallyDuplicate
 }
@@ -243,8 +249,8 @@ export function areSemanticDuplicates(
  * Returns: (questions, duplicatesRemoved count)
  */
 export function strongDeduplicateSuggestions(
-  vNextQuestions: Array<{ question?: string | null; prompt?: string | null }>,
-  cachedSuggestions: Array<{ question?: string | null }>,
+  vNextQuestions: Array<{ question?: string | null; prompt?: string | null; intent?: string }>,
+  cachedSuggestions: Array<{ question?: string | null; intent?: string }>,
   newGeminiSuggestions: Array<{ question?: string | null; intent?: string }>
 ): {
   dedupedQuestions: Array<{ question: string; intent?: string; source: string }>
@@ -284,12 +290,12 @@ export function strongDeduplicateSuggestions(
 
   // Add vNext questions
   vNextQuestions.forEach((q) => {
-    addQuestion(q.prompt || q.question, 'vNext')
+    addQuestion(q.prompt || q.question, 'vNext', (q as { intent?: string }).intent)
   })
 
-  // Add cached suggestions
+  // Add cached suggestions — preserve intent so labels survive the round-trip
   cachedSuggestions.forEach((q) => {
-    addQuestion(q.question, 'cached')
+    addQuestion(q.question, 'cached', (q as { intent?: string }).intent)
   })
 
   // Add new Gemini suggestions
