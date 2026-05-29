@@ -79,6 +79,13 @@ export async function POST(request: Request) {
   const { admin, project } = result
 
   try {
+    console.log('[enriched-suggestions] API called', {
+      projectId,
+      language,
+      country,
+      businessCategory,
+    })
+
     // Step 1: Load vNext (ai_prompts) questions
     const { data: vNextData } = await admin
       .from('ai_prompts')
@@ -90,6 +97,11 @@ export async function POST(request: Request) {
     const vNextQuestions = vNextData || []
     const vNextSet = new Set(vNextQuestions.map(q => normalizeQuestion(q.prompt)))
 
+    console.log('[enriched-suggestions] vNext questions loaded', {
+      count: vNextQuestions.length,
+      unique: vNextSet.size,
+    })
+
     // Step 2: Load cached Gemini suggestions (status = 'suggested' only)
     const cachedSuggestions = await loadCachedSuggestions({
       projectId,
@@ -99,18 +111,35 @@ export async function POST(request: Request) {
       keywordsHash: null
     })
 
+    console.log('[enriched-suggestions] Cached Gemini suggestions loaded', {
+      count: cachedSuggestions.length,
+    })
+
     const cachedSet = new Set(cachedSuggestions.map(q => normalizeQuestion(q.question)))
 
     // Step 3: Count unique questions so far
     const uniqueCount = vNextSet.size + (cachedSuggestions.length - Array.from(cachedSuggestions).filter(c => vNextSet.has(normalizeQuestion(c.question))).length)
 
+    console.log('[enriched-suggestions] Unique count', {
+      vNextUnique: vNextSet.size,
+      cachedUnique: cachedSuggestions.length - Array.from(cachedSuggestions).filter(c => vNextSet.has(normalizeQuestion(c.question))).length,
+      totalUnique: uniqueCount,
+    })
+
     // Step 4: If <20 total unique, call Gemini for new suggestions
     const QUALITY_THRESHOLD = 20
     let newSuggestions: Array<{ question: string; intent: string; model_used?: string }> = []
     let source: 'vNext' | 'vNext+cache' | 'vNext+cache+gemini' = 'vNext'
+    let geminiWasCalled = false
 
     if (uniqueCount < QUALITY_THRESHOLD) {
       source = cachedSuggestions.length > 0 ? 'vNext+cache+gemini' : 'vNext+cache+gemini'
+      geminiWasCalled = true
+
+      console.log('[enriched-suggestions] Calling Gemini (threshold not met)', {
+        uniqueCount,
+        threshold: QUALITY_THRESHOLD,
+      })
 
       // Generate new suggestions from Gemini
       const geminiSuggestions = await generateFallbackQuestions(
@@ -119,6 +148,10 @@ export async function POST(request: Request) {
         language,
         country || undefined
       )
+
+      console.log('[enriched-suggestions] Gemini returned', {
+        count: geminiSuggestions.length,
+      })
 
       // Deduplicate against vNext and cache
       const deduped = deduplicateSuggestions(
@@ -136,13 +169,23 @@ export async function POST(request: Request) {
         model_used: process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
       }))
 
+      console.log('[enriched-suggestions] After dedup and cap', {
+        maxToAdd,
+        newCount: newSuggestions.length,
+      })
+
       // Write new suggestions to cache
       if (newSuggestions.length > 0) {
-        await writeSuggestionsToCache(
+        const writeSuccess = await writeSuggestionsToCache(
           projectId,
           newSuggestions,
           { projectId, language, country, businessCategory }
         )
+
+        console.log('[enriched-suggestions] Cache write', {
+          success: writeSuccess,
+          count: newSuggestions.length,
+        })
 
         // Add to cached list for response
         cachedSuggestions.push(
@@ -157,13 +200,28 @@ export async function POST(request: Request) {
       }
     } else {
       source = cachedSuggestions.length > 0 ? 'vNext+cache' : 'vNext'
+      console.log('[enriched-suggestions] Gemini not called (threshold met)', {
+        uniqueCount,
+        threshold: QUALITY_THRESHOLD,
+      })
     }
+
+    const finalTotal = vNextQuestions.length + cachedSuggestions.filter(c => !vNextSet.has(normalizeQuestion(c.question))).length
+
+    console.log('[enriched-suggestions] API response', {
+      vNextCount: vNextQuestions.length,
+      cachedCount: cachedSuggestions.length,
+      newCount: newSuggestions.length,
+      finalTotal,
+      source,
+      geminiWasCalled,
+    })
 
     return Response.json({
       vNextQuestions,
       cachedSuggestions,
       newSuggestions,
-      total: vNextQuestions.length + cachedSuggestions.filter(c => !vNextSet.has(normalizeQuestion(c.question))).length,
+      total: finalTotal,
       source
     })
   } catch (err) {

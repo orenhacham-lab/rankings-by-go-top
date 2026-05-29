@@ -38,8 +38,7 @@ import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
-import { USE_KEYWORD_ENRICHMENT_SMART_QUESTIONS } from '@/lib/ai-visibility/enrichment-feature-flag'
-import { generateSmartQuestionKeywordEnrichment, isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
+import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
@@ -719,61 +718,62 @@ export default function AIVisibilitySection({
       // truly ran out of diverse options. Surface the helper hint in that case.
       const DIVERSITY_THRESHOLD = 4
 
-      // ── Keyword enrichment (flag-gated, refresh-only, fallback-only) ──────
-      // Conditions:
-      //   1. Feature flag is explicitly enabled.
-      //   2. Project has keywords to analyze.
-      //   3. vNext returned fewer than DIVERSITY_THRESHOLD distinct candidates
-      //      (i.e., the pool is thin or exhausted for this context).
-      // This block is completely inert when the flag is false — no code path
-      // inside it is reachable, preserving identical behavior to today.
-
-      if (
-        USE_KEYWORD_ENRICHMENT_SMART_QUESTIONS &&
-        projectKeywords &&
-        projectKeywords.length > 0 &&
-        trulyNew.length < DIVERSITY_THRESHOLD
-      ) {
-        const lang: 'he' | 'en' = projectLanguage === 'he' ? 'he' : 'en'
-
-        const enrichmentResult = generateSmartQuestionKeywordEnrichment({
-          projectKeywords,
-          language: lang,
-          businessName: projectBrandName ?? undefined,
-          // Pass the full vNext output (both fresh and previously shown) so the
-          // helper can perform entity+intent dedup against the whole known pool.
-          existingSuggestions: [...refreshed, ...suggestedQuestions],
-          savedQuestions: allPrompts.map((p) => p.prompt || '').filter(Boolean),
-          alreadyShownQuestions: exclude,
+      // ── Gemini-powered enrichment via persistent cache layer ──────────────
+      // Call new enriched-suggestions endpoint which:
+      // 1. Loads cached Gemini suggestions (status='suggested')
+      // 2. Calls Gemini only if < 20 total unique suggestions
+      // 3. Returns combined vNext + cache + (new Gemini if called)
+      try {
+        const enrichResponse = await fetch('/api/ai-visibility/enriched-suggestions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            language: projectLanguage === 'he' ? 'he' : 'en',
+            country: projectCountry || undefined,
+            businessCategory: null,
+          }),
         })
 
-        // Convert EnrichmentCandidate → PromptSuggestion, with a final text
-        // dedup pass to guarantee no overlap with anything already in seenKeys.
-        const enriched = enrichmentResult.candidates
-          .filter((c) => !seenKeys.has(normalize(c.question)))
-          .map((c): PromptSuggestion => ({
-            id: `enrichment-${Math.random().toString(36).slice(2, 8)}`,
-            prompt: c.question,
-            intent: c.intent,
-            intentLabel: c.intentLabel,
-            // Enrichment is a secondary source; use 'generic' category so no
-            // category-specific rendering path is triggered unintentionally.
-            category: 'generic',
-            language: projectLanguage ?? 'he',
-            // Map 3-tier enrichment confidence to 5-tier PromptSuggestion tier.
-            // Enrichment candidates are at most 'good' (never 'high') because
-            // they are pattern-generated, not intent-engine optimized.
-            qualityScore: c.confidence === 'high' ? 88 : c.confidence === 'medium' ? 72 : 55,
-            confidenceTier:
-              c.confidence === 'high' ? 'good'
-              : c.confidence === 'medium' ? 'medium'
-              : 'opportunity',
-            reason: '',  // no internal/debug reason text shown to users for enrichment
-            chips: [],
-            valueReason: '',
-          }))
+        if (enrichResponse.ok) {
+          const enrichData = await enrichResponse.json()
 
-        trulyNew = [...trulyNew, ...enriched]
+          // Extract cached Gemini suggestions (not vNext, which are already in refreshed)
+          const cachedSuggestions = enrichData.cachedSuggestions || []
+          const newSuggestions = enrichData.newSuggestions || []
+
+          // Combine cached + new Gemini suggestions
+          const allEnriched = [...cachedSuggestions, ...newSuggestions]
+
+          // Convert to PromptSuggestion format, with dedup against seenKeys
+          const enriched = allEnriched
+            .filter((c: any) => !seenKeys.has(normalize(c.question)))
+            .map((c: any): PromptSuggestion => ({
+              id: `gemini-cache-${c.id || Math.random().toString(36).slice(2, 8)}`,
+              prompt: c.question,
+              intent: c.intent,
+              intentLabel: c.intent === 'commercial' ? 'Commercial'
+                         : c.intent === 'informational' ? 'Informational'
+                         : c.intent === 'pre_purchase' ? 'Pre-purchase'
+                         : c.intent === 'comparison' ? 'Comparison'
+                         : c.intent === 'recommendation' ? 'Recommendation'
+                         : c.intent === 'brand' ? 'Brand'
+                         : c.intent === 'local' ? 'Local'
+                         : 'Other',
+              category: 'generic',
+              language: projectLanguage ?? 'he',
+              qualityScore: 75,
+              confidenceTier: 'good',
+              reason: '',
+              chips: [],
+              valueReason: '',
+            }))
+
+          trulyNew = [...trulyNew, ...enriched]
+        }
+      } catch (enrichErr) {
+        // Silently fail — if enrichment endpoint is unavailable, continue with vNext only
+        console.debug('[AIVisibility] Enrichment endpoint unavailable, continuing with vNext:', enrichErr)
       }
       // ──────────────────────────────────────────────────────────────────────
       // Apply display-level safety filter: block invalid price questions
