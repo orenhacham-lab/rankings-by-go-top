@@ -29,6 +29,7 @@ import { createClient } from '@/lib/supabase/server'
 import {
   loadCachedSuggestions,
   writeSuggestionsToCache,
+  type CacheWriteResult,
   deduplicateSuggestions,
   computeContextHash,
   strongNormalize,
@@ -208,6 +209,7 @@ export async function POST(request: Request) {
     let source: 'vNext' | 'vNext+cache' | 'vNext+cache+gemini' = 'vNext'
     let geminiWasCalled = false
     let geminiNotCalledReason = ''
+    let cacheWriteResult: CacheWriteResult | null = null
 
     if (cacheOnly) {
       source = cachedSuggestions.length > 0 ? 'vNext+cache' : 'vNext'
@@ -382,32 +384,25 @@ export async function POST(request: Request) {
 
       // Write new suggestions to cache
       if (newSuggestions.length > 0) {
-        const contextHashForWrite = computeContextHash(projectId, language, country, businessCategory)
-        const writeSuccess = await writeSuggestionsToCache(
+        cacheWriteResult = await writeSuggestionsToCache(
           projectId,
           newSuggestions,
           { projectId, language, country, businessCategory }
         )
 
-        if (!writeSuccess) {
-          console.error('[enriched-suggestions] CRITICAL: Cache write FAILED! Suggestions were NOT persisted to database', {
-            contextHash: contextHashForWrite,
-            projectId,
-            language,
-            country: country || '(none)',
-            businessCategory: businessCategory || '(none)',
-            attemptedInsertCount: newSuggestions.length,
-            questions: newSuggestions.slice(0, 3).map(q => `"${q.question.substring(0, 60)}..."`),
+        if (!cacheWriteResult.success || cacheWriteResult.rowsVisibleAfterWrite === 0) {
+          console.error('[enriched-suggestions] CRITICAL: Cache write did NOT persist!', {
+            ...cacheWriteResult,
+            writeContextHash: cacheWriteResult.contextHash,
+            readContextHash: contextHashForLoad,
+            contextHashMatches: cacheWriteResult.contextHash === contextHashForLoad,
           })
         } else {
           console.log('[enriched-suggestions] Cache write SUCCESS (Gemini → DB)', {
-            contextHash: contextHashForWrite,
-            projectId,
-            language,
-            country: country || '(none)',
-            businessCategory: businessCategory || '(none)',
-            insertedCount: newSuggestions.length,
-            questions: newSuggestions.slice(0, 3).map(q => `"${q.question.substring(0, 60)}..."`),
+            ...cacheWriteResult,
+            writeContextHash: cacheWriteResult.contextHash,
+            readContextHash: contextHashForLoad,
+            contextHashMatches: cacheWriteResult.contextHash === contextHashForLoad,
           })
         }
 
@@ -488,6 +483,7 @@ export async function POST(request: Request) {
       geminiWasCalled,
       geminiNotCalledReason: geminiWasCalled ? null : geminiNotCalledReason,
       contextHash: contextHashForLoad,
+      cacheWrite: cacheWriteResult,
     })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)

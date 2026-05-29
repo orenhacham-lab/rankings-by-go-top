@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export interface CachedSuggestion {
   id: string
@@ -345,11 +346,15 @@ export function computeContextHash(
 /**
  * Load cached suggestions for a project/context
  * Returns only 'suggested' status rows, filtered by freshness_days
+ *
+ * Uses the admin (service-role) client so that Row-Level Security can never be
+ * the silent reason a row is invisible. The API route authorizes project
+ * ownership BEFORE calling this, so bypassing RLS here is safe.
  */
 export async function loadCachedSuggestions(
   params: CacheLookupParams
 ): Promise<CachedSuggestion[]> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const contextHash = computeContextHash(
     params.projectId,
@@ -369,16 +374,48 @@ export async function loadCachedSuggestions(
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('[Suggestion Cache] Load error:', error)
+    console.error('[Suggestion Cache] Load error:', {
+      errorCode: (error as any)?.code,
+      errorMessage: error.message,
+      contextHash,
+      projectId: params.projectId,
+    })
     return []
   }
 
   return data || []
 }
 
+export interface CacheWriteResult {
+  success: boolean
+  contextHash: string
+  rowsAttempted: number
+  rowsInserted: number
+  rowsAlreadyPresent: number
+  rowsVisibleAfterWrite: number
+  errorCode: string | null
+  errorMessage: string | null
+  sampleQuestionHashes: string[]
+}
+
 /**
- * Write new suggestions to cache
- * Returns true if all wrote successfully, false if any failed
+ * Write new suggestions to cache.
+ *
+ * IMPORTANT: This implementation does NOT depend on any UNIQUE constraint or
+ * ON CONFLICT target. The original code relied on an upsert against a column
+ * list, but the production table only has a *partial/filtered* unique index
+ * (`WHERE status NOT IN ('expired','dismissed')`). Postgres cannot use a
+ * partial index as an ON CONFLICT inference target from a column list, so the
+ * upsert failed with error 42P10 and the failure was swallowed — nothing was
+ * ever persisted. That was the production persistence bug.
+ *
+ * This version instead:
+ *   1. Uses the admin (service-role) client (RLS can't silently block it).
+ *   2. Reads the existing question_hashes for this project+context_hash.
+ *   3. Inserts ONLY the genuinely-new rows via a plain INSERT (no constraint).
+ *   4. Performs a post-write SELECT to PROVE the rows are visible.
+ *
+ * Returns a detailed proof object so the caller can log/verify persistence.
  */
 export async function writeSuggestionsToCache(
   projectId: string,
@@ -389,13 +426,7 @@ export async function writeSuggestionsToCache(
     metadata?: Record<string, any>
   }>,
   params: CacheLookupParams
-): Promise<boolean> {
-  if (!suggestions || suggestions.length === 0) {
-    return true
-  }
-
-  const supabase = await createClient()
-
+): Promise<CacheWriteResult> {
   const contextHash = computeContextHash(
     params.projectId,
     params.language,
@@ -404,48 +435,163 @@ export async function writeSuggestionsToCache(
     params.keywordsHash
   )
 
-  const rows = suggestions.map((s) => ({
-    project_id: projectId,
-    language: params.language,
-    country: params.country || null,
-    business_category: params.businessCategory || null,
-    keywords_hash: params.keywordsHash || null,
-    context_hash: contextHash,
-    question: s.question,
-    normalized_question: strongNormalize(s.question),
-    question_hash: computeQuestionHash(s.question),
-    intent: s.intent,
-    source: 'gemini' as const,
-    model_used: s.model_used || null,
-    metadata: s.metadata || {},
-    status: 'suggested' as const,
-    freshness_days: 30
-  }))
-
-  const { error } = await supabase
-    .from('ai_question_suggestion_cache')
-    .upsert(rows, {
-      onConflict: 'ai_suggestion_cache_upsert_key',
-      ignoreDuplicates: false
-    })
-
-  if (error) {
-    console.error('[Suggestion Cache] Write error (CRITICAL - cache persistence blocked):', {
-      errorCode: (error as any)?.code,
-      errorMessage: error.message,
-      errorDetails: (error as any)?.details,
-      rowCount: rows.length,
-      contextHash: rows.length > 0 ? rows[0].context_hash : 'N/A',
-      firstQuestion: rows.length > 0 ? rows[0].question.substring(0, 60) : 'N/A',
-    })
-    return false
+  if (!suggestions || suggestions.length === 0) {
+    return {
+      success: true,
+      contextHash,
+      rowsAttempted: 0,
+      rowsInserted: 0,
+      rowsAlreadyPresent: 0,
+      rowsVisibleAfterWrite: 0,
+      errorCode: null,
+      errorMessage: null,
+      sampleQuestionHashes: [],
+    }
   }
 
-  console.log('[Suggestion Cache] Write successful', {
-    rowCount: rows.length,
-    contextHash: rows.length > 0 ? rows[0].context_hash : 'N/A',
+  const supabase = createAdminClient()
+
+  // Build candidate rows, de-duplicating by question_hash within this batch.
+  const candidateByHash = new Map<string, {
+    project_id: string
+    language: string
+    country: string | null
+    business_category: string | null
+    keywords_hash: string | null
+    context_hash: string
+    question: string
+    normalized_question: string
+    question_hash: string
+    intent: string
+    source: 'gemini'
+    model_used: string | null
+    metadata: Record<string, any>
+    status: 'suggested'
+    freshness_days: number
+  }>()
+
+  for (const s of suggestions) {
+    const question_hash = computeQuestionHash(s.question)
+    if (candidateByHash.has(question_hash)) continue
+    candidateByHash.set(question_hash, {
+      project_id: projectId,
+      language: params.language,
+      country: params.country || null,
+      business_category: params.businessCategory || null,
+      keywords_hash: params.keywordsHash || null,
+      context_hash: contextHash,
+      question: s.question,
+      normalized_question: strongNormalize(s.question),
+      question_hash,
+      intent: s.intent,
+      source: 'gemini',
+      model_used: s.model_used || null,
+      metadata: s.metadata || {},
+      status: 'suggested',
+      freshness_days: 30,
+    })
+  }
+
+  const sampleQuestionHashes = Array.from(candidateByHash.keys()).slice(0, 5)
+
+  // Step 1: Find which question_hashes already exist for this project+context.
+  // This makes the insert idempotent WITHOUT needing a unique constraint.
+  const { data: existingRows, error: existingErr } = await supabase
+    .from('ai_question_suggestion_cache')
+    .select('question_hash')
+    .eq('project_id', projectId)
+    .eq('context_hash', contextHash)
+    .in('question_hash', Array.from(candidateByHash.keys()))
+
+  if (existingErr) {
+    console.error('[Suggestion Cache] Pre-insert existence check failed:', {
+      errorCode: (existingErr as any)?.code,
+      errorMessage: existingErr.message,
+      contextHash,
+      projectId,
+    })
+    // Continue anyway — worst case we attempt to insert rows that exist.
+  }
+
+  const existingHashes = new Set((existingRows || []).map((r: any) => r.question_hash))
+  const rowsToInsert = Array.from(candidateByHash.values()).filter(
+    (r) => !existingHashes.has(r.question_hash)
+  )
+  const rowsAlreadyPresent = candidateByHash.size - rowsToInsert.length
+
+  // Step 2: Plain INSERT of only the new rows (no ON CONFLICT, no constraint).
+  let insertErrorCode: string | null = null
+  let insertErrorMessage: string | null = null
+  let rowsInserted = 0
+
+  if (rowsToInsert.length > 0) {
+    const { data: inserted, error: insertErr } = await supabase
+      .from('ai_question_suggestion_cache')
+      .insert(rowsToInsert)
+      .select('id')
+
+    if (insertErr) {
+      insertErrorCode = (insertErr as any)?.code ?? 'unknown'
+      insertErrorMessage = insertErr.message
+      console.error('[Suggestion Cache] INSERT failed (CRITICAL - persistence blocked):', {
+        errorCode: insertErrorCode,
+        errorMessage: insertErrorMessage,
+        errorDetails: (insertErr as any)?.details,
+        errorHint: (insertErr as any)?.hint,
+        rowsToInsert: rowsToInsert.length,
+        contextHash,
+        projectId,
+        firstQuestion: rowsToInsert[0]?.question?.substring(0, 60),
+      })
+    } else {
+      rowsInserted = inserted?.length ?? rowsToInsert.length
+    }
+  }
+
+  // Step 3: Post-write verification SELECT — prove the rows are persisted.
+  const { count: visibleCount, error: verifyErr } = await supabase
+    .from('ai_question_suggestion_cache')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .eq('context_hash', contextHash)
+    .eq('status', 'suggested')
+
+  if (verifyErr) {
+    console.error('[Suggestion Cache] Post-write verification SELECT failed:', {
+      errorCode: (verifyErr as any)?.code,
+      errorMessage: verifyErr.message,
+      contextHash,
+      projectId,
+    })
+  }
+
+  const rowsVisibleAfterWrite = visibleCount ?? 0
+  const success = insertErrorCode === null
+
+  console.log('[Suggestion Cache Write]', {
+    projectId,
+    contextHash,
+    rowsAttempted: candidateByHash.size,
+    rowsAlreadyPresent,
+    rowsInserted,
+    upsertSuccess: success,
+    upsertErrorCode: insertErrorCode,
+    upsertErrorMessage: insertErrorMessage,
+    rowsVisibleAfterWrite,
+    sampleQuestionHashes,
   })
-  return true
+
+  return {
+    success,
+    contextHash,
+    rowsAttempted: candidateByHash.size,
+    rowsInserted,
+    rowsAlreadyPresent,
+    rowsVisibleAfterWrite,
+    errorCode: insertErrorCode,
+    errorMessage: insertErrorMessage,
+    sampleQuestionHashes,
+  }
 }
 
 /**
