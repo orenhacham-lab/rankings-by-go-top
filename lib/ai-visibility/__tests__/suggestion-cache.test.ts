@@ -3,7 +3,7 @@
  * Covers: normalization, hashing, deduplication, semantic dedup gates
  */
 
-import { computeContextHash, computeQuestionHash, normalizeQuestion, deduplicateSuggestions, areSemanticDuplicates } from '../suggestion-cache'
+import { computeContextHash, computeQuestionHash, normalizeQuestion, deduplicateSuggestions, areSemanticDuplicates, extractContextModifiers } from '../suggestion-cache'
 
 describe('Suggestion cache utilities', () => {
   describe('normalizeQuestion', () => {
@@ -245,6 +245,74 @@ describe('areSemanticDuplicates — occasion and location hard gates', () => {
   it('same price intent, same product: "כמה עולה זר ורדים" vs "מה המחיר של זר ורדים"', () => {
     const q1 = { question: 'כמה עולה זר ורדים?', intent: 'commercial' }
     const q2 = { question: 'מה המחיר של זר ורדים?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(true)
+  })
+})
+
+// ============================================================
+// Context modifier gate tests
+// Verifies that extractContextModifiers + the modifier hard gate
+// prevent collapsing questions with incompatible context (size/mode/occasion)
+// while still allowing dedup of same-modifier or modifier-free questions.
+// ============================================================
+describe('areSemanticDuplicates — context modifier gate', () => {
+  // ── extractContextModifiers unit tests ────────────────────
+  it('extractContextModifiers: detects holiday from "לחג"', () => {
+    const mods = extractContextModifiers('מה המחיר הממוצע לזר פרחים לחג?')
+    expect(mods.has('holiday')).toBe(true)
+  })
+
+  it('extractContextModifiers: detects size_large and mode_online', () => {
+    const mods = extractContextModifiers('מה המחיר של זר פרחים גדול להזמנה אונליין?')
+    expect(mods.has('size_large')).toBe(true)
+    expect(mods.has('mode_online')).toBe(true)
+  })
+
+  it('extractContextModifiers: detects mode_instore from "בחנות"', () => {
+    const mods = extractContextModifiers('מה המחיר בחנות?')
+    expect(mods.has('mode_instore')).toBe(true)
+  })
+
+  it('extractContextModifiers: empty for generic price question', () => {
+    const mods = extractContextModifiers('כמה עולה זר פרחים?')
+    expect(mods.size).toBe(0)
+  })
+
+  // ── Should NOT be duplicates ──────────────────────────────
+  it('size+online vs holiday: "זר גדול להזמנה אונליין" vs "זר לחג"', () => {
+    const q1 = { question: 'מה המחיר של זר פרחים גדול להזמנה אונליין?', intent: 'commercial' }
+    const q2 = { question: 'מה המחיר הממוצע לזר פרחים לחג?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  it('wedding vs birthday: "כמה עולה זר לחתונה" vs "כמה עולה זר ליום הולדת"', () => {
+    const q1 = { question: 'כמה עולה זר לחתונה?', intent: 'commercial' }
+    const q2 = { question: 'כמה עולה זר ליום הולדת?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  it('in-store vs online: "מה המחיר בחנות" vs "כמה עולה להזמנה אונליין"', () => {
+    const q1 = { question: 'מה המחיר בחנות?', intent: 'commercial' }
+    const q2 = { question: 'כמה עולה להזמנה אונליין?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(false)
+  })
+
+  // ── Should STILL be duplicates ────────────────────────────
+  it('same location phrasing: "בירושלים" vs "לירושלים" — same service', () => {
+    const q1 = { question: 'כמה עולה משלוח פרחים בירושלים?', intent: 'commercial' }
+    const q2 = { question: 'כמה עולה משלוח פרחים לירושלים?', intent: 'commercial' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(true)
+  })
+
+  it('same anniversary occasion, slight phrasing variation', () => {
+    const q1 = { question: 'איזה זר מתאים ליום נישואין?', intent: 'pre_purchase' }
+    const q2 = { question: 'איזה סוג זר מתאים ליום נישואין?', intent: 'pre_purchase' }
+    expect(areSemanticDuplicates(q1, q2)).toBe(true)
+  })
+
+  it('no modifiers, same product — generic price question', () => {
+    const q1 = { question: 'כמה עולה זר פרחים?', intent: 'commercial' }
+    const q2 = { question: 'מה המחיר של זר פרחים?', intent: 'commercial' }
     expect(areSemanticDuplicates(q1, q2)).toBe(true)
   })
 })

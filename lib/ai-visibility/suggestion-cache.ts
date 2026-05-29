@@ -166,6 +166,7 @@ export function generateSemanticSignature(question: string, intent?: string): {
     'חתונה': ['חתונה', 'חתן', 'כלה', 'חתונת'],  // 'חתונת' = construct form (e.g. "לחתונת שישי")
     'לידה': ['לידה', 'תינוק', 'תינוקת', 'ברית', 'נולד'],
     'הנצחה': ['הנצחה', 'זיכרון', 'ניחומים', 'אבל'],
+    'חג': ['חג', 'חגים', 'ראש השנה', 'פסח', 'חנוכה', 'ולנטיין'],
     'מתנה': ['מתנה', 'מתנות'],
   }
   let occasion = ''
@@ -188,6 +189,45 @@ export function generateSemanticSignature(question: string, intent?: string): {
     occasion,
     location,
   }
+}
+
+/**
+ * Extract meaningful context modifiers from a question for dedup gating.
+ * Returns a Set of modifier tokens covering occasions, size qualifiers, and
+ * purchase/delivery modes. Used to prevent collapsing questions that describe
+ * genuinely different contexts even when their main topics overlap.
+ *
+ * Rule: if the union of modifier sets is non-empty but the intersection is
+ * empty, the questions carry incompatible contexts and must NOT be deduped.
+ */
+export function extractContextModifiers(question: string): Set<string> {
+  const lower = question.toLowerCase()
+  const mods = new Set<string>()
+
+  // Occasions
+  if (/\bחג\b|\bחגים\b|\bראש\s+השנה\b|\bפסח\b|\bחנוכה\b|\bולנטיין\b/.test(lower)) mods.add('holiday')
+  if (/יום\s+הולדת/.test(lower)) mods.add('birthday')
+  if (/יום\s+נישואין|יום\s+נישואים/.test(lower)) mods.add('anniversary')
+  if (/\bחתונה\b|\bחתן\b|\bכלה\b|חתונת/.test(lower)) mods.add('wedding')
+  if (/\bלידה\b|\bתינוק\b|\bתינוקת\b|\bברית\b|\bנולד\b/.test(lower)) mods.add('birth')
+  if (/\bהנצחה\b|\bזיכרון\b|\bניחומים\b|\bאבל\b/.test(lower)) mods.add('condolence')
+  if (/\bאירוע\b/.test(lower)) mods.add('event')
+  if (/\bעסקי\b|\bעסקית\b/.test(lower)) mods.add('business')
+
+  // Size / product qualifiers
+  if (/\bגדול\b|\bגדולה\b|\bגדולים\b/.test(lower)) mods.add('size_large')
+  if (/\bקטן\b|\bקטנה\b/.test(lower)) mods.add('size_small')
+  if (/\bענק\b|\bענקי\b|\bענקית\b/.test(lower)) mods.add('size_xl')
+  if (/\bשולחני\b|\bשולחנית\b/.test(lower)) mods.add('size_table')
+  if (/\bמיוחד\b|\bמיוחדת\b/.test(lower)) mods.add('size_special')
+
+  // Purchase / delivery mode
+  if (/\bאונליין\b|\bonline\b|הזמנה\s+אונליין|הזמנה\s+אינטרנטית|להזמין\s+באתר/.test(lower)) mods.add('mode_online')
+  if (/\bבחנות\b|\bמהחנות\b/.test(lower)) mods.add('mode_instore')
+  if (/איסוף\s+עצמי/.test(lower)) mods.add('mode_pickup')
+  if (/להיום\b|באותו\s+היום/.test(lower)) mods.add('timing_sameday')
+
+  return mods
 }
 
 /**
@@ -224,6 +264,19 @@ export function areSemanticDuplicates(
   // "לירושלים" vs "לבית" are different delivery contexts.
   if ((sig1.location || sig2.location) && sig1.location !== sig2.location) {
     return false
+  }
+
+  // HARD GATE — context modifiers: if the questions carry incompatible context
+  // modifiers (non-empty modifier union but zero intersection), treat as distinct.
+  // Example: "זר גדול להזמנה אונליין" vs "זר לחג" — large/online vs holiday.
+  // Same-modifier questions (both have "anniversary", or both empty) pass through.
+  const mods1 = extractContextModifiers(q1.question)
+  const mods2 = extractContextModifiers(q2.question)
+  if (mods1.size > 0 || mods2.size > 0) {
+    const modsIntersection = new Set([...mods1].filter(m => mods2.has(m)))
+    if (modsIntersection.size === 0) {
+      return false
+    }
   }
 
   // Main entity must match (primary topic)

@@ -205,7 +205,14 @@ export default function AIVisibilitySection({
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
   const [showAllPrompts, setShowAllPrompts] = useState(false)
-  const [showAllSmartQuestions, setShowAllSmartQuestions] = useState(false)
+  const [showAllSmartQuestions, setShowAllSmartQuestions] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return localStorage.getItem(`ai-visibility-expanded-${projectId}`) === 'true'
+    } catch {
+      return false
+    }
+  })
   const [scanStatus, setScanStatus] = useState<string | null>(null)
   const [competitorsRefreshKey, setCompetitorsRefreshKey] = useState(0)
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysisData | null>(null)
@@ -546,11 +553,9 @@ export default function AIVisibilitySection({
           geminiWasCalled: false,
         })
 
-        // Check if cached pool is significantly larger — auto-expand if so
-        const hasLargeCachedPool = cachedRaw.length > 0 && merged.length > vNextFiltered.length + 3
-        const shouldAutoExpand = hasLargeCachedPool && data.source === 'vNext+cache'
-
-        // Check localStorage for saved expanded state per project
+        // Read localStorage — only source of truth for expanded/collapsed state.
+        // Never auto-expand based on cache size; only user action (show-more button)
+        // should expand, and it persists via localStorage.
         let savedExpandedState = false
         try {
           savedExpandedState = localStorage.getItem(`ai-visibility-expanded-${projectId}`) === 'true'
@@ -558,31 +563,17 @@ export default function AIVisibilitySection({
           // localStorage may not be available
         }
 
-        // Use localStorage if available, otherwise auto-expand for large pools
-        const expandState = savedExpandedState || shouldAutoExpand
-
         if (!cancelled) {
           setSuggestedQuestions(merged)
-          setShowAllSmartQuestions(expandState)
+          setShowAllSmartQuestions(savedExpandedState)
 
           console.log('[AI_SUGGESTIONS_STATE_SET]', {
             suggestedQuestionsCount: merged.length,
-            showAllSmartQuestions: expandState,
+            showAllSmartQuestions: savedExpandedState,
             geminiQuestionsInState: cachedDisplayedCount,
             vNextQuestionsInState: vNextFiltered.length,
-            hasLargeCachedPool,
-            shouldAutoExpand,
             savedExpandedState,
           })
-
-          // Save expanded state to localStorage for persistence across refreshes
-          if (expandState) {
-            try {
-              localStorage.setItem(`ai-visibility-expanded-${projectId}`, 'true')
-            } catch (e) {
-              // localStorage may be unavailable
-            }
-          }
         }
       } catch (e) {
         console.debug('[AIVisibility-initialLoad] Cache load failed, showing vNext only:', e)
@@ -1784,16 +1775,18 @@ export default function AIVisibilitySection({
               const normalized = typeof qText === 'string' ? normalizeText(qText) : ''
               return normalized && !trackedSet.has(normalized)
             })
+            const COLLAPSED_VISIBLE_SUGGESTIONS = 8
             const isCollapsed = !showAllSmartQuestions
-            const visibleSliced = availableSuggestions.slice(0, isCollapsed ? 4 : undefined)
+            const visibleSliced = availableSuggestions.slice(0, isCollapsed ? COLLAPSED_VISIBLE_SUGGESTIONS : undefined)
 
             console.log('[AI_SUGGESTIONS_RENDER]', {
               allInState: suggestedQuestions.length,
               availableSuggestions: availableSuggestions.length,
               trackedPrompts: trackedSet.size,
               isCollapsed,
-              showMoreButtonVisible: availableSuggestions.length > 4 && isCollapsed,
+              showMoreButtonVisible: availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && isCollapsed,
               visibleSliced: visibleSliced.length,
+              collapsedLimit: COLLAPSED_VISIBLE_SUGGESTIONS,
             })
 
             const showPanel = refreshingSuggestions || availableSuggestions.length > 0
@@ -1852,7 +1845,7 @@ export default function AIVisibilitySection({
                 )}
                 {/* Questions grid is always visible — even while loading */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {availableSuggestions.slice(0, showAllSmartQuestions ? undefined : 4).map((q) => (
+                  {visibleSliced.map((q) => (
                     <SmartQuestionCard
                       key={q.id}
                       question={q}
@@ -1882,7 +1875,7 @@ export default function AIVisibilitySection({
                     />
                   ))}
                 </div>
-                {availableSuggestions.length > 4 && !showAllSmartQuestions && (
+                {availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && !showAllSmartQuestions && (
                   <div className="text-center mt-4">
                     <Button
                       variant="outline"
