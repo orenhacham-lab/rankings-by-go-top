@@ -44,8 +44,108 @@ export function strongNormalize(text?: string | null): string {
 }
 
 /**
+ * Extract main topic keywords from a question for semantic comparison
+ * Filters out generic words to find the substantive topics
+ */
+export function extractTopicKeywords(question: string): Set<string> {
+  if (!question) return new Set()
+
+  const normalized = strongNormalize(question).toLowerCase()
+
+  // Hebrew stop words (generic words that don't represent topic)
+  const hebrewStopWords = new Set([
+    'את', 'או', 'אל', 'אלו', 'אם', 'אתה', 'אתן', 'אתכם',
+    'את', 'אתך', 'אתה', 'בא', 'בד', 'בה', 'בהם', 'בהן',
+    'בו', 'בי', 'בנו', 'בן', 'בעצם', 'בעל', 'בעלת',
+    'בפני', 'בצורה', 'בשביל', 'בשם', 'בתא',
+    'גם', 'גם',
+    'ד', 'דבר',
+    'ה', 'הוא', 'היא', 'היום', 'הם', 'הן', 'הערה',
+    'כ', 'כאן', 'כאלו', 'כמו', 'כל', 'כלא', 'כן',
+    'לא', 'לאן', 'לאור', 'לאחד', 'לאיזה', 'לבקש', 'לי', 'לנו', 'לעצמו',
+    'מ', 'מה', 'מהן', 'מהו', 'מהיום', 'מו', 'מועד',
+    'נ', 'נא', 'נעם', 'נתון',
+    'ס', 'סוג', 'סימן',
+    'ע', 'על', 'עלי', 'עליהם', 'עליה', 'עליך', 'עליכם', 'עלינו',
+    'עצמו', 'עצמה', 'עצמם', 'עצמן',
+    'פ', 'פה', 'פי',
+    'ש', 'שאיזה', 'שאם', 'שבוע',
+    'תא', 'תוך', 'תי', 'תיתן',
+    'ו', 'ויש',
+    'ז', 'זה', 'זו', 'זאת',
+    'חוקי', 'חוקן',
+    'י', 'יד', 'יום', 'יוש', 'יש',
+  ])
+
+  // English stop words
+  const englishStopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+    'should', 'could', 'can', 'may', 'might', 'must',
+    'this', 'that', 'these', 'those', 'my', 'your', 'his', 'her', 'its',
+    'with', 'from', 'as', 'by', 'about', 'what', 'which', 'who', 'how',
+    'where', 'when', 'why', 'if', 'because', 'as', 'while', 'if'
+  ])
+
+  const keywords = new Set<string>()
+
+  // Extract words (split by spaces and punctuation)
+  const words = normalized
+    .split(/\s+/)
+    .filter(w => w && w.length > 2) // Only words longer than 2 chars
+
+  words.forEach(word => {
+    // Remove trailing punctuation
+    const clean = word.replace(/[?!.,;:-]+$/, '')
+
+    // Check if it's not a stop word
+    if (
+      clean.length > 2 &&
+      !hebrewStopWords.has(clean) &&
+      !englishStopWords.has(clean)
+    ) {
+      keywords.add(clean)
+    }
+  })
+
+  return keywords
+}
+
+/**
+ * Check if two questions are semantic duplicates (same intent + similar topics)
+ * Returns true if they should be considered duplicates
+ */
+export function areSemanticDuplicates(
+  q1: { question: string; intent?: string },
+  q2: { question: string; intent?: string },
+  similarityThreshold: number = 0.6
+): boolean {
+  // Must have same intent to be semantic duplicate
+  if (!q1.intent || !q2.intent || q1.intent !== q2.intent) {
+    return false
+  }
+
+  // Extract topics
+  const topics1 = extractTopicKeywords(q1.question)
+  const topics2 = extractTopicKeywords(q2.question)
+
+  // Need at least 2 keywords in each
+  if (topics1.size < 2 || topics2.size < 2) {
+    return false
+  }
+
+  // Calculate overlap
+  const intersection = new Set([...topics1].filter(x => topics2.has(x)))
+  const union = new Set([...topics1, ...topics2])
+
+  const similarity = intersection.size / union.size
+  return similarity >= similarityThreshold
+}
+
+/**
  * Strong deduplication across all sources
- * Finds near-duplicates and exact matches
+ * Finds exact matches AND semantic duplicates (same intent + similar topics)
  * Returns: (questions, duplicatesRemoved count)
  */
 export function strongDeduplicateSuggestions(
@@ -65,16 +165,27 @@ export function strongDeduplicateSuggestions(
     const norm = strongNormalize(question)
     if (!norm) return
 
+    // Check for exact text duplicate
     if (seen.has(norm)) {
       duplicateCount++
       return
     }
 
-    seen.set(norm, {
-      question,
-      source,
-      intent: intent || undefined,
-    })
+    // Check for semantic duplicate with existing questions of same intent
+    const newEntry = { question, source, intent: intent || undefined }
+    let isSemanticDuplicate = false
+
+    for (const [_, existing] of seen) {
+      if (areSemanticDuplicates(newEntry, existing)) {
+        duplicateCount++
+        isSemanticDuplicate = true
+        break
+      }
+    }
+
+    if (!isSemanticDuplicate) {
+      seen.set(norm, newEntry)
+    }
   }
 
   // Add vNext questions
