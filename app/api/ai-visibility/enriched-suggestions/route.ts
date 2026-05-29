@@ -95,7 +95,11 @@ export async function POST(request: Request) {
       .order('created_at', { ascending: false })
 
     const vNextQuestions = vNextData || []
-    const vNextSet = new Set(vNextQuestions.map(q => normalizeQuestion(q.prompt)))
+    const vNextSet = new Set(
+      vNextQuestions
+        .filter(q => q.prompt) // Filter out null/empty prompts
+        .map(q => normalizeQuestion(q.prompt))
+    )
 
     console.log('[enriched-suggestions] vNext questions loaded', {
       count: vNextQuestions.length,

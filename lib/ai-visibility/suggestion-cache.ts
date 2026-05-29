@@ -19,8 +19,12 @@ export interface CacheLookupParams {
 
 /**
  * Normalize question for deduplication
+ * Defensively handles null/undefined/empty strings
  */
-export function normalizeQuestion(question: string): string {
+export function normalizeQuestion(question?: string | null): string {
+  if (!question || typeof question !== 'string') {
+    return ''
+  }
   return question.toLowerCase().trim()
 }
 
@@ -205,44 +209,58 @@ export async function dismissSuggestedQuestion(
 /**
  * Deduplicate suggestions against existing lists
  * Returns array with exact duplicates and near-duplicates (by intent) removed
+ * Defensively handles missing/null questions
  */
 export function deduplicateSuggestions(
   newSuggestions: Array<{ question: string; intent: string }>,
-  vNextQuestions: Array<{ question: string }>,
-  cachedQuestions: Array<{ question: string }>,
-  savedPromptQuestions: Array<{ text: string }>
+  vNextQuestions: Array<{ question?: string | null }>,
+  cachedQuestions: Array<{ question?: string | null }>,
+  savedPromptQuestions: Array<{ text?: string | null }>
 ): Array<{ question: string; intent: string }> {
   const existingQuestions = new Set<string>()
   const existingIntents = new Map<string, string>()
 
   // Populate with vNext questions
   vNextQuestions.forEach((q) => {
-    const norm = normalizeQuestion(q.question)
-    existingQuestions.add(norm)
-    existingIntents.set(norm, 'vNext')
+    if (q.question) {
+      const norm = normalizeQuestion(q.question)
+      if (norm) {
+        existingQuestions.add(norm)
+        existingIntents.set(norm, 'vNext')
+      }
+    }
   })
 
   // Populate with cached questions
   cachedQuestions.forEach((q) => {
-    const norm = normalizeQuestion(q.question)
-    existingQuestions.add(norm)
-    if (!existingIntents.has(norm)) {
-      existingIntents.set(norm, 'cached')
+    if (q.question) {
+      const norm = normalizeQuestion(q.question)
+      if (norm) {
+        existingQuestions.add(norm)
+        if (!existingIntents.has(norm)) {
+          existingIntents.set(norm, 'cached')
+        }
+      }
     }
   })
 
   // Populate with saved prompts
   savedPromptQuestions.forEach((q) => {
-    const norm = normalizeQuestion(q.text)
-    existingQuestions.add(norm)
-    if (!existingIntents.has(norm)) {
-      existingIntents.set(norm, 'saved')
+    if (q.text) {
+      const norm = normalizeQuestion(q.text)
+      if (norm) {
+        existingQuestions.add(norm)
+        if (!existingIntents.has(norm)) {
+          existingIntents.set(norm, 'saved')
+        }
+      }
     }
   })
 
   // Filter new suggestions
   return newSuggestions.filter((suggestion) => {
+    if (!suggestion.question) return false
     const norm = normalizeQuestion(suggestion.question)
-    return !existingQuestions.has(norm)
+    return norm && !existingQuestions.has(norm)
   })
 }

@@ -679,8 +679,10 @@ export default function AIVisibilitySection({
       // is synchronous — avoids a flash that the user can't see.
       await new Promise((resolve) => setTimeout(resolve, 200))
 
-      const normalize = (text: string): string =>
-        text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+      const normalize = (text?: string | null): string => {
+        if (!text || typeof text !== 'string') return ''
+        return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+      }
 
       // Build the exclusion ledger: every prompt the user has ever seen in this
       // session OR already tracks. The generator dedupes against this internally
@@ -747,7 +749,7 @@ export default function AIVisibilitySection({
 
           // Convert to PromptSuggestion format, with dedup against seenKeys
           const enriched = allEnriched
-            .filter((c: any) => !seenKeys.has(normalize(c.question)))
+            .filter((c: any) => c.question && !seenKeys.has(normalize(c.question)))
             .map((c: any): PromptSuggestion => ({
               id: `gemini-cache-${c.id || Math.random().toString(36).slice(2, 8)}`,
               prompt: c.question,
