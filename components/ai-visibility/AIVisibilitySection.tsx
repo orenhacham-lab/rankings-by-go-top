@@ -474,6 +474,13 @@ export default function AIVisibilitySection({
           return t.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
         }
 
+        // Safe helper to extract suggestion text from mixed data shapes
+        // Server returns dedupedQuestions with either 'prompt' or 'question' field
+        function getSuggestionText(item: any): string {
+          const raw = item?.prompt ?? item?.question ?? item?.text ?? ''
+          return typeof raw === 'string' ? raw.trim() : ''
+        }
+
         // Track rejection reasons for each cached suggestion
         const cachedFilteringLog: Array<{
           question: string
@@ -486,27 +493,34 @@ export default function AIVisibilitySection({
         // The server already deduped across vNext + cached + Gemini = 35 unique
         const serverDedupedQuestions = data.dedupedQuestions || []
 
-        // Convert to PromptSuggestion format
-        const merged: PromptSuggestion[] = serverDedupedQuestions.map((q: any) => {
-          const fromVNext = vNextFiltered.find((v) => normalizeText(v.prompt) === normalizeText(q.prompt))
-          if (fromVNext) return fromVNext
+        // Convert to PromptSuggestion format with safe data-shape normalization
+        const merged: PromptSuggestion[] = serverDedupedQuestions
+          .map((q: any) => {
+            // Get text safely from either prompt or question field
+            const promptText = getSuggestionText(q)
+            if (!promptText) return null // Skip items with no text
 
-          // Cached/Gemini item
-          const meta = deriveSuggestionMeta(q.intent)
-          return {
-            id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
-            prompt: q.prompt,
-            intent: meta.intent,
-            intentLabel: meta.intent,
-            category: 'generic',
-            language: projectLanguage ?? 'he',
-            qualityScore: meta.qualityScore,
-            confidenceTier: meta.confidenceTier,
-            reason: '',
-            chips: [],
-            valueReason: '',
-          }
-        })
+            // Check if this matches a vNext question
+            const fromVNext = vNextFiltered.find((v) => normalizeText(v.prompt) === normalizeText(promptText))
+            if (fromVNext) return fromVNext
+
+            // Cached/Gemini item
+            const meta = deriveSuggestionMeta(q.intent)
+            return {
+              id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
+              prompt: promptText, // Use safely extracted text
+              intent: meta.intent,
+              intentLabel: meta.intent,
+              category: 'generic',
+              language: projectLanguage ?? 'he',
+              qualityScore: meta.qualityScore,
+              confidenceTier: meta.confidenceTier,
+              reason: '',
+              chips: [],
+              valueReason: '',
+            }
+          })
+          .filter((item): item is PromptSuggestion => item !== null) // Remove null entries
 
         const cachedDisplayedCount = merged.filter((m) => m.id.startsWith('gemini-')).length
 
@@ -1544,7 +1558,7 @@ export default function AIVisibilitySection({
               text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
             const trackedSet = new Set(allPrompts.map((p) => normalizeText(p.prompt || '')))
             const availableSuggestions = suggestedQuestions.filter(
-              (q) => !trackedSet.has(normalizeText(q.prompt))
+              (q) => !trackedSet.has(normalizeText(q.prompt || ''))
             )
             const isCollapsed = !showAllSmartQuestions
             const visibleSliced = availableSuggestions.slice(0, isCollapsed ? 4 : undefined)
@@ -4162,7 +4176,7 @@ function NewAIQueryModal({
   const [error, setError] = useState<string | null>(null)
 
   const existingSet = useMemo(
-    () => new Set(existingPrompts.map((p) => p.prompt.trim().toLowerCase())),
+    () => new Set(existingPrompts.map((p) => (p.prompt || '').trim().toLowerCase())),
     [existingPrompts]
   )
 
