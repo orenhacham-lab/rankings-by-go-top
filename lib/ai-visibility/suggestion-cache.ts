@@ -279,6 +279,139 @@ export async function dismissSuggestedQuestion(
 }
 
 /**
+ * Business scope info for validating question relevance
+ */
+export interface BusinessScope {
+  allowedTopics: string[]
+  excludedTerms: string[]
+  businessCategory: string | null
+}
+
+/**
+ * Extract business scope from project and business profile data
+ * Returns allowed topics and excluded/blocked terms
+ */
+export function extractBusinessScope(projectData: Record<string, any>): BusinessScope {
+  const allowedTopics: Set<string> = new Set()
+  const excludedTerms: Set<string> = new Set()
+  let businessCategory: string | null = null
+
+  // Extract from ai_business_profile if available
+  if (projectData.ai_business_profile && typeof projectData.ai_business_profile === 'object') {
+    const profile = projectData.ai_business_profile
+
+    // Get primary category
+    if (profile.primaryCategory && typeof profile.primaryCategory === 'string') {
+      businessCategory = profile.primaryCategory
+      allowedTopics.add(profile.primaryCategory)
+    }
+
+    // Get secondary categories
+    if (Array.isArray(profile.secondaryCategories)) {
+      profile.secondaryCategories.forEach((cat: any) => {
+        if (typeof cat === 'string') {
+          allowedTopics.add(cat)
+        }
+      })
+    }
+
+    // Get excluded topics (these are the terms to block)
+    if (Array.isArray(profile.excludedTopics)) {
+      profile.excludedTopics.forEach((term: any) => {
+        if (typeof term === 'string') {
+          excludedTerms.add(term)
+        }
+      })
+    }
+  }
+
+  // Also add business_name as a topic hint if no categories defined
+  if (allowedTopics.size === 0 && projectData.business_name && typeof projectData.business_name === 'string') {
+    allowedTopics.add(projectData.business_name)
+  }
+
+  return {
+    allowedTopics: Array.from(allowedTopics),
+    excludedTerms: Array.from(excludedTerms),
+    businessCategory
+  }
+}
+
+/**
+ * Check if a question contains excluded/blocked business terms
+ * Returns true if question should be rejected (contains excluded term)
+ */
+export function containsExcludedBusinessTerm(
+  question: string,
+  excludedTerms: string[]
+): boolean {
+  if (!excludedTerms || excludedTerms.length === 0) {
+    return false
+  }
+
+  const lowerQuestion = question.toLowerCase()
+
+  // Check for exact word matches or substring matches of excluded terms
+  for (const term of excludedTerms) {
+    const lowerTerm = term.toLowerCase().trim()
+    if (!lowerTerm) continue
+
+    // Check for word boundaries match (more conservative)
+    // This helps avoid false positives while catching most cases
+    const wordBoundaryRegex = new RegExp(`\\b${lowerTerm}\\b|${lowerTerm}`, 'i')
+    if (wordBoundaryRegex.test(lowerQuestion)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Check if a question is within allowed business scope
+ * Conservative validation: if unsure, consider it safe
+ * Returns true if question should be ACCEPTED (is relevant or ambiguous-safe)
+ * Returns false if question should be REJECTED (clearly outside scope)
+ */
+export function isWithinBusinessScope(
+  question: string,
+  businessScope: BusinessScope
+): boolean {
+  // If no allowed topics defined, accept anything (no constraints)
+  if (!businessScope.allowedTopics || businessScope.allowedTopics.length === 0) {
+    return true
+  }
+
+  const lowerQuestion = question.toLowerCase()
+  const allowedLower = businessScope.allowedTopics.map(t => t.toLowerCase())
+
+  // Check if any allowed topic appears in the question
+  // This is a simple heuristic - if any allowed topic is mentioned, consider it in-scope
+  for (const topic of allowedLower) {
+    if (lowerQuestion.includes(topic)) {
+      return true
+    }
+  }
+
+  // If no explicit match but question is vague/general, accept it (conservative)
+  // Examples: "מה חשוב?", "איך לבחור?", "כמה עולה?" - these could apply to anything
+  const genericQuestionPatterns = [
+    /^(כמה|איך|מה|איזה|למי|איפה)\s+/i, // Generic question starters
+    /יש\s+\w+\s+טוב/i, // "is there good X"
+  ]
+
+  const isGeneric = genericQuestionPatterns.some(pattern => pattern.test(lowerQuestion))
+  if (isGeneric) {
+    // Generic questions are considered in-scope (safe to include)
+    return true
+  }
+
+  // If we get here: question mentions something specific that's not in allowed topics
+  // This is likely out of scope, so reject it
+  return false
+}
+
+/**
  * Extract allowed locations from project data
  * Builds a list of actual locations mentioned in the project's own data
  * Does NOT invent or assume locations
@@ -402,6 +535,32 @@ export function containsDisallowedLocation(
   }
 
   return false
+}
+
+/**
+ * Filter suggestions by business scope and excluded terms
+ * Removes questions that violate business constraints
+ */
+export function filterSuggestionsByBusinessScope(
+  suggestions: Array<{ question: string; intent?: string; source?: string }>,
+  businessScope: BusinessScope,
+  onFilteredOut?: (question: string, reason: string) => void
+): Array<{ question: string; intent?: string; source?: string }> {
+  return suggestions.filter(suggestion => {
+    // Check for excluded terms first
+    if (containsExcludedBusinessTerm(suggestion.question, businessScope.excludedTerms)) {
+      onFilteredOut?.(suggestion.question, `contains excluded term: ${businessScope.excludedTerms.find(t => suggestion.question.toLowerCase().includes(t.toLowerCase()))}`)
+      return false
+    }
+
+    // Check if within business scope
+    if (!isWithinBusinessScope(suggestion.question, businessScope)) {
+      onFilteredOut?.(suggestion.question, `outside business scope`)
+      return false
+    }
+
+    return true
+  })
 }
 
 /**

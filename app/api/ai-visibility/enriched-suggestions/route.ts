@@ -26,7 +26,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions, extractAllowedLocations, containsDisallowedLocation } from '@/lib/ai-visibility/suggestion-cache'
+import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions, extractAllowedLocations, containsDisallowedLocation, extractBusinessScope, filterSuggestionsByBusinessScope } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 async function authAndProject(projectId: string) {
@@ -37,7 +37,7 @@ async function authAndProject(projectId: string) {
   const admin = createAdminClient()
   const { data: project, error: projectError } = await admin
     .from('projects')
-    .select('id, user_id, target_domain, business_name, country, language, city')
+    .select('id, user_id, target_domain, business_name, country, language, city, ai_business_profile')
     .eq('id', projectId)
     .single()
 
@@ -79,15 +79,18 @@ export async function POST(request: Request) {
   const { admin, project } = result
 
   try {
-    // Extract allowed locations from project data
+    // Extract allowed locations and business scope from project data
     const allowedLocations = extractAllowedLocations(project as Record<string, any>)
+    const businessScope = extractBusinessScope(project as Record<string, any>)
 
     console.log('[enriched-suggestions] API called', {
       projectId,
       language,
       country,
       businessCategory,
-      allowedLocations: allowedLocations.length > 0 ? allowedLocations : '(none found)',
+      allowedLocations: allowedLocations.length > 0 ? allowedLocations : '(none)',
+      allowedTopics: businessScope.allowedTopics.length > 0 ? businessScope.allowedTopics : '(none)',
+      excludedTerms: businessScope.excludedTerms.length > 0 ? businessScope.excludedTerms : '(none)',
     })
 
     // Step 1: Load vNext (ai_prompts) questions
@@ -111,7 +114,7 @@ export async function POST(request: Request) {
     })
 
     // Step 2: Load cached Gemini suggestions (status = 'suggested' only)
-    const cachedSuggestions = await loadCachedSuggestions({
+    const rawCachedSuggestions = await loadCachedSuggestions({
       projectId,
       language,
       country,
@@ -119,8 +122,25 @@ export async function POST(request: Request) {
       keywordsHash: null
     })
 
-    console.log('[enriched-suggestions] Cached Gemini suggestions loaded', {
-      count: cachedSuggestions.length,
+    console.log('[enriched-suggestions] Cached suggestions loaded (before scope filter)', {
+      count: rawCachedSuggestions.length,
+    })
+
+    // Filter cached suggestions by business scope
+    const filteredCachedLogs: Array<{ question: string; reason: string }> = []
+    const cachedSuggestions = filterSuggestionsByBusinessScope(
+      rawCachedSuggestions,
+      businessScope,
+      (question, reason) => {
+        filteredCachedLogs.push({ question, reason })
+      }
+    )
+
+    console.log('[enriched-suggestions] Cached suggestions filtered by business scope', {
+      beforeFilter: rawCachedSuggestions.length,
+      afterFilter: cachedSuggestions.length,
+      filtered: filteredCachedLogs.length,
+      examples: filteredCachedLogs.slice(0, 3),
     })
 
     const cachedSet = new Set(cachedSuggestions.map(q => strongNormalize(q.question)))
@@ -161,7 +181,8 @@ export async function POST(request: Request) {
           project.target_domain || '',
           language,
           country || undefined,
-          allowedLocations
+          allowedLocations,
+          businessScope
         )
 
         console.log('[enriched-suggestions] Gemini returned', {
@@ -174,25 +195,36 @@ export async function POST(request: Request) {
         geminiSuggestions = []
       }
 
-      // Filter out questions with disallowed locations
-      const allowedSuggestions = geminiSuggestions.filter(g => {
+      // Filter by location constraints
+      const locationFilteredLogs: Array<{ question: string }> = []
+      const locationFiltered = geminiSuggestions.filter(g => {
         const hasDisallowed = containsDisallowedLocation(g.question, allowedLocations)
         if (hasDisallowed) {
-          console.log('[enriched-suggestions] Filtered out disallowed location', {
-            question: g.question,
-            allowedLocations: allowedLocations.length > 0 ? allowedLocations : '(none)',
-          })
+          locationFilteredLogs.push({ question: g.question })
         }
         return !hasDisallowed
       })
 
-      console.log('[enriched-suggestions] Location filtering', {
-        beforeFilter: geminiSuggestions.length,
-        afterFilter: allowedSuggestions.length,
-        filtered: geminiSuggestions.length - allowedSuggestions.length,
+      // Filter by business scope constraints
+      const scopeFilteredLogs: Array<{ question: string; reason: string }> = []
+      const scopeFiltered = filterSuggestionsByBusinessScope(
+        locationFiltered,
+        businessScope,
+        (question, reason) => {
+          scopeFilteredLogs.push({ question, reason })
+        }
+      )
+
+      console.log('[enriched-suggestions] Gemini output filtering', {
+        original: geminiSuggestions.length,
+        afterLocationFilter: locationFiltered.length,
+        locationFiltered: locationFilteredLogs.length,
+        afterScopeFilter: scopeFiltered.length,
+        scopeFiltered: scopeFilteredLogs.length,
+        scopeFilterExamples: scopeFilteredLogs.slice(0, 2),
       })
 
-      geminiSuggestions = allowedSuggestions
+      geminiSuggestions = scopeFiltered
 
       // Deduplicate against vNext and cache
       const deduped = deduplicateSuggestions(

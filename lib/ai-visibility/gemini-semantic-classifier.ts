@@ -426,7 +426,8 @@ export async function generateProjectEnrichmentQuestions(
   domain: string,
   language: 'he' | 'en',
   country?: string,
-  allowedLocations?: string[]
+  allowedLocations?: string[],
+  businessScope?: { allowedTopics: string[]; excludedTerms: string[]; businessCategory: string | null }
 ): Promise<FallbackQuestionResponse[]> {
   const client = getGeminiClient()
   if (!client) {
@@ -446,6 +447,20 @@ export async function generateProjectEnrichmentQuestions(
         ? 'אם אין מיקום ברור בנתוני הפרויקט, אל תזכיר בכלל עיר, שכונה או אזור.'
         : 'If no location is specified in the project data, do not mention any city, neighborhood, or region.')
 
+    // Build business scope constraint for the prompt
+    const scopeConstraint = (businessScope && (businessScope.allowedTopics.length > 0 || businessScope.excludedTerms.length > 0))
+      ? (language === 'he'
+        ? `עיסוק מותר: ${businessScope.allowedTopics.join(', ') || '(כללי)'}
+נושאים/מוצרים שלא מותרים: ${businessScope.excludedTerms.join(', ') || '(אף אחד)'}
+אסור לייצר שאלות על נושאים שלא ברשימת המותרים או המופקדים בנושאים המחוסרים.
+אם אתה לא בטוח, בחר שאלות פחות מדי מאשר יותר מדי.`
+        : `Allowed business topics: ${businessScope.allowedTopics.join(', ') || '(general)'}
+Blocked/excluded topics: ${businessScope.excludedTerms.join(', ') || '(none)'}
+Do NOT generate questions about blocked/excluded topics.
+Never infer additional product categories beyond what is listed in allowed topics.
+If unsure, return fewer questions rather than more.`)
+      : ''
+
     const systemPrompt =
       language === 'he'
         ? `אתה יוצר שאלות חיפוש בעברית לאנשים המחפשים עיסוקים, שירותים או מוצרים.
@@ -454,6 +469,8 @@ export async function generateProjectEnrichmentQuestions(
 שם העסק/הביטוי: "${projectName}"
 התחום או URL: ${domain || 'כללי'}
 ${country ? `מדינה: ${country}` : ''}
+
+${scopeConstraint}
 
 חשוב: אל תנסח כל שאלה עם "כיצד ניתן", "מהן האפשרויות", "איפה ניתן למצוא".
 הנסח טבעי בעברית: "איזה", "כמה", "איפה אפשר", "מה חשוב", "למי כדאי".
@@ -475,6 +492,8 @@ ${country ? `מדינה: ${country}` : ''}
 Business/Product: "${projectName}"
 Domain or URL: ${domain || 'General'}
 ${country ? `Country: ${country}` : ''}
+
+${scopeConstraint}
 
 IMPORTANT: Avoid "How can one", "What are the options", "Where can one find".
 Use natural English: "What is", "How much", "Which", "Is there a", "Should I".
@@ -558,7 +577,9 @@ Return ONLY JSON (no other text):
       domain: domain || '(empty)',
       language,
       country: country || '(not specified)',
-      allowedLocations: allowedLocations && allowedLocations.length > 0 ? allowedLocations : '(none specified)',
+      allowedLocations: allowedLocations && allowedLocations.length > 0 ? allowedLocations : '(none)',
+      allowedTopics: businessScope?.allowedTopics.length ? businessScope.allowedTopics : '(none)',
+      excludedTerms: businessScope?.excludedTerms.length ? businessScope.excludedTerms : '(none)',
     })
 
     const genAI = client
