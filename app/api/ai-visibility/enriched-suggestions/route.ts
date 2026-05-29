@@ -136,6 +136,9 @@ export async function POST(request: Request) {
     })
 
     // Step 2: Load cached Gemini suggestions (status = 'suggested' only)
+    // CRITICAL: Use consistent context_hash computation for cache lookup
+    const contextHashForLoad = computeContextHash(projectId, language, country, businessCategory)
+
     const rawCachedSuggestions = await loadCachedSuggestions({
       projectId,
       language,
@@ -144,7 +147,13 @@ export async function POST(request: Request) {
       keywordsHash: null
     })
 
-    console.log('[enriched-suggestions] Cached suggestions loaded (before scope filter)', {
+    console.log('[enriched-suggestions] Cached suggestions lookup', {
+      contextHash: contextHashForLoad,
+      projectId,
+      cacheOnly,
+      language,
+      country: country || '(none)',
+      businessCategory: businessCategory || '(none)',
       count: rawCachedSuggestions.length,
     })
 
@@ -365,6 +374,7 @@ export async function POST(request: Request) {
 
       // Write new suggestions to cache
       if (newSuggestions.length > 0) {
+        const contextHashForWrite = computeContextHash(projectId, language, country, businessCategory)
         const writeSuccess = await writeSuggestionsToCache(
           projectId,
           newSuggestions,
@@ -372,8 +382,14 @@ export async function POST(request: Request) {
         )
 
         console.log('[enriched-suggestions] Cache write', {
+          contextHash: contextHashForWrite,
+          projectId,
+          language,
+          country: country || '(none)',
+          businessCategory: businessCategory || '(none)',
           success: writeSuccess,
           count: newSuggestions.length,
+          questions: newSuggestions.slice(0, 3).map(q => `"${q.question.substring(0, 60)}..."`),
         })
 
         // Add to cached list for response

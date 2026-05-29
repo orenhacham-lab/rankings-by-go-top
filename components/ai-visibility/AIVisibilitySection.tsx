@@ -434,8 +434,24 @@ export default function AIVisibilitySection({
 
         const cachedRaw: Array<{ id?: string; question: string; intent?: string }> = data.cachedSuggestions || []
 
+        console.log('[AIVisibility-initialLoad] Cache load attempt', {
+          projectId,
+          language: lang,
+          country: projectCountry || '(none)',
+          businessCategory: null,
+          cacheOnlyMode: true,
+          cachedLoadedRaw: cachedRaw.length,
+          vNextCount: vNextFiltered.length,
+          geminiWasCalled: data.geminiWasCalled || false,
+          apiResponse: {
+            total: data.total,
+            source: data.source,
+            vNextQuestionsCount: data.vNextQuestions?.length || 0,
+          }
+        })
+
         if (cachedRaw.length === 0) {
-          console.log('[AIVisibility-initialLoad] No cached suggestions found', {
+          console.log('[AIVisibility-initialLoad] No cached suggestions found after API call', {
             vNextCount: vNextFiltered.length,
             cachedLoadedRaw: 0,
             geminiWasCalled: false,

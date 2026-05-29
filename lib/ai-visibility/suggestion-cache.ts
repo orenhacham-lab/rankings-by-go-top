@@ -329,7 +329,7 @@ export function computeContextHash(
     language,
     country || '',
     businessCategory || '',
-    keywordsHash || ''
+    keywordsHash || '' // Treat undefined and null the same
   ]
 
   const input = parts.join('|')
