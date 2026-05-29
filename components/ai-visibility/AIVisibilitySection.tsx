@@ -916,9 +916,6 @@ export default function AIVisibilitySection({
         return normalized && !seenKeys.has(normalized)
       })
 
-      let cachedFromApi: any[] = []
-      let newFromGemini: any[] = []
-
       // ── Gemini-powered enrichment via persistent cache layer ──────────────
       try {
         const enrichResponse = await fetch('/api/ai-visibility/enriched-suggestions', {
@@ -935,21 +932,25 @@ export default function AIVisibilitySection({
         if (enrichResponse.ok) {
           const enrichData = await enrichResponse.json()
 
-          // Use API's DEDUPED suggestions, not the pre-dedup arrays
+          // Use ONLY API's DEDUPED suggestions as authoritative pool
           const apiDedupedQuestions = enrichData.dedupedQuestions || []
-          cachedFromApi = enrichData.cachedSuggestions || []
-          newFromGemini = enrichData.newSuggestions || []
           geminiWasCalled = enrichData.geminiWasCalled || false
           geminiNotCalledReason = enrichData.geminiNotCalledReason || ''
           contextHash = enrichData.contextHash || ''
-          newGeminiCount = newFromGemini.length
-          cachedLoadedCount = cachedFromApi.length
+
+          // Count items by source from dedupedQuestions (not raw arrays)
+          const cachedItemsInDedup = apiDedupedQuestions.filter((q: any) => q.source === 'cached').length
+          const geminiItemsInDedup = apiDedupedQuestions.filter((q: any) => q.source === 'gemini').length
+          const vNextItemsInDedup = apiDedupedQuestions.filter((q: any) => q.source === 'vnext').length
+          cachedLoadedCount = cachedItemsInDedup // Track count of cached items that survived server dedup
+          newGeminiCount = geminiItemsInDedup // Track count of gemini items that survived server dedup
 
           // Log metrics from API
           console.log('[AIVisibility-refreshSuggestions] API dedup metrics', {
             apiDedupedCount: apiDedupedQuestions.length,
-            cachedLoaded: cachedLoadedCount,
-            newGemini: newGeminiCount,
+            cachedInDedup: cachedItemsInDedup,
+            geminiInDedup: geminiItemsInDedup,
+            vNextInDedup: vNextItemsInDedup,
             geminiWasCalled,
             duplicatesRemovedByApi: enrichData.duplicatesRemoved || 0,
           })
@@ -961,27 +962,25 @@ export default function AIVisibilitySection({
             return typeof raw === 'string' ? raw.trim() : ''
           }
 
-          // Filter deduplicated API suggestions against vNext exclusions one more time.
-          // Each item gets proper intent + deterministic quality tier so it renders
-          // with the same label structure as built-in vNext suggestions.
+          // Map deduplicated API suggestions to PromptSuggestion format
+          // Preserve source field so we can track which items came from cache/gemini/vnext
           const apiProcessed = apiDedupedQuestions
             .map((q: any) => {
               // Safely extract text from mixed data shapes
               const promptText = getSuggestionTextForAPI(q)
               if (!promptText) return null // Skip items with no text
-              return { ...q, promptText, wasDeduped: true }
+              return {
+                ...q,
+                promptText,
+                source: q.source || 'unknown', // Preserve source from server
+                wasDeduped: true,
+              }
             })
             .filter((q: any): q is any => q !== null)
 
-          // Track cache vs gemini sources in deduped results
-          const fromCacheInDedup = apiProcessed.filter((q: any) => {
-            // If it came from cache originally, track it
-            return cachedFromApi.some((c) => normalize(c.question) === normalize(q.promptText))
-          }).length
-
           const apiFiltered = apiProcessed
             .filter((q: any) => !seenKeys.has(normalize(q.promptText)))
-            .map((q: any): PromptSuggestion => {
+            .map((q: any): PromptSuggestion & { _apiSource?: string } => {
               const meta = deriveSuggestionMeta(q.intent)
               return {
                 id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
@@ -995,18 +994,20 @@ export default function AIVisibilitySection({
                 reason: '',
                 chips: [],
                 valueReason: '',
+                _apiSource: q.source, // Track source for metrics
               }
             })
 
           vNextFiltered = [...vNextFiltered, ...apiFiltered]
 
-          // Log cache dedup analysis
+          // Log dedup breakdown using dedupedQuestions as source of truth
           console.log('[AIVisibility-refreshSuggestions] Server dedup breakdown', {
             apiDedupedCount: apiDedupedQuestions.length,
-            cachedOriginal: cachedFromApi.length,
-            cachedSurvivingDedup: fromCacheInDedup,
-            cachedRemovedByDedup: cachedFromApi.length - fromCacheInDedup,
+            cachedSurvivingDedup: cachedItemsInDedup,
+            geminiSurvivingDedup: geminiItemsInDedup,
+            vNextSurvivingDedup: vNextItemsInDedup,
             apiFilteredByClient: apiFiltered.length,
+            duplicatesRemoved: enrichData.duplicatesRemoved || 0,
           })
         }
       } catch (enrichErr) {
@@ -1073,13 +1074,25 @@ export default function AIVisibilitySection({
 
         setSuggestedQuestions(finalDeduped)
 
+        // Safe text extraction for metrics logging
+        const normalize = (text?: string | null): string => {
+          if (!text || typeof text !== 'string') return ''
+          return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+        }
+
+        // Count newItems by source using _apiSource field (preserved from dedupedQuestions)
+        const newItemsFromCache = newItems.filter((q: any) => (q as any)._apiSource === 'cached').length
+        const newItemsFromGemini = newItems.filter((q: any) => (q as any)._apiSource === 'gemini').length
+        const newItemsFromVNext = newItems.filter((q: any) => (q as any)._apiSource === 'vnext').length
+        const newItemsFromUnknown = newItems.filter((q: any) => !((q as any)._apiSource)).length
+
         // Determine explicit reason why we stopped adding suggestions
         let stoppedReason: string
         if (visibleAfter >= MAX_SUGGESTIONS) {
           stoppedReason = 'reached_max_40'
-        } else if (growth > 0 && cachedLoadedCount > 0) {
+        } else if (growth > 0 && newItemsFromCache > 0) {
           stoppedReason = 'added_from_cache'
-        } else if (growth > 0 && geminiWasCalled && newGeminiCount > 0) {
+        } else if (growth > 0 && geminiWasCalled && newItemsFromGemini > 0) {
           stoppedReason = 'added_from_gemini'
         } else if (growth > 0) {
           stoppedReason = 'added_from_vnext_or_mixed'
@@ -1093,36 +1106,33 @@ export default function AIVisibilitySection({
           stoppedReason = 'all_gemini_were_duplicates'
         } else {
           // Fallback with diagnostic info
-          stoppedReason = `no_growth_unclear_${growth}_${cachedLoadedCount}_${newGeminiCount}`
+          stoppedReason = `no_growth_unclear_${growth}_cached:${newItemsFromCache}_gemini:${newItemsFromGemini}`
         }
 
-        // Safe text extraction for metrics logging
-        const normalize = (text?: string | null): string => {
-          if (!text || typeof text !== 'string') return ''
-          return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+        // Validate source accounting
+        const sourceTotal = newItemsFromCache + newItemsFromGemini + newItemsFromVNext + newItemsFromUnknown
+        if (sourceTotal !== newItems.length) {
+          console.error('[AIVisibility-refreshSuggestions] METRIC_MISMATCH: source accounting failed', {
+            cachedInNewItems: newItemsFromCache,
+            geminiInNewItems: newItemsFromGemini,
+            vNextInNewItems: newItemsFromVNext,
+            unknownInNewItems: newItemsFromUnknown,
+            total: sourceTotal,
+            expected: newItems.length,
+          })
         }
-
-        // Calculate which newItems came from cache (were in dedupedQuestions from API)
-        const newItemsFromCache = newItems.filter((q: any) => {
-          const qText = q.prompt ?? ''
-          const normalized = normalize(qText)
-          // Check if this normalized text was in the API's deduped results
-          return normalized && cachedFromApi.some((c) => normalize(c.question) === normalized)
-        }).length
 
         console.log('[AIVisibility-refreshSuggestions] Full cycle metrics', {
           maxExpandedPool: MAX_SUGGESTIONS,
           visibleBefore,
           neededToReachMax: MAX_SUGGESTIONS - visibleBefore,
-          cachedLoadedRaw: cachedLoadedCount,
-          cachedSurvivingServerDedup: cachedLoadedCount - (cachedLoadedCount - cachedLoadedCount), // Set from earlier log
+          cachedSurvivingServerDedup: cachedLoadedCount,
           cachedInNewItems: newItemsFromCache,
-          geminiInNewItems: newItems.filter((q: any) => q.id.startsWith('gemini-')).length,
+          geminiInNewItems: newItemsFromGemini,
+          vNextInNewItems: newItemsFromVNext,
+          unknownInNewItems: newItemsFromUnknown,
           geminiWasCalled,
           geminiRequestedCandidateCount: geminiWasCalled ? refreshed.length : 0,
-          geminiRawCount: newGeminiCount,
-          geminiAfterValidation: filtered.filter((q) => q.id.startsWith('gemini-')).length,
-          rejectedByValidationCount: newGeminiCount > 0 ? newGeminiCount : 0,
           rejectedByDedupCount: duplicatesRemovedCount,
           rejectedByDiversityCount: diversityFilteredCount,
           acceptedNewCount: newItems.length,
