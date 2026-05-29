@@ -404,7 +404,11 @@ export default function AIVisibilitySection({
       limit: 8,
     })
     const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
-    const vNextFiltered = suggestions.filter((q) => !isInvalidPriceQuestion(q.prompt, lang))
+    // Filter vNext questions safely — ensure prompt field is valid string
+    const vNextFiltered = suggestions.filter((q) => {
+      const promptText = q?.prompt ?? ''
+      return typeof promptText === 'string' && promptText.trim().length > 0 && !isInvalidPriceQuestion(promptText, lang)
+    })
 
     // Show vNext immediately — cached suggestions arrive in the background
     setSuggestedQuestions(vNextFiltered)
@@ -476,8 +480,10 @@ export default function AIVisibilitySection({
 
         // Safe helper to extract suggestion text from mixed data shapes
         // Server returns dedupedQuestions with either 'prompt' or 'question' field
+        // Used globally to prevent "Cannot read properties of undefined" crashes
         function getSuggestionText(item: any): string {
-          const raw = item?.prompt ?? item?.question ?? item?.text ?? ''
+          if (!item) return ''
+          const raw = item.prompt ?? item.question ?? item.text ?? ''
           return typeof raw === 'string' ? raw.trim() : ''
         }
 
@@ -501,7 +507,12 @@ export default function AIVisibilitySection({
             if (!promptText) return null // Skip items with no text
 
             // Check if this matches a vNext question
-            const fromVNext = vNextFiltered.find((v) => normalizeText(v.prompt) === normalizeText(promptText))
+            const fromVNext = vNextFiltered.find((v) => {
+              const vText = v?.prompt ?? ''
+              const vNorm = typeof vText === 'string' ? normalizeText(vText) : ''
+              const qNorm = normalizeText(promptText)
+              return vNorm && qNorm && vNorm === qNorm
+            })
             if (fromVNext) return fromVNext
 
             // Cached/Gemini item
@@ -520,7 +531,7 @@ export default function AIVisibilitySection({
               valueReason: '',
             }
           })
-          .filter((item): item is PromptSuggestion => item !== null) // Remove null entries
+          .filter((item: any): item is PromptSuggestion => item !== null) // Remove null entries
 
         const cachedDisplayedCount = merged.filter((m) => m.id.startsWith('gemini-')).length
 
@@ -893,8 +904,17 @@ export default function AIVisibilitySection({
       })
 
       // Defense in depth: even with excludePrompts the generator can return overlap if the pool is exhausted
-      const seenKeys = new Set<string>(exclude.map(normalize))
-      let vNextFiltered = refreshed.filter((q) => !seenKeys.has(normalize(q.prompt)))
+      // Safe normalize function for this context
+      const safeNormalize = (text?: string | null): string => {
+        if (!text || typeof text !== 'string') return ''
+        return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+      }
+      const seenKeys = new Set<string>(exclude.map(safeNormalize))
+      let vNextFiltered = refreshed.filter((q) => {
+        const qText = q?.prompt ?? ''
+        const normalized = typeof qText === 'string' ? safeNormalize(qText) : ''
+        return normalized && !seenKeys.has(normalized)
+      })
 
       let cachedFromApi: any[] = []
       let newFromGemini: any[] = []
@@ -934,16 +954,30 @@ export default function AIVisibilitySection({
             duplicatesRemovedByApi: enrichData.duplicatesRemoved || 0,
           })
 
+          // Safe helper for API suggestion text extraction
+          function getSuggestionTextForAPI(item: any): string {
+            if (!item) return ''
+            const raw = item.question ?? item.prompt ?? item.text ?? ''
+            return typeof raw === 'string' ? raw.trim() : ''
+          }
+
           // Filter deduplicated API suggestions against vNext exclusions one more time.
           // Each item gets proper intent + deterministic quality tier so it renders
           // with the same label structure as built-in vNext suggestions.
           const apiFiltered = apiDedupedQuestions
-            .filter((q: any) => q.question && !seenKeys.has(normalize(q.question)))
+            .map((q: any) => {
+              // Safely extract text from mixed data shapes
+              const promptText = getSuggestionTextForAPI(q)
+              if (!promptText) return null // Skip items with no text
+              return { ...q, promptText }
+            })
+            .filter((q: any): q is any => q !== null)
+            .filter((q: any) => !seenKeys.has(normalize(q.promptText)))
             .map((q: any): PromptSuggestion => {
               const meta = deriveSuggestionMeta(q.intent)
               return {
                 id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
-                prompt: q.question,
+                prompt: q.promptText, // Use safely extracted text
                 intent: meta.intent,
                 intentLabel: meta.intent,
                 category: 'generic',
@@ -975,8 +1009,21 @@ export default function AIVisibilitySection({
       } else {
         // Light client-side dedup: only remove exact normalized matches against currently visible.
         // The API already ran strong dedup, so we trust its work and don't re-dedup semantically here.
-        const prevNormSet = new Set(suggestedQuestions.map((q) => normalize(q.prompt)))
-        const newItems = filtered.filter((q) => !prevNormSet.has(normalize(q.prompt)))
+        const normalizeLightDedup = (text?: string | null): string => {
+          if (!text || typeof text !== 'string') return ''
+          return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+        }
+        // PromptSuggestion items in state always have prompt field
+        const prevNormSet = new Set(suggestedQuestions.map((q) => {
+          const qText = q?.prompt ?? ''
+          return typeof qText === 'string' ? normalizeLightDedup(qText) : ''
+        }).filter(t => t.length > 0))
+        // filtered items also have prompt field (they're PromptSuggestion)
+        const newItems = filtered.filter((q) => {
+          const qText = q?.prompt ?? ''
+          const normalized = typeof qText === 'string' ? normalizeLightDedup(qText) : ''
+          return normalized && !prevNormSet.has(normalized)
+        })
 
         duplicatesRemovedCount = filtered.length - newItems.length
         diversityFilteredCount = 0
@@ -1018,12 +1065,21 @@ export default function AIVisibilitySection({
           (growth === 0) ? 'no_growth_this_batch' :
           'empty_state_unknown'
 
+        // Safe text extraction for metrics logging
+        const normalize = (text?: string | null): string => {
+          if (!text || typeof text !== 'string') return ''
+          return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+        }
+
         console.log('[AIVisibility-refreshSuggestions] Full cycle metrics', {
           maxExpandedPool: MAX_SUGGESTIONS,
           visibleBefore,
           neededToReachMax: MAX_SUGGESTIONS - visibleBefore,
           cachedLoadedRaw: cachedLoadedCount,
-          cachedValidUnused: newItems.filter((q: any) => cachedFromApi.some((c) => normalize(c.question) === normalize(q.prompt))).length,
+          cachedValidUnused: newItems.filter((q: any) => {
+            const qText = q.prompt ?? q.question ?? ''
+            return cachedFromApi.some((c) => normalize(c.question) === normalize(qText))
+          }).length,
           afterCacheMergeCount: visibleBefore + cachedLoadedCount,
           geminiWasCalled,
           geminiRequestedCandidateCount: geminiWasCalled ? refreshed.length : 0,
@@ -1554,12 +1610,26 @@ export default function AIVisibilitySection({
           )}
 
           {(() => {
-            const normalizeText = (text: string): string =>
-              text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
-            const trackedSet = new Set(allPrompts.map((p) => normalizeText(p.prompt || '')))
-            const availableSuggestions = suggestedQuestions.filter(
-              (q) => !trackedSet.has(normalizeText(q.prompt || ''))
+            const normalizeText = (text?: string | null): string => {
+              if (!text || typeof text !== 'string') return ''
+              return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
+            }
+            // Build set of tracked prompts using safe text extraction
+            const trackedSet = new Set(
+              allPrompts
+                .map((p) => {
+                  const text = p.prompt ?? ''
+                  return typeof text === 'string' ? normalizeText(text) : ''
+                })
+                .filter((t) => t.length > 0)
             )
+            // Filter available suggestions, using safe text extraction
+            // PromptSuggestion items always have prompt field
+            const availableSuggestions = suggestedQuestions.filter((q) => {
+              const qText = q.prompt ?? ''
+              const normalized = typeof qText === 'string' ? normalizeText(qText) : ''
+              return normalized && !trackedSet.has(normalized)
+            })
             const isCollapsed = !showAllSmartQuestions
             const visibleSliced = availableSuggestions.slice(0, isCollapsed ? 4 : undefined)
 
