@@ -482,68 +482,19 @@ export default function AIVisibilitySection({
           rejectedReason?: string
         }> = []
 
-        // Dedup: vNext as "previous", cached as "new additions"
-        const dedupResult = dedupClientSide(
-          vNextFiltered.map((q) => ({ prompt: q.prompt, intent: q.intent })),
-          cachedRaw.map((q) => ({ question: q.question, intent: q.intent }))
-        )
+        // Use server's dedupedQuestions directly — do NOT re-dedup on client
+        // The server already deduped across vNext + cached + Gemini = 35 unique
+        const serverDedupedQuestions = data.dedupedQuestions || []
 
-        // Map normalized text -> original cached item
-        const cachedByNorm = new Map<string, { id?: string; question: string; intent?: string }>()
-        cachedRaw.forEach((c) => {
-          const norm = normalizeText(c.question)
-          cachedByNorm.set(norm, c)
-        })
-
-        // Identify which cached items were removed by dedup
-        const dedupedNorms = new Set(dedupResult.deduped.map((q) => normalizeText(q.prompt || '')))
-        cachedRaw.forEach((c) => {
-          const norm = normalizeText(c.question)
-          const displayedByDedup = dedupedNorms.has(norm)
-          cachedFilteringLog.push({
-            question: c.question,
-            intent: c.intent,
-            displayed: displayedByDedup,
-            rejectedReason: displayedByDedup ? undefined : 'duplicate',
-          })
-        })
-
-        // Diversity filter on the full merged pool (nothing pre-existing)
-        const { filtered: diversePool, removedCount: diversityRemoved } = applyDiversityFilter(dedupResult.deduped)
-
-        // Update filtering log for diversity rejections
-        const diverseNorms = new Set(diversePool.map((q) => normalizeText(q.prompt || '')))
-        cachedFilteringLog.forEach((log) => {
-          const norm = normalizeText(log.question)
-          if (log.displayed && !diverseNorms.has(norm)) {
-            log.displayed = false
-            log.rejectedReason = 'diversity_filter'
-          }
-        })
-
-        // Cap at MAX_SUGGESTIONS
-        const capped = diversePool.slice(0, MAX_SUGGESTIONS)
-
-        // Update filtering log for MAX_SUGGESTIONS cap
-        const cappedNorms = new Set(capped.map((q) => normalizeText(q.prompt || '')))
-        cachedFilteringLog.forEach((log) => {
-          const norm = normalizeText(log.question)
-          if (log.displayed && !cappedNorms.has(norm)) {
-            log.displayed = false
-            log.rejectedReason = 'exceeded_max_suggestions'
-          }
-        })
-
-        // Convert back to PromptSuggestion[], reusing existing objects where possible.
-        // Cached/Gemini items get proper intent + deterministic quality tier so they
-        // render with the same label structure as built-in vNext suggestions.
-        const merged: PromptSuggestion[] = capped.map((q) => {
+        // Convert to PromptSuggestion format
+        const merged: PromptSuggestion[] = serverDedupedQuestions.map((q: any) => {
           const fromVNext = vNextFiltered.find((v) => normalizeText(v.prompt) === normalizeText(q.prompt))
           if (fromVNext) return fromVNext
-          const fromCached = cachedRaw.find((c) => normalizeText(c.question) === normalizeText(q.prompt))
-          const meta = deriveSuggestionMeta(fromCached?.intent ?? q.intent)
+
+          // Cached/Gemini item
+          const meta = deriveSuggestionMeta(q.intent)
           return {
-            id: `gemini-${fromCached?.id || Math.random().toString(36).slice(2, 8)}`,
+            id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
             prompt: q.prompt,
             intent: meta.intent,
             intentLabel: meta.intent,
@@ -558,42 +509,55 @@ export default function AIVisibilitySection({
         })
 
         const cachedDisplayedCount = merged.filter((m) => m.id.startsWith('gemini-')).length
-        const cachedFilteredOut = cachedFilteringLog.filter((log) => !log.displayed)
 
-        console.log('[AIVisibility-initialLoad] Merged vNext + cached', {
+        console.log('[AIVisibility-initialLoad] Using server dedupedQuestions', {
           projectId,
           contextHash: data.contextHash || '(not returned)',
+          serverDedupedCount: serverDedupedQuestions.length,
           vNextCount: vNextFiltered.length,
           cachedLoadedRaw: cachedRaw.length,
-          cachedDisplayedCount,
-          cachedFilteredOut: cachedFilteredOut.length,
-          duplicatesRemovedByDedup: dedupResult.removed,
-          diversityFiltered: diversityRemoved,
-          finalInitialVisibleCount: merged.length,
+          cachedDisplayedInMerged: cachedDisplayedCount,
+          finalMergedCount: merged.length,
           geminiWasCalled: false,
         })
 
-        // Log detailed rejection reasons for each filtered cached suggestion
-        if (cachedFilteredOut.length > 0) {
-          console.log('[AIVisibility-initialLoad] Cached suggestions filtered during merge:', {
-            projectId,
-            contextHash: data.contextHash || '(not returned)',
-            filteredDetails: cachedFilteredOut.map((log) => ({
-              question: log.question,
-              intent: log.intent,
-              rejectedReason: log.rejectedReason,
-            })),
-          })
+        // Check if cached pool is significantly larger — auto-expand if so
+        const hasLargeCachedPool = cachedRaw.length > 0 && merged.length > vNextFiltered.length + 3
+        const shouldAutoExpand = hasLargeCachedPool && data.source === 'vNext+cache'
+
+        // Check localStorage for saved expanded state per project
+        let savedExpandedState = false
+        try {
+          savedExpandedState = localStorage.getItem(`ai-visibility-expanded-${projectId}`) === 'true'
+        } catch (e) {
+          // localStorage may not be available
         }
+
+        // Use localStorage if available, otherwise auto-expand for large pools
+        const expandState = savedExpandedState || shouldAutoExpand
 
         if (!cancelled) {
           setSuggestedQuestions(merged)
+          setShowAllSmartQuestions(expandState)
+
           console.log('[AI_SUGGESTIONS_STATE_SET]', {
             suggestedQuestionsCount: merged.length,
-            showAllSmartQuestions: false,
-            geminiQuestionsInState: merged.filter((m) => m.id.startsWith('gemini-')).length,
-            vNextQuestionsInState: merged.filter((m) => !m.id.startsWith('gemini-')).length,
+            showAllSmartQuestions: expandState,
+            geminiQuestionsInState: cachedDisplayedCount,
+            vNextQuestionsInState: vNextFiltered.length,
+            hasLargeCachedPool,
+            shouldAutoExpand,
+            savedExpandedState,
           })
+
+          // Save expanded state to localStorage for persistence across refreshes
+          if (expandState) {
+            try {
+              localStorage.setItem(`ai-visibility-expanded-${projectId}`, 'true')
+            } catch (e) {
+              // localStorage may be unavailable
+            }
+          }
         }
       } catch (e) {
         console.debug('[AIVisibility-initialLoad] Cache load failed, showing vNext only:', e)
@@ -1685,7 +1649,14 @@ export default function AIVisibilitySection({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowAllSmartQuestions(true)}
+                      onClick={() => {
+                        setShowAllSmartQuestions(true)
+                        try {
+                          localStorage.setItem(`ai-visibility-expanded-${projectId}`, 'true')
+                        } catch (e) {
+                          // localStorage may be unavailable
+                        }
+                      }}
                     >
                       {t('show_more')}
                     </Button>
