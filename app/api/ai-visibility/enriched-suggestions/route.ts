@@ -26,7 +26,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions } from '@/lib/ai-visibility/suggestion-cache'
+import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, strongNormalize, strongDeduplicateSuggestions, extractAllowedLocations, containsDisallowedLocation } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 async function authAndProject(projectId: string) {
@@ -37,7 +37,7 @@ async function authAndProject(projectId: string) {
   const admin = createAdminClient()
   const { data: project, error: projectError } = await admin
     .from('projects')
-    .select('id, user_id, target_domain, business_name, country, language')
+    .select('id, user_id, target_domain, business_name, country, language, city')
     .eq('id', projectId)
     .single()
 
@@ -79,11 +79,15 @@ export async function POST(request: Request) {
   const { admin, project } = result
 
   try {
+    // Extract allowed locations from project data
+    const allowedLocations = extractAllowedLocations(project as Record<string, any>)
+
     console.log('[enriched-suggestions] API called', {
       projectId,
       language,
       country,
       businessCategory,
+      allowedLocations: allowedLocations.length > 0 ? allowedLocations : '(none found)',
     })
 
     // Step 1: Load vNext (ai_prompts) questions
@@ -156,7 +160,8 @@ export async function POST(request: Request) {
           project.business_name || 'Project',
           project.target_domain || '',
           language,
-          country || undefined
+          country || undefined,
+          allowedLocations
         )
 
         console.log('[enriched-suggestions] Gemini returned', {
@@ -168,6 +173,26 @@ export async function POST(request: Request) {
         console.error('[enriched-suggestions] Gemini call failed:', errMsg)
         geminiSuggestions = []
       }
+
+      // Filter out questions with disallowed locations
+      const allowedSuggestions = geminiSuggestions.filter(g => {
+        const hasDisallowed = containsDisallowedLocation(g.question, allowedLocations)
+        if (hasDisallowed) {
+          console.log('[enriched-suggestions] Filtered out disallowed location', {
+            question: g.question,
+            allowedLocations: allowedLocations.length > 0 ? allowedLocations : '(none)',
+          })
+        }
+        return !hasDisallowed
+      })
+
+      console.log('[enriched-suggestions] Location filtering', {
+        beforeFilter: geminiSuggestions.length,
+        afterFilter: allowedSuggestions.length,
+        filtered: geminiSuggestions.length - allowedSuggestions.length,
+      })
+
+      geminiSuggestions = allowedSuggestions
 
       // Deduplicate against vNext and cache
       const deduped = deduplicateSuggestions(

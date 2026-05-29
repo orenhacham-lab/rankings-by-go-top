@@ -425,7 +425,8 @@ export async function generateProjectEnrichmentQuestions(
   projectName: string,
   domain: string,
   language: 'he' | 'en',
-  country?: string
+  country?: string,
+  allowedLocations?: string[]
 ): Promise<FallbackQuestionResponse[]> {
   const client = getGeminiClient()
   if (!client) {
@@ -436,6 +437,15 @@ export async function generateProjectEnrichmentQuestions(
   const model = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
 
   try {
+    // Build location constraint for the prompt
+    const locationConstraint = (allowedLocations && allowedLocations.length > 0)
+      ? (language === 'he'
+        ? `מיקומים מותרים: ${allowedLocations.join(', ')}`
+        : `Allowed locations: ${allowedLocations.join(', ')}`)
+      : (language === 'he'
+        ? 'אם אין מיקום ברור בנתוני הפרויקט, אל תזכיר בכלל עיר, שכונה או אזור.'
+        : 'If no location is specified in the project data, do not mention any city, neighborhood, or region.')
+
     const systemPrompt =
       language === 'he'
         ? `אתה יוצר שאלות חיפוש בעברית לאנשים המחפשים עיסוקים, שירותים או מוצרים.
@@ -443,15 +453,15 @@ export async function generateProjectEnrichmentQuestions(
 
 שם העסק/הביטוי: "${projectName}"
 התחום או URL: ${domain || 'כללי'}
-${country ? `מדינה/עיר: ${country}` : ''}
+${country ? `מדינה: ${country}` : ''}
 
 חשוב: אל תנסח כל שאלה עם "כיצד ניתן", "מהן האפשרויות", "איפה ניתן למצוא".
 הנסח טבעי בעברית: "איזה", "כמה", "איפה אפשר", "מה חשוב", "למי כדאי".
 
 סוגי שאלות שיוצרות ערך:
-1. מקוריות + מסחרי: "איזה זר מתאים ליום הולדת רומנטי?" or "כמה עולה משלוח אותו יום בירושלים?"
+1. מקוריות + מסחרי: "איזה זר מתאים ליום הולדת רומנטי?" or "כמה עולה משלוח באותו יום?"
 2. בעיה שצריך לפתור: "איפה אפשר לקבל עצה מהיום למחר?"
-3. השוואה של ספקים: "מי בעמק רפאים עושה משלוח במהירות?"
+3. השוואה של ספקים: "מי עושה משלוח במהירות?"
 4. מאפיינים של מוצר/שירות: "איזו חנות מומלצת לקנות פרחים טריים?"
 5. מחירים ותנאים: "כמה עולה זר פרחים גדול עם משלוח?"
 
@@ -464,7 +474,7 @@ ${country ? `מדינה/עיר: ${country}` : ''}
 
 Business/Product: "${projectName}"
 Domain or URL: ${domain || 'General'}
-${country ? `Country/City: ${country}` : ''}
+${country ? `Country: ${country}` : ''}
 
 IMPORTANT: Avoid "How can one", "What are the options", "Where can one find".
 Use natural English: "What is", "How much", "Which", "Is there a", "Should I".
@@ -472,7 +482,7 @@ Use natural English: "What is", "How much", "Which", "Is there a", "Should I".
 Value-creating question types:
 1. Purchase intent + specificity: "What flowers are best for a romantic birthday?" or "How much does same-day delivery cost?"
 2. Problem solving: "Where can I get emergency delivery today?"
-3. Provider comparison: "Which florist in Jerusalem has the fastest delivery?"
+3. Provider comparison: "Which florist has the fastest delivery?"
 4. Product features: "What makes a good bouquet for a hospital visit?"
 5. Pricing & terms: "How much does a large flower arrangement cost with delivery?"
 
@@ -482,9 +492,25 @@ Result should be:
 - Natural phrasing
 - Not a template`
 
+    const locationRules = (allowedLocations && allowedLocations.length > 0)
+      ? (language === 'he'
+        ? `הוראות מיקום: מותר לך להזכיר רק את המיקומים הבאים: ${allowedLocations.join(', ')}.
+אסור להמציא מיקומים.
+אסור להשתמש בעיות שאינן ברשימה זו.`
+        : `Location rules: You may ONLY mention these locations: ${allowedLocations.join(', ')}.
+Do not invent locations.
+Do not mention any city, neighborhood, or region that is not in this list.`)
+      : (language === 'he'
+        ? `הוראות מיקום: אם אין מיקום ברור בנתוני הפרויקט, אל תזכיר בכלל עיר, שכונה, אזור או אזור שירות.
+אסור להמציא מיקומים.
+אסור להשתמש בדוגמאות מתוך הוראות אלו.`
+        : `Location rules: Do not mention any city, neighborhood, region, or service area.
+Do not invent locations.
+Do not use example locations from instructions.`)
+
     const userPrompt =
       language === 'he'
-        ? `בנה עבור "${projectName}"${country ? ` ב${country}` : ''} בדיוק 5 שאלות בעברית טבעית.
+        ? `בנה עבור "${projectName}" בדיוק 5 שאלות בעברית טבעית.
 
 בחר מגוון:
 • 2 שאלות עם כוונה מסחרית (מחיר, משלוח, הזמנה, זמינות)
@@ -492,7 +518,7 @@ Result should be:
 • 1 שאלה השוואה או המלצה ("מי הטוב", "מומלץ")
 • 1 שאלה על בעיה או צורך ("איפה", "האם אפשר")
 
-אם יש עיר בירושלים/תל אביב/חיפה - עשה את השאלה מקומית עם שם העיר או השכונה.
+${locationRules}
 
 חזור ONLY JSON (ללא טקסט אחר):
 
@@ -505,7 +531,7 @@ Result should be:
     }
   ]
 }`
-        : `Create exactly 5 natural English questions for "${projectName}"${country ? ` in ${country}` : ''}.
+        : `Create exactly 5 natural English questions for "${projectName}".
 
 Choose variety:
 • 2 questions with commercial intent (price, delivery, ordering, availability)
@@ -513,7 +539,7 @@ Choose variety:
 • 1 comparison or recommendation question ("which is best", "recommended")
 • 1 problem or need question ("where", "can I")
 
-If there is a city mentioned — make the question location-specific with the city or neighborhood name.
+${locationRules}
 
 Return ONLY JSON (no other text):
 
@@ -532,6 +558,7 @@ Return ONLY JSON (no other text):
       domain: domain || '(empty)',
       language,
       country: country || '(not specified)',
+      allowedLocations: allowedLocations && allowedLocations.length > 0 ? allowedLocations : '(none specified)',
     })
 
     const genAI = client

@@ -279,6 +279,132 @@ export async function dismissSuggestedQuestion(
 }
 
 /**
+ * Extract allowed locations from project data
+ * Builds a list of actual locations mentioned in the project's own data
+ * Does NOT invent or assume locations
+ */
+export function extractAllowedLocations(projectData: Record<string, any>): string[] {
+  const locations = new Set<string>()
+
+  // Extract from explicit location fields
+  if (projectData.city && typeof projectData.city === 'string') {
+    const trimmed = projectData.city.trim().toLowerCase()
+    if (trimmed) locations.add(trimmed)
+  }
+
+  // Extract from country if specified (but usually too broad)
+  // Only add if it's a city-level precision, not a whole country
+  if (projectData.country && typeof projectData.country === 'string' && projectData.country.length < 10) {
+    const trimmed = projectData.country.trim().toLowerCase()
+    // Only add small country codes like "il", "us", "gb" if they look like city codes
+    if (trimmed.length <= 2) {
+      locations.add(trimmed)
+    }
+  }
+
+  // Extract locations from service_areas if it's an array or comma-separated string
+  if (projectData.service_areas) {
+    const areas = Array.isArray(projectData.service_areas)
+      ? projectData.service_areas
+      : (typeof projectData.service_areas === 'string' ? projectData.service_areas.split(',') : [])
+
+    areas.forEach((area: any) => {
+      if (typeof area === 'string') {
+        const trimmed = area.trim().toLowerCase()
+        if (trimmed) locations.add(trimmed)
+      }
+    })
+  }
+
+  // Extract from description if it exists (be conservative)
+  if (projectData.description && typeof projectData.description === 'string') {
+    // Simple heuristic: look for patterns like "in [City]" or "[City], Israel"
+    // but be very conservative to avoid false positives
+    const matches = projectData.description.match(/(?:in|at|בתוך)\s+([A-Za-zא-ת\s'-]+)/gi)
+    if (matches) {
+      matches.forEach((match: string) => {
+        const city = match.replace(/^(?:in|at|בתוך)\s+/i, '').trim().toLowerCase()
+        if (city && city.length > 2 && city.length < 50) {
+          locations.add(city)
+        }
+      })
+    }
+  }
+
+  return Array.from(locations)
+}
+
+/**
+ * Check if a question contains locations that are NOT in allowedLocations list
+ * Returns true if the question contains a disallowed location
+ * Returns false if the question is safe (no locations, or only allowed locations)
+ */
+export function containsDisallowedLocation(
+  question: string,
+  allowedLocations: string[]
+): boolean {
+  if (!allowedLocations || allowedLocations.length === 0) {
+    // If no allowed locations, reject ANY question that mentions a location
+    // Common location indicators in Hebrew and English
+    const locationPatterns = [
+      /בתל\s*אביב/i, // Tel Aviv in Hebrew
+      /בהרצליה/i, // Herzliya in Hebrew
+      /בחיפה/i, // Haifa in Hebrew
+      /בירושלים/i, // Jerusalem in Hebrew
+      /בבאר\s*שבע/i, // Beersheba in Hebrew
+      /בראמת\s*גן/i, // Ramat Gan in Hebrew
+      /בגבעתיים/i, // Givatayim in Hebrew
+      /בהרצליה\s*פיתוח/i, // Herzliya Pituach in Hebrew
+      /בעמק\s*רפאים/i, // Emek Refaim in Hebrew
+      /in\s+Tel\s+Aviv/i,
+      /in\s+Herzliya/i,
+      /in\s+Haifa/i,
+      /in\s+Jerusalem/i,
+      /in\s+Beersheba/i,
+      /in\s+Ramat\s+Gan/i,
+      /in\s+Givatayim/i,
+      /delivery\s+to\s+\w+/i,
+      /משלוח.*ל[א-ת\s]+/i, // delivery to [Hebrew location]
+    ]
+
+    return locationPatterns.some(pattern => pattern.test(question))
+  }
+
+  // Normalize allowed locations for comparison
+  const normalizedAllowed = allowedLocations.map(loc => loc.trim().toLowerCase())
+
+  // Simple word-boundary check: look for city names in the question
+  // This is a heuristic that may not catch everything, but avoids false positives
+  const lowerQuestion = question.toLowerCase()
+
+  // Check for common location patterns that might not be in allowedLocations
+  const suspiciousPatterns = [
+    /(?:בתל\s*אביב|in\s+Tel\s+Aviv)/,
+    /(?:בהרצליה|in\s+Herzliya)/,
+    /(?:בחיפה|in\s+Haifa)/,
+    /(?:בירושלים|in\s+Jerusalem)/,
+    /(?:בבאר\s*שבע|in\s+Beersheba)/,
+    /(?:בראמת\s*גן|in\s+Ramat\s+Gan)/,
+    /(?:בגבעתיים|in\s+Givatayim)/,
+    /(?:בעמק\s*רפאים|in\s+Emek\s+Refaim)/,
+    /משלוח.*(?:ל|to)\s+(\w+)/,
+  ]
+
+  for (const pattern of suspiciousPatterns) {
+    const match = question.match(pattern)
+    if (match) {
+      const detectedLocation = match[1]?.toLowerCase() || match[0].toLowerCase()
+      // If detected location is NOT in allowed list, it's disallowed
+      if (!normalizedAllowed.some(allowed => detectedLocation.includes(allowed) || allowed.includes(detectedLocation))) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
  * Deduplicate suggestions against existing lists
  * Returns array with exact duplicates and near-duplicates (by intent) removed
  * Defensively handles missing/null questions
