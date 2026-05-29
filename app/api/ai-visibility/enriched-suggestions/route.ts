@@ -47,6 +47,7 @@ import {
   normalizeQuotes,
   containsUnnaturalorBrokenHebrew,
   containsDirectAddress,
+  isWeakPromotionalQuestion,
 } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
@@ -363,6 +364,7 @@ export async function POST(request: Request) {
         businessNameQuotes: [] as Array<{ question: string }>,
         hebrewQuality: [] as Array<{ question: string }>,
         directAddress: [] as Array<{ question: string }>,
+        weakPromotion: [] as Array<{ question: string }>,
         businessScope: [] as Array<{ question: string; reason: string }>,
       }
 
@@ -431,6 +433,16 @@ export async function POST(request: Request) {
         })
       }
 
+      // 6c. Weak promotional/unclear phrasing — reject time-sensitive promo claims
+      // and unclear phrasing unless business explicitly offers these
+      if (language === 'he') {
+        filtered = filtered.filter(g => {
+          const isWeakPromo = isWeakPromotionalQuestion(g.question, [])
+          if (isWeakPromo) filteringLogs.weakPromotion.push({ question: g.question })
+          return !isWeakPromo
+        })
+      }
+
       // 7. Business scope validation
       const scopeFilteredLogs: Array<{ question: string; reason: string }> = []
       filtered = filterSuggestionsByBusinessScope(
@@ -457,6 +469,7 @@ export async function POST(request: Request) {
         afterHebrewQualityFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length - filteringLogs.temporal.length - filteringLogs.locationDisallowed.length - filteringLogs.serviceAreaUnauthorized.length - filteringLogs.businessNameQuotes.length - filteringLogs.hebrewQuality.length,
         hebrewQualityFiltered: filteringLogs.hebrewQuality.length,
         directAddressFiltered: filteringLogs.directAddress.length,
+        weakPromotionFiltered: filteringLogs.weakPromotion.length,
         afterScopeFilter: filtered.length,
         scopeFiltered: filteringLogs.businessScope.length,
         exampleFilters: {
@@ -465,6 +478,7 @@ export async function POST(request: Request) {
           serviceArea: filteringLogs.serviceAreaUnauthorized.slice(0, 1),
           hebrewQuality: filteringLogs.hebrewQuality.slice(0, 1),
           directAddress: filteringLogs.directAddress.slice(0, 1),
+          weakPromotion: filteringLogs.weakPromotion.slice(0, 1),
         }
       })
 

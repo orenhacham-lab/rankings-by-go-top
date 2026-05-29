@@ -1117,10 +1117,79 @@ export function containsDirectAddress(question: string, businessName?: string | 
 }
 
 /**
- * Extract allowed locations from project data
- * Builds a list of actual locations mentioned in the project's own data
- * Does NOT invent or assume locations
+ * Check if question is weak promotional or out-of-scope
+ * Rejects:
+ * - Unclear/awkward phrasing (לחנות, unclear references)
+ * - Promotion/time-sensitive claims without context (הנחות, מבצע, היום, חגים, משלוח חינם)
+ * - Used/second-hand questions unless applicable to business
  */
+export function isWeakPromotionalQuestion(
+  question: string,
+  businessKeywords?: string[] | null
+): boolean {
+  if (!question || typeof question !== 'string') return false
+
+  const lower = question.toLowerCase()
+  const businessKeywordsLower = (businessKeywords || []).map((k) => k.toLowerCase())
+
+  // Unclear phrasing patterns
+  const unclearPatterns = [
+    /לחנות\b/i, // "לחנות" (to store/shop) is unclear without context - should be "לבית" (to home) or omitted
+    /משקולות.*לחנות/i, // dumbells for store (unclear context)
+    /מה\s+המחיר\s+של\s+משקולות\s+מתכווננות\s+לחנות/i, // specific unclear example
+  ]
+
+  // Weak promotional/time-sensitive patterns (unless business explicitly in promo mode)
+  const promotionalPatterns = [
+    /\bהנחות\b/i, // discounts
+    /\bמבצע\b/i, // sale/promotion
+    /\bהיום\b/i, // today (time-sensitive)
+    /לקראת\s+החגים/i, // before holidays
+    /עד\s+סוף\s+החודש/i, // until end of month
+    /משלוח\s+חינם/i, // free shipping
+  ]
+
+  // Used/second-hand patterns (only valid if business handles these)
+  const secondHandPatterns = [
+    /יד\s+שנייה/i, // second-hand
+    /משומש/i, // used
+    /מחודש/i, // refurbished
+  ]
+
+  // Check unclear phrasing
+  for (const pattern of unclearPatterns) {
+    if (pattern.test(question)) {
+      return true
+    }
+  }
+
+  // Check promotional - only reject if business doesn't explicitly offer promos
+  const hasPromoMarker = promotionalPatterns.some((p) => p.test(question))
+  if (hasPromoMarker) {
+    // Check if business keywords include promo indicators
+    const hasPromoKeyword = businessKeywordsLower.some((kw) =>
+      ['הנחה', 'מבצע', 'קידום', 'הצעה', 'חסכון', 'הנחות'].some((pk) => kw.includes(pk))
+    )
+    if (!hasPromoKeyword) {
+      return true // Reject promo questions if business doesn't advertise promos
+    }
+  }
+
+  // Check second-hand - only reject if business doesn't handle used items
+  const hasSecondHandMarker = secondHandPatterns.some((p) => p.test(question))
+  if (hasSecondHandMarker) {
+    // Check if business keywords include used/refurbished indicators
+    const hasSecondHandKeyword = businessKeywordsLower.some((kw) =>
+      ['יד שנייה', 'משומש', 'מחודש', 'רפורביש'].some((uk) => kw.includes(uk))
+    )
+    if (!hasSecondHandKeyword) {
+      return true // Reject second-hand questions if business doesn't offer them
+    }
+  }
+
+  return false
+}
+
 export function extractAllowedLocations(projectData: Record<string, any>): string[] {
   const locations = new Set<string>()
 

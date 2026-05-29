@@ -434,6 +434,16 @@ export default function AIVisibilitySection({
 
         const cachedRaw: Array<{ id?: string; question: string; intent?: string }> = data.cachedSuggestions || []
 
+        console.log('[AI_SUGGESTIONS_CLIENT_RECEIVED]', {
+          apiReturnedTotal: data.total || 0,
+          apiReturnedDedupedCount: data.dedupedQuestions?.length || 0,
+          vNextCount: vNextFiltered.length,
+          cachedCount: cachedRaw.length,
+          newGeminiCount: (data.newSuggestions || []).length,
+          geminiWasCalled: data.geminiWasCalled || false,
+          source: data.source,
+        })
+
         console.log('[AIVisibility-initialLoad] Cache load attempt', {
           projectId,
           language: lang,
@@ -578,6 +588,12 @@ export default function AIVisibilitySection({
 
         if (!cancelled) {
           setSuggestedQuestions(merged)
+          console.log('[AI_SUGGESTIONS_STATE_SET]', {
+            suggestedQuestionsCount: merged.length,
+            showAllSmartQuestions: false,
+            geminiQuestionsInState: merged.filter((m) => m.id.startsWith('gemini-')).length,
+            vNextQuestionsInState: merged.filter((m) => !m.id.startsWith('gemini-')).length,
+          })
         }
       } catch (e) {
         console.debug('[AIVisibility-initialLoad] Cache load failed, showing vNext only:', e)
@@ -1566,6 +1582,18 @@ export default function AIVisibilitySection({
             const availableSuggestions = suggestedQuestions.filter(
               (q) => !trackedSet.has(normalizeText(q.prompt))
             )
+            const isCollapsed = !showAllSmartQuestions
+            const visibleSliced = availableSuggestions.slice(0, isCollapsed ? 4 : undefined)
+
+            console.log('[AI_SUGGESTIONS_RENDER]', {
+              allInState: suggestedQuestions.length,
+              availableSuggestions: availableSuggestions.length,
+              trackedPrompts: trackedSet.size,
+              isCollapsed,
+              showMoreButtonVisible: availableSuggestions.length > 4 && isCollapsed,
+              visibleSliced: visibleSliced.length,
+            })
+
             const showPanel = refreshingSuggestions || availableSuggestions.length > 0
             if (!showPanel) return null
             return (
