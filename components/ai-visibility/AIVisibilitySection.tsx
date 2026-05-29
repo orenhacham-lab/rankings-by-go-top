@@ -935,7 +935,10 @@ export default function AIVisibilitySection({
           const normalized = typeof qText === 'string' ? safeNormalize(qText) : ''
           return normalized && !seenKeys.has(normalized)
         })
-        .map((q) => ({ ...q, _apiSource: 'vnext' as const }))
+        .map((q): PromptSuggestion & { _apiSource?: string } => ({
+          ...q,
+          _apiSource: 'vnext' as const,
+        }))
 
       // DEBUG: Check vNextFiltered initial state
       console.log('[AIVisibility-refreshSuggestions] VNEXT_FILTERED_INITIAL', {
