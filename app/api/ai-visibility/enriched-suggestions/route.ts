@@ -27,7 +27,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { loadCachedSuggestions, writeSuggestionsToCache, deduplicateSuggestions, computeContextHash, normalizeQuestion } from '@/lib/ai-visibility/suggestion-cache'
-import { classifyKeywordsWithGemini, generateFallbackQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 async function authAndProject(projectId: string) {
   const supabase = await createClient()
@@ -143,19 +143,31 @@ export async function POST(request: Request) {
       console.log('[enriched-suggestions] Calling Gemini (threshold not met)', {
         uniqueCount,
         threshold: QUALITY_THRESHOLD,
-      })
-
-      // Generate new suggestions from Gemini
-      const geminiSuggestions = await generateFallbackQuestions(
-        project.business_name || '',
-        project.target_domain || '',
+        projectName: project.business_name || '(empty)',
+        projectDomain: project.target_domain || '(empty)',
         language,
-        country || undefined
-      )
-
-      console.log('[enriched-suggestions] Gemini returned', {
-        count: geminiSuggestions.length,
+        country: country || '(not specified)',
       })
+
+      // Generate new suggestions from Gemini based on project profile
+      let geminiSuggestions: any[] = []
+      try {
+        geminiSuggestions = await generateProjectEnrichmentQuestions(
+          project.business_name || 'Project',
+          project.target_domain || '',
+          language,
+          country || undefined
+        )
+
+        console.log('[enriched-suggestions] Gemini returned', {
+          count: geminiSuggestions.length,
+          model: process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite',
+        })
+      } catch (geminiErr) {
+        const errMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
+        console.error('[enriched-suggestions] Gemini call failed:', errMsg)
+        geminiSuggestions = []
+      }
 
       // Deduplicate against vNext and cache
       const deduped = deduplicateSuggestions(

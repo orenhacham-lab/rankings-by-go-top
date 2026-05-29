@@ -417,53 +417,117 @@ export interface FallbackQuestionResponse {
   reason: string
 }
 
-export async function generateFallbackQuestions(
-  keyword: string,
-  semantic: SemanticClassification,
+/**
+ * Generate fallback questions based on project profile (not keyword-specific)
+ * Used by enrichment layer when generating diverse suggestions
+ */
+export async function generateProjectEnrichmentQuestions(
+  projectName: string,
+  domain: string,
   language: 'he' | 'en',
-  country?: string,
+  country?: string
 ): Promise<FallbackQuestionResponse[]> {
   const client = getGeminiClient()
   if (!client) {
-    console.warn('[Gemini Fallback] API unavailable, returning empty')
+    console.warn('[Gemini Enrichment] API unavailable, returning empty')
     return []
   }
 
   const model = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
 
-  const prompt = buildFallbackPrompt(keyword, semantic, language, country)
-
   try {
+    const systemPrompt =
+      language === 'he'
+        ? `אתה יוצר שאלות חיפוש איכותיות ומגוונות עבור עסק.
+
+שם העסק: "${projectName}"
+תחום: ${domain || 'כללי'}
+
+צור שאלות חיפוש טבעיות שעשויות להעניין לקוחות פוטנציאליים:
+- שאלות מתוך סקרנות (מה, איך, למה)
+- שאלות משוואה (טוב, זול, איכות)
+- שאלות בחירה (איפה, איזה, כמה עולה)
+- שאלות קשורות לעסק`
+        : `You are a quality search question generator for a business.
+
+Business: "${projectName}"
+Domain: ${domain || 'General'}
+
+Generate diverse, natural search questions that potential customers might ask:
+- Curiosity questions (what, how, why)
+- Comparison questions (good, cheap, quality)
+- Choice questions (where, which, how much)
+- Business-related questions`
+
+    const userPrompt =
+      language === 'he'
+        ? `צור 3-5 שאלות חיפוש איכותיות ומגוונות עבור "${projectName}"${country ? ` (${country})` : ''}
+
+עדיף שונות בכוונה: סקרנות, השוואה, בחירה, מידע.
+
+החזר ONLY JSON תקין (ללא טקסט אחר):
+
+{
+  "questions": [
+    {
+      "question": "שאלה טבעית בעברית",
+      "intent": "commercial|pre_purchase|informational|comparison|recommendation",
+      "reason": "סיבה קצרה"
+    }
+  ]
+}`
+        : `Generate 3-5 diverse, high-quality search questions for "${projectName}"${country ? ` (${country})` : ''}
+
+Prefer variety: curiosity, comparison, choice, information.
+
+Return ONLY valid JSON (no other text):
+
+{
+  "questions": [
+    {
+      "question": "natural question in English",
+      "intent": "commercial|pre_purchase|informational|comparison|recommendation",
+      "reason": "brief reason"
+    }
+  ]
+}`
+
+    console.log('[Gemini Enrichment] Generating project-based suggestions', {
+      projectName,
+      domain: domain || '(empty)',
+      language,
+      country: country || '(not specified)',
+    })
+
     const genAI = client
     const modelInstance = genAI.getGenerativeModel({ model })
 
-    const result = await modelInstance.generateContent(prompt)
+    const result = await modelInstance.generateContent(`${systemPrompt}\n\n${userPrompt}`)
     const responseText = result.response.text()
 
     // Parse JSON response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      console.warn('[Gemini Fallback] Response did not contain valid JSON')
+      console.warn('[Gemini Enrichment] Response did not contain valid JSON')
       return []
     }
 
     const parsed = JSON.parse(jsonMatch[0])
     if (!parsed.questions || !Array.isArray(parsed.questions)) {
-      console.warn('[Gemini Fallback] Response missing questions array')
+      console.warn('[Gemini Enrichment] Response missing questions array')
       return []
     }
 
-    // Return raw questions (will be validated by caller)
-    const questions = parsed.questions.slice(0, 3) as FallbackQuestionResponse[]
+    const questions = parsed.questions.slice(0, 5) as FallbackQuestionResponse[]
 
     console.log(
-      `[Gemini Fallback] Generated ${questions.length} questions for "${keyword}" (model: ${model})`
+      `[Gemini Enrichment] Generated ${questions.length} enrichment questions for "${projectName}" (model: ${model})`
     )
 
     return questions
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
-    console.warn(`[Gemini Fallback] Generation failed: ${errorMsg}`)
+    console.error(`[Gemini Enrichment] Generation failed: ${errorMsg}`)
     return []
   }
 }
