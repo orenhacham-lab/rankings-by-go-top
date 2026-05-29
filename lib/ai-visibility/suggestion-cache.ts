@@ -245,63 +245,83 @@ export function areSemanticDuplicates(
 }
 
 /**
- * Strong deduplication across all sources
+ * Strong deduplication across all sources with detailed logging
  * Finds exact matches AND semantic duplicates (same intent + similar topics)
- * Returns: (questions, duplicatesRemoved count)
+ * Returns: (questions, duplicatesRemoved count, removalLog)
  */
 export function strongDeduplicateSuggestions(
-  vNextQuestions: Array<{ question?: string | null; prompt?: string | null; intent?: string }>,
-  cachedSuggestions: Array<{ question?: string | null; intent?: string }>,
-  newGeminiSuggestions: Array<{ question?: string | null; intent?: string }>
+  vNextQuestions: Array<{ question?: string | null; prompt?: string | null; intent?: string; id?: string }>,
+  cachedSuggestions: Array<{ question?: string | null; intent?: string; id?: string }>,
+  newGeminiSuggestions: Array<{ question?: string | null; intent?: string; id?: string }>
 ): {
   dedupedQuestions: Array<{ question: string; intent?: string; source: string }>
   duplicateCount: number
+  removalLog: Array<{ question: string; source: string; removedBy: string; removedAsDuplicateOf?: string; removedReason: string }>
 } {
-  const seen = new Map<string, { question: string; source: string; intent?: string }>()
+  const seen = new Map<string, { question: string; source: string; intent?: string; id?: string }>()
   let duplicateCount = 0
+  const removalLog: Array<{ question: string; source: string; removedBy: string; removedAsDuplicateOf?: string; removedReason: string }> = []
 
   // Helper to add question to seen map
-  const addQuestion = (question: string | null | undefined, source: string, intent?: string) => {
+  const addQuestion = (question: string | null | undefined, source: string, intent?: string, id?: string) => {
     if (!question) return
     const norm = strongNormalize(question)
     if (!norm) return
 
     // Check for exact text duplicate
     if (seen.has(norm)) {
+      const existing = seen.get(norm)!
+      removalLog.push({
+        question,
+        source,
+        removedBy: 'client',
+        removedAsDuplicateOf: existing.question,
+        removedReason: 'exact_duplicate'
+      })
       duplicateCount++
       return
     }
 
     // Check for semantic duplicate with existing questions of same intent
-    const newEntry = { question, source, intent: intent || undefined }
+    const newEntry = { question, source, intent: intent || undefined, id }
     let isSemanticDuplicate = false
+    let matchedExisting: typeof seen extends Map<string, infer V> ? V : never
 
     for (const [_, existing] of seen) {
       if (areSemanticDuplicates(newEntry, existing)) {
-        duplicateCount++
         isSemanticDuplicate = true
+        matchedExisting = existing
         break
       }
     }
 
-    if (!isSemanticDuplicate) {
+    if (isSemanticDuplicate) {
+      removalLog.push({
+        question,
+        source,
+        removedBy: 'client',
+        removedAsDuplicateOf: matchedExisting!.question,
+        removedReason: 'semantic_duplicate'
+      })
+      duplicateCount++
+    } else {
       seen.set(norm, newEntry)
     }
   }
 
   // Add vNext questions
   vNextQuestions.forEach((q) => {
-    addQuestion(q.prompt || q.question, 'vNext', (q as { intent?: string }).intent)
+    addQuestion(q.prompt || q.question, 'vNext', (q as { intent?: string }).intent, (q as { id?: string }).id)
   })
 
   // Add cached suggestions — preserve intent so labels survive the round-trip
   cachedSuggestions.forEach((q) => {
-    addQuestion(q.question, 'cached', (q as { intent?: string }).intent)
+    addQuestion(q.question, 'cached', (q as { intent?: string }).intent, (q as { id?: string }).id)
   })
 
   // Add new Gemini suggestions
   newGeminiSuggestions.forEach((q) => {
-    addQuestion(q.question, 'gemini', q.intent)
+    addQuestion(q.question, 'gemini', q.intent, (q as { id?: string }).id)
   })
 
   const dedupedQuestions = Array.from(seen.values())
@@ -309,6 +329,7 @@ export function strongDeduplicateSuggestions(
   return {
     dedupedQuestions,
     duplicateCount,
+    removalLog,
   }
 }
 

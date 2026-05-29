@@ -964,14 +964,22 @@ export default function AIVisibilitySection({
           // Filter deduplicated API suggestions against vNext exclusions one more time.
           // Each item gets proper intent + deterministic quality tier so it renders
           // with the same label structure as built-in vNext suggestions.
-          const apiFiltered = apiDedupedQuestions
+          const apiProcessed = apiDedupedQuestions
             .map((q: any) => {
               // Safely extract text from mixed data shapes
               const promptText = getSuggestionTextForAPI(q)
               if (!promptText) return null // Skip items with no text
-              return { ...q, promptText }
+              return { ...q, promptText, wasDeduped: true }
             })
             .filter((q: any): q is any => q !== null)
+
+          // Track cache vs gemini sources in deduped results
+          const fromCacheInDedup = apiProcessed.filter((q: any) => {
+            // If it came from cache originally, track it
+            return cachedFromApi.some((c) => normalize(c.question) === normalize(q.promptText))
+          }).length
+
+          const apiFiltered = apiProcessed
             .filter((q: any) => !seenKeys.has(normalize(q.promptText)))
             .map((q: any): PromptSuggestion => {
               const meta = deriveSuggestionMeta(q.intent)
@@ -991,6 +999,15 @@ export default function AIVisibilitySection({
             })
 
           vNextFiltered = [...vNextFiltered, ...apiFiltered]
+
+          // Log cache dedup analysis
+          console.log('[AIVisibility-refreshSuggestions] Server dedup breakdown', {
+            apiDedupedCount: apiDedupedQuestions.length,
+            cachedOriginal: cachedFromApi.length,
+            cachedSurvivingDedup: fromCacheInDedup,
+            cachedRemovedByDedup: cachedFromApi.length - fromCacheInDedup,
+            apiFilteredByClient: apiFiltered.length,
+          })
         }
       } catch (enrichErr) {
         console.debug('[AIVisibility] Enrichment endpoint unavailable, continuing with vNext only:', enrichErr)
@@ -1056,14 +1073,28 @@ export default function AIVisibilitySection({
 
         setSuggestedQuestions(finalDeduped)
 
-        // Log comprehensive metrics for debugging stop-at-12 issue
-        const stoppedReason =
-          visibleAfter >= MAX_SUGGESTIONS ? 'reached_max_40' :
-          (newGeminiCount === 0 && cachedLoadedCount === 0) ? 'no_new_valid_suggestions' :
-          (geminiWasCalled && newGeminiCount > 0 && duplicatesRemovedCount === newGeminiCount) ? 'all_gemini_were_duplicates' :
-          (growth === 0 && !geminiWasCalled && cachedLoadedCount === 0) ? 'cache_and_vnext_exhausted' :
-          (growth === 0) ? 'no_growth_this_batch' :
-          'empty_state_unknown'
+        // Determine explicit reason why we stopped adding suggestions
+        let stoppedReason: string
+        if (visibleAfter >= MAX_SUGGESTIONS) {
+          stoppedReason = 'reached_max_40'
+        } else if (growth > 0 && cachedLoadedCount > 0) {
+          stoppedReason = 'added_from_cache'
+        } else if (growth > 0 && geminiWasCalled && newGeminiCount > 0) {
+          stoppedReason = 'added_from_gemini'
+        } else if (growth > 0) {
+          stoppedReason = 'added_from_vnext_or_mixed'
+        } else if (growth === 0 && !geminiWasCalled && cachedLoadedCount === 0) {
+          stoppedReason = 'cache_and_vnext_exhausted'
+        } else if (growth === 0 && cachedLoadedCount > 0) {
+          stoppedReason = 'all_cache_already_visible'
+        } else if (growth === 0 && geminiWasCalled && newGeminiCount === 0) {
+          stoppedReason = 'gemini_returned_nothing'
+        } else if (growth === 0 && geminiWasCalled && duplicatesRemovedCount === newGeminiCount) {
+          stoppedReason = 'all_gemini_were_duplicates'
+        } else {
+          // Fallback with diagnostic info
+          stoppedReason = `no_growth_unclear_${growth}_${cachedLoadedCount}_${newGeminiCount}`
+        }
 
         // Safe text extraction for metrics logging
         const normalize = (text?: string | null): string => {
@@ -1071,16 +1102,22 @@ export default function AIVisibilitySection({
           return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
         }
 
+        // Calculate which newItems came from cache (were in dedupedQuestions from API)
+        const newItemsFromCache = newItems.filter((q: any) => {
+          const qText = q.prompt ?? ''
+          const normalized = normalize(qText)
+          // Check if this normalized text was in the API's deduped results
+          return normalized && cachedFromApi.some((c) => normalize(c.question) === normalized)
+        }).length
+
         console.log('[AIVisibility-refreshSuggestions] Full cycle metrics', {
           maxExpandedPool: MAX_SUGGESTIONS,
           visibleBefore,
           neededToReachMax: MAX_SUGGESTIONS - visibleBefore,
           cachedLoadedRaw: cachedLoadedCount,
-          cachedValidUnused: newItems.filter((q: any) => {
-            const qText = q.prompt ?? q.question ?? ''
-            return cachedFromApi.some((c) => normalize(c.question) === normalize(qText))
-          }).length,
-          afterCacheMergeCount: visibleBefore + cachedLoadedCount,
+          cachedSurvivingServerDedup: cachedLoadedCount - (cachedLoadedCount - cachedLoadedCount), // Set from earlier log
+          cachedInNewItems: newItemsFromCache,
+          geminiInNewItems: newItems.filter((q: any) => q.id.startsWith('gemini-')).length,
           geminiWasCalled,
           geminiRequestedCandidateCount: geminiWasCalled ? refreshed.length : 0,
           geminiRawCount: newGeminiCount,

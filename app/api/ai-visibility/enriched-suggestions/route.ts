@@ -553,7 +553,7 @@ export async function POST(request: Request) {
 
     // Step 5: STRONG DEDUPLICATION across all sources
     // Apply strong normalization: quotes, dashes, spaces, case, punctuation
-    const { dedupedQuestions, duplicateCount } = strongDeduplicateSuggestions(
+    const { dedupedQuestions, duplicateCount, removalLog } = strongDeduplicateSuggestions(
       vNextQuestions,
       cachedSuggestions,
       newSuggestions
@@ -568,6 +568,28 @@ export async function POST(request: Request) {
         cached: dedupedQuestions.filter(q => q.source === 'cached').length,
         gemini: dedupedQuestions.filter(q => q.source === 'gemini').length,
       },
+    })
+
+    // Log detailed removal reasons grouped by source
+    const removalsBySource = {
+      vNext: removalLog.filter(r => r.source === 'vNext').length,
+      cached: removalLog.filter(r => r.source === 'cached').length,
+      gemini: removalLog.filter(r => r.source === 'gemini').length,
+    }
+    const removalsByReason = {
+      exact_duplicate: removalLog.filter(r => r.removedReason === 'exact_duplicate').length,
+      semantic_duplicate: removalLog.filter(r => r.removedReason === 'semantic_duplicate').length,
+    }
+    console.log('[enriched-suggestions] Detailed dedup removal analysis', {
+      totalRemoved: removalLog.length,
+      removalsBySource,
+      removalsByReason,
+      sampleRemovals: removalLog.slice(0, 5).map(r => ({
+        question: r.question,
+        source: r.source,
+        reason: r.removedReason,
+        duplicateOf: r.removedAsDuplicateOf?.substring(0, 80),
+      })),
     })
 
     // Sample top questions for logging
