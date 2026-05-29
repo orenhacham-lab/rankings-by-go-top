@@ -389,17 +389,27 @@ export async function POST(request: Request) {
           { projectId, language, country, businessCategory }
         )
 
-        console.log('[enriched-suggestions] Cache write (Gemini → DB)', {
-          contextHash: contextHashForWrite,
-          projectId,
-          language,
-          country: country || '(none)',
-          businessCategory: businessCategory || '(none)',
-          insertSuccess: writeSuccess,
-          insertedCount: writeSuccess ? newSuggestions.length : 0,
-          insertedQuestionHashesCount: newSuggestions.length,
-          questions: newSuggestions.slice(0, 3).map(q => `"${q.question.substring(0, 60)}..."`),
-        })
+        if (!writeSuccess) {
+          console.error('[enriched-suggestions] CRITICAL: Cache write FAILED! Suggestions were NOT persisted to database', {
+            contextHash: contextHashForWrite,
+            projectId,
+            language,
+            country: country || '(none)',
+            businessCategory: businessCategory || '(none)',
+            attemptedInsertCount: newSuggestions.length,
+            questions: newSuggestions.slice(0, 3).map(q => `"${q.question.substring(0, 60)}..."`),
+          })
+        } else {
+          console.log('[enriched-suggestions] Cache write SUCCESS (Gemini → DB)', {
+            contextHash: contextHashForWrite,
+            projectId,
+            language,
+            country: country || '(none)',
+            businessCategory: businessCategory || '(none)',
+            insertedCount: newSuggestions.length,
+            questions: newSuggestions.slice(0, 3).map(q => `"${q.question.substring(0, 60)}..."`),
+          })
+        }
 
         // Add to cached list for response
         cachedSuggestions.push(

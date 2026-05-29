@@ -425,15 +425,26 @@ export async function writeSuggestionsToCache(
   const { error } = await supabase
     .from('ai_question_suggestion_cache')
     .upsert(rows, {
-      onConflict: 'project_id,context_hash,question_hash,source',
+      onConflict: 'ai_suggestion_cache_upsert_key',
       ignoreDuplicates: false
     })
 
   if (error) {
-    console.error('[Suggestion Cache] Write error:', error)
+    console.error('[Suggestion Cache] Write error (CRITICAL - cache persistence blocked):', {
+      errorCode: (error as any)?.code,
+      errorMessage: error.message,
+      errorDetails: (error as any)?.details,
+      rowCount: rows.length,
+      contextHash: rows.length > 0 ? rows[0].context_hash : 'N/A',
+      firstQuestion: rows.length > 0 ? rows[0].question.substring(0, 60) : 'N/A',
+    })
     return false
   }
 
+  console.log('[Suggestion Cache] Write successful', {
+    rowCount: rows.length,
+    contextHash: rows.length > 0 ? rows[0].context_hash : 'N/A',
+  })
   return true
 }
 
