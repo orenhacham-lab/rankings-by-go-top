@@ -861,6 +861,25 @@ export default function AIVisibilitySection({
         return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
       }
 
+      // Normalize source field from any shape the server might return
+      function normalizeSuggestionSource(item: any): 'cache' | 'gemini' | 'vnext' | 'unknown' {
+        const raw = String(
+          item?._apiSource ??
+          item?.source ??
+          item?.origin ??
+          item?.metadata?.source ??
+          ''
+        ).toLowerCase()
+        if (raw.includes('cache') || raw.includes('cached')) return 'cache'
+        if (raw.includes('gemini')) return 'gemini'
+        if (raw.includes('vnext') || raw.includes('smart')) return 'vnext'
+        // Fallback: detect cache by structural fields even if source label is missing
+        if (item?.cacheId || item?.status === 'suggested' || item?.question_hash || item?.questionHash) {
+          return 'cache'
+        }
+        return 'unknown'
+      }
+
       // Metrics tracking for logging
       const visibleBefore = suggestedQuestions.length
       const trackedPrompts = allPrompts.map((p) => p.prompt || '').filter(Boolean)
@@ -910,11 +929,13 @@ export default function AIVisibilitySection({
         return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
       }
       const seenKeys = new Set<string>(exclude.map(safeNormalize))
-      let vNextFiltered = refreshed.filter((q) => {
-        const qText = q?.prompt ?? ''
-        const normalized = typeof qText === 'string' ? safeNormalize(qText) : ''
-        return normalized && !seenKeys.has(normalized)
-      })
+      let vNextFiltered: (PromptSuggestion & { _apiSource?: string })[] = refreshed
+        .filter((q) => {
+          const qText = q?.prompt ?? ''
+          const normalized = typeof qText === 'string' ? safeNormalize(qText) : ''
+          return normalized && !seenKeys.has(normalized)
+        })
+        .map((q) => ({ ...q, _apiSource: 'vnext' as const }))
 
       // ── Gemini-powered enrichment via persistent cache layer ──────────────
       try {
@@ -938,10 +959,11 @@ export default function AIVisibilitySection({
           geminiNotCalledReason = enrichData.geminiNotCalledReason || ''
           contextHash = enrichData.contextHash || ''
 
-          // Count items by source from dedupedQuestions (not raw arrays)
-          const cachedItemsInDedup = apiDedupedQuestions.filter((q: any) => q.source === 'cached').length
-          const geminiItemsInDedup = apiDedupedQuestions.filter((q: any) => q.source === 'gemini').length
-          const vNextItemsInDedup = apiDedupedQuestions.filter((q: any) => q.source === 'vnext').length
+          // Count items by source from dedupedQuestions using normalized source
+          const cachedItemsInDedup = apiDedupedQuestions.filter((q: any) => normalizeSuggestionSource(q) === 'cache').length
+          const geminiItemsInDedup = apiDedupedQuestions.filter((q: any) => normalizeSuggestionSource(q) === 'gemini').length
+          const vNextItemsInDedup = apiDedupedQuestions.filter((q: any) => normalizeSuggestionSource(q) === 'vnext').length
+          const unknownItemsInDedup = apiDedupedQuestions.filter((q: any) => normalizeSuggestionSource(q) === 'unknown').length
           cachedLoadedCount = cachedItemsInDedup // Track count of cached items that survived server dedup
           newGeminiCount = geminiItemsInDedup // Track count of gemini items that survived server dedup
 
@@ -951,6 +973,7 @@ export default function AIVisibilitySection({
             cachedInDedup: cachedItemsInDedup,
             geminiInDedup: geminiItemsInDedup,
             vNextInDedup: vNextItemsInDedup,
+            unknownInDedup: unknownItemsInDedup,
             geminiWasCalled,
             duplicatesRemovedByApi: enrichData.duplicatesRemoved || 0,
           })
@@ -982,6 +1005,7 @@ export default function AIVisibilitySection({
             .filter((q: any) => !seenKeys.has(normalize(q.promptText)))
             .map((q: any): PromptSuggestion & { _apiSource?: string } => {
               const meta = deriveSuggestionMeta(q.intent)
+              const normalizedSource = normalizeSuggestionSource(q)
               return {
                 id: `gemini-${q.id || Math.random().toString(36).slice(2, 8)}`,
                 prompt: q.promptText, // Use safely extracted text
@@ -994,9 +1018,25 @@ export default function AIVisibilitySection({
                 reason: '',
                 chips: [],
                 valueReason: '',
-                _apiSource: q.source, // Track source for metrics
+                _apiSource: normalizedSource, // Normalized source: cache | gemini | vnext | unknown
               }
             })
+
+          // Log unknown-source items if any exist in API pool
+          if (unknownItemsInDedup > 0) {
+            const unknownSamples = apiDedupedQuestions.filter((q: any) => normalizeSuggestionSource(q) === 'unknown').slice(0, 5)
+            console.warn('[AIVisibility-refreshSuggestions] UNKNOWN_SOURCE_ITEMS in dedupedQuestions', {
+              count: unknownItemsInDedup,
+              samples: unknownSamples.map((q: any) => ({
+                question: getSuggestionTextForAPI(q)?.substring(0, 80),
+                rawSource: q.source,
+                metadataSource: q.metadata?.source,
+                status: q.status,
+                hasQuestionHash: !!(q.question_hash || q.questionHash),
+                keys: Object.keys(q).join(','),
+              })),
+            })
+          }
 
           vNextFiltered = [...vNextFiltered, ...apiFiltered]
 
@@ -1006,6 +1046,7 @@ export default function AIVisibilitySection({
             cachedSurvivingDedup: cachedItemsInDedup,
             geminiSurvivingDedup: geminiItemsInDedup,
             vNextSurvivingDedup: vNextItemsInDedup,
+            unknownInDedup: unknownItemsInDedup,
             apiFilteredByClient: apiFiltered.length,
             duplicatesRemoved: enrichData.duplicatesRemoved || 0,
           })
@@ -1080,11 +1121,14 @@ export default function AIVisibilitySection({
           return text.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!,;؟،]+\s*$/u, '').trim()
         }
 
-        // Count newItems by source using _apiSource field (preserved from dedupedQuestions)
-        const newItemsFromCache = newItems.filter((q: any) => (q as any)._apiSource === 'cached').length
+        // Count newItems by normalized _apiSource (cache | gemini | vnext | unknown)
+        const newItemsFromCache = newItems.filter((q: any) => (q as any)._apiSource === 'cache').length
         const newItemsFromGemini = newItems.filter((q: any) => (q as any)._apiSource === 'gemini').length
         const newItemsFromVNext = newItems.filter((q: any) => (q as any)._apiSource === 'vnext').length
-        const newItemsFromUnknown = newItems.filter((q: any) => !((q as any)._apiSource)).length
+        const newItemsFromUnknown = newItems.filter((q: any) => {
+          const src = (q as any)._apiSource
+          return !src || src === 'unknown'
+        }).length
 
         // Determine explicit reason why we stopped adding suggestions
         let stoppedReason: string
@@ -1119,6 +1163,22 @@ export default function AIVisibilitySection({
             unknownInNewItems: newItemsFromUnknown,
             total: sourceTotal,
             expected: newItems.length,
+          })
+        }
+
+        // Log unknown-source items in newItems for diagnosis
+        if (newItemsFromUnknown > 0) {
+          const unknownNewItems = newItems.filter((q: any) => {
+            const src = (q as any)._apiSource
+            return !src || src === 'unknown'
+          }).slice(0, 5)
+          console.warn('[AIVisibility-refreshSuggestions] UNKNOWN_SOURCE_ITEMS in newItems', {
+            count: newItemsFromUnknown,
+            samples: unknownNewItems.map((q: any) => ({
+              question: q.prompt?.substring(0, 80),
+              rawSource: (q as any)._apiSource,
+              keys: Object.keys(q).join(','),
+            })),
           })
         }
 
