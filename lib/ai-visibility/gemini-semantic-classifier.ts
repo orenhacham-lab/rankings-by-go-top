@@ -479,6 +479,10 @@ ${scopeConstraint}
 חשוב: אל תנסח כל שאלה עם "כיצד ניתן", "מהן האפשרויות", "איפה ניתן למצוא".
 הנסח טבעי בעברית: "איזה", "כמה", "איפה אפשר", "מה חשוב", "למי כדאי".
 
+חשוב מאוד: אל תפנה ישירות לעסק. אסור להשתמש ב"שלכם", "אצלכם", "אתם", "יש לכם", "תוכלו".
+השאלה צריכה להיות שאלה כללית למנוע חיפוש/AI בגוף שלישי, לא פנייה אל בית העסק.
+דוגמה רעה: "מה מדיניות ההחזרות שלכם?" — דוגמה טובה: "איך עובדת מדיניות החזרות בחנות פרחים?"
+
 סוגי שאלות שיוצרות ערך:
 1. מקוריות + מסחרי: "איזה זר מתאים ליום הולדת רומנטי?" or "כמה עולה משלוח באותו יום?"
 2. בעיה שצריך לפתור: "איפה אפשר לקבל עצה מהיום למחר?"
@@ -504,6 +508,10 @@ ${scopeConstraint}
 
 IMPORTANT: Avoid "How can one", "What are the options", "Where can one find".
 Use natural English: "What is", "How much", "Which", "Is there a", "Should I".
+
+IMPORTANT: Do NOT address the business directly ("your", "do you", "your store").
+Write general third-person questions for a search engine/AI, not messages to the business.
+Bad: "What is your return policy?" — Good: "How do return policies work at flower shops?"
 
 Value-creating question types:
 1. Purchase intent + specificity: "What flowers are best for a romantic birthday?" or "How much does same-day delivery cost?"

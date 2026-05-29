@@ -1045,6 +1045,58 @@ export function containsUnnaturalorBrokenHebrew(question: string): boolean {
 }
 
 /**
+ * Detect "direct-address" questions — phrased as if speaking directly to the
+ * business ("שלכם", "אצלכם", "אתם", "יש לכם") rather than asking an AI/search
+ * engine in natural third person. These are poor for AI-visibility tracking
+ * because the AI engine has no "you" to answer about.
+ *
+ * EXCEPTION: if the question also names the business explicitly, the
+ * second-person phrasing is acceptable (it reads naturally) — but in practice
+ * Gemini rarely combines both, so the safe default is to reject when a
+ * direct-address marker is present and no business name is included.
+ *
+ * Examples rejected:
+ *   "מה מדיניות ההחזרות שלכם?"
+ *   "יש לכם משלוח פרחים?"
+ *   "כמה עולה אצלכם זר ורדים?"
+ *
+ * Examples allowed (third-person / generic):
+ *   "איפה אפשר להזמין זר ורדים עם משלוח?"
+ *   "מה מדיניות ההחזרות של פרחי ארז?" (business name present)
+ */
+export function containsDirectAddress(question: string, businessName?: string | null): boolean {
+  if (!question || typeof question !== 'string') return false
+
+  const text = question.trim()
+
+  // Second-person / direct-address markers (Hebrew). Word-boundary-ish via
+  // surrounding whitespace or punctuation so we don't match inside other words.
+  const directAddressPatterns = [
+    /(^|[\s,.?!"׳״()-])שלכם($|[\s,.?!"׳״()-])/u,   // "...שלכם" (your, plural)
+    /(^|[\s,.?!"׳״()-])שלכן($|[\s,.?!"׳״()-])/u,   // "...שלכן" (your, fem. plural)
+    /(^|[\s,.?!"׳״()-])אצלכם($|[\s,.?!"׳״()-])/u,  // "at your place"
+    /(^|[\s,.?!"׳״()-])אצלכן($|[\s,.?!"׳״()-])/u,
+    /(^|[\s,.?!"׳״()-])אתם($|[\s,.?!"׳״()-])/u,    // "you" (plural)
+    /(^|[\s,.?!"׳״()-])אתן($|[\s,.?!"׳״()-])/u,
+    /(^|[\s,.?!"׳״()-])יש\s+לכם($|[\s,.?!"׳״()-])/u, // "do you have"
+    /(^|[\s,.?!"׳״()-])יש\s+לכן($|[\s,.?!"׳״()-])/u,
+    /(^|[\s,.?!"׳״()-])תוכלו($|[\s,.?!"׳״()-])/u,   // "can you (plural)"
+    /(^|[\s,.?!"׳״()-])מציעים\s+לי($|[\s,.?!"׳״()-])/u,
+  ]
+
+  const hasDirectAddress = directAddressPatterns.some((p) => p.test(text))
+  if (!hasDirectAddress) return false
+
+  // Exception: if the business name appears naturally, second person is OK.
+  if (businessName && businessName.trim().length > 1) {
+    const bn = businessName.trim()
+    if (text.includes(bn)) return false
+  }
+
+  return true
+}
+
+/**
  * Extract allowed locations from project data
  * Builds a list of actual locations mentioned in the project's own data
  * Does NOT invent or assume locations

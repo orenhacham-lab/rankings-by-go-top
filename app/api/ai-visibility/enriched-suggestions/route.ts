@@ -46,6 +46,7 @@ import {
   containsBusinessNameInQuotes,
   normalizeQuotes,
   containsUnnaturalorBrokenHebrew,
+  containsDirectAddress,
 } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
@@ -185,6 +186,16 @@ export async function POST(request: Request) {
           count: rejectedByQuality,
         })
       }
+
+      // Also strip stale direct-address cached entries ("שלכם", "אצלכם", ...)
+      const beforeDirect = cachedSuggestions.length
+      cachedSuggestions = cachedSuggestions.filter(q => !containsDirectAddress(q.question, project.business_name))
+      const rejectedByDirect = beforeDirect - cachedSuggestions.length
+      if (rejectedByDirect > 0) {
+        console.log('[enriched-suggestions] Removed stale cached suggestions via direct-address filter', {
+          count: rejectedByDirect,
+        })
+      }
     }
 
     const cachedSet = new Set(cachedSuggestions.map(q => strongNormalize(q.question)))
@@ -279,6 +290,7 @@ export async function POST(request: Request) {
         serviceAreaUnauthorized: [] as Array<{ question: string }>,
         businessNameQuotes: [] as Array<{ question: string }>,
         hebrewQuality: [] as Array<{ question: string }>,
+        directAddress: [] as Array<{ question: string }>,
         businessScope: [] as Array<{ question: string; reason: string }>,
       }
 
@@ -336,6 +348,17 @@ export async function POST(request: Request) {
         })
       }
 
+      // 6b. Direct-address rejection — questions phrased AT the business
+      // ("שלכם", "אצלכם", "אתם", "יש לכם") read unnaturally for AI/search and
+      // are poor for visibility tracking, unless they name the business.
+      if (language === 'he') {
+        filtered = filtered.filter(g => {
+          const isDirectAddress = containsDirectAddress(g.question, project.business_name)
+          if (isDirectAddress) filteringLogs.directAddress.push({ question: g.question })
+          return !isDirectAddress
+        })
+      }
+
       // 7. Business scope validation
       const scopeFilteredLogs: Array<{ question: string; reason: string }> = []
       filtered = filterSuggestionsByBusinessScope(
@@ -361,6 +384,7 @@ export async function POST(request: Request) {
         businessNameFiltered: filteringLogs.businessNameQuotes.length,
         afterHebrewQualityFilter: geminiSuggestions.length - filteringLogs.isoCodeLeak.length - filteringLogs.temporal.length - filteringLogs.locationDisallowed.length - filteringLogs.serviceAreaUnauthorized.length - filteringLogs.businessNameQuotes.length - filteringLogs.hebrewQuality.length,
         hebrewQualityFiltered: filteringLogs.hebrewQuality.length,
+        directAddressFiltered: filteringLogs.directAddress.length,
         afterScopeFilter: filtered.length,
         scopeFiltered: filteringLogs.businessScope.length,
         exampleFilters: {
@@ -368,6 +392,7 @@ export async function POST(request: Request) {
           temporal: filteringLogs.temporal.slice(0, 1),
           serviceArea: filteringLogs.serviceAreaUnauthorized.slice(0, 1),
           hebrewQuality: filteringLogs.hebrewQuality.slice(0, 1),
+          directAddress: filteringLogs.directAddress.slice(0, 1),
         }
       })
 
