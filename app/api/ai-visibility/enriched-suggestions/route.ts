@@ -584,11 +584,11 @@ export async function POST(request: Request) {
       totalRemoved: removalLog.length,
       removalsBySource,
       removalsByReason,
-      sampleRemovals: removalLog.slice(0, 5).map(r => ({
-        question: r.question,
+      allRemovals: removalLog.map(r => ({
+        removedQuestion: r.question,
+        duplicateOf: r.removedAsDuplicateOf,
+        duplicateReason: r.removedReason,
         source: r.source,
-        reason: r.removedReason,
-        duplicateOf: r.removedAsDuplicateOf?.substring(0, 80),
       })),
     })
 
