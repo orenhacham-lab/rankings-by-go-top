@@ -968,6 +968,7 @@ export default function AIVisibilitySection({
       })
 
       // ── Gemini-powered enrichment via persistent cache layer ──────────────
+      let apiDedupedQuestions: any[] = []
       try {
         const enrichResponse = await fetch('/api/ai-visibility/enriched-suggestions', {
           method: 'POST',
@@ -984,7 +985,7 @@ export default function AIVisibilitySection({
           const enrichData = await enrichResponse.json()
 
           // Use ONLY API's DEDUPED suggestions as authoritative pool
-          const apiDedupedQuestions = enrichData.dedupedQuestions || []
+          apiDedupedQuestions = enrichData.dedupedQuestions || []
           geminiWasCalled = enrichData.geminiWasCalled || false
           geminiNotCalledReason = enrichData.geminiNotCalledReason || ''
           contextHash = enrichData.contextHash || ''
