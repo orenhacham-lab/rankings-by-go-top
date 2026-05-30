@@ -208,7 +208,8 @@ export default function AIVisibilitySection({
   const [showAllSmartQuestions, setShowAllSmartQuestions] = useState(() => {
     if (typeof window === 'undefined') return false
     try {
-      return localStorage.getItem(`ai-visibility-expanded-${projectId}`) === 'true'
+      // Only read from v2 key (user-click versioned). Ignore old auto-expand pollution.
+      return localStorage.getItem(`ai-visibility-expanded-v2-${projectId}`) === 'true'
     } catch {
       return false
     }
@@ -1779,10 +1780,30 @@ export default function AIVisibilitySection({
             const isCollapsed = !showAllSmartQuestions
             const visibleSliced = availableSuggestions.slice(0, isCollapsed ? COLLAPSED_VISIBLE_SUGGESTIONS : undefined)
 
+            // Determine source of expanded state for logging
+            let expandedStateSource = 'missing' as const
+            let localStorageKeyUsed = `ai-visibility-expanded-v2-${projectId}`
+            let localStorageValue = null
+            try {
+              localStorageValue = localStorage.getItem(localStorageKeyUsed)
+              if (localStorageValue === 'true') expandedStateSource = 'v2_user_click'
+              // Old key should be ignored (but log if present for diagnostic)
+              const oldKey = `ai-visibility-expanded-${projectId}`
+              const oldValue = localStorage.getItem(oldKey)
+              if (oldValue === 'true' && expandedStateSource === 'missing') {
+                console.debug('[AI_SUGGESTIONS_RENDER] Old localStorage key detected but ignored:', oldKey)
+              }
+            } catch (e) {
+              // localStorage unavailable
+            }
+
             console.log('[AI_SUGGESTIONS_RENDER]', {
               allInState: suggestedQuestions.length,
               availableSuggestions: availableSuggestions.length,
               trackedPrompts: trackedSet.size,
+              localStorageKeyUsed,
+              localStorageValue,
+              expandedStateSource,
               isCollapsed,
               showMoreButtonVisible: availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && isCollapsed,
               visibleSliced: visibleSliced.length,
@@ -1883,7 +1904,8 @@ export default function AIVisibilitySection({
                       onClick={() => {
                         setShowAllSmartQuestions(true)
                         try {
-                          localStorage.setItem(`ai-visibility-expanded-${projectId}`, 'true')
+                          // Set v2 key only on user-explicit click
+                          localStorage.setItem(`ai-visibility-expanded-v2-${projectId}`, 'true')
                         } catch (e) {
                           // localStorage may be unavailable
                         }
