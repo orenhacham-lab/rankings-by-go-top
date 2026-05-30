@@ -1781,7 +1781,7 @@ export default function AIVisibilitySection({
             const visibleSliced = availableSuggestions.slice(0, isCollapsed ? COLLAPSED_VISIBLE_SUGGESTIONS : undefined)
 
             // Determine source of expanded state for logging
-            let expandedStateSource = 'missing' as const
+            let expandedStateSource: 'v2_user_click' | 'missing' = 'missing'
             let localStorageKeyUsed = `ai-visibility-expanded-v2-${projectId}`
             let localStorageValue = null
             try {
