@@ -282,11 +282,11 @@ export async function POST(request: Request) {
       totalUnique: uniqueCount,
     })
 
-    // Step 4: Gemini fill policy.
-    // QUALITY_THRESHOLD is for logging; MAX_POOL is the true hard cap (40).
-    // We fill to MAX_POOL by requesting appropriate candidate counts from Gemini.
-    // With ~50% surviving validation, we ask for 2-3x the missing amount.
-    const QUALITY_THRESHOLD = 20
+    // Step 4: Gemini fill policy with MIN_RECOMMENDED_POOL contract.
+    // MIN_RECOMMENDED_POOL: target minimum 30 questions (GLOBAL CONTRACT)
+    // MAX_POOL: hard cap at 40 to prevent unbounded growth
+    // If pool stays below 30, logs explain why (no silent failures)
+    const MIN_RECOMMENDED_POOL = 30
     const MAX_POOL = 40
     const MIN_GEMINI_REQUEST = 15
     const MAX_GEMINI_REQUEST = 30
@@ -296,6 +296,16 @@ export async function POST(request: Request) {
     let geminiNotCalledReason = ''
     let cacheWriteResult: CacheWriteResult | null = null
 
+    // Track Gemini generation details for debugging
+    let geminiGenerationResult = {
+      rawCount: 0,
+      parsedCount: 0,
+      afterValidationCount: 0,
+      dedupedCount: 0,
+      savedToCacheCount: 0,
+      rejectionReasons: {} as Record<string, number>,
+    }
+
     if (cacheOnly) {
       source = cachedSuggestions.length > 0 ? 'vNext+cache' : 'vNext'
       geminiNotCalledReason = 'cache_only_mode'
@@ -303,14 +313,17 @@ export async function POST(request: Request) {
         cacheOnly,
         uniqueCount,
         cachedCount: cachedSuggestions.length,
+        minRecommendedPool: MIN_RECOMMENDED_POOL,
       })
-    } else if (uniqueCount < MAX_POOL) {
-      // Scale Gemini request based on how far we are from MAX_POOL.
-      // Need 28 more? Ask for ~2.5x (70), capped between 15–30.
-      const needed = MAX_POOL - uniqueCount
+    } else if (uniqueCount < MAX_POOL && uniqueCount < MIN_RECOMMENDED_POOL) {
+      // GLOBAL CONTRACT: Fill toward MIN_RECOMMENDED_POOL (30) as target.
+      // Only stop if we reach MAX_POOL (40) or pool is full enough.
+      // Scale Gemini request: if 13 questions and need 17 to reach 30,
+      // ask for 2.5x (~42), capped between 15–30.
+      const targetNeeded = Math.max(0, MIN_RECOMMENDED_POOL - uniqueCount)
       const candidateCount = Math.min(
         MAX_GEMINI_REQUEST,
-        Math.max(MIN_GEMINI_REQUEST, Math.ceil(needed * 2.5))
+        Math.max(MIN_GEMINI_REQUEST, Math.ceil(targetNeeded * 2.5))
       )
 
       source = 'vNext+cache+gemini'
@@ -319,11 +332,12 @@ export async function POST(request: Request) {
       // Convert country code to display name for Gemini
       const countryForGemini = country ? getCountryDisplayName(country) : undefined
 
-      console.log('[enriched-suggestions] Calling Gemini (pool below MAX_POOL)', {
+      console.log('[enriched-suggestions] Calling Gemini (pool below MIN)', {
         uniqueCount,
-        needed,
+        minRecommendedPool: MIN_RECOMMENDED_POOL,
+        targetNeeded,
         candidateRequest: candidateCount,
-        threshold: QUALITY_THRESHOLD,
+        maxPool: MAX_POOL,
         projectName: project.business_name || '(empty)',
         projectDomain: project.target_domain || '(empty)',
         language,
@@ -344,18 +358,27 @@ export async function POST(request: Request) {
           candidateCount // Pass the scaled candidate count
         )
 
-        console.log('[enriched-suggestions] Gemini returned', {
+        geminiGenerationResult.rawCount = geminiSuggestions.length
+
+        console.log('[enriched-suggestions] Gemini returned raw candidates', {
           count: geminiSuggestions.length,
           requestedCandidates: candidateCount,
           model: process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite',
+          projectId,
+          projectName: project.business_name || '(empty)',
         })
       } catch (geminiErr) {
         const errMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
-        console.error('[enriched-suggestions] Gemini call failed:', errMsg)
+        console.error('[enriched-suggestions] Gemini call failed:', {
+          error: errMsg,
+          projectId,
+          requestedCandidates: candidateCount,
+        })
         geminiSuggestions = []
       }
 
       // 11-Layer validation pipeline for production quality
+      // Track what gets filtered out at each step
       let filteringLogs = {
         isoCodeLeak: [] as Array<{ question: string }>,
         temporal: [] as Array<{ question: string }>,
@@ -369,6 +392,18 @@ export async function POST(request: Request) {
       }
 
       let filtered = geminiSuggestions
+      const filterTracker = {
+        start: geminiSuggestions.length,
+        afterISO: 0,
+        afterTemporal: 0,
+        afterLocation: 0,
+        afterServiceArea: 0,
+        afterBusinessName: 0,
+        afterHebrew: 0,
+        afterDirectAddress: 0,
+        afterWeakPromo: 0,
+        afterScope: 0,
+      }
 
       // 1. ISO country code leak detection
       filtered = filtered.filter(g => {
@@ -376,6 +411,7 @@ export async function POST(request: Request) {
         if (hasLeak) filteringLogs.isoCodeLeak.push({ question: g.question })
         return !hasLeak
       })
+      filterTracker.afterISO = filtered.length
 
       // 2. Temporal/promotion sensitivity detection
       filtered = filtered.filter(g => {
@@ -383,6 +419,7 @@ export async function POST(request: Request) {
         if (isTemporal) filteringLogs.temporal.push({ question: g.question })
         return !isTemporal
       })
+      filterTracker.afterTemporal = filtered.length
 
       // 3. Disallowed location validation (legacy check)
       filtered = filtered.filter(g => {
@@ -483,6 +520,7 @@ export async function POST(request: Request) {
       })
 
       geminiSuggestions = filtered
+      geminiGenerationResult.afterValidationCount = filtered.length
 
       // Deduplicate against vNext and cache
       const deduped = deduplicateSuggestions(
@@ -491,6 +529,8 @@ export async function POST(request: Request) {
         cachedSuggestions,
         []
       )
+
+      geminiGenerationResult.dedupedCount = deduped.length
 
       // Cap so total unique persisted suggestions approaches MAX_POOL (40),
       // letting the cache accumulate a large expanded pool across clicks.
@@ -501,9 +541,27 @@ export async function POST(request: Request) {
         model_used: process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
       }))
 
-      console.log('[enriched-suggestions] After dedup and cap', {
-        maxToAdd,
-        newCount: newSuggestions.length,
+      geminiGenerationResult.savedToCacheCount = newSuggestions.length
+
+      console.log('[enriched-suggestions] GEMINI_GENERATION_FLOW', {
+        projectId,
+        geminiWasCalled,
+        rawCount: geminiGenerationResult.rawCount,
+        afterValidationCount: geminiGenerationResult.afterValidationCount,
+        validationFiltersApplied: {
+          isoCodeLeak: filteringLogs.isoCodeLeak.length,
+          temporal: filteringLogs.temporal.length,
+          locationDisallowed: filteringLogs.locationDisallowed.length,
+          serviceAreaUnauthorized: filteringLogs.serviceAreaUnauthorized.length,
+          businessNameQuotes: filteringLogs.businessNameQuotes.length,
+          hebrewQuality: filteringLogs.hebrewQuality.length,
+          directAddress: filteringLogs.directAddress.length,
+          weakPromotion: filteringLogs.weakPromotion.length,
+          businessScope: filteringLogs.businessScope.length,
+        },
+        afterDedupCount: deduped.length,
+        savedToCacheCount: newSuggestions.length,
+        reasonIfZero: newSuggestions.length === 0 ? 'all_filtered_or_deduped' : null,
       })
 
       // Write new suggestions to cache
@@ -546,7 +604,7 @@ export async function POST(request: Request) {
       geminiNotCalledReason = 'pool_full_max_reached'
       console.log('[enriched-suggestions] Gemini not called (pool at MAX_POOL)', {
         uniqueCount,
-        target: QUALITY_THRESHOLD,
+        minRecommendedPool: MIN_RECOMMENDED_POOL,
         maxPool: MAX_POOL,
       })
     }
@@ -599,6 +657,43 @@ export async function POST(request: Request) {
       samples: sampleQuestions,
     })
 
+    // POOL HEALTH LOG — explains if final pool meets MIN_RECOMMENDED_POOL target
+    const poolBelowTarget = dedupedQuestions.length < MIN_RECOMMENDED_POOL
+    let belowTargetReason = ''
+    if (poolBelowTarget) {
+      if (geminiWasCalled && geminiGenerationResult.savedToCacheCount === 0) {
+        belowTargetReason = 'gemini_called_but_zero_survived'
+      } else if (!geminiWasCalled && cacheOnly) {
+        belowTargetReason = 'cache_only_mode_insufficient'
+      } else if (!geminiWasCalled && !cacheOnly) {
+        belowTargetReason = 'should_have_called_gemini'
+      } else {
+        belowTargetReason = 'unknown'
+      }
+    }
+
+    console.log('[enriched-suggestions] POOL_HEALTH', {
+      projectId,
+      minRecommendedPool: MIN_RECOMMENDED_POOL,
+      maxPool: MAX_POOL,
+      finalPoolSize: dedupedQuestions.length,
+      meetsTarget: !poolBelowTarget,
+      belowTargetReason: poolBelowTarget ? belowTargetReason : null,
+      breakdown: {
+        vNext: dedupedQuestions.filter(q => q.source === 'vNext').length,
+        cached: dedupedQuestions.filter(q => q.source === 'cached').length,
+        gemini: dedupedQuestions.filter(q => q.source === 'gemini').length,
+      },
+      geminiMetrics: {
+        called: geminiWasCalled,
+        rawCount: geminiGenerationResult.rawCount,
+        afterValidation: geminiGenerationResult.afterValidationCount,
+        dedupedCount: geminiGenerationResult.dedupedCount,
+        savedToCache: geminiGenerationResult.savedToCacheCount,
+        notCalledReason: !geminiWasCalled ? geminiNotCalledReason : null,
+      },
+    })
+
     // CACHE VERIFICATION LOGGING for debugging
     console.log('[enriched-suggestions] CACHE VERIFICATION', {
       cacheOnly,
@@ -613,7 +708,7 @@ export async function POST(request: Request) {
       geminiWasCalled,
       uniqueCountBefore: uniqueCount,
       uniqueCountAfter: dedupedQuestions.length,
-      target: QUALITY_THRESHOLD,
+      minRecommendedPool: MIN_RECOMMENDED_POOL,
       maxPool: MAX_POOL,
       geminiNotCalledReason: geminiWasCalled ? 'N/A' : geminiNotCalledReason,
     })
