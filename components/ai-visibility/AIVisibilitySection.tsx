@@ -554,12 +554,10 @@ export default function AIVisibilitySection({
           geminiWasCalled: false,
         })
 
-        // Read localStorage — only source of truth for expanded/collapsed state.
-        // Never auto-expand based on cache size; only user action (show-more button)
-        // should expand, and it persists via localStorage.
+        // Read localStorage v2 key only — never respect old auto-expand key
         let savedExpandedState = false
         try {
-          savedExpandedState = localStorage.getItem(`ai-visibility-expanded-${projectId}`) === 'true'
+          savedExpandedState = localStorage.getItem(`ai-visibility-expanded-v2-${projectId}`) === 'true'
         } catch (e) {
           // localStorage may not be available
         }
