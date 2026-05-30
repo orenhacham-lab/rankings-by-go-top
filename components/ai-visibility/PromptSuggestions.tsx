@@ -16,6 +16,7 @@ import Badge from '@/components/ui/Badge'
 import { generatePromptSuggestions, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
 
 const INTENT_TONE: Record<string, 'info' | 'success' | 'warning' | 'neutral' | 'danger'> = {
   brand: 'info',
@@ -100,6 +101,35 @@ export default function PromptSuggestions({
 
   const chipLabel = (chip: string): string => {
     return t(chip as any) || chip
+  }
+
+  // Helper to preserve quality mapping from cached items (via intent)
+  function enrichCachedSuggestion(item: any): PromptSuggestion {
+    const intent = item?.intent || 'informational'
+    const meta = deriveSuggestionMeta(intent)
+    return {
+      id: item.id || `cached-${Math.random().toString(36).slice(2, 8)}`,
+      prompt: item.question,
+      intent: meta.intent,
+      intentLabel: meta.intent,
+      category: 'generic',
+      language: language || 'he',
+      qualityScore: meta.qualityScore,
+      confidenceTier: meta.confidenceTier,
+      reason: item.reason || '',
+      chips: [],
+      valueReason: '',
+    }
+  }
+
+  // Calculate quality distribution for logging
+  function analyzeQualityDistribution(items: PromptSuggestion[]): Record<string, number> {
+    const dist: Record<string, number> = { high: 0, good: 0, medium: 0 }
+    for (const item of items) {
+      const tier = item.confidenceTier || 'medium'
+      dist[tier] = (dist[tier] || 0) + 1
+    }
+    return dist
   }
 
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
@@ -188,7 +218,7 @@ export default function PromptSuggestions({
       alreadyAddedPromptsRef.current = new Set()
       setError(null)
       setIsLoadingSuggestions(true)
-      setSuggestions([])
+      // DO NOT clear suggestions here — keep previous list visible while loading
 
       // Fetch already-added prompts first
       fetchAlreadyAdded().then(() => {
@@ -214,34 +244,26 @@ export default function PromptSuggestions({
             const data = await response.json()
             const cachedRaw: Array<{ id?: string; question: string; intent?: string }> = data.cachedSuggestions || []
 
-            console.log('[AI_RECOMMENDED_MODAL_OPEN]', {
-              projectId,
-              cachedPoolSize: cachedRaw.length,
-              alreadyAdded: alreadyAddedPromptsRef.current.size,
-              language,
-              source: data.source,
-            })
-
-            // Convert cached questions to PromptSuggestion format and filter
+            // Filter and convert cached questions with proper quality mapping
             const convertedFromCache = cachedRaw
               .filter(q => {
                 const normalized = normalizePrompt(q.question)
                 // Exclude already-added prompts
                 return !alreadyAddedPromptsRef.current.has(normalized)
               })
-              .map((q, idx) => ({
-                id: q.id || `cached-${idx}`,
-                prompt: q.question,
-                intent: (q.intent || 'informational') as any,
-                intentLabel: '',
-                category: '' as any,
-                language: '',
-                qualityScore: 0,
-                confidenceTier: 'medium' as const,
-                reason: '',
-                chips: [],
-                valueReason: '',
-              } as PromptSuggestion))
+              .map(enrichCachedSuggestion)
+
+            const qualityDistribution = analyzeQualityDistribution(convertedFromCache)
+
+            console.log('[AI_RECOMMENDED_MODAL_OPEN]', {
+              projectId,
+              cachedPoolSize: cachedRaw.length,
+              alreadyAdded: alreadyAddedPromptsRef.current.size,
+              modalAvailableCount: convertedFromCache.length,
+              qualityDistribution,
+              language,
+              source: data.source,
+            })
 
             if (convertedFromCache.length > 0) {
               recordAndSet(convertedFromCache, convertedFromCache.length)
@@ -250,6 +272,7 @@ export default function PromptSuggestions({
               console.log('[AI_RECOMMENDED_MODAL_LOAD]', {
                 source: 'cache',
                 displayedCount: convertedFromCache.length,
+                qualityDistribution,
               })
               return
             }
@@ -257,6 +280,7 @@ export default function PromptSuggestions({
             // Cache is empty — fall back to generator
             console.log('[AI_RECOMMENDED_MODAL_CACHE_EMPTY]', {
               fallbackToGenerator: true,
+              alreadyAddedCount: alreadyAddedPromptsRef.current.size,
             })
 
             const produced = generatePromptSuggestions({
@@ -304,6 +328,7 @@ export default function PromptSuggestions({
   async function regenerate() {
     setRegenerating(true)
     setError(null)
+    const beforeCount = suggestions.length
     await new Promise((r) => setTimeout(r, 250))
 
     // Combine all exclusions: seen in this session + already added to project
@@ -335,30 +360,30 @@ export default function PromptSuggestions({
             const normalized = normalizePrompt(q.question)
             return !allExcluded.includes(normalized) && !alreadyAddedPromptsRef.current.has(normalized)
           })
-          .map((q, idx) => ({
-            id: q.id || `cached-${idx}`,
-            prompt: q.question,
-            intent: (q.intent || 'informational') as any,
-            intentLabel: '',
-            category: '' as any,
-            language: '',
-            qualityScore: 0,
-            confidenceTier: 'medium' as const,
-            reason: '',
-            chips: [],
-            valueReason: '',
-          } as PromptSuggestion))
+          .map(enrichCachedSuggestion)
 
         if (filtered.length > 0) {
           recordAndSet(filtered, filtered.length)
           setSelectedIds(new Set())
           setRegenerating(false)
+          const qualityDistAfter = analyzeQualityDistribution(filtered)
           console.log('[AI_RECOMMENDED_MODAL_REGENERATE]', {
             source: 'cache',
-            produced: filtered.length,
+            beforeCount,
+            afterCount: filtered.length,
+            cacheReturnedCount: cachedRaw.length,
+            cacheAvailableCount: filtered.length,
+            qualityDistribution: qualityDistAfter,
           })
           return
         }
+
+        // Cache returned suggestions but all were excluded (already added/seen)
+        console.log('[AI_RECOMMENDED_MODAL_REGENERATE_CACHE_ALL_EXCLUDED]', {
+          cacheReturnedCount: cachedRaw.length,
+          alreadyAdded: alreadyAddedPromptsRef.current.size,
+          alreadySeen: seenPromptsRef.current.size,
+        })
       }
     } catch (err) {
       console.log('[AI_RECOMMENDED_MODAL_REGENERATE_CACHE_ERROR]', {
@@ -366,7 +391,7 @@ export default function PromptSuggestions({
       })
     }
 
-    // Cache exhausted or error — fall back to generator
+    // Cache exhausted/unavailable or error — fall back to generator
     const produced = generatePromptSuggestions({
       businessName,
       domain,
@@ -380,13 +405,34 @@ export default function PromptSuggestions({
       previousSet: lastShownPromptsRef.current,
       recentlyUsedSecondaryCategories: Array.from(recentlyUsedSecondaryRef.current),
     })
+
+    const qualityDistAfter = analyzeQualityDistribution(produced)
+
+    if (produced.length === 0) {
+      // Generator also returned nothing — truly exhausted
+      console.log('[AI_RECOMMENDED_MODAL_REGENERATE_EMPTY]', {
+        source: 'generator',
+        beforeCount,
+        afterCount: 0,
+        fallbackCalled: true,
+        reasonIfEmpty: 'generator_exhausted',
+        alreadyAddedCount: alreadyAddedPromptsRef.current.size,
+      })
+      // Keep previous suggestions visible instead of clearing
+      setRegenerating(false)
+      return
+    }
+
     recordAndSet(produced, produced.length)
     setSelectedIds(new Set())
     setRegenerating(false)
 
     console.log('[AI_RECOMMENDED_MODAL_REGENERATE]', {
       source: 'generator',
-      produced: produced.length,
+      beforeCount,
+      afterCount: produced.length,
+      fallbackCalled: true,
+      qualityDistribution: qualityDistAfter,
     })
   }
 
