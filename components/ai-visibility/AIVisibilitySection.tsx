@@ -1795,6 +1795,9 @@ export default function AIVisibilitySection({
               // localStorage unavailable
             }
 
+            const showMoreButtonVisible = availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && !showAllSmartQuestions
+            const showLessButtonVisible = availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && showAllSmartQuestions
+
             console.log('[AI_SUGGESTIONS_RENDER]', {
               allInState: suggestedQuestions.length,
               availableSuggestions: availableSuggestions.length,
@@ -1803,8 +1806,9 @@ export default function AIVisibilitySection({
               localStorageValue,
               expandedStateSource,
               isCollapsed,
-              showMoreButtonVisible: availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && isCollapsed,
               visibleSliced: visibleSliced.length,
+              showMoreButtonVisible,
+              showLessButtonVisible,
               collapsedLimit: COLLAPSED_VISIBLE_SUGGESTIONS,
             })
 
@@ -1894,22 +1898,28 @@ export default function AIVisibilitySection({
                     />
                   ))}
                 </div>
-                {availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && !showAllSmartQuestions && (
+                {availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && (
                   <div className="text-center mt-4">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setShowAllSmartQuestions(true)
+                        const newExpandedState = !showAllSmartQuestions
+                        setShowAllSmartQuestions(newExpandedState)
                         try {
-                          // Set v2 key only on user-explicit click
-                          localStorage.setItem(`ai-visibility-expanded-v2-${projectId}`, 'true')
+                          if (newExpandedState) {
+                            // User clicked show-more: expand and save v2 key
+                            localStorage.setItem(`ai-visibility-expanded-v2-${projectId}`, 'true')
+                          } else {
+                            // User clicked show-less: collapse and clear v2 key
+                            localStorage.removeItem(`ai-visibility-expanded-v2-${projectId}`)
+                          }
                         } catch (e) {
                           // localStorage may be unavailable
                         }
                       }}
                     >
-                      {t('show_more')}
+                      {showAllSmartQuestions ? t('show_less') : t('show_more')}
                     </Button>
                   </div>
                 )}
