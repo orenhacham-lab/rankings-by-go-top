@@ -586,18 +586,29 @@ export async function POST(request: Request) {
             readContextHash: contextHashForLoad,
             contextHashMatches: cacheWriteResult.contextHash === contextHashForLoad,
           })
-        }
 
-        // Add to cached list for response
-        cachedSuggestions.push(
-          ...newSuggestions.map(s => ({
-            id: `generated-${Date.now()}-${Math.random()}`,
-            question: s.question,
-            intent: s.intent,
-            model_used: s.model_used || null,
-            created_at: new Date().toISOString()
-          }))
-        )
+          // PHASE 2 FIX: Reload cache after write to ensure we only return persisted questions
+          // This guarantees that displayed recommendations are stable across refresh
+          const reloadedCachedSuggestions = await loadCachedSuggestions({
+            projectId,
+            language,
+            country,
+            businessCategory,
+            keywordsHash: null
+          })
+
+          console.log('[enriched-suggestions] Cache reloaded after Gemini write', {
+            beforeReload: cachedSuggestions.length,
+            afterReload: reloadedCachedSuggestions.length,
+            newQuestionsWritten: newSuggestions.length,
+            contextHash: contextHashForLoad,
+          })
+
+          // Replace cachedSuggestions with freshly loaded cache
+          // This ensures final dedup operates on persisted data only
+          cachedSuggestions = reloadedCachedSuggestions
+          newSuggestions = [] // Clear newSuggestions; they're now in cachedSuggestions after reload
+        }
       }
     } else {
       source = cachedSuggestions.length > 0 ? 'vNext+cache' : 'vNext'

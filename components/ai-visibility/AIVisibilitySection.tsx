@@ -201,6 +201,8 @@ export default function AIVisibilitySection({
   // Set to true when "Generate more" produced zero new suggestions. Cleared
   // when the profile changes or another generate-more attempt is made.
   const [noNewSuggestionsFound, setNoNewSuggestionsFound] = useState(false)
+  // Track previous server pool count to detect shrinkage across requests
+  const [previousServerPoolCount, setPreviousServerPoolCount] = useState(0)
   const [scanningKey, setScanningKey] = useState<string | null>(null)
   const [scanProgress, setScanProgress] = useState<number>(0)
   const [manualProfile, setManualProfile] = useState<ManualAIProfile | null>(null)
@@ -554,6 +556,19 @@ export default function AIVisibilitySection({
           geminiWasCalled: false,
         })
 
+        // PHASE 2: Detect pool shrinkage for warning logs
+        const currentServerPoolCount = serverDedupedQuestions.length
+        if (previousServerPoolCount > 0 && currentServerPoolCount < previousServerPoolCount) {
+          console.warn('[AI_SUGGESTIONS_POOL_SHRINK_WARNING]', {
+            projectId,
+            contextHash: data.contextHash || '(not returned)',
+            previousCount: previousServerPoolCount,
+            currentCount: currentServerPoolCount,
+            shrinkageCount: previousServerPoolCount - currentServerPoolCount,
+            percentChange: Math.round(((currentServerPoolCount - previousServerPoolCount) / previousServerPoolCount) * 100),
+          })
+        }
+
         // Read localStorage v2 key only — never respect old auto-expand key
         let savedExpandedState = false
         try {
@@ -565,6 +580,18 @@ export default function AIVisibilitySection({
         if (!cancelled) {
           setSuggestedQuestions(merged)
           setShowAllSmartQuestions(savedExpandedState)
+          setPreviousServerPoolCount(currentServerPoolCount)
+
+          console.log('[AI_SUGGESTIONS_CLIENT_SERVER_RECONCILE]', {
+            projectId,
+            contextHash: data.contextHash || '(not returned)',
+            serverDedupedCount: currentServerPoolCount,
+            clientMergedCount: merged.length,
+            vNextCount: vNextFiltered.length,
+            cachedInServer: cachedDisplayedCount,
+            geminiWasCalled: false,
+            persistenceSource: 'server_cache_write',
+          })
 
           console.log('[AI_SUGGESTIONS_STATE_SET]', {
             suggestedQuestionsCount: merged.length,
@@ -971,6 +998,20 @@ export default function AIVisibilitySection({
           newGeminiCount = geminiItemsInDedup // Track count of gemini items that survived server dedup
 
           // Log metrics from API
+          console.log('[AI_SUGGESTIONS_SERVER_POOL_RESPONSE]', {
+            projectId,
+            contextHash,
+            apiDedupedCount: apiDedupedQuestions.length,
+            cachedInDedup: cachedItemsInDedup,
+            geminiInDedup: geminiItemsInDedup,
+            vNextInDedup: vNextItemsInDedup,
+            unknownInDedup: unknownItemsInDedup,
+            geminiWasCalled,
+            duplicatesRemovedByApi: enrichData.duplicatesRemoved || 0,
+            persistenceMethod: 'server_cache_write_reload',
+            apiSource: enrichData.source || 'unknown',
+          })
+
           console.log('[AIVisibility-refreshSuggestions] API dedup metrics', {
             apiDedupedCount: apiDedupedQuestions.length,
             cachedInDedup: cachedItemsInDedup,
@@ -1143,6 +1184,20 @@ export default function AIVisibilitySection({
         const visibleAfter = finalDeduped.length
         const growth = visibleAfter - visibleBefore
 
+        // PHASE 2: Detect pool shrinkage for warning logs
+        const currentServerPoolCount = apiDedupedQuestions.length
+        if (previousServerPoolCount > 0 && currentServerPoolCount < previousServerPoolCount) {
+          console.warn('[AI_SUGGESTIONS_POOL_SHRINK_WARNING]', {
+            projectId,
+            contextHash,
+            previousCount: previousServerPoolCount,
+            currentCount: currentServerPoolCount,
+            shrinkageCount: previousServerPoolCount - currentServerPoolCount,
+            percentChange: Math.round(((currentServerPoolCount - previousServerPoolCount) / previousServerPoolCount) * 100),
+            geminiWasCalled,
+          })
+        }
+
         // Update exclusion ledger
         setExcludedSuggestionKeys((prev) => {
           const next = new Set(prev)
@@ -1151,6 +1206,19 @@ export default function AIVisibilitySection({
         })
 
         setSuggestedQuestions(finalDeduped)
+        setPreviousServerPoolCount(currentServerPoolCount)
+
+        // Log server-to-client reconciliation
+        console.log('[AI_SUGGESTIONS_CLIENT_SERVER_RECONCILE]', {
+          projectId,
+          contextHash,
+          serverDedupedCount: currentServerPoolCount,
+          clientMergedCount: finalDeduped.length,
+          cachedInServer: cachedLoadedCount,
+          geminiInServer: newGeminiCount,
+          geminiWasCalled,
+          persistenceSource: 'server_cache_write',
+        })
 
         // Safe text extraction for metrics logging
         const normalize = (text?: string | null): string => {
@@ -1269,6 +1337,7 @@ export default function AIVisibilitySection({
     suggestedQuestions,
     allPrompts,
     excludedSuggestionKeys,
+    previousServerPoolCount,
   ])
 
   const dedupedAllResults = useMemo(() => {
