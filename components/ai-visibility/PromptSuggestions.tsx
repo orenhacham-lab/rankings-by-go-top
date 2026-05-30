@@ -109,13 +109,7 @@ export default function PromptSuggestions({
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Initial-load tracker — separate from `regenerating`. Distinguishes
-  // "still loading suggestions" from "loaded with zero results" so the
-  // "all added" empty state never shows during the initial fetch.
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
-  // Show-more pagination — start with 4 items, expand on click.
-  const [showAllSuggestions, setShowAllSuggestions] = useState(false)
-  const INITIAL_SUGGESTIONS = 4
 
   // Session memory: every prompt shown in any past regenerate (avoid repeats),
   // the *last* shown set (never echo the previous set exactly),
@@ -185,7 +179,7 @@ export default function PromptSuggestions({
     setSuggestions(produced)
   }
 
-  // Generate fresh suggestions when modal opens
+  // Fetch full cached pool when modal opens, fall back to generator only if cache exhausted
   useEffect(() => {
     if (open) {
       seenPromptsRef.current = new Set()
@@ -194,27 +188,114 @@ export default function PromptSuggestions({
       alreadyAddedPromptsRef.current = new Set()
       setError(null)
       setIsLoadingSuggestions(true)
-      setShowAllSuggestions(false)
       setSuggestions([])
 
       // Fetch already-added prompts first
       fetchAlreadyAdded().then(() => {
-        const produced = generatePromptSuggestions({
-          businessName,
-          domain,
-          city,
-          country,
-          language,
-          keywords,
-          manualProfile,
-          diversify: true,
-          limit: 6,
-          // Exclude already-added prompts from suggestions
-          excludePrompts: Array.from(alreadyAddedPromptsRef.current),
-        })
-        recordAndSet(produced, 6)
-        setSelectedIds(new Set())
-        setIsLoadingSuggestions(false)
+        // Try to fetch cached pool from server
+        ;(async () => {
+          try {
+            const response = await fetch('/api/ai-visibility/enriched-suggestions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                projectId,
+                language: language || undefined,
+                country: country || undefined,
+                businessCategory: null,
+                cacheOnly: true,
+              }),
+            })
+
+            if (!response.ok) {
+              throw new Error('Cache fetch failed')
+            }
+
+            const data = await response.json()
+            const cachedRaw: Array<{ id?: string; question: string; intent?: string }> = data.cachedSuggestions || []
+
+            console.log('[AI_RECOMMENDED_MODAL_OPEN]', {
+              projectId,
+              cachedPoolSize: cachedRaw.length,
+              alreadyAdded: alreadyAddedPromptsRef.current.size,
+              language,
+              source: data.source,
+            })
+
+            // Convert cached questions to PromptSuggestion format and filter
+            const convertedFromCache = cachedRaw
+              .filter(q => {
+                const normalized = normalizePrompt(q.question)
+                // Exclude already-added prompts
+                return !alreadyAddedPromptsRef.current.has(normalized)
+              })
+              .map((q, idx) => ({
+                id: q.id || `cached-${idx}`,
+                prompt: q.question,
+                intent: (q.intent || 'informational') as any,
+                intentLabel: '',
+                category: '' as any,
+                language: '',
+                qualityScore: 0,
+                confidenceTier: 'medium' as const,
+                reason: '',
+                chips: [],
+                valueReason: '',
+              } as PromptSuggestion))
+
+            if (convertedFromCache.length > 0) {
+              recordAndSet(convertedFromCache, convertedFromCache.length)
+              setSelectedIds(new Set())
+              setIsLoadingSuggestions(false)
+              console.log('[AI_RECOMMENDED_MODAL_LOAD]', {
+                source: 'cache',
+                displayedCount: convertedFromCache.length,
+              })
+              return
+            }
+
+            // Cache is empty — fall back to generator
+            console.log('[AI_RECOMMENDED_MODAL_CACHE_EMPTY]', {
+              fallbackToGenerator: true,
+            })
+
+            const produced = generatePromptSuggestions({
+              businessName,
+              domain,
+              city,
+              country,
+              language,
+              keywords,
+              manualProfile,
+              diversify: true,
+              excludePrompts: Array.from(alreadyAddedPromptsRef.current),
+            })
+            recordAndSet(produced, produced.length)
+            setSelectedIds(new Set())
+            setIsLoadingSuggestions(false)
+          } catch (err) {
+            console.log('[AI_RECOMMENDED_MODAL_FETCH_ERROR]', {
+              error: err instanceof Error ? err.message : String(err),
+              fallbackToGenerator: true,
+            })
+
+            // Fallback to generator on any error
+            const produced = generatePromptSuggestions({
+              businessName,
+              domain,
+              city,
+              country,
+              language,
+              keywords,
+              manualProfile,
+              diversify: true,
+              excludePrompts: Array.from(alreadyAddedPromptsRef.current),
+            })
+            recordAndSet(produced, produced.length)
+            setSelectedIds(new Set())
+            setIsLoadingSuggestions(false)
+          }
+        })()
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -230,6 +311,62 @@ export default function PromptSuggestions({
       Array.from(alreadyAddedPromptsRef.current)
     )
 
+    // Try fresh cache fetch first
+    try {
+      const response = await fetch('/api/ai-visibility/enriched-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          language: language || undefined,
+          country: country || undefined,
+          businessCategory: null,
+          cacheOnly: true,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const cachedRaw: Array<{ id?: string; question: string; intent?: string }> = data.cachedSuggestions || []
+
+        // Filter: exclude seen, excluded, and duplicates
+        const filtered = cachedRaw
+          .filter(q => {
+            const normalized = normalizePrompt(q.question)
+            return !allExcluded.includes(normalized) && !alreadyAddedPromptsRef.current.has(normalized)
+          })
+          .map((q, idx) => ({
+            id: q.id || `cached-${idx}`,
+            prompt: q.question,
+            intent: (q.intent || 'informational') as any,
+            intentLabel: '',
+            category: '' as any,
+            language: '',
+            qualityScore: 0,
+            confidenceTier: 'medium' as const,
+            reason: '',
+            chips: [],
+            valueReason: '',
+          } as PromptSuggestion))
+
+        if (filtered.length > 0) {
+          recordAndSet(filtered, filtered.length)
+          setSelectedIds(new Set())
+          setRegenerating(false)
+          console.log('[AI_RECOMMENDED_MODAL_REGENERATE]', {
+            source: 'cache',
+            produced: filtered.length,
+          })
+          return
+        }
+      }
+    } catch (err) {
+      console.log('[AI_RECOMMENDED_MODAL_REGENERATE_CACHE_ERROR]', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+
+    // Cache exhausted or error — fall back to generator
     const produced = generatePromptSuggestions({
       businessName,
       domain,
@@ -242,12 +379,15 @@ export default function PromptSuggestions({
       excludePrompts: allExcluded,
       previousSet: lastShownPromptsRef.current,
       recentlyUsedSecondaryCategories: Array.from(recentlyUsedSecondaryRef.current),
-      limit: 6,
     })
-    recordAndSet(produced, 6)
+    recordAndSet(produced, produced.length)
     setSelectedIds(new Set())
-    setShowAllSuggestions(false)
     setRegenerating(false)
+
+    console.log('[AI_RECOMMENDED_MODAL_REGENERATE]', {
+      source: 'generator',
+      produced: produced.length,
+    })
   }
 
   function toggleSelect(id: string) {
@@ -395,7 +535,7 @@ export default function PromptSuggestions({
           </div>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-            {(showAllSuggestions ? suggestions : suggestions.slice(0, INITIAL_SUGGESTIONS)).map((s) => {
+            {suggestions.map((s) => {
               const checked = selectedIds.has(s.id)
               const isEditing = editingId === s.id
               return (
@@ -487,17 +627,6 @@ export default function PromptSuggestions({
                 </div>
               )
             })}
-            {!showAllSuggestions && suggestions.length > INITIAL_SUGGESTIONS && (
-              <div className="text-center pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAllSuggestions(true)}
-                >
-                  {t('show_more')}
-                </Button>
-              </div>
-            )}
           </div>
         )}
 
