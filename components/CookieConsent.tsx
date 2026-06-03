@@ -60,16 +60,16 @@ export function CookieConsent() {
       dir={isEnglish ? 'ltr' : 'rtl'}
       role="dialog"
       aria-label={content.title}
-      className="fixed inset-x-4 bottom-[88px] z-[58] mx-auto w-[calc(100vw-32px)] max-w-sm sm:inset-x-auto sm:bottom-6 sm:left-6 sm:right-auto sm:mx-0 sm:w-auto"
+      className="fixed inset-x-3 bottom-[82px] z-[58] mx-auto w-[calc(100vw-24px)] max-w-[380px] sm:inset-x-auto sm:bottom-6 sm:left-6 sm:right-auto sm:mx-0 sm:w-[420px] sm:max-w-[420px]"
     >
-      <div className="rounded-2xl border border-white/10 bg-[#0b1f3a] p-5 text-white shadow-2xl ring-1 ring-black/20 sm:p-6">
+      <div className="rounded-[22px] border border-white/10 bg-[#0b1f3a] p-4 text-white shadow-2xl ring-1 ring-black/20 sm:p-5">
         <div className="flex items-start gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-base sm:h-10 sm:w-10">
             🍪
           </div>
           <div className="flex-1">
-            <h2 className="text-base font-bold leading-tight sm:text-lg">{content.title}</h2>
-            <p className="mt-1 text-xs leading-snug text-slate-300 sm:text-sm">
+            <h2 className="text-[16px] font-bold leading-tight sm:text-[17px]">{content.title}</h2>
+            <p className="mt-1 text-[13px] leading-[1.5] text-slate-300 sm:text-[13px]">
               {content.message}{' '}
               <Link
                 href={privacyLink}
@@ -82,7 +82,7 @@ export function CookieConsent() {
         </div>
         <button
           onClick={handleAccept}
-          className="mt-3 w-full rounded-xl bg-blue-600 px-6 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50 sm:mt-4 sm:py-2.5 sm:text-sm"
+          className="mt-3 flex h-11 w-full items-center justify-center rounded-2xl bg-blue-600 px-6 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-blue-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50"
         >
           {content.buttonLabel}
         </button>
