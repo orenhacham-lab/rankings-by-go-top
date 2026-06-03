@@ -61,19 +61,19 @@ export function CookieConsent() {
       aria-label={content.title}
       style={{
         position: 'fixed',
-        bottom: isMobile ? '86px' : '20px',
-        left: isMobile ? '14px' : '20px',
-        right: isMobile ? '14px' : 'auto',
+        bottom: isMobile ? '82px' : '20px',
+        left: isMobile ? '16px' : '20px',
+        right: isMobile ? '16px' : 'auto',
         zIndex: 58,
-        width: isMobile ? 'calc(100vw - 28px)' : '340px',
-        maxWidth: isMobile ? '330px' : '340px',
+        width: isMobile ? 'calc(100vw - 32px)' : '360px',
+        maxWidth: isMobile ? '300px' : '360px',
         margin: isMobile ? '0 auto' : '0',
       }}
     >
       <div
         style={{
-          borderRadius: '16px',
-          padding: '14px 16px',
+          borderRadius: isMobile ? '14px' : '16px',
+          padding: isMobile ? '12px' : '14px 16px',
           backgroundColor: '#0b1f3a',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
@@ -84,20 +84,20 @@ export function CookieConsent() {
           style={{
             display: 'flex',
             alignItems: 'flex-start',
-            gap: '10px',
+            gap: isMobile ? '7px' : '10px',
           }}
         >
           <div
             style={{
               display: 'flex',
-              width: '30px',
-              height: '30px',
+              width: isMobile ? '24px' : '30px',
+              height: isMobile ? '24px' : '30px',
               flexShrink: 0,
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '50%',
               backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              fontSize: '14px',
+              fontSize: isMobile ? '12px' : '14px',
             }}
           >
             🍪
@@ -105,9 +105,9 @@ export function CookieConsent() {
           <div style={{ flex: 1 }}>
             <h2
               style={{
-                fontSize: '15px',
+                fontSize: isMobile ? '14px' : '15px',
                 fontWeight: 'bold',
-                lineHeight: '1.25',
+                lineHeight: isMobile ? '1.2' : '1.25',
                 marginBottom: '4px',
                 marginTop: 0,
               }}
@@ -116,8 +116,8 @@ export function CookieConsent() {
             </h2>
             <p
               style={{
-                fontSize: '12px',
-                lineHeight: '1.4',
+                fontSize: isMobile ? '11px' : '12px',
+                lineHeight: isMobile ? '1.35' : '1.45',
                 color: '#cbd5e1',
                 margin: 0,
               }}
@@ -135,14 +135,14 @@ export function CookieConsent() {
         <button
           onClick={handleAccept}
           style={{
-            marginTop: '10px',
+            marginTop: isMobile ? '8px' : '10px',
             width: '100%',
-            height: isMobile ? '38px' : '36px',
+            height: isMobile ? '34px' : '38px',
             backgroundColor: '#2563eb',
             color: 'white',
             border: 'none',
-            borderRadius: '12px',
-            fontSize: '14px',
+            borderRadius: isMobile ? '10px' : '12px',
+            fontSize: isMobile ? '13px' : '14px',
             fontWeight: 'bold',
             cursor: 'pointer',
             transition: 'background-color 0.2s',
