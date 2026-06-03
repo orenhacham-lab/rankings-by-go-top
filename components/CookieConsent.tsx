@@ -36,11 +36,11 @@ export function CookieConsent() {
       aria-label={isEnglish ? 'Privacy notice' : 'הודעת פרטיות'}
     >
       {/* MOBILE ONLY — ultra compact: 240px width, 26px button, 10px text */}
-      <div className="fixed bottom-[88px] left-[14px] z-[58] w-[240px] max-w-[240px] rounded-[12px] border border-white/10 bg-[#0b1f3a] sm:hidden" style={{ padding: '6px 10px 8px 10px', boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
-        <h2 className="m-0 text-center text-[12px] font-bold leading-[1.1]">
+      <div className="fixed bottom-[88px] left-[14px] z-[58] w-[240px] max-w-[240px] rounded-[12px] border border-white/10 bg-[#0b1f3a] sm:hidden" style={{ padding: '2px 10px 8px 10px', boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
+        <h2 className="m-0 p-0 text-center text-[12px] font-bold leading-[1]">
           {isEnglish ? 'Privacy & cookies' : 'פרטיות וקוקיז'}
         </h2>
-        <p className="m-0 mb-[6px] text-center text-[10px] leading-[1.2] text-slate-300">
+        <p className="m-0 p-0 mb-[2px] text-center text-[10px] leading-[1.15] text-slate-300">
           {isEnglish
             ? 'We use cookies. Continued use constitutes consent to the'
             : 'אנחנו משתמשים בעוגיות. המשך שימוש מהווה הסכמה ל'}
@@ -56,7 +56,7 @@ export function CookieConsent() {
         <button
           onClick={handleAccept}
           className="w-full rounded-[8px] bg-blue-600 px-2 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50"
-          style={{ height: '26px' }}
+          style={{ height: '26px', marginTop: '2px' }}
         >
           {isEnglish ? 'Accept' : 'אישור'}
         </button>
