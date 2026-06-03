@@ -93,9 +93,8 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
             <Image
               src="/gotop-primary.png"
               alt="Go Top"
-              width={135}
-              height={54}
-              sizes="(max-width: 640px) 72px, 96px"
+              width={270}
+              height={108}
               className="h-[72px] lg:h-24 w-auto group-hover:opacity-80 transition-opacity"
               priority
             />

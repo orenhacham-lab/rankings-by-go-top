@@ -1,15 +1,7 @@
 import type { Metadata } from 'next'
-import { Rubik } from 'next/font/google'
 import './globals.css'
 import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
-
-const rubik = Rubik({
-  subsets: ['hebrew', 'latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  display: 'swap',
-  preload: true,
-})
 
 export const metadata: Metadata = {
   title: 'מעקב מיקומים בגוגל ונראות ב-AI - Rankings by Go Top',
@@ -47,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="he" dir="rtl" className="h-full" suppressHydrationWarning style={{ fontFamily: rubik.style.fontFamily }}>
+    <html lang="he" dir="rtl" className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
@@ -75,6 +67,13 @@ export default function RootLayout({
 
         {/* Google Tag Manager Script */}
         <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
         {/* JSON-LD Schema for SEO */}
         <script
           type="application/ld+json"
