@@ -189,24 +189,24 @@ export function AccessibilityWidget() {
         aria-haspopup="dialog"
         className="fixed left-3 top-1/2 z-[60] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white ring-1 ring-white/10 backdrop-blur transition-all duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 focus-visible:opacity-90"
         style={{
-          background: 'rgba(59, 130, 246, 0.12)',
-          opacity: 0.4,
+          background: 'rgba(59, 130, 246, 0.2)',
+          opacity: 0.5,
           boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           border: '1px solid rgba(255,255,255,0.1)',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = '0.85'
-          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.18)'
+          e.currentTarget.style.opacity = '0.92'
+          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.26)'
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = '0.4'
-          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.12)'
+          e.currentTarget.style.opacity = '0.5'
+          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'
         }}
         onFocus={(e) => {
-          e.currentTarget.style.opacity = '0.9'
+          e.currentTarget.style.opacity = '0.95'
         }}
         onBlur={(e) => {
-          e.currentTarget.style.opacity = '0.4'
+          e.currentTarget.style.opacity = '0.5'
         }}
       >
         <svg viewBox="0 0 24 24" className="h-7 w-7 fill-current" aria-hidden="true">
