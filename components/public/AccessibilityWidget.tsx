@@ -179,7 +179,7 @@ export function AccessibilityWidget() {
 
   return (
     <>
-      {/* Trigger — left-middle, gentle transparency until hovered (more subtle on mobile) */}
+      {/* Trigger — left-middle, frosted glass overlay (very subtle, nearly transparent) */}
       <button
         ref={buttonRef}
         type="button"
@@ -187,7 +187,27 @@ export function AccessibilityWidget() {
         aria-label="פתיחת תפריט נגישות"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="fixed left-3 top-1/2 z-[60] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-blue-600/45 text-white shadow-md ring-1 ring-white/20 backdrop-blur transition-all duration-200 hover:bg-blue-600/90 hover:opacity-100 focus:outline-none focus-visible:opacity-100 focus-visible:ring-4 focus-visible:ring-blue-300 active:opacity-100 opacity-50 sm:h-12 sm:w-12 sm:bg-blue-600/60 sm:opacity-60"
+        className="fixed left-3 top-1/2 z-[60] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white ring-1 ring-white/10 backdrop-blur transition-all duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 focus-visible:opacity-90"
+        style={{
+          background: 'rgba(59, 130, 246, 0.12)',
+          opacity: 0.4,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          border: '1px solid rgba(255,255,255,0.1)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '0.85'
+          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.18)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0.4'
+          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.12)'
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.opacity = '0.9'
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.opacity = '0.4'
+        }}
       >
         <svg viewBox="0 0 24 24" className="h-7 w-7 fill-current" aria-hidden="true">
           <path d="M12 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm8 5.5c0 .6-.4 1-1 1-1.9.3-3.8.5-5 .6V12l1.8 6.3a1 1 0 0 1-1.9.6L12 14.5l-1.9 4.4a1 1 0 0 1-1.9-.6L10 12V9.1c-1.2-.1-3.1-.3-5-.6a1 1 0 0 1 .3-2c2.4.4 5 .6 6.7.6 1.7 0 4.3-.2 6.7-.6.6-.1 1.1.4 1.3 1Z" />
