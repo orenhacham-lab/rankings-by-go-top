@@ -36,7 +36,7 @@ export function CookieConsent() {
       aria-label={isEnglish ? 'Privacy notice' : 'הודעת פרטיות'}
     >
       {/* MOBILE ONLY — ultra compact: 240px width, 26px button, 10px text */}
-      <div className="fixed bottom-[88px] left-1/2 z-[58] w-[240px] max-w-[240px] -translate-x-1/2 rounded-[12px] border border-white/10 bg-[#0b1f3a] p-[8px_10px] sm:hidden" style={{ boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
+      <div className="fixed bottom-[88px] left-[14px] z-[58] w-[240px] max-w-[240px] rounded-[12px] border border-white/10 bg-[#0b1f3a] sm:hidden" style={{ padding: '6px 10px 8px 10px', boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
         <h2 className="m-0 text-center text-[12px] font-bold leading-[1.1]">
           {isEnglish ? 'Privacy & cookies' : 'פרטיות וקוקיז'}
         </h2>
