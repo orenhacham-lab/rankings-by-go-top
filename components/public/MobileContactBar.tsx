@@ -17,7 +17,7 @@ export function MobileContactBar() {
       role="region"
       aria-label="אזור יצירת קשר"
     >
-      <div className="flex w-full items-stretch gap-2 border-t border-white/10 bg-slate-900/95 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-slate-900/85">
+      <div className="flex w-full items-stretch gap-3 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <a
           href={WHATSAPP_HELP_URL}
           target="_blank"

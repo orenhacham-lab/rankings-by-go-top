@@ -13,7 +13,7 @@ export function CookieConsent() {
   const isEnglish = pathname?.startsWith('/en')
   const privacyLink = isEnglish ? '/en/privacy' : '/privacy'
 
-  const content = isEnglish
+  const desktopContent = isEnglish
     ? {
         title: 'We value your privacy',
         message:
@@ -28,6 +28,22 @@ export function CookieConsent() {
         privacyLabel: 'מדיניות הפרטיות',
         buttonLabel: 'אישור',
       }
+
+  const mobileContent = isEnglish
+    ? {
+        title: 'Your privacy matters',
+        message: 'We use cookies. Continued use constitutes consent per',
+        privacyLabel: 'Privacy Policy',
+        buttonLabel: 'Accept',
+      }
+    : {
+        title: 'הפרטיות שלך חשובה לנו',
+        message: 'אנחנו משתמשים בעוגיות. המשך השימוש באתר מהווה הסכמה בהתאם ל',
+        privacyLabel: 'מדיניות הפרטיות',
+        buttonLabel: 'אישור',
+      }
+
+  const content = isMobile ? mobileContent : desktopContent
 
   useEffect(() => {
     setIsClient(true)
@@ -61,53 +77,91 @@ export function CookieConsent() {
       aria-label={content.title}
       style={{
         position: 'fixed',
-        bottom: isMobile ? '82px' : '20px',
-        left: isMobile ? '16px' : '20px',
-        right: isMobile ? '16px' : 'auto',
+        bottom: isMobile ? '84px' : '20px',
+        left: isMobile ? '50%' : '20px',
+        transform: isMobile ? 'translateX(-50%)' : 'none',
         zIndex: 58,
-        width: isMobile ? 'calc(100vw - 32px)' : '360px',
-        maxWidth: isMobile ? '300px' : '360px',
-        margin: isMobile ? '0 auto' : '0',
+        width: isMobile ? 'calc(100vw - 40px)' : '360px',
+        maxWidth: isMobile ? '270px' : '360px',
+        margin: 0,
       }}
     >
       <div
         style={{
-          borderRadius: isMobile ? '14px' : '16px',
-          padding: isMobile ? '12px' : '14px 16px',
+          borderRadius: isMobile ? '12px' : '16px',
+          padding: isMobile ? '10px 12px' : '14px 16px',
           backgroundColor: '#0b1f3a',
           border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+          boxShadow: isMobile
+            ? '0 4px 12px rgba(0, 0, 0, 0.15)'
+            : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
           color: 'white',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: isMobile ? '7px' : '10px',
-          }}
-        >
+        {!isMobile && (
           <div
             style={{
               display: 'flex',
-              width: isMobile ? '24px' : '30px',
-              height: isMobile ? '24px' : '30px',
-              flexShrink: 0,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              fontSize: isMobile ? '12px' : '14px',
+              alignItems: 'flex-start',
+              gap: '10px',
+              marginBottom: 0,
             }}
           >
-            🍪
+            <div
+              style={{
+                display: 'flex',
+                width: '30px',
+                height: '30px',
+                flexShrink: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                fontSize: '14px',
+              }}
+            >
+              🍪
+            </div>
+            <div style={{ flex: 1 }}>
+              <h2
+                style={{
+                  fontSize: '15px',
+                  fontWeight: 'bold',
+                  lineHeight: '1.25',
+                  marginBottom: '4px',
+                  marginTop: 0,
+                }}
+              >
+                {content.title}
+              </h2>
+              <p
+                style={{
+                  fontSize: '12px',
+                  lineHeight: '1.45',
+                  color: '#cbd5e1',
+                  margin: 0,
+                  marginBottom: '10px',
+                }}
+              >
+                {content.message}{' '}
+                <Link
+                  href={privacyLink}
+                  className="font-medium text-blue-300 underline underline-offset-2 hover:text-blue-200"
+                >
+                  {content.privacyLabel}
+                </Link>
+              </p>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
+        )}
+
+        {isMobile && (
+          <div>
             <h2
               style={{
-                fontSize: isMobile ? '14px' : '15px',
+                fontSize: '13px',
                 fontWeight: 'bold',
-                lineHeight: isMobile ? '1.2' : '1.25',
+                lineHeight: '1.15',
                 marginBottom: '4px',
                 marginTop: 0,
               }}
@@ -116,10 +170,11 @@ export function CookieConsent() {
             </h2>
             <p
               style={{
-                fontSize: isMobile ? '11px' : '12px',
-                lineHeight: isMobile ? '1.35' : '1.45',
+                fontSize: '11px',
+                lineHeight: '1.3',
                 color: '#cbd5e1',
                 margin: 0,
+                marginBottom: '8px',
               }}
             >
               {content.message}{' '}
@@ -131,21 +186,23 @@ export function CookieConsent() {
               </Link>
             </p>
           </div>
-        </div>
+        )}
+
         <button
           onClick={handleAccept}
           style={{
-            marginTop: isMobile ? '8px' : '10px',
+            marginTop: isMobile ? 0 : '10px',
             width: '100%',
-            height: isMobile ? '34px' : '38px',
+            height: isMobile ? '30px' : '38px',
             backgroundColor: '#2563eb',
             color: 'white',
             border: 'none',
-            borderRadius: isMobile ? '10px' : '12px',
-            fontSize: isMobile ? '13px' : '14px',
+            borderRadius: isMobile ? '9px' : '12px',
+            fontSize: isMobile ? '12px' : '14px',
             fontWeight: 'bold',
             cursor: 'pointer',
             transition: 'background-color 0.2s',
+            paddingInline: isMobile ? '14px' : 0,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = '#1d4ed8'
