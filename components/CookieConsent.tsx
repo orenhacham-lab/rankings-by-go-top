@@ -8,44 +8,9 @@ export function CookieConsent() {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(false)
   const [isClient, setIsClient] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
 
   const isEnglish = pathname?.startsWith('/en')
   const privacyLink = isEnglish ? '/en/privacy' : '/privacy'
-
-  const desktop = isEnglish
-    ? {
-        title: 'We value your privacy',
-        before:
-          'We use cookies to improve your browsing experience. By continuing to use this site, you agree to our',
-        link: 'Privacy Policy',
-        after: '',
-        button: 'Accept',
-      }
-    : {
-        title: 'אנחנו מכבדים את הפרטיות שלך',
-        before:
-          'אנו משתמשים בעוגיות כדי לשפר את חוויית הגלישה. המשך השימוש באתר מהווה הסכמה לשימוש בהן בהתאם ל',
-        link: 'מדיניות הפרטיות',
-        after: '',
-        button: 'אישור',
-      }
-
-  const mobile = isEnglish
-    ? {
-        title: 'Your privacy matters',
-        before: 'We use cookies. Continued use constitutes consent to the',
-        link: 'Privacy Policy',
-        after: '.',
-        button: 'Accept',
-      }
-    : {
-        title: 'הפרטיות שלך חשובה לנו',
-        before: 'אנחנו משתמשים בעוגיות. המשך השימוש מהווה הסכמה ל',
-        link: 'מדיניות הפרטיות',
-        after: '.',
-        button: 'אישור',
-      }
 
   useEffect(() => {
     setIsClient(true)
@@ -53,14 +18,6 @@ export function CookieConsent() {
     if (!hasAccepted) {
       setIsVisible(true)
     }
-
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 640)
-    }
-
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   const handleAccept = () => {
@@ -72,156 +29,71 @@ export function CookieConsent() {
     return null
   }
 
-  const c = isMobile ? mobile : desktop
-
   return (
     <div
       dir={isEnglish ? 'ltr' : 'rtl'}
       role="dialog"
-      aria-label={c.title}
-      style={{
-        position: 'fixed',
-        bottom: isMobile ? '92px' : '24px',
-        left: isMobile ? '50%' : '24px',
-        transform: isMobile ? 'translateX(-50%)' : 'none',
-        zIndex: 58,
-        width: isMobile ? '240px' : '340px',
-        maxWidth: isMobile ? '240px' : '340px',
-        minWidth: isMobile ? 0 : undefined,
-      }}
+      aria-label={isEnglish ? 'Privacy notice' : 'הודעת פרטיות'}
     >
-      <div
-        style={{
-          borderRadius: isMobile ? '12px' : '16px',
-          padding: isMobile ? '8px 10px' : '14px 16px',
-          backgroundColor: '#0b1f3a',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: isMobile
-            ? '0 4px 12px rgba(0, 0, 0, 0.15)'
-            : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-          color: 'white',
-        }}
-      >
-        {/* Desktop: icon + title + body */}
-        {!isMobile && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-            <div
-              style={{
-                display: 'flex',
-                width: '30px',
-                height: '30px',
-                flexShrink: 0,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                fontSize: '14px',
-              }}
-            >
-              🍪
-            </div>
-            <div style={{ flex: 1 }}>
-              <h2
-                style={{
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  lineHeight: '1.25',
-                  marginBottom: '4px',
-                  marginTop: 0,
-                }}
-              >
-                {c.title}
-              </h2>
-              <p
-                style={{
-                  fontSize: '12px',
-                  lineHeight: '1.4',
-                  color: '#cbd5e1',
-                  margin: 0,
-                  marginBottom: '10px',
-                }}
-              >
-                {c.before}{' '}
-                <Link
-                  href={privacyLink}
-                  className="font-medium text-blue-300 underline underline-offset-2 hover:text-blue-200"
-                >
-                  {c.link}
-                </Link>
-                {c.after}
-              </p>
-            </div>
-          </div>
-        )}
+      {/* MOBILE ONLY — ultra compact: 240px width, 26px button, 10px text */}
+      <div className="fixed bottom-[88px] left-1/2 z-[58] w-[240px] max-w-[240px] -translate-x-1/2 rounded-[12px] border border-white/10 bg-[#0b1f3a] p-[8px_10px] sm:hidden" style={{ boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
+        <h2 className="m-0 text-center text-[12px] font-bold leading-[1.1]">
+          {isEnglish ? 'Privacy & cookies' : 'פרטיות וקוקיז'}
+        </h2>
+        <p className="m-0 mb-[6px] text-center text-[10px] leading-[1.2] text-slate-300">
+          {isEnglish
+            ? 'We use cookies. Continued use constitutes consent to the'
+            : 'אנחנו משתמשים בעוגיות. המשך שימוש מהווה הסכמה ל'}
+          {' '}
+          <Link
+            href={privacyLink}
+            className="font-medium text-blue-300 underline underline-offset-2 hover:text-blue-200"
+          >
+            {isEnglish ? 'Privacy Policy' : 'מדיניות הפרטיות'}
+          </Link>
+          {'.'}
+        </p>
+        <button
+          onClick={handleAccept}
+          className="w-full rounded-[8px] bg-blue-600 px-2 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50"
+          style={{ height: '26px' }}
+        >
+          {isEnglish ? 'Accept' : 'אישור'}
+        </button>
+      </div>
 
-        {/* Mobile: no icon, centered short text */}
-        {isMobile && (
-          <div>
-            <h2
-              style={{
-                fontSize: '12px',
-                fontWeight: 700,
-                lineHeight: '1.15',
-                marginBottom: '4px',
-                marginTop: 0,
-                textAlign: 'center',
-              }}
-            >
-              {c.title}
+      {/* DESKTOP ONLY — compact but readable: 340px width, 36px button, 12px body text */}
+      <div className="fixed bottom-6 left-6 z-[58] hidden w-[340px] max-w-[340px] rounded-[16px] border border-white/10 bg-[#0b1f3a] p-[14px_16px] sm:block" style={{ boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)' }}>
+        <div className="flex items-start gap-[10px]">
+          <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-white/10 text-[14px]">
+            🍪
+          </div>
+          <div className="flex-1">
+            <h2 className="m-0 text-[15px] font-bold leading-[1.25]">
+              {isEnglish
+                ? 'We value your privacy'
+                : 'אנחנו מכבדים את הפרטיות שלך'}
             </h2>
-            <p
-              style={{
-                fontSize: '10px',
-                lineHeight: '1.25',
-                color: '#cbd5e1',
-                margin: 0,
-                marginBottom: '6px',
-                textAlign: 'center',
-              }}
-            >
-              {c.before}{' '}
+            <p className="m-0 mb-[10px] text-[12px] leading-[1.4] text-slate-300">
+              {isEnglish
+                ? 'We use cookies to improve your browsing experience. By continuing to use this site, you agree to our'
+                : 'אנו משתמשים בעוגיות כדי לשפר את חוויית הגלישה. המשך השימוש באתר מהווה הסכמה לשימוש בהן בהתאם ל'}
+              {' '}
               <Link
                 href={privacyLink}
                 className="font-medium text-blue-300 underline underline-offset-2 hover:text-blue-200"
               >
-                {c.link}
+                {isEnglish ? 'Privacy Policy' : 'מדיניות הפרטיות'}
               </Link>
-              {c.after}
             </p>
           </div>
-        )}
-
+        </div>
         <button
           onClick={handleAccept}
-          style={{
-            marginTop: isMobile ? 0 : '10px',
-            width: '100%',
-            height: isMobile ? '28px' : '36px',
-            backgroundColor: '#2563eb',
-            color: 'white',
-            border: 'none',
-            borderRadius: isMobile ? '8px' : '10px',
-            fontSize: isMobile ? '12px' : '13px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'background-color 0.2s',
-            padding: isMobile ? '0 10px' : 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#1d4ed8'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#2563eb'
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.outline = 'none'
-            e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.5)'
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.boxShadow = 'none'
-          }}
+          className="mt-[10px] w-full rounded-[10px] bg-blue-600 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50"
+          style={{ height: '36px' }}
         >
-          {c.button}
+          {isEnglish ? 'Accept' : 'אישור'}
         </button>
       </div>
     </div>
