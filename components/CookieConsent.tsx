@@ -77,19 +77,20 @@ export function CookieConsent() {
       aria-label={content.title}
       style={{
         position: 'fixed',
-        bottom: isMobile ? '84px' : '20px',
+        bottom: isMobile ? '88px' : '20px',
         left: isMobile ? '50%' : '20px',
         transform: isMobile ? 'translateX(-50%)' : 'none',
         zIndex: 58,
-        width: isMobile ? 'calc(100vw - 40px)' : '360px',
-        maxWidth: isMobile ? '270px' : '360px',
+        width: isMobile ? 'calc(100vw - 56px)' : '360px',
+        maxWidth: isMobile ? '300px' : '360px',
+        minWidth: isMobile ? '260px' : undefined,
         margin: 0,
       }}
     >
       <div
         style={{
-          borderRadius: isMobile ? '12px' : '16px',
-          padding: isMobile ? '10px 12px' : '14px 16px',
+          borderRadius: '16px',
+          padding: isMobile ? '12px 14px' : '14px 16px',
           backgroundColor: '#0b1f3a',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: isMobile
@@ -159,22 +160,24 @@ export function CookieConsent() {
           <div>
             <h2
               style={{
-                fontSize: '13px',
-                fontWeight: 'bold',
-                lineHeight: '1.15',
-                marginBottom: '4px',
+                fontSize: '15px',
+                fontWeight: 700,
+                lineHeight: '1.2',
+                marginBottom: '6px',
                 marginTop: 0,
+                textAlign: 'center',
               }}
             >
               {content.title}
             </h2>
             <p
               style={{
-                fontSize: '11px',
-                lineHeight: '1.3',
+                fontSize: '12px',
+                lineHeight: '1.35',
                 color: '#cbd5e1',
                 margin: 0,
-                marginBottom: '8px',
+                marginBottom: '10px',
+                textAlign: 'center',
               }}
             >
               {content.message}{' '}
@@ -193,16 +196,16 @@ export function CookieConsent() {
           style={{
             marginTop: isMobile ? 0 : '10px',
             width: '100%',
-            height: isMobile ? '30px' : '38px',
+            height: '38px',
             backgroundColor: '#2563eb',
             color: 'white',
             border: 'none',
-            borderRadius: isMobile ? '9px' : '12px',
-            fontSize: isMobile ? '12px' : '14px',
+            borderRadius: '12px',
+            fontSize: '14px',
             fontWeight: 'bold',
             cursor: 'pointer',
             transition: 'background-color 0.2s',
-            paddingInline: isMobile ? '14px' : 0,
+            paddingInline: '14px',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = '#1d4ed8'
