@@ -60,16 +60,16 @@ export function CookieConsent() {
       dir={isEnglish ? 'ltr' : 'rtl'}
       role="dialog"
       aria-label={content.title}
-      className="fixed inset-x-3 bottom-[88px] z-[58] mx-auto max-w-md sm:inset-x-auto sm:bottom-6 sm:left-6 sm:right-auto sm:mx-0"
+      className="fixed inset-x-4 bottom-[88px] z-[58] mx-auto w-[calc(100vw-32px)] max-w-sm sm:inset-x-auto sm:bottom-6 sm:left-6 sm:right-auto sm:mx-0 sm:w-auto"
     >
       <div className="rounded-2xl border border-white/10 bg-[#0b1f3a] p-5 text-white shadow-2xl ring-1 ring-black/20 sm:p-6">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-xl">
+        <div className="flex items-start gap-2.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg">
             🍪
           </div>
           <div className="flex-1">
             <h2 className="text-base font-bold leading-tight sm:text-lg">{content.title}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-slate-300">
+            <p className="mt-1 text-xs leading-snug text-slate-300 sm:text-sm">
               {content.message}{' '}
               <Link
                 href={privacyLink}
@@ -82,7 +82,7 @@ export function CookieConsent() {
         </div>
         <button
           onClick={handleAccept}
-          className="mt-4 w-full rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50"
+          className="mt-3 w-full rounded-xl bg-blue-600 px-6 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50 sm:mt-4 sm:py-2.5 sm:text-sm"
         >
           {content.buttonLabel}
         </button>
