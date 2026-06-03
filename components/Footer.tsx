@@ -17,7 +17,7 @@ export function Footer({ locale = 'he' }: { locale?: Locale } = {}) {
           <div>
             <h3 className="font-bold text-lg mb-4">
               <span>Rankings by </span>
-              <Link href="https://www.gotop.co.il" className="text-blue-400 hover:text-blue-300 transition-colors" aria-label="Go Top - digital marketing agency">
+              <Link href="https://www.gotop.co.il" className="text-sky-300 underline underline-offset-4 hover:text-sky-200 transition-colors" aria-label="Go Top - digital marketing agency">
                 Go Top
               </Link>
             </h3>
