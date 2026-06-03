@@ -35,9 +35,9 @@ export function CookieConsent() {
       role="dialog"
       aria-label={isEnglish ? 'Privacy notice' : 'הודעת פרטיות'}
     >
-      {/* MOBILE ONLY — ultra compact: 240px width, 26px button, 8px text, no title */}
-      <div className="fixed bottom-[72px] left-[14px] z-[58] flex w-[240px] max-w-[240px] flex-col items-stretch justify-start rounded-[12px] border border-white/10 bg-[#0b1f3a] sm:hidden" style={{ padding: '4px 10px 8px 10px', minHeight: 0, height: 'auto', boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
-        <p className="m-0 p-0 text-center text-[10px] leading-[1.25] text-slate-300">
+      {/* MOBILE ONLY — ultra compact: 240px width, 26px button, no title */}
+      <div className="fixed left-[14px] z-[58] flex w-[240px] max-w-[240px] flex-col items-stretch justify-start rounded-[12px] border border-white/10 bg-[#0b1f3a] sm:hidden" style={{ bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))', padding: '4px 10px 8px 10px', minHeight: 0, height: 'auto', boxShadow: '0 8px 20px rgba(0,0,0,0.18)' }}>
+        <p className="m-0 p-0 text-center text-[12px] leading-[1.25] text-slate-300">
           {isEnglish
             ? 'We use cookies. Continued use constitutes consent to the'
             : 'אנחנו משתמשים בעוגיות. המשך שימוש מהווה הסכמה ל'}
@@ -66,7 +66,7 @@ export function CookieConsent() {
             🍪
           </div>
           <div className="flex-1">
-            <h2 className="m-0 text-[15px] font-bold leading-[1.25]">
+            <h2 className="m-0 text-white text-[15px] font-bold leading-[1.25]">
               {isEnglish
                 ? 'We value your privacy'
                 : 'אנחנו מכבדים את הפרטיות שלך'}
