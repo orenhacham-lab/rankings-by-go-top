@@ -127,6 +127,34 @@ export default function EnglishPrivacyPage() {
             </section>
 
             <section>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Contacting Us via WhatsApp</h2>
+              <p>
+                Our site and services may offer an option to contact us via WhatsApp. When a user chooses to contact us
+                through WhatsApp, we may receive and process the information provided as part of that contact, including
+                name, phone number, the content of the messages, files or images sent to us at the user&rsquo;s initiative,
+                and any additional contact details shared during the conversation.
+              </p>
+              <p className="mt-4">
+                The information provided to us via WhatsApp will be used to respond to the inquiry, provide service and
+                support, handle requests, document inquiries, improve the service, maintain information security and
+                protect our rights, as well as to comply with legal requirements where necessary.
+              </p>
+              <p className="mt-4">
+                Use of WhatsApp is also subject to the terms of use and privacy policy of WhatsApp and/or Meta, and we
+                recommend reviewing them before using this channel. Please do not send us, via WhatsApp, sensitive
+                information that is not required to handle your inquiry, including passwords, full payment details, medical
+                information, identification documents or other sensitive personal information, unless you have been
+                expressly asked to do so for a defined purpose.
+              </p>
+              <p className="mt-4">
+                We may retain the correspondence records for as long as necessary for the purposes of providing the
+                service, handling inquiries, documentation, monitoring, legal defense and compliance with the law. Users
+                may contact us to request access to, correction of, or deletion of the personal information they provided,
+                subject to applicable law and this privacy policy.
+              </p>
+            </section>
+
+            <section>
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Updates to This Policy</h2>
               <p>
                 We may update this policy from time to time. Changes take effect immediately upon publication. We encourage you

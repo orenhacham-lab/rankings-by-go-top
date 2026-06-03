@@ -209,7 +209,12 @@ function ReportsContent() {
       }
 
       // Calculate summary
-      const successfulResults = results.filter((r: any) => r.status === 'success')
+      // Archived questions (excluded_from_score = true) are removed from the
+      // report's data source entirely: they are not listed, not counted, and
+      // not part of any KPI, percentage, engine breakdown or export.
+      const successfulResults = results.filter(
+        (r: any) => r.status === 'success' && r.excludedFromScore !== true
+      )
       const mentionedCount = successfulResults.filter((r: any) => r.mentioned).length
       const citedCount = successfulResults.filter((r: any) => r.target_cited).length
       const totalCitations = successfulResults.reduce((sum: number, r: any) => sum + (r.citation_count || 0), 0)

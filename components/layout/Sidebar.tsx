@@ -171,7 +171,9 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       {!isAdmin && (
         <div className="px-3 pb-3 hidden md:block">
           <a
-            href="mailto:oren@gotop.co.il"
+            href="https://wa.me/972549489377?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%AA%D7%9E%D7%99%D7%9B%D7%94"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
           >
             <MessageCircle size={18} className="text-slate-500 dark:text-slate-400" strokeWidth={2} />

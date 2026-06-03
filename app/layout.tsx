@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { CookieConsent } from '@/components/CookieConsent'
+import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
 
 export const metadata: Metadata = {
@@ -137,7 +137,7 @@ export default function RootLayout({
         />
         <RootThemeProvider>
           {children}
-          <CookieConsent />
+          <PublicSiteWidgets />
         </RootThemeProvider>
       </body>
     </html>

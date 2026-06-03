@@ -232,6 +232,85 @@ dialog::backdrop {
   border-top: 1px solid #e2e8f0;
 }
 
+/* ── Accessibility Widget Effects (public site) ───────────────────── */
+/* All effects are toggled by classes/variables on <html> and persisted in
+   localStorage by the AccessibilityWidget. Reset removes every class/var. */
+
+/* Text enlargement — scales the root font-size (rem-based UI scales with it) */
+html.a11y-text-1 { font-size: 112.5%; }
+html.a11y-text-2 { font-size: 125%; }
+html.a11y-text-3 { font-size: 140%; }
+
+/* Readable font — swap to a high-legibility stack with looser spacing */
+html.a11y-readable-font,
+html.a11y-readable-font * {
+  font-family: Arial, 'Segoe UI', Tahoma, system-ui, sans-serif !important;
+  letter-spacing: 0.4px !important;
+  line-height: 1.7 !important;
+  word-spacing: 1px !important;
+}
+
+/* Highlight links — clear underline + visible outline */
+html.a11y-highlight-links a {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+  outline: 2px solid #1d4ed8 !important;
+  outline-offset: 2px;
+  border-radius: 2px;
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Highlight headings — dashed outline + soft background */
+html.a11y-highlight-headings :is(h1, h2, h3, h4, h5, h6) {
+  outline: 2px dashed #d97706 !important;
+  outline-offset: 3px;
+  background-color: rgba(245, 158, 11, 0.08) !important;
+}
+
+/* Contrast + grayscale — combined into one filter via CSS variables so they
+   stack instead of overriding each other. Applied on <html> (the ICB),
+   which keeps the floating widgets fixed to the viewport. */
+html.a11y-filter {
+  filter: grayscale(var(--a11y-gray, 0)) contrast(var(--a11y-contrast, 1)) !important;
+}
+
+/* Readable / large cursor */
+html.a11y-big-cursor,
+html.a11y-big-cursor * {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cpath d='M8 4 L8 38 L17 29 L23 43 L29 40 L23 26 L36 26 Z' fill='black' stroke='white' stroke-width='2'/%3E%3C/svg%3E")
+      4 4,
+    auto !important;
+}
+
+/* Stop animations / transitions */
+html.a11y-stop-animations *,
+html.a11y-stop-animations *::before,
+html.a11y-stop-animations *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+/* Image descriptions — outline images and flag any missing alt text */
+html.a11y-image-descriptions img {
+  outline: 2px solid #0ea5e9 !important;
+  outline-offset: 2px;
+}
+html.a11y-image-descriptions img[data-a11y-noalt='true'] {
+  outline: 3px solid #dc2626 !important;
+}
+
+/* Respect the OS-level reduced-motion preference too */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.a11y-allow-motion) * {
+    scroll-behavior: auto;
+  }
+}
+
 /* ── PayPal Buttons Dark Mode Fix ─────────────────────────────────── */
 /* PayPal renders buttons inside iframes which cannot be styled directly.
    We use CSS filter on the wrapper: invert flips white→dark, and
