@@ -4,20 +4,11 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 
-/**
- * Cookie consent banner.
- *
- * Redesigned as a compact dark card (not a full-width strip): bottom-left on
- * desktop so it composes with the floating WhatsApp button (bottom-right), and
- * a centered card lifted above the mobile contact bar on small screens.
- *
- * Consent logic is unchanged: a single `cookie-consent-accepted` flag in
- * localStorage gates visibility, and the privacy link adapts to /en pages.
- */
 export function CookieConsent() {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [isMobile, setIsMobile] = useState(true)
 
   const isEnglish = pathname?.startsWith('/en')
   const privacyLink = isEnglish ? '/en/privacy' : '/privacy'
@@ -44,6 +35,14 @@ export function CookieConsent() {
     if (!hasAccepted) {
       setIsVisible(true)
     }
+
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   const handleAccept = () => {
@@ -60,16 +59,69 @@ export function CookieConsent() {
       dir={isEnglish ? 'ltr' : 'rtl'}
       role="dialog"
       aria-label={content.title}
-      className="fixed inset-x-3 bottom-[82px] z-[58] mx-auto w-[calc(100vw-24px)] max-w-[380px] sm:inset-x-auto sm:bottom-6 sm:left-6 sm:right-auto sm:mx-0 sm:w-[420px] sm:max-w-[420px]"
+      style={{
+        position: 'fixed',
+        bottom: isMobile ? '86px' : '20px',
+        left: isMobile ? '14px' : '20px',
+        right: isMobile ? '14px' : 'auto',
+        zIndex: 58,
+        width: isMobile ? 'calc(100vw - 28px)' : '340px',
+        maxWidth: isMobile ? '330px' : '340px',
+        margin: isMobile ? '0 auto' : '0',
+      }}
     >
-      <div className="rounded-[22px] border border-white/10 bg-[#0b1f3a] p-4 text-white shadow-2xl ring-1 ring-black/20 sm:p-5">
-        <div className="flex items-start gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-base sm:h-10 sm:w-10">
+      <div
+        style={{
+          borderRadius: '16px',
+          padding: '14px 16px',
+          backgroundColor: '#0b1f3a',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+          color: 'white',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              width: '30px',
+              height: '30px',
+              flexShrink: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              fontSize: '14px',
+            }}
+          >
             🍪
           </div>
-          <div className="flex-1">
-            <h2 className="text-[16px] font-bold leading-tight sm:text-[17px]">{content.title}</h2>
-            <p className="mt-1 text-[13px] leading-[1.5] text-slate-300 sm:text-[13px]">
+          <div style={{ flex: 1 }}>
+            <h2
+              style={{
+                fontSize: '15px',
+                fontWeight: 'bold',
+                lineHeight: '1.25',
+                marginBottom: '4px',
+                marginTop: 0,
+              }}
+            >
+              {content.title}
+            </h2>
+            <p
+              style={{
+                fontSize: '12px',
+                lineHeight: '1.4',
+                color: '#cbd5e1',
+                margin: 0,
+              }}
+            >
               {content.message}{' '}
               <Link
                 href={privacyLink}
@@ -82,7 +134,32 @@ export function CookieConsent() {
         </div>
         <button
           onClick={handleAccept}
-          className="mt-3 flex h-11 w-full items-center justify-center rounded-2xl bg-blue-600 px-6 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-blue-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300/50"
+          style={{
+            marginTop: '10px',
+            width: '100%',
+            height: isMobile ? '38px' : '36px',
+            backgroundColor: '#2563eb',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#1d4ed8'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#2563eb'
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.outline = 'none'
+            e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.5)'
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.boxShadow = 'none'
+          }}
         >
           {content.buttonLabel}
         </button>
