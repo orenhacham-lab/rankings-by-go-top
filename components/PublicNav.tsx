@@ -89,12 +89,13 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 lg:h-28">
           {/* Logo */}
-          <Link href={prefix === '/en' ? '/en' : '/'} className="flex items-center shrink-0 group">
+          <Link href={prefix === '/en' ? '/en' : '/'} className="flex items-center shrink-0 group" aria-label="Rankings by Go Top - home">
             <Image
               src="/gotop-primary.png"
               alt="Go Top"
-              width={270}
-              height={108}
+              width={135}
+              height={54}
+              sizes="(max-width: 640px) 72px, 96px"
               className="h-[72px] lg:h-24 w-auto group-hover:opacity-80 transition-opacity"
               priority
             />
