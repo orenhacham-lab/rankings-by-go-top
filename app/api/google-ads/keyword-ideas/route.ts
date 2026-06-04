@@ -59,30 +59,36 @@ async function getGoogleAdsAccessToken(): Promise<string> {
   if (!response.ok || !tokenData.access_token) {
     const desc = tokenData.error_description || tokenData.error || ''
 
+    // Classify the error type
+    const classification =
+      /invalid_grant/i.test(desc) ? 'reauth_required' :
+      /invalid_client/i.test(desc) ? 'client_credentials_invalid' :
+      /unauthorized_client/i.test(desc) ? 'unauthorized_client' :
+      /temporarily_unavailable/i.test(desc) ? 'temporarily_unavailable' :
+      /access_denied/i.test(desc) ? 'access_denied' :
+      response.status >= 500 ? 'google_server_error' :
+      response.status === 0 ? 'network_error' :
+      'unknown'
+
     // Safe diagnostic log — no secrets. Surfaces real Google OAuth error in production logs.
-    console.error('[keyword-ideas] OAuth token fetch failed', {
+    console.error('[keyword-ideas] Google Ads reauth required', {
       stage: 'oauth',
       timestamp: new Date().toISOString(),
       httpStatus: response.status,
       httpOk: response.ok,
       hasAccessToken: Boolean(tokenData.access_token),
-      // Google OAuth error codes (not secrets):
       oauthError: tokenData.error ?? null,
-      oauthErrorDescription: tokenData.error_description ?? null,
-      // Classified error type:
-      classification:
-        /invalid_grant/i.test(desc) ? 'refresh_token_invalid' :
-        /invalid_client/i.test(desc) ? 'client_credentials_invalid' :
-        /unauthorized_client/i.test(desc) ? 'unauthorized_client' :
-        /temporarily_unavailable/i.test(desc) ? 'temporarily_unavailable' :
-        /access_denied/i.test(desc) ? 'access_denied' :
-        response.status >= 500 ? 'google_server_error' :
-        response.status === 0 ? 'network_error' :
-        'unknown',
+      oauthErrorDescription: desc ?? null,
+      classification,
+      hasClientId: Boolean(process.env.GOOGLE_ADS_CLIENT_ID),
+      hasClientSecret: Boolean(process.env.GOOGLE_ADS_CLIENT_SECRET),
+      hasDeveloperToken: Boolean(process.env.GOOGLE_ADS_DEVELOPER_TOKEN),
+      hasCustomerId: Boolean(process.env.GOOGLE_ADS_CUSTOMER_ID),
+      hasRefreshToken: Boolean(process.env.GOOGLE_ADS_REFRESH_TOKEN),
     })
 
-    if (/invalid_grant/i.test(desc)) {
-      throw new Error('refresh_token_invalid')
+    if (classification === 'reauth_required') {
+      throw new Error('reauth_required')
     } else if (/invalid_client/i.test(desc)) {
       throw new Error('client_credentials_invalid')
     }
@@ -256,19 +262,40 @@ export async function POST(request: Request) {
       accessToken = await getGoogleAdsAccessToken()
     } catch (error) {
       const err = error instanceof Error ? error.message : 'unknown'
-      if (err === 'refresh_token_invalid') {
+      if (err === 'reauth_required') {
         return Response.json(
-          { success: false, stage: 'oauth', error: 'Google Ads refresh token is invalid or expired' },
-          { status: 503 }
+          {
+            success: false,
+            stage: 'oauth',
+            errorCode: 'GOOGLE_ADS_REAUTH_REQUIRED',
+            error: 'Google Ads connection requires re-authentication',
+            message: 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש.',
+            details: {
+              reason: 'refresh_token_expired_or_revoked',
+              instruction: 'No need to create new credentials. Just re-authenticate to Google Ads.',
+            },
+          },
+          { status: 401 }
         )
       } else if (err === 'client_credentials_invalid') {
         return Response.json(
-          { success: false, stage: 'oauth', error: 'Google Ads OAuth credentials are invalid' },
+          {
+            success: false,
+            stage: 'oauth',
+            errorCode: 'GOOGLE_ADS_CLIENT_CREDENTIALS_INVALID',
+            error: 'Google Ads OAuth credentials are invalid',
+            details: { reason: 'client_id or client_secret invalid' },
+          },
           { status: 503 }
         )
       }
       return Response.json(
-        { success: false, stage: 'oauth', error: 'Failed to obtain Google Ads access token' },
+        {
+          success: false,
+          stage: 'oauth',
+          errorCode: 'GOOGLE_ADS_OAUTH_FAILED',
+          error: 'Failed to obtain Google Ads access token',
+        },
         { status: 502 }
       )
     }

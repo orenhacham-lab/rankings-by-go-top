@@ -542,6 +542,7 @@ export const dashboardHe = {
       loading: 'מחפש רעיונות לביטויים...',
       noResults: 'לא נמצאו רעיונות לביטויים עבור החיפוש הזה.',
       errorEnv: 'חיבור Google Ads API לא הוגדר עדיין.',
+      errorReauth: 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש לחשבון Google Ads.',
       errorQuota: 'הגעתם למגבלת הקריאות של Google Ads API. נסו שוב מאוחר יותר.',
       errorResourceExhausted: 'Google Ads API הגביל זמנית את בקשת מחקר הביטויים. נסו לבחור כמות תוצאות נמוכה יותר או נסו שוב מאוחר יותר.',
       errorGeneral: 'אירעה שגיאה בשליפת רעיונות לביטויים.',

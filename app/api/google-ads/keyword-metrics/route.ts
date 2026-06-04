@@ -44,6 +44,12 @@ async function getGoogleAdsAccessToken(): Promise<string> {
 
   const tokenData = (await response.json()) as TokenResponse
   if (!response.ok || !tokenData.access_token) {
+    const desc = tokenData.error_description || tokenData.error || ''
+    if (/invalid_grant/i.test(desc)) {
+      throw new Error('reauth_required')
+    } else if (/invalid_client/i.test(desc)) {
+      throw new Error('client_credentials_invalid')
+    }
     throw new Error('oauth_token_failed')
   }
   return tokenData.access_token
@@ -177,7 +183,29 @@ export async function POST(request: Request) {
     let accessToken: string
     try {
       accessToken = await getGoogleAdsAccessToken()
-    } catch {
+    } catch (error) {
+      const err = error instanceof Error ? error.message : 'unknown'
+      if (err === 'reauth_required') {
+        return Response.json(
+          {
+            success: false,
+            errorCode: 'GOOGLE_ADS_REAUTH_REQUIRED',
+            error: 'Google Ads connection requires re-authentication',
+            details: { reason: 'refresh_token_expired_or_revoked' },
+          },
+          { status: 401 }
+        )
+      } else if (err === 'client_credentials_invalid') {
+        return Response.json(
+          {
+            success: false,
+            errorCode: 'GOOGLE_ADS_CLIENT_CREDENTIALS_INVALID',
+            error: 'Google Ads OAuth credentials are invalid',
+            details: { reason: 'client_id or client_secret invalid' },
+          },
+          { status: 503 }
+        )
+      }
       return Response.json(
         { success: false, error: 'Failed to obtain access token' },
         { status: 503 }

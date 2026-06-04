@@ -544,6 +544,7 @@ export const dashboardEn = {
       loading: 'Finding keyword ideas...',
       noResults: 'No keyword ideas were found for this search.',
       errorEnv: 'Google Ads API connection is not configured yet.',
+      errorReauth: 'Google Ads connection expired. Please re-authenticate your Google Ads account.',
       errorQuota: 'You have reached the Google Ads API request limit. Please try again later.',
       errorResourceExhausted: 'Google Ads API temporarily limited this keyword research request. Try selecting fewer results or try again later.',
       errorGeneral: 'An error occurred while fetching keyword ideas.',

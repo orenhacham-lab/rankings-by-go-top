@@ -280,8 +280,15 @@ export default function KeywordResearchPage() {
           setError(t.states.errorResourceExhausted)
         } else if (data.error === 'rate_limit_exceeded' || response.status === 429) {
           setError(t.states.errorQuota)
-        } else if (data.stage === 'env_check' || data.stage === 'oauth') {
+        } else if (data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED') {
+          // Refresh token expired or revoked — user needs to re-authenticate
+          setError(isRTL ? 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש לחשבון Google Ads.' : 'Google Ads connection expired. Please re-authenticate.')
+        } else if (data.stage === 'env_check') {
+          // Missing configuration (CLIENT_ID, CLIENT_SECRET, etc.)
           setError(t.states.errorEnv)
+        } else if (data.stage === 'oauth') {
+          // Other OAuth errors
+          setError(isRTL ? 'שגיאת הרשאה ב-Google Ads. אנא נסה שוב או פנה לתמיכה.' : 'Google Ads authentication error. Please try again or contact support.')
         } else if (data.stage === 'validation' && data.error) {
           setError(`${t.states.errorGeneral} (${data.error})`)
         } else {
@@ -387,6 +394,7 @@ export default function KeywordResearchPage() {
         success?: boolean
         stage?: string
         error?: string
+        errorCode?: string
         apiMessage?: string
         debug?: unknown
         avgMonthlySearches?: number | null
@@ -407,11 +415,16 @@ export default function KeywordResearchPage() {
             httpStatus: response.status,
             stage: data.stage,
             error: data.error,
+            errorCode: data.errorCode,
             apiMessage: data.apiMessage,
             debug: data.debug,
           })
         }
-        setTrendError(data.error || 'Failed to fetch trend data')
+        if (data.errorCode === 'GOOGLE_ADS_REAUTH_REQUIRED') {
+          setTrendError(isRTL ? 'חיבור Google Ads פג או בוטל. יש להתחבר מחדש.' : 'Google Ads connection expired. Please re-authenticate.')
+        } else {
+          setTrendError(data.error || 'Failed to fetch trend data')
+        }
         setTrendData(undefined)
         return
       }

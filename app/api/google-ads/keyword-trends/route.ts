@@ -118,7 +118,7 @@ async function getGoogleAdsAccessToken(): Promise<string> {
   if (!response.ok || !tokenData.access_token) {
     const desc = tokenData.error_description || tokenData.error || ''
     if (/invalid_grant/i.test(desc)) {
-      throw new Error('refresh_token_invalid')
+      throw new Error('reauth_required')
     } else if (/invalid_client/i.test(desc)) {
       throw new Error('client_credentials_invalid')
     }
@@ -201,19 +201,36 @@ export async function POST(request: Request) {
       accessToken = await getGoogleAdsAccessToken()
     } catch (error) {
       const err = error instanceof Error ? error.message : 'unknown'
-      if (err === 'refresh_token_invalid') {
+      if (err === 'reauth_required') {
         return Response.json(
-          { success: false, stage: 'oauth', error: 'Google Ads refresh token is invalid or expired' },
-          { status: 503 }
+          {
+            success: false,
+            stage: 'oauth',
+            errorCode: 'GOOGLE_ADS_REAUTH_REQUIRED',
+            error: 'Google Ads connection requires re-authentication',
+            details: { reason: 'refresh_token_expired_or_revoked' },
+          },
+          { status: 401 }
         )
       } else if (err === 'client_credentials_invalid') {
         return Response.json(
-          { success: false, stage: 'oauth', error: 'Google Ads OAuth credentials are invalid' },
+          {
+            success: false,
+            stage: 'oauth',
+            errorCode: 'GOOGLE_ADS_CLIENT_CREDENTIALS_INVALID',
+            error: 'Google Ads OAuth credentials are invalid',
+            details: { reason: 'client_id or client_secret invalid' },
+          },
           { status: 503 }
         )
       }
       return Response.json(
-        { success: false, stage: 'oauth', error: 'Failed to obtain Google Ads access token' },
+        {
+          success: false,
+          stage: 'oauth',
+          errorCode: 'GOOGLE_ADS_OAUTH_FAILED',
+          error: 'Failed to obtain Google Ads access token',
+        },
         { status: 502 }
       )
     }

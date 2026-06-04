@@ -23,7 +23,7 @@ async function getGoogleAdsAccessToken(): Promise<string> {
   if (!response.ok || !tokenData.access_token) {
     const desc = tokenData.error_description || tokenData.error || ''
     if (/invalid_grant/i.test(desc)) {
-      throw new Error('refresh_token_invalid')
+      throw new Error('reauth_required')
     } else if (/invalid_client/i.test(desc)) {
       throw new Error('client_credentials_invalid')
     }
