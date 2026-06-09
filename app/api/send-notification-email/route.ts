@@ -21,9 +21,10 @@ export async function POST(request: NextRequest) {
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'Rankings by Go Top <onboarding@resend.dev>'
 
     // Send notification to admin
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'orenhacham@gmail.com'
     const adminEmailResult = await resend.emails.send({
       from: fromEmail,
-      to: 'orenhacham@gmail.com',
+      to: adminEmail,
       subject: 'חשבון חדש נפתח - Rankings by Go Top',
       html: `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

@@ -116,6 +116,40 @@ export function SignupForm() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // Phone input filter: allow only digits and dash, max 11 chars, max 1 dash
+  function handlePhoneChange(value: string) {
+    // Allow only digits and dash
+    let filtered = value.replace(/[^\d-]/g, '')
+
+    // Limit to 11 chars (054-9489377)
+    filtered = filtered.substring(0, 11)
+
+    // Prevent multiple dashes and ensure dash is only after 3rd digit
+    const dashCount = (filtered.match(/-/g) || []).length
+    if (dashCount > 1) {
+      // Remove all dashes and rebuild
+      const digits = filtered.replace(/-/g, '')
+      if (digits.length > 3) {
+        filtered = digits.substring(0, 3) + '-' + digits.substring(3, 10)
+      } else {
+        filtered = digits
+      }
+    } else if (dashCount === 1) {
+      const dashIndex = filtered.indexOf('-')
+      if (dashIndex !== 3) {
+        // Remove dash and rebuild
+        const digits = filtered.replace(/-/g, '')
+        if (digits.length > 3) {
+          filtered = digits.substring(0, 3) + '-' + digits.substring(3, 10)
+        } else {
+          filtered = digits
+        }
+      }
+    }
+
+    setFormData({ ...formData, phone: filtered })
+  }
+
   // Form validation
   function validateForm(): string[] {
     const errors: string[] = []
@@ -136,7 +170,7 @@ export function SignupForm() {
 
     if (!formData.phone.trim()) {
       errors.push(t.err.fieldRequired)
-    } else if (!/^[\d\s\-\+\(\)]+$/.test(formData.phone)) {
+    } else if (!/^(?:[0-9]{10}|[0-9]{3}-[0-9]{7})$/.test(formData.phone)) {
       errors.push(t.err.invalidPhone)
     }
 
@@ -169,6 +203,9 @@ export function SignupForm() {
     try {
       const supabase = createClient()
 
+      // Normalize phone (remove dash) before storing
+      const normalizedPhone = formData.phone.replace(/-/g, '')
+
       // 1. Create Supabase auth user with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -177,7 +214,7 @@ export function SignupForm() {
           data: {
             full_name: formData.fullName,
             company_name: formData.companyName,
-            phone: formData.phone,
+            phone: normalizedPhone,
             terms_accepted: true,
           },
           emailRedirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent('/dashboard')}`,
@@ -266,6 +303,22 @@ export function SignupForm() {
       }
 
       setSuccess(t.success.accountCreated)
+
+      // Send admin notification email
+      try {
+        await fetch('/api/send-notification-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            userName: formData.fullName || formData.email,
+          }),
+        })
+        console.log('[signup-email] admin notification sent')
+      } catch (emailError) {
+        console.error('[signup-email] admin notification failed:', emailError instanceof Error ? emailError.message : String(emailError))
+        // Don't block signup if email fails
+      }
 
       // Track signup success in Google Tag Manager (for Meta Pixel via GTM)
       if (typeof window !== 'undefined') {
@@ -365,7 +418,7 @@ export function SignupForm() {
               label={t.phone}
               type="tel"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onChange={(e) => handlePhoneChange(e.target.value)}
               placeholder={t.phonePlaceholder}
               required
               autoComplete="tel"
