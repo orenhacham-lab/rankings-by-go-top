@@ -22,6 +22,8 @@ const SIGNUP_UI = {
     phonePlaceholder: '050-1234567',
     password: 'סיסמה',
     passwordPlaceholder: '••••••••',
+    confirmPassword: 'אימות סיסמה',
+    confirmPasswordPlaceholder: '••••••••',
     termsCheckbox: 'אני מסכים לתנאי השימוש ולמדיניות הפרטיות',
     signupBtn: 'יצירת חשבון',
     trialBadge: '7 ימי ניסיון בחינם',
@@ -36,6 +38,7 @@ const SIGNUP_UI = {
     err: {
       invalidEmail: 'כתובת אימייל לא תקינה',
       passwordTooShort: 'הסיסמה חייבת להכיל לפחות 8 תווים',
+      passwordMismatch: 'הסיסמאות אינן תואמות',
       invalidPhone: 'מספר טלפון לא תקין',
       fieldRequired: 'שדה זה הוא חובה',
       termsRequired: 'עליך להסכים לתנאים ולמדיניות הפרטיות',
@@ -62,6 +65,8 @@ const SIGNUP_UI = {
     phonePlaceholder: '(555) 123-4567',
     password: 'Password',
     passwordPlaceholder: '••••••••',
+    confirmPassword: 'Confirm password',
+    confirmPasswordPlaceholder: '••••••••',
     termsCheckbox: 'I agree to the Terms of Service and Privacy Policy',
     signupBtn: 'Create account',
     trialBadge: '7-day free trial',
@@ -76,6 +81,7 @@ const SIGNUP_UI = {
     err: {
       invalidEmail: 'Invalid email address',
       passwordTooShort: 'Password must be at least 8 characters',
+      passwordMismatch: 'Passwords do not match',
       invalidPhone: 'Invalid phone number',
       fieldRequired: 'This field is required',
       termsRequired: 'You must agree to the terms and privacy policy',
@@ -109,6 +115,7 @@ export function SignupForm() {
     companyName: '',
     phone: '',
     password: '',
+    confirmPassword: '',
     termsAccepted: false,
   })
 
@@ -178,6 +185,12 @@ export function SignupForm() {
       errors.push(t.err.fieldRequired)
     } else if (formData.password.length < 8) {
       errors.push(t.err.passwordTooShort)
+    }
+
+    if (!formData.confirmPassword) {
+      errors.push(t.err.fieldRequired)
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.push(t.err.passwordMismatch)
     }
 
     if (!formData.termsAccepted) {
@@ -321,8 +334,10 @@ export function SignupForm() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            fullName: formData.fullName,
             email: formData.email,
-            userName: formData.fullName || formData.email,
+            companyName: formData.companyName,
+            phone: normalizedPhone,
           }),
         })
 
@@ -450,6 +465,16 @@ export function SignupForm() {
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               placeholder={t.passwordPlaceholder}
+              required
+              autoComplete="new-password"
+            />
+
+            <Input
+              label={t.confirmPassword}
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              placeholder={t.confirmPasswordPlaceholder}
               required
               autoComplete="new-password"
             />

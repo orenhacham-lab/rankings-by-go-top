@@ -4,12 +4,12 @@ export async function POST(request: NextRequest) {
   try {
     console.log('[email-route] received request')
     const body = await request.json()
-    const { email, userName } = body
+    const { fullName, email, companyName, phone } = body
 
-    console.log('[email-route] email:', email, 'userName:', userName)
+    console.log('[email-route] fullName:', fullName, 'email:', email, 'companyName:', companyName, 'phone:', phone)
 
-    if (!email || !userName) {
-      console.error('[email-route] missing required fields')
+    if (!email || !fullName) {
+      console.error('[email-route] missing required fields (email or fullName)')
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -36,9 +36,11 @@ export async function POST(request: NextRequest) {
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #2563eb;">🎉 חשבון חדש נפתח ב-Rankings by Go Top!</h2>
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border-right: 4px solid #2563eb;">
-            <p><strong>דוא"ל:</strong> ${email}</p>
-            <p><strong>שם:</strong> ${userName || 'לא הוזן'}</p>
-            <p><strong>זמן:</strong> ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}</p>
+            <p><strong>שם מלא:</strong> ${fullName || 'לא הוזן'}</p>
+            <p><strong>דוא״ל:</strong> ${email}</p>
+            <p><strong>שם חברה:</strong> ${companyName || 'לא הוזן'}</p>
+            <p><strong>טלפון:</strong> ${phone || 'לא הוזן'}</p>
+            <p><strong>זמן הרשמה:</strong> ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}</p>
           </div>
           <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
           <p style="color: #64748b; font-size: 12px;">הודעה אוטומטית מ-Rankings by Go Top</p>
