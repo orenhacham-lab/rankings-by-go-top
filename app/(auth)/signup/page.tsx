@@ -269,13 +269,11 @@ export function SignupForm() {
 
       // Track signup success in Google Tag Manager (for Meta Pixel via GTM)
       if (typeof window !== 'undefined') {
-        const dataLayer = (window as any).dataLayer as Record<string, unknown>[] | undefined
-        if (dataLayer) {
-          dataLayer.push({
-            event: 'signup_success',
-            product: 'rankings_by_go_top',
-          })
-        }
+        (window as any).dataLayer = (window as any).dataLayer || []
+        ;(window as any).dataLayer.push({
+          event: 'signup_success',
+          product: 'rankings_by_go_top',
+        })
       }
 
       // Redirect to dashboard after a short delay
