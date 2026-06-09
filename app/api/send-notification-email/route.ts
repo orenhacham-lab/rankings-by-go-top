@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[email-route] received request')
     const body = await request.json()
     const { email, userName } = body
 
+    console.log('[email-route] email:', email, 'userName:', userName)
+
     if (!email || !userName) {
+      console.error('[email-route] missing required fields')
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -22,6 +26,8 @@ export async function POST(request: NextRequest) {
 
     // Send notification to admin
     const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'orenhacham@gmail.com'
+    console.log('[email-route] admin email:', adminEmail, 'from email:', fromEmail)
+    console.log('[email-route] calling resend.emails.send...')
     const adminEmailResult = await resend.emails.send({
       from: fromEmail,
       to: adminEmail,
@@ -40,14 +46,17 @@ export async function POST(request: NextRequest) {
       `,
     })
 
+    console.log('[email-route] resend response:', { hasError: !!adminEmailResult.error, hasData: !!adminEmailResult.data })
+
     if (adminEmailResult.error) {
-      console.error('Failed to send notification email:', adminEmailResult.error)
+      console.error('[email-route] Resend error:', adminEmailResult.error)
       return NextResponse.json(
         { error: 'Failed to send email' },
         { status: 500 }
       )
     }
 
+    console.log('[email-route] email sent successfully, messageId:', adminEmailResult.data?.id)
     return NextResponse.json(
       { success: true, messageId: adminEmailResult.data?.id },
       { status: 200 }

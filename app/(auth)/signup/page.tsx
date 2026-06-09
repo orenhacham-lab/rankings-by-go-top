@@ -192,19 +192,29 @@ export function SignupForm() {
     setError('')
     setSuccess('')
 
+    // Debug: Log raw phone input
+    console.log('[signup-phone] raw phone:', JSON.stringify(formData.phone), 'length:', formData.phone.length)
+
     const validationErrors = validateForm()
+
+    // Debug: Log validation result
+    console.log('[signup-phone] validation errors:', validationErrors)
+    console.log('[signup-phone] phone regex test:', /^(?:[0-9]{10}|[0-9]{3}-[0-9]{7})$/.test(formData.phone))
+
     if (validationErrors.length > 0) {
+      console.log('[signup] validation failed, showing error:', validationErrors[0])
       setError(validationErrors[0])
       return
     }
 
     setLoading(true)
 
+    // Debug: Normalization
+    const normalizedPhone = formData.phone.replace(/-/g, '')
+    console.log('[signup-phone] normalized phone:', normalizedPhone, 'length:', normalizedPhone.length)
+
     try {
       const supabase = createClient()
-
-      // Normalize phone (remove dash) before storing
-      const normalizedPhone = formData.phone.replace(/-/g, '')
 
       // 1. Create Supabase auth user with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -306,7 +316,8 @@ export function SignupForm() {
 
       // Send admin notification email
       try {
-        await fetch('/api/send-notification-email', {
+        console.log('[signup-email] sending admin notification...')
+        const emailResponse = await fetch('/api/send-notification-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -314,7 +325,16 @@ export function SignupForm() {
             userName: formData.fullName || formData.email,
           }),
         })
-        console.log('[signup-email] admin notification sent')
+
+        console.log('[signup-email] response status:', emailResponse.status, 'ok:', emailResponse.ok)
+
+        if (!emailResponse.ok) {
+          const errorText = await emailResponse.text().catch(() => '(no response body)')
+          console.error('[signup-email] failed, status:', emailResponse.status, 'body:', errorText)
+        } else {
+          const result = await emailResponse.json().catch(() => ({}))
+          console.log('[signup-email] admin notification sent, messageId:', result.messageId)
+        }
       } catch (emailError) {
         console.error('[signup-email] admin notification failed:', emailError instanceof Error ? emailError.message : String(emailError))
         // Don't block signup if email fails
