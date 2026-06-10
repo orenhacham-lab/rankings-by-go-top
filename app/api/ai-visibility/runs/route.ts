@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 import { runAIVisibilityScan } from '@/lib/ai-visibility'
 import { isDomainMatch } from '@/lib/ai-visibility/matching/domain-normalize'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
-import { computeDisplayMatches } from '@/lib/ai-visibility/display-classification'
+import { computeDisplayMatches, buildDomainList } from '@/lib/ai-visibility/display-classification'
 import { computeGeoInsights, classifyCitationType } from '@/lib/ai-visibility/geo-signals'
 import {
   computeGeoOpportunityMapping,
@@ -332,7 +332,7 @@ export async function GET(request: Request) {
   // the client's findMatchedLabels on the server. Read-only; no DB writes.
   const { data: project } = await admin
     .from('projects')
-    .select('id, user_id, target_domain, business_name')
+    .select('id, user_id, target_domain, business_name, brand_aliases, domain_aliases')
     .eq('id', projectId)
     .single()
 
@@ -342,7 +342,15 @@ export async function GET(request: Request) {
 
   const projectTargetDomain = (project as { target_domain?: string | null }).target_domain ?? null
   const projectBusinessName = (project as { business_name?: string | null }).business_name ?? null
-  const brandVariants = getBrandVariants(projectBusinessName, projectTargetDomain)
+  const projectBrandAliases = (project as { brand_aliases?: string[] | null }).brand_aliases ?? []
+  const projectDomainAliases = (project as { domain_aliases?: string[] | null }).domain_aliases ?? []
+  const brandVariants = getBrandVariants(
+    projectBusinessName,
+    projectTargetDomain,
+    projectBrandAliases,
+    projectDomainAliases
+  )
+  const projectDomainList = buildDomainList(projectTargetDomain, projectDomainAliases)
 
   // Fetch recent runs
   const { data: runs, error: runsError } = await admin
@@ -439,6 +447,7 @@ export async function GET(request: Request) {
           responseText: (r.response_text as string | null) ?? null,
           brandVariants,
           targetDomain: projectTargetDomain,
+          domainList: projectDomainList,
           mentioned: (r.mentioned as boolean | null) ?? false,
           cited: (r.target_cited as boolean | null) ?? false,
           citations: citationsForResult,
@@ -506,6 +515,13 @@ export async function GET(request: Request) {
           displayCited: display.displayCited,
           displayBrandLabels: display.displayBrandLabels,
           displayDomainLabel: display.displayDomainLabel,
+          // Strict 4-signal model — mention in answer vs citation as source.
+          mentionedInAnswer: display.mentionedInAnswer,
+          citedAsSource: display.citedAsSource,
+          domainMentioned: display.domainMentioned,
+          brandMentioned: display.brandMentioned,
+          domainInAnswerLabel: display.domainInAnswerLabel,
+          domainInSourceLabel: display.domainInSourceLabel,
           geoInsights,
         }
       }),

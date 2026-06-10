@@ -238,6 +238,16 @@ const STRINGS = {
   // Result row enrichments
   what_was_mentioned: { he: 'מה הוזכר', en: 'What was mentioned' },
   what_was_cited: { he: 'מה צוטט', en: 'What was cited' },
+
+  // Strict mention-vs-source signal labels
+  mentioned_in_answer: { he: 'אוזכר בתשובה', en: 'Mentioned in answer' },
+  not_mentioned_in_answer: { he: 'לא אוזכר בתשובה', en: 'Not mentioned in answer' },
+  appeared_as_source: { he: 'הופיע כמקור', en: 'Appeared as source' },
+  not_appeared_as_source: { he: 'לא הופיע כמקור', en: 'Not a source' },
+  mentioned_and_source: { he: 'אוזכר והופיע כמקור', en: 'Mentioned & cited as source' },
+  brand_mentioned: { he: 'מותג אוזכר', en: 'Brand mentioned' },
+  domain_mentioned: { he: 'דומיין אוזכר', en: 'Domain mentioned' },
+  what_appeared_as_source: { he: 'מה הופיע כמקור', en: 'What appeared as a source' },
   view_details: { he: 'פרטים', en: 'Details' },
   scanned_at: { he: 'נסרק', en: 'Scanned' },
 

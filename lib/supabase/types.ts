@@ -75,6 +75,10 @@ export interface Project {
   name: string
   target_domain: string
   business_name: string | null
+  // AI Visibility — extra aliases used to recognise the business / site in AI
+  // answers and their source lists. Default to empty arrays.
+  brand_aliases?: string[]
+  domain_aliases?: string[]
   country: string
   language: string
   city: string | null

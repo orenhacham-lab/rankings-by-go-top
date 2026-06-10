@@ -41,6 +41,7 @@ import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
 import { normalizeDomain } from '@/lib/ai-visibility/matching/domain-normalize'
+import { computeDisplayMatches, buildDomainList } from '@/lib/ai-visibility/display-classification'
 import type { GeoInsights, QueryIntent, CitationType } from '@/lib/ai-visibility/geo-signals'
 import { generateGeoExplanation } from '@/lib/ai-visibility/geo-explanations'
 import { generateGeoRecommendations } from '@/lib/ai-visibility/geo-recommendations'
@@ -84,6 +85,15 @@ type ResultRow = {
   displayCited: boolean
   displayBrandLabels: string[]
   displayDomainLabel: string | null
+  // Strict 4-signal model — distinguishes an answer-text mention from a
+  // source/citation. citedAsSource is true ONLY when a project domain is in the
+  // sources list (never when the domain merely appears in the answer body).
+  mentionedInAnswer: boolean
+  citedAsSource: boolean
+  domainMentioned: boolean
+  brandMentioned: boolean
+  domainInAnswerLabel: string | null
+  domainInSourceLabel: string | null
   // GEO Insights — server-computed, rule-based, read-only. Drawer-only UI.
   geoInsights: GeoInsights | null
 }
@@ -150,6 +160,8 @@ export default function AIVisibilitySection({
   projectLanguage,
   projectDomain,
   projectBrandName,
+  projectBrandAliases,
+  projectDomainAliases,
   projectCity,
   projectKeywords,
 }: {
@@ -158,6 +170,8 @@ export default function AIVisibilitySection({
   projectLanguage: string | null
   projectDomain: string | null
   projectBrandName: string | null
+  projectBrandAliases?: string[] | null
+  projectDomainAliases?: string[] | null
   projectCity?: string | null
   projectKeywords?: string[]
 }) {
@@ -221,10 +235,17 @@ export default function AIVisibilitySection({
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysisData | null>(null)
   const [competitorAnalysisStatus, setCompetitorAnalysisStatus] = useState<'idle' | 'loading' | 'loaded' | 'error' | 'empty'>('idle')
 
-  // Build brand variants once for reuse in result rows (mention chips)
+  // Build brand variants once for reuse in result rows (mention chips).
+  // Includes project-level brand & domain aliases so e.g. "Samsung Israel" or
+  // "samsungmobile.co.il" are recognised.
   const brandVariants = useMemo(
-    () => getBrandVariants(projectBrandName, projectDomain),
-    [projectBrandName, projectDomain]
+    () => getBrandVariants(projectBrandName, projectDomain, projectBrandAliases, projectDomainAliases),
+    [projectBrandName, projectDomain, projectBrandAliases, projectDomainAliases]
+  )
+  // Normalized project domains (primary + aliases) for citation + mention checks.
+  const domainList = useMemo(
+    () => buildDomainList(projectDomain, projectDomainAliases),
+    [projectDomain, projectDomainAliases]
   )
   const normalizedTargetDomain = useMemo(
     () => (projectDomain ? normalizeDomain(projectDomain) : null),
@@ -305,6 +326,17 @@ export default function AIVisibilitySection({
             displayCited: hasDisplay ? result.displayCited : (result.targetCited || false),
             displayBrandLabels: Array.isArray(result.displayBrandLabels) ? result.displayBrandLabels : [],
             displayDomainLabel: typeof result.displayDomainLabel === 'string' ? result.displayDomainLabel : null,
+            // Strict signals — fall back to display flags on older API payloads.
+            mentionedInAnswer: typeof result.mentionedInAnswer === 'boolean'
+              ? result.mentionedInAnswer
+              : (hasDisplay ? result.displayMentioned : (result.mentioned || false)),
+            citedAsSource: typeof result.citedAsSource === 'boolean'
+              ? result.citedAsSource
+              : (hasDisplay ? result.displayCited : (result.targetCited || false)),
+            domainMentioned: typeof result.domainMentioned === 'boolean' ? result.domainMentioned : false,
+            brandMentioned: typeof result.brandMentioned === 'boolean' ? result.brandMentioned : false,
+            domainInAnswerLabel: typeof result.domainInAnswerLabel === 'string' ? result.domainInAnswerLabel : null,
+            domainInSourceLabel: typeof result.domainInSourceLabel === 'string' ? result.domainInSourceLabel : null,
             geoInsights: result.geoInsights ?? null,
           })
         }
@@ -1598,6 +1630,7 @@ export default function AIVisibilitySection({
                     highlighted={highlightResultId === r.id}
                     brandVariants={brandVariants}
                     targetDomain={normalizedTargetDomain}
+                    domainList={domainList}
                     isHebrew={isHebrew}
                     onRowClick={openResultDrawer}
                     onArchiveToggle={handleArchiveResult}
@@ -2023,6 +2056,7 @@ export default function AIVisibilitySection({
           result={selectedResult}
           brandVariants={brandVariants}
           targetDomain={normalizedTargetDomain}
+          domainList={domainList}
           isHebrew={isHebrew}
           onClose={() => {
             setDrawerOpen(false)
@@ -2488,104 +2522,54 @@ function isTargetCitation(citationDomain: string | null | undefined, targetDomai
   return c === t
 }
 
+/**
+ * Re-evaluate a result's signals for display. Delegates to the shared
+ * computeDisplayMatches so the client, server and scripts stay in lock-step.
+ *
+ * Strict separation:
+ *   - A project domain in the ANSWER body → mention (reMentioned), never reCited.
+ *   - reCited is true ONLY when a project domain is in the SOURCES list.
+ *
+ * `domainList` carries the project domain + any domain aliases.
+ */
 function findMatchedLabels(
   responseText: string | null,
   brandVariants: string[],
   targetDomain: string | null,
   mentioned: boolean,
   cited: boolean,
-  citations?: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }> | null
-): { brandLabels: string[]; domainLabel: string | null; reMentioned: boolean; reCited: boolean } {
-  const brandLabels: string[] = []
-  let domainLabel: string | null = null
-  // Fallback to DB-stored values when we can't re-evaluate
-  let reMentioned = mentioned
-  let reCited = cited
+  citations?: Array<{ domain: string; is_target_domain: boolean; url: string; title?: string | null }> | null,
+  domainList?: string[]
+): {
+  brandLabels: string[]
+  domainLabel: string | null
+  reMentioned: boolean
+  reCited: boolean
+  reBrandMentioned: boolean
+  reDomainMentioned: boolean
+  domainInAnswerLabel: string | null
+  domainInSourceLabel: string | null
+} {
+  const d = computeDisplayMatches({
+    responseText,
+    brandVariants,
+    targetDomain,
+    domainList: domainList ?? buildDomainList(targetDomain),
+    mentioned,
+    cited,
+    citations: citations ?? null,
+  })
 
-  // A variant is "domain-form" if it looks like a URL or domain (has TLD, www, or scheme).
-  // This is a CLASSIFICATION check — detection itself is unchanged.
-  const isDomainForm = (s: string): boolean => {
-    const t = s.toLowerCase().trim()
-    if (/^https?:\/\//.test(t)) return true
-    if (/^www\./.test(t)) return true
-    if (/\.[a-z]{2,}(\/|$|\?|#)/.test(t)) return true
-    return false
+  return {
+    brandLabels: d.displayBrandLabels,
+    domainLabel: d.displayDomainLabel,
+    reMentioned: d.mentionedInAnswer,
+    reCited: d.citedAsSource,
+    reBrandMentioned: d.brandMentioned,
+    reDomainMentioned: d.domainMentioned,
+    domainInAnswerLabel: d.domainInAnswerLabel,
+    domainInSourceLabel: d.domainInSourceLabel,
   }
-
-  if (responseText) {
-    // We can re-evaluate precisely from the actual text — reset and rebuild
-    // so domain-only responses do not falsely flag as "mentioned".
-    reMentioned = false
-    reCited = false
-
-    const lower = responseText.toLowerCase()
-
-    // Find every variant that appears in the response (detection unchanged)
-    const matched: string[] = []
-    for (const v of brandVariants) {
-      if (lower.includes(v.toLowerCase())) matched.push(v)
-    }
-
-    // Filter to most specific matches (drop shorter substrings of longer matches)
-    const filtered: string[] = []
-    for (const variant of matched) {
-      const variantLower = variant.toLowerCase()
-      const isShorterSubstring = matched.some(
-        (other) => other !== variant &&
-        other.toLowerCase().includes(variantLower) &&
-        other.length > variant.length
-      )
-      if (!isShorterSubstring) filtered.push(variant)
-    }
-
-    // Strict classification:
-    //   domain-form match  → reCited only  (never reMentioned)
-    //   brand-form match   → reMentioned only  (never reCited)
-    for (const v of filtered) {
-      if (isDomainForm(v)) {
-        if (!domainLabel || v.length > domainLabel.length) {
-          domainLabel = v
-        }
-        reCited = true
-      } else {
-        brandLabels.push(v)
-        reMentioned = true
-      }
-    }
-
-    // Explicit targetDomain substring check (only contributes to reCited)
-    if (targetDomain) {
-      const cleaned = targetDomain.toLowerCase()
-      if (
-        lower.includes(cleaned) ||
-        lower.includes(`www.${cleaned}`) ||
-        lower.includes(`https://${cleaned}`) ||
-        lower.includes(`http://${cleaned}`)
-      ) {
-        if (!domainLabel) domainLabel = targetDomain
-        reCited = true
-      }
-    }
-  }
-
-  // Check citations for target domain match. Citations contribute ONLY to
-  // reCited — having the domain in the sources list is a citation, not a mention.
-  if (citations && citations.length > 0 && targetDomain) {
-    for (const c of citations) {
-      if (c.is_target_domain || isTargetCitation(c.domain, targetDomain)) {
-        if (!domainLabel) domainLabel = c.domain || targetDomain
-        reCited = true
-        break
-      }
-    }
-  }
-
-  if (reCited && targetDomain && !domainLabel) domainLabel = targetDomain
-
-  // Final display cleanup: strip protocols / query params from the domain label
-  const displayDomain = cleanDisplayDomain(domainLabel)
-
-  return { brandLabels: Array.from(new Set(brandLabels)), domainLabel: displayDomain, reMentioned, reCited }
 }
 
 function ResultRowCard({
@@ -2593,6 +2577,7 @@ function ResultRowCard({
   highlighted,
   brandVariants,
   targetDomain,
+  domainList,
   isHebrew,
   onRowClick,
   onArchiveToggle,
@@ -2603,6 +2588,7 @@ function ResultRowCard({
   highlighted: boolean
   brandVariants: string[]
   targetDomain: string | null
+  domainList?: string[]
   isHebrew: boolean
   onRowClick: (r: ResultRow) => void
   onArchiveToggle: (resultId: string, newExcludedState: boolean) => void
@@ -2622,12 +2608,13 @@ function ResultRowCard({
     targetDomain,
     result.mentioned,
     result.targetCited,
-    result.citations
+    result.citations,
+    domainList
   )
   const brandLabels = result.responseText ? live.brandLabels : result.displayBrandLabels
-  const domainLabel = result.responseText ? live.domainLabel : result.displayDomainLabel
   const reMentioned = result.responseText ? live.reMentioned : result.displayMentioned
   const reCited = result.responseText ? live.reCited : result.displayCited
+  const reDomainInSource = result.responseText ? live.domainInSourceLabel : result.domainInSourceLabel
 
   const scannedAtStr = result.scannedAt ? formatShortDateTime(result.scannedAt, isHebrew) : null
 
@@ -2716,15 +2703,24 @@ function ResultRowCard({
 
             {!result.excludedFromScore && (
               <>
-                {reMentioned ? (
-                  <Badge variant="success" className="!text-xs">{t('mentioned')}</Badge>
+                {/* Strict separation: a mention in the answer is NOT a source
+                    citation. Only reCited (domain in the sources list) shows
+                    "appeared as source". */}
+                {reMentioned && reCited ? (
+                  <Badge variant="success" className="!text-xs">{t('mentioned_and_source')}</Badge>
                 ) : (
-                  <Badge variant="neutral" className="!text-xs">{t('not_mentioned')}</Badge>
-                )}
-                {reCited ? (
-                  <Badge variant="info" className="!text-xs">{t('target_cited')}</Badge>
-                ) : (
-                  <Badge variant="neutral" className="!text-xs">{t('not_cited')}</Badge>
+                  <>
+                    {reMentioned ? (
+                      <Badge variant="success" className="!text-xs">{t('mentioned_in_answer')}</Badge>
+                    ) : (
+                      <Badge variant="neutral" className="!text-xs">{t('not_mentioned_in_answer')}</Badge>
+                    )}
+                    {reCited ? (
+                      <Badge variant="info" className="!text-xs">{t('appeared_as_source')}</Badge>
+                    ) : (
+                      <Badge variant="neutral" className="!text-xs">{t('not_appeared_as_source')}</Badge>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -2736,8 +2732,10 @@ function ResultRowCard({
             )}
           </div>
 
-          {/* Row 3: matched variants — only when something was matched and not archived */}
-          {!result.excludedFromScore && (brandLabels.length > 0 || domainLabel) && (
+          {/* Row 3: matched variants — only when something was matched and not archived.
+              "Mentioned" chips = brand aliases + any domain seen in the answer body.
+              "Appeared as source" chip = the project domain found in the sources list. */}
+          {!result.excludedFromScore && (brandLabels.length > 0 || reDomainInSource) && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
               {brandLabels.length > 0 && (
                 <div className="inline-flex items-center gap-1.5 flex-wrap">
@@ -2752,11 +2750,11 @@ function ResultRowCard({
                   ))}
                 </div>
               )}
-              {domainLabel && (
+              {reDomainInSource && (
                 <div className="inline-flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{t('what_was_cited')}:</span>
+                  <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{t('what_appeared_as_source')}:</span>
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                    {domainLabel}
+                    {reDomainInSource}
                   </span>
                 </div>
               )}
@@ -2920,6 +2918,7 @@ function ResultDetailDrawer({
   result,
   brandVariants,
   targetDomain,
+  domainList,
   isHebrew,
   onClose,
   t,
@@ -2928,6 +2927,7 @@ function ResultDetailDrawer({
   result: ResultRow
   brandVariants: string[]
   targetDomain: string | null
+  domainList?: string[]
   isHebrew: boolean
   onClose: () => void
   t: T
@@ -2943,12 +2943,13 @@ function ResultDetailDrawer({
     targetDomain,
     result.mentioned,
     result.targetCited,
-    result.citations
+    result.citations,
+    domainList
   )
   const brandLabels = result.responseText ? live.brandLabels : result.displayBrandLabels
-  const domainLabel = result.responseText ? live.domainLabel : result.displayDomainLabel
   const reMentioned = result.responseText ? live.reMentioned : result.displayMentioned
   const reCited = result.responseText ? live.reCited : result.displayCited
+  const reDomainInSource = result.responseText ? live.domainInSourceLabel : result.domainInSourceLabel
 
   function cleanResponseText(text: string): string {
     if (!text) return ''
@@ -2988,19 +2989,19 @@ function ResultDetailDrawer({
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('scan_activity')}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-xs text-slate-600 dark:text-slate-300">{t('mentioned')}</div>
+                <div className="text-xs text-slate-600 dark:text-slate-300">{t('mentioned_in_answer')}</div>
                 <div className={`text-lg font-bold ${reMentioned ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                   {reMentioned ? '✓' : '—'}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-blue-600 dark:text-blue-400">{t('target_cited')}</div>
+                <div className="text-xs text-blue-600 dark:text-blue-400">{t('appeared_as_source')}</div>
                 <div className={`text-lg font-bold ${reCited ? 'text-blue-700 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
                   {reCited ? '✓' : '—'}
                 </div>
               </div>
             </div>
-            {(brandLabels.length > 0 || domainLabel) && (
+            {(brandLabels.length > 0 || reDomainInSource) && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3">
                 {brandLabels.length > 0 && (
                   <div className="inline-flex items-center gap-1.5 flex-wrap">
@@ -3015,11 +3016,11 @@ function ResultDetailDrawer({
                     ))}
                   </div>
                 )}
-                {domainLabel && (
+                {reDomainInSource && (
                   <div className="inline-flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{t('what_was_cited')}:</span>
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">{t('what_appeared_as_source')}:</span>
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      {domainLabel}
+                      {reDomainInSource}
                     </span>
                   </div>
                 )}

@@ -156,7 +156,9 @@ function splitCompound(input: string): string {
  */
 export function getBrandVariants(
   brandName: string | null | undefined,
-  domain: string | null | undefined
+  domain: string | null | undefined,
+  brandAliases?: string[] | null,
+  domainAliases?: string[] | null
 ): string[] {
   const variants = new Set<string>()
   const push = (s: string | null | undefined) => {
@@ -165,12 +167,37 @@ export function getBrandVariants(
     if (trimmed.length >= 2) variants.add(trimmed)
   }
 
+  // 0. Explicit project-level brand aliases (Hebrew + English).
+  //    Each alias is expanded the same way the business name is.
+  for (const alias of brandAliases ?? []) {
+    if (!alias) continue
+    for (const a of extractAliases(alias)) push(a)
+    const noSpaces = alias.replace(/\s+/g, '').toLowerCase()
+    if (noSpaces.length >= 4 && noSpaces !== alias.toLowerCase()) push(noSpaces)
+  }
+
   // 1. Business name as-is, aliases, and segments
   if (brandName) {
     for (const a of extractAliases(brandName)) push(a)
     // Tight-join multi-word names — "Perfume Club" → "perfumeclub"
     const noSpaces = brandName.replace(/\s+/g, '').toLowerCase()
     if (noSpaces.length >= 4 && noSpaces !== brandName.toLowerCase()) push(noSpaces)
+  }
+
+  // 1b. Explicit domain aliases — push full host + www + bare first label,
+  //     so they are recognised both as domain mentions and brand tokens.
+  for (const alias of domainAliases ?? []) {
+    if (!alias) continue
+    const cleaned = alias
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase()
+    if (!cleaned) continue
+    push(cleaned)
+    push(`www.${cleaned}`)
+    const firstLabel = cleaned.split('.')[0]
+    if (firstLabel && firstLabel.length >= 3) push(firstLabel)
   }
 
   // 2. Extract brand-part from domain (perfumeclub.co.il → perfumeclub)

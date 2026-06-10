@@ -388,6 +388,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             projectLanguage={project.language}
             projectDomain={project.target_domain}
             projectBrandName={project.business_name}
+            projectBrandAliases={project.brand_aliases}
+            projectDomainAliases={project.domain_aliases}
             projectCity={project.city}
             projectKeywords={targets.map((t) => t.keyword).filter(Boolean)}
           />
