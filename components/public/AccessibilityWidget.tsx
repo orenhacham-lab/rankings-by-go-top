@@ -134,20 +134,24 @@ function applyState(s: A11yState) {
   // ── Black + Yellow mode ───────────────────────────────────────────────
   injectStyle('a11y-black-yellow', s.blackYellow ? `
     html,body{background:#000!important}
-    body *{background-color:#000!important;color:#ff0!important;border-color:#ff0!important}
-    a{color:#ff0!important;text-decoration:underline!important}
-    button,[role=button]{background:#111!important;color:#ff0!important;border:1px solid #ff0!important}
-    input,select,textarea{background:#111!important;color:#ff0!important;border:1px solid #ff0!important}
+    *{background-color:#000!important!important;color:#ff0!important;border-color:#ff0!important;outline-color:#ff0!important}
+    a{color:#ff0!important;text-decoration:underline!important;font-weight:bold!important}
+    button,[role=button]{background:#111!important;color:#ff0!important;border:2px solid #ff0!important}
+    input,select,textarea{background:#111!important;color:#ff0!important;border:2px solid #ff0!important}
+    img{opacity:.85;border:1px solid #ff0!important}
+    ::placeholder{color:#ff0!important;opacity:.7!important}
   ` : null)
 
   // ── High contrast mode ────────────────────────────────────────────────
   injectStyle('a11y-high-contrast', s.highContrast ? `
     html,body{background:#000!important;color:#fff!important}
-    body *{color:#fff!important}
-    a{color:#7ad4ff!important;text-decoration:underline!important}
-    button,[role=button]{background:#222!important;color:#fff!important;border:1px solid #fff!important}
-    input,select,textarea{background:#111!important;color:#fff!important;border:1px solid #ccc!important}
-    img{opacity:.85}
+    *{background-color:#000!important;color:#fff!important!important;border-color:#fff!important;outline-color:#fff!important}
+    a{color:#7ad4ff!important;text-decoration:underline!important;font-weight:bold!important}
+    button,[role=button]{background:#111!important;color:#fff!important;border:2px solid #fff!important;font-weight:bold!important}
+    input,select,textarea{background:#1a1a1a!important;color:#fff!important;border:2px solid #ccc!important}
+    input::placeholder,textarea::placeholder{color:#999!important}
+    img{opacity:.9;border:1px solid #ccc!important}
+    h1,h2,h3,h4,h5,h6{color:#fff!important;font-weight:900!important}
   ` : null)
 
   // ── Keyboard navigation (enhanced focus ring) ─────────────────────────
