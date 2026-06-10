@@ -488,6 +488,38 @@ export const dashboardEn = {
       aiVisibilityReport: 'AI Visibility Report',
     },
   },
+  onboarding: {
+    title: 'Welcome! Let\'s get started',
+    subtitle: 'Let\'s walk through the first steps together',
+    steps: {
+      createClient: {
+        title: 'Create your first client',
+        description: 'Add your first client to the system. A client can include multiple projects.',
+        action: 'Create client',
+      },
+      createProject: {
+        title: 'Create a project',
+        description: 'Select a client and create a project for your domain. This is where you\'ll track your keywords.',
+        action: 'Create project',
+      },
+      keywordResearch: {
+        title: 'Research keywords',
+        description: 'Use the keyword research tool to discover ideas and understand search volume and market competition.',
+        action: 'Go to keyword research',
+      },
+      generateReports: {
+        title: 'View reports',
+        description: 'View detailed reports of your rankings and AI visibility. Track your progress over time.',
+        action: 'Go to reports',
+      },
+    },
+    buttons: {
+      next: 'Next',
+      skip: 'Skip',
+      done: 'Done',
+      skipAll: 'Skip all',
+    },
+  },
   keywordResearch: {
     title: 'Keyword Research',
     subtitle: 'Discover keyword ideas, search volume, competition, and estimated CPC data from Google Ads.',

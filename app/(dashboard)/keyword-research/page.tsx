@@ -763,7 +763,7 @@ export default function KeywordResearchPage() {
   }
 
   return (
-    <div className={`max-w-6xl mx-auto ${isRTL ? 'rtl' : 'ltr'}`}>
+    <div className={`max-w-6xl mx-auto ${isRTL ? 'rtl' : 'ltr'}`} data-onboarding-keyword-research>
       {/* Header */}
       <div className={`mb-8 ${isRTL ? 'text-right' : 'text-left'}`}>
         <h1 className="text-3xl font-bold mb-2 dark:text-slate-100">{t.title}</h1>

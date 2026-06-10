@@ -8,6 +8,7 @@ import { ScanStatusBadge, PositionChange, EngineBadge } from '@/components/ui/St
 import { formatDateTime } from '@/lib/utils'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { DashboardOnboardingTour } from '@/components/onboarding/DashboardOnboardingTour'
 import Link from 'next/link'
 import { Users, Folder, KeyRound, Search, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 
@@ -154,6 +155,11 @@ export default function DashboardPage() {
 
   return (
     <div>
+      <DashboardOnboardingTour
+        totalClients={stats.totalClients}
+        totalProjects={stats.totalProjects}
+      />
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{dict.home.title}</h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">{dict.home.welcome}</p>
@@ -161,8 +167,12 @@ export default function DashboardPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label={dict.home.activeClients} value={stats.totalClients} icon={Users} color="indigo" href="/clients" />
-        <StatCard label={dict.home.activeProjects} value={stats.totalProjects} icon={Folder} color="indigo" href="/projects" />
+        <div data-onboarding-create-client>
+          <StatCard label={dict.home.activeClients} value={stats.totalClients} icon={Users} color="indigo" href="/clients" />
+        </div>
+        <div data-onboarding-create-project>
+          <StatCard label={dict.home.activeProjects} value={stats.totalProjects} icon={Folder} color="indigo" href="/projects" />
+        </div>
         <StatCard label={dict.home.keywords} value={stats.totalKeywords} icon={KeyRound} color="indigo" href="/keywords" />
         <StatCard label={dict.home.scansPerformed} value={stats.totalScans} icon={Search} color="indigo" href="/scans" />
       </div>
@@ -200,10 +210,18 @@ export default function DashboardPage() {
         <Card>
           <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">{dict.home.quickLinks}</h2>
           <div className="grid grid-cols-2 gap-3">
-            <QuickLink href="/clients" icon={Users} label={dict.sidebar.clients} sub={dict.home.clientsManagement} />
-            <QuickLink href="/projects" icon={Folder} label={dict.sidebar.projects} sub={dict.home.allProjects} />
-            <QuickLink href="/keywords" icon={KeyRound} label={dict.sidebar.keywords} sub={dict.home.trackingPhrases} />
-            <QuickLink href="/reports" icon={FileText} label={dict.sidebar.reports} sub={dict.home.excelAndPdf} />
+            <div data-onboarding-create-client>
+              <QuickLink href="/clients" icon={Users} label={dict.sidebar.clients} sub={dict.home.clientsManagement} />
+            </div>
+            <div data-onboarding-create-project>
+              <QuickLink href="/projects" icon={Folder} label={dict.sidebar.projects} sub={dict.home.allProjects} />
+            </div>
+            <div data-onboarding-keyword-research>
+              <QuickLink href="/keyword-research" icon={KeyRound} label={dict.sidebar.keywordResearch} sub={dict.home.trackingPhrases} />
+            </div>
+            <div data-onboarding-reports>
+              <QuickLink href="/reports" icon={FileText} label={dict.sidebar.reports} sub={dict.home.excelAndPdf} />
+            </div>
           </div>
         </Card>
       </div>

@@ -486,6 +486,38 @@ export const dashboardHe = {
       aiVisibilityReport: 'דוח נראות ב-AI',
     },
   },
+  onboarding: {
+    title: 'ברוך הבא! בואו נתחיל',
+    subtitle: 'בואו ניהל יחד את הצעדים הראשונים שלך',
+    steps: {
+      createClient: {
+        title: 'צור לקוח ראשון',
+        description: 'הוסף את הלקוח הראשון שלך במערכת. לקוח יכול לכלול מספר פרויקטים.',
+        action: 'צור לקוח',
+      },
+      createProject: {
+        title: 'צור פרויקט',
+        description: 'בחר לקוח וצור פרויקט לדומיין שלך. זה המקום בו תעקוב אחרי מילות המפתח שלך.',
+        action: 'צור פרויקט',
+      },
+      keywordResearch: {
+        title: 'חקור ביטויים',
+        description: 'השתמש בכלי מחקר הביטויים כדי לגלות רעיונות ולהבין את נפח החיפוש ותחרות השוק.',
+        action: 'עבור למחקר ביטויים',
+      },
+      generateReports: {
+        title: 'צפה בדוחות',
+        description: 'צפה בדוחות מפורטים של דירוגיך ונראותך ב-AI. עקוב אחרי התקדמות לאורך זמן.',
+        action: 'עבור לדוחות',
+      },
+    },
+    buttons: {
+      next: 'הבא',
+      skip: 'דלג',
+      done: 'סיום',
+      skipAll: 'דלג על הכל',
+    },
+  },
   keywordResearch: {
     title: 'מחקר ביטויים',
     subtitle: 'גלו רעיונות לביטויים, נפחי חיפוש, תחרות ועלויות משוערות לפי נתוני Google Ads.',
