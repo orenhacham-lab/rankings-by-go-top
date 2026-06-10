@@ -67,6 +67,7 @@ export default function EnglishPrivacyPage() {
                 <li><strong>Supabase:</strong> for secure data storage</li>
                 <li><strong>Serper:</strong> for Google search queries</li>
                 <li><strong>Vercel:</strong> for site hosting</li>
+                <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below</li>
                 <li>When required by law</li>
               </ul>
             </section>
@@ -127,6 +128,30 @@ export default function EnglishPrivacyPage() {
             </section>
 
             <section>
+              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Meta Advertising (Facebook / Instagram)</h2>
+              <p>
+                We use the Meta Pixel (Facebook Pixel) to run advertising campaigns on Facebook and Instagram. The Pixel
+                allows us to measure conversion events (such as completing a signup), build custom audiences, and show
+                relevant ads to people who have visited our site.
+              </p>
+              <p className="mt-4">Information that may be collected and sent to Meta includes:</p>
+              <ul className="list-disc list-inside space-y-2">
+                <li>Browsing data and pages visited on our site</li>
+                <li>Conversion events (such as registering for the service)</li>
+                <li>IP address and browser technical information</li>
+                <li>Information collected via Meta cookies</li>
+              </ul>
+              <p className="mt-4">
+                This use is subject to the privacy policy of Meta Platforms, Inc., available at{' '}
+                <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  facebook.com/privacy/policy
+                </a>
+                {'. '}
+                You can opt out of personalised advertising through your Facebook account&rsquo;s privacy settings.
+              </p>
+            </section>
+
+            <section>
               <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Contacting Us via WhatsApp</h2>
               <p>
                 Our site and services may offer an option to contact us via WhatsApp. When a user chooses to contact us
@@ -181,7 +206,7 @@ export default function EnglishPrivacyPage() {
 
             <section>
               <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
-                This policy was last updated in May 2026
+                This policy was last updated in June 2026
               </p>
             </section>
           </div>

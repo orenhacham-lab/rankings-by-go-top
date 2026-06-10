@@ -66,6 +66,7 @@ export default function PrivacyPage() {
               <li><strong>Supabase:</strong> לאחסון נתונים מאובטח</li>
               <li><strong>Serper:</strong> לביצוע חיפושים בגוגל</li>
               <li><strong>Vercel:</strong> להנעת האתר</li>
+              <li><strong>Meta (Facebook / Instagram):</strong> לצורך פרסום ממוקד — ראה פירוט בסעיף שירותי פרסום מטא</li>
               <li>כאשר דרוש על פי חוק</li>
             </ul>
           </section>
@@ -135,6 +136,30 @@ export default function PrivacyPage() {
           </section>
 
           <section>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שירותי פרסום מטא (Meta / Facebook)</h2>
+            <p>
+              אנו משתמשים ב-Meta Pixel (פיקסל פייסבוק) לצורך ניהול קמפיינים פרסומיים ב-Facebook ו-Instagram. הפיקסל מאפשר לנו למדוד אירועי המרה (לדוגמה: השלמת הרשמה), לבנות קהלי פרסום מותאמים, ולהציג מודעות רלוונטיות.
+            </p>
+            <p className="mt-4">
+              המידע שעשוי להיאסף ולהישלח למטא כולל:
+            </p>
+            <ul className="list-disc list-inside space-y-2">
+              <li>נתוני גלישה ועמודים שבוקרו באתר</li>
+              <li>אירועי המרה (כגון הרשמה לשירות)</li>
+              <li>כתובת IP ומידע טכני על הדפדפן</li>
+              <li>מידע שנאסף באמצעות עוגיות Meta</li>
+            </ul>
+            <p className="mt-4">
+              שימוש זה כפוף למדיניות הפרטיות של Meta Platforms, Inc. ניתן לעיין בה בכתובת{' '}
+              <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                facebook.com/privacy/policy
+              </a>
+              {'. '}
+              ניתן לבטל פרסום מותאם אישית באמצעות הגדרות הפרטיות של חשבון Facebook שלך.
+            </p>
+          </section>
+
+          <section>
             <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">פנייה אלינו באמצעות WhatsApp</h2>
             <p>
               באתר ובשירותים שלנו עשויה להופיע אפשרות ליצור איתנו קשר באמצעות WhatsApp. כאשר משתמש בוחר לפנות אלינו באמצעות WhatsApp, אנו עשויים לקבל ולעבד את המידע שנמסר במסגרת הפנייה, לרבות שם, מספר טלפון, תוכן ההודעות, קבצים או תמונות שנשלחו אלינו מיוזמת המשתמש, ופרטי התקשרות נוספים שנמסרו במסגרת השיחה.
@@ -178,7 +203,7 @@ export default function PrivacyPage() {
 
           <section>
             <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
-              מדיניות זו עודכנה לאחרונה באפריל 2026
+              מדיניות זו עודכנה לאחרונה ביוני 2026
             </p>
           </section>
         </div>
