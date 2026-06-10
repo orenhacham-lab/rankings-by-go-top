@@ -5,6 +5,65 @@ import Link from 'next/link'
 
 const STORAGE_KEY = 'a11y-settings-v2'
 
+// ── Module-level tooltip state for showDescriptions ───────────────────────────
+// Must live outside the component so applyState (called from localStorage) can
+// access them without a React ref.
+let _descTooltip: HTMLDivElement | null = null
+let _descCleanup: Array<() => void> = []
+
+function _positionTip(x: number, y: number) {
+  if (!_descTooltip) return
+  const W = window.innerWidth
+  const tipW = 250
+  const left = x + 16 + tipW > W ? x - tipW - 10 : x + 16
+  _descTooltip.style.left = `${left}px`
+  _descTooltip.style.top  = `${y + 24}px`
+}
+
+function _setupDescTooltip() {
+  _teardownDescTooltip()
+  if (typeof document === 'undefined') return
+
+  const tip = document.createElement('div')
+  tip.id = 'a11y-hover-tip'
+  tip.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;display:none;' +
+    'background:#1e293b;color:#f8fafc;padding:4px 10px;border-radius:5px;font-size:12px;' +
+    'line-height:1.5;max-width:250px;box-shadow:0 2px 10px rgba(0,0,0,.45);word-break:break-word'
+  document.body.appendChild(tip)
+  _descTooltip = tip
+
+  document.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+    const alt   = img.getAttribute('alt')?.trim()   ?? ''
+    const label = alt || '(ללא תיאור alt)'
+
+    const onEnter = (e: MouseEvent) => {
+      tip.textContent = label
+      tip.style.display = 'block'
+      _positionTip(e.clientX, e.clientY)
+    }
+    const onMove  = (e: MouseEvent) => _positionTip(e.clientX, e.clientY)
+    const onLeave = () => { tip.style.display = 'none' }
+
+    img.addEventListener('mouseenter', onEnter as EventListener)
+    img.addEventListener('mousemove',  onMove  as EventListener)
+    img.addEventListener('mouseleave', onLeave)
+
+    _descCleanup.push(() => {
+      img.removeEventListener('mouseenter', onEnter as EventListener)
+      img.removeEventListener('mousemove',  onMove  as EventListener)
+      img.removeEventListener('mouseleave', onLeave)
+    })
+  })
+}
+
+function _teardownDescTooltip() {
+  _descCleanup.forEach(fn => fn())
+  _descCleanup = []
+  _descTooltip?.remove()
+  _descTooltip = null
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 type A11yState = {
   textLevel: number    // -3..+3: negative = smaller, positive = larger
   zoomLevel: number    // -3..+3: negative = zoom out, positive = zoom in
@@ -100,28 +159,11 @@ function applyState(s: A11yState) {
     document.querySelectorAll('[data-a11y-desc]').forEach(el => el.removeAttribute('data-a11y-desc'))
   }
 
-  // ── Show descriptions (hover title tooltips) ──────────────────────────
+  // ── Show descriptions (custom hover tooltip) ─────────────────────────
   if (s.showDescriptions) {
-    document.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
-      const alt = img.getAttribute('alt') ?? ''
-      if (alt && !img.getAttribute('data-a11y-title-added')) {
-        img.setAttribute('data-a11y-title-added', '1')
-        if (!img.getAttribute('title')) img.setAttribute('title', alt)
-      }
-      img.setAttribute('data-a11y-noalt', alt ? 'false' : 'true')
-    })
-    document.querySelectorAll<HTMLElement>('[aria-label]:not(img)').forEach((el) => {
-      const label = el.getAttribute('aria-label') ?? ''
-      if (label && !el.getAttribute('title') && !el.getAttribute('data-a11y-title-added')) {
-        el.setAttribute('data-a11y-title-added', '1')
-        el.setAttribute('title', label)
-      }
-    })
+    _setupDescTooltip()
   } else {
-    document.querySelectorAll('[data-a11y-title-added]').forEach(el => {
-      el.removeAttribute('data-a11y-title-added')
-      el.removeAttribute('data-a11y-noalt')
-    })
+    _teardownDescTooltip()
   }
 
   // ── CSS filter: invert / sepia / grayscale ────────────────────────────
@@ -245,6 +287,10 @@ export function AccessibilityWidget() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [open])
 
+  // When any CSS filter is applied to <html>, the semi-transparent button disappears.
+  // Switching to a solid style makes it clearly visible even through sepia/grayscale/invert.
+  const anyColorFilter = state.sepia || state.grayscale || state.invertColors
+
   const activeCount = [
     state.textLevel !== 0,
     state.zoomLevel !== 0,
@@ -274,12 +320,23 @@ export function AccessibilityWidget() {
         aria-label="פתיחת תפריט נגישות"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="fixed left-3 top-1/2 z-[60] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white ring-1 ring-white/10 backdrop-blur transition-all duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300"
-        style={{ background: 'rgba(59,130,246,0.2)', opacity: 0.5, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.background = 'rgba(59,130,246,0.26)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5';  e.currentTarget.style.background = 'rgba(59,130,246,0.2)'  }}
-        onFocus={(e)      => { e.currentTarget.style.opacity = '0.95' }}
-        onBlur={(e)       => { e.currentTarget.style.opacity = '0.5'  }}
+        className={`fixed left-3 top-1/2 z-[60] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full ring-1 backdrop-blur transition-all duration-200 focus:outline-none focus-visible:ring-4 ${anyColorFilter ? 'text-slate-900 ring-black/30 focus-visible:ring-slate-800' : 'text-white ring-white/10 focus-visible:ring-blue-300'}`}
+        style={anyColorFilter
+          ? { background: 'rgba(255,255,255,0.95)', opacity: 1, boxShadow: '0 2px 12px rgba(0,0,0,0.35)', border: '2px solid rgba(0,0,0,0.25)' }
+          : { background: 'rgba(59,130,246,0.2)',   opacity: 0.5, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid rgba(255,255,255,0.1)' }
+        }
+        onMouseEnter={(e) => {
+          if (anyColorFilter) return
+          e.currentTarget.style.opacity = '0.92'
+          e.currentTarget.style.background = 'rgba(59,130,246,0.26)'
+        }}
+        onMouseLeave={(e) => {
+          if (anyColorFilter) return
+          e.currentTarget.style.opacity = '0.5'
+          e.currentTarget.style.background = 'rgba(59,130,246,0.2)'
+        }}
+        onFocus={(e) => { if (!anyColorFilter) e.currentTarget.style.opacity = '0.95' }}
+        onBlur={(e)  => { if (!anyColorFilter) e.currentTarget.style.opacity = '0.5'  }}
       >
         <svg viewBox="0 0 24 24" className="h-7 w-7 fill-current" aria-hidden="true">
           <path d="M12 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm8 5.5c0 .6-.4 1-1 1-1.9.3-3.8.5-5 .6V12l1.8 6.3a1 1 0 0 1-1.9.6L12 14.5l-1.9 4.4a1 1 0 0 1-1.9-.6L10 12V9.1c-1.2-.1-3.1-.3-5-.6a1 1 0 0 1 .3-2c2.4.4 5 .6 6.7.6 1.7 0 4.3-.2 6.7-.6.6-.1 1.1.4 1.3 1Z" />
