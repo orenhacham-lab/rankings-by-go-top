@@ -88,11 +88,9 @@ export default function ProjectsPage() {
         title={dict.projects.title}
         subtitle={`${dict.projects.countPrefix} ${projects.length} ${dict.projects.countSuffix}`}
         actions={
-          <div data-onboarding-create-project>
-            <Button onClick={() => setShowCreate(true)}>
-              {dict.projects.newProject}
-            </Button>
-          </div>
+          <Button onClick={() => setShowCreate(true)}>
+            {dict.projects.newProject}
+          </Button>
         }
       />
 

@@ -494,22 +494,22 @@ export const dashboardEn = {
     steps: {
       createClient: {
         title: 'Create your first client',
-        description: 'Add your first client to the system. A client can include multiple projects.',
+        description: 'Click the highlighted "Clients" menu to create your first client. A client can hold multiple projects.',
         action: 'Create client',
       },
       createProject: {
         title: 'Create a project',
-        description: 'Select a client and create a project for your domain. This is where you\'ll track your keywords.',
+        description: 'Use the "Projects" menu to create a project for your domain — this is where you track your keywords.',
         action: 'Create project',
       },
       keywordResearch: {
         title: 'Research keywords',
-        description: 'Use the keyword research tool to discover ideas and understand search volume and market competition.',
+        description: 'Open "Keyword Research" to discover ideas, search volume and competition from Google Ads data.',
         action: 'Go to keyword research',
       },
       generateReports: {
         title: 'View reports',
-        description: 'View detailed reports of your rankings and AI visibility. Track your progress over time.',
+        description: 'Head to "Reports" to see your rankings and AI visibility, and track progress over time.',
         action: 'Go to reports',
       },
     },

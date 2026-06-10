@@ -1,27 +1,38 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { X, ChevronRight } from 'lucide-react'
+import { X, ChevronLeft } from 'lucide-react'
 
 const STORAGE_KEY = 'rankings_dashboard_onboarding_completed'
 const CURRENT_STEP_KEY = 'rankings_dashboard_onboarding_step'
+const HIGHLIGHT_CLASS = 'onboarding-highlight'
+
+const TOOLTIP_WIDTH = 380
+const GAP = 16
+const MOBILE_BP = 768
 
 type TourStep = 'createClient' | 'createProject' | 'keywordResearch' | 'generateReports'
 
 interface TourConfig {
   step: TourStep
-  dataAttribute: string
-  actionOnClick?: boolean
+  // Reliable, always-present targets: the sidebar navigation items.
+  selector: string
 }
 
 const tourSteps: TourConfig[] = [
-  { step: 'createClient', dataAttribute: 'data-onboarding-create-client', actionOnClick: true },
-  { step: 'createProject', dataAttribute: 'data-onboarding-create-project', actionOnClick: true },
-  { step: 'keywordResearch', dataAttribute: 'data-onboarding-keyword-research', actionOnClick: true },
-  { step: 'generateReports', dataAttribute: 'data-onboarding-reports', actionOnClick: true },
+  { step: 'createClient', selector: '[data-onboarding="clients"]' },
+  { step: 'createProject', selector: '[data-onboarding="projects"]' },
+  { step: 'keywordResearch', selector: '[data-onboarding="keyword-research"]' },
+  { step: 'generateReports', selector: '[data-onboarding="reports"]' },
 ]
+
+interface TooltipPosition {
+  left: number
+  top: number
+  isMobile: boolean
+}
 
 interface DashboardOnboardingTourProps {
   totalClients: number
@@ -38,240 +49,228 @@ export function DashboardOnboardingTour({
   const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
   const t = dict.onboarding
 
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [isVisible, setIsVisible] = useState(false)
-  const [targetElement, setTargetElement] = useState<HTMLElement | null>(null)
-  const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null)
-  const tooltipRef = useRef<HTMLDivElement>(null)
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
+  const [position, setPosition] = useState<TooltipPosition | null>(null)
 
-  // Determine if we should skip any steps based on user progress
-  const getStartStep = () => {
-    if (totalClients === 0) return 0 // createClient
-    if (totalProjects === 0) return 1 // createProject
-    return 2 // keywordResearch
-  }
+  // Skip steps the user already finished (has clients → start at project, etc).
+  const getStartStep = useCallback(() => {
+    if (totalClients === 0) return 0
+    if (totalProjects === 0) return 1
+    return 2
+  }, [totalClients, totalProjects])
 
-  // Initialize tour
+  // Decide whether to run the tour at all (logic preserved from before).
   useEffect(() => {
-    // Check if already completed
-    const completed = localStorage.getItem(STORAGE_KEY)
-    if (completed === 'true') {
-      setIsCompleted(true)
-      return
-    }
+    if (typeof window === 'undefined') return
 
-    // Only show for new users (no clients or projects)
-    if (!shouldShowTour && totalClients > 0 && totalProjects > 0) {
-      setIsCompleted(true)
-      return
-    }
+    if (localStorage.getItem(STORAGE_KEY) === 'true') return
 
-    // Restore saved step or start from appropriate step
-    const savedStep = localStorage.getItem(CURRENT_STEP_KEY)
+    if (!shouldShowTour && totalClients > 0 && totalProjects > 0) return
+
     const startStep = getStartStep()
+    const savedStep = localStorage.getItem(CURRENT_STEP_KEY)
+    const parsed = savedStep ? parseInt(savedStep, 10) : NaN
+    const initialStep =
+      !Number.isNaN(parsed) && parsed >= startStep && parsed < tourSteps.length
+        ? parsed
+        : startStep
 
-    if (savedStep) {
-      const step = parseInt(savedStep, 10)
-      if (step >= startStep && step < tourSteps.length) {
-        setCurrentStepIndex(step)
-      } else {
-        setCurrentStepIndex(startStep)
-      }
-    } else {
-      setCurrentStepIndex(startStep)
-    }
-
+    setCurrentStepIndex(initialStep)
     setIsVisible(true)
-  }, [totalClients, totalProjects, shouldShowTour])
+  }, [totalClients, totalProjects, shouldShowTour, getStartStep])
 
-  // Find and highlight target element
+  // Locate the target for the current step, skipping any that are missing.
+  const resolveTarget = useCallback((fromIndex: number): { el: HTMLElement; index: number } | null => {
+    for (let i = fromIndex; i < tourSteps.length; i++) {
+      const el = document.querySelector(tourSteps[i].selector) as HTMLElement | null
+      if (el) return { el, index: i }
+    }
+    return null
+  }, [])
+
+  const computePosition = useCallback((el: HTMLElement): TooltipPosition => {
+    const rect = el.getBoundingClientRect()
+    const isMobile = window.innerWidth < MOBILE_BP
+
+    if (isMobile) {
+      // Bottom sheet — clean and predictable on small screens.
+      return { left: 0, top: 0, isMobile: true }
+    }
+
+    // Sidebar lives on the right (RTL). Prefer placing the card to its left.
+    let left = rect.left - TOOLTIP_WIDTH - GAP
+    let top = rect.top - 8
+
+    if (left < GAP) {
+      // Not enough room to the left → place below the element instead.
+      left = Math.max(GAP, Math.min(rect.left, window.innerWidth - TOOLTIP_WIDTH - GAP))
+      top = rect.bottom + GAP
+    }
+
+    // Keep the card fully on-screen vertically.
+    top = Math.max(GAP, Math.min(top, window.innerHeight - 300))
+
+    return { left, top, isMobile: false }
+  }, [])
+
+  // Apply the highlight ring + position the tooltip whenever the step changes.
   useEffect(() => {
-    if (!isVisible || isCompleted) return
+    if (!isVisible) return
 
-    const findTarget = () => {
-      const config = tourSteps[currentStepIndex]
-      if (!config) return null
+    const resolved = resolveTarget(currentStepIndex)
 
-      // Try to find by data attribute
-      const selector = `[${config.dataAttribute}]`
-      const element = document.querySelector(selector) as HTMLElement | null
-
-      return element
+    if (!resolved) {
+      // No target anywhere from here on → end gracefully (no black screen).
+      finishTour()
+      return
     }
 
-    const target = findTarget()
-    setTargetElement(target)
-
-    if (target) {
-      const rect = target.getBoundingClientRect()
-      setSpotlightRect(rect)
-
-      // Scroll target into view if needed
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-      // Handle click on target if specified
-      if (tourSteps[currentStepIndex]?.actionOnClick && target) {
-        const handleClick = () => {
-          // Small delay to let click register
-          setTimeout(() => {
-            moveNext()
-          }, 500)
-        }
-
-        target.addEventListener('click', handleClick, { once: true })
-        return () => {
-          target.removeEventListener('click', handleClick)
-        }
-      }
+    if (resolved.index !== currentStepIndex) {
+      setCurrentStepIndex(resolved.index)
+      return
     }
-  }, [isVisible, isCompleted, currentStepIndex])
 
-  const moveNext = () => {
-    if (currentStepIndex < tourSteps.length - 1) {
-      const nextIndex = currentStepIndex + 1
-      setCurrentStepIndex(nextIndex)
-      localStorage.setItem(CURRENT_STEP_KEY, nextIndex.toString())
-    } else {
-      completeTour()
+    const el = resolved.el
+    el.classList.add(HIGHLIGHT_CLASS)
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    setPosition(computePosition(el))
+
+    const reposition = () => setPosition(computePosition(el))
+    window.addEventListener('resize', reposition)
+    window.addEventListener('scroll', reposition, true)
+
+    return () => {
+      el.classList.remove(HIGHLIGHT_CLASS)
+      window.removeEventListener('resize', reposition)
+      window.removeEventListener('scroll', reposition, true)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, currentStepIndex])
 
-  const completeTour = () => {
+  function finishTour() {
     localStorage.setItem(STORAGE_KEY, 'true')
     localStorage.removeItem(CURRENT_STEP_KEY)
-    setIsCompleted(true)
+    // Defensive cleanup in case a highlight is still attached.
+    document.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((n) => n.classList.remove(HIGHLIGHT_CLASS))
     setIsVisible(false)
+    setPosition(null)
   }
 
-  const skipTour = () => {
-    completeTour()
+  const goNext = () => {
+    const next = resolveTarget(currentStepIndex + 1)
+    if (next) {
+      setCurrentStepIndex(next.index)
+      localStorage.setItem(CURRENT_STEP_KEY, next.index.toString())
+    } else {
+      finishTour()
+    }
   }
 
-  if (!isVisible || isCompleted) {
-    return null
-  }
+  if (!isVisible || !position) return null
 
   const currentConfig = tourSteps[currentStepIndex]
-  const currentStepData = t.steps[currentConfig?.step as TourStep]
+  const stepData = t.steps[currentConfig.step]
   const isLast = currentStepIndex === tourSteps.length - 1
+  const stepLabel =
+    language === 'he'
+      ? `שלב ${currentStepIndex + 1} מתוך ${tourSteps.length}`
+      : `Step ${currentStepIndex + 1} of ${tourSteps.length}`
+
+  const cardStyle: React.CSSProperties = position.isMobile
+    ? {
+        left: 16,
+        right: 16,
+        bottom: 16,
+        maxWidth: 'none',
+      }
+    : {
+        left: position.left,
+        top: position.top,
+        width: TOOLTIP_WIDTH,
+      }
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 z-40 pointer-events-auto">
-        {/* Semi-transparent dark overlay */}
-        <div className="absolute inset-0 bg-black bg-opacity-40" />
-
-        {/* Spotlight cutout */}
-        {spotlightRect && (
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            style={{
-              filter: 'drop-shadow(0 0 0 9999px rgba(0, 0, 0, 0.4))',
-            }}
-          >
-            <rect
-              x={Math.max(0, spotlightRect.left - 8)}
-              y={Math.max(0, spotlightRect.top - 8)}
-              width={spotlightRect.width + 16}
-              height={spotlightRect.height + 16}
-              rx="8"
-              fill="white"
-            />
-          </svg>
-        )}
-      </div>
-
-      {/* Tooltip */}
+      {/* Subtle overlay — sits BELOW the sidebar (z-40) so the highlighted
+          sidebar item stays bright, visible and clickable. */}
       <div
-        ref={tooltipRef}
-        className="fixed z-50 bg-white dark:bg-slate-800 rounded-lg shadow-2xl p-6 max-w-sm pointer-events-auto"
-        style={{
-          left: spotlightRect
-            ? Math.min(
-                spotlightRect.left + spotlightRect.width / 2 - 200,
-                window.innerWidth - 240
-              )
-            : '50%',
-          top: spotlightRect
-            ? Math.max(spotlightRect.top - 250, 80)
-            : 'auto',
-          transform: !spotlightRect ? 'translate(-50%, 0)' : 'translateX(0)',
-        }}
+        className="fixed inset-0 z-30"
+        style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        onClick={finishTour}
+        aria-hidden="true"
+      />
+
+      {/* Tooltip card */}
+      <div
+        dir={language === 'he' ? 'rtl' : 'ltr'}
+        className="fixed z-50 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 p-5"
+        style={cardStyle}
+        role="dialog"
+        aria-modal="true"
       >
-        {/* Header with close button */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">
-              {dict.common.loading === dict.common.loading
-                ? language === 'he'
-                  ? `שלב ${currentStepIndex + 1} מתוך ${tourSteps.length}`
-                  : `Step ${currentStepIndex + 1} of ${tourSteps.length}`
-                : ''}
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">
+              {stepLabel}
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-              {currentStepData.title}
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug">
+              {stepData.title}
             </h3>
           </div>
           <button
-            onClick={skipTour}
-            className="flex-shrink-0 ml-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-            aria-label="Close tour"
+            onClick={finishTour}
+            className="flex-shrink-0 -mt-1 -me-1 p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            aria-label={t.buttons.skip}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Description */}
-        <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
-          {currentStepData.description}
+        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-5">
+          {stepData.description}
         </p>
 
-        {/* Buttons */}
-        <div className="flex items-center gap-3 justify-between">
-          <button
-            onClick={skipTour}
-            className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
-          >
-            {isLast ? t.buttons.done : t.buttons.skipAll}
-          </button>
-
-          <div className="flex items-center gap-2">
-            {!isLast && (
-              <button
-                onClick={moveNext}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-              >
-                {t.buttons.next}
-                <ChevronRight size={16} />
-              </button>
-            )}
-            {isLast && (
-              <button
-                onClick={completeTour}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-              >
-                {t.buttons.done}
-              </button>
-            )}
-          </div>
-        </div>
-
         {/* Progress dots */}
-        <div className="flex items-center justify-center gap-1.5 mt-5">
+        <div className="flex items-center gap-1.5 mb-4">
           {tourSteps.map((_, index) => (
-            <div
+            <span
               key={index}
               className={`h-1.5 rounded-full transition-all ${
                 index === currentStepIndex
-                  ? 'bg-blue-600 w-6'
+                  ? 'bg-indigo-600 w-5'
                   : index < currentStepIndex
-                    ? 'bg-green-600 w-2'
-                    : 'bg-slate-300 dark:bg-slate-600 w-2'
+                    ? 'bg-indigo-300 dark:bg-indigo-500/60 w-2'
+                    : 'bg-slate-200 dark:bg-slate-600 w-2'
               }`}
             />
           ))}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={finishTour}
+            className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+          >
+            {t.buttons.skip}
+          </button>
+
+          <button
+            onClick={isLast ? finishTour : goNext}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors ${
+              isLast
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            {isLast ? t.buttons.done : t.buttons.next}
+            {!isLast && (
+              <ChevronLeft size={16} className={language === 'he' ? '' : 'rotate-180'} />
+            )}
+          </button>
         </div>
       </div>
     </>

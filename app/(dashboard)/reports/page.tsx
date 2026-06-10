@@ -367,7 +367,7 @@ function ReportsContent() {
   }
 
   return (
-    <div data-onboarding-reports>
+    <div>
       <Header
         title={t.title}
         subtitle={reportType === 'google' ? t.googleSubtitle : t.aiSubtitle}

@@ -70,11 +70,9 @@ export default function ClientsPage() {
         title={dict.clients.title}
         subtitle={`${dict.clients.countPrefix} ${clients.length} ${dict.clients.countSuffix}`}
         actions={
-          <div data-onboarding-create-client>
-            <Button onClick={() => setShowCreate(true)}>
-              {dict.clients.newClient}
-            </Button>
-          </div>
+          <Button onClick={() => setShowCreate(true)}>
+            {dict.clients.newClient}
+          </Button>
         }
       />
 

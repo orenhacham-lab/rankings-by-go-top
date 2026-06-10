@@ -167,12 +167,8 @@ export default function DashboardPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div data-onboarding-create-client>
-          <StatCard label={dict.home.activeClients} value={stats.totalClients} icon={Users} color="indigo" href="/clients" />
-        </div>
-        <div data-onboarding-create-project>
-          <StatCard label={dict.home.activeProjects} value={stats.totalProjects} icon={Folder} color="indigo" href="/projects" />
-        </div>
+        <StatCard label={dict.home.activeClients} value={stats.totalClients} icon={Users} color="indigo" href="/clients" />
+        <StatCard label={dict.home.activeProjects} value={stats.totalProjects} icon={Folder} color="indigo" href="/projects" />
         <StatCard label={dict.home.keywords} value={stats.totalKeywords} icon={KeyRound} color="indigo" href="/keywords" />
         <StatCard label={dict.home.scansPerformed} value={stats.totalScans} icon={Search} color="indigo" href="/scans" />
       </div>
@@ -210,18 +206,10 @@ export default function DashboardPage() {
         <Card>
           <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">{dict.home.quickLinks}</h2>
           <div className="grid grid-cols-2 gap-3">
-            <div data-onboarding-create-client>
-              <QuickLink href="/clients" icon={Users} label={dict.sidebar.clients} sub={dict.home.clientsManagement} />
-            </div>
-            <div data-onboarding-create-project>
-              <QuickLink href="/projects" icon={Folder} label={dict.sidebar.projects} sub={dict.home.allProjects} />
-            </div>
-            <div data-onboarding-keyword-research>
-              <QuickLink href="/keyword-research" icon={KeyRound} label={dict.sidebar.keywordResearch} sub={dict.home.trackingPhrases} />
-            </div>
-            <div data-onboarding-reports>
-              <QuickLink href="/reports" icon={FileText} label={dict.sidebar.reports} sub={dict.home.excelAndPdf} />
-            </div>
+            <QuickLink href="/clients" icon={Users} label={dict.sidebar.clients} sub={dict.home.clientsManagement} />
+            <QuickLink href="/projects" icon={Folder} label={dict.sidebar.projects} sub={dict.home.allProjects} />
+            <QuickLink href="/keyword-research" icon={KeyRound} label={dict.sidebar.keywordResearch} sub={dict.home.trackingPhrases} />
+            <QuickLink href="/reports" icon={FileText} label={dict.sidebar.reports} sub={dict.home.excelAndPdf} />
           </div>
         </Card>
       </div>

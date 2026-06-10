@@ -26,13 +26,13 @@ import {
 
 const navItemKeys = [
   { href: '/dashboard', labelKey: 'dashboard' as const, icon: BarChart3 },
-  { href: '/clients', labelKey: 'clients' as const, icon: Users },
-  { href: '/projects', labelKey: 'projects' as const, icon: Folder },
-  { href: '/keyword-research', labelKey: 'keywordResearch' as const, icon: Lightbulb },
+  { href: '/clients', labelKey: 'clients' as const, icon: Users, onboarding: 'clients' },
+  { href: '/projects', labelKey: 'projects' as const, icon: Folder, onboarding: 'projects' },
+  { href: '/keyword-research', labelKey: 'keywordResearch' as const, icon: Lightbulb, onboarding: 'keyword-research' },
   { href: '/keywords', labelKey: 'keywords' as const, icon: KeyRound },
   { href: '/ai-visibility', labelKey: 'aiVisibility' as const, icon: Sparkles },
   { href: '/scans', labelKey: 'scans' as const, icon: Search },
-  { href: '/reports', labelKey: 'reports' as const, icon: FileText },
+  { href: '/reports', labelKey: 'reports' as const, icon: FileText, onboarding: 'reports' },
   { href: '/billing', labelKey: 'billing' as const, icon: CreditCard },
 ]
 
@@ -105,6 +105,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  data-onboarding={item.onboarding}
                   className={cn(
                     'group w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-150 text-center md:text-right leading-tight break-words',
                     isActive
