@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { createClient } from '@/lib/supabase/client'
 import { X, ChevronLeft } from 'lucide-react'
 
-const STORAGE_KEY = 'rankings_dashboard_onboarding_completed'
-const CURRENT_STEP_KEY = 'rankings_dashboard_onboarding_step'
-const HIGHLIGHT_CLASS = 'onboarding-highlight'
+const STORAGE_KEY_BASE = 'rankings_dashboard_onboarding_completed'
+const CURRENT_STEP_KEY_BASE = 'rankings_dashboard_onboarding_step'
 
 const TOOLTIP_WIDTH = 380
 const GAP = 16
@@ -17,7 +17,6 @@ type TourStep = 'createClient' | 'createProject' | 'keywordResearch' | 'generate
 
 interface TourConfig {
   step: TourStep
-  // Reliable, always-present targets: the sidebar navigation items.
   selector: string
 }
 
@@ -40,6 +39,8 @@ interface DashboardOnboardingTourProps {
   shouldShowTour?: boolean
 }
 
+const HIGHLIGHT_CLASS = 'onboarding-highlight'
+
 export function DashboardOnboardingTour({
   totalClients,
   totalProjects,
@@ -52,40 +53,102 @@ export function DashboardOnboardingTour({
   const [isVisible, setIsVisible] = useState(false)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [position, setPosition] = useState<TooltipPosition | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
 
-  // Skip steps the user already finished (has clients → start at project, etc).
+  // Get the user ID to make localStorage keys user-specific
+  useEffect(() => {
+    const getUserId = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user?.id) {
+        setUserId(user.id)
+        const debugUserId = user.id.slice(0, 8) + '...'
+        console.log('[onboarding] mounted, userId:', debugUserId)
+
+        // Debug: check if selectors can find targets
+        const foundTargets = tourSteps
+          .map((step) => ({
+            step: step.step,
+            selector: step.selector,
+            found: !!document.querySelector(step.selector),
+          }))
+          .filter((t) => !t.found)
+        if (foundTargets.length > 0) {
+          console.warn('[onboarding] some targets not found:', foundTargets)
+        }
+      }
+    }
+    // Small delay to ensure DOM is fully painted
+    const timer = setTimeout(getUserId, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Construct user-specific storage keys
+  const getStorageKey = (userId: string | null) => userId ? `${STORAGE_KEY_BASE}_${userId}` : STORAGE_KEY_BASE
+  const getCurrentStepKey = (userId: string | null) => userId ? `${CURRENT_STEP_KEY_BASE}_${userId}` : CURRENT_STEP_KEY_BASE
+
+  // Skip steps the user already finished
   const getStartStep = useCallback(() => {
     if (totalClients === 0) return 0
     if (totalProjects === 0) return 1
     return 2
   }, [totalClients, totalProjects])
 
-  // Decide whether to run the tour at all (logic preserved from before).
+  // Decide whether to run the tour
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (!userId) return // Wait for user ID
 
-    if (localStorage.getItem(STORAGE_KEY) === 'true') return
+    const storageKey = getStorageKey(userId)
+    const currentStepKey = getCurrentStepKey(userId)
 
-    if (!shouldShowTour && totalClients > 0 && totalProjects > 0) return
-
+    const isCompleted = localStorage.getItem(storageKey) === 'true'
     const startStep = getStartStep()
-    const savedStep = localStorage.getItem(CURRENT_STEP_KEY)
+    const hasClients = totalClients > 0
+    const hasProjects = totalProjects > 0
+
+    console.log('[onboarding] check conditions', {
+      isCompleted,
+      shouldShowTour,
+      hasClients,
+      hasProjects,
+      startStep,
+    })
+
+    // Don't show if already completed
+    if (isCompleted) {
+      console.log('[onboarding] already completed, skipping')
+      return
+    }
+
+    // Don't show if established user (has clients and projects) and shouldn't force show
+    if (!shouldShowTour && hasClients && hasProjects) {
+      console.log('[onboarding] user is established (has clients + projects), skipping')
+      return
+    }
+
+    const savedStep = localStorage.getItem(currentStepKey)
     const parsed = savedStep ? parseInt(savedStep, 10) : NaN
     const initialStep =
       !Number.isNaN(parsed) && parsed >= startStep && parsed < tourSteps.length
         ? parsed
         : startStep
 
+    console.log('[onboarding] showing tour, initialStep:', initialStep)
     setCurrentStepIndex(initialStep)
     setIsVisible(true)
-  }, [totalClients, totalProjects, shouldShowTour, getStartStep])
+  }, [totalClients, totalProjects, shouldShowTour, getStartStep, userId])
 
-  // Locate the target for the current step, skipping any that are missing.
+  // Locate the target for the current step
   const resolveTarget = useCallback((fromIndex: number): { el: HTMLElement; index: number } | null => {
     for (let i = fromIndex; i < tourSteps.length; i++) {
       const el = document.querySelector(tourSteps[i].selector) as HTMLElement | null
-      if (el) return { el, index: i }
+      if (el) {
+        console.log('[onboarding] found target:', tourSteps[i].selector, 'at step', i)
+        return { el, index: i }
+      }
     }
+    console.log('[onboarding] no targets found from step', fromIndex)
     return null
   }, [])
 
@@ -94,39 +157,36 @@ export function DashboardOnboardingTour({
     const isMobile = window.innerWidth < MOBILE_BP
 
     if (isMobile) {
-      // Bottom sheet — clean and predictable on small screens.
       return { left: 0, top: 0, isMobile: true }
     }
 
-    // Sidebar lives on the right (RTL). Prefer placing the card to its left.
     let left = rect.left - TOOLTIP_WIDTH - GAP
     let top = rect.top - 8
 
     if (left < GAP) {
-      // Not enough room to the left → place below the element instead.
       left = Math.max(GAP, Math.min(rect.left, window.innerWidth - TOOLTIP_WIDTH - GAP))
       top = rect.bottom + GAP
     }
 
-    // Keep the card fully on-screen vertically.
     top = Math.max(GAP, Math.min(top, window.innerHeight - 300))
 
     return { left, top, isMobile: false }
   }, [])
 
-  // Apply the highlight ring + position the tooltip whenever the step changes.
+  // Apply highlight + position tooltip
   useEffect(() => {
     if (!isVisible) return
 
     const resolved = resolveTarget(currentStepIndex)
 
     if (!resolved) {
-      // No target anywhere from here on → end gracefully (no black screen).
+      console.log('[onboarding] no target found, ending tour')
       finishTour()
       return
     }
 
     if (resolved.index !== currentStepIndex) {
+      console.log('[onboarding] skipping to next available step:', resolved.index)
       setCurrentStepIndex(resolved.index)
       return
     }
@@ -149,10 +209,13 @@ export function DashboardOnboardingTour({
   }, [isVisible, currentStepIndex])
 
   function finishTour() {
-    localStorage.setItem(STORAGE_KEY, 'true')
-    localStorage.removeItem(CURRENT_STEP_KEY)
-    // Defensive cleanup in case a highlight is still attached.
+    if (!userId) return
+    const storageKey = getStorageKey(userId)
+    const currentStepKey = getCurrentStepKey(userId)
+    localStorage.setItem(storageKey, 'true')
+    localStorage.removeItem(currentStepKey)
     document.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((n) => n.classList.remove(HIGHLIGHT_CLASS))
+    console.log('[onboarding] tour finished')
     setIsVisible(false)
     setPosition(null)
   }
@@ -160,8 +223,11 @@ export function DashboardOnboardingTour({
   const goNext = () => {
     const next = resolveTarget(currentStepIndex + 1)
     if (next) {
+      console.log('[onboarding] moving to next step:', next.index)
       setCurrentStepIndex(next.index)
-      localStorage.setItem(CURRENT_STEP_KEY, next.index.toString())
+      if (userId) {
+        localStorage.setItem(getCurrentStepKey(userId), next.index.toString())
+      }
     } else {
       finishTour()
     }
