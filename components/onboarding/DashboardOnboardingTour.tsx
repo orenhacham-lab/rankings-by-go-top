@@ -41,6 +41,15 @@ interface DashboardOnboardingTourProps {
 
 const HIGHLIGHT_CLASS = 'onboarding-highlight'
 
+// Dev-only logging — stripped in production builds.
+const isDev = process.env.NODE_ENV !== 'production'
+const debugLog = (...args: unknown[]) => {
+  if (isDev) console.log(...args)
+}
+const debugWarn = (...args: unknown[]) => {
+  if (isDev) console.warn(...args)
+}
+
 export function DashboardOnboardingTour({
   totalClients,
   totalProjects,
@@ -63,7 +72,7 @@ export function DashboardOnboardingTour({
       if (user?.id) {
         setUserId(user.id)
         const debugUserId = user.id.slice(0, 8) + '...'
-        console.log('[onboarding] mounted, userId:', debugUserId)
+        debugLog('[onboarding] mounted, userId:', debugUserId)
 
         // Debug: check if selectors can find targets
         const foundTargets = tourSteps
@@ -74,7 +83,7 @@ export function DashboardOnboardingTour({
           }))
           .filter((t) => !t.found)
         if (foundTargets.length > 0) {
-          console.warn('[onboarding] some targets not found:', foundTargets)
+          debugWarn('[onboarding] some targets not found:', foundTargets)
         }
       }
     }
@@ -107,7 +116,7 @@ export function DashboardOnboardingTour({
     const hasClients = totalClients > 0
     const hasProjects = totalProjects > 0
 
-    console.log('[onboarding] check conditions', {
+    debugLog('[onboarding] check conditions', {
       isCompleted,
       shouldShowTour,
       hasClients,
@@ -117,13 +126,13 @@ export function DashboardOnboardingTour({
 
     // Don't show if already completed
     if (isCompleted) {
-      console.log('[onboarding] already completed, skipping')
+      debugLog('[onboarding] already completed, skipping')
       return
     }
 
     // Don't show if established user (has clients and projects) and shouldn't force show
     if (!shouldShowTour && hasClients && hasProjects) {
-      console.log('[onboarding] user is established (has clients + projects), skipping')
+      debugLog('[onboarding] user is established (has clients + projects), skipping')
       return
     }
 
@@ -134,7 +143,7 @@ export function DashboardOnboardingTour({
         ? parsed
         : startStep
 
-    console.log('[onboarding] showing tour, initialStep:', initialStep)
+    debugLog('[onboarding] showing tour, initialStep:', initialStep)
     setCurrentStepIndex(initialStep)
     setIsVisible(true)
   }, [totalClients, totalProjects, shouldShowTour, getStartStep, userId])
@@ -144,11 +153,11 @@ export function DashboardOnboardingTour({
     for (let i = fromIndex; i < tourSteps.length; i++) {
       const el = document.querySelector(tourSteps[i].selector) as HTMLElement | null
       if (el) {
-        console.log('[onboarding] found target:', tourSteps[i].selector, 'at step', i)
+        debugLog('[onboarding] found target:', tourSteps[i].selector, 'at step', i)
         return { el, index: i }
       }
     }
-    console.log('[onboarding] no targets found from step', fromIndex)
+    debugLog('[onboarding] no targets found from step', fromIndex)
     return null
   }, [])
 
@@ -180,13 +189,13 @@ export function DashboardOnboardingTour({
     const resolved = resolveTarget(currentStepIndex)
 
     if (!resolved) {
-      console.log('[onboarding] no target found, ending tour')
+      debugLog('[onboarding] no target found, ending tour')
       finishTour()
       return
     }
 
     if (resolved.index !== currentStepIndex) {
-      console.log('[onboarding] skipping to next available step:', resolved.index)
+      debugLog('[onboarding] skipping to next available step:', resolved.index)
       setCurrentStepIndex(resolved.index)
       return
     }
@@ -215,7 +224,7 @@ export function DashboardOnboardingTour({
     localStorage.setItem(storageKey, 'true')
     localStorage.removeItem(currentStepKey)
     document.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((n) => n.classList.remove(HIGHLIGHT_CLASS))
-    console.log('[onboarding] tour finished')
+    debugLog('[onboarding] tour finished')
     setIsVisible(false)
     setPosition(null)
   }
@@ -223,7 +232,7 @@ export function DashboardOnboardingTour({
   const goNext = () => {
     const next = resolveTarget(currentStepIndex + 1)
     if (next) {
-      console.log('[onboarding] moving to next step:', next.index)
+      debugLog('[onboarding] moving to next step:', next.index)
       setCurrentStepIndex(next.index)
       if (userId) {
         localStorage.setItem(getCurrentStepKey(userId), next.index.toString())

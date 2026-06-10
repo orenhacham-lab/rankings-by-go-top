@@ -493,23 +493,23 @@ export const dashboardEn = {
     subtitle: 'Let\'s walk through the first steps together',
     steps: {
       createClient: {
-        title: 'Create your first client',
-        description: 'Click the highlighted "Clients" menu to create your first client. A client can hold multiple projects.',
+        title: 'Start with your first client',
+        description: 'Click "Clients" in the menu to create your first client. You can then attach projects, scans and reports to it.',
         action: 'Create client',
       },
       createProject: {
-        title: 'Create a project',
-        description: 'Use the "Projects" menu to create a project for your domain — this is where you track your keywords.',
+        title: 'Add a new project',
+        description: 'Click "Projects" in the menu, then create a new project for the domain you want to track.',
         action: 'Create project',
       },
       keywordResearch: {
-        title: 'Research keywords',
-        description: 'Open "Keyword Research" to discover ideas, search volume and competition from Google Ads data.',
+        title: 'Keyword Research',
+        description: 'Here you can find keyword ideas, check search volume and trends, and add keywords directly to a project.',
         action: 'Go to keyword research',
       },
       generateReports: {
-        title: 'View reports',
-        description: 'Head to "Reports" to see your rankings and AI visibility, and track progress over time.',
+        title: 'Reports',
+        description: 'Here you can generate clean SEO/GEO reports for clients, including AI visibility, rankings, competitors and recommendations.',
         action: 'Go to reports',
       },
     },
