@@ -16,6 +16,7 @@ const navItems = [
 ]
 
 const adminItems = [
+  { href: '/admin/articles', label: 'ניהול מאמרים', icon: '📝' },
   { href: '/setup', label: 'סטטוס חיבור', icon: '🔌' },
   { href: '/admin/logs', label: 'לוג שגיאות', icon: '📋' },
 ]

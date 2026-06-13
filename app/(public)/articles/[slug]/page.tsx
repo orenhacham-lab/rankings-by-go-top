@@ -25,6 +25,10 @@ interface Article {
   content: string
   author: string | null
   published_at: string | null
+  featured_image_url: string | null
+  featured_image_alt: string | null
+  meta_title: string | null
+  meta_description: string | null
 }
 
 export default function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -47,7 +51,7 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
       // This prevents unauthorized access to unpublished articles
       const { data, error } = await supabase
         .from('articles')
-        .select('id, slug, title, content, author, published_at')
+        .select('id, slug, title, content, author, published_at, featured_image_url, featured_image_alt, meta_title, meta_description')
         .eq('slug', slug)
         .eq('is_published', true)
         .single()
@@ -119,6 +123,14 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
               </span>
             )}
           </div>
+
+          {article.featured_image_url && (
+            <img
+              src={article.featured_image_url}
+              alt={article.featured_image_alt ?? article.title}
+              className="w-full rounded-xl mb-8 object-cover max-h-80"
+            />
+          )}
 
           <div
             className="prose prose-sm max-w-none text-slate-700 article-content"
