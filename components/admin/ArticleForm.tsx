@@ -56,6 +56,32 @@ export default function ArticleForm({ initial }: Props) {
   const [slugManual, setSlugManual] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file
+    if (!file) return
+
+    setUploadError('')
+    setUploading(true)
+    try {
+      const data = new FormData()
+      data.append('file', file)
+      const res = await fetch('/api/articles/upload', { method: 'POST', body: data })
+      const json = await res.json()
+      if (!res.ok) {
+        setUploadError(json.error ?? 'שגיאה בהעלאת התמונה')
+        return
+      }
+      set('featured_image_url', json.url)
+    } catch {
+      setUploadError('שגיאה בהעלאת התמונה')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   useEffect(() => {
     if (!slugManual) {
@@ -155,13 +181,44 @@ export default function ArticleForm({ initial }: Props) {
       </div>
 
       {/* Featured Image */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="border border-slate-200 rounded-xl p-4 space-y-4">
+        <h3 className="text-sm font-semibold text-slate-700">תמונה ראשית</h3>
+
+        {/* Preview */}
+        {form.featured_image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={form.featured_image_url}
+            alt={form.featured_image_alt || 'תצוגה מקדימה'}
+            className="max-h-48 rounded-lg border border-slate-200 object-cover"
+          />
+        )}
+
+        {/* Upload (primary) */}
         <div>
-          <label className={labelCls}>כתובת תמונה ראשית (URL)</label>
+          <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 cursor-pointer transition-colors disabled:opacity-60">
+            {uploading ? 'מעלה...' : '⬆️ העלה תמונה מהמחשב'}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleImageUpload}
+              disabled={uploading}
+              className="hidden"
+            />
+          </label>
+          <p className="text-xs text-slate-500 mt-1">קבצים נתמכים: JPG, PNG, WEBP · עד 5MB</p>
+          {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
+        </div>
+
+        {/* Manual URL (secondary) */}
+        <div>
+          <label className={labelCls}>או הדבק כתובת תמונה (URL)</label>
           <input type="url" value={form.featured_image_url} onChange={e => set('featured_image_url', e.target.value)} className={inputCls} dir="ltr" placeholder="https://..." />
         </div>
+
+        {/* Alt text */}
         <div>
-          <label className={labelCls}>טקסט חלופי לתמונה (alt)</label>
+          <label className={labelCls}>טקסט חלופי לתמונה (alt) <span className="text-slate-400 font-normal">— מומלץ ל-SEO ונגישות</span></label>
           <input type="text" value={form.featured_image_alt} onChange={e => set('featured_image_alt', e.target.value)} className={inputCls} placeholder="תיאור התמונה" />
         </div>
       </div>
