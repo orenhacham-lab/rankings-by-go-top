@@ -1,7 +1,119 @@
-import { ScanInput, ScanOutput } from './types'
+import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
+import { US_ZIP_CODES, type USZIPCode } from './us-zip-codes'
+import { generateRadiusPoints, aggregateRadiusResults, type RadiusPointResult } from './radius-scan'
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
 const REQUEST_TIMEOUT_MS = 15_000
+const GEOCODING_CACHE: Map<string, GeocodeResult | null> = new Map()
+
+interface GeocodeResult {
+  lat: number
+  lng: number
+  provider: string
+  query_used: string
+  success: boolean
+}
+
+async function resolveUSZIP(zipCode: string): Promise<GeocodeResult | null> {
+  const cacheKey = `zip_${zipCode}`
+  if (GEOCODING_CACHE.has(cacheKey)) {
+    return GEOCODING_CACHE.get(cacheKey) || null
+  }
+
+  // Primary: Local dataset lookup
+  const localZIP = US_ZIP_CODES[zipCode]
+  if (localZIP) {
+    const result: GeocodeResult = {
+      lat: localZIP.lat,
+      lng: localZIP.lng,
+      provider: 'local_dataset',
+      query_used: `lookup_zip_${zipCode}`,
+      success: true,
+    }
+    GEOCODING_CACHE.set(cacheKey, result)
+    return result
+  }
+
+  // Secondary fallback: Nominatim (only if local lookup fails)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+
+  try {
+    // Fallback attempt 1: postalcode with countrycodes constraint
+    let url = `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zipCode)}&countrycodes=us&format=json`
+    let response = await fetch(url, { signal: controller.signal })
+
+    if (!response.ok) {
+      GEOCODING_CACHE.set(cacheKey, null)
+      return null
+    }
+
+    let data = (await response.json()) as Array<{ lat: string; lon: string }>
+
+    // Fallback attempt 2: if no results, try full text query
+    if (data.length === 0) {
+      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(`${zipCode}, United States`)}&format=json`
+      response = await fetch(url, { signal: controller.signal })
+
+      if (response.ok) {
+        data = (await response.json()) as Array<{ lat: string; lon: string }>
+      }
+    }
+
+    if (data.length > 0) {
+      const result: GeocodeResult = {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+        provider: 'external_fallback',
+        query_used: 'nominatim_postalcode',
+        success: true,
+      }
+      GEOCODING_CACHE.set(cacheKey, result)
+      return result
+    }
+
+    console.warn(`[ZIP Resolution] ZIP ${zipCode} not found in local dataset or Nominatim`)
+  } catch (err) {
+    console.error(`[ZIP Resolution] External fallback failed for ${zipCode}:`, (err as Error).message)
+  } finally {
+    clearTimeout(timer)
+  }
+
+  GEOCODING_CACHE.set(cacheKey, null)
+  return null
+}
+
+function validateZIPResults(places: SerperMapsPlace[], geocodeResult: GeocodeResult): boolean {
+  // Validate that results are approximately within US bounds and not obviously wrong
+  // Allow 100+ mile radius for results (ZIP areas can be scattered)
+  const VALIDATION_RADIUS_KM = 200
+
+  if (!places.length) return true
+
+  for (const place of places.slice(0, 5)) {
+    if (place.latitude !== undefined && place.longitude !== undefined) {
+      const distance = calculateDistance(geocodeResult.lat, geocodeResult.lng, place.latitude, place.longitude)
+      if (distance <= VALIDATION_RADIUS_KM) {
+        return true
+      }
+    }
+  }
+
+  // If no coordinates available in response, assume valid (can't validate)
+  return !places.some((p) => p.latitude !== undefined && p.longitude !== undefined)
+}
+
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  // Haversine formula for distance between two points in km
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
 
 interface SerperMapsPlace {
   title: string
@@ -10,117 +122,1044 @@ interface SerperMapsPlace {
   rating?: number
   phoneNumber?: string
   website?: string
+  latitude?: number
+  longitude?: number
+  cid?: string
 }
 
 interface SerperMapsResponse {
   places?: SerperMapsPlace[]
   error?: string
+  searchParameters?: {
+    ll?: string
+    [key: string]: unknown
+  }
+}
+
+// Country bounding boxes — used to reject provider responses that return
+// results clearly outside the project's country
+const COUNTRY_BOUNDS: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
+  il: { minLat: 29.0, maxLat: 33.5, minLng: 34.0, maxLng: 36.0 },
+  us: { minLat: 24.0, maxLat: 50.0, minLng: -125.0, maxLng: -66.0 },
+  gb: { minLat: 49.0, maxLat: 61.0, minLng: -8.5, maxLng: 2.0 },
+}
+
+// Israeli cities with their coordinates for proper geo context
+const ISRAELI_CITIES: Record<string, { lat: number; lng: number }> = {
+  'tel aviv': { lat: 32.0853, lng: 34.7818 },
+  'tel-aviv': { lat: 32.0853, lng: 34.7818 },
+  'תל אביב': { lat: 32.0853, lng: 34.7818 },
+  'jerusalem': { lat: 31.7683, lng: 35.2137 },
+  'ירושלים': { lat: 31.7683, lng: 35.2137 },
+  'haifa': { lat: 32.8193, lng: 34.9991 },
+  'חיפה': { lat: 32.8193, lng: 34.9991 },
+  'be\'er sheva': { lat: 31.2507, lng: 34.7915 },
+  'beersheva': { lat: 31.2507, lng: 34.7915 },
+  'באר שבע': { lat: 31.2507, lng: 34.7915 },
+  'ramat gan': { lat: 32.0684, lng: 34.8248 },
+  'רמת גן': { lat: 32.0684, lng: 34.8248 },
+  'petah tikva': { lat: 32.0878, lng: 34.8878 },
+  'petach tikva': { lat: 32.0878, lng: 34.8878 },
+  'פתח תקווה': { lat: 32.0878, lng: 34.8878 },
+  'netanya': { lat: 32.3215, lng: 34.8532 },
+  'נתניה': { lat: 32.3215, lng: 34.8532 },
+  'holon': { lat: 32.0167, lng: 34.7792 },
+  'חולון': { lat: 32.0167, lng: 34.7792 },
+  'rishon lezion': { lat: 31.9594, lng: 34.8048 },
+  'ראשון לציון': { lat: 31.9594, lng: 34.8048 },
+  'ashdod': { lat: 31.8044, lng: 34.6553 },
+  'אשדוד': { lat: 31.8044, lng: 34.6553 },
+  'bat yam': { lat: 32.0171, lng: 34.7506 },
+  'בת ים': { lat: 32.0171, lng: 34.7506 },
+  'herzliya': { lat: 32.1663, lng: 34.8434 },
+  'הרצליה': { lat: 32.1663, lng: 34.8434 },
+  'givatayim': { lat: 32.0719, lng: 34.8108 },
+  'גבעתיים': { lat: 32.0719, lng: 34.8108 },
+  'kfar saba': { lat: 32.1750, lng: 34.9069 },
+  'כפר סבא': { lat: 32.1750, lng: 34.9069 },
+  'raanana': { lat: 32.1836, lng: 34.8708 },
+  'רעננה': { lat: 32.1836, lng: 34.8708 },
+  'beit shemesh': { lat: 31.7486, lng: 34.9886 },
+  'בית שמש': { lat: 31.7486, lng: 34.9886 },
+  'eilat': { lat: 29.5577, lng: 34.9519 },
+  'אילת': { lat: 29.5577, lng: 34.9519 },
+}
+
+// Parse "lat,lng" or "@lat,lng,zoom" or "@lat,lng" into coordinates
+function parseCoordinates(raw: string | undefined): { lat: number; lng: number } | null {
+  if (!raw) return null
+  const cleaned = raw.replace(/^@/, '')
+  const parts = cleaned.split(',').map(s => s.trim())
+  if (parts.length < 2) return null
+  const lat = parseFloat(parts[0])
+  const lng = parseFloat(parts[1])
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  return { lat, lng }
+}
+
+// Check if a point is inside a country's bounding box
+function isInBounds(
+  coords: { lat: number; lng: number },
+  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }
+): boolean {
+  return (
+    coords.lat >= bounds.minLat &&
+    coords.lat <= bounds.maxLat &&
+    coords.lng >= bounds.minLng &&
+    coords.lng <= bounds.maxLng
+  )
+}
+
+// Validate that the provider's response geo context actually belongs to the
+// project's country. Returns { valid, returnedLl, placesInCountry, placesWithCoords }
+function validateGeoContext(
+  response: SerperMapsResponse,
+  country: string
+): {
+  valid: boolean
+  returnedLl: string | null
+  returnedCoords: { lat: number; lng: number } | null
+  placesWithCoords: number
+  placesInCountry: number
+  reason: string
+} {
+  const bounds = COUNTRY_BOUNDS[country.toLowerCase()]
+  if (!bounds) {
+    return { valid: true, returnedLl: null, returnedCoords: null, placesWithCoords: 0, placesInCountry: 0, reason: 'no bounds defined for country' }
+  }
+
+  const returnedLl = response.searchParameters?.ll ?? null
+  const returnedCoords = parseCoordinates(returnedLl ?? undefined)
+
+  // If the provider returned ll and it's outside the country, reject
+  if (returnedCoords && !isInBounds(returnedCoords, bounds)) {
+    return {
+      valid: false,
+      returnedLl,
+      returnedCoords,
+      placesWithCoords: 0,
+      placesInCountry: 0,
+      reason: `returned ll ${returnedLl} is outside ${country.toUpperCase()} bounds`,
+    }
+  }
+
+  const places = response.places ?? []
+  const placesWithCoords = places.filter(
+    p => typeof p.latitude === 'number' && typeof p.longitude === 'number'
+  )
+  const placesInCountry = placesWithCoords.filter(p =>
+    isInBounds({ lat: p.latitude as number, lng: p.longitude as number }, bounds)
+  )
+
+  // If we have place coordinates, majority must be in-country
+  if (placesWithCoords.length > 0) {
+    const ratio = placesInCountry.length / placesWithCoords.length
+    if (ratio < 0.5) {
+      return {
+        valid: false,
+        returnedLl,
+        returnedCoords,
+        placesWithCoords: placesWithCoords.length,
+        placesInCountry: placesInCountry.length,
+        reason: `only ${placesInCountry.length}/${placesWithCoords.length} places are inside ${country.toUpperCase()}`,
+      }
+    }
+  }
+
+  return {
+    valid: true,
+    returnedLl,
+    returnedCoords,
+    placesWithCoords: placesWithCoords.length,
+    placesInCountry: placesInCountry.length,
+    reason: 'geo context valid',
+  }
+}
+
+async function querySerperMaps(
+  query: string,
+  country: string,
+  language: string,
+  location?: string,
+  coordinates?: { lat: number; lng: number }
+): Promise<SerperMapsResponse | null> {
+  const apiKey = process.env.SERPER_API_KEY
+  if (!apiKey) return null
+
+  const body: Record<string, unknown> = {
+    q: query,
+    gl: country.toLowerCase(),
+    hl: language,
+  }
+
+  // Always set location string for proper geocoding context
+  // If coordinates available, add as ll for precision
+  if (location) {
+    body.location = location
+  }
+
+  if (coordinates) {
+    // Serper Maps expects ll in "@lat,lng,zoom" format (Google Maps URL format)
+    // Zoom level 13 = city-level view; 12 = wider city area
+    body.ll = `@${coordinates.lat},${coordinates.lng},13z`
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  console.log('[Maps:API] Sending to Serper:', {
+    q: body.q,
+    gl: body.gl,
+    hl: body.hl,
+    location: body.location ?? '(not set)',
+    ll: body.ll ?? '(not set)',
+  })
+
+  try {
+    const response = await fetch(SERPER_MAPS_URL, {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    return await response.json()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function findBusinessMatch(places: SerperMapsPlace[], targetName: string, targetDomain?: string | null): SerperMapsPlace | null {
+  const normalizedTarget = normalizeBusinessName(targetName)
+  console.log('[Maps:matching] findBusinessMatch looking for:', { targetName, normalizedTarget, targetDomain: targetDomain || '(not provided)' })
+
+  for (const place of places) {
+    const normalizedPlace = normalizeBusinessName(place.title)
+
+    // Log each place being checked
+    console.log(`[Maps:matching]   checking place: "${place.title}" (normalized: "${normalizedPlace}", position: ${place.position}, website: ${place.website || 'none'})`)
+
+    // PRIORITY 1: Exact normalized match
+    if (normalizedPlace === normalizedTarget) {
+      console.log(`[Maps:matching]     ✓ EXACT MATCH (normalized names identical)`)
+      return place
+    }
+
+    // PRIORITY 2: Business name + domain verification
+    // If we have a target domain, check if this place's domain matches
+    if (targetDomain && place.website) {
+      const placeUrlNormalized = place.website.toLowerCase()
+      const targetDomainNormalized = targetDomain.toLowerCase()
+
+      // Check if place website contains target domain
+      if (placeUrlNormalized.includes(targetDomainNormalized) || targetDomainNormalized.includes(placeUrlNormalized.split('/')[2]?.split('?')[0] || '')) {
+        // ALSO verify business name is similar enough (at least 0.85 similarity or prefix match)
+        const similarity = diceSimilarity(normalizedPlace, normalizedTarget)
+        if (similarity >= 0.85 || normalizedPlace.startsWith(normalizedTarget.substring(0, Math.min(4, normalizedTarget.length)))) {
+          console.log(`[Maps:matching]     ✓ DOMAIN MATCH: place website "${place.website}" contains target domain "${targetDomain}" (similarity: ${similarity.toFixed(2)})`)
+          return place
+        } else {
+          console.log(`[Maps:matching]     ✗ Domain matched but name similarity too low (${similarity.toFixed(2)}) - REJECTED`)
+        }
+      }
+    }
+
+    // PRIORITY 3: Very strict name matching only (no fuzzy fallback)
+    // For strict matching: require either exact match (already checked) or very high similarity (0.90+)
+    if (normalizedPlace.length >= 6 && normalizedTarget.length >= 6) {
+      const similarity = diceSimilarity(normalizedPlace, normalizedTarget)
+      if (similarity >= 0.90) {
+        console.log(`[Maps:matching]     ✓ STRICT MATCH: similarity ${similarity.toFixed(2)} >= 0.90`)
+        return place
+      } else {
+        console.log(`[Maps:matching]     ✗ Similarity ${similarity.toFixed(2)} < 0.90 - REJECTED`)
+      }
+    }
+  }
+
+  console.log(`[Maps:matching]   NO MATCH FOUND in ${places.length} places`)
+  return null
+}
+
+function computeResultSignature(places: SerperMapsPlace[]): string {
+  return places.slice(0, 5).map(p => p.cid || p.title).join('|')
+}
+
+function analyzeMatchDebug(places: SerperMapsPlace[], targetName: string): {
+  top_places: Array<{ title: string; position: number }>
+  business_returned: boolean
+  business_rejected: boolean
+  rejection_reason?: 'title_mismatch' | 'domain_mismatch' | 'phone_mismatch'
+  places_checked_count: number
+  target_checked_against_all_places: boolean
+  result_signature: string
+} {
+  const normalizedTarget = normalizeBusinessName(targetName)
+  const topPlaces = places.slice(0, 5).map(p => ({ title: p.title, position: p.position }))
+  const signature = computeResultSignature(places)
+
+  // Check if business appears in the returned places
+  let foundIndex = -1
+  for (let i = 0; i < places.length; i++) {
+    const normalizedPlace = normalizeBusinessName(places[i].title)
+    if (normalizedPlace === normalizedTarget) {
+      foundIndex = i
+      break
+    }
+  }
+
+  if (foundIndex >= 0) {
+    return {
+      top_places: topPlaces,
+      business_returned: true,
+      business_rejected: false,
+      places_checked_count: places.length,
+      target_checked_against_all_places: true,
+      result_signature: signature,
+    }
+  }
+
+  // Check if business was in results but title didn't match closely
+  const normalizedTarget2 = normalizeBusinessName(targetName)
+  for (const place of places) {
+    const normalizedPlace = normalizeBusinessName(place.title)
+    // Check if it's close but isBusinessMatch rejected it
+    const similarity = diceSimilarity(normalizedPlace, normalizedTarget2)
+    if (similarity > 0.5) {
+      return {
+        top_places: topPlaces,
+        business_returned: true,
+        business_rejected: true,
+        rejection_reason: 'title_mismatch',
+        places_checked_count: places.length,
+        target_checked_against_all_places: true,
+        result_signature: signature,
+      }
+    }
+  }
+
+  return {
+    top_places: topPlaces,
+    business_returned: false,
+    business_rejected: false,
+    places_checked_count: places.length,
+    target_checked_against_all_places: true,
+    result_signature: signature,
+  }
 }
 
 export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const apiKey = process.env.SERPER_API_KEY
   if (!apiKey) {
-    return makeError('SERPER_API_KEY is not configured')
+    return makeError('SERPER_API_KEY is not configured', null, null)
   }
 
   const businessName = input.targetBusinessName?.trim()
   if (!businessName) {
-    return makeError('No target business name specified')
+    return makeError('No target business name specified', null, null)
   }
 
-  try {
-    const body: Record<string, unknown> = {
-      q: input.keyword,
-      gl: (input.country || 'IL').toLowerCase(),
-      hl: input.language || 'he',
-    }
+  const country = (input.country || 'IL').toLowerCase()
+  const language = input.language || 'he'
 
-    if (input.city) {
-      body.location = input.city
-    }
+  console.log('\n' + '='.repeat(100))
+  console.log('[Maps:CRITICAL] ========== SCANNER ENTRY POINT ==========')
+  console.log('[Maps:CRITICAL] Input received:')
+  console.log('[Maps:CRITICAL]   - locationMode:', input.locationMode, `(${typeof input.locationMode})`)
+  console.log('[Maps:CRITICAL]   - exactPoint:', input.exactPoint ? `{lat: ${input.exactPoint.lat}, lng: ${input.exactPoint.lng}}` : 'null/undefined')
+  console.log('[Maps:CRITICAL]   - radiusCenter:', input.radiusCenter ? `{lat: ${input.radiusCenter.lat}, lng: ${input.radiusCenter.lng}, zip: ${input.radiusCenter.centerZip}, miles: ${input.radiusCenter.radiusMiles}}` : 'null/undefined')
+  console.log('[Maps:CRITICAL]   - keyword:', input.keyword)
+  console.log('[Maps:CRITICAL]   - postalCode:', input.postalCode)
+  console.log('[Maps:CRITICAL]   - city:', input.city)
+  console.log('[Maps:CRITICAL] BRANCH DECISION LOGIC:')
+  console.log('[Maps:CRITICAL]   - Will exact_point branch trigger?', input.locationMode === 'exact_point' && input.exactPoint ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL]   - Will radius branch trigger?', input.locationMode === 'radius' && input.radiusCenter ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL]   - Will zip branch trigger?', input.locationMode === 'zip' && input.postalCode?.trim() ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL]   - Will city/default branch trigger?', !((input.locationMode === 'exact_point' && input.exactPoint) || (input.locationMode === 'radius' && input.radiusCenter) || (input.locationMode === 'zip' && input.postalCode?.trim())) ? '✓ YES' : '✗ NO')
+  console.log('[Maps:CRITICAL] =====================================')
+  console.log('='.repeat(100) + '\n')
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  console.log('[Maps:scanGoogleMaps] Entry point:', {
+    locationMode: input.locationMode,
+    hasExactPoint: !!input.exactPoint,
+    exactPointLat: input.exactPoint?.lat,
+    exactPointLng: input.exactPoint?.lng,
+    postalCode: input.postalCode,
+    keyword: input.keyword,
+  })
 
-    let response: Response
+  // exact_point mode: ll is the ONLY source of truth. No city, no ZIP fallback.
+  if (input.locationMode === 'exact_point' && input.exactPoint) {
+    console.log('[Maps:exact_point] BRANCH TAKEN: exact_point with coordinates', {
+      lat: input.exactPoint.lat,
+      lng: input.exactPoint.lng,
+    })
+    const { lat, lng } = input.exactPoint
+    const auditAttempts: ScanAttempt[] = []
+    const outgoingLl = `@${lat},${lng},13z`
+
     try {
-      response = await fetch(SERPER_MAPS_URL, {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-    } finally {
-      clearTimeout(timer)
-    }
+      // Deliberately pass NO location (only ll + gl + hl). This is what makes
+      // exact_point deterministic: no city string can drift the geo context.
+      const response = await querySerperMaps(input.keyword, country, language, undefined, { lat, lng })
+      const lastResponse = response
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => '')
-      return makeError(`Serper API error: ${response.status} ${response.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`)
-    }
+      if (!response) {
+        auditAttempts.push({ attemptNumber: 1, context: 'exact_point', location: null, ll: outgoingLl, found: false })
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, 'No response from Serper', null)
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).exact_point_used = true
+          ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+          ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+          ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+          ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+          ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+        }
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
+      }
+      if (response.error) {
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).exact_point_used = true
+          ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+          ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+          ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+          ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+          ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+        }
+        return { ...makeError(response.error, input, audit), audit }
+      }
 
-    let data: SerperMapsResponse
-    try {
-      data = await response.json()
-    } catch {
-      return makeError('Serper API returned invalid JSON')
-    }
+      const places = response.places ?? []
+      const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
 
-    if (data.error) {
-      return makeError(`Serper: ${data.error}`)
-    }
-
-    const places = data.places ?? []
-    const normalizedTarget = normalizeBusinessName(businessName)
-
-    for (const place of places) {
-      const normalizedPlace = normalizeBusinessName(place.title)
-
-      if (isBusinessMatch(normalizedPlace, normalizedTarget)) {
+      if (matchedPlace) {
+        auditAttempts.push({
+          attemptNumber: 1,
+          context: 'exact_point',
+          location: null,
+          ll: outgoingLl,
+          found: true,
+          matchedTitle: matchedPlace.title,
+          matchedPosition: matchedPlace.position,
+          matchedAddress: matchedPlace.address || null,
+        })
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, null)
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).exact_point_used = true
+          ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+          ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+          ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+          ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+          ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+        }
         return {
           found: true,
-          position: place.position,
-          resultUrl: place.website || null,
-          resultTitle: place.title,
-          resultAddress: place.address || null,
+          position: matchedPlace.position,
+          resultUrl: matchedPlace.website || null,
+          resultTitle: matchedPlace.title,
+          resultAddress: matchedPlace.address || null,
           error: null,
+          audit,
         }
+      }
+
+      auditAttempts.push({ attemptNumber: 1, context: 'exact_point', location: null, ll: outgoingLl, found: false })
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).exact_point_used = true
+        ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+        ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+        ;(audit.decision as Record<string, unknown>).exact_point_resolution_source = input.exactPoint.resolutionSource || null
+        ;(audit.decision as Record<string, unknown>).exact_point_geocoding_provider = input.exactPoint.geocodingProvider || null
+        ;(audit.decision as Record<string, unknown>).exact_point_address_input = input.exactPoint.addressInput || null
+      }
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
+    } catch (err) {
+      const audit = buildAudit(input, country, language, null, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).exact_point_used = true
+        ;(audit.decision as Record<string, unknown>).exact_point_lat = lat
+        ;(audit.decision as Record<string, unknown>).exact_point_lng = lng
+      }
+      return { ...makeError((err as Error).message, input, audit), audit }
+    }
+  }
+
+  if (input.locationMode === 'exact_point' && !input.exactPoint) {
+    console.warn('[Maps:exact_point] WARNING: locationMode=exact_point but no exactPoint coords provided')
+  }
+
+  // Radius mode: multi-point scan strategy
+  if (input.locationMode === 'radius' && input.radiusCenter) {
+    console.log('\n' + '='.repeat(100))
+    console.log('[Maps:radius] ✓✓✓ RADIUS BRANCH TAKEN ✓✓✓ (multi-point strategy)')
+    console.log('[Maps:radius] Center coordinates and radius:')
+    console.log('[Maps:radius]   - centerZip:', input.radiusCenter.centerZip)
+    console.log('[Maps:radius]   - lat:', input.radiusCenter.lat)
+    console.log('[Maps:radius]   - lng:', input.radiusCenter.lng)
+    console.log('[Maps:radius]   - radiusMiles:', input.radiusCenter.radiusMiles)
+    console.log('='.repeat(100) + '\n')
+    const { lat, lng, centerZip, radiusMiles } = input.radiusCenter
+
+    // Validate all required values before using them
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      const errorMsg = `Radius mode requires valid numeric coordinates. Got: lat=${lat} (${typeof lat}), lng=${lng} (${typeof lng})`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      const errorMsg = `Invalid radius coordinates: lat=${lat}, lng=${lng}`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    if (radiusMiles === null || radiusMiles === undefined || typeof radiusMiles !== 'number') {
+      const errorMsg = `Radius mode requires valid numeric radiusMiles. Got: ${radiusMiles} (${typeof radiusMiles})`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    if (radiusMiles <= 0) {
+      const errorMsg = `Radius mode requires positive radiusMiles. Got: ${radiusMiles}`
+      console.error('[Maps:radius] ERROR:', errorMsg)
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg }
+    }
+
+    // Now all values are validated as numbers, safe to use
+    // Generate radius points around center
+    const radiusPoints = generateRadiusPoints(lat, lng, radiusMiles, centerZip || 'unknown')
+    console.log(`[Maps:radius] Generated ${radiusPoints.length} radius scan points:`)
+    radiusPoints.forEach(p => {
+      console.log(`  - ${p.label}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)} (${p.distanceMiles.toFixed(1)}mi)`)
+    })
+
+    const radiusResults: RadiusPointResult[] = []
+    let lastResponse: SerperMapsResponse | null = null
+
+    // Execute scan from each radius point
+    for (const point of radiusPoints) {
+      try {
+        console.log(`[Maps:radius:${point.label}] Querying from ${point.label}...`)
+        const response = await querySerperMaps(input.keyword, country, language, undefined, { lat: point.lat, lng: point.lng })
+        lastResponse = response
+
+        if (!response) {
+          console.log(`[Maps:radius:${point.label}] No response`)
+          radiusResults.push({
+            point,
+            found: false,
+            error: 'No response from Serper',
+          })
+          continue
+        }
+        if (response.error) {
+          console.log(`[Maps:radius:${point.label}] Serper error: ${response.error}`)
+          radiusResults.push({
+            point,
+            found: false,
+            error: response.error,
+          })
+          continue
+        }
+
+        const places = response.places ?? []
+        console.log(`[Maps:radius:${point.label}] Got ${places.length} places`)
+
+        const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
+        if (matchedPlace) {
+          console.log(`[Maps:radius:${point.label}] MATCH at position ${matchedPlace.position}: ${matchedPlace.title}`)
+          radiusResults.push({
+            point,
+            found: true,
+            position: matchedPlace.position,
+            title: matchedPlace.title,
+            address: matchedPlace.address || null,
+          })
+        } else {
+          radiusResults.push({
+            point,
+            found: false,
+          })
+        }
+      } catch (err) {
+        console.error(`[Maps:radius:${point.label}] Exception:`, (err as Error).message)
+        radiusResults.push({
+          point,
+          found: false,
+          error: (err as Error).message,
+        })
       }
     }
 
-    return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null }
+    // Aggregate results
+    const aggregated = aggregateRadiusResults(radiusResults)
+    console.log(`[Maps:radius] AGGREGATED RESULTS:`)
+    console.log(`  - Successful scans: ${aggregated.successCount}/${radiusPoints.length}`)
+    console.log(`  - Best match: ${aggregated.bestMatch ? `position ${aggregated.bestMatch.position} from ${aggregated.bestMatch.point.label}` : 'not found'}`)
+
+    if (aggregated.bestMatch) {
+      const auditAttempts: ScanAttempt[] = radiusResults.map((r, idx) => ({
+        attemptNumber: idx + 1,
+        context: `radius ${radiusMiles}mi: ${r.point.label}`,
+        location: null,
+        ll: `@${r.point.lat},${r.point.lng},13z`,
+        found: r.found,
+        matchedTitle: r.title || null,
+        matchedPosition: r.position,
+        matchedAddress: r.address || null,
+      }))
+
+      const audit = buildAudit(
+        input,
+        country,
+        language,
+        lastResponse,
+        auditAttempts,
+        true,
+        aggregated.bestMatch.position ?? null,
+        aggregated.bestMatch.title || null,
+        aggregated.bestMatch.address || null,
+        0,
+        null,
+        null
+      )
+
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).radius_used = true
+        ;(audit.decision as Record<string, unknown>).radius_center_zip = centerZip
+        ;(audit.decision as Record<string, unknown>).radius_center_lat = lat
+        ;(audit.decision as Record<string, unknown>).radius_center_lng = lng
+        ;(audit.decision as Record<string, unknown>).radius_miles = radiusMiles
+        ;(audit.decision as Record<string, unknown>).radius_points_scanned = radiusPoints.length
+        ;(audit.decision as Record<string, unknown>).radius_successful_scans = aggregated.successCount
+      }
+
+      return {
+        found: true,
+        position: aggregated.bestMatch.position ?? null,
+        resultUrl: aggregated.bestMatch.address ? null : null, // Maps doesn't provide URLs
+        resultTitle: aggregated.bestMatch.title || null,
+        resultAddress: aggregated.bestMatch.address || null,
+        error: null,
+        audit,
+        radiusScanMetadata: {
+          centerZip: centerZip || undefined,
+          centerLat: lat,
+          centerLng: lng,
+          radiusMiles,
+          pointsScanned: radiusPoints.length,
+          successfulScans: aggregated.successCount,
+          radiusAttempts: radiusResults.map(r => ({
+            direction: r.point.direction,
+            label: r.point.label,
+            lat: r.point.lat,
+            lng: r.point.lng,
+            distanceMiles: r.point.distanceMiles,
+            found: r.found,
+            position: r.position ?? null,
+          })),
+          bestMatch: aggregated.bestMatch && typeof aggregated.bestMatch.position === 'number' ? {
+            direction: aggregated.bestMatch.point.direction,
+            label: aggregated.bestMatch.point.label,
+            position: aggregated.bestMatch.position,
+          } : null,
+        },
+      }
+    } else {
+      const auditAttempts: ScanAttempt[] = radiusResults.map((r, idx) => ({
+        attemptNumber: idx + 1,
+        context: `radius ${radiusMiles}mi: ${r.point.label}`,
+        location: null,
+        ll: `@${r.point.lat},${r.point.lng},13z`,
+        found: false,
+      }))
+
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).radius_used = true
+        ;(audit.decision as Record<string, unknown>).radius_center_zip = centerZip
+        ;(audit.decision as Record<string, unknown>).radius_center_lat = lat
+        ;(audit.decision as Record<string, unknown>).radius_center_lng = lng
+        ;(audit.decision as Record<string, unknown>).radius_miles = radiusMiles
+        ;(audit.decision as Record<string, unknown>).radius_points_scanned = radiusPoints.length
+        ;(audit.decision as Record<string, unknown>).radius_successful_scans = aggregated.successCount
+      }
+
+      return {
+        found: false,
+        position: null,
+        resultUrl: null,
+        resultTitle: null,
+        resultAddress: null,
+        error: null,
+        audit,
+        radiusScanMetadata: {
+          centerZip: centerZip || undefined,
+          centerLat: lat,
+          centerLng: lng,
+          radiusMiles,
+          pointsScanned: radiusPoints.length,
+          successfulScans: aggregated.successCount,
+          radiusAttempts: radiusResults.map(r => ({
+            direction: r.point.direction,
+            label: r.point.label,
+            lat: r.point.lat,
+            lng: r.point.lng,
+            distanceMiles: r.point.distanceMiles,
+            found: r.found,
+            position: r.position,
+          })),
+          bestMatch: null,
+        },
+      }
+    }
+  }
+
+  if (input.locationMode === 'radius' && !input.radiusCenter) {
+    console.warn('[Maps:radius] WARNING: locationMode=radius but no radiusCenter coords provided')
+  }
+
+  // ZIP code mode: geocode ZIP to coordinates, send both location and ll
+  if (input.locationMode === 'zip' && input.postalCode?.trim()) {
+    console.log('[Maps:zip] BRANCH TAKEN: ZIP code mode')
+    const postalCode = input.postalCode.trim()
+    const auditAttempts: ScanAttempt[] = []
+    let lastResponse: SerperMapsResponse | null = null
+
+    try {
+      // Resolve ZIP to coordinates (local dataset first, then external fallback)
+      const zipResolution = await resolveUSZIP(postalCode)
+      if (!zipResolution) {
+        const errorMsg = `Unknown ZIP code: ${postalCode}`
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, null)
+        // Add ZIP resolution metadata to audit
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).zip_resolution_source = 'unknown'
+          ;(audit.decision as Record<string, unknown>).resolved_zip = postalCode
+          ;(audit.decision as Record<string, unknown>).zip_found = false
+        }
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg, audit }
+      }
+
+      const response = await querySerperMaps(input.keyword, 'us', 'en', postalCode, zipResolution)
+      lastResponse = response
+
+      if (!response) {
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+        return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
+      }
+      if (response.error) {
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        return { ...makeError(response.error, input, audit), audit }
+      }
+
+      const places = response.places ?? []
+      const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
+
+      // Validate: check if results are within expected US bounds for the ZIP
+      const withinUSBounds = validateZIPResults(places, zipResolution)
+      if (!withinUSBounds && places.length > 0) {
+        console.warn(`[ZIP Validation] Results for ${postalCode} appear outside expected ZIP area`)
+      }
+
+      if (matchedPlace) {
+        auditAttempts.push({
+          attemptNumber: 1,
+          context: 'postal code',
+          location: postalCode,
+          found: true,
+          matchedTitle: matchedPlace.title,
+          matchedPosition: matchedPlace.position,
+          matchedAddress: matchedPlace.address || null,
+        })
+        const validationWarning = !withinUSBounds && places.length > 0 ? ' (geo validation warning)' : ''
+        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, validationWarning ? `ZIP area validation: ${validationWarning}` : null)
+        // Add ZIP resolution metadata to audit
+        if (audit.decision) {
+          ;(audit.decision as Record<string, unknown>).zip_resolution_source = zipResolution.provider
+          ;(audit.decision as Record<string, unknown>).resolved_zip = postalCode
+          ;(audit.decision as Record<string, unknown>).zip_found = true
+          ;(audit.decision as Record<string, unknown>).resolved_lat = zipResolution.lat
+          ;(audit.decision as Record<string, unknown>).resolved_lng = zipResolution.lng
+        }
+        return {
+          found: true,
+          position: matchedPlace.position,
+          resultUrl: matchedPlace.website || null,
+          resultTitle: matchedPlace.title,
+          resultAddress: matchedPlace.address || null,
+          error: null,
+          audit,
+        }
+      }
+
+      auditAttempts.push({
+        attemptNumber: 1,
+        context: 'postal code',
+        location: postalCode,
+        found: false,
+      })
+      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      // Add ZIP resolution metadata to audit
+      if (audit.decision) {
+        ;(audit.decision as Record<string, unknown>).zip_resolution_source = zipResolution.provider
+        ;(audit.decision as Record<string, unknown>).resolved_zip = postalCode
+        ;(audit.decision as Record<string, unknown>).zip_found = true
+        ;(audit.decision as Record<string, unknown>).resolved_lat = zipResolution.lat
+        ;(audit.decision as Record<string, unknown>).resolved_lng = zipResolution.lng
+      }
+      return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
+    } catch (err) {
+      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      return { ...makeError((err as Error).message, input, audit), audit }
+    }
+  }
+
+  // Resolve effective city: custom override > project city
+  const effectiveCity =
+    input.locationMode === 'custom' && input.customCity?.trim()
+      ? input.customCity.trim()
+      : input.city?.trim() || null
+
+  const hasCity = Boolean(effectiveCity)
+
+  // Resolve coordinates using effectiveCity (may be custom or project city)
+  const cityLower = effectiveCity?.toLowerCase() || ''
+  const cityCoordinates = cityLower ? ISRAELI_CITIES[cityLower] : undefined
+
+  console.log('[Maps] ========== SCAN START ==========')
+  console.log('[Maps] Input:', {
+    keyword: input.keyword,
+    businessName,
+    projectCountry: country.toUpperCase(),
+    effectiveCity: effectiveCity || '(not set)',
+    locationMode: input.locationMode || 'project',
+    language,
+    cityCoordinatesResolved: cityCoordinates ?? null,
+  })
+
+  // Build context attempts — project city is PRIMARY, never replaced by
+  // generic country-level context when a city is set.
+  // Exact keyword is passed unchanged to every attempt.
+  console.log('[Maps:default] BRANCH TAKEN: project/custom city mode', {
+    locationMode: input.locationMode,
+    effectiveCity,
+    hasCity,
+  })
+
+  const contextAttempts: Array<{
+    label: string
+    location: string | undefined
+    coordinates?: { lat: number; lng: number }
+  }> = []
+
+  if (hasCity) {
+    if (country === 'il') {
+      // Israel: EXACTLY ONE attempt — city + resolved coordinates. No fallbacks.
+      console.log('[IL] Single city scan mode active - no fallback attempts')
+      contextAttempts.push({
+        label: `city "${effectiveCity}" (IL single-attempt)`,
+        location: effectiveCity!,
+        coordinates: cityCoordinates,
+      })
+    } else {
+      // Non-IL (US): preserve existing multi-attempt logic.
+      // Effective city (custom or project) — primary and only context attempts
+      contextAttempts.push({
+        label: `city "${effectiveCity}"`,
+        location: effectiveCity!,
+        coordinates: cityCoordinates,
+      })
+      contextAttempts.push({
+        label: `city+country "${effectiveCity}, ${country.toUpperCase()}"`,
+        location: `${effectiveCity}, ${country.toUpperCase()}`,
+        coordinates: cityCoordinates,
+      })
+      if (cityCoordinates) {
+        contextAttempts.push({
+          label: `city via explicit coordinates only`,
+          location: effectiveCity!,
+          coordinates: cityCoordinates,
+        })
+      }
+    }
+  } else {
+    // No project city — fall back to country-level only (generic)
+    contextAttempts.push({
+      label: `country "${country.toUpperCase()}" (no city set)`,
+      location: country.toUpperCase(),
+      coordinates: country === 'il' ? { lat: 31.5, lng: 34.75 } : undefined,
+    })
+  }
+
+  const auditAttempts: ScanAttempt[] = []
+  let lastResponse: SerperMapsResponse | null = null
+  let successfulAttemptIndex: number | undefined
+
+  try {
+    for (let attemptIndex = 0; attemptIndex < contextAttempts.length; attemptIndex++) {
+      const attempt = contextAttempts[attemptIndex]
+
+      // GUARD: if city was configured, block any generic country-level fallback
+      if (hasCity) {
+        const isGenericFallback =
+          attempt.location === 'IL' ||
+          attempt.location === 'is' ||
+          attempt.location === country.toUpperCase() ||
+          attempt.location === country ||
+          (attempt.coordinates?.lat === 31.5 && attempt.coordinates?.lng === 34.75)
+
+        if (isGenericFallback) {
+          const msg = `FORBIDDEN: Generic country fallback attempt for city-configured project (city="${effectiveCity}", location="${attempt.location}", ll="${attempt.coordinates ? `@${attempt.coordinates.lat},${attempt.coordinates.lng},13z` : 'none'}")`
+          console.error('[Maps] ERROR:', msg)
+          throw new Error(msg)
+        }
+      }
+
+      const outgoingLl = attempt.coordinates ? `@${attempt.coordinates.lat},${attempt.coordinates.lng},13z` : undefined
+      console.log(`[Maps] ---- Attempt: ${attempt.label} ----`)
+      console.log('[Maps] FINAL outgoing request:', {
+        keyword: input.keyword,
+        projectCity: input.city ?? null,
+        projectCountry: input.country ?? null,
+        location: attempt.location ?? '(none)',
+        ll: outgoingLl ?? '(none)',
+        gl: country,
+        hl: language,
+      })
+
+      const response = await querySerperMaps(input.keyword, country, language, attempt.location, attempt.coordinates)
+      lastResponse = response
+
+      if (!response) {
+        console.log(`[Maps] Attempt "${attempt.label}": no response, skipping`)
+        auditAttempts.push({
+          attemptNumber: attemptIndex + 1,
+          context: attempt.label,
+          location: attempt.location,
+          ll: outgoingLl,
+          found: false,
+        })
+        continue
+      }
+      if (response.error) {
+        const errorMsg = `Serper API error: ${response.error}`
+        console.error('[Maps] ERROR:', errorMsg)
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, effectiveCity)
+        return { ...makeError(errorMsg, input, audit), audit }
+      }
+
+      const places = response.places ?? []
+
+      // Validate returned geo context against project country
+      const geoCheck = validateGeoContext(response, country)
+      console.log('[Maps] Geo validation:', {
+        returnedLl: geoCheck.returnedLl ?? '(not in response)',
+        placesTotal: places.length,
+        placesWithCoords: geoCheck.placesWithCoords,
+        placesInCountry: geoCheck.placesInCountry,
+        valid: geoCheck.valid,
+        reason: geoCheck.reason,
+      })
+
+      if (!geoCheck.valid) {
+        console.log(`[Maps] ✗ REJECTED attempt "${attempt.label}" — wrong geo context (${geoCheck.reason})`)
+        auditAttempts.push({
+          attemptNumber: attemptIndex + 1,
+          context: attempt.label,
+          location: attempt.location,
+          ll: outgoingLl,
+          found: false,
+          geoValidationPassed: false,
+          rejectionReason: geoCheck.reason,
+        })
+        continue
+      }
+
+      console.log(`[Maps] Attempt "${attempt.label}": ${places.length} places returned (geo OK)`)
+
+      const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
+      if (matchedPlace) {
+        successfulAttemptIndex = attemptIndex
+        auditAttempts.push({
+          attemptNumber: attemptIndex + 1,
+          context: attempt.label,
+          location: attempt.location,
+          ll: outgoingLl,
+          found: true,
+          matchedTitle: matchedPlace.title,
+          matchedPosition: matchedPlace.position,
+          matchedAddress: matchedPlace.address || null,
+          geoValidationPassed: true,
+        })
+        console.log(`[Maps] ✓ FOUND via "${attempt.label}" at position ${matchedPlace.position}`)
+        console.log('[Maps] ========== SCAN END (FOUND) ==========')
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, successfulAttemptIndex, null, effectiveCity)
+        return {
+          found: true,
+          position: matchedPlace.position,
+          resultUrl: matchedPlace.website || null,
+          resultTitle: matchedPlace.title,
+          resultAddress: matchedPlace.address || null,
+          error: null,
+          audit,
+        }
+      }
+
+      console.log(`[Maps] ✗ No match for attempt "${attempt.label}"`)
+      auditAttempts.push({
+        attemptNumber: attemptIndex + 1,
+        context: attempt.label,
+        location: attempt.location,
+        ll: outgoingLl,
+        found: false,
+        geoValidationPassed: true,
+      })
+    }
+
+    console.log('[Maps] ✗ NO MATCH — all project-location attempts exhausted (keyword unchanged)')
+    console.log('[Maps] ========== SCAN END (NOT FOUND) ==========')
+    const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, effectiveCity)
+    return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
-      return makeError('Serper API request timed out')
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, 'Serper API request timed out', effectiveCity)
+      return { ...makeError('Serper API request timed out', input, audit), audit }
     }
-    return makeError((err as Error).message)
+    const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, effectiveCity)
+    return { ...makeError((err as Error).message, input, audit), audit }
   }
 }
 
 /**
- * Determine if a Maps result title matches the target business name.
+ * STRICT business name matching for Google Maps results.
  *
- * Strategy (in order of strictness):
- * 1. Exact match after normalization
- * 2. One is a prefix of the other (handles "Foo Bar" vs "Foo Bar Restaurant")
- *    — only if the shorter string is >= 5 chars to avoid false positives
- * 3. Dice-coefficient similarity >= 0.82 for strings >= 6 chars
- *    — higher threshold than before to reduce false positives
+ * This is now a STRICT validator used only for backup checks.
+ * Main matching logic is in findBusinessMatch() which handles:
+ * 1. Exact normalization match (highest priority)
+ * 2. Domain-based matching with name verification
+ * 3. Very strict similarity matching (0.90+)
  */
 function isBusinessMatch(place: string, target: string): boolean {
+  // STRICT: Only exact match or very high similarity
   if (place === target) return true
 
-  const shorter = place.length <= target.length ? place : target
-  const longer = place.length > target.length ? place : target
-
-  // Prefix match only if shorter side is long enough
-  if (shorter.length >= 5 && longer.startsWith(shorter)) return true
-
-  // Fuzzy match only for sufficiently long strings
-  if (shorter.length >= 6 && diceSimilarity(place, target) >= 0.82) return true
+  if (place.length >= 6 && target.length >= 6) {
+    const similarity = diceSimilarity(place, target)
+    if (similarity >= 0.90) return true
+  }
 
   return false
 }
@@ -129,6 +1168,8 @@ function normalizeBusinessName(name: string): string {
   return name
     .trim()
     .toLowerCase()
+    // Normalize Hebrew cleaning variations: ניקיון and נקיון are DIFFERENT and must stay distinct
+    // DO NOT replace one with the other - keep them as-is to prevent cross-project false matches
     // Strip common legal suffixes and punctuation that don't affect identity
     .replace(/[,.'"""''()\-–—]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -161,6 +1202,94 @@ function diceSimilarity(a: string, b: string): number {
   return (2 * intersection) / (a.length - 1 + (b.length - 1))
 }
 
-function makeError(message: string): ScanOutput {
-  return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: message }
+function makeError(message: string, input: ScanInput | null, audit: ScanAudit | null): ScanOutput {
+  return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: message, audit: audit || undefined }
+}
+
+function buildAudit(
+  input: ScanInput,
+  country: string,
+  language: string,
+  lastResponse: SerperMapsResponse | null,
+  attempts: ScanAttempt[],
+  found: boolean,
+  matchedPosition: number | null,
+  matchedTitle: string | null,
+  matchedAddress: string | null,
+  successfulAttemptIndex: number | undefined,
+  rejectionReason: string | null,
+  effectiveCity: string | null
+): ScanAudit {
+  // Limit raw response to prevent excessively large audit data
+  let rawResponse: unknown = lastResponse || null
+  let rawResponseTruncated = false
+
+  if (lastResponse && typeof lastResponse === 'object') {
+    const jsonStr = JSON.stringify(lastResponse)
+    if (jsonStr.length > 50000) {
+      rawResponseTruncated = true
+      rawResponse = {
+        places: (lastResponse.places ?? []).slice(0, 10),
+        searchParameters: lastResponse.searchParameters,
+        error: lastResponse.error,
+      }
+    }
+  }
+
+  // Determine what was actually sent
+  const sentLocation = attempts.find(a => a.location)?.location || null
+  const sentLl = attempts.find(a => a.ll)?.ll || null
+  const postalCodeSent = input.locationMode === 'zip' ? input.postalCode || null : null
+
+  const requestObj: ScanAudit['request'] = {
+    keyword: input.keyword,
+    engine: 'google_maps',
+    projectCity: effectiveCity || null,
+    projectCountry: country.toUpperCase(),
+    locationMode: input.locationMode,
+    locationSent: sentLocation,
+    llSent: sentLl,
+    postalCodeSent,
+    gl: country,
+    hl: language,
+    scanner_version: '2.0',
+  }
+
+  // Explicit exact_point metadata for auditability
+  if (input.locationMode === 'exact_point' && input.exactPoint) {
+    requestObj.exactPointLat = input.exactPoint.lat
+    requestObj.exactPointLng = input.exactPoint.lng
+    requestObj.exactPointAddressInput = input.exactPoint.addressInput || null
+    requestObj.exactPointResolutionSource = input.exactPoint.resolutionSource || null
+    requestObj.exactPointGeocodingProvider = input.exactPoint.geocodingProvider || null
+  }
+
+  return {
+    request: requestObj,
+    response: {
+      searchParameters: lastResponse?.searchParameters,
+      placesCount: (lastResponse?.places || []).length,
+      placesSample: (lastResponse?.places || []).slice(0, 10).map(p => ({
+        title: p.title,
+        position: p.position,
+        website: p.website || null,
+        address: p.address || null,
+      })),
+      rawResponse,
+      rawResponseTruncated,
+    },
+    decision: {
+      found,
+      matchedPosition,
+      matchedTitle,
+      matchedAddress,
+      attempts,
+      successfulAttemptIndex,
+      geoValidationPassed: attempts.length > 0 ? attempts.some(a => a.geoValidationPassed !== false) : undefined,
+      rejectionReason,
+      targetBusinessName: input.targetBusinessName || null,
+      targetDomain: input.targetDomain || null,
+      matchingStrategy: found ? (input.targetDomain ? 'domain_verification' : 'strict_name_match') : 'no_match',
+    },
+  }
 }

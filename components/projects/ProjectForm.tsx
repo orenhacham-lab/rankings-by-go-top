@@ -6,6 +6,8 @@ import Select from '@/components/ui/Select'
 import Button from '@/components/ui/Button'
 import { Project, Client } from '@/lib/supabase/types'
 import { createProjectAction, updateProjectAction } from '@/app/actions/projects'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 interface ProjectFormProps {
   project?: Project
@@ -22,16 +24,42 @@ export default function ProjectForm({
   onSuccess,
   onCancel,
 }: ProjectFormProps) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const f = dict.projects.form
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [autoScan, setAutoScan] = useState(project?.auto_scan_enabled ?? false)
   const [scanFreq, setScanFreq] = useState<'manual' | 'weekly' | 'monthly' | 'monthly_first_day'>(
     project?.scan_frequency || 'manual'
   )
+  const [country, setCountry] = useState(project?.country || 'IL')
+  const [city, setCity] = useState(project?.city || '')
+
+  const validateUSCityFormat = (cityStr: string): boolean => {
+    if (!cityStr.trim()) return false
+    // Format: "City, ST" where ST is 2-letter state code
+    const pattern = /^[A-Za-z\s]+,\s?[A-Z]{2}$/
+    return pattern.test(cityStr.trim())
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError('')
+
+    // Validate US city format
+    if (country === 'US') {
+      if (!city.trim()) {
+        setError(f.errorUsCity)
+        return
+      }
+      if (!validateUSCityFormat(city)) {
+        setError(f.errorUsCityFormat)
+        return
+      }
+    }
+
     setLoading(true)
 
     const formData = new FormData(e.currentTarget)
@@ -39,13 +67,25 @@ export default function ProjectForm({
 
     try {
       if (project) {
+        // Update existing project - use server action
         await updateProjectAction(project.id, formData)
       } else {
-        await createProjectAction(formData)
+        // Create new project - use API route
+        const response = await fetch('/api/projects/create', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || f.errorCreate)
+        }
+
+        await response.json()
       }
       onSuccess()
     } catch (err) {
-      setError((err as Error).message || 'שגיאה בשמירה')
+      setError((err as Error).message || dict.common.saveError)
     } finally {
       setLoading(false)
     }
@@ -61,89 +101,95 @@ export default function ProjectForm({
 
       {!project && (
         <Select
-          label="לקוח *"
+          label={f.clientLabel}
           name="client_id"
           defaultValue={defaultClientId || ''}
           required
           options={[
-            { value: '', label: 'בחר לקוח...' },
+            { value: '', label: f.clientPlaceholder },
             ...clients.map((c) => ({ value: c.id, label: c.name })),
           ]}
         />
       )}
 
       <Input
-        label="שם הפרויקט *"
+        label={f.nameLabel}
         name="name"
         defaultValue={project?.name}
         required
-        placeholder="פרויקט SEO ראשי"
+        placeholder={f.namePlaceholder}
       />
 
       <Input
-        label="דומיין יעד *"
+        label={f.domainLabel}
         name="target_domain"
         defaultValue={project?.target_domain}
         required
-        placeholder="example.co.il"
-        hint="הכנס דומיין בלבד, ללא https://"
+        placeholder={f.domainPlaceholder}
+        hint={f.domainHint}
       />
 
       <Input
-        label="שם עסק (לגוגל מפות)"
+        label={f.businessNameLabel}
         name="business_name"
         defaultValue={project?.business_name || ''}
-        placeholder="שם העסק כפי שמופיע בגוגל מפות"
+        placeholder={f.businessNamePlaceholder}
       />
 
       <div className="grid grid-cols-2 gap-4">
         <Select
-          label="מדינה"
+          label={f.countryLabel}
           name="country"
-          defaultValue={project?.country || 'IL'}
+          value={country}
+          onChange={(e) => setCountry(e.target.value)}
           options={[
-            { value: 'IL', label: 'ישראל' },
-            { value: 'US', label: 'ארצות הברית' },
-            { value: 'GB', label: 'בריטניה' },
+            { value: 'IL', label: f.countryIL },
+            { value: 'US', label: f.countryUS },
+            { value: 'GB', label: f.countryGB },
           ]}
         />
         <Select
-          label="שפה"
+          label={f.languageLabel}
           name="language"
           defaultValue={project?.language || 'he'}
           options={[
-            { value: 'he', label: 'עברית' },
-            { value: 'en', label: 'אנגלית' },
-            { value: 'ar', label: 'ערבית' },
+            { value: 'he', label: f.languageHe },
+            { value: 'en', label: f.languageEn },
+            { value: 'ar', label: f.languageAr },
           ]}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label="עיר / מיקום"
-          name="city"
-          defaultValue={project?.city || ''}
-          placeholder="תל אביב"
-        />
+        <div>
+          <Input
+            label={country === 'US' ? f.cityLabelUS : f.cityLabel}
+            name="city"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder={country === 'US' ? f.cityPlaceholderUS : f.cityPlaceholder}
+            hint={country === 'US' ? f.cityHintUS : ''}
+            required={country === 'US'}
+          />
+        </div>
         <Select
-          label="מכשיר"
+          label={f.deviceLabel}
           name="device_type"
           defaultValue={project?.device_type || ''}
           options={[
-            { value: '', label: 'ברירת מחדל' },
-            { value: 'desktop', label: 'מחשב' },
-            { value: 'mobile', label: 'נייד' },
+            { value: '', label: f.deviceDefault },
+            { value: 'desktop', label: f.deviceDesktop },
+            { value: 'mobile', label: f.deviceMobile },
           ]}
         />
       </div>
 
       {/* Scheduling */}
-      <div className="border-t border-slate-200 pt-4">
-        <h4 className="text-sm font-semibold text-slate-700 mb-3">הגדרות סריקה אוטומטית</h4>
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">{f.schedulingTitle}</h4>
 
         <Select
-          label="תדירות סריקה"
+          label={f.scanFrequencyLabel}
           name="scan_frequency"
           value={scanFreq}
           onChange={(e) => {
@@ -151,10 +197,10 @@ export default function ProjectForm({
             if (e.target.value === 'manual') setAutoScan(false)
           }}
           options={[
-            { value: 'manual', label: 'ידני בלבד' },
-            { value: 'weekly', label: 'פעם בשבוע' },
-            { value: 'monthly', label: 'פעם בחודש' },
-            { value: 'monthly_first_day', label: 'כל חודש ב-1 לחודש' },
+            { value: 'manual', label: f.scanFreqManual },
+            { value: 'weekly', label: f.scanFreqWeekly },
+            { value: 'monthly', label: f.scanFreqMonthly },
+            { value: 'monthly_first_day', label: f.scanFreqMonthlyFirstDay },
           ]}
         />
 
@@ -166,17 +212,17 @@ export default function ProjectForm({
               onChange={(e) => setAutoScan(e.target.checked)}
               className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm text-slate-700">הפעל סריקה אוטומטית</span>
+            <span className="text-sm text-slate-700 dark:text-slate-200">{f.autoScanLabel}</span>
           </label>
         )}
       </div>
 
       <div className="flex gap-3 pt-2">
         <Button type="submit" loading={loading}>
-          {project ? 'שמור שינויים' : 'צור פרויקט'}
+          {project ? f.submitUpdate : f.submitCreate}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel}>
-          ביטול
+          {f.cancel}
         </Button>
       </div>
     </form>

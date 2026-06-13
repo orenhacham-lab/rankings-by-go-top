@@ -9,17 +9,30 @@ import { ScanStatusBadge } from '@/components/ui/StatusBadge'
 import Badge from '@/components/ui/Badge'
 import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ScansPage() {
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const t = dict.scans
+
   const [scans, setScans] = useState<(Scan & { projects?: { name: string; id: string; clients?: { name: string } } })[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadData() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
       const { data } = await supabase
         .from('scans')
         .select('*, projects(id, name, clients(name))')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(100)
       setScans(data || [])
@@ -30,29 +43,30 @@ export default function ScansPage() {
 
   return (
     <div>
-      <Header title="סריקות" subtitle="היסטוריית סריקות מלאה" />
+      <Header title={t.title} subtitle={t.subtitle} />
 
       {loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען...
+          {t.loading}
         </div>
       ) : (
         <Table>
           <TableHead>
             <tr>
-              <Th>פרויקט</Th>
-              <Th>לקוח</Th>
-              <Th>סטטוס</Th>
-              <Th>הפעלה</Th>
-              <Th>תוצאות</Th>
-              <Th>התחיל</Th>
-              <Th>הסתיים</Th>
+              <Th>{t.table.project}</Th>
+              <Th>{t.table.client}</Th>
+              <Th>{t.table.status}</Th>
+              <Th>{t.table.trigger}</Th>
+              <Th>{t.table.results}</Th>
+              <Th>{t.table.started}</Th>
+              <Th>{t.table.finished}</Th>
+              <Th>{t.table.actions}</Th>
             </tr>
           </TableHead>
           <TableBody>
             {scans.length === 0 && (
-              <EmptyRow colSpan={7} message="אין סריקות עדיין" />
+              <EmptyRow colSpan={8} message={t.table.emptyState} />
             )}
             {scans.map((scan) => (
               <TableRow key={scan.id}>
@@ -64,7 +78,7 @@ export default function ScansPage() {
                   ) : '—'}
                 </Td>
                 <Td>
-                  <span className="text-slate-500 text-sm">
+                  <span className="text-slate-500 dark:text-slate-400 text-sm">
                     {(scan.projects as { clients?: { name: string } })?.clients?.name || '—'}
                   </span>
                 </Td>
@@ -73,28 +87,33 @@ export default function ScansPage() {
                 </Td>
                 <Td>
                   <Badge variant={scan.triggered_by === 'scheduled' ? 'info' : 'neutral'}>
-                    {scan.triggered_by === 'scheduled' ? 'אוטומטי' : 'ידני'}
+                    {scan.triggered_by === 'scheduled' ? t.trigger.automatic : t.trigger.manual}
                   </Badge>
                 </Td>
                 <Td>
                   <span className="text-sm">
                     <span className="text-green-600 font-medium">{scan.completed_targets}</span>
                     {' / '}
-                    <span className="text-slate-600">{scan.total_targets}</span>
+                    <span className="text-slate-600 dark:text-slate-300">{scan.total_targets}</span>
                     {scan.failed_targets > 0 && (
-                      <span className="text-red-500 mr-1"> ({scan.failed_targets} נכשלו)</span>
+                      <span className="text-red-500 mr-1"> {t.table.failedSuffix(scan.failed_targets)}</span>
                     )}
                   </span>
                 </Td>
                 <Td>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {scan.started_at ? formatDateTime(scan.started_at) : '—'}
                   </span>
                 </Td>
                 <Td>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {scan.completed_at ? formatDateTime(scan.completed_at) : '—'}
                   </span>
+                </Td>
+                <Td>
+                  <Link href={`/scans/${scan.id}/details`} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                    {t.table.viewDetails}
+                  </Link>
                 </Td>
               </TableRow>
             ))}

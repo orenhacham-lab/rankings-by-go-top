@@ -56,8 +56,8 @@ export default function AdminLogsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">לוג שגיאות</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">לוג שגיאות</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             שגיאות אחרונות מסריקות ומהמערכת
           </p>
         </div>
@@ -73,11 +73,11 @@ export default function AdminLogsPage() {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: 'סה"כ', count: logs.length, color: 'bg-slate-50 text-slate-700' },
+          { label: 'סה"כ', count: logs.length, color: 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200' },
           { label: 'שגיאות', count: errorCount, color: 'bg-red-50 text-red-700' },
           { label: 'אזהרות', count: warningCount, color: 'bg-amber-50 text-amber-700' },
         ].map(({ label, count, color }) => (
-          <div key={label} className={`rounded-xl border border-slate-200 p-4 ${color}`}>
+          <div key={label} className={`rounded-xl border border-slate-200 dark:border-slate-700 p-4 ${color}`}>
             <div className="text-2xl font-bold">{count}</div>
             <div className="text-xs mt-1">{label}</div>
           </div>
@@ -96,8 +96,8 @@ export default function AdminLogsPage() {
             onClick={() => setFilter(opt.value as typeof filter)}
             className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
               filter === opt.value
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                ? 'bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-700'
+                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
             }`}
           >
             {opt.label}
@@ -120,14 +120,14 @@ export default function AdminLogsPage() {
       )}
 
       {!loading && !error && filtered.length === 0 && (
-        <div className="text-center py-20 text-slate-400">
+        <div className="text-center py-20 text-slate-400 dark:text-slate-500">
           <span className="text-4xl block mb-3">✅</span>
-          <p className="font-medium text-slate-600">אין שגיאות</p>
+          <p className="font-medium text-slate-600 dark:text-slate-300">אין שגיאות</p>
         </div>
       )}
 
       {!loading && filtered.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm divide-y divide-slate-100 dark:divide-slate-700">
           {filtered.map((log) => (
             <div key={log.id} className="px-5 py-4">
               <div className="flex items-start gap-3">
@@ -137,9 +137,9 @@ export default function AdminLogsPage() {
                   {levelLabel(log.level)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800">{log.message}</p>
-                  <p className="text-xs text-slate-500 mt-0.5 break-words">{log.detail}</p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{log.message}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 break-words">{log.detail}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                     {log.project} &bull;{' '}
                     {new Date(log.timestamp).toLocaleString('he-IL')}
                   </p>

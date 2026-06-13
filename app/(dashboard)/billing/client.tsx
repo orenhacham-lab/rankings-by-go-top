@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 interface PayPalButtonsOptions {
   style: {
@@ -21,6 +23,11 @@ interface PayPalWindow extends Window {
 }
 
 export default function BillingClient() {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const t = dict.billing.paypal
+  const paypalLocale = language === 'en' ? 'en_US' : 'he_IL'
+
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState('')
 
@@ -33,12 +40,14 @@ export default function BillingClient() {
       regular:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_REGULAR,
       advanced: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ADVANCED,
       premium:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PREMIUM,
+      large_agency: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_LARGE_AGENCY,
     }
 
     const plans = [
       { id: 'paypal-button-regular',  plan: 'regular'  },
       { id: 'paypal-button-advanced', plan: 'advanced' },
       { id: 'paypal-button-premium',  plan: 'premium'  },
+      { id: 'paypal-button-large_agency', plan: 'large_agency' },
     ]
 
     for (const { id, plan } of plans) {
@@ -50,8 +59,8 @@ export default function BillingClient() {
         const envVarName = `NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()}`
         console.warn(`[PayPal] Plan ID for "${plan}" not configured. Set env var: ${envVarName}`)
         container.innerHTML = `<p class="text-xs text-slate-500 text-center py-3 p-2 bg-amber-50 rounded border border-amber-200">
-          תוכנית ${plan} טרם הוגדרה.<br/>
-          <span class="text-xs">משתנה סביבה: ${envVarName}</span>
+          ${t.planNotConfiguredPrefix} ${plan} ${t.planNotConfiguredSuffix}<br/>
+          <span class="text-xs">${t.envVarLabel} ${envVarName}</span>
         </p>`
         continue
       }
@@ -74,7 +83,7 @@ export default function BillingClient() {
             } catch (error) {
               const errorMsg = error instanceof Error ? error.message : String(error)
               console.error('[PayPal] Failed to create subscription:', errorMsg)
-              alert(`שגיאה ביצירת המנוי. פרטים: ${errorMsg}`)
+              alert(`${t.createSubscriptionError} ${errorMsg}`)
               throw error
             }
           },
@@ -88,21 +97,21 @@ export default function BillingClient() {
               })
               if (!response.ok) {
                 const err = await response.json() as Record<string, unknown>
-                const errorMsg = (err.error as string) || 'שגיאה לא ידועה'
+                const errorMsg = (err.error as string) || t.unknownError
                 console.error('[PayPal] Activate error:', err)
                 console.error('[PayPal] Error message:', errorMsg)
-                alert(`שגיאה בהפעלת המנוי: ${errorMsg}`)
+                alert(`${t.activateSubscriptionError} ${errorMsg}`)
                 return
               }
               const result = await response.json()
               console.log('[PayPal] Subscription activation successful:', result)
-              alert('המנוי הופעל בהצלחה! 🎉')
+              alert(t.activatedSuccess)
               window.location.reload()
             } catch (error) {
               const errorMsg = error instanceof Error ? error.message : String(error)
               console.error('[PayPal] Failed to activate subscription:', error)
               console.error('[PayPal] Error details:', errorMsg)
-              alert(`שגיאה בהפעלת המנוי: ${errorMsg}`)
+              alert(`${t.activateSubscriptionError} ${errorMsg}`)
             }
           },
           onError: (err: unknown) => {
@@ -111,11 +120,11 @@ export default function BillingClient() {
             console.error('[PayPal] Error details:', errorDetails)
 
             // Show detailed error to help debug
-            let userMessage = `שגיאה ב-PayPal: ${errorDetails}`
+            let userMessage = `${t.buttonError} ${errorDetails}`
             if (errorDetails.includes('Invalid plan')) {
-              userMessage = `מזהה התוכנית אינו תקין: ${planId}. בדוק את משתני הסביבה NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()}`
+              userMessage = `${t.invalidPlanIdPrefix} ${planId}${t.invalidPlanIdSuffix}${plan.toUpperCase()}`
             } else if (errorDetails.toLowerCase().includes('client')) {
-              userMessage = 'שגיאה ב-client ID של PayPal. בדוק את NEXT_PUBLIC_PAYPAL_CLIENT_ID'
+              userMessage = t.invalidClientId
             }
 
             alert(userMessage)
@@ -125,7 +134,7 @@ export default function BillingClient() {
         console.error(`[PayPal] Failed to render button for plan "${plan}":`, error)
       }
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
@@ -133,7 +142,7 @@ export default function BillingClient() {
     if (!clientId) {
       console.warn('[PayPal] NEXT_PUBLIC_PAYPAL_CLIENT_ID is not configured. Set: NEXT_PUBLIC_PAYPAL_CLIENT_ID=<client-id>')
       setTimeout(() => {
-        setConfigError('PayPal אינו מוגדר כרגע. משתנה סביבה חסר: NEXT_PUBLIC_PAYPAL_CLIENT_ID')
+        setConfigError(t.notConfigured)
         setLoading(false)
       }, 0)
       return
@@ -148,7 +157,7 @@ export default function BillingClient() {
 
     const script = document.createElement('script')
     script.id = 'paypal-sdk'
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription&locale=he_IL`
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription&locale=${paypalLocale}`
     script.async = true
     script.onload = () => {
       console.log('[PayPal] SDK loaded successfully')
@@ -157,7 +166,7 @@ export default function BillingClient() {
     }
     script.onerror = () => {
       console.error('[PayPal] Failed to load SDK from:', script.src)
-      setConfigError('לא ניתן לטעון את PayPal SDK. בדוק את החיבור לאינטרנט, את NEXT_PUBLIC_PAYPAL_CLIENT_ID, וspam filter ב-browser console.')
+      setConfigError(t.sdkLoadFailed)
       setLoading(false)
     }
     document.body.appendChild(script)
@@ -165,11 +174,11 @@ export default function BillingClient() {
     return () => {
       if (script.parentNode) script.parentNode.removeChild(script)
     }
-  }, [initPayPalButtons])
+  }, [initPayPalButtons, t.notConfigured, t.sdkLoadFailed, paypalLocale])
 
   if (loading) {
     return (
-      <div className="text-center py-4 text-slate-400 text-sm">טוען PayPal...</div>
+      <div className="text-center py-4 text-slate-400 text-sm">{t.loading}</div>
     )
   }
 

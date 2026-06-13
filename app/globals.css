@@ -1,16 +1,39 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4 custom dark variant for class-based dark mode ───── */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Base RTL setup ────────────────────────────────────────────── */
 html {
   direction: rtl;
+}
+
+/* ── LTR overrides for English pages ───────────────────────────── */
+html[lang="en"],
+html[dir="ltr"],
+[dir="ltr"] {
+  direction: ltr;
+}
+
+[dir="ltr"] table th,
+[dir="ltr"] table td {
+  text-align: left;
+}
+
+[dir="ltr"] input,
+[dir="ltr"] textarea,
+[dir="ltr"] select {
+  direction: ltr;
+  text-align: left;
 }
 
 body {
   /* Rubik loaded from Google Fonts in layout.tsx */
   font-family: 'Rubik', 'Segoe UI', Arial, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #f8fafc;
+  background: linear-gradient(180deg, #f8fbff 0%, #f4f6fb 45%, #f8fafc 100%);
   color: #0f172a;
+  min-height: 100vh;
 }
 
 /* ── Table defaults — explicit RTL alignment ───────────────────── */
@@ -48,8 +71,302 @@ select {
   background: #94a3b8;
 }
 
-/* ── Native dialog backdrop ────────────────────────────────────── */
+/* ── Native dialog backdrop ────────────────────── */
 dialog::backdrop {
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(2px);
+}
+
+/* ── Article Content Styles ───────────────────────────────────────── */
+.article-content {
+  line-height: 1.8;
+}
+
+.article-content p {
+  margin: 1.25rem 0;
+  color: #1e293b;
+}
+
+.article-content h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin: 2rem 0 1rem;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.article-content h2 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin: 2rem 0 1rem;
+  color: #0f172a;
+  line-height: 1.2;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.article-content h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem;
+  color: #1e293b;
+  line-height: 1.3;
+}
+
+.article-content h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  color: #1e293b;
+}
+
+.article-content ul,
+.article-content ol {
+  margin: 1.25rem 0;
+  padding-right: 2rem;
+}
+
+.article-content ul {
+  list-style-type: disc;
+}
+
+.article-content ol {
+  list-style-type: decimal;
+}
+
+.article-content li {
+  margin: 0.5rem 0;
+  color: #1e293b;
+}
+
+.article-content li p {
+  margin: 0.25rem 0;
+}
+
+.article-content blockquote {
+  border-right: 4px solid #3b82f6;
+  padding-right: 1rem;
+  margin: 1.5rem 0;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background-color: #f0f9ff;
+  color: #1e293b;
+  font-style: italic;
+}
+
+.article-content code {
+  background-color: #f1f5f9;
+  color: #7c3aed;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875em;
+}
+
+.article-content pre {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+.article-content pre code {
+  background-color: transparent;
+  color: #e2e8f0;
+  padding: 0;
+}
+
+.article-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  border: 1px solid #e2e8f0;
+}
+
+.article-content table thead {
+  background-color: #f1f5f9;
+}
+
+.article-content table th {
+  border: 1px solid #cbd5e1;
+  padding: 0.75rem;
+  text-align: right;
+  font-weight: 600;
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.article-content table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.75rem;
+  text-align: right;
+  color: #1e293b;
+}
+
+.article-content table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.article-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1.5rem 0;
+  display: block;
+}
+
+.article-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.article-content a:hover {
+  color: #1d4ed8;
+}
+
+.article-content hr {
+  margin: 2rem 0;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* ── Accessibility Widget Effects (public site) ───────────────────── */
+/* All effects are toggled by classes/variables on <html> and persisted in
+   localStorage by the AccessibilityWidget. Reset removes every class/var. */
+
+/* Text enlargement */
+html.a11y-text-1 { font-size: 112.5%; }
+html.a11y-text-2 { font-size: 125%; }
+html.a11y-text-3 { font-size: 140%; }
+
+/* Text reduction */
+html.a11y-text-n1 { font-size: 92%; }
+html.a11y-text-n2 { font-size: 84%; }
+html.a11y-text-n3 { font-size: 75%; }
+
+/* Readable font — swap to a high-legibility stack with looser spacing */
+html.a11y-readable-font,
+html.a11y-readable-font * {
+  font-family: Arial, 'Assistant', 'Segoe UI', system-ui, sans-serif !important;
+  letter-spacing: 0.4px !important;
+  line-height: 1.75 !important;
+  word-spacing: 1px !important;
+}
+
+/* Highlight links — clear underline + visible outline */
+html.a11y-highlight-links a {
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  outline: 2px solid #1d4ed8 !important;
+  outline-offset: 2px !important;
+  border-radius: 2px !important;
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Highlight headings — dashed outline + soft background */
+html.a11y-highlight-headings :is(h1, h2, h3, h4, h5, h6) {
+  outline: 2px dashed #d97706 !important;
+  outline-offset: 3px !important;
+  background-color: rgba(245, 158, 11, 0.08) !important;
+}
+
+/* Persistent alt-text labels injected next to images */
+.a11y-desc-label {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 1px 6px;
+  margin-top: 2px;
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: 3px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+/* Stop animations / transitions */
+html.a11y-stop-animations *,
+html.a11y-stop-animations *::before,
+html.a11y-stop-animations *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+/* Kept for backward compat — filter/contrast/grayscale now applied via inline style */
+html.a11y-filter {
+  filter: grayscale(var(--a11y-gray, 0)) contrast(var(--a11y-contrast, 1)) !important;
+}
+
+/* Big cursor (kept for backward compat; new code uses injected <style>) */
+html.a11y-big-cursor,
+html.a11y-big-cursor * {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cpath d='M8 4 L8 38 L17 29 L23 43 L29 40 L23 26 L36 26 Z' fill='black' stroke='white' stroke-width='2'/%3E%3C/svg%3E")
+      4 4,
+    auto !important;
+}
+
+/* Image description outlines (kept for backward compat) */
+html.a11y-image-descriptions img {
+  outline: 2px solid #0ea5e9 !important;
+  outline-offset: 2px;
+}
+html.a11y-image-descriptions img[data-a11y-noalt='true'] {
+  outline: 3px solid #dc2626 !important;
+}
+
+/* Respect the OS-level reduced-motion preference too */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.a11y-allow-motion) * {
+    scroll-behavior: auto;
+  }
+}
+
+/* ── Onboarding Tour Highlight ────────────────────────────────────── */
+/* Applied temporarily to the [data-onboarding] target during the tour.
+   The overlay sits below the sidebar (z-40), so a ringed sidebar item stays
+   fully visible and clickable above the dimmed main content. */
+.onboarding-highlight {
+  position: relative;
+  z-index: 45;
+  border-radius: 10px !important;
+  /* outline is never clipped by an ancestor's overflow, so the ring is
+     always fully visible even inside the scrollable sidebar nav. */
+  outline: 3px solid rgba(99, 102, 241, 0.95);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 7px rgba(99, 102, 241, 0.18), 0 8px 26px rgba(15, 23, 42, 0.22);
+  animation: onboarding-pulse 1.9s ease-in-out infinite;
+}
+
+@keyframes onboarding-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.18), 0 8px 26px rgba(15, 23, 42, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 11px rgba(99, 102, 241, 0.08), 0 8px 26px rgba(15, 23, 42, 0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-highlight {
+    animation: none;
+  }
+}
+
+/* ── PayPal Buttons Dark Mode Fix ─────────────────────────────────── */
+/* PayPal renders buttons inside iframes which cannot be styled directly.
+   We use CSS filter on the wrapper: invert flips white→dark, and
+   hue-rotate(180deg) preserves the original blue PayPal color. */
+.dark .paypal-button-wrapper {
+  filter: invert(1) hue-rotate(180deg);
 }
