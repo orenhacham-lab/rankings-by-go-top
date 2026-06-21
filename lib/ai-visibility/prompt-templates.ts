@@ -2825,48 +2825,186 @@ function deriveLabelFromDomain(domain: string): string {
   return firstLabel || d
 }
 
+/** Check if a string is likely a domain slug (contains hyphens, numbers, underscores but no spaces). */
+function isProbablyDomainSlug(str: string): boolean {
+  // Domain slugs typically have lowercase letters + hyphens/numbers, no spaces
+  if (!str || str.includes(' ')) return false
+  return /^[a-z0-9-]+$/.test(str)
+}
+
 export function buildFallbackSuggestions(
   businessName: string | null,
-  domain: string | null,
+  projectName: string | null = null,
+  targetDomain: string | null = null,
+  category: BusinessCategory | null = null,
+  location: string | null = null,
+  keywords: string[] = [],
+  competitors: string[] = [],
   language?: string | null
 ): PromptSuggestion[] {
   const lang: 'he' | 'en' = language === 'en' ? 'en' : 'he'
-  const name = (businessName && businessName.trim()) || (domain ? deriveLabelFromDomain(domain) : '')
-  const domLabel = domain ? deriveLabelFromDomain(domain) : name
 
-  // Need at least something to anchor the questions on.
-  if (!name && !domLabel) return []
+  // Determine the best name to use (priority: businessName > projectName > avoid domain slug)
+  let name = ''
+  if (businessName && businessName.trim() && !isProbablyDomainSlug(businessName)) {
+    name = businessName.trim()
+  } else if (projectName && projectName.trim() && !isProbablyDomainSlug(projectName)) {
+    name = projectName.trim()
+  }
 
-  type Spec = { he: string; en: string; intent: PromptIntent }
-  const specs: Spec[] = [
-    { he: `איפה אפשר למצוא את ${name}?`, en: `Where can I find ${name}?`, intent: 'local' },
-    { he: `מה היתרונות של ${name}?`, en: `What are the advantages of ${name}?`, intent: 'informational' },
-    { he: `האם ${name} מומלץ?`, en: `Is ${name} recommended?`, intent: 'recommendation' },
-    { he: `מה המחירים של ${name}?`, en: `What are the prices of ${name}?`, intent: 'commercial' },
-    { he: `מה האלטרנטיבות ל-${name}?`, en: `What are the alternatives to ${name}?`, intent: 'alternatives' },
-    { he: `איך ${name} בהשוואה למתחרים?`, en: `How does ${name} compare to competitors?`, intent: 'comparison' },
-  ]
-  // Domain-trust question only when we actually have a domain.
-  if (domain) {
+  // Fallback to generic label if we have no good name
+  const genericLabel = lang === 'he' ? 'העסק' : 'the business'
+  const displayName = name || genericLabel
+
+  // If we still have no useful information, return empty
+  if (!name && !targetDomain) return []
+
+  // Extract keyword themes for smarter question prioritization
+  const keywordLower = keywords.map((k) => k.toLowerCase())
+  const hasKeywords = keywordLower.length > 0
+  const hasPricingKeywords = keywordLower.some((k) => /(price|cost|מחיר|עלות|כמה|חסכון)/.test(k))
+  const hasReviewKeywords = keywordLower.some((k) => /(review|rating|ביקורות|דירוג|הדעות)/.test(k))
+  const hasComparisonKeywords = keywordLower.some((k) => /(vs|versus|compare|השוואה|לעומת|אלטרנטיבה)/.test(k))
+  const hasLocationKeywords = keywordLower.some((k) => /(near|nearby|local|מקומי|קרוב|באזור)/.test(k))
+
+  type Spec = { he: string; en: string; intent: PromptIntent; priority: number }
+  const specs: Spec[] = []
+
+  // Priority 1: Keyword-based questions (if we have keywords, these are most relevant)
+  if (hasKeywords) {
+    if (hasPricingKeywords) {
+      specs.push({
+        he: `כמה עולה ${displayName} בהשוואה לחלופות אחרות?`,
+        en: `How much does ${displayName} cost compared to alternatives?`,
+        intent: 'commercial',
+        priority: 95,
+      })
+    }
+    if (hasReviewKeywords || hasComparisonKeywords) {
+      specs.push({
+        he: `מה הדעות על ${displayName}? האם זה ממלא תפקיד?`,
+        en: `What are people saying about ${displayName}? Does it work?`,
+        intent: 'recommendation',
+        priority: 90,
+      })
+    }
+    if (hasComparisonKeywords) {
+      specs.push({
+        he: `מה ההבדל בין ${displayName} לבין מתחרים מרכזיים?`,
+        en: `What makes ${displayName} different from main competitors?`,
+        intent: 'comparison',
+        priority: 88,
+      })
+    }
+    if (hasLocationKeywords && location) {
+      specs.push({
+        he: `איפה אפשר למצוא ${displayName} ב-${location}?`,
+        en: `Where can I find ${displayName} in ${location}?`,
+        intent: 'local',
+        priority: 85,
+      })
+    }
+  }
+
+  // Priority 2: Competitor-based questions (if we have competitors)
+  if (competitors && competitors.length > 0) {
+    const mainCompetitor = competitors[0]
+    specs.push({
+      he: `${displayName} או ${mainCompetitor} - איזה עדיף?`,
+      en: `${displayName} or ${mainCompetitor} - which is better?`,
+      intent: 'comparison',
+      priority: 82,
+    })
+  }
+
+  // Priority 3: Location-based questions (if we have location)
+  if (location && !hasLocationKeywords) {
+    specs.push({
+      he: `איפה אפשר למצוא שירות כמו ${displayName} בישראל ב-${location}?`,
+      en: `Where can I find ${displayName} services in ${location}?`,
+      intent: 'local',
+      priority: 75,
+    })
+  }
+
+  // Priority 4: Category-based smart questions (if we have a real category)
+  if (category && category !== 'generic') {
+    const categoryLabel = lang === 'he' ? HE_CATEGORY_LABEL[category] : EN_CATEGORY_LABEL[category]
+    specs.push({
+      he: `מי נחשב לאחד המומלצים בתחום ${categoryLabel}?`,
+      en: `Who is considered one of the top ${categoryLabel} providers?`,
+      intent: 'recommendation',
+      priority: 70,
+    })
+  }
+
+  // Priority 5: Always include core business questions (fallback for any business)
+  specs.push({
+    he: `למה לבחור ${displayName} על פני אלטרנטיבות אחרות?`,
+    en: `Why choose ${displayName} over other alternatives?`,
+    intent: 'pre_purchase',
+    priority: 65,
+  })
+
+  specs.push({
+    he: `האם ${displayName} מומלץ בביקורות?`,
+    en: `Is ${displayName} recommended by users?`,
+    intent: 'recommendation',
+    priority: 60,
+  })
+
+  specs.push({
+    he: `מה היתרונות של ${displayName}?`,
+    en: `What are the main advantages of ${displayName}?`,
+    intent: 'informational',
+    priority: 58,
+  })
+
+  // Add domain-trust question if we have a domain
+  if (targetDomain) {
+    const domLabel = deriveLabelFromDomain(targetDomain)
     specs.push({
       he: `האם ${domLabel} מקור אמין בתחום?`,
-      en: `Is ${domLabel} a reliable source in its field?`,
+      en: `Is ${domLabel} a trustworthy source?`,
       intent: 'brand',
+      priority: 50,
+    })
+  }
+
+  // Sort by priority (highest first) and take top 7 questions
+  const sorted = specs.sort((a, b) => b.priority - a.priority).slice(0, 7)
+
+  // If we have too few questions, add generic fallback questions
+  if (sorted.length < 4) {
+    sorted.push({
+      he: `מהם החסרונות של ${displayName}?`,
+      en: `What are the drawbacks of ${displayName}?`,
+      intent: 'informational',
+      priority: 45,
+    })
+  }
+
+  if (sorted.length < 5) {
+    sorted.push({
+      he: `איפה אפשר ללמוד עוד על ${displayName}?`,
+      en: `Where can I learn more about ${displayName}?`,
+      intent: 'informational',
+      priority: 40,
     })
   }
 
   const intentLabels = lang === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
 
-  return specs.map((s, i) => ({
+  return sorted.map((s, i) => ({
     id: `fallback-${i}-${Math.random().toString(36).slice(2, 6)}`,
     prompt: lang === 'he' ? s.he : s.en,
     intent: s.intent,
     intentLabel: intentLabels[s.intent],
-    category: 'generic' as BusinessCategory,
+    category: category || ('generic' as BusinessCategory),
     language: lang,
-    qualityScore: 60,
-    confidenceTier: 'medium' as const,
-    reason: '',
+    qualityScore: 70,
+    confidenceTier: 'good' as const,
+    reason: lang === 'he' ? 'ברירת מחדל' : 'default',
     chips: [],
     valueReason: '',
   }))

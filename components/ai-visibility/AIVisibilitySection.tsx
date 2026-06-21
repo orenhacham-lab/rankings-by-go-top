@@ -36,7 +36,7 @@ import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { generatePromptSuggestions, buildFallbackSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
@@ -462,13 +462,24 @@ export default function AIVisibilitySection({
     // No notice here — this is a passive load, not a failed AI attempt. Cached
     // Gemini questions (if any) replace these silently in the background below.
     if (vNextFiltered.length === 0) {
-      const fallback = buildFallbackSuggestions(projectBrandName, projectDomain, projectLanguage)
+      const category = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+      const fallback = buildFallbackSuggestions(
+        projectBrandName,
+        null, // projectName not available
+        projectDomain,
+        category,
+        projectCity || null,
+        projectKeywords || [],
+        [], // competitors not available on initial load
+        projectLanguage
+      )
       if (fallback.length > 0) {
         vNextFiltered = fallback
         console.log('[ai-question-suggestions] initial load seeded local fallback', {
           projectId,
           businessName: projectBrandName || '(none)',
           targetDomain: projectDomain || '(none)',
+          category,
           fallbackCount: fallback.length,
         })
       }
@@ -1208,15 +1219,30 @@ export default function AIVisibilitySection({
         // For projects that already show suggestions (rich projects clicking
         // "generate more") we keep the normal "pool exhausted" behavior.
         if (suggestedQuestions.length === 0) {
-          const fallback = buildFallbackSuggestions(projectBrandName, projectDomain, projectLanguage)
+          const category = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+          const fallback = buildFallbackSuggestions(
+            projectBrandName,
+            null, // projectName not available
+            projectDomain,
+            category,
+            projectCity || null,
+            projectKeywords || [],
+            [], // competitors not available
+            projectLanguage
+          )
           if (fallback.length > 0) {
+            const fallbackReason = geminiWasCalled ? 'gemini_returned_nothing' : (geminiNotCalledReason || 'enrichment_unavailable')
             console.log('[ai-question-suggestions] fallback used: true', {
               projectId,
-              reason: geminiWasCalled ? 'gemini_returned_nothing' : (geminiNotCalledReason || 'enrichment_unavailable'),
+              reason: fallbackReason,
               fallbackCount: fallback.length,
+              geminiWasCalled,
+              geminiNotCalledReason,
             })
             setSuggestedQuestions(fallback)
-            setUsedFallbackQuestions(true)
+            // Only show fallback notice if Gemini was actually called and failed (not just unavailable)
+            const shouldShowNotice = geminiWasCalled && fallbackReason === 'gemini_returned_nothing'
+            setUsedFallbackQuestions(shouldShowNotice)
             setNoNewSuggestionsFound(false)
             console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
             console.log('[ai-question-suggestions] state updated')
@@ -1426,10 +1452,21 @@ export default function AIVisibilitySection({
       // shown at all, guarantee basic local questions so they're never empty.
       console.error('[ai-question-suggestions] generation error:', e instanceof Error ? e.message : String(e))
       if (suggestedQuestions.length === 0) {
-        const fallback = buildFallbackSuggestions(projectBrandName, projectDomain, projectLanguage)
+        const category = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+        const fallback = buildFallbackSuggestions(
+          projectBrandName,
+          null, // projectName not available
+          projectDomain,
+          category,
+          projectCity || null,
+          projectKeywords || [],
+          [], // competitors not available
+          projectLanguage
+        )
         if (fallback.length > 0) {
-          console.log('[ai-question-suggestions] fallback used: true', { projectId, reason: 'exception', fallbackCount: fallback.length })
+          console.log('[ai-question-suggestions] fallback used: true', { projectId, reason: 'exception', fallbackCount: fallback.length, error: e instanceof Error ? e.message : String(e) })
           setSuggestedQuestions(fallback)
+          // Show notice on exception (user-triggered generation failed)
           setUsedFallbackQuestions(true)
           console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
           console.log('[ai-question-suggestions] state updated')
