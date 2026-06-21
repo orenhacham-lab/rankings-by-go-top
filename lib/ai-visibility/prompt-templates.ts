@@ -2825,6 +2825,29 @@ function deriveLabelFromDomain(domain: string): string {
   return firstLabel || d
 }
 
+/**
+ * Normalize a raw language value into a supported 2-letter code.
+ * Handles common variants: en/english/EN → 'en', he/hebrew/HE/iw → 'he'.
+ * Falls back to the provided fallback (default 'he') when unknown/empty.
+ *
+ * IMPORTANT: project.language is the source of truth, not the UI language —
+ * an English project shown in a Hebrew UI must still produce English questions.
+ */
+export function normalizeLanguage(
+  raw: string | null | undefined,
+  fallback: 'he' | 'en' = 'he'
+): 'he' | 'en' {
+  if (!raw || typeof raw !== 'string') return fallback
+  const v = raw.trim().toLowerCase()
+  if (!v) return fallback
+  if (v === 'en' || v === 'eng' || v.startsWith('english') || v.startsWith('en-') || v.startsWith('en_')) return 'en'
+  // 'iw' is the legacy ISO code for Hebrew.
+  if (v === 'he' || v === 'iw' || v.startsWith('hebrew') || v.startsWith('he-') || v.startsWith('he_')) return 'he'
+  // Anything else (e.g. 'ar') — default to the safe fallback. Fallback questions
+  // only support he/en, so we keep the experience coherent.
+  return fallback
+}
+
 /** Check if a string is likely a domain slug (contains hyphens, numbers, underscores but no spaces). */
 function isProbablyDomainSlug(str: string): boolean {
   // Domain slugs typically have lowercase letters + hyphens/numbers, no spaces
@@ -2842,7 +2865,7 @@ export function buildFallbackSuggestions(
   competitors: string[] = [],
   language?: string | null
 ): PromptSuggestion[] {
-  const lang: 'he' | 'en' = language === 'en' ? 'en' : 'he'
+  const lang: 'he' | 'en' = normalizeLanguage(language)
 
   // Determine the best name to use (priority: businessName > projectName > avoid domain slug)
   let name = ''
@@ -2852,12 +2875,14 @@ export function buildFallbackSuggestions(
     name = projectName.trim()
   }
 
-  // Fallback to generic label if we have no good name
+  // Fallback to generic label if we have no good name. NEVER surface a raw
+  // domain slug as the business name — use a clean generic label instead.
   const genericLabel = lang === 'he' ? 'העסק' : 'the business'
   const displayName = name || genericLabel
 
-  // If we still have no useful information, return empty
-  if (!name && !targetDomain) return []
+  // CONTRACT: this function must never return []. Even with zero project
+  // information we still produce a coherent generic question set below using
+  // `displayName` ("העסק" / "the business"), so the panel is never empty.
 
   // Extract keyword themes for smarter question prioritization
   const keywordLower = keywords.map((k) => k.toLowerCase())
@@ -2960,9 +2985,11 @@ export function buildFallbackSuggestions(
     priority: 58,
   })
 
-  // Add domain-trust question if we have a domain
-  if (targetDomain) {
-    const domLabel = deriveLabelFromDomain(targetDomain)
+  // Add domain-trust question only when the domain label reads as a clean brand
+  // word (no hyphens/digits). A slug like "mashkanta-be-click" looks broken, so
+  // we skip it rather than surface an ugly label.
+  const domLabel = targetDomain ? deriveLabelFromDomain(targetDomain) : ''
+  if (targetDomain && domLabel && /^[a-z֐-׿]+$/.test(domLabel)) {
     specs.push({
       he: `האם ${domLabel} מקור אמין בתחום?`,
       en: `Is ${domLabel} a trustworthy source?`,

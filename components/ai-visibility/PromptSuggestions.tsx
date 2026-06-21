@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
-import { generatePromptSuggestions, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
@@ -219,11 +219,47 @@ export default function PromptSuggestions({
     }
   }
 
-  // Load full modal recommendation pool: cache first, then optional generation
+  // Build a quality local fallback set (shared with the inline panel logic).
+  // Never returns [] — guarantees the modal is never left empty even when
+  // Gemini is unavailable / returns nothing and the cache is empty.
+  function buildModalFallback(): PromptSuggestion[] {
+    const lang = normalizeLanguage(language)
+    const category = detectCategory(businessName || '', domain || '', keywords || [])
+    const fb = buildFallbackSuggestions(
+      businessName,
+      null, // projectName not available here
+      domain,
+      category,
+      city,
+      keywords || [],
+      [], // competitors not available here
+      lang,
+    )
+    // Filter out anything the project already tracks so the modal stays useful.
+    return fb.filter((q) => !alreadyAddedPromptsRef.current.has(normalizePrompt(q.prompt)))
+  }
+
+  // Load full modal recommendation pool: cache first, then optional Gemini
+  // generation, then a guaranteed local fallback so the panel is never empty.
   // Scenario A: Project has cached questions → show full pool
-  // Scenario B: New project, no cache → trigger generation, show resulting pool
+  // Scenario B: New project, no cache → try Gemini, else quality fallback
   const MIN_MODAL_POOL = 8
   async function loadModalRecommendationPool({ allowGenerate }: { allowGenerate: boolean }) {
+    const normalizedLang = normalizeLanguage(language)
+    const detectedCategory = detectCategory(businessName || '', domain || '', keywords || [])
+    console.log('[ai-question-suggestions] inner button clicked', { projectId, via: 'recommend_modal' })
+    console.log('[ai-question-suggestions] generate clicked', {
+      projectId,
+      businessName: businessName || '(none)',
+      projectName: businessName || '(none)',
+      targetDomain: domain || '(none)',
+      rawLanguage: language || '(none)',
+      normalizedLanguage: normalizedLang,
+      detectedCategory,
+      location: city || '(none)',
+      keywordsCount: (keywords || []).length,
+      competitorsCount: 0,
+    })
     try {
       // Step 1: Try full cache load
       const response = await fetch('/api/ai-visibility/enriched-suggestions', {
@@ -231,7 +267,7 @@ export default function PromptSuggestions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          language: language || undefined,
+          language: normalizedLang,
           country: country || undefined,
           businessCategory: null,
           cacheOnly: true,
@@ -270,18 +306,24 @@ export default function PromptSuggestions({
 
       // Step 2: Enough in cache? Display it
       if (availableAfterFiltering.length >= MIN_MODAL_POOL) {
+        console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
+        console.log('[ai-question-suggestions] final suggestions count:', availableAfterFiltering.length)
+        console.log('[ai-question-suggestions] state updated')
         setSuggestions(availableAfterFiltering)
         setSelectedIds(new Set())
         setIsLoadingSuggestions(false)
         return
       }
 
-      // Step 3: Not enough in cache and allowGenerate=true? Trigger generation
+      // Step 3: Not enough in cache and allowGenerate=true? Trigger Gemini.
+      // Gemini is the PRIMARY source — only fall back to local questions when
+      // it is unavailable or returns nothing usable.
       if (allowGenerate && availableAfterFiltering.length < MIN_MODAL_POOL) {
         console.log('[AI_RECOMMENDED_MODAL_TRIGGERING_GENERATION]', {
           currentCacheCount: cachedRaw.length,
           threshold: MIN_MODAL_POOL,
         })
+        console.log('[ai-question-suggestions] calling enriched suggestions endpoint', { projectId, normalizedLanguage: normalizedLang })
 
         // Call enriched endpoint with cacheOnly=false to allow Gemini
         const genResponse = await fetch('/api/ai-visibility/enriched-suggestions', {
@@ -289,7 +331,7 @@ export default function PromptSuggestions({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId,
-            language: language || undefined,
+            language: normalizedLang,
             country: country || undefined,
             businessCategory: null,
             cacheOnly: false, // Allow generation
@@ -297,9 +339,21 @@ export default function PromptSuggestions({
         })
 
         if (genResponse.ok) {
-          // After generation, reload full cache
+          // After generation, reload full cache. Prefer reloaded cache (which now
+          // includes any Gemini questions); fall back to dedupedQuestions if the
+          // cache reload came back empty for any reason.
           const genData = await genResponse.json()
-          const newCachedRaw: Array<{ id?: string; question: string; intent?: string }> = genData.cachedSuggestions || []
+          let newCachedRaw: Array<{ id?: string; question: string; intent?: string }> = genData.cachedSuggestions || []
+          if (newCachedRaw.length === 0 && Array.isArray(genData.dedupedQuestions)) {
+            newCachedRaw = genData.dedupedQuestions
+              .map((q: any) => ({ id: q.id, question: q.question ?? q.prompt, intent: q.intent }))
+              .filter((q: any) => q.question)
+          }
+          const geminiWasCalled = genData.geminiWasCalled || false
+          const geminiNotCalledReason = genData.geminiNotCalledReason || ''
+
+          console.log('[ai-question-suggestions] Gemini attempted', { projectId, geminiWasCalled, geminiNotCalledReason: geminiWasCalled ? null : geminiNotCalledReason })
+          console.log('[ai-question-suggestions] Gemini response count', { projectId, count: newCachedRaw.length })
 
           const newAvailable = newCachedRaw
             .filter(q => {
@@ -325,6 +379,24 @@ export default function PromptSuggestions({
             qualityDistribution: newQualityDist,
           })
 
+          // If Gemini (and cache) still produced nothing usable, fall back to a
+          // quality local set so the modal never shows an empty state.
+          if (newAvailable.length === 0) {
+            const fb = buildModalFallback()
+            const fallbackReason = geminiWasCalled ? 'gemini_returned_nothing' : (geminiNotCalledReason || 'enrichment_unavailable')
+            console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: fallbackReason, fallbackCount: fb.length })
+            console.log('[ai-question-suggestions] fallback reason', { projectId, reason: fallbackReason })
+            console.log('[ai-question-suggestions] final suggestions count:', fb.length)
+            console.log('[ai-question-suggestions] state updated')
+            setSuggestions(fb)
+            setSelectedIds(new Set())
+            setIsLoadingSuggestions(false)
+            return
+          }
+
+          console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
+          console.log('[ai-question-suggestions] final suggestions count:', newAvailable.length)
+          console.log('[ai-question-suggestions] state updated')
           setSuggestions(newAvailable)
           setSelectedIds(new Set())
           setIsLoadingSuggestions(false)
@@ -332,14 +404,35 @@ export default function PromptSuggestions({
         }
       }
 
-      // Step 4: No generation or it failed - show what we have (even if empty)
-      setSuggestions(availableAfterFiltering)
+      // Step 4: Generation skipped/failed. Show cache if we have any; otherwise
+      // guarantee a quality local fallback (never leave the modal empty).
+      if (availableAfterFiltering.length > 0) {
+        console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
+        console.log('[ai-question-suggestions] final suggestions count:', availableAfterFiltering.length)
+        console.log('[ai-question-suggestions] state updated')
+        setSuggestions(availableAfterFiltering)
+      } else {
+        const fb = buildModalFallback()
+        console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: 'cache_empty_generation_skipped', fallbackCount: fb.length })
+        console.log('[ai-question-suggestions] fallback reason', { projectId, reason: 'cache_empty_generation_skipped' })
+        console.log('[ai-question-suggestions] final suggestions count:', fb.length)
+        console.log('[ai-question-suggestions] state updated')
+        setSuggestions(fb)
+      }
       setSelectedIds(new Set())
       setIsLoadingSuggestions(false)
     } catch (err) {
       console.error('[AI_RECOMMENDED_MODAL_LOAD_ERROR]', {
         error: err instanceof Error ? err.message : String(err),
       })
+      // Even on error, guarantee a quality local fallback rather than empty.
+      const fb = buildModalFallback()
+      console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: 'exception', fallbackCount: fb.length })
+      console.log('[ai-question-suggestions] fallback reason', { projectId, reason: 'exception' })
+      console.log('[ai-question-suggestions] final suggestions count:', fb.length)
+      console.log('[ai-question-suggestions] state updated')
+      setSuggestions(fb)
+      setSelectedIds(new Set())
       setIsLoadingSuggestions(false)
     }
   }
@@ -348,6 +441,7 @@ export default function PromptSuggestions({
     setRegenerating(true)
     setError(null)
     const beforeCount = suggestions.length
+    const normalizedLang = normalizeLanguage(language)
     await new Promise((r) => setTimeout(r, 250))
 
     try {
@@ -357,7 +451,7 @@ export default function PromptSuggestions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          language: language || undefined,
+          language: normalizedLang,
           country: country || undefined,
           businessCategory: null,
           cacheOnly: true,
@@ -388,10 +482,14 @@ export default function PromptSuggestions({
           qualityDistribution: qualityDist,
         })
 
-        setSuggestions(refreshedAvailable)
-        setSelectedIds(new Set())
-        setRegenerating(false)
-        return
+        // Cache had usable questions → show them (no fallback).
+        if (refreshedAvailable.length > 0) {
+          setSuggestions(refreshedAvailable)
+          setSelectedIds(new Set())
+          setRegenerating(false)
+          return
+        }
+        // Cache empty → fall through to generator/fallback below.
       }
     } catch (err) {
       console.log('[AI_RECOMMENDED_MODAL_REFRESH_ERROR]', {
@@ -399,17 +497,18 @@ export default function PromptSuggestions({
       })
     }
 
-    // Cache failed - try generation as fallback
+    // Cache empty/failed - try the vNext generator first (keyword-rich projects),
+    // then a guaranteed quality fallback so regenerate never yields an empty set.
     const allExcluded = Array.from(seenPromptsRef.current).concat(
       Array.from(alreadyAddedPromptsRef.current)
     )
 
-    const produced = generatePromptSuggestions({
+    let produced = generatePromptSuggestions({
       businessName,
       domain,
       city,
       country,
-      language,
+      language: normalizedLang,
       keywords,
       manualProfile,
       diversify: true,
@@ -417,6 +516,13 @@ export default function PromptSuggestions({
       previousSet: lastShownPromptsRef.current,
       recentlyUsedSecondaryCategories: Array.from(recentlyUsedSecondaryRef.current),
     })
+
+    // Generic/new projects yield [] from the vNext engine — guarantee a set.
+    let usedFallback = false
+    if (produced.length === 0) {
+      produced = buildModalFallback()
+      usedFallback = true
+    }
 
     recordGeneratorState(produced)
 
@@ -426,6 +532,7 @@ export default function PromptSuggestions({
       beforeCount,
       initialCacheCount: 0,
       generationCalled: true,
+      usedFallback,
       finalAvailableCount: produced.length,
       renderedCount: produced.length,
       usedSeenPromptsFilter: false,

@@ -36,7 +36,7 @@ import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
@@ -448,7 +448,9 @@ export default function AIVisibilitySection({
       shuffle: false,
       limit: 8,
     })
-    const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
+    // project.language is the source of truth — an English project shown in a
+    // Hebrew UI must still produce English questions (and vice-versa).
+    const lang: 'he' | 'en' = normalizeLanguage(projectLanguage)
     // Filter vNext questions safely — ensure prompt field is valid string
     let vNextFiltered = suggestions.filter((q) => {
       const promptText = q?.prompt ?? ''
@@ -471,7 +473,7 @@ export default function AIVisibilitySection({
         projectCity || null,
         projectKeywords || [],
         [], // competitors not available on initial load
-        projectLanguage
+        lang
       )
       if (fallback.length > 0) {
         vNextFiltered = fallback
@@ -479,6 +481,8 @@ export default function AIVisibilitySection({
           projectId,
           businessName: projectBrandName || '(none)',
           targetDomain: projectDomain || '(none)',
+          rawLanguage: projectLanguage || '(none)',
+          normalizedLanguage: lang,
           category,
           fallbackCount: fallback.length,
         })
@@ -935,16 +939,27 @@ export default function AIVisibilitySection({
     }
   }, [allPrompts, loadAllResults])
 
-  const refreshSuggestions = useCallback(async () => {
+  const refreshSuggestions = useCallback(async (trigger: 'inner' | 'top' = 'inner') => {
     setRefreshingSuggestions(true)
     setNoNewSuggestionsFound(false)
     // Track whether Gemini actually produced anything this cycle so we know if a
     // local fallback is required (so the user is never left with no questions).
     let geminiProducedQuestions = false
+    const normalizedLang = normalizeLanguage(projectLanguage)
+    const detectedCategory = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
+    if (trigger === 'top') console.log('[ai-question-suggestions] top button clicked', { projectId })
+    else console.log('[ai-question-suggestions] inner button clicked', { projectId })
     console.log('[ai-question-suggestions] generate clicked', {
       projectId,
       businessName: projectBrandName || '(none)',
+      projectName: projectBrandName || '(none)',
       targetDomain: projectDomain || '(none)',
+      rawLanguage: projectLanguage || '(none)',
+      normalizedLanguage: normalizedLang,
+      detectedCategory,
+      location: projectCity || '(none)',
+      keywordsCount: (projectKeywords || []).length,
+      competitorsCount: 0,
       currentlyShown: suggestedQuestions.length,
     })
     try {
@@ -1045,14 +1060,17 @@ export default function AIVisibilitySection({
       })
 
       // ── Gemini-powered enrichment via persistent cache layer ──────────────
+      // Gemini is the PRIMARY source: this endpoint tries vNext + cache + Gemini
+      // first. Only if it yields nothing do we fall back to local questions.
       let apiDedupedQuestions: any[] = []
       try {
+        console.log('[ai-question-suggestions] calling enriched suggestions endpoint', { projectId, normalizedLanguage: normalizedLang })
         const enrichResponse = await fetch('/api/ai-visibility/enriched-suggestions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId,
-            language: projectLanguage === 'he' ? 'he' : 'en',
+            language: normalizedLang,
             country: projectCountry || undefined,
             businessCategory: null,
           }),
@@ -1068,6 +1086,7 @@ export default function AIVisibilitySection({
           contextHash = enrichData.contextHash || ''
           geminiProducedQuestions = apiDedupedQuestions.length > 0
 
+          console.log('[ai-question-suggestions] Gemini attempted', { projectId, geminiWasCalled, geminiNotCalledReason: geminiWasCalled ? null : geminiNotCalledReason })
           console.log('[ai-question-suggestions] Gemini response count:', {
             usingGemini: geminiWasCalled,
             geminiNotCalledReason: geminiWasCalled ? null : geminiNotCalledReason,
@@ -1196,8 +1215,7 @@ export default function AIVisibilitySection({
       // ──────────────────────────────────────────────────────────────────────
 
       // Apply display-level safety filter: block invalid price questions
-      const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
-      const filtered = vNextFiltered.filter((q) => !isInvalidPriceQuestion(q.prompt, lang))
+      const filtered = vNextFiltered.filter((q) => !isInvalidPriceQuestion(q.prompt, normalizedLang))
 
       // DEBUG: Check filtered items have _apiSource
       console.log('[AIVisibility-refreshSuggestions] FILTERED_SOURCE_DEBUG', {
@@ -1219,26 +1237,20 @@ export default function AIVisibilitySection({
         // For projects that already show suggestions (rich projects clicking
         // "generate more") we keep the normal "pool exhausted" behavior.
         if (suggestedQuestions.length === 0) {
-          const category = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
           const fallback = buildFallbackSuggestions(
             projectBrandName,
             null, // projectName not available
             projectDomain,
-            category,
+            detectedCategory,
             projectCity || null,
             projectKeywords || [],
             [], // competitors not available
-            projectLanguage
+            normalizedLang
           )
+          const fallbackReason = geminiWasCalled ? 'gemini_returned_nothing' : (geminiNotCalledReason || 'enrichment_unavailable')
           if (fallback.length > 0) {
-            const fallbackReason = geminiWasCalled ? 'gemini_returned_nothing' : (geminiNotCalledReason || 'enrichment_unavailable')
-            console.log('[ai-question-suggestions] fallback used: true', {
-              projectId,
-              reason: fallbackReason,
-              fallbackCount: fallback.length,
-              geminiWasCalled,
-              geminiNotCalledReason,
-            })
+            console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: fallbackReason, fallbackCount: fallback.length, geminiWasCalled, geminiNotCalledReason })
+            console.log('[ai-question-suggestions] fallback reason', { projectId, reason: fallbackReason })
             setSuggestedQuestions(fallback)
             // Only show fallback notice if Gemini was actually called and failed (not just unavailable)
             const shouldShowNotice = geminiWasCalled && fallbackReason === 'gemini_returned_nothing'
@@ -1247,6 +1259,8 @@ export default function AIVisibilitySection({
             console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
             console.log('[ai-question-suggestions] state updated')
           } else {
+            // buildFallbackSuggestions never returns [] anymore, but keep the
+            // guard so a future regression can't strand the user on empty.
             setNoNewSuggestionsFound(true)
           }
         } else {
@@ -1452,19 +1466,19 @@ export default function AIVisibilitySection({
       // shown at all, guarantee basic local questions so they're never empty.
       console.error('[ai-question-suggestions] generation error:', e instanceof Error ? e.message : String(e))
       if (suggestedQuestions.length === 0) {
-        const category = detectCategory(projectBrandName || '', projectDomain || '', projectKeywords || [])
         const fallback = buildFallbackSuggestions(
           projectBrandName,
           null, // projectName not available
           projectDomain,
-          category,
+          detectedCategory,
           projectCity || null,
           projectKeywords || [],
           [], // competitors not available
-          projectLanguage
+          normalizedLang
         )
         if (fallback.length > 0) {
-          console.log('[ai-question-suggestions] fallback used: true', { projectId, reason: 'exception', fallbackCount: fallback.length, error: e instanceof Error ? e.message : String(e) })
+          console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: 'exception', fallbackCount: fallback.length, error: e instanceof Error ? e.message : String(e) })
+          console.log('[ai-question-suggestions] fallback reason', { projectId, reason: 'exception' })
           setSuggestedQuestions(fallback)
           // Show notice on exception (user-triggered generation failed)
           setUsedFallbackQuestions(true)
@@ -1856,7 +1870,7 @@ export default function AIVisibilitySection({
               <Badge variant="neutral" className="!text-xs">{allPrompts.length}</Badge>
             </div>
             <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" onClick={() => setShowSuggestions(true)} className="w-full sm:w-auto">
+              <Button variant="outline" size="sm" onClick={() => { console.log('[ai-question-suggestions] top button clicked', { projectId }); setShowSuggestions(true) }} className="w-full sm:w-auto">
                 {t('recommend_questions')}
               </Button>
               <Button size="sm" onClick={() => setShowNewPrompt(true)} className="w-full sm:w-auto">
@@ -2072,7 +2086,7 @@ export default function AIVisibilitySection({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={refreshSuggestions}
+                    onClick={() => refreshSuggestions('inner')}
                     loading={refreshingSuggestions}
                     disabled={refreshingSuggestions || noNewSuggestionsFound}
                     className="shrink-0"
@@ -2096,7 +2110,7 @@ export default function AIVisibilitySection({
                     </p>
                     <Button
                       size="sm"
-                      onClick={refreshSuggestions}
+                      onClick={() => refreshSuggestions('inner')}
                       disabled={refreshingSuggestions}
                     >
                       {isHebrew ? 'צור שאלות מומלצות' : 'Generate recommended questions'}
