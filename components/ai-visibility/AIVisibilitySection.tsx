@@ -1915,8 +1915,10 @@ export default function AIVisibilitySection({
               collapsedLimit: COLLAPSED_VISIBLE_SUGGESTIONS,
             })
 
-            const showPanel = refreshingSuggestions || availableSuggestions.length > 0
-            if (!showPanel) return null
+            // ALWAYS render the panel in the queries tab for new projects.
+            // On initial load, suggestedQuestions may be empty but vNext generation
+            // in the background (useEffect at line 437) will populate them.
+            // If truly empty, show empty state with button to manually generate.
             return (
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50/40 to-white dark:from-slate-900 dark:to-slate-800 p-5 mt-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
@@ -1962,74 +1964,107 @@ export default function AIVisibilitySection({
                     </span>
                   </Button>
                 </div>
-                {/* Inline loading indicator — shown above the grid, never replaces it */}
-                {refreshingSuggestions && (
-                  <div className="flex items-center gap-2 mb-3 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    <span>{t('generating_more')}</span>
-                  </div>
-                )}
-                {/* Questions grid is always visible — even while loading */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {visibleSliced.map((q) => (
-                    <SmartQuestionCard
-                      key={q.id}
-                      question={q}
-                      isAlreadyTracked={false}
-                      allPrompts={allPrompts}
-                      onAdd={async () => {
-                        try {
-                          const res = await fetch('/api/ai-visibility/prompts', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              projectId,
-                              prompt: q.prompt,
-                              country: projectCountry,
-                              language: projectLanguage,
-                              targetDomain: projectDomain,
-                              targetBrandName: projectBrandName,
-                            }),
-                          })
-                          if (!res.ok) throw new Error('Failed to add')
-                          loadAllResults()
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : 'Failed to add question')
-                        }
-                      }}
-                      t={t}
-                    />
-                  ))}
-                </div>
-                {availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && (
-                  <div className="text-center mt-4">
+
+                {/* EMPTY STATE: Show when no suggestions available and not refreshing */}
+                {availableSuggestions.length === 0 && !refreshingSuggestions && (
+                  <div className="rounded-lg border border-dashed border-indigo-200 dark:border-indigo-800 bg-indigo-50/30 dark:bg-indigo-900/10 p-6 text-center">
+                    <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">
+                      {isHebrew
+                        ? 'עדיין אין שאלות מומלצות לפרויקט הזה'
+                        : 'No recommended questions yet for this project'}
+                    </p>
                     <Button
-                      variant="outline"
                       size="sm"
-                      onClick={() => {
-                        const newExpandedState = !showAllSmartQuestions
-                        setShowAllSmartQuestions(newExpandedState)
-                        try {
-                          if (newExpandedState) {
-                            // User clicked show-more: expand and save v2 key
-                            localStorage.setItem(`ai-visibility-expanded-v2-${projectId}`, 'true')
-                          } else {
-                            // User clicked show-less: collapse and clear v2 key
-                            localStorage.removeItem(`ai-visibility-expanded-v2-${projectId}`)
-                          }
-                        } catch (e) {
-                          // localStorage may be unavailable
-                        }
-                      }}
+                      onClick={refreshSuggestions}
+                      disabled={refreshingSuggestions}
                     >
-                      {showAllSmartQuestions ? t('show_less') : t('show_more')}
+                      {isHebrew ? 'צור שאלות מומלצות' : 'Generate recommended questions'}
                     </Button>
                   </div>
                 )}
-                {noNewSuggestionsFound && (
-                  <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
-                    {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
+
+                {/* LOADING INDICATOR: Show while generating */}
+                {refreshingSuggestions && availableSuggestions.length === 0 && (
+                  <div className="flex flex-col items-center gap-3 py-6">
+                    <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                      {isHebrew ? 'יוצר שאלות מומלצות...' : 'Generating recommended questions...'}
+                    </span>
                   </div>
+                )}
+
+                {/* SUGGESTIONS GRID: Show when there are available suggestions */}
+                {availableSuggestions.length > 0 && (
+                  <>
+                    {/* Inline loading indicator — shown above the grid when adding more */}
+                    {refreshingSuggestions && (
+                      <div className="flex items-center gap-2 mb-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                        <span>{t('generating_more')}</span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {visibleSliced.map((q) => (
+                        <SmartQuestionCard
+                          key={q.id}
+                          question={q}
+                          isAlreadyTracked={false}
+                          allPrompts={allPrompts}
+                          onAdd={async () => {
+                            try {
+                              const res = await fetch('/api/ai-visibility/prompts', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  projectId,
+                                  prompt: q.prompt,
+                                  country: projectCountry,
+                                  language: projectLanguage,
+                                  targetDomain: projectDomain,
+                                  targetBrandName: projectBrandName,
+                                }),
+                              })
+                              if (!res.ok) throw new Error('Failed to add')
+                              loadAllResults()
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : 'Failed to add question')
+                            }
+                          }}
+                          t={t}
+                        />
+                      ))}
+                    </div>
+                    {availableSuggestions.length > COLLAPSED_VISIBLE_SUGGESTIONS && (
+                      <div className="text-center mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newExpandedState = !showAllSmartQuestions
+                            setShowAllSmartQuestions(newExpandedState)
+                            try {
+                              if (newExpandedState) {
+                                // User clicked show-more: expand and save v2 key
+                                localStorage.setItem(`ai-visibility-expanded-v2-${projectId}`, 'true')
+                              } else {
+                                // User clicked show-less: collapse and clear v2 key
+                                localStorage.removeItem(`ai-visibility-expanded-v2-${projectId}`)
+                              }
+                            } catch (e) {
+                              // localStorage may be unavailable
+                            }
+                          }}
+                        >
+                          {showAllSmartQuestions ? t('show_less') : t('show_more')}
+                        </Button>
+                      </div>
+                    )}
+                    {noNewSuggestionsFound && (
+                      <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-400 italic">
+                        {t(isRichProject ? 'pool_exhausted_rich' : 'pool_exhausted_thin')}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )
