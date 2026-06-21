@@ -2855,6 +2855,321 @@ function isProbablyDomainSlug(str: string): boolean {
   return /^[a-z0-9-]+$/.test(str)
 }
 
+// ============================================================================
+// INTENT-BASED FALLBACK GENERATION
+// ----------------------------------------------------------------------------
+// Root-cause replacement for the old static-template fallback. Instead of
+// substituting a raw name/category into generic templates ("What are the
+// advantages of X?"), we:
+//   1. normalizeBusinessName()  → a clean, human name or null (rejects slugs)
+//   2. inferBusinessType()      → broad behaviour class for the project
+//   3. inferServiceLabel()      → a natural, language-correct service noun
+//   4. buildQuestionFromIntent()→ a real, grammatically-correct question per
+//                                 user intent (recommendation/price/trust/...)
+//   5. qualityFilterQuestions() → drop weak/slug/duplicate/mixed-language items
+//
+// Hebrew note: question frames are deliberately gender-neutral (they avoid
+// adjective agreement) so they read naturally for any service-label gender.
+// ============================================================================
+
+export type BusinessType =
+  | 'service_provider'
+  | 'expert_advisor'
+  | 'local_store'
+  | 'online_store'
+  | 'product_brand'
+  | 'software'
+  | 'generic_business'
+
+/** Fallback-pipeline intents (distinct from the output PromptIntent union). */
+type FallbackIntent =
+  | 'recommendation'
+  | 'comparison'
+  | 'price'
+  | 'trust'
+  | 'local'
+  | 'decision'
+  | 'alternatives'
+
+/** Natural, language-correct labels for a category, in all the grammatical
+ * forms the question frames need (singular, plural, price-subject). */
+type ServiceLabel = {
+  he: string
+  en: string
+  hePlural: string
+  enPlural: string
+  /** Subject of "how much does ___ cost" / "כמה עולה ___". Omit if a price
+   * question reads unnaturally for the category. */
+  hePrice?: string
+  enPrice?: string
+}
+
+const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> = {
+  agency: {
+    he: 'סוכנות שיווק דיגיטלי', hePlural: 'סוכנויות שיווק דיגיטלי',
+    en: 'digital marketing agency', enPlural: 'digital marketing agencies',
+    hePrice: 'קידום בגוגל', enPrice: 'digital marketing',
+  },
+  cleaning: {
+    he: 'חברת ניקיון', hePlural: 'חברות ניקיון',
+    en: 'commercial cleaning company', enPlural: 'commercial cleaning companies',
+    hePrice: 'שירות ניקיון', enPrice: 'office cleaning',
+  },
+  home_improvement_service: {
+    he: 'חברת שיפוצים', hePlural: 'חברות שיפוצים',
+    en: 'remodeling company', enPlural: 'remodeling companies',
+    hePrice: 'שיפוץ', enPrice: 'a home remodel',
+  },
+  local_service: {
+    he: 'בעל מקצוע', hePlural: 'בעלי מקצוע',
+    en: 'local professional', enPlural: 'local professionals',
+    hePrice: 'שירות מקצועי', enPrice: 'the service',
+  },
+  legal: {
+    he: 'משרד עורכי דין', hePlural: 'משרדי עורכי דין',
+    en: 'law firm', enPlural: 'law firms',
+    hePrice: 'ייעוץ משפטי', enPrice: 'legal consultation',
+  },
+  real_estate: {
+    he: 'משרד תיווך', hePlural: 'משרדי תיווך',
+    en: 'real estate agency', enPlural: 'real estate agencies',
+  },
+  healthcare: {
+    he: 'מרפאה פרטית', hePlural: 'מרפאות פרטיות',
+    en: 'medical clinic', enPlural: 'medical clinics',
+    hePrice: 'טיפול פרטי', enPrice: 'private treatment',
+  },
+  education: {
+    he: 'מוסד לימודים', hePlural: 'מוסדות לימוד',
+    en: 'training provider', enPlural: 'training providers',
+    hePrice: 'קורס מקצועי', enPrice: 'a professional course',
+  },
+  florist: {
+    he: 'חנות פרחים', hePlural: 'חנויות פרחים',
+    en: 'flower shop', enPlural: 'flower shops',
+    hePrice: 'משלוח פרחים', enPrice: 'flower delivery',
+  },
+  gifts: {
+    he: 'חנות מתנות', hePlural: 'חנויות מתנות',
+    en: 'gift shop', enPlural: 'gift shops',
+  },
+  perfume: {
+    he: 'חנות בשמים', hePlural: 'חנויות בשמים',
+    en: 'perfume shop', enPlural: 'perfume shops',
+    hePrice: 'בושם איכותי', enPrice: 'a quality perfume',
+  },
+  sports_store: {
+    he: 'חנות ספורט', hePlural: 'חנויות ספורט',
+    en: 'sports store', enPlural: 'sports stores',
+  },
+  appliance_store: {
+    he: 'חנות מוצרי חשמל', hePlural: 'חנויות מוצרי חשמל',
+    en: 'home appliance store', enPlural: 'home appliance stores',
+  },
+  second_hand_fashion: {
+    he: 'חנות יד שנייה', hePlural: 'חנויות יד שנייה',
+    en: 'second-hand clothing store', enPlural: 'second-hand clothing stores',
+  },
+  restaurant: {
+    he: 'מסעדה', hePlural: 'מסעדות',
+    en: 'restaurant', enPlural: 'restaurants',
+  },
+  fitness: {
+    he: 'חדר כושר', hePlural: 'חדרי כושר',
+    en: 'gym', enPlural: 'gyms',
+    hePrice: 'מנוי לחדר כושר', enPrice: 'a gym membership',
+  },
+  beauty: {
+    he: 'מכון יופי', hePlural: 'מכוני יופי',
+    en: 'beauty salon', enPlural: 'beauty salons',
+    hePrice: 'טיפול יופי', enPrice: 'a beauty treatment',
+  },
+  ecommerce: {
+    he: 'חנות אונליין', hePlural: 'חנויות אונליין',
+    en: 'online store', enPlural: 'online stores',
+  },
+  saas: {
+    he: 'תוכנה לעסקים', hePlural: 'מערכות תוכנה',
+    en: 'software platform', enPlural: 'software platforms',
+  },
+}
+
+const BUSINESS_TYPE_INTENTS: Record<BusinessType, FallbackIntent[]> = {
+  service_provider: ['trust', 'price', 'local', 'comparison', 'decision', 'recommendation'],
+  expert_advisor: ['trust', 'price', 'comparison', 'decision', 'recommendation'],
+  local_store: ['recommendation', 'price', 'local', 'trust', 'comparison'],
+  online_store: ['trust', 'price', 'comparison', 'alternatives', 'recommendation'],
+  product_brand: ['recommendation', 'price', 'comparison', 'alternatives'],
+  software: ['recommendation', 'price', 'comparison', 'trust', 'alternatives'],
+  generic_business: ['recommendation', 'trust', 'decision'],
+}
+
+/** Map a fallback intent to the public PromptIntent used by the UI. */
+const FALLBACK_INTENT_TO_PROMPT: Record<FallbackIntent, PromptIntent> = {
+  recommendation: 'recommendation',
+  comparison: 'comparison',
+  price: 'commercial',
+  trust: 'pre_purchase',
+  local: 'local',
+  decision: 'pre_purchase',
+  alternatives: 'alternatives',
+}
+
+/**
+ * Return a clean, human-readable business name, or null if the value is not
+ * suitable for display in a question (domain, URL, slug, or single mashed-up
+ * token). Callers must fall back to a service label when this returns null.
+ */
+export function normalizeBusinessName(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') return null
+  const s = raw.trim()
+  if (!s) return null
+  // URLs / protocol / www
+  if (/https?:\/\//i.test(s) || /\bwww\./i.test(s)) return null
+  // Domain with a TLD (example.com, foo.co.il, bar.io)
+  if (/\.[a-z]{2,}(\.[a-z]{2,})?$/i.test(s) && !s.includes(' ')) return null
+  // Hyphenated lowercase slug (mashkanta-be-click)
+  if (isProbablyDomainSlug(s)) return null
+  // Single all-lowercase mashed token with no spaces and no capitalization —
+  // looks derived from a domain (janitorialnyc) rather than a real brand.
+  if (!s.includes(' ') && /^[a-z0-9]{10,}$/.test(s)) return null
+  return s
+}
+
+/** Classify a project into a broad behaviour class that drives intent choice. */
+export function inferBusinessType(
+  category: BusinessCategory | null,
+  _keywords: string[] = []
+): BusinessType {
+  switch (category) {
+    case 'cleaning':
+    case 'home_improvement_service':
+    case 'local_service':
+    case 'agency':
+      return 'service_provider'
+    case 'legal':
+    case 'real_estate':
+    case 'healthcare':
+    case 'education':
+      return 'expert_advisor'
+    case 'florist':
+    case 'gifts':
+    case 'perfume':
+    case 'sports_store':
+    case 'appliance_store':
+    case 'second_hand_fashion':
+    case 'restaurant':
+    case 'fitness':
+    case 'beauty':
+      return 'local_store'
+    case 'ecommerce':
+      return 'online_store'
+    case 'product_brand':
+      return 'product_brand'
+    case 'saas':
+      return 'software'
+    default:
+      return 'generic_business'
+  }
+}
+
+/** Natural, language-correct service label for a category (singular form), or
+ * null when the category has no good label (generic). */
+export function inferServiceLabel(
+  category: BusinessCategory | null,
+  language: 'he' | 'en'
+): string | null {
+  if (!category) return null
+  const label = CATEGORY_SERVICE_LABELS[category]
+  if (!label) return null
+  return language === 'he' ? label.he : label.en
+}
+
+/** Pick the correct English indefinite article for a noun phrase. */
+function enArticle(noun: string): string {
+  return /^[aeiou]/i.test(noun.trim()) ? 'an' : 'a'
+}
+
+/**
+ * Build one natural question for a specific intent. Returns null when the
+ * intent cannot be expressed naturally with the available context (e.g. price
+ * for a category with no price subject, or local without a location).
+ */
+export function buildQuestionFromIntent(
+  intent: FallbackIntent,
+  label: ServiceLabel | null,
+  language: 'he' | 'en',
+  location: string | null
+): string | null {
+  if (!label) return null
+  const he = language === 'he'
+  switch (intent) {
+    case 'recommendation':
+      return he ? `איך בוחרים ${label.he}?` : `How do I choose a good ${label.en}?`
+    case 'decision':
+      return he
+        ? `מה כדאי לבדוק לפני שבוחרים ${label.he}?`
+        : `What should I check before choosing ${enArticle(label.en)} ${label.en}?`
+    case 'trust':
+      return he
+        ? `איך בודקים את האמינות של ${label.he}?`
+        : `How do I know if ${enArticle(label.en)} ${label.en} is reliable?`
+    case 'price':
+      if (he) return label.hePrice ? `כמה עולה ${label.hePrice}?` : null
+      return label.enPrice ? `How much does ${label.enPrice} cost?` : null
+    case 'local':
+      if (!location) return null
+      return he
+        ? `איך מוצאים ${label.he} ב${location}?`
+        : `Where can I find ${enArticle(label.en)} ${label.en} in ${location}?`
+    case 'comparison':
+      return he
+        ? `איך משווים בין ${label.hePlural}?`
+        : `How do I compare different ${label.enPlural}?`
+    case 'alternatives':
+      return he
+        ? `מה האלטרנטיבות ל${label.he}?`
+        : `What are the alternatives to ${enArticle(label.en)} ${label.en}?`
+    default:
+      return null
+  }
+}
+
+/**
+ * Strict quality gate for fallback questions. Drops slugs, domains, malformed,
+ * too-short/long, language-mixed, and duplicate questions. Preserves input
+ * order. Does NOT pad — padding is the caller's responsibility.
+ */
+export function qualityFilterQuestions(
+  questions: string[],
+  language: 'he' | 'en'
+): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of questions) {
+    if (!raw || typeof raw !== 'string') continue
+    const q = raw.trim()
+    if (q.length < 8 || q.length > 120) continue
+    if (!q.endsWith('?')) continue
+    if (/\s\s+/.test(q)) continue
+    // Slug / domain / URL leakage
+    if (/https?:\/\//i.test(q) || /\bwww\./i.test(q)) continue
+    if (/[a-z0-9]+\.(com|co|io|net|org|il)\b/i.test(q)) continue
+    if (/\b[a-z0-9]+-[a-z0-9]+-[a-z0-9-]+\b/i.test(q)) continue // 3+ token slug
+    // Language coherence: Hebrew question must contain Hebrew letters; English
+    // question must not contain Hebrew letters.
+    const hasHebrew = /[֐-׿]/.test(q)
+    if (language === 'he' && !hasHebrew) continue
+    if (language === 'en' && hasHebrew) continue
+    // Dedup (normalized)
+    const norm = q.toLowerCase().replace(/\s+/g, ' ').replace(/[?.!]+$/, '').trim()
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    out.push(q)
+  }
+  return out
+}
+
 export function buildFallbackSuggestions(
   businessName: string | null,
   projectName: string | null = null,
@@ -2866,175 +3181,120 @@ export function buildFallbackSuggestions(
   language?: string | null
 ): PromptSuggestion[] {
   const lang: 'he' | 'en' = normalizeLanguage(language)
+  const cat: BusinessCategory = category || 'generic'
 
-  // Determine the best name to use (priority: businessName > projectName > avoid domain slug)
-  let name = ''
-  if (businessName && businessName.trim() && !isProbablyDomainSlug(businessName)) {
-    name = businessName.trim()
-  } else if (projectName && projectName.trim() && !isProbablyDomainSlug(projectName)) {
-    name = projectName.trim()
+  // 1. Clean name (rejects slugs/domains). Try businessName, then projectName.
+  const cleanName = normalizeBusinessName(businessName) ?? normalizeBusinessName(projectName)
+
+  // 2. Behaviour class + natural service label (with all grammatical forms).
+  const businessType = inferBusinessType(cat, keywords)
+  const labelObj = CATEGORY_SERVICE_LABELS[cat] ?? null
+
+  // 3. Build intent-driven candidates. Each entry carries its source intent so
+  //    the UI gets a meaningful intent tag.
+  const candidates: Array<{ prompt: string; intent: PromptIntent }> = []
+  const push = (prompt: string | null, intent: PromptIntent) => {
+    if (prompt) candidates.push({ prompt, intent })
   }
 
-  // Fallback to generic label if we have no good name. NEVER surface a raw
-  // domain slug as the business name — use a clean generic label instead.
-  const genericLabel = lang === 'he' ? 'העסק' : 'the business'
-  const displayName = name || genericLabel
+  for (const fi of BUSINESS_TYPE_INTENTS[businessType]) {
+    push(buildQuestionFromIntent(fi, labelObj, lang, location), FALLBACK_INTENT_TO_PROMPT[fi])
+  }
 
-  // CONTRACT: this function must never return []. Even with zero project
-  // information we still produce a coherent generic question set below using
-  // `displayName` ("העסק" / "the business"), so the panel is never empty.
-
-  // Extract keyword themes for smarter question prioritization
-  const keywordLower = keywords.map((k) => k.toLowerCase())
-  const hasKeywords = keywordLower.length > 0
-  const hasPricingKeywords = keywordLower.some((k) => /(price|cost|מחיר|עלות|כמה|חסכון)/.test(k))
-  const hasReviewKeywords = keywordLower.some((k) => /(review|rating|ביקורות|דירוג|הדעות)/.test(k))
-  const hasComparisonKeywords = keywordLower.some((k) => /(vs|versus|compare|השוואה|לעומת|אלטרנטיבה)/.test(k))
-  const hasLocationKeywords = keywordLower.some((k) => /(near|nearby|local|מקומי|קרוב|באזור)/.test(k))
-
-  type Spec = { he: string; en: string; intent: PromptIntent; priority: number }
-  const specs: Spec[] = []
-
-  // Priority 1: Keyword-based questions (if we have keywords, these are most relevant)
-  if (hasKeywords) {
-    if (hasPricingKeywords) {
-      specs.push({
-        he: `כמה עולה ${displayName} בהשוואה לחלופות אחרות?`,
-        en: `How much does ${displayName} cost compared to alternatives?`,
-        intent: 'commercial',
-        priority: 95,
-      })
-    }
-    if (hasReviewKeywords || hasComparisonKeywords) {
-      specs.push({
-        he: `מה הדעות על ${displayName}? האם זה ממלא תפקיד?`,
-        en: `What are people saying about ${displayName}? Does it work?`,
-        intent: 'recommendation',
-        priority: 90,
-      })
-    }
-    if (hasComparisonKeywords) {
-      specs.push({
-        he: `מה ההבדל בין ${displayName} לבין מתחרים מרכזיים?`,
-        en: `What makes ${displayName} different from main competitors?`,
-        intent: 'comparison',
-        priority: 88,
-      })
-    }
-    if (hasLocationKeywords && location) {
-      specs.push({
-        he: `איפה אפשר למצוא ${displayName} ב-${location}?`,
-        en: `Where can I find ${displayName} in ${location}?`,
-        intent: 'local',
-        priority: 85,
-      })
+  // 3b. Name-based questions — only safe, gender-neutral frames so a real brand
+  //     name always reads naturally. (Names are never slugs here.)
+  if (cleanName) {
+    if (lang === 'he') {
+      push(`מה חוות הדעת על ${cleanName}?`, 'brand')
+    } else {
+      push(`What are the reviews of ${cleanName}?`, 'brand')
+      if (labelObj) {
+        push(`Is ${cleanName} a reliable ${labelObj.en}?`, 'pre_purchase')
+        push(`How does ${cleanName} compare to other ${labelObj.enPlural}?`, 'comparison')
+      } else {
+        push(`What do people say about ${cleanName}?`, 'recommendation')
+      }
     }
   }
 
-  // Priority 2: Competitor-based questions (if we have competitors)
-  if (competitors && competitors.length > 0) {
-    const mainCompetitor = competitors[0]
-    specs.push({
-      he: `${displayName} או ${mainCompetitor} - איזה עדיף?`,
-      en: `${displayName} or ${mainCompetitor} - which is better?`,
-      intent: 'comparison',
-      priority: 82,
-    })
+  // 3c. Competitor comparison ("difference between X and Y" — gender-neutral HE).
+  if (competitors && competitors.length > 0 && competitors[0]) {
+    if (cleanName) {
+      push(
+        lang === 'he'
+          ? `מה ההבדל בין ${cleanName} ל${competitors[0]}?`
+          : `What is the difference between ${cleanName} and ${competitors[0]}?`,
+        'comparison'
+      )
+    } else if (labelObj) {
+      // Subject is a generic label — English needs an article to read naturally.
+      push(
+        lang === 'he'
+          ? `מה ההבדל בין ${labelObj.he} ל${competitors[0]}?`
+          : `What is the difference between ${enArticle(labelObj.en)} ${labelObj.en} and ${competitors[0]}?`,
+        'comparison'
+      )
+    }
   }
 
-  // Priority 3: Location-based questions (if we have location)
-  if (location && !hasLocationKeywords) {
-    specs.push({
-      he: `איפה אפשר למצוא שירות כמו ${displayName} בישראל ב-${location}?`,
-      en: `Where can I find ${displayName} services in ${location}?`,
-      intent: 'local',
-      priority: 75,
-    })
+  // 4. Quality filter (dedup, slug/domain/language gate).
+  let prompts = qualityFilterQuestions(candidates.map((c) => c.prompt), lang)
+
+  // 5. Guaranteed minimum — never return an empty/too-thin set. These generic
+  //    frames are natural and do NOT reference a name or raw category.
+  if (prompts.length < 4) {
+    const generic = lang === 'he'
+      ? [
+          'איך בוחרים עסק אמין בתחום?',
+          'מה כדאי לבדוק לפני שבוחרים נותן שירות?',
+          'איך משווים בין כמה עסקים באותו תחום?',
+          'מה חשוב לבדוק לפני שמתחייבים לספק?',
+        ]
+      : [
+          'How do I choose a reliable business in this field?',
+          'What should I check before choosing a provider?',
+          'How do I compare businesses in the same field?',
+          'What matters most before committing to a provider?',
+        ]
+    const merged = qualityFilterQuestions([...prompts, ...generic], lang)
+    prompts = merged
   }
 
-  // Priority 4: Category-based smart questions (if we have a real category)
-  if (category && category !== 'generic') {
-    const categoryLabel = lang === 'he' ? HE_CATEGORY_LABEL[category] : EN_CATEGORY_LABEL[category]
-    specs.push({
-      he: `מי נחשב לאחד המומלצים בתחום ${categoryLabel}?`,
-      en: `Who is considered one of the top ${categoryLabel} providers?`,
-      intent: 'recommendation',
-      priority: 70,
-    })
-  }
+  // Cap to a focused set.
+  prompts = prompts.slice(0, 7)
 
-  // Priority 5: Always include core business questions (fallback for any business)
-  specs.push({
-    he: `למה לבחור ${displayName} על פני אלטרנטיבות אחרות?`,
-    en: `Why choose ${displayName} over other alternatives?`,
-    intent: 'pre_purchase',
-    priority: 65,
-  })
-
-  specs.push({
-    he: `האם ${displayName} מומלץ בביקורות?`,
-    en: `Is ${displayName} recommended by users?`,
-    intent: 'recommendation',
-    priority: 60,
-  })
-
-  specs.push({
-    he: `מה היתרונות של ${displayName}?`,
-    en: `What are the main advantages of ${displayName}?`,
-    intent: 'informational',
-    priority: 58,
-  })
-
-  // Add domain-trust question only when the domain label reads as a clean brand
-  // word (no hyphens/digits). A slug like "mashkanta-be-click" looks broken, so
-  // we skip it rather than surface an ugly label.
-  const domLabel = targetDomain ? deriveLabelFromDomain(targetDomain) : ''
-  if (targetDomain && domLabel && /^[a-z֐-׿]+$/.test(domLabel)) {
-    specs.push({
-      he: `האם ${domLabel} מקור אמין בתחום?`,
-      en: `Is ${domLabel} a trustworthy source?`,
-      intent: 'brand',
-      priority: 50,
-    })
-  }
-
-  // Sort by priority (highest first) and take top 7 questions
-  const sorted = specs.sort((a, b) => b.priority - a.priority).slice(0, 7)
-
-  // If we have too few questions, add generic fallback questions
-  if (sorted.length < 4) {
-    sorted.push({
-      he: `מהם החסרונות של ${displayName}?`,
-      en: `What are the drawbacks of ${displayName}?`,
-      intent: 'informational',
-      priority: 45,
-    })
-  }
-
-  if (sorted.length < 5) {
-    sorted.push({
-      he: `איפה אפשר ללמוד עוד על ${displayName}?`,
-      en: `Where can I learn more about ${displayName}?`,
-      intent: 'informational',
-      priority: 40,
-    })
-  }
-
+  // Re-attach the best-known intent for each surviving prompt.
+  const intentByPrompt = new Map(candidates.map((c) => [c.prompt, c.intent]))
   const intentLabels = lang === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
 
-  return sorted.map((s, i) => ({
-    id: `fallback-${i}-${Math.random().toString(36).slice(2, 6)}`,
-    prompt: lang === 'he' ? s.he : s.en,
-    intent: s.intent,
-    intentLabel: intentLabels[s.intent],
-    category: category || ('generic' as BusinessCategory),
-    language: lang,
-    qualityScore: 70,
-    confidenceTier: 'good' as const,
-    reason: lang === 'he' ? 'ברירת מחדל' : 'default',
-    chips: [],
-    valueReason: '',
-  }))
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[ai-question-suggestions] intent-fallback built', {
+      category: cat,
+      businessType,
+      serviceLabel: inferServiceLabel(cat, lang),
+      cleanName: cleanName || '(none — name rejected or missing)',
+      location: location || '(none)',
+      candidateCount: candidates.length,
+      finalCount: prompts.length,
+    })
+  }
+
+  return prompts.map((prompt, i) => {
+    const intent = intentByPrompt.get(prompt) || 'recommendation'
+    return {
+      id: `fallback-${i}-${Math.random().toString(36).slice(2, 6)}`,
+      prompt,
+      intent,
+      intentLabel: intentLabels[intent],
+      category: cat,
+      language: lang,
+      qualityScore: 72,
+      confidenceTier: 'good' as const,
+      reason: lang === 'he' ? 'ברירת מחדל' : 'default',
+      chips: [],
+      valueReason: '',
+    }
+  })
 }
 
 // ============================================================================
