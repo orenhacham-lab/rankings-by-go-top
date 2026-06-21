@@ -36,7 +36,7 @@ import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { generatePromptSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
@@ -215,6 +215,9 @@ export default function AIVisibilitySection({
   // Set to true when "Generate more" produced zero new suggestions. Cleared
   // when the profile changes or another generate-more attempt is made.
   const [noNewSuggestionsFound, setNoNewSuggestionsFound] = useState(false)
+  // Set to true when the AI/Gemini path failed or returned nothing and we fell
+  // back to basic local questions. Shows a friendly notice. Cleared on success.
+  const [usedFallbackQuestions, setUsedFallbackQuestions] = useState(false)
   // Track previous server pool count to detect shrinkage across requests
   const [previousServerPoolCount, setPreviousServerPoolCount] = useState(0)
   const [scanningKey, setScanningKey] = useState<string | null>(null)
@@ -447,15 +450,35 @@ export default function AIVisibilitySection({
     })
     const lang: 'he' | 'en' = projectLanguage === 'en' ? 'en' : 'he'
     // Filter vNext questions safely — ensure prompt field is valid string
-    const vNextFiltered = suggestions.filter((q) => {
+    let vNextFiltered = suggestions.filter((q) => {
       const promptText = q?.prompt ?? ''
       return typeof promptText === 'string' && promptText.trim().length > 0 && !isInvalidPriceQuestion(promptText, lang)
     })
+
+    // GUARANTEED FALLBACK: brand-new projects with no keyword signals resolve to
+    // the `generic` category, for which the vNext engine has no seeds → returns [].
+    // Without this, the panel would auto-show an empty state. Seed it with basic
+    // business-name/domain questions so new projects always display suggestions.
+    // No notice here — this is a passive load, not a failed AI attempt. Cached
+    // Gemini questions (if any) replace these silently in the background below.
+    if (vNextFiltered.length === 0) {
+      const fallback = buildFallbackSuggestions(projectBrandName, projectDomain, projectLanguage)
+      if (fallback.length > 0) {
+        vNextFiltered = fallback
+        console.log('[ai-question-suggestions] initial load seeded local fallback', {
+          projectId,
+          businessName: projectBrandName || '(none)',
+          targetDomain: projectDomain || '(none)',
+          fallbackCount: fallback.length,
+        })
+      }
+    }
 
     // Show vNext immediately — cached suggestions arrive in the background
     setSuggestedQuestions(vNextFiltered)
     setExcludedSuggestionKeys(new Set())
     setNoNewSuggestionsFound(false)
+    setUsedFallbackQuestions(false)
 
     // Background: load cached Gemini suggestions without calling Gemini API
     ;(async () => {
@@ -613,6 +636,8 @@ export default function AIVisibilitySection({
           setSuggestedQuestions(merged)
           setShowAllSmartQuestions(savedExpandedState)
           setPreviousServerPoolCount(currentServerPoolCount)
+          // Real cached/Gemini questions arrived — clear the local-fallback notice.
+          if (merged.length > 0) setUsedFallbackQuestions(false)
 
           console.log('[AI_SUGGESTIONS_CLIENT_SERVER_RECONCILE]', {
             projectId,
@@ -902,6 +927,15 @@ export default function AIVisibilitySection({
   const refreshSuggestions = useCallback(async () => {
     setRefreshingSuggestions(true)
     setNoNewSuggestionsFound(false)
+    // Track whether Gemini actually produced anything this cycle so we know if a
+    // local fallback is required (so the user is never left with no questions).
+    let geminiProducedQuestions = false
+    console.log('[ai-question-suggestions] generate clicked', {
+      projectId,
+      businessName: projectBrandName || '(none)',
+      targetDomain: projectDomain || '(none)',
+      currentlyShown: suggestedQuestions.length,
+    })
     try {
       await new Promise((resolve) => setTimeout(resolve, 200))
 
@@ -1021,6 +1055,13 @@ export default function AIVisibilitySection({
           geminiWasCalled = enrichData.geminiWasCalled || false
           geminiNotCalledReason = enrichData.geminiNotCalledReason || ''
           contextHash = enrichData.contextHash || ''
+          geminiProducedQuestions = apiDedupedQuestions.length > 0
+
+          console.log('[ai-question-suggestions] Gemini response count:', {
+            usingGemini: geminiWasCalled,
+            geminiNotCalledReason: geminiWasCalled ? null : geminiNotCalledReason,
+            apiPoolCount: apiDedupedQuestions.length,
+          })
 
           // Count items by source from dedupedQuestions using normalized source
           const cachedItemsInDedup = apiDedupedQuestions.filter((q: any) => normalizeSuggestionSource(q) === 'cache').length
@@ -1159,10 +1200,35 @@ export default function AIVisibilitySection({
       })
 
       if (filtered.length === 0) {
-        // No new candidates from this batch
+        // No new candidates from this batch (vNext empty + Gemini gave nothing).
         emptyStateReason = 'no_new_candidates'
-        setNoNewSuggestionsFound(true)
+        // GUARANTEED FALLBACK: if the user currently has NO suggestions shown
+        // (new/generic project where Gemini is disabled, failing, or returned
+        // nothing), seed basic local questions so they are never left empty.
+        // For projects that already show suggestions (rich projects clicking
+        // "generate more") we keep the normal "pool exhausted" behavior.
+        if (suggestedQuestions.length === 0) {
+          const fallback = buildFallbackSuggestions(projectBrandName, projectDomain, projectLanguage)
+          if (fallback.length > 0) {
+            console.log('[ai-question-suggestions] fallback used: true', {
+              projectId,
+              reason: geminiWasCalled ? 'gemini_returned_nothing' : (geminiNotCalledReason || 'enrichment_unavailable'),
+              fallbackCount: fallback.length,
+            })
+            setSuggestedQuestions(fallback)
+            setUsedFallbackQuestions(true)
+            setNoNewSuggestionsFound(false)
+            console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
+            console.log('[ai-question-suggestions] state updated')
+          } else {
+            setNoNewSuggestionsFound(true)
+          }
+        } else {
+          setNoNewSuggestionsFound(true)
+        }
       } else {
+        // Real candidates produced (vNext and/or Gemini) — clear fallback notice.
+        if (geminiProducedQuestions) setUsedFallbackQuestions(false)
         // Light client-side dedup: only remove exact normalized matches against currently visible.
         // The API already ran strong dedup, so we trust its work and don't re-dedup semantically here.
         const normalizeLightDedup = (text?: string | null): string => {
@@ -1240,6 +1306,8 @@ export default function AIVisibilitySection({
 
         setSuggestedQuestions(finalDeduped)
         setPreviousServerPoolCount(currentServerPoolCount)
+        console.log('[ai-question-suggestions] final suggestions count:', finalDeduped.length)
+        console.log('[ai-question-suggestions] state updated')
 
         // Log server-to-client reconciliation
         console.log('[AI_SUGGESTIONS_CLIENT_SERVER_RECONCILE]', {
@@ -1354,8 +1422,23 @@ export default function AIVisibilitySection({
         }
       }
     } catch (e) {
-      // On failure: keep existing suggestions visible
-      setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
+      // On failure: keep existing suggestions visible. If the user has nothing
+      // shown at all, guarantee basic local questions so they're never empty.
+      console.error('[ai-question-suggestions] generation error:', e instanceof Error ? e.message : String(e))
+      if (suggestedQuestions.length === 0) {
+        const fallback = buildFallbackSuggestions(projectBrandName, projectDomain, projectLanguage)
+        if (fallback.length > 0) {
+          console.log('[ai-question-suggestions] fallback used: true', { projectId, reason: 'exception', fallbackCount: fallback.length })
+          setSuggestedQuestions(fallback)
+          setUsedFallbackQuestions(true)
+          console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
+          console.log('[ai-question-suggestions] state updated')
+        } else {
+          setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
+        }
+      } else {
+        setError(e instanceof Error ? e.message : 'Failed to generate suggestions')
+      }
     } finally {
       setRefreshingSuggestions(false)
     }
@@ -1371,6 +1454,7 @@ export default function AIVisibilitySection({
     allPrompts,
     excludedSuggestionKeys,
     previousServerPoolCount,
+    projectId,
   ])
 
   const dedupedAllResults = useMemo(() => {
@@ -1990,6 +2074,15 @@ export default function AIVisibilitySection({
                     <span className="text-sm text-slate-600 dark:text-slate-400">
                       {isHebrew ? 'יוצר שאלות מומלצות...' : 'Generating recommended questions...'}
                     </span>
+                  </div>
+                )}
+
+                {/* FALLBACK NOTICE: shown when AI was unavailable and we seeded basics */}
+                {usedFallbackQuestions && availableSuggestions.length > 0 && !refreshingSuggestions && (
+                  <div className="mb-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                    {isHebrew
+                      ? 'לא הצלחנו ליצור שאלות דרך AI כרגע, הצגנו שאלות בסיסיות להתחלה.'
+                      : "We couldn't generate AI questions right now, so we've shown basic starter questions."}
                   </div>
                 )}
 

@@ -2804,6 +2804,75 @@ function filterSuggestionsByUnwantedTopics(
 }
 
 // ============================================================================
+// GUARANTEED LOCAL FALLBACK
+// ============================================================================
+// Brand-new projects often resolve to the `generic` business category, which
+// the vNext intent engine has no curated seeds for — so generatePromptSuggestions
+// legitimately returns []. Existing projects only show questions because they
+// already have cached Gemini suggestions in the DB. To guarantee the user never
+// sees an empty "recommended questions" panel, we build a small deterministic set
+// of basic, business-name/domain-driven questions. These require nothing but a
+// business name OR a domain and are safe in every environment (no Gemini, no
+// keywords, no scans). Used as the last-resort fallback in the UI.
+
+/** Derive a clean human-readable label from a domain (strips protocol + TLD). */
+function deriveLabelFromDomain(domain: string): string {
+  let d = domain.trim().toLowerCase()
+  d = d.replace(/^https?:\/\//, '').replace(/^www\./, '')
+  d = d.split('/')[0] // drop path
+  // Keep the registrable part before the first dot (e.g. "morningbakery").
+  const firstLabel = d.split('.')[0]
+  return firstLabel || d
+}
+
+export function buildFallbackSuggestions(
+  businessName: string | null,
+  domain: string | null,
+  language?: string | null
+): PromptSuggestion[] {
+  const lang: 'he' | 'en' = language === 'en' ? 'en' : 'he'
+  const name = (businessName && businessName.trim()) || (domain ? deriveLabelFromDomain(domain) : '')
+  const domLabel = domain ? deriveLabelFromDomain(domain) : name
+
+  // Need at least something to anchor the questions on.
+  if (!name && !domLabel) return []
+
+  type Spec = { he: string; en: string; intent: PromptIntent }
+  const specs: Spec[] = [
+    { he: `איפה אפשר למצוא את ${name}?`, en: `Where can I find ${name}?`, intent: 'local' },
+    { he: `מה היתרונות של ${name}?`, en: `What are the advantages of ${name}?`, intent: 'informational' },
+    { he: `האם ${name} מומלץ?`, en: `Is ${name} recommended?`, intent: 'recommendation' },
+    { he: `מה המחירים של ${name}?`, en: `What are the prices of ${name}?`, intent: 'commercial' },
+    { he: `מה האלטרנטיבות ל-${name}?`, en: `What are the alternatives to ${name}?`, intent: 'alternatives' },
+    { he: `איך ${name} בהשוואה למתחרים?`, en: `How does ${name} compare to competitors?`, intent: 'comparison' },
+  ]
+  // Domain-trust question only when we actually have a domain.
+  if (domain) {
+    specs.push({
+      he: `האם ${domLabel} מקור אמין בתחום?`,
+      en: `Is ${domLabel} a reliable source in its field?`,
+      intent: 'brand',
+    })
+  }
+
+  const intentLabels = lang === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
+
+  return specs.map((s, i) => ({
+    id: `fallback-${i}-${Math.random().toString(36).slice(2, 6)}`,
+    prompt: lang === 'he' ? s.he : s.en,
+    intent: s.intent,
+    intentLabel: intentLabels[s.intent],
+    category: 'generic' as BusinessCategory,
+    language: lang,
+    qualityScore: 60,
+    confidenceTier: 'medium' as const,
+    reason: '',
+    chips: [],
+    valueReason: '',
+  }))
+}
+
+// ============================================================================
 // ORIGINAL GENERATION PATH
 // ============================================================================
 
