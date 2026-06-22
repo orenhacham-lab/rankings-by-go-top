@@ -141,6 +141,10 @@ export async function POST(request: Request) {
     return Response.json({ error: 'projectId and language are required' }, { status: 400 })
   }
 
+  // ====== PHASE 4 DEBUG: Verify deployment ======
+  console.log('[PHASE_4_ACTIVE] commit=133be9c generation_version tracking deployed')
+  // ====================================================
+
   const result = await authAndProject(projectId)
   if ('error' in result) {
     return Response.json({ error: result.error }, { status: result.status })
@@ -159,6 +163,8 @@ export async function POST(request: Request) {
       language,
       country,
       businessCategory,
+      cacheOnly,
+      forceRefresh,
       allowedLocations: allowedLocations.length > 0 ? allowedLocations : '(none)',
       allowedServiceAreas: allowedServiceAreas.length > 0 ? allowedServiceAreas : '(none)',
       allowedTopics: businessScope.allowedTopics.length > 0 ? businessScope.allowedTopics : '(none)',
@@ -201,10 +207,12 @@ export async function POST(request: Request) {
       contextHash: contextHashForLoad,
       projectId,
       cacheOnly,
+      forceRefresh,
       language,
       country: country || '(none)',
       businessCategory: businessCategory || '(none)',
-      count: rawCachedSuggestions.length,
+      rawCachedCount: rawCachedSuggestions.length,
+      generationVersions: rawCachedSuggestions.map((r: any) => r.generation_version || 'null').slice(0, 10),
     })
 
     // Track detailed rejection reasons for cached suggestions
@@ -878,6 +886,21 @@ export async function POST(request: Request) {
       'generation version': QUESTION_GENERATION_VERSION,
       'force refresh': forceRefresh,
     })
+
+    // ====== DEBUG: Show actual sources of displayed questions ======
+    const displayedSources = dedupedQuestions.map(q => (q as any).source || 'unknown').reduce((acc: Record<string, number>, src: string) => {
+      acc[src] = (acc[src] || 0) + 1
+      return acc
+    }, {})
+    console.log('[ai-question-suggestions] displayed questions by source', displayedSources)
+    console.log('[ai-question-suggestions] sample displayed questions', {
+      samples: dedupedQuestions.slice(0, 3).map(q => ({
+        question: (q as any).question?.substring(0, 80),
+        source: (q as any).source || 'unknown',
+        intent: (q as any).intent || 'unknown',
+      }))
+    })
+    // ============================================================
 
     return Response.json({
       vNextQuestions,

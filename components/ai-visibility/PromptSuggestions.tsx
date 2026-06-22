@@ -477,7 +477,7 @@ export default function PromptSuggestions({
     await new Promise((r) => setTimeout(r, 250))
 
     try {
-      // Reload full cache pool (not filtered by seenPromptsRef)
+      // Regenerate: force fresh intent_v2 questions, bypass legacy cache
       const response = await fetch('/api/ai-visibility/enriched-suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -486,7 +486,7 @@ export default function PromptSuggestions({
           language: normalizedLang,
           country: country || undefined,
           businessCategory: null,
-          cacheOnly: true,
+          forceRefresh: true,
         }),
       })
 

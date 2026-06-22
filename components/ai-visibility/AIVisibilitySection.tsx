@@ -1086,7 +1086,7 @@ export default function AIVisibilitySection({
       // first. Only if it yields nothing do we fall back to local questions.
       let apiDedupedQuestions: any[] = []
       try {
-        console.log('[ai-question-suggestions] calling enriched suggestions endpoint', { projectId, normalizedLanguage: normalizedLang })
+        console.log('[ai-question-suggestions] calling enriched suggestions endpoint', { projectId, normalizedLanguage: normalizedLang, trigger, forceRefresh: trigger === 'inner' || trigger === 'top' })
         const enrichResponse = await fetch('/api/ai-visibility/enriched-suggestions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1095,6 +1095,7 @@ export default function AIVisibilitySection({
             language: normalizedLang,
             country: projectCountry || undefined,
             businessCategory: null,
+            forceRefresh: trigger === 'inner' || trigger === 'top',
           }),
         })
 
