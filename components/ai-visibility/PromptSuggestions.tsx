@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
@@ -219,6 +219,35 @@ export default function PromptSuggestions({
     }
   }
 
+  // DISPLAY QUALITY GATE for the modal: drop legacy/weak cached questions and
+  // top up with the intent-v2 engine. `forceRefresh` is logged so we can tell
+  // an explicit regenerate from a passive load.
+  function gateModalSuggestions(
+    items: PromptSuggestion[],
+    source: string,
+    forceRefresh: boolean
+  ): PromptSuggestion[] {
+    const category = detectCategory(businessName || '', domain || '', keywords || [])
+    const result = applyDisplayQualityGate(items, {
+      businessName,
+      domain,
+      category,
+      location: city,
+      keywords: keywords || [],
+      language,
+    }, { minCount: 6, maxCount: Math.max(items.length + 8, 24) })
+    console.log('[ai-question-suggestions] displayed source:', source)
+    console.log('[ai-question-suggestions] cache suggestions count', { count: items.length })
+    console.log('[ai-question-suggestions] current generation version', { version: QUESTION_GENERATION_VERSION })
+    console.log('[ai-question-suggestions] using cached suggestions:', items.length > 0)
+    console.log('[ai-question-suggestions] force refresh:', forceRefresh)
+    console.log('[ai-question-suggestions] old suggestions rejected count', { count: result.rejectedCount })
+    console.log('[ai-question-suggestions] new suggestions generated count', { count: result.addedFromEngine })
+    console.log('[ai-question-suggestions] final displayed suggestions count', { count: result.suggestions.length })
+    // Keep already-tracked questions out of the modal.
+    return result.suggestions.filter((q) => !alreadyAddedPromptsRef.current.has(normalizePrompt(q.prompt)))
+  }
+
   // Build a quality local fallback set (shared with the inline panel logic).
   // Never returns [] — guarantees the modal is never left empty even when
   // Gemini is unavailable / returns nothing and the cache is empty.
@@ -304,12 +333,13 @@ export default function PromptSuggestions({
         qualityDistribution: qualityDist,
       })
 
-      // Step 2: Enough in cache? Display it
+      // Step 2: Enough in cache? Display it (after the display quality gate).
       if (availableAfterFiltering.length >= MIN_MODAL_POOL) {
+        const gatedCache = gateModalSuggestions(availableAfterFiltering, 'cache', false)
         console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
-        console.log('[ai-question-suggestions] final suggestions count:', availableAfterFiltering.length)
+        console.log('[ai-question-suggestions] final suggestions count:', gatedCache.length)
         console.log('[ai-question-suggestions] state updated')
-        setSuggestions(availableAfterFiltering)
+        setSuggestions(gatedCache)
         setSelectedIds(new Set())
         setIsLoadingSuggestions(false)
         return
@@ -394,10 +424,11 @@ export default function PromptSuggestions({
             return
           }
 
+          const gatedNew = gateModalSuggestions(newAvailable, 'cache+gemini', allowGenerate)
           console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
-          console.log('[ai-question-suggestions] final suggestions count:', newAvailable.length)
+          console.log('[ai-question-suggestions] final suggestions count:', gatedNew.length)
           console.log('[ai-question-suggestions] state updated')
-          setSuggestions(newAvailable)
+          setSuggestions(gatedNew)
           setSelectedIds(new Set())
           setIsLoadingSuggestions(false)
           return
@@ -407,10 +438,11 @@ export default function PromptSuggestions({
       // Step 4: Generation skipped/failed. Show cache if we have any; otherwise
       // guarantee a quality local fallback (never leave the modal empty).
       if (availableAfterFiltering.length > 0) {
+        const gatedCache2 = gateModalSuggestions(availableAfterFiltering, 'cache', false)
         console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
-        console.log('[ai-question-suggestions] final suggestions count:', availableAfterFiltering.length)
+        console.log('[ai-question-suggestions] final suggestions count:', gatedCache2.length)
         console.log('[ai-question-suggestions] state updated')
-        setSuggestions(availableAfterFiltering)
+        setSuggestions(gatedCache2)
       } else {
         const fb = buildModalFallback()
         console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: 'cache_empty_generation_skipped', fallbackCount: fb.length })
@@ -482,12 +514,16 @@ export default function PromptSuggestions({
           qualityDistribution: qualityDist,
         })
 
-        // Cache had usable questions → show them (no fallback).
+        // Cache had usable questions → show them (after the display quality
+        // gate; regenerate is an explicit user action → force refresh).
         if (refreshedAvailable.length > 0) {
-          setSuggestions(refreshedAvailable)
-          setSelectedIds(new Set())
-          setRegenerating(false)
-          return
+          const gatedRefresh = gateModalSuggestions(refreshedAvailable, 'cache', true)
+          if (gatedRefresh.length > 0) {
+            setSuggestions(gatedRefresh)
+            setSelectedIds(new Set())
+            setRegenerating(false)
+            return
+          }
         }
         // Cache empty → fall through to generator/fallback below.
       }
