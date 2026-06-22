@@ -36,7 +36,7 @@ import CompetitorsPanel from './CompetitorsPanel'
 import CompetitorAnalysisPanel from './CompetitorAnalysisPanel'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, type PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { analyzeSmartQuestionContext } from '@/lib/ai-visibility/intent-engine'
 import { isInvalidPriceQuestion } from '@/lib/ai-visibility/smart-question-keyword-enrichment'
 import { getBrandVariants } from '@/lib/ai-visibility/matching/mention-detector'
@@ -207,6 +207,11 @@ export default function AIVisibilitySection({
   const [searchQuery, setSearchQuery] = useState('')
 
   const [suggestedQuestions, setSuggestedQuestions] = useState<PromptSuggestion[]>([])
+  // Always strip the insufficient-context marker before it can enter state, so
+  // it never lingers as a "+" card after the user generates new questions.
+  const commitSuggestedQuestions = useCallback((list: PromptSuggestion[]) => {
+    setSuggestedQuestions(list.filter((s) => !isInsufficientContextSuggestion(s)))
+  }, [])
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false)
   // Tracks normalized prompt text of every suggestion shown across all batches
   // in this session. Used as exclusion input to the generator on "Generate more"
@@ -490,7 +495,7 @@ export default function AIVisibilitySection({
     }
 
     // Show vNext immediately — cached suggestions arrive in the background
-    setSuggestedQuestions(vNextFiltered)
+    commitSuggestedQuestions(vNextFiltered)
     setExcludedSuggestionKeys(new Set())
     setNoNewSuggestionsFound(false)
     setUsedFallbackQuestions(false)
@@ -670,7 +675,7 @@ export default function AIVisibilitySection({
         console.log('[ai-question-suggestions] final displayed suggestions count', { count: gatedMerged.length })
 
         if (!cancelled) {
-          setSuggestedQuestions(gatedMerged)
+          commitSuggestedQuestions(gatedMerged)
           setShowAllSmartQuestions(savedExpandedState)
           setPreviousServerPoolCount(currentServerPoolCount)
           // Real cached/Gemini questions arrived — clear the local-fallback notice.
@@ -1274,7 +1279,7 @@ export default function AIVisibilitySection({
           if (fallback.length > 0) {
             console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: fallbackReason, fallbackCount: fallback.length, geminiWasCalled, geminiNotCalledReason })
             console.log('[ai-question-suggestions] fallback reason', { projectId, reason: fallbackReason })
-            setSuggestedQuestions(fallback)
+            commitSuggestedQuestions(fallback)
             // Only show fallback notice if Gemini was actually called and failed (not just unavailable)
             const shouldShowNotice = geminiWasCalled && fallbackReason === 'gemini_returned_nothing'
             setUsedFallbackQuestions(shouldShowNotice)
@@ -1387,7 +1392,7 @@ export default function AIVisibilitySection({
           return next
         })
 
-        setSuggestedQuestions(finalDeduped)
+        commitSuggestedQuestions(finalDeduped)
         setPreviousServerPoolCount(currentServerPoolCount)
         console.log('[ai-question-suggestions] final suggestions count:', finalDeduped.length)
         console.log('[ai-question-suggestions] state updated')
@@ -1522,7 +1527,7 @@ export default function AIVisibilitySection({
         if (fallback.length > 0) {
           console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: 'exception', fallbackCount: fallback.length, error: e instanceof Error ? e.message : String(e) })
           console.log('[ai-question-suggestions] fallback reason', { projectId, reason: 'exception' })
-          setSuggestedQuestions(fallback)
+          commitSuggestedQuestions(fallback)
           // Show notice on exception (user-triggered generation failed)
           setUsedFallbackQuestions(true)
           console.log('[ai-question-suggestions] final suggestions count:', fallback.length)
@@ -1902,7 +1907,7 @@ export default function AIVisibilitySection({
                 shuffle: false,
                 limit: 20,
               })
-              setSuggestedQuestions(refreshed)
+              commitSuggestedQuestions(refreshed)
             }}
           />
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
@@ -2051,6 +2056,9 @@ export default function AIVisibilitySection({
             // Filter available suggestions, using safe text extraction
             // PromptSuggestion items always have prompt field
             const availableSuggestions = suggestedQuestions.filter((q) => {
+              // The insufficient-context marker is a notice, never a question
+              // card — exclude it so it can never render with a "+" button.
+              if (isInsufficientContextSuggestion(q)) return false
               const qText = q.prompt ?? ''
               const normalized = typeof qText === 'string' ? normalizeText(qText) : ''
               return normalized && !trackedSet.has(normalized)

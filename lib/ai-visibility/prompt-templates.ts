@@ -3485,6 +3485,45 @@ export function buildFallbackSuggestions(
 /** Bump when the generation logic changes meaningfully. Logged for diagnostics. */
 export const QUESTION_GENERATION_VERSION = 'intent_v2'
 
+/** Stable id used for the insufficient-context marker (never a real question). */
+export const INSUFFICIENT_CONTEXT_MARKER_ID = 'insufficient-context-marker'
+
+/**
+ * The exact insufficient-context notice phrasings (HE + EN). These are NOT
+ * questions — they are an empty/context-state notice. Used by both server and
+ * client guards to make sure the marker is never treated, stored, returned, or
+ * rendered as a normal suggestion.
+ */
+export const INSUFFICIENT_CONTEXT_PHRASES = [
+  'כדי ליצור שאלות מדויקות יותר',
+  'מומלץ להשלים את פרופיל',
+  'To create more accurate questions',
+  'completing your business AI profile',
+  'insufficient_context',
+] as const
+
+/**
+ * Single source of truth for detecting the insufficient-context marker, whatever
+ * shape it arrives in: a PromptSuggestion ({ prompt, confidenceTier, ... }), a
+ * cached row ({ question, intent, ... }), or a dedup entry. Returns true if the
+ * item is the marker and must be treated as a notice, never as a question.
+ */
+export function isInsufficientContextSuggestion(item: unknown): boolean {
+  if (!item || typeof item !== 'object') return false
+  const o = item as Record<string, unknown>
+
+  if (o.id === INSUFFICIENT_CONTEXT_MARKER_ID) return true
+  if (o.confidenceTier === 'insufficient_context') return true
+  if (o.intent === 'insufficient_context') return true
+  if (o.category === 'insufficient_context') return true
+
+  const text = [o.prompt, o.question, o.text]
+    .filter((v): v is string => typeof v === 'string')
+    .join(' ')
+  if (!text) return false
+  return INSUFFICIENT_CONTEXT_PHRASES.some((p) => text.includes(p))
+}
+
 /**
  * Conservative blocklist of the exact weak/template phrasings produced by the
  * pre-intent-v2 engine, plus slug/domain leakage. Intentionally narrow so it
@@ -3577,7 +3616,11 @@ export function applyDisplayQualityGate(
   const maxCount = opts.maxCount ?? 12
 
   const before = items.length
-  const kept = items.filter((s) => s && s.prompt && !isLegacyWeakQuestion(s.prompt, lang))
+  // Drop the insufficient-context marker (it is a notice, never a question) and
+  // any legacy/weak/slug phrasings.
+  const kept = items.filter(
+    (s) => s && s.prompt && !isInsufficientContextSuggestion(s) && !isLegacyWeakQuestion(s.prompt, lang)
+  )
   const rejectedCount = before - kept.length
 
   let addedFromEngine = 0
@@ -3604,7 +3647,7 @@ export function applyDisplayQualityGate(
     )
     for (const e of engine) {
       if (kept.length >= minCount) break
-      if (e.confidenceTier === 'insufficient_context') continue
+      if (isInsufficientContextSuggestion(e)) continue
       if (isLegacyWeakQuestion(e.prompt, lang)) continue
       const norm = e.prompt.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?.!]+$/, '')
       if (seen.has(norm)) continue

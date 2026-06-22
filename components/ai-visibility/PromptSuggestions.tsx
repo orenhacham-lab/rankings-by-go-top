@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
-import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
+import { generatePromptSuggestions, buildFallbackSuggestions, detectCategory, normalizeLanguage, applyDisplayQualityGate, isInsufficientContextSuggestion, QUESTION_GENERATION_VERSION, PromptSuggestion, type ManualAIProfile } from '@/lib/ai-visibility/prompt-templates'
 import { createI18n } from '@/lib/ai-visibility/i18n'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { deriveSuggestionMeta } from '@/lib/ai-visibility/suggestion-dedup'
@@ -133,6 +133,12 @@ export default function PromptSuggestions({
   }
 
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
+  // Marker-safe commit: the insufficient-context notice is never a question and
+  // must never be rendered as a selectable card. Replaces (never appends) the
+  // displayed pool so a stale marker can't survive a regenerate.
+  function commitSuggestions(list: PromptSuggestion[]) {
+    setSuggestions(list.filter((s) => !isInsufficientContextSuggestion(s)))
+  }
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -264,8 +270,11 @@ export default function PromptSuggestions({
       [], // competitors not available here
       lang,
     )
-    // Filter out anything the project already tracks so the modal stays useful.
-    return fb.filter((q) => !alreadyAddedPromptsRef.current.has(normalizePrompt(q.prompt)))
+    // Filter out the insufficient-context marker (a notice, not a question) and
+    // anything the project already tracks so the modal stays useful.
+    return fb.filter(
+      (q) => !isInsufficientContextSuggestion(q) && !alreadyAddedPromptsRef.current.has(normalizePrompt(q.prompt))
+    )
   }
 
   // Load full modal recommendation pool: cache first, then optional Gemini
@@ -339,7 +348,7 @@ export default function PromptSuggestions({
         console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
         console.log('[ai-question-suggestions] final suggestions count:', gatedCache.length)
         console.log('[ai-question-suggestions] state updated')
-        setSuggestions(gatedCache)
+        commitSuggestions(gatedCache)
         setSelectedIds(new Set())
         setIsLoadingSuggestions(false)
         return
@@ -418,7 +427,7 @@ export default function PromptSuggestions({
             console.log('[ai-question-suggestions] fallback reason', { projectId, reason: fallbackReason })
             console.log('[ai-question-suggestions] final suggestions count:', fb.length)
             console.log('[ai-question-suggestions] state updated')
-            setSuggestions(fb)
+            commitSuggestions(fb)
             setSelectedIds(new Set())
             setIsLoadingSuggestions(false)
             return
@@ -428,7 +437,7 @@ export default function PromptSuggestions({
           console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
           console.log('[ai-question-suggestions] final suggestions count:', gatedNew.length)
           console.log('[ai-question-suggestions] state updated')
-          setSuggestions(gatedNew)
+          commitSuggestions(gatedNew)
           setSelectedIds(new Set())
           setIsLoadingSuggestions(false)
           return
@@ -442,14 +451,14 @@ export default function PromptSuggestions({
         console.log('[ai-question-suggestions] fallback used', { projectId, used: false })
         console.log('[ai-question-suggestions] final suggestions count:', gatedCache2.length)
         console.log('[ai-question-suggestions] state updated')
-        setSuggestions(gatedCache2)
+        commitSuggestions(gatedCache2)
       } else {
         const fb = buildModalFallback()
         console.log('[ai-question-suggestions] fallback used', { projectId, used: true, reason: 'cache_empty_generation_skipped', fallbackCount: fb.length })
         console.log('[ai-question-suggestions] fallback reason', { projectId, reason: 'cache_empty_generation_skipped' })
         console.log('[ai-question-suggestions] final suggestions count:', fb.length)
         console.log('[ai-question-suggestions] state updated')
-        setSuggestions(fb)
+        commitSuggestions(fb)
       }
       setSelectedIds(new Set())
       setIsLoadingSuggestions(false)
@@ -463,7 +472,7 @@ export default function PromptSuggestions({
       console.log('[ai-question-suggestions] fallback reason', { projectId, reason: 'exception' })
       console.log('[ai-question-suggestions] final suggestions count:', fb.length)
       console.log('[ai-question-suggestions] state updated')
-      setSuggestions(fb)
+      commitSuggestions(fb)
       setSelectedIds(new Set())
       setIsLoadingSuggestions(false)
     }
@@ -519,7 +528,7 @@ export default function PromptSuggestions({
         if (refreshedAvailable.length > 0) {
           const gatedRefresh = gateModalSuggestions(refreshedAvailable, 'cache', true)
           if (gatedRefresh.length > 0) {
-            setSuggestions(gatedRefresh)
+            commitSuggestions(gatedRefresh)
             setSelectedIds(new Set())
             setRegenerating(false)
             return
@@ -575,7 +584,7 @@ export default function PromptSuggestions({
       qualityDistribution: qualityDist,
     })
 
-    setSuggestions(produced)
+    commitSuggestions(produced)
     setSelectedIds(new Set())
     setRegenerating(false)
   }

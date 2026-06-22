@@ -53,6 +53,7 @@ import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-s
 import {
   buildFallbackSuggestions,
   isLegacyWeakQuestion,
+  isInsufficientContextSuggestion,
   QUESTION_GENERATION_VERSION,
   type BusinessCategory,
   type PromptIntent,
@@ -349,6 +350,11 @@ export async function POST(request: Request) {
     let intentV2GeneratedCount = 0
 
     cachedSuggestions = cachedSuggestions.filter((row: any) => {
+      // Insufficient-context marker is a notice, never a question — never return it.
+      if (isInsufficientContextSuggestion(row)) {
+        legacyRowsRejected++
+        return false
+      }
       const isLegacyVersion = (row.generation_version || null) !== QUESTION_GENERATION_VERSION
 
       // force_refresh: bypass legacy cache entirely.
@@ -385,7 +391,7 @@ export async function POST(request: Request) {
       )
 
       const intentV2Candidates = generated
-        .filter(s => s.confidenceTier !== 'insufficient_context')
+        .filter(s => !isInsufficientContextSuggestion(s))
         .filter(s => !isLegacyWeakQuestion(s.prompt, language))
         .map(s => ({ question: s.prompt, intent: mapIntentForCache(s.intent) }))
 
@@ -412,6 +418,7 @@ export async function POST(request: Request) {
           projectId, language, country, businessCategory, keywordsHash: null,
         })
         cachedSuggestions = reloaded.filter((row: any) => {
+          if (isInsufficientContextSuggestion(row)) return false
           if (forceRefresh && (row.generation_version || null) !== QUESTION_GENERATION_VERSION) return false
           return !isLegacyWeakQuestion(row.question, language)
         })
@@ -902,12 +909,31 @@ export async function POST(request: Request) {
     })
     // ============================================================
 
+    // FINAL SAFETY NET: the insufficient-context marker is a notice, never a
+    // question. Strip it from every array the client could render as a card.
+    const safeCachedSuggestions = cachedSuggestions.filter(q => !isInsufficientContextSuggestion(q))
+    const safeNewSuggestions = newSuggestions.filter(q => !isInsufficientContextSuggestion(q))
+    const safeDedupedQuestions = dedupedQuestions.filter(q => !isInsufficientContextSuggestion(q))
+    const markerStripped =
+      (cachedSuggestions.length - safeCachedSuggestions.length) +
+      (newSuggestions.length - safeNewSuggestions.length) +
+      (dedupedQuestions.length - safeDedupedQuestions.length)
+    if (markerStripped > 0) {
+      console.warn('[ai-question-suggestions] insufficient_context marker stripped from response', {
+        markerStripped,
+        cachedBefore: cachedSuggestions.length,
+        cachedAfter: safeCachedSuggestions.length,
+        dedupedBefore: dedupedQuestions.length,
+        dedupedAfter: safeDedupedQuestions.length,
+      })
+    }
+
     return Response.json({
       vNextQuestions,
-      cachedSuggestions,
-      newSuggestions,
-      dedupedQuestions,
-      total: dedupedQuestions.length,
+      cachedSuggestions: safeCachedSuggestions,
+      newSuggestions: safeNewSuggestions,
+      dedupedQuestions: safeDedupedQuestions,
+      total: safeDedupedQuestions.length,
       duplicatesRemoved: duplicateCount,
       source,
       geminiWasCalled,
