@@ -50,6 +50,52 @@ import {
   isWeakPromotionalQuestion,
 } from '@/lib/ai-visibility/suggestion-cache'
 import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import {
+  buildFallbackSuggestions,
+  isLegacyWeakQuestion,
+  QUESTION_GENERATION_VERSION,
+  type BusinessCategory,
+  type PromptIntent,
+} from '@/lib/ai-visibility/prompt-templates'
+
+/** Valid BusinessCategory values for coercing the free-form businessCategory param. */
+const VALID_BUSINESS_CATEGORIES: BusinessCategory[] = [
+  'agency', 'ecommerce', 'perfume', 'sports_store', 'gifts', 'appliance_store',
+  'saas', 'product_brand', 'local_service', 'home_improvement_service', 'cleaning',
+  'florist', 'restaurant', 'healthcare', 'legal', 'real_estate', 'fitness',
+  'beauty', 'education', 'second_hand_fashion', 'generic',
+]
+
+function coerceBusinessCategory(raw?: string | null): BusinessCategory | null {
+  if (!raw || typeof raw !== 'string') return null
+  const v = raw.trim().toLowerCase()
+  return (VALID_BUSINESS_CATEGORIES as string[]).includes(v) ? (v as BusinessCategory) : null
+}
+
+/**
+ * Map a PromptIntent (from the intent engine) to one of the intent values the
+ * cache CHECK constraint accepts: commercial | pre_purchase | informational |
+ * comparison | recommendation | brand | local.
+ */
+function mapIntentForCache(intent: PromptIntent): string {
+  switch (intent) {
+    case 'transactional':
+    case 'gift':
+      return 'commercial'
+    case 'alternatives':
+      return 'comparison'
+    case 'commercial':
+    case 'pre_purchase':
+    case 'informational':
+    case 'comparison':
+    case 'recommendation':
+    case 'brand':
+    case 'local':
+      return intent
+    default:
+      return 'recommendation'
+  }
+}
 
 async function authAndProject(projectId: string) {
   const supabase = await createClient()
@@ -81,6 +127,7 @@ export async function POST(request: Request) {
     country?: string | null
     businessCategory?: string | null
     cacheOnly?: boolean
+    forceRefresh?: boolean
   }
   try {
     body = await request.json()
@@ -88,7 +135,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { projectId, language = 'he', country, businessCategory, cacheOnly = false } = body
+  const { projectId, language = 'he', country, businessCategory, cacheOnly = false, forceRefresh = false } = body
 
   if (!projectId || !language) {
     return Response.json({ error: 'projectId and language are required' }, { status: 400 })
@@ -270,6 +317,108 @@ export async function POST(request: Request) {
         })),
       })
     }
+
+    // ========================================================================
+    // PHASE 4: Server-side generation_version gate + intent_v2 floor
+    // ------------------------------------------------------------------------
+    // Legacy row  = generation_version !== QUESTION_GENERATION_VERSION (NULL/old).
+    // Rules:
+    //   * Apply a server-side quality gate to EVERY cached row (any version):
+    //     drop legacy/weak/slug/domain/raw-category phrasings (isLegacyWeakQuestion).
+    //   * force_refresh=true: additionally drop ALL legacy rows outright (bypass
+    //     old cache completely) and force fresh intent_v2 generation.
+    //   * If the surviving quality pool (cache + vNext) falls below the floor,
+    //     generate fresh intent_v2 questions, persist them as 'intent_v2', and
+    //     reload so the API returns only vetted rows.
+    // This never deletes rows and never touches ai_prompts (user tracked/active
+    // questions). It only changes which cached suggestions are RETURNED.
+    // ========================================================================
+    const cacheRowsCount = rawCachedSuggestions.length
+    const legacyRowsCount = rawCachedSuggestions.filter(
+      (r: any) => (r.generation_version || null) !== QUESTION_GENERATION_VERSION
+    ).length
+    let legacyRowsRejected = 0
+    let intentV2GeneratedCount = 0
+
+    cachedSuggestions = cachedSuggestions.filter((row: any) => {
+      const isLegacyVersion = (row.generation_version || null) !== QUESTION_GENERATION_VERSION
+
+      // force_refresh: bypass legacy cache entirely.
+      if (forceRefresh && isLegacyVersion) {
+        legacyRowsRejected++
+        return false
+      }
+      // Server-side quality gate (all versions): drop weak/slug/domain/template.
+      if (isLegacyWeakQuestion(row.question, language)) {
+        legacyRowsRejected++
+        return false
+      }
+      return true
+    })
+
+    // Quality pool that already exists (cache + active vNext prompts that pass the gate).
+    const vNextQualityCount = vNextQuestions.filter(
+      q => q.prompt && !isLegacyWeakQuestion(q.prompt, language)
+    ).length
+    const MIN_QUALITY_FLOOR = 4
+
+    // Generate fresh intent_v2 questions when the pool is depleted, or always on
+    // force_refresh (so the user gets new questions after bypassing legacy cache).
+    if (!cacheOnly && (forceRefresh || cachedSuggestions.length + vNextQualityCount < MIN_QUALITY_FLOOR)) {
+      const generated = buildFallbackSuggestions(
+        project.business_name || null,
+        project.business_name || null,
+        project.target_domain || null,
+        coerceBusinessCategory(businessCategory) ?? coerceBusinessCategory(businessScope.businessCategory),
+        project.city || null,
+        [],
+        [],
+        language
+      )
+
+      const intentV2Candidates = generated
+        .filter(s => s.confidenceTier !== 'insufficient_context')
+        .filter(s => !isLegacyWeakQuestion(s.prompt, language))
+        .map(s => ({ question: s.prompt, intent: mapIntentForCache(s.intent) }))
+
+      // Dedup against existing vNext + surviving cached rows.
+      const dedupedIntentV2 = deduplicateSuggestions(
+        intentV2Candidates,
+        vNextQuestions.map(q => ({ question: q.prompt })),
+        cachedSuggestions,
+        []
+      )
+
+      if (dedupedIntentV2.length > 0) {
+        const writeRes = await writeSuggestionsToCache(
+          projectId,
+          dedupedIntentV2.map(s => ({ question: s.question, intent: s.intent, model_used: 'intent_v2' })),
+          { projectId, language, country, businessCategory },
+          QUESTION_GENERATION_VERSION
+        )
+        intentV2GeneratedCount = writeRes.rowsInserted
+
+        // Reload so the returned set includes the freshly persisted intent_v2 rows,
+        // then re-apply the server-side quality gate (intent_v2 rows pass it).
+        const reloaded = await loadCachedSuggestions({
+          projectId, language, country, businessCategory, keywordsHash: null,
+        })
+        cachedSuggestions = reloaded.filter((row: any) => {
+          if (forceRefresh && (row.generation_version || null) !== QUESTION_GENERATION_VERSION) return false
+          return !isLegacyWeakQuestion(row.question, language)
+        })
+      }
+    }
+
+    console.log('[ai-question-suggestions] generation_version gate', {
+      'cache rows count': cacheRowsCount,
+      'legacy rows count': legacyRowsCount,
+      'legacy rows rejected': legacyRowsRejected,
+      'generation version': QUESTION_GENERATION_VERSION,
+      'force refresh': forceRefresh,
+      'intent_v2 generated count': intentV2GeneratedCount,
+      'cached after gate': cachedSuggestions.length,
+    })
 
     const cachedSet = new Set(cachedSuggestions.map(q => strongNormalize(q.question)))
 
@@ -724,6 +873,12 @@ export async function POST(request: Request) {
       geminiNotCalledReason: geminiWasCalled ? 'N/A' : geminiNotCalledReason,
     })
 
+    console.log('[ai-question-suggestions] final returned count', {
+      'final returned count': dedupedQuestions.length,
+      'generation version': QUESTION_GENERATION_VERSION,
+      'force refresh': forceRefresh,
+    })
+
     return Response.json({
       vNextQuestions,
       cachedSuggestions,
@@ -736,6 +891,8 @@ export async function POST(request: Request) {
       geminiNotCalledReason: geminiWasCalled ? null : geminiNotCalledReason,
       contextHash: contextHashForLoad,
       cacheWrite: cacheWriteResult,
+      generationVersion: QUESTION_GENERATION_VERSION,
+      forceRefresh,
     })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)

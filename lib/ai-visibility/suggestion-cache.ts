@@ -8,7 +8,16 @@ export interface CachedSuggestion {
   intent: string
   model_used: string | null
   created_at: string
+  /** Engine version that produced this row. NULL/undefined = legacy (pre-intent_v2). */
+  generation_version?: string | null
 }
+
+/**
+ * Current question-generation engine version. Rows written by the intent-based
+ * engine carry this value; legacy rows have generation_version IS NULL.
+ * Kept in sync with QUESTION_GENERATION_VERSION in prompt-templates.ts.
+ */
+export const CURRENT_GENERATION_VERSION = 'intent_v2'
 
 export interface CacheLookupParams {
   projectId: string
@@ -463,7 +472,7 @@ export async function loadCachedSuggestions(
 
   const { data, error } = await supabase
     .from('ai_question_suggestion_cache')
-    .select('id, question, intent, model_used, created_at, status, source, question_hash, context_hash')
+    .select('id, question, intent, model_used, created_at, status, source, question_hash, context_hash, generation_version')
     .eq('project_id', params.projectId)
     .eq('context_hash', contextHash)
     .eq('status', 'suggested')
@@ -542,7 +551,12 @@ export async function writeSuggestionsToCache(
     model_used?: string
     metadata?: Record<string, any>
   }>,
-  params: CacheLookupParams
+  params: CacheLookupParams,
+  /**
+   * Engine version stamped on every newly-inserted row. Defaults to the current
+   * intent-based engine so all fresh cache writes are marked 'intent_v2'.
+   */
+  generationVersion: string = CURRENT_GENERATION_VERSION
 ): Promise<CacheWriteResult> {
   const contextHash = computeContextHash(
     params.projectId,
@@ -585,6 +599,7 @@ export async function writeSuggestionsToCache(
     metadata: Record<string, any>
     status: 'suggested'
     freshness_days: number
+    generation_version: string
   }>()
 
   for (const s of suggestions) {
@@ -606,6 +621,7 @@ export async function writeSuggestionsToCache(
       metadata: s.metadata || {},
       status: 'suggested',
       freshness_days: 30,
+      generation_version: generationVersion,
     })
   }
 
