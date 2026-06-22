@@ -92,7 +92,7 @@ export type PromptSuggestion = {
   category: BusinessCategory
   language: string
   qualityScore: number
-  confidenceTier: 'high' | 'good' | 'medium' | 'opportunity' | 'experimental'
+  confidenceTier: 'high' | 'good' | 'medium' | 'opportunity' | 'experimental' | 'insufficient_context' | 'starter'
   reason: string
   chips: string[] // signal-based, e.g. 'chip_commercial_phrase', 'chip_competitor_gap'
   valueReason: string // localized 1-line explanation of business value
@@ -3136,6 +3136,78 @@ export function buildQuestionFromIntent(
 }
 
 /**
+ * Calculate a contextQualityScore (0–100) based on available business metadata.
+ * Used to determine whether to show high-quality, starter, or insufficient-context UI.
+ *
+ * Scoring:
+ *   businessName valid:     +25
+ *   category (non-generic): +25
+ *   keywords present:       +25
+ *   location:               +15
+ *   competitors:            +10
+ *   domain:                 +5
+ *   base:                   +0 (minimum is 0)
+ * Max: 105 (normalized to 0–100)
+ */
+export function calculateContextQualityScore(
+  businessName: string | null | undefined,
+  category: BusinessCategory | null | undefined,
+  keywords: string[] | undefined,
+  location: string | null | undefined,
+  competitors: string[] | undefined,
+  domain: string | null | undefined
+): number {
+  let score = 0
+
+  // businessName: +25 if valid (clean, not a slug/domain)
+  if (businessName && normalizeBusinessName(businessName)) {
+    score += 25
+  }
+
+  // category: +25 if exists and not generic
+  if (category && category !== 'generic') {
+    score += 25
+  }
+
+  // keywords: +25 if non-empty
+  if (keywords && keywords.length > 0) {
+    score += 25
+  }
+
+  // location: +15 if exists
+  if (location && location.trim()) {
+    score += 15
+  }
+
+  // competitors: +10 if non-empty
+  if (competitors && competitors.length > 0) {
+    score += 10
+  }
+
+  // domain: +5 as a weak signal
+  if (domain && domain.trim()) {
+    score += 5
+  }
+
+  // Normalize to 0–100
+  return Math.min(100, Math.round((score / 105) * 100))
+}
+
+/**
+ * Determine the tier based on contextQualityScore.
+ * - 'high': score >= 65 (enough context for high-quality questions)
+ * - 'starter': 35 <= score < 65 (partial context, show starter questions with label)
+ * - 'insufficient_context': score < 35 (too little info, show context-state message)
+ */
+export function scoreTierName(
+  score: number
+): 'high' | 'starter' | 'insufficient_context' {
+  if (score >= 65) return 'high'
+  if (score >= 35) return 'starter'
+  return 'insufficient_context'
+}
+
+/**
  * Strict quality gate for fallback questions. Drops slugs, domains, malformed,
  * too-short/long, language-mixed, and duplicate questions. Preserves input
  * order. Does NOT pad — padding is the caller's responsibility.
@@ -3183,6 +3255,38 @@ export function buildFallbackSuggestions(
   const lang: 'he' | 'en' = normalizeLanguage(language)
   const cat: BusinessCategory = category || 'generic'
 
+  // 0. Calculate context quality score to determine tier.
+  const contextScore = calculateContextQualityScore(
+    businessName,
+    category,
+    keywords,
+    location,
+    competitors,
+    targetDomain
+  )
+  const tier = scoreTierName(contextScore)
+
+  // When context is insufficient, return a marker suggestion that tells UI
+  // to show the context-state message instead of weak questions.
+  if (tier === 'insufficient_context') {
+    const msg = lang === 'he'
+      ? 'כדי ליצור שאלות מדויקות יותר, מומלץ להשלים את פרופיל ה-AI של העסק.'
+      : 'To create more accurate questions, consider completing your business AI profile.'
+    return [{
+      id: 'insufficient-context-marker',
+      prompt: msg,
+      intent: 'recommendation',
+      intentLabel: lang === 'he' ? 'בדיקה' : 'Review',
+      category: cat,
+      language: lang,
+      qualityScore: 0,
+      confidenceTier: 'insufficient_context' as const,
+      reason: lang === 'he' ? 'חסר הקשר' : 'insufficient context',
+      chips: [],
+      valueReason: '',
+    }]
+  }
+
   // 1. Clean name (rejects slugs/domains). Try businessName, then projectName.
   const cleanName = normalizeBusinessName(businessName) ?? normalizeBusinessName(projectName)
 
@@ -3190,18 +3294,60 @@ export function buildFallbackSuggestions(
   const businessType = inferBusinessType(cat, keywords)
   const labelObj = CATEGORY_SERVICE_LABELS[cat] ?? null
 
-  // 3. Build intent-driven candidates. Each entry carries its source intent so
-  //    the UI gets a meaningful intent tag.
+  // 3. Build intent-driven candidates. Prioritize keywords if present.
+  //    When good keywords exist, frame questions around them instead of just
+  //    generic intents.
   const candidates: Array<{ prompt: string; intent: PromptIntent }> = []
   const push = (prompt: string | null, intent: PromptIntent) => {
     if (prompt) candidates.push({ prompt, intent })
   }
 
+  // 3a. Keyword-aware questions (priority when keywords exist).
+  if (keywords && keywords.length > 0) {
+    // For each keyword, try to build a natural question frame around it.
+    // This is a heuristic: check if the keyword contains common phrases
+    // that suggest a specific intent (price, local, comparison, etc).
+    for (const kw of keywords) {
+      const kwLower = kw.toLowerCase()
+      // Price intent
+      if (/(price|cost|כמה|עלות|תעריף|חיוב)/.test(kwLower)) {
+        if (labelObj && labelObj.hePrice && lang === 'he') {
+          push(`כמה עולה ${labelObj.hePrice}?`, 'commercial')
+        } else if (labelObj && labelObj.enPrice && lang === 'en') {
+          push(`How much does ${labelObj.enPrice} cost?`, 'commercial')
+        }
+      }
+      // Local intent
+      if (/(near|local|מקומי|באזור|ב-|ניו יורק|לונדון)/.test(kwLower) && location) {
+        if (labelObj) {
+          push(
+            lang === 'he'
+              ? `איך מוצאים ${labelObj.he} ב${location}?`
+              : `Where can I find ${enArticle(labelObj.en)} ${labelObj.en} in ${location}?`,
+            'local'
+          )
+        }
+      }
+      // Comparison intent
+      if (/(vs|compare|לעומת|השוואה|הבדל)/.test(kwLower)) {
+        if (labelObj) {
+          push(
+            lang === 'he'
+              ? `איך משווים בין ${labelObj.hePlural}?`
+              : `How do I compare different ${labelObj.enPlural}?`,
+            'comparison'
+          )
+        }
+      }
+    }
+  }
+
+  // 3b. Standard intent-driven questions (service provider intents).
   for (const fi of BUSINESS_TYPE_INTENTS[businessType]) {
     push(buildQuestionFromIntent(fi, labelObj, lang, location), FALLBACK_INTENT_TO_PROMPT[fi])
   }
 
-  // 3b. Name-based questions — only safe, gender-neutral frames so a real brand
+  // 3c. Name-based questions — only safe, gender-neutral frames so a real brand
   //     name always reads naturally. (Names are never slugs here.)
   if (cleanName) {
     if (lang === 'he') {
@@ -3217,7 +3363,7 @@ export function buildFallbackSuggestions(
     }
   }
 
-  // 3c. Competitor comparison ("difference between X and Y" — gender-neutral HE).
+  // 3d. Competitor comparison ("difference between X and Y" — gender-neutral HE).
   if (competitors && competitors.length > 0 && competitors[0]) {
     if (cleanName) {
       push(
@@ -3240,9 +3386,13 @@ export function buildFallbackSuggestions(
   // 4. Quality filter (dedup, slug/domain/language gate).
   let prompts = qualityFilterQuestions(candidates.map((c) => c.prompt), lang)
 
-  // 5. Guaranteed minimum — never return an empty/too-thin set. These generic
+  // 5. For 'starter' tier, limit to 3-4 questions (fewer than 'high' tier)
+  // to emphasize that more context is needed.
+  const maxQuestions = tier === 'starter' ? 4 : 7
+
+  // 6. Guaranteed minimum — never return an empty/too-thin set. These generic
   //    frames are natural and do NOT reference a name or raw category.
-  if (prompts.length < 4) {
+  if (prompts.length < 3) {
     const generic = lang === 'he'
       ? [
           'איך בוחרים עסק אמין בתחום?',
@@ -3260,8 +3410,8 @@ export function buildFallbackSuggestions(
     prompts = merged
   }
 
-  // Cap to a focused set.
-  prompts = prompts.slice(0, 7)
+  // Cap to maxQuestions.
+  prompts = prompts.slice(0, maxQuestions)
 
   // Re-attach the best-known intent for each surviving prompt.
   const intentByPrompt = new Map(candidates.map((c) => [c.prompt, c.intent]))
@@ -3274,10 +3424,28 @@ export function buildFallbackSuggestions(
       serviceLabel: inferServiceLabel(cat, lang),
       cleanName: cleanName || '(none — name rejected or missing)',
       location: location || '(none)',
+      keywordCount: keywords.length,
+      contextScore,
+      tier,
       candidateCount: candidates.length,
       finalCount: prompts.length,
     })
   }
+
+  const getTierConfidence = (): 'high' | 'good' | 'starter' => {
+    // Note: 'insufficient_context' tier returns early above, so tier is now 'high' | 'starter' only.
+    if (tier === 'starter') return 'starter'
+    return 'good' // tier === 'high'
+  }
+
+  const getQualityScore = (): number => {
+    if (tier === 'high') return 75
+    if (tier === 'starter') return 60
+    return 40
+  }
+
+  const tierConfidence = getTierConfidence()
+  const qualityScoreValue = getQualityScore()
 
   return prompts.map((prompt, i) => {
     const intent = intentByPrompt.get(prompt) || 'recommendation'
@@ -3288,11 +3456,15 @@ export function buildFallbackSuggestions(
       intentLabel: intentLabels[intent],
       category: cat,
       language: lang,
-      qualityScore: 72,
-      confidenceTier: 'good' as const,
-      reason: lang === 'he' ? 'ברירת מחדל' : 'default',
-      chips: [],
-      valueReason: '',
+      qualityScore: qualityScoreValue,
+      confidenceTier: tierConfidence,
+      reason: lang === 'he'
+        ? (tier === 'starter' ? 'התחלה' : 'ברירת מחדל')
+        : (tier === 'starter' ? 'starter' : 'default'),
+      chips: tier === 'starter' ? ['starter_questions'] : [],
+      valueReason: tier === 'starter'
+        ? (lang === 'he' ? 'שאלות התחלה - השלם את הפרופיל לשאלות מדויקות יותר' : 'Starter questions - complete your profile for more accurate suggestions')
+        : '',
     }
   })
 }
