@@ -304,6 +304,9 @@ CREATE POLICY article_pools_delete ON public.article_pools
   );
 
 -- article_pool_items
+-- INSERT/UPDATE also verify that the referenced pool AND article resolve to a
+-- project the caller owns — not just that project_id is theirs — so a caller
+-- cannot link another owner's pool/article into a row under their own project.
 CREATE POLICY article_pool_items_select ON public.article_pool_items
   FOR SELECT USING (
     project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
@@ -311,12 +314,28 @@ CREATE POLICY article_pool_items_select ON public.article_pool_items
 CREATE POLICY article_pool_items_insert ON public.article_pool_items
   FOR INSERT WITH CHECK (
     project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    AND pool_id IN (
+      SELECT id FROM public.article_pools
+      WHERE project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    )
+    AND article_id IN (
+      SELECT id FROM public.generated_articles
+      WHERE project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    )
   );
 CREATE POLICY article_pool_items_update ON public.article_pool_items
   FOR UPDATE USING (
     project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
   ) WITH CHECK (
     project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    AND pool_id IN (
+      SELECT id FROM public.article_pools
+      WHERE project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    )
+    AND article_id IN (
+      SELECT id FROM public.generated_articles
+      WHERE project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    )
   );
 CREATE POLICY article_pool_items_delete ON public.article_pool_items
   FOR DELETE USING (

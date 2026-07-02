@@ -110,6 +110,8 @@ export async function POST(request: Request) {
     return Response.json({ error: 'applicationPassword is required' }, { status: 400 })
   }
 
+  // Resolve the ciphertext to store: encrypt the new password, or carry the
+  // stored one forward on an update that leaves the password blank.
   let encrypted: string
   try {
     encrypted = applicationPassword
@@ -121,53 +123,55 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to encrypt credentials' }, { status: 500 })
   }
 
+  // Resolve the plaintext used to verify the connection. When the password was
+  // omitted we decrypt the stored value — and we do this BEFORE any DB write so
+  // a decryption failure (e.g. rotated key) cannot leave the row half-updated.
+  let passwordForTest: string
+  if (applicationPassword) {
+    passwordForTest = applicationPassword
+  } else {
+    try {
+      passwordForTest = decryptCredential(encrypted)
+    } catch {
+      return Response.json(
+        { error: 'Stored WordPress credentials could not be decrypted. Re-enter the Application Password.' },
+        { status: 500 }
+      )
+    }
+  }
+
   const now = new Date().toISOString()
+  // Only write default_* fields when the caller actually provided them, so an
+  // edit that omits them preserves the previously stored defaults (insert falls
+  // back to the column defaults defined in the migration).
   const rowValues = {
     user_id: auth.user.id,
     project_id: auth.project.id,
     site_url: origin,
     wp_username: username,
     wp_application_password_encrypted: encrypted,
-    default_author_id: body.defaultAuthorId ?? null,
-    default_category_id: body.defaultCategoryId ?? null,
-    default_status: body.defaultStatus ?? 'draft',
-    default_timezone: body.defaultTimezone || 'Asia/Jerusalem',
     connection_status: 'untested' as const,
     updated_at: now,
+    ...('defaultAuthorId' in body ? { default_author_id: body.defaultAuthorId ?? null } : {}),
+    ...('defaultCategoryId' in body ? { default_category_id: body.defaultCategoryId ?? null } : {}),
+    ...(body.defaultStatus ? { default_status: body.defaultStatus } : {}),
+    ...(body.defaultTimezone ? { default_timezone: body.defaultTimezone } : {}),
   }
 
-  const write = existing
-    ? await auth.admin
-        .from('wordpress_connections')
-        .update(rowValues)
-        .eq('id', existing.id)
-        .select('*')
-        .single()
-    : await auth.admin
-        .from('wordpress_connections')
-        .insert(rowValues)
-        .select('*')
-        .single()
+  // Atomic upsert keyed on the UNIQUE(project_id) constraint — avoids the
+  // select-then-insert race where two concurrent first-time saves collide.
+  const write = await auth.admin
+    .from('wordpress_connections')
+    .upsert(rowValues, { onConflict: 'project_id' })
+    .select('*')
+    .single()
 
   if (write.error || !write.data) {
     console.error('[Content WP] Connection save failed:', write.error?.message)
     return Response.json({ error: 'Failed to save connection' }, { status: 500 })
   }
 
-  // Immediately verify the saved credentials and persist the outcome.
-  // When the password was omitted (update keeping the stored one), decrypt the
-  // stored value transiently for the test — it never leaves the server.
-  let passwordForTest = applicationPassword
-  if (!passwordForTest) {
-    try {
-      passwordForTest = decryptCredential(encrypted)
-    } catch {
-      return Response.json(
-        { error: 'Stored WordPress credentials could not be decrypted' },
-        { status: 500 }
-      )
-    }
-  }
+  // Verify the saved credentials and persist the outcome.
   const test = await testConnection({
     siteUrl: origin,
     username,

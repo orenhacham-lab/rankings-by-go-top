@@ -1,10 +1,14 @@
 /**
  * Content module — POST /api/wordpress/test-connection
  *
- * Two modes:
- *   1. Pre-save test: body includes siteUrl + username + applicationPassword —
+ * Three modes:
+ *   1. Pre-save test: body has siteUrl + username + applicationPassword —
  *      tests those credentials without storing anything.
- *   2. Saved-connection test: only projectId — loads the stored connection,
+ *   2. Edited-values test: body has siteUrl + username but NO password, and a
+ *      stored connection exists — tests the provided siteUrl/username using the
+ *      stored (decrypted) password. Nothing is persisted. This is what the edit
+ *      form uses when the user changes the URL/username but keeps the password.
+ *   3. Saved-connection test: only projectId — loads the stored connection,
  *      decrypts server-side, tests, and persists connection_status/last_tested_at.
  *
  * Never returns or logs credentials. Gated by ENABLE_CONTENT.
@@ -55,7 +59,31 @@ export async function POST(request: Request) {
     })
   }
 
-  // Mode 2: test the stored connection.
+  // Mode 2: edited siteUrl/username with the password left blank — test the
+  // provided values against the STORED password. Nothing is persisted (these
+  // are unsaved edits). Requires a stored connection to source the password.
+  if (siteUrl && username && !applicationPassword) {
+    const loaded = await loadWordPressCredentials(auth.admin, auth.project.id)
+    if ('error' in loaded) {
+      return Response.json({ ok: false, error: loaded.error }, { status: loaded.status })
+    }
+    const result = await testConnection({
+      siteUrl,
+      username,
+      applicationPassword: loaded.creds.applicationPassword,
+    })
+    console.log('[Content WP] Edited-values test', {
+      projectId: auth.project.id,
+      ok: result.ok,
+    })
+    return Response.json({
+      ok: result.ok,
+      user: result.user ?? null,
+      error: result.ok ? null : result.error,
+    })
+  }
+
+  // Mode 3: test the stored connection as-is and persist the outcome.
   const loaded = await loadWordPressCredentials(auth.admin, auth.project.id)
   if ('error' in loaded) {
     return Response.json({ ok: false, error: loaded.error }, { status: loaded.status })

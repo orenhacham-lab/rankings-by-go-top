@@ -72,11 +72,17 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
     setTesting(true)
     setMessage(null)
     try {
-      // Pre-save test when the user typed a new password; otherwise test the
-      // stored connection server-side.
-      const body = appPassword
-        ? { projectId, siteUrl, username, applicationPassword: appPassword }
-        : { projectId }
+      // Choose the test payload so the server checks exactly what the user sees:
+      //  - typed a password  → test the typed URL/username/password (mode 1)
+      //  - editing the form, no password → test the edited URL/username with the
+      //    stored password (mode 2), so edited values aren't silently ignored
+      //  - saved-connection view → test the stored connection as-is (mode 3)
+      const body =
+        appPassword
+          ? { projectId, siteUrl, username, applicationPassword: appPassword }
+          : showForm && siteUrl && username
+            ? { projectId, siteUrl, username }
+            : { projectId }
       const res = await fetch('/api/wordpress/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
