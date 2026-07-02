@@ -53,6 +53,36 @@ export interface Database {
         Insert: Omit<AIVisibilityCompetitor, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<AIVisibilityCompetitor, 'id' | 'created_at'>>
       }
+      wordpress_connections: {
+        Row: WordPressConnection
+        Insert: Omit<WordPressConnection, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<WordPressConnection, 'id' | 'created_at'>>
+      }
+      article_topics: {
+        Row: ArticleTopic
+        Insert: Omit<ArticleTopic, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ArticleTopic, 'id' | 'created_at'>>
+      }
+      generated_articles: {
+        Row: GeneratedArticle
+        Insert: Omit<GeneratedArticle, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<GeneratedArticle, 'id' | 'created_at'>>
+      }
+      article_pools: {
+        Row: ArticlePool
+        Insert: Omit<ArticlePool, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ArticlePool, 'id' | 'created_at'>>
+      }
+      article_pool_items: {
+        Row: ArticlePoolItem
+        Insert: Omit<ArticlePoolItem, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ArticlePoolItem, 'id' | 'created_at'>>
+      }
+      ai_usage_logs: {
+        Row: AIUsageLog
+        Insert: Omit<AIUsageLog, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<AIUsageLog, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -325,6 +355,141 @@ export interface AIVisibilityCompetitor {
   domain: string | null
   aliases: string[]
   is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+// ============================================================================
+// Content module (Phase 1) — per-project articles + WordPress publishing.
+// NOTE: generated_articles is distinct from the global marketing-blog table
+// `articles`, which must not be touched.
+// ============================================================================
+
+export type WordPressDefaultStatus = 'draft' | 'publish' | 'future'
+export type WordPressConnectionStatus = 'untested' | 'connected' | 'failed'
+
+export interface WordPressConnection {
+  id: string
+  user_id: string
+  project_id: string
+  site_url: string
+  wp_username: string
+  /** AES-256-GCM encrypted (iv:tag:ciphertext). Never sent to the client. */
+  wp_application_password_encrypted: string
+  default_author_id: number | null
+  default_category_id: number | null
+  default_status: WordPressDefaultStatus
+  default_timezone: string
+  connection_status: WordPressConnectionStatus
+  last_tested_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ArticleTopicSource = 'manual' | 'ai' | 'keyword' | 'ai_question' | 'competitor'
+export type ArticleTopicStatus = 'suggested' | 'approved' | 'rejected' | 'used'
+
+export interface ArticleTopic {
+  id: string
+  user_id: string
+  project_id: string
+  source: ArticleTopicSource
+  topic: string
+  primary_keyword: string | null
+  secondary_keywords: string[]
+  search_intent: string | null
+  target_audience: string | null
+  status: ArticleTopicStatus
+  created_at: string
+  updated_at: string
+}
+
+export type GeneratedArticleStatus =
+  | 'draft'
+  | 'ready'
+  | 'scheduled'
+  | 'publishing'
+  | 'published'
+  | 'failed'
+
+export interface GeneratedArticle {
+  id: string
+  user_id: string
+  project_id: string
+  topic_id: string | null
+  title: string
+  slug: string
+  meta_title: string | null
+  meta_description: string | null
+  excerpt: string | null
+  content_html: string | null
+  content_markdown: string | null
+  faq_json: Record<string, unknown>[] | null
+  internal_links_json: Record<string, unknown>[] | null
+  image_prompt: string | null
+  featured_image_url: string | null
+  status: GeneratedArticleStatus
+  wp_connection_id: string | null
+  wp_post_id: number | null
+  wp_post_url: string | null
+  scheduled_at: string | null
+  published_at: string | null
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ArticlePoolCadence = 'daily' | 'weekly' | 'monthly' | 'custom'
+
+export interface ArticlePool {
+  id: string
+  user_id: string
+  project_id: string
+  name: string
+  cadence: ArticlePoolCadence
+  interval_days: number | null
+  publish_time: string | null
+  timezone: string
+  is_active: boolean
+  next_publish_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ArticlePoolItemStatus = 'queued' | 'scheduled' | 'published' | 'skipped' | 'failed'
+
+export interface ArticlePoolItem {
+  id: string
+  user_id: string
+  project_id: string
+  pool_id: string
+  article_id: string
+  position: number
+  status: ArticlePoolItemStatus
+  scheduled_at: string | null
+  published_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AIUsageOperation =
+  | 'topic_generation'
+  | 'outline'
+  | 'article_generation'
+  | 'polish'
+  | 'metadata'
+
+export interface AIUsageLog {
+  id: string
+  user_id: string
+  project_id: string
+  article_id: string | null
+  provider: string
+  model: string
+  input_tokens: number
+  output_tokens: number
+  estimated_cost: number
+  operation: AIUsageOperation
   created_at: string
   updated_at: string
 }

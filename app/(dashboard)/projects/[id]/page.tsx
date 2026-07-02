@@ -15,11 +15,12 @@ import ProjectForm from '@/components/projects/ProjectForm'
 import TrackingTargetsTable from '@/components/keywords/TrackingTargetsTable'
 import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
+import ContentSection from '@/components/content/ContentSection'
 import ProjectSwitcher from '@/components/projects/ProjectSwitcher'
 import Link from 'next/link'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
-import { Search, BarChart3, Sparkles, FileText } from 'lucide-react'
+import { Search, BarChart3, Sparkles, FileText, Newspaper } from 'lucide-react'
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -101,6 +102,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       'ai-visibility': 'ai-visibility',
       rankings: 'keywords-section',
       reports: 'keywords-section',
+      content: 'content-section',
     }
     const elementId = sectionMap[section]
     if (!elementId) return
@@ -335,6 +337,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/25 font-bold tracking-wider">{k.tabs.aiVisibilityBadge}</span>
             </a>
           )}
+          {process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true' && (
+            <a
+              href="#content-section"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition whitespace-nowrap"
+            >
+              <Newspaper size={18} strokeWidth={2} className="text-slate-600 dark:text-slate-300" />
+              <span>{k.tabs.content}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold tracking-wider">{k.tabs.contentBadge}</span>
+            </a>
+          )}
           <Link
             href={`/reports?project_id=${id}`}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition whitespace-nowrap"
@@ -393,6 +405,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             projectCity={project.city}
             projectKeywords={targets.map((t) => t.keyword).filter(Boolean)}
           />
+        </div>
+      )}
+
+      {/* Content & Articles module — Phase 1: WordPress connection + dashboard */}
+      {/* Gated by client-side NEXT_PUBLIC_ENABLE_CONTENT flag (build-time). */}
+      {process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true' && (
+        <div id="content-section" className="scroll-mt-6">
+          <ContentSection projectId={id} />
         </div>
       )}
 
