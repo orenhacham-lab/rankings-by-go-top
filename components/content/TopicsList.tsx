@@ -7,6 +7,7 @@
  */
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
@@ -35,7 +36,30 @@ export default function TopicsList({
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
+  const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [creatingId, setCreatingId] = useState<string | null>(null)
+
+  async function createArticle(topicId: string) {
+    setCreatingId(topicId)
+    try {
+      const res = await fetch('/api/content/articles/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.articleId) {
+        router.push(`/content/articles/${data.articleId}`)
+        return
+      }
+      window.alert(c.createArticleFailed)
+    } catch {
+      window.alert(c.createArticleFailed)
+    } finally {
+      setCreatingId(null)
+    }
+  }
 
   async function setStatus(id: string, status: 'approved' | 'rejected') {
     setBusyId(id)
@@ -119,13 +143,14 @@ export default function TopicsList({
                       >
                         {c.topicActions.delete}
                       </Button>
-                      {/* Article generation arrives in a later phase. */}
-                      <span
-                        className="inline-flex items-center px-2 text-xs text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                        title={c.topicActions.comingSoon}
+                      <Button
+                        size="sm"
+                        onClick={() => createArticle(topic.id)}
+                        loading={creatingId === topic.id}
+                        disabled={busy || creatingId === topic.id}
                       >
-                        {c.topicActions.createArticle} · {c.topicActions.comingSoon}
-                      </span>
+                        {creatingId === topic.id ? c.creatingArticle : c.createArticle}
+                      </Button>
                     </div>
                   </Td>
                 </TableRow>

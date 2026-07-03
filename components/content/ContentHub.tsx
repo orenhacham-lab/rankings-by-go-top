@@ -278,10 +278,15 @@ export default function ContentHub() {
                             ) : '—'}
                           </Td>
                           <Td>
-                            {/* Actions arrive in later phases — disabled placeholders. */}
-                            <span className="text-xs text-slate-400 dark:text-slate-600" title={t.actions.comingSoon}>
-                              {t.actions.comingSoon}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <Link href={`/content/articles/${a.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                                {t.actions.edit}
+                              </Link>
+                              {/* Publish/Schedule arrive in later phases. */}
+                              <span className="text-xs text-slate-400 dark:text-slate-600" title={t.actions.comingSoon}>
+                                {t.actions.publish} · {t.actions.comingSoon}
+                              </span>
+                            </div>
                           </Td>
                         </TableRow>
                       ))
