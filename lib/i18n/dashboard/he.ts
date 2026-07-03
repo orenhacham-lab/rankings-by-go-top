@@ -311,6 +311,7 @@ export const dashboardHe = {
         paragraphs_below_ideal: 'אפשר עוד כמה פסקאות',
         has_list: 'חסרה רשימה',
         no_unsafe_html: 'HTML לא בטוח',
+        markdown_artifacts_absent: 'נמצאו סימני Markdown בתוך גוף המאמר',
         toc_ready: 'מוכן לתוכן עניינים',
         table_structure_valid: 'הטבלה אינה טבלה תקינה (צריך לפחות 2 עמודות ו-2 שורות)',
         table_recommended: 'הנושא מתאים לטבלת השוואה/מחירים — כדאי להוסיף טבלה אמיתית',

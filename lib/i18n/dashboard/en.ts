@@ -313,6 +313,7 @@ export const dashboardEn = {
         paragraphs_below_ideal: 'A few more paragraphs would help',
         has_list: 'Missing a list',
         no_unsafe_html: 'Unsafe HTML',
+        markdown_artifacts_absent: 'Markdown syntax found in the article body',
         toc_ready: 'TOC-ready',
         table_structure_valid: 'Table is not a valid table (needs ≥2 columns and ≥2 rows)',
         table_recommended: 'This topic suits a comparison/price table — add a real table',

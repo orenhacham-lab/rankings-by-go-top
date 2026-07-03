@@ -109,6 +109,7 @@ const FAILURE_HINT: Record<string, string> = {
   cta_details_missing: 'the CTA is missing usable contact details — use only the provided phone/WhatsApp/URL',
   cta_too_early: 'move the call-to-action to the END of the article, not the opening',
   brand_mention_when_disabled: 'remove the business/brand name from the article text — it may appear ONLY inside a requested link, nowhere else',
+  markdown_artifacts_absent: 'do NOT use any Markdown (**bold**, ## headings, [text](url), backticks) — plain text only',
   has_early_answer: 'add a clear direct answer in the first paragraph',
   not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
   anchor_too_early: 'move the required link OUT of the direct answer / first paragraph — place it only after the article has established context',
@@ -181,6 +182,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `"sections":[{"heading":"...","answerFirst":"...","paragraphs":["...","..."],"bullets":["..."],"table":{"caption":"...","columns":["...","..."],"rows":[["...","..."]]},"subsections":[{"heading":"...","paragraphs":["..."]}]}],`,
     `"comparisonTables":[{"caption":"...","columns":["...","..."],"rows":[["...","..."]]}],"faq":[{"question":"...","answer":"..."}],"imagePrompt":"...","warnings":[]}`,
     `- Every paragraph/answerFirst/directAnswer is PLAIN TEXT (no HTML). "table"/"bullets"/"subsections" are optional per section.`,
+    `- Do NOT use Markdown syntax in ANY field: no **bold**, no __bold__, no ##/### headings, no [text](url) links, no backticks. Return plain readable text only — the server builds all HTML and structure.`,
     `- faq answers: 40-90 words, concise, no duplicates. slug: MUST be English (translate, never transliterate Hebrew), lowercase, hyphens. metaTitle <= 60 chars; metaDescription 120-160 chars. imagePrompt in ${lang}.`,
   ].filter((l) => l !== undefined).join('\n')
 }
@@ -451,28 +453,58 @@ function enforceAnchors(html: string, anchors: ArticleTopicAnchor[], language: S
 
 function str(v: unknown): string { return typeof v === 'string' ? v : '' }
 function strArr(v: unknown): string[] { return Array.isArray(v) ? v.map(str).map((s) => s.trim()).filter(Boolean) : [] }
+
+/**
+ * Strip Markdown from a Gemini text field so the SERVER-built content_html stays
+ * clean HTML (WordPress-ready). Gemini is told to return plain text, but it
+ * sometimes leaks **bold**, ## headings, [text](url), backticks, etc. We remove
+ * the markers and keep the readable text (bold becomes plain text — buildHtml
+ * decides real structure/emphasis). Does NOT touch real HTML (fields are plain
+ * text here) and runs BEFORE buildHtml, so tables/lists/anchors are unaffected.
+ */
+export function cleanMarkdown(input: string): string {
+  let t = str(input)
+  if (!t) return ''
+  // Images ![alt](url) → drop entirely (no images in Phase 3A).
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+  // Links [text](url) → text (real/required links are added later by the server).
+  t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+  // Bold/italic: **text**, __text__, then leftover markers; *text*, _text_.
+  t = t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/__([^_]+)__/g, '$1')
+  t = t.replace(/\*\*/g, '').replace(/(?<!_)__(?!_)/g, '')
+  t = t.replace(/(?<![\w*])\*([^*\n]+)\*(?![\w*])/g, '$1')
+  t = t.replace(/(?<![\w_])_([^_\n]+)_(?![\w_])/g, '$1')
+  // Inline code `text` → text (no code in marketing/SEO articles).
+  t = t.replace(/`+([^`]*)`+/g, '$1').replace(/`/g, '')
+  // Heading + blockquote line markers → drop the marker, keep the text.
+  t = t.replace(/^\s{0,3}#{1,6}\s+/gm, '').replace(/^\s{0,3}>\s?/gm, '')
+  return t.trim()
+}
+function cstr(v: unknown): string { return cleanMarkdown(str(v)) }
+function cstrArr(v: unknown): string[] { return strArr(v).map(cleanMarkdown).filter(Boolean) }
+
 function parseTable(v: unknown): ArticleTable | null {
   if (!v || typeof v !== 'object') return null
   const o = v as Record<string, unknown>
-  const columns = strArr(o.columns)
-  const rows = Array.isArray(o.rows) ? (o.rows as unknown[]).filter(Array.isArray).map((r) => (r as unknown[]).map((c) => str(c).trim())) : []
+  const columns = cstrArr(o.columns)
+  const rows = Array.isArray(o.rows) ? (o.rows as unknown[]).filter(Array.isArray).map((r) => (r as unknown[]).map((c) => cleanMarkdown(str(c)))) : []
   if (columns.length === 0 || rows.length === 0) return null
-  return { caption: str(o.caption).trim(), columns, rows }
+  return { caption: cstr(o.caption), columns, rows }
 }
 function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
   const sections: Section[] = Array.isArray(parsed.sections) ? (parsed.sections as Record<string, unknown>[]).map((s) => ({
-    heading: str(s?.heading), answerFirst: str(s?.answerFirst), paragraphs: strArr(s?.paragraphs), bullets: strArr(s?.bullets),
+    heading: cstr(s?.heading), answerFirst: cstr(s?.answerFirst), paragraphs: cstrArr(s?.paragraphs), bullets: cstrArr(s?.bullets),
     table: parseTable(s?.table),
-    subsections: Array.isArray(s?.subsections) ? (s.subsections as Record<string, unknown>[]).map((ss) => ({ heading: str(ss?.heading), paragraphs: strArr(ss?.paragraphs) })) : [],
+    subsections: Array.isArray(s?.subsections) ? (s.subsections as Record<string, unknown>[]).map((ss) => ({ heading: cstr(ss?.heading), paragraphs: cstrArr(ss?.paragraphs) })) : [],
   })) : []
   const faq: GeneratedArticleFaq[] = Array.isArray(parsed.faq) ? (parsed.faq as Record<string, unknown>[])
-    .map((f) => ({ question: str(f?.question).trim(), answer: str(f?.answer).trim() })).filter((f) => f.question && f.answer).slice(0, 12) : []
+    .map((f) => ({ question: cstr(f?.question), answer: cstr(f?.answer) })).filter((f) => f.question && f.answer).slice(0, 12) : []
   const comparisonTables = Array.isArray(parsed.comparisonTables) ? (parsed.comparisonTables as unknown[]).map(parseTable).filter((t): t is ArticleTable => !!t) : []
   return {
-    title: str(parsed.title).trim(), slug: str(parsed.slug).trim(), metaTitle: str(parsed.metaTitle).trim(),
-    metaDescription: str(parsed.metaDescription).trim(), excerpt: str(parsed.excerpt).trim(),
-    directAnswer: str(parsed.directAnswer).trim(), intro: strArr(parsed.intro), sections, comparisonTables, faq,
-    imagePrompt: str(parsed.imagePrompt).trim(), warnings: Array.isArray(parsed.warnings) ? (parsed.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : [],
+    title: cstr(parsed.title), slug: cstr(parsed.slug), metaTitle: cstr(parsed.metaTitle),
+    metaDescription: cstr(parsed.metaDescription), excerpt: cstr(parsed.excerpt),
+    directAnswer: cstr(parsed.directAnswer), intro: cstrArr(parsed.intro), sections, comparisonTables, faq,
+    imagePrompt: cstr(parsed.imagePrompt), warnings: Array.isArray(parsed.warnings) ? (parsed.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : [],
   }
 }
 

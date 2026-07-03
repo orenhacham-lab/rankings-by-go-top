@@ -94,6 +94,20 @@ function ctaDetailsSufficient(pref: string, d: CtaDetails): boolean {
   }
 }
 
+/** Detect leftover Markdown in the article's VISIBLE text (ignores attributes/
+ * hrefs so real links don't false-positive). The server cleans Markdown before
+ * saving; this is a safety net (e.g. for hand edits in the editor). */
+function hasMarkdownArtifacts(html: string): boolean {
+  const vis = textOf(html)
+  return (
+    /\*\*/.test(vis) ||               // **bold**
+    /(^|\s)__(?=\S)/.test(vis) ||     // __bold__ (start)
+    /`/.test(vis) ||                  // `code`
+    /\[[^\]\n]+\]\([^)\s]+\)/.test(vis) || // [text](url)
+    /(^|\s)#{2,6}\s/.test(vis)        // ## / ### headings
+  )
+}
+
 function countTag(html: string, tag: string): number { const m = html.match(new RegExp(`<${tag}[\\s>]`, 'gi')); return m ? m.length : 0 }
 function paragraphs(html: string): string[] {
   const out: string[] = []
@@ -250,6 +264,9 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   const tableWorthy = isTableWorthy(`${input.title} ${input.primaryKeyword || ''} ${input.secondaryKeywords.join(' ')} ${input.slug}`, lang)
   add('table_recommended', 'technical', 'warning', !tableWorthy || tables >= 1)
   add('no_unsafe_html', 'technical', 'blocker', !/<script|<iframe|on\w+\s*=/i.test(html))
+  // Leftover Markdown in the body (server cleans it pre-save; warn if any slips
+  // through or the user pasted Markdown while editing).
+  add('markdown_artifacts_absent', 'technical', 'warning', !hasMarkdownArtifacts(html))
   // TOC-ready (structure), NOT "manual TOC present" — never a blocker.
   const h1Count = countTag(html, 'h1')
   const firstH2 = html.search(/<h2[\s>]/i)
