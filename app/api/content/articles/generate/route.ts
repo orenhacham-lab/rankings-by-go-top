@@ -115,13 +115,7 @@ export async function POST(request: Request) {
 
   const article = gen.article
   const safeHtml = gen.safeHtml
-  const validation = gen.anchorValidation
-
-  // Safe diagnostics (counts + model only, never content or secrets).
-  console.log(
-    `[content-article-generation] model=${gen.model} sanitized h2=${gen.quality.counts.h2} h3=${gen.quality.counts.h3} p=${gen.quality.counts.p} words=${gen.quality.counts.words} faq=${gen.quality.counts.faq}`
-  )
-  console.log(`[content-article-generation] validation passed=${gen.quality.ok} warnings=[${gen.quality.warnings.join(',')}]`)
+  // Audit already logged model + counts + blockers inside the lib.
 
   const baseRow = {
     user_id: auth.user.id,
@@ -192,12 +186,13 @@ export async function POST(request: Request) {
   console.log('[content-article-generation] created', {
     articleId: inserted.id,
     projectId: auth.project.id,
-    missingRequiredAnchors: validation.missingRequired.length,
+    score: gen.audit.score,
+    warnings: gen.audit.warnings.length,
   })
 
   return Response.json({
     articleId: inserted.id,
     warnings: article.warnings,
-    anchorValidation: validation,
+    audit: gen.audit,
   })
 }

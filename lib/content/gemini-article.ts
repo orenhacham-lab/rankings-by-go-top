@@ -1,20 +1,19 @@
 /**
- * Gemini-backed full SEO/GEO article generation (content module, Phase 3A QA).
+ * Gemini-backed premium SEO/GEO article generation (content module, Phase 3A
+ * Article Quality Upgrade).
  *
- * Robust approach: Gemini returns a STRUCTURED article (intro/sections/
- * subsections/bullets/FAQ as data — not raw HTML), and the SERVER builds clean,
- * consistent HTML deterministically. This removes any dependence on Gemini
- * emitting well-formed HTML, and guarantees real <h2>/<h3>/<p>/<ul> structure.
- *
- * Reuses the SAME Gemini client/env as topic suggestions. Article model is
- * GEMINI_ARTICLE_MODEL (falls back to GEMINI_CLASSIFIER_MODEL to avoid breaking
- * production). Enforces a per-length quality gate, brand/CTA gating, required-
- * anchor placement, and an English slug. Never returns a fake-success article.
+ * Gemini returns STRUCTURED data only; the SERVER builds clean HTML (TOC,
+ * direct answer, answer-first sections, tables, lists, FAQ). A Yoast/Rank-Math-
+ * inspired audit (lib/content/article-audit) gates saving: on blockers, one
+ * repair pass runs; if blockers remain, nothing is saved. Article model is
+ * GEMINI_ARTICLE_MODEL (default gemini-2.5-pro), independent of the classifier/
+ * topic-suggestions model. No Anthropic.
  */
 
 import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
-import { validateAnchorPlacement, type AnchorValidation } from '@/lib/content/anchors-check'
+import { validateAnchorPlacement } from '@/lib/content/anchors-check'
+import { runArticleAudit, thresholdsFor, type AuditResult } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 
@@ -38,27 +37,19 @@ export interface ArticleBrief {
 }
 
 export interface GeneratedArticleFaq { question: string; answer: string }
-
 export interface GeneratedArticleContent {
-  title: string
-  slug: string
-  metaTitle: string
-  metaDescription: string
-  excerpt: string
-  contentHtml: string
-  contentMarkdown: string
-  faq: GeneratedArticleFaq[]
-  imagePrompt: string
-  warnings: string[]
+  title: string; slug: string; metaTitle: string; metaDescription: string; excerpt: string
+  contentHtml: string; contentMarkdown: string; faq: GeneratedArticleFaq[]; imagePrompt: string; warnings: string[]
 }
-
 export interface GeminiUsage { model: string; inputTokens: number; outputTokens: number }
 
+interface ArticleTable { caption: string; columns: string[]; rows: string[][] }
 interface Subsection { heading: string; paragraphs: string[] }
-interface Section { heading: string; paragraphs: string[]; bullets: string[]; subsections: Subsection[] }
+interface Section { heading: string; answerFirst: string; paragraphs: string[]; bullets: string[]; table: ArticleTable | null; subsections: Subsection[] }
 interface StructuredArticle {
   title: string; slug: string; metaTitle: string; metaDescription: string; excerpt: string
-  intro: string[]; sections: Section[]; faq: GeneratedArticleFaq[]; imagePrompt: string; warnings: string[]
+  directAnswer: string; intro: string[]; sections: Section[]; comparisonTables: ArticleTable[]
+  faq: GeneratedArticleFaq[]; imagePrompt: string; warnings: string[]
 }
 
 const TONE_HINT: Record<string, string> = {
@@ -70,47 +61,62 @@ const CTA_HINT: Record<string, string> = {
   whatsapp: 'a WhatsApp/phone call-to-action', marketing: 'a stronger marketing call-to-action',
 }
 
-function articleModel(): string {
-  return process.env.GEMINI_ARTICLE_MODEL || process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
-}
-
-// -- per-length quality thresholds -----------------------------------------
-
-export interface QualityThresholds { minH2: number; minParagraphs: number; minFaq: number; minLists: number }
-export function qualityThresholds(desired: number): QualityThresholds {
-  if (desired <= 500) return { minH2: 3, minParagraphs: 5, minFaq: 0, minLists: 0 }
-  if (desired <= 1000) return { minH2: 5, minParagraphs: 10, minFaq: 3, minLists: 1 }
-  if (desired <= 1500) return { minH2: 6, minParagraphs: 14, minFaq: 4, minLists: 1 }
-  return { minH2: 8, minParagraphs: 18, minFaq: 5, minLists: 1 }
+export function articleModel(): { model: string; fellBack: boolean } {
+  if (process.env.GEMINI_ARTICLE_MODEL) return { model: process.env.GEMINI_ARTICLE_MODEL, fellBack: false }
+  return { model: process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-pro', fellBack: true }
 }
 
 // -- prompt -----------------------------------------------------------------
 
-interface GenOpts { strengthen?: boolean }
+interface GenOpts { repairFailures?: string[] }
+
+const FAILURE_HINT: Record<string, string> = {
+  enough_h2: 'add more distinct <h2> sections',
+  enough_paragraphs: 'add more real paragraphs',
+  enough_h3: 'add <h3> subsections inside broad sections',
+  has_list: 'add at least one bulleted list',
+  has_faq: 'add more FAQ question/answer pairs',
+  has_table: 'add a comparison/data table where it fits',
+  word_count: 'make the article substantially longer to meet the target length',
+  word_count_band: 'make the article a bit longer',
+  has_transition_words: 'use more natural transition words',
+  paragraphs_not_too_long: 'break long paragraphs into shorter ones (2-4 sentences)',
+  varied_sentence_starts: 'vary how sentences begin',
+  primary_keyword_in_intro: 'include the primary keyword naturally in the first paragraphs',
+  primary_keyword_in_h2: 'include the primary keyword naturally in at least one <h2>',
+  primary_keyword_in_meta: 'include the primary keyword in metaTitle/metaDescription',
+  meta_description_length: 'make metaDescription 120-160 characters',
+  no_cta_when_disabled: 'REMOVE every call-to-action',
+  no_brand_when_disabled: 'REMOVE any business/brand name',
+  has_early_answer: 'add a clear direct answer in the first paragraph',
+  not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
+}
 
 function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const lang = brief.language === 'he' ? 'Hebrew' : 'English'
   const tone = (brief.toneOfVoice && TONE_HINT[brief.toneOfVoice]) || 'professional and credible'
   const words = brief.desiredWordCount || 1000
-  const th = qualityThresholds(words)
-
+  const th = thresholdsFor(words)
   const ctaLine = brief.ctaPreference === 'none' || !brief.ctaPreference
     ? 'Do NOT include any call-to-action anywhere.'
-    : `Include ${CTA_HINT[brief.ctaPreference] || 'a gentle call-to-action'} in the LAST section's paragraphs.`
+    : `Include ${CTA_HINT[brief.ctaPreference] || 'a gentle call-to-action'} only at the end.`
   const brandName = (brief.brandNameToInclude || '').trim()
   const brandLine = brief.includeBrandName && brandName
     ? `You MAY mention the business/brand name "${brandName}" naturally and subtly.`
     : 'Do NOT mention any business or brand name.'
   const anchorTopics = brief.anchors
     .filter((a) => a.anchor_text?.trim() && a.target_url?.trim())
-    .map((a) => `  - naturally discuss and use the phrase "${a.anchor_text}"` + (a.note ? ` (${a.note})` : ''))
+    .map((a) => `  - naturally use the exact phrase "${a.anchor_text}"` + (a.note ? ` (${a.note})` : ''))
+  const repairLines = (opts.repairFailures || []).map((f) => `  - ${FAILURE_HINT[f] || f}`)
 
   return [
-    opts.strengthen ? `Your previous article was too thin or unstructured. Produce a RICHER, longer, well-sectioned article that meets every minimum below.` : '',
-    `You are an expert SEO/GEO content writer. Produce a COMPLETE, high-quality, PROMOTIONAL-yet-credible article in ${lang}.`,
+    repairLines.length ? `Your previous draft failed these quality checks — fix ALL of them while keeping the good parts:` : '',
+    ...repairLines,
+    repairLines.length ? '' : '',
+    `You are a top SEO/GEO content writer. Write a COMPLETE, premium, PROMOTIONAL-yet-credible article in ${lang} that would score high in Yoast / Rank Math and be quoted by AI answer engines.`,
     ``,
     `Topic: ${brief.topic}`,
-    brief.primaryKeyword ? `Primary keyword: "${brief.primaryKeyword}" — use it naturally, no stuffing.` : '',
+    brief.primaryKeyword ? `Primary keyword: "${brief.primaryKeyword}" — MUST appear in title, metaTitle, metaDescription, the first paragraph, and at least one <h2>; used naturally throughout (no stuffing, ~0.8-1.5% density).` : '',
     brief.secondaryKeywords.length ? `Secondary keywords (weave in naturally): ${brief.secondaryKeywords.join(', ')}.` : '',
     brief.searchIntent ? `Search intent: ${brief.searchIntent}.` : '',
     brief.targetAudience ? `Target audience: ${brief.targetAudience}.` : '',
@@ -120,69 +126,87 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     brandLine,
     ctaLine,
     ``,
-    `Write for BOTH Google SEO and AI/GEO answer engines:`,
-    `- Start with a short intro that says what the reader will get, and give a DIRECT answer to the main question early.`,
-    `- Clear section structure; short, readable paragraphs; practical specifics (not vague filler).`,
-    `- Relevant entities; phrasing an AI engine could quote; cover common questions in the FAQ.`,
-    `- Do NOT invent prices, statistics or facts not in this brief.`,
-    anchorTopics.length ? `Make sure to naturally use these exact phrases somewhere in the body (they will become links):` : '',
+    `Writing rules:`,
+    `- directAnswer: a direct 2-3 sentence answer to the main question (will appear at the very top).`,
+    `- Each major section starts with "answerFirst": one short sentence answering that section's question.`,
+    `- Short paragraphs (2-4 sentences). Short-ish sentences. Mostly ACTIVE voice; avoid passive.`,
+    `- Use natural transition words (${brief.language === 'he' ? 'בנוסף, לכן, עם זאת, למשל, לסיכום' : 'additionally, therefore, however, for example, in summary'}).`,
+    `- Do not start many sentences with the same word.`,
+    `- Relevant entities; practical specifics. Include at least 3 of: examples, common mistakes, a checklist, comparison, tips by situation, budget/price considerations, steps, when-to / when-not-to, what to check before deciding.`,
+    `- Do NOT invent prices/statistics/laws/facts not in this brief; when unsure use hedges ("in most cases", "typically", "prices may vary", "check with the provider").`,
+    anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     ``,
-    `MINIMUMS (mandatory):`,
-    `- At least ${th.minH2} sections (each a distinct <h2> topic).`,
-    `- At least ${th.minParagraphs} paragraphs total across intro + sections + subsections.`,
-    th.minLists ? `- At least ${th.minLists} bulleted list where it helps.` : '',
-    th.minFaq ? `- An FAQ of ${th.minFaq}-${th.minFaq + 2} question/answer pairs.` : '',
-    `- Use subsections (h3) inside broader sections where helpful.`,
+    `MINIMUMS (mandatory): >=${th.minH2} sections (<h2>), >=${th.minP} paragraphs total, ${th.minLists} list(s), ${th.minFaq} FAQ pairs${th.minH3 ? `, >=${th.minH3} subsections (<h3>)` : ''}. Include a comparison/data TABLE when the topic supports it (how to choose, price, comparison, buying guide, pros/cons, types).`,
     ``,
-    `Return ONLY valid JSON (no markdown, no text outside the JSON) as STRUCTURED DATA (NOT html):`,
-    `{`,
-    `  "title":"...","slug":"...","metaTitle":"...","metaDescription":"...","excerpt":"...",`,
-    `  "intro":["paragraph","paragraph"],`,
-    `  "sections":[{"heading":"...","paragraphs":["...","..."],"bullets":["...","..."],"subsections":[{"heading":"...","paragraphs":["..."]}]}],`,
-    `  "faq":[{"question":"...","answer":"..."}],`,
-    `  "imagePrompt":"...","warnings":[]`,
-    `}`,
-    `- Every paragraph is PLAIN TEXT (no HTML tags). bullets/subsections are optional per section.`,
-    `- title: compelling ${lang} title. slug: MUST be English — translate the concept, NEVER transliterate Hebrew; lowercase, hyphens.`,
-    `- metaTitle <= 60 chars. metaDescription <= 155 chars. excerpt: 1-2 sentences. imagePrompt in ${lang}.`,
-  ].filter(Boolean).join('\n')
+    `Return ONLY valid JSON (no markdown, no text outside the JSON), as STRUCTURED DATA (NOT html), plain-text fields:`,
+    `{"title":"...","slug":"...","metaTitle":"...","metaDescription":"...","excerpt":"...","searchIntent":"...","directAnswer":"...","intro":["...","..."],`,
+    `"sections":[{"heading":"...","answerFirst":"...","paragraphs":["...","..."],"bullets":["..."],"table":{"caption":"...","columns":["...","..."],"rows":[["...","..."]]},"subsections":[{"heading":"...","paragraphs":["..."]}]}],`,
+    `"comparisonTables":[{"caption":"...","columns":["...","..."],"rows":[["...","..."]]}],"faq":[{"question":"...","answer":"..."}],"imagePrompt":"...","warnings":[]}`,
+    `- Every paragraph/answerFirst/directAnswer is PLAIN TEXT (no HTML). "table"/"bullets"/"subsections" are optional per section.`,
+    `- faq answers: 40-90 words, concise, no duplicates. slug: MUST be English (translate, never transliterate Hebrew), lowercase, hyphens. metaTitle <= 60 chars; metaDescription 120-160 chars. imagePrompt in ${lang}.`,
+  ].filter((l) => l !== undefined).join('\n')
 }
 
 // -- structured → HTML/Markdown --------------------------------------------
 
-function esc(s: string): string {
-  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
+function esc(s: string): string { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 function pTag(text: string): string { const t = (text || '').trim(); return t ? `<p>${esc(t)}</p>` : '' }
+function sectionId(heading: string, i: number): string {
+  const s = (heading || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
+  return s && /[a-z0-9]/.test(s) ? s : `section-${i + 1}`
+}
+function tableHtml(t: ArticleTable | null): string {
+  if (!t || !Array.isArray(t.columns) || t.columns.length === 0 || !Array.isArray(t.rows)) return ''
+  const rows = t.rows.filter((r) => Array.isArray(r) && r.length)
+  if (!rows.length) return ''
+  const cap = (t.caption || '').trim() ? `<caption>${esc(t.caption.trim())}</caption>` : ''
+  const head = `<thead><tr>${t.columns.map((c) => `<th>${esc(String(c))}</th>`).join('')}</tr></thead>`
+  const body = `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody>`
+  return `<table>${cap}${head}${body}</table>`
+}
 
 function buildHtml(a: StructuredArticle, language: SuggestionLanguage): string {
   const out: string[] = []
+  if (a.directAnswer?.trim()) out.push(`<p><strong>${esc(a.directAnswer.trim())}</strong></p>`)
   for (const intro of a.intro || []) { const t = pTag(intro); if (t) out.push(t) }
-  for (const s of a.sections || []) {
-    if (s.heading?.trim()) out.push(`<h2>${esc(s.heading.trim())}</h2>`)
+
+  const ids = (a.sections || []).map((s, i) => sectionId(s.heading, i))
+  if ((a.sections || []).length >= 5) {
+    const toc = a.sections.map((s, i) => s.heading?.trim() ? `<li><a href="#${ids[i]}">${esc(s.heading.trim())}</a></li>` : '').filter(Boolean).join('')
+    if (toc) out.push(`<nav class="toc" aria-label="${language === 'he' ? 'תוכן העניינים' : 'Table of contents'}"><ul>${toc}</ul></nav>`)
+  }
+
+  a.sections?.forEach((s, i) => {
+    if (s.heading?.trim()) out.push(`<h2 id="${ids[i]}">${esc(s.heading.trim())}</h2>`)
+    if (s.answerFirst?.trim()) out.push(pTag(s.answerFirst))
     for (const para of s.paragraphs || []) { const t = pTag(para); if (t) out.push(t) }
     const bullets = (s.bullets || []).map((b) => (b || '').trim()).filter(Boolean)
     if (bullets.length) out.push(`<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`)
+    const tbl = tableHtml(s.table)
+    if (tbl) out.push(tbl)
     for (const sub of s.subsections || []) {
       if (sub.heading?.trim()) out.push(`<h3>${esc(sub.heading.trim())}</h3>`)
       for (const para of sub.paragraphs || []) { const t = pTag(para); if (t) out.push(t) }
     }
-  }
+  })
+
+  for (const t of a.comparisonTables || []) { const h = tableHtml(t); if (h) out.push(h) }
+
   if ((a.faq || []).length) {
     out.push(`<h2>${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}</h2>`)
-    for (const f of a.faq) {
-      if (f.question?.trim() && f.answer?.trim()) { out.push(`<h3>${esc(f.question.trim())}</h3>`); const t = pTag(f.answer); if (t) out.push(t) }
-    }
+    for (const f of a.faq) if (f.question?.trim() && f.answer?.trim()) { out.push(`<h3>${esc(f.question.trim())}</h3>`); const t = pTag(f.answer); if (t) out.push(t) }
   }
   return out.join('\n')
 }
 
 function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): string {
   const out: string[] = []
+  if (a.directAnswer?.trim()) out.push(`**${a.directAnswer.trim()}**`)
   for (const intro of a.intro || []) if (intro?.trim()) out.push(intro.trim())
   for (const s of a.sections || []) {
     if (s.heading?.trim()) out.push(`## ${s.heading.trim()}`)
+    if (s.answerFirst?.trim()) out.push(s.answerFirst.trim())
     for (const para of s.paragraphs || []) if (para?.trim()) out.push(para.trim())
     for (const b of (s.bullets || []).map((x) => (x || '').trim()).filter(Boolean)) out.push(`- ${b}`)
     for (const sub of s.subsections || []) {
@@ -197,55 +221,14 @@ function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): stri
   return out.join('\n\n')
 }
 
-// -- counts + quality gate --------------------------------------------------
-
-export interface StructureCounts { h2: number; h3: number; p: number; li: number; words: number; faq: number }
-function countTag(html: string, tag: string): number { const m = html.match(new RegExp(`<${tag}[\\s>]`, 'gi')); return m ? m.length : 0 }
-function textOf(html: string): string { return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim() }
-
-export function countStructure(html: string, faqCount: number): StructureCounts {
-  const text = textOf(html)
-  return { h2: countTag(html, 'h2'), h3: countTag(html, 'h3'), p: countTag(html, 'p'), li: countTag(html, 'li'), words: text ? text.split(/\s+/).length : 0, faq: faqCount }
-}
-
-export interface QualityResult { ok: boolean; issues: string[]; warnings: string[]; counts: StructureCounts }
-export function evaluateQuality(html: string, faqCount: number, opts: { language: SuggestionLanguage; desiredWordCount: number }): QualityResult {
-  const th = qualityThresholds(opts.desiredWordCount)
-  const counts = countStructure(html, faqCount)
-  const issues: string[] = []
-  const warnings: string[] = []
-
-  if (counts.h2 < th.minH2) issues.push('too_few_h2')
-  if (counts.p < th.minParagraphs) issues.push('too_few_paragraphs')
-  if (th.minLists && countTag(html, 'ul') + countTag(html, 'ol') < th.minLists) warnings.push('no_list')
-  if (th.minFaq && faqCount < th.minFaq) warnings.push('too_few_faq')
-
-  const ratio = counts.words / opts.desiredWordCount
-  if (ratio < 0.7) issues.push('too_short')
-  else if (ratio < 0.85) warnings.push('slightly_short')
-
-  if (opts.language === 'he') {
-    const t = textOf(html)
-    const hebrew = (t.match(/[֐-׿]/g) || []).length
-    const latin = (t.match(/[A-Za-z]/g) || []).length
-    if (hebrew < latin) issues.push('wrong_language')
-  }
-  return { ok: issues.length === 0, issues, warnings, counts }
-}
-
-// -- English slug -----------------------------------------------------------
+// -- English slug + deterministic anchor insertion --------------------------
 
 export function toEnglishSlug(geminiSlug: string, primaryKeyword: string | null): string {
   const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-').slice(0, 80)
-  const a = clean(geminiSlug || '')
-  if (a.length >= 3 && /[a-z]/.test(a)) return a
-  const b = clean(primaryKeyword || '')
-  if (b.length >= 3 && /[a-z]/.test(b)) return b
+  const a = clean(geminiSlug || ''); if (a.length >= 3 && /[a-z]/.test(a)) return a
+  const b = clean(primaryKeyword || ''); if (b.length >= 3 && /[a-z]/.test(b)) return b
   return ''
 }
-
-// -- deterministic anchor insertion ----------------------------------------
-
 function escAttr(s: string): string { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 function insertAnchors(html: string, missing: { anchorText: string; targetUrl: string }[], language: SuggestionLanguage): string {
   let out = html
@@ -267,32 +250,40 @@ function insertAnchors(html: string, missing: { anchorText: string; targetUrl: s
   return out
 }
 
-// -- generation -------------------------------------------------------------
+// -- parse + generate -------------------------------------------------------
 
 function str(v: unknown): string { return typeof v === 'string' ? v : '' }
 function strArr(v: unknown): string[] { return Array.isArray(v) ? v.map(str).map((s) => s.trim()).filter(Boolean) : [] }
-
+function parseTable(v: unknown): ArticleTable | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const columns = strArr(o.columns)
+  const rows = Array.isArray(o.rows) ? (o.rows as unknown[]).filter(Array.isArray).map((r) => (r as unknown[]).map((c) => str(c).trim())) : []
+  if (columns.length === 0 || rows.length === 0) return null
+  return { caption: str(o.caption).trim(), columns, rows }
+}
 function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
   const sections: Section[] = Array.isArray(parsed.sections) ? (parsed.sections as Record<string, unknown>[]).map((s) => ({
-    heading: str(s?.heading), paragraphs: strArr(s?.paragraphs), bullets: strArr(s?.bullets),
+    heading: str(s?.heading), answerFirst: str(s?.answerFirst), paragraphs: strArr(s?.paragraphs), bullets: strArr(s?.bullets),
+    table: parseTable(s?.table),
     subsections: Array.isArray(s?.subsections) ? (s.subsections as Record<string, unknown>[]).map((ss) => ({ heading: str(ss?.heading), paragraphs: strArr(ss?.paragraphs) })) : [],
   })) : []
   const faq: GeneratedArticleFaq[] = Array.isArray(parsed.faq) ? (parsed.faq as Record<string, unknown>[])
-    .map((f) => ({ question: str(f?.question).trim(), answer: str(f?.answer).trim() })).filter((f) => f.question && f.answer).slice(0, 10) : []
+    .map((f) => ({ question: str(f?.question).trim(), answer: str(f?.answer).trim() })).filter((f) => f.question && f.answer).slice(0, 12) : []
+  const comparisonTables = Array.isArray(parsed.comparisonTables) ? (parsed.comparisonTables as unknown[]).map(parseTable).filter((t): t is ArticleTable => !!t) : []
   return {
     title: str(parsed.title).trim(), slug: str(parsed.slug).trim(), metaTitle: str(parsed.metaTitle).trim(),
     metaDescription: str(parsed.metaDescription).trim(), excerpt: str(parsed.excerpt).trim(),
-    intro: strArr(parsed.intro), sections, faq, imagePrompt: str(parsed.imagePrompt).trim(),
-    warnings: Array.isArray(parsed.warnings) ? (parsed.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : [],
+    directAnswer: str(parsed.directAnswer).trim(), intro: strArr(parsed.intro), sections, comparisonTables, faq,
+    imagePrompt: str(parsed.imagePrompt).trim(), warnings: Array.isArray(parsed.warnings) ? (parsed.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : [],
   }
 }
 
-async function callGemini(brief: ArticleBrief, opts: GenOpts): Promise<{ structured: StructuredArticle; usage: GeminiUsage | null } | { error: string }> {
+async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string): Promise<{ structured: StructuredArticle; usage: GeminiUsage | null } | { error: string }> {
   const client = getGeminiClient()
   if (!client) return { error: process.env.GEMINI_API_KEY ? 'gemini_init_failed' : 'missing_gemini_api_key' }
-  const modelName = articleModel()
   try {
-    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.8 } })
+    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.75 } })
     const result = await model.generateContent(buildPrompt(brief, opts))
     const text = result.response.text()
     let parsed: Record<string, unknown>
@@ -313,56 +304,64 @@ export interface ValidatedArticle {
   safeHtml: string
   slug: string
   usage: GeminiUsage | null
-  anchorValidation: AnchorValidation
-  quality: QualityResult
+  audit: AuditResult
   model: string
-  rawCounts: StructureCounts
 }
 
-/**
- * Generate a structured article, build clean HTML, enforce the per-length
- * quality gate (one strengthened retry) and required anchors. Returns { error }
- * (never a fake-success draft) when it cannot comply.
- */
+function auditFor(brief: ArticleBrief, structured: StructuredArticle, safeHtml: string, slug: string): AuditResult {
+  return runArticleAudit({
+    language: brief.language, desiredWordCount: brief.desiredWordCount || 1000,
+    primaryKeyword: brief.primaryKeyword, secondaryKeywords: brief.secondaryKeywords,
+    ctaPreference: brief.ctaPreference, includeBrandName: brief.includeBrandName,
+    brandName: brief.brandNameToInclude, businessName: brief.businessName,
+    title: structured.title, metaTitle: structured.metaTitle, metaDescription: structured.metaDescription,
+    slug, excerpt: structured.excerpt, contentHtml: safeHtml, faq: structured.faq, anchors: brief.anchors,
+  })
+}
+
+/** Generate → build → audit → repair (once) → audit. Never saves a bad draft. */
 export async function generateValidatedArticle(brief: ArticleBrief): Promise<ValidatedArticle | { error: string; reason?: string }> {
   const language = brief.language
-  const desired = brief.desiredWordCount || 1000
-  const model = articleModel()
+  const { model, fellBack } = articleModel()
+  if (fellBack) console.warn('[content-article-generation] GEMINI_ARTICLE_MODEL missing, falling back to classifier model')
+  console.log(`[content-article-generation] model=${model}`)
 
-  let best: { structured: StructuredArticle; usage: GeminiUsage | null; raw: string; safe: string; quality: QualityResult; rawCounts: StructureCounts } | null = null
+  let best: { structured: StructuredArticle; usage: GeminiUsage | null; safe: string; slug: string; audit: AuditResult } | null = null
 
-  for (const strengthen of [false, true]) {
-    const g = await callGemini(brief, { strengthen })
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const opts: GenOpts = attempt === 0 ? {} : { repairFailures: [...(best?.audit.blockers || []), ...(best?.audit.warnings || [])] }
+    const g = await callGemini(brief, opts, model)
     if ('error' in g) { if (!best) continue; else break }
-    const rawHtml = buildHtml(g.structured, language)
-    const rawCounts = countStructure(rawHtml, g.structured.faq.length)
-    const safe = sanitizeArticleHtml(rawHtml)
-    const quality = evaluateQuality(safe, g.structured.faq.length, { language, desiredWordCount: desired })
-    console.log(`[content-article-generation] ${strengthen ? 'retry ' : ''}raw h2=${rawCounts.h2} h3=${rawCounts.h3} p=${rawCounts.p} words=${rawCounts.words} faq=${rawCounts.faq}`)
-    console.log(`[content-article-generation] ${strengthen ? 'retry ' : ''}quality passed=${quality.ok} issues=[${quality.issues.join(',')}]`)
-    best = { structured: g.structured, usage: g.usage, raw: rawHtml, safe, quality, rawCounts }
-    if (quality.ok) break
+
+    let safe = sanitizeArticleHtml(buildHtml(g.structured, language))
+    // Enforce required anchors on the built HTML before auditing.
+    const preAnchors = validateAnchorPlacement(brief.anchors, safe)
+    if (preAnchors.hasBlockingIssues) {
+      const missing = preAnchors.missingRequired.map((a) => ({ anchorText: a.anchorText, targetUrl: a.targetUrl }))
+      safe = sanitizeArticleHtml(insertAnchors(safe, missing, language))
+    }
+    const slug = toEnglishSlug(g.structured.slug, brief.primaryKeyword)
+    const audit = auditFor(brief, g.structured, safe, slug)
+
+    console.log(`[content-article-generation] ${attempt ? 'repair ' : ''}h2=${audit.counts.h2} h3=${audit.counts.h3} p=${audit.counts.p} words=${audit.counts.words} faq=${audit.counts.faq} tables=${audit.counts.tables} score=${audit.score}`)
+    console.log(`[content-article-generation] ${attempt ? 'repair ' : ''}blockers=[${audit.blockers.join(',')}]`)
+
+    best = { structured: g.structured, usage: g.usage, safe, slug, audit }
+    if (audit.blockers.length === 0) break
   }
 
   if (!best) return { error: 'Article generation failed', reason: 'gemini_request_failed' }
   if (!best.safe) return { error: 'Article generation failed', reason: 'empty_after_sanitize' }
-  if (!best.quality.ok) return { error: 'Article generation failed', reason: 'article_quality_gate_failed' }
-
-  // Required anchors — deterministic insertion on the built HTML.
-  let safe = best.safe
-  let anchorValidation = validateAnchorPlacement(brief.anchors, safe)
-  if (anchorValidation.hasBlockingIssues) {
-    const missing = anchorValidation.missingRequired.map((a) => ({ anchorText: a.anchorText, targetUrl: a.targetUrl }))
-    const inserted = sanitizeArticleHtml(insertAnchors(safe, missing, language))
-    const reAnchors = validateAnchorPlacement(brief.anchors, inserted)
-    if (!reAnchors.hasBlockingIssues) { safe = inserted; anchorValidation = reAnchors }
-    if (anchorValidation.hasBlockingIssues) return { error: 'Article generation failed', reason: 'required_anchor_missing' }
+  if (best.audit.blockers.length > 0) {
+    const reason = best.audit.requiredAnchorsMissing > 0 ? 'required_anchor_missing' : 'article_quality_gate_failed'
+    return { error: 'Article generation failed', reason }
   }
 
   const a = best.structured
   const article: GeneratedArticleContent = {
     title: a.title, slug: a.slug, metaTitle: a.metaTitle, metaDescription: a.metaDescription, excerpt: a.excerpt,
-    contentHtml: safe, contentMarkdown: buildMarkdown(a, language), faq: a.faq, imagePrompt: a.imagePrompt, warnings: [...a.warnings, ...best.quality.warnings],
+    contentHtml: best.safe, contentMarkdown: buildMarkdown(a, language), faq: a.faq, imagePrompt: a.imagePrompt,
+    warnings: [...a.warnings, ...best.audit.warnings],
   }
-  return { article, safeHtml: safe, slug: toEnglishSlug(a.slug, brief.primaryKeyword), usage: best.usage, anchorValidation, quality: best.quality, model, rawCounts: best.rawCounts }
+  return { article, safeHtml: best.safe, slug: best.slug || `article-${Date.now().toString(36)}`, usage: best.usage, audit: best.audit, model }
 }

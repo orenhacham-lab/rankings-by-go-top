@@ -409,3 +409,29 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
   color: #64748b;
   margin: 0.75rem 0;
 }
+.article-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+.article-content th,
+.article-content td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.6rem;
+  text-align: start;
+}
+.dark .article-content th,
+.dark .article-content td { border-color: #334155; }
+.article-content th { background: #f8fafc; font-weight: 600; }
+.dark .article-content th { background: #1e293b; }
+.article-content caption { caption-side: top; font-weight: 600; margin-bottom: 0.4rem; text-align: start; }
+.article-content nav.toc {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+}
+.dark .article-content nav.toc { background: #1e293b; border-color: #334155; }
+.article-content nav.toc ul { margin: 0; }

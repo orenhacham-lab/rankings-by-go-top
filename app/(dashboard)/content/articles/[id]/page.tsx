@@ -19,7 +19,8 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { AlertTriangle } from 'lucide-react'
 
 type Faq = { question: string; answer: string }
-type AnchorPlacement = { anchorText: string; targetUrl: string; required: boolean; placed: boolean }
+type AuditCounts = { h2: number; h3: number; p: number; words: number; faq: number; tables: number; lists: number }
+type Audit = { score: number; blockers: string[]; warnings: string[]; counts: AuditCounts }
 
 export default function ArticleEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -27,6 +28,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const c = useMemo(() => getDashboardDictionary(language).contentHub, [language])
   const e = c.editor
   const isHebrew = language === 'he'
+  const auditLabel = (code: string) => (e.auditCodes as Record<string, string>)[code] || code
 
   const enabled = process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
 
@@ -48,7 +50,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [imagePrompt, setImagePrompt] = useState('')
   const [faq, setFaq] = useState<Faq[]>([])
   const [status, setStatus] = useState<'draft' | 'ready'>('draft')
-  const [missingRequired, setMissingRequired] = useState<AnchorPlacement[]>([])
+  const [audit, setAudit] = useState<Audit | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -68,7 +70,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setImagePrompt(a.image_prompt ?? '')
       setFaq(Array.isArray(a.faq_json) ? a.faq_json : [])
       setStatus(a.status === 'ready' ? 'ready' : 'draft')
-      setMissingRequired(data.anchorValidation?.missingRequired ?? [])
+      setAudit(data.audit ?? null)
     } finally {
       setLoading(false)
     }
@@ -100,8 +102,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         body: JSON.stringify(bodyPayload(nextStatus)),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 409 && data.error === 'required_anchors_missing') {
-        setMissingRequired(data.anchorValidation?.missingRequired ?? [])
+      if (res.status === 409 && data.error === 'quality_blockers') {
+        setAudit(data.audit ?? null)
         setMessage({ text: e.readyBlocked, ok: false })
         return
       }
@@ -110,7 +112,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         return
       }
       if (data.article?.status) setStatus(data.article.status === 'ready' ? 'ready' : 'draft')
-      if (data.anchorValidation?.missingRequired) setMissingRequired(data.anchorValidation.missingRequired)
+      if (data.audit) setAudit(data.audit)
       setMessage({ text: e.saved, ok: true })
     } catch {
       setMessage({ text: e.saveError, ok: false })
@@ -162,17 +164,55 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {missingRequired.length > 0 && (
-        <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-1">
-            <AlertTriangle size={16} /> {e.anchorWarningsTitle}
+      {audit && (
+        <Card className="mb-4 hover:translate-y-0">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.auditTitle}</h3>
+            <div className="flex items-center gap-2">
+              <span className={`text-lg font-bold ${audit.score >= 80 ? 'text-green-600 dark:text-green-400' : audit.score >= 55 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{audit.score}</span>
+              <span className="text-xs text-slate-400">/ 100</span>
+            </div>
           </div>
-          <ul className="text-xs text-amber-700 dark:text-amber-400 list-disc ps-5 space-y-0.5">
-            {missingRequired.map((a, i) => (
-              <li key={i}>{e.anchorMissingRequired}: <span className="font-medium">{a.anchorText}</span> → {a.targetUrl}</li>
+
+          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 mb-3 text-center">
+            {[
+              { l: e.auditWords, v: audit.counts.words },
+              { l: 'H2', v: audit.counts.h2 },
+              { l: 'H3', v: audit.counts.h3 },
+              { l: e.auditParagraphs, v: audit.counts.p },
+              { l: 'FAQ', v: audit.counts.faq },
+              { l: e.auditTables, v: audit.counts.tables },
+              { l: e.auditLists, v: audit.counts.lists },
+            ].map((c) => (
+              <div key={c.l} className="rounded-md bg-slate-50 dark:bg-slate-800/60 p-2">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400">{c.l}</div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{c.v}</div>
+              </div>
             ))}
-          </ul>
-        </div>
+          </div>
+
+          {audit.blockers.length > 0 && (
+            <div className="mb-2">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400 mb-1">
+                <AlertTriangle size={14} /> {e.auditBlockers}
+              </div>
+              <ul className="text-xs text-red-600 dark:text-red-400 list-disc ps-5 space-y-0.5">
+                {audit.blockers.map((b) => <li key={b}>{auditLabel(b)}</li>)}
+              </ul>
+            </div>
+          )}
+          {audit.warnings.length > 0 && (
+            <div>
+              <div className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-1">{e.auditWarnings}</div>
+              <ul className="text-xs text-amber-600 dark:text-amber-400 list-disc ps-5 space-y-0.5">
+                {audit.warnings.map((w) => <li key={w}>{auditLabel(w)}</li>)}
+              </ul>
+            </div>
+          )}
+          {audit.blockers.length === 0 && audit.warnings.length === 0 && (
+            <div className="text-sm text-green-700 dark:text-green-400">{e.auditAllGood}</div>
+          )}
+        </Card>
       )}
 
       <div className="space-y-4">
@@ -225,7 +265,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
         <div className="flex flex-wrap items-center gap-2 pb-8">
           <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
-          <Button variant="outline" onClick={() => save('ready')} disabled={saving || missingRequired.length > 0}>{e.markReady}</Button>
+          <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
           <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
           <span className="text-xs text-slate-400 dark:text-slate-600 px-2">{e.publishNextPhase}</span>
           <Link href={backHref} className="ms-auto"><Button variant="ghost">{e.back}</Button></Link>

@@ -12,9 +12,9 @@ const ALLOWED_TAGS = [
   'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'ul', 'ol', 'li',
   'strong', 'em', 'b', 'i', 'u', 's',
-  'a', 'br', 'hr',
+  'a', 'br', 'hr', 'nav',
   'blockquote', 'code', 'pre',
-  'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+  'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
   'figure', 'figcaption', 'span',
 ]
 
@@ -32,6 +32,9 @@ export function sanitizeArticleHtml(html: string): string {
       th: ['scope', 'colspan', 'rowspan'],
       td: ['colspan', 'rowspan'],
       span: ['class'],
+      // TOC support: heading anchor targets + a nav wrapper.
+      h2: ['id'], h3: ['id'], h4: ['id'],
+      nav: ['class', 'aria-label'],
     },
     allowedSchemes: ['http', 'https', 'mailto', 'tel'],
     transformTags: {

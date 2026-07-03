@@ -13,12 +13,54 @@
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, slugify } from '@/lib/content/article-html'
-import { validateAnchorPlacement } from '@/lib/content/anchors-check'
+import { decodeBriefNotes } from '@/lib/content/brief-notes'
+import { runArticleAudit, type AuditResult } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
+// Anchor placement is included inside runArticleAudit.
 
 const EDITABLE_STATUSES = ['draft', 'ready'] as const
 const META_TITLE_MAX = 60
 const META_DESC_MAX = 155
+
+/**
+ * Compute the live SEO/GEO audit for an article using its stored fields + the
+ * linked topic's brief context (keyword/secondary/language/cta/brand/anchors)
+ * and the project's business name. Never persists — computed on demand.
+ */
+async function computeAudit(admin: ReturnType<typeof createAdminClient>, article: Record<string, unknown>): Promise<AuditResult> {
+  const topicId = article.topic_id
+  let topic: Record<string, unknown> | null = null
+  if (topicId && typeof topicId === 'string') {
+    const { data } = await admin
+      .from('article_topics')
+      .select('primary_keyword, secondary_keywords, language, cta_preference, desired_word_count, brief_notes, anchors_json')
+      .eq('id', topicId)
+      .maybeSingle()
+    topic = (data as Record<string, unknown>) ?? null
+  }
+  const { data: project } = await admin.from('projects').select('business_name').eq('id', article.project_id as string).maybeSingle()
+  const decoded = decodeBriefNotes((topic?.brief_notes as string) ?? null)
+  const language = String(topic?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+
+  return runArticleAudit({
+    language,
+    desiredWordCount: (topic?.desired_word_count as number) || 1000,
+    primaryKeyword: (topic?.primary_keyword as string) ?? null,
+    secondaryKeywords: Array.isArray(topic?.secondary_keywords) ? (topic!.secondary_keywords as string[]) : [],
+    ctaPreference: (topic?.cta_preference as string) ?? null,
+    includeBrandName: decoded.flags.includeBrandName,
+    brandName: decoded.flags.brandNameToInclude,
+    businessName: (project as { business_name?: string } | null)?.business_name ?? null,
+    title: String(article.title || ''),
+    metaTitle: (article.meta_title as string) ?? null,
+    metaDescription: (article.meta_description as string) ?? null,
+    slug: String(article.slug || ''),
+    excerpt: (article.excerpt as string) ?? null,
+    contentHtml: String(article.content_html || ''),
+    faq: Array.isArray(article.faq_json) ? (article.faq_json as { question: string; answer: string }[]) : [],
+    anchors: Array.isArray(topic?.anchors_json) ? (topic!.anchors_json as ArticleTopicAnchor[]) : [],
+  })
+}
 
 async function loadOwnedArticle(articleId: string) {
   const admin = createAdminClient()
@@ -37,14 +79,6 @@ async function loadOwnedArticle(articleId: string) {
   const auth = await authContentProject((article as { project_id: string }).project_id)
   if ('error' in auth) return { error: auth.error, status: auth.status }
   return { admin, auth, article: article as Record<string, unknown> }
-}
-
-/** Load the anchors from the article's linked topic (for live validation). */
-async function loadTopicAnchors(admin: ReturnType<typeof createAdminClient>, topicId: unknown): Promise<ArticleTopicAnchor[]> {
-  if (!topicId || typeof topicId !== 'string') return []
-  const { data } = await admin.from('article_topics').select('anchors_json').eq('id', topicId).maybeSingle()
-  const raw = (data as { anchors_json?: unknown } | null)?.anchors_json
-  return Array.isArray(raw) ? (raw as ArticleTopicAnchor[]) : []
 }
 
 function sanitizeArticleRow(a: Record<string, unknown>) {
@@ -76,10 +110,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const owned = await loadOwnedArticle(id)
   if ('error' in owned) return Response.json({ error: owned.error }, { status: owned.status })
 
-  const anchors = await loadTopicAnchors(owned.admin, owned.article.topic_id)
-  const validation = validateAnchorPlacement(anchors, String(owned.article.content_html || ''))
-
-  return Response.json({ article: sanitizeArticleRow(owned.article), anchorValidation: validation })
+  const audit = await computeAudit(owned.admin, owned.article)
+  return Response.json({ article: sanitizeArticleRow(owned.article), audit })
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -149,17 +181,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return Response.json({ error: 'invalid status (allowed: draft, ready)' }, { status: 400 })
     }
     if (status === 'ready') {
-      const title = String(patch.title ?? owned.article.title ?? '').trim()
-      if (!title || !nextContentHtml.trim()) {
-        return Response.json({ error: 'Article needs a title and content before it can be marked ready.' }, { status: 400 })
-      }
-      const anchors = await loadTopicAnchors(owned.admin, owned.article.topic_id)
-      const validation = validateAnchorPlacement(anchors, nextContentHtml)
-      if (validation.hasBlockingIssues) {
-        return Response.json(
-          { error: 'required_anchors_missing', anchorValidation: validation },
-          { status: 409 }
-        )
+      // Audit the POST-EDIT article; block "ready" while any blocker remains.
+      const merged = { ...owned.article, ...patch, content_html: nextContentHtml }
+      const audit = await computeAudit(owned.admin, merged)
+      if (audit.blockers.length > 0) {
+        return Response.json({ error: 'quality_blockers', audit }, { status: 409 })
       }
     }
     patch.status = status
@@ -181,10 +207,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return Response.json({ error: 'Failed to save article' }, { status: 500 })
   }
 
-  const anchors = await loadTopicAnchors(owned.admin, owned.article.topic_id)
-  const validation = validateAnchorPlacement(anchors, String((write.data as Record<string, unknown>).content_html || ''))
-
-  return Response.json({ article: sanitizeArticleRow(write.data as Record<string, unknown>), warnings, anchorValidation: validation })
+  const audit = await computeAudit(owned.admin, write.data as Record<string, unknown>)
+  return Response.json({ article: sanitizeArticleRow(write.data as Record<string, unknown>), warnings, audit })
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
