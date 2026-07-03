@@ -328,7 +328,7 @@ export const dashboardHe = {
         has_early_answer: 'חסרה תשובה ישירה בפתיחה',
         language_matches: 'שפת התוכן לא תואמת',
         brand_mention_when_disabled: 'שם העסק מופיע במאמר למרות שלא סומן לשילוב. ניתן לערוך ידנית אם זה לא רצוי.',
-        cta_present_when_disabled: 'יש CTA למרות שנבחר "ללא CTA"',
+        cta_present_when_disabled: 'נראה שיש ניסוח קריאה לפעולה במאמר למרות שנבחר "ללא CTA". ניתן לערוך ידנית אם זה לא רצוי.',
         cta_details_missing: 'חסרים פרטי קשר ל-CTA (טלפון/וואטסאפ/קישור)',
         cta_too_early: 'ה-CTA מופיע מוקדם מדי — עדיף בסוף המאמר',
         required_anchors_present: 'קישור חובה חסר במאמר',

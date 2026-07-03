@@ -80,8 +80,45 @@ export function thresholdsFor(desired: number): Thresholds {
 
 const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'מצד שני', 'למשל', 'בפועל', 'לסיכום', 'חשוב לדעת', 'מעבר לכך', 'כלומר', 'לעומת זאת', 'בסופו של דבר', 'ראשית', 'שנית', 'לבסוף']
 const TRANSITIONS_EN = ['additionally', 'therefore', 'however', 'on the other hand', 'for example', 'in practice', 'in summary', 'importantly', 'moreover', 'in other words', 'finally', 'first', 'second', 'meanwhile', 'in short']
-const CTA_HE = ['צרו קשר', 'צור קשר', 'חייגו', 'התקשרו', 'לחצו כאן', 'הזמינו', 'וואטסאפ', 'דברו איתנו', 'השאירו פרטים']
-const CTA_EN = ['contact us', 'call now', 'click here', 'order now', 'get in touch', 'buy now', 'sign up', 'book now', 'reach out']
+// Unambiguous, standalone CTA phrases (imperative action + intent). Natural
+// service words like "הזמנה"/"משלוח"/"שירות" are deliberately NOT here.
+const CTA_STRONG_HE = ['צרו קשר', 'צור קשר', 'צרו איתנו קשר', 'דברו איתנו', 'השאירו פרטים', 'לחצו כאן', 'להזמנה עכשיו', 'הזמינו עכשיו', 'לקבלת הצעת מחיר', 'שלחו הודעת וואטסאפ', 'שלחו לנו הודעה', 'חייגו עכשיו', 'התקשרו עכשיו', 'הזמינו כעת']
+const CTA_STRONG_EN = ['contact us', 'call now', 'click here', 'order now', 'get in touch', 'sign up now', 'book now', 'reach out to us', 'send us a message', 'leave your details', 'get a quote', 'whatsapp us', 'call us now', 'buy now']
+// Action imperatives that only count as a CTA when a contact CHANNEL is nearby.
+const CTA_ACTION_HE = ['התקשרו', 'חייגו', 'שלחו', 'פנו אלינו', 'לחצו', 'דברו', 'השאירו', 'כתבו לנו']
+const CTA_ACTION_EN = ['call', 'text', 'message', 'click', 'contact', 'reach out', 'book']
+// A phone/WhatsApp number, WhatsApp/phone words, or a URL — the "target" of a CTA.
+const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|https?:\/\/|www\.)/i
+
+/**
+ * Find the first REAL call-to-action in the text (word index), or -1. A CTA is
+ * either an unambiguous standalone phrase, or an action imperative sitting right
+ * next to a contact channel (number/WhatsApp/phone/URL). This avoids treating
+ * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
+ */
+function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
+  const low = bodyText.toLowerCase()
+  const strong = lang === 'he' ? CTA_STRONG_HE : CTA_STRONG_EN
+  const actions = lang === 'he' ? CTA_ACTION_HE : CTA_ACTION_EN
+  let earliest = -1
+  const mark = (idx: number) => {
+    if (idx < 0) return
+    const wi = words(bodyText.slice(0, idx)).length
+    if (earliest < 0 || wi < earliest) earliest = wi
+  }
+  for (const p of strong) mark(low.indexOf(p.toLowerCase()))
+  for (const a of actions) {
+    let from = 0
+    for (;;) {
+      const i = low.indexOf(a.toLowerCase(), from)
+      if (i < 0) break
+      from = i + 1
+      // Require a contact channel within a short window after the action verb.
+      if (CTA_CHANNEL_RE.test(bodyText.slice(i, i + 60))) { mark(i); break }
+    }
+  }
+  return earliest
+}
 
 /** Whether the CTA channel the user chose has the contact details it needs. */
 function ctaDetailsSufficient(pref: string, d: CtaDetails): boolean {
@@ -316,17 +353,12 @@ export function runArticleAudit(input: AuditInput): AuditResult {
     add('brand_mention_when_disabled', 'seo', 'warning', !brandMentionedOutsideAnchors(html, input.anchors, brandForCheck))
   }
   const ctaEnabled = !(input.ctaPreference === 'none' || !input.ctaPreference)
-  const ctaList = lang === 'he' ? CTA_HE : CTA_EN
-  const ctaLower = bodyText.toLowerCase()
-  let ctaFirstWord = -1
-  for (const c of ctaList) {
-    const idx = ctaLower.indexOf(c)
-    if (idx >= 0) { const wi = words(bodyText.slice(0, idx)).length; if (ctaFirstWord < 0 || wi < ctaFirstWord) ctaFirstWord = wi }
-  }
+  const ctaFirstWord = detectCtaFirstWord(bodyText, lang)
   const ctaPresent = ctaFirstWord >= 0
   if (!ctaEnabled) {
-    // "none" chosen → there must be no CTA in the article.
-    add('cta_present_when_disabled', 'seo', 'blocker', !ctaPresent)
+    // "none" chosen: a stray CTA is only a WARNING — natural service wording
+    // must never fail generation or block "mark as ready" (user can edit it out).
+    add('cta_present_when_disabled', 'seo', 'warning', !ctaPresent)
   } else {
     // A WhatsApp/phone/contact CTA needs real contact details to point at.
     add('cta_details_missing', 'seo', 'blocker', ctaDetailsSufficient(input.ctaPreference!, input.ctaDetails))

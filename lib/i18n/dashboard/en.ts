@@ -330,7 +330,7 @@ export const dashboardEn = {
         has_early_answer: 'Missing a direct answer in the intro',
         language_matches: 'Content language mismatch',
         brand_mention_when_disabled: 'The business name appears in the article although it wasn\'t enabled. You can edit it out if unwanted.',
-        cta_present_when_disabled: 'CTA present though "no CTA" was chosen',
+        cta_present_when_disabled: 'The article seems to include a call-to-action although "no CTA" was chosen. You can edit it out if unwanted.',
         cta_details_missing: 'CTA is missing contact details (phone/WhatsApp/URL)',
         cta_too_early: 'CTA appears too early — better near the end',
         required_anchors_present: 'Required link missing from the article',
