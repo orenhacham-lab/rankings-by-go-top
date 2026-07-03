@@ -293,10 +293,10 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // --- brand / CTA rules ---
   const brandForCheck = (input.brandName || input.businessName || '').trim()
   if (!input.includeBrandName && brandForCheck) {
-    // Brand inside a user-provided anchor (required/optional) is allowed — it's
-    // the link the user asked for. Only a FREE mention (plain text, heading, a
-    // non-requested link) blocks.
-    add('brand_mention_when_disabled', 'seo', 'blocker', !brandMentionedOutsideAnchors(html, input.anchors, brandForCheck))
+    // Brand inside a user-provided anchor (required/optional) is allowed. A FREE
+    // mention is only a WARNING — never a blocker: it must not fail generation
+    // or block "mark as ready" (the user can edit it out if unwanted).
+    add('brand_mention_when_disabled', 'seo', 'warning', !brandMentionedOutsideAnchors(html, input.anchors, brandForCheck))
   }
   const ctaEnabled = !(input.ctaPreference === 'none' || !input.ctaPreference)
   const ctaList = lang === 'he' ? CTA_HE : CTA_EN
