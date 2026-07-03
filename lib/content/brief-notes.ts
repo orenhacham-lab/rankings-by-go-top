@@ -63,6 +63,49 @@ export function stripBriefMarker(raw: string | null | undefined): string {
   return (raw || '').replace(MARKER_RE, '').trim()
 }
 
+// ---------------------------------------------------------------------------
+// Human notes are split into two readable sections inside the SAME brief_notes
+// text (no new column, no change to the hidden [[brief:…]] marker). Structural
+// headers are fixed ASCII so parsing is language-independent and round-trips.
+// ---------------------------------------------------------------------------
+
+const SECTION_INCLUDE = '[MUST INCLUDE]'
+const SECTION_AVOID = '[MUST AVOID]'
+
+export interface BriefSections {
+  mustInclude: string
+  mustAvoid: string
+}
+
+/** Compose the two sections into a single plain-text notes string. */
+export function encodeBriefSections(s: BriefSections): string {
+  const inc = (s.mustInclude || '').trim()
+  const avoid = (s.mustAvoid || '').trim()
+  const parts: string[] = []
+  if (inc) parts.push(`${SECTION_INCLUDE}\n${inc}`)
+  if (avoid) parts.push(`${SECTION_AVOID}\n${avoid}`)
+  return parts.join('\n\n')
+}
+
+/**
+ * Split notes back into the two sections. Legacy free-text notes (no headers)
+ * go into mustInclude so nothing is lost. Order-agnostic.
+ */
+export function decodeBriefSections(notes: string | null | undefined): BriefSections {
+  const text = (notes || '').trim()
+  if (!text) return { mustInclude: '', mustAvoid: '' }
+  const incIdx = text.indexOf(SECTION_INCLUDE)
+  const avoidIdx = text.indexOf(SECTION_AVOID)
+  if (incIdx < 0 && avoidIdx < 0) return { mustInclude: text, mustAvoid: '' }
+  const cut = (start: number, headerLen: number, end: number) =>
+    text.slice(start + headerLen, end < 0 ? undefined : end).trim()
+  let mustInclude = ''
+  let mustAvoid = ''
+  if (incIdx >= 0) mustInclude = cut(incIdx, SECTION_INCLUDE.length, avoidIdx > incIdx ? avoidIdx : -1)
+  if (avoidIdx >= 0) mustAvoid = cut(avoidIdx, SECTION_AVOID.length, incIdx > avoidIdx ? incIdx : -1)
+  return { mustInclude, mustAvoid }
+}
+
 /** Parse the flags (and clean notes) from a stored brief_notes value. */
 export function decodeBriefNotes(raw: string | null | undefined): { notes: string; flags: BriefFlags } {
   const text = raw || ''
