@@ -98,6 +98,8 @@ export async function POST(request: Request) {
     includeBrandName: decodedNotes.flags.includeBrandName,
     // Explicit brand name from the brief; fall back to the project's business name.
     brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
+    // Default false: only inject a manual TOC when the brief opted in.
+    includeManualToc: decodedNotes.flags.includeManualToc,
     anchors,
     businessName,
     domain: (project as { target_domain?: string } | null)?.target_domain ?? null,

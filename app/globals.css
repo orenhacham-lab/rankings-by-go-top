@@ -435,3 +435,8 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
 }
 .dark .article-content nav.toc { background: #1e293b; border-color: #334155; }
 .article-content nav.toc ul { margin: 0; }
+/* Wide tables scroll horizontally on small screens instead of overflowing the
+   page. `display:block` lets the table become its own scroll container. */
+@media (max-width: 640px) {
+  .article-content table { display: block; overflow-x: auto; white-space: nowrap; }
+}

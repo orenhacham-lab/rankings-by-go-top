@@ -20,7 +20,7 @@ import { AlertTriangle } from 'lucide-react'
 
 type Faq = { question: string; answer: string }
 type AuditCounts = { h2: number; h3: number; p: number; words: number; faq: number; tables: number; lists: number }
-type Audit = { score: number; blockers: string[]; warnings: string[]; counts: AuditCounts }
+type Audit = { score: number; blockers: string[]; warnings: string[]; counts: AuditCounts; tocReady?: boolean }
 
 export default function ArticleEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -191,6 +191,12 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             ))}
           </div>
 
+          <div className="mb-3 text-xs">
+            <span className={audit.tocReady ? 'text-green-700 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}>
+              {audit.tocReady ? `✓ ${e.tocReady}` : e.tocNotReady}
+            </span>
+          </div>
+
           {audit.blockers.length > 0 && (
             <div className="mb-2">
               <div className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400 mb-1">
@@ -241,10 +247,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         </Card>
 
         <Card>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.faqTitle}</h3>
             <Button size="sm" variant="outline" onClick={() => setFaq((p) => [...p, { question: '', answer: '' }])}>{e.addFaq}</Button>
           </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{e.faqSchemaReadyHint}</p>
           <div className="space-y-3">
             {faq.map((f, i) => (
               <div key={i} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">

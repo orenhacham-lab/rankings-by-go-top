@@ -30,6 +30,10 @@ export interface ArticleBrief {
   briefNotes: string | null
   includeBrandName: boolean
   brandNameToInclude: string | null
+  // When true, build a manual <nav> table of contents into the HTML. Default
+  // false — the article stays "TOC-ready" (clean H2/H3 + ids) so a WordPress
+  // TOC plugin/theme can generate it.
+  includeManualToc: boolean
   anchors: ArticleTopicAnchor[]
   businessName: string | null
   domain: string | null
@@ -76,7 +80,10 @@ const FAILURE_HINT: Record<string, string> = {
   enough_h3: 'add <h3> subsections inside broad sections',
   has_list: 'add at least one bulleted list',
   has_faq: 'add more FAQ question/answer pairs',
+  faq_answers_have_value: 'expand short/thin FAQ answers to 40-90 words of real value',
   has_table: 'add a comparison/data table where it fits',
+  table_recommended: 'this topic needs a real comparison/data table (>=2 columns, >=2 rows) — add one',
+  table_structure_valid: 'fix the table to be a real table with >=2 columns and >=2 data rows',
   word_count: 'make the article substantially longer to meet the target length',
   word_count_band: 'make the article a bit longer',
   has_transition_words: 'use more natural transition words',
@@ -133,11 +140,14 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Use natural transition words (${brief.language === 'he' ? 'בנוסף, לכן, עם זאת, למשל, לסיכום' : 'additionally, therefore, however, for example, in summary'}).`,
     `- Do not start many sentences with the same word.`,
     `- Relevant entities; practical specifics. Include at least 3 of: examples, common mistakes, a checklist, comparison, tips by situation, budget/price considerations, steps, when-to / when-not-to, what to check before deciding.`,
+    `- Weave the most important user questions into the BODY as <h2>/<h3> question-style section headings where natural — do NOT leave all questions only for the FAQ section at the end.`,
+    `- FAQ section (end of article): ${th.minFaq}-${th.minFaq + 2} concise pairs; real, specific questions (no generic filler like "what is X?"); answers 40-90 words; never repeat earlier paragraphs word-for-word.`,
     `- Do NOT invent prices/statistics/laws/facts not in this brief; when unsure use hedges ("in most cases", "typically", "prices may vary", "check with the provider").`,
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     ``,
-    `MINIMUMS (mandatory): >=${th.minH2} sections (<h2>), >=${th.minP} paragraphs total, ${th.minLists} list(s), ${th.minFaq} FAQ pairs${th.minH3 ? `, >=${th.minH3} subsections (<h3>)` : ''}. Include a comparison/data TABLE when the topic supports it (how to choose, price, comparison, buying guide, pros/cons, types).`,
+    `MINIMUMS (mandatory): >=${th.minH2} sections (<h2>), >=${th.minP} paragraphs total, ${th.minLists} list(s), ${th.minFaq} FAQ pairs${th.minH3 ? `, >=${th.minH3} subsections (<h3>)` : ''}.`,
+    `- When the topic involves comparison, pricing/cost, choosing between options, types, or pros/cons, you MUST include a REAL data/comparison TABLE (>=2 columns AND >=2 rows) via the "table" field — never fake it as a paragraph or a single row.`,
     ``,
     `Return ONLY valid JSON (no markdown, no text outside the JSON), as STRUCTURED DATA (NOT html), plain-text fields:`,
     `{"title":"...","slug":"...","metaTitle":"...","metaDescription":"...","excerpt":"...","searchIntent":"...","directAnswer":"...","intro":["...","..."],`,
@@ -152,9 +162,24 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
 
 function esc(s: string): string { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 function pTag(text: string): string { const t = (text || '').trim(); return t ? `<p>${esc(t)}</p>` : '' }
-function sectionId(heading: string, i: number): string {
-  const s = (heading || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
-  return s && /[a-z0-9]/.test(s) ? s : `section-${i + 1}`
+
+/**
+ * Build a factory that mints stable, clean, slug-safe, UNIQUE English ids for
+ * headings so the article is "TOC-ready" (H2/H3 anchor targets) regardless of
+ * whether a manual TOC is injected. Falls back to a deterministic prefix when a
+ * heading has no latin/digit characters (e.g. Hebrew-only headings).
+ */
+function makeIdFactory(): (heading: string, fallbackPrefix: string, i: number) => string {
+  const used = new Set<string>()
+  return (heading, fallbackPrefix, i) => {
+    let base = (heading || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
+    if (!base || !/[a-z0-9]/.test(base)) base = `${fallbackPrefix}-${i + 1}`
+    let id = base
+    let n = 2
+    while (used.has(id)) { id = `${base}-${n++}` }
+    used.add(id)
+    return id
+  }
 }
 function tableHtml(t: ArticleTable | null): string {
   if (!t || !Array.isArray(t.columns) || t.columns.length === 0 || !Array.isArray(t.rows)) return ''
@@ -166,36 +191,50 @@ function tableHtml(t: ArticleTable | null): string {
   return `<table>${cap}${head}${body}</table>`
 }
 
-function buildHtml(a: StructuredArticle, language: SuggestionLanguage): string {
+/**
+ * Build clean article HTML. Every H2/H3 gets a stable slug-safe id (TOC-ready).
+ * A manual <nav> table of contents is injected ONLY when includeManualToc is
+ * true — by default the article is TOC-ready but carries no manual TOC HTML, so
+ * a WordPress TOC plugin/theme can render one. No <h1> is ever emitted.
+ */
+function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeManualToc: boolean): string {
   const out: string[] = []
+  const makeId = makeIdFactory()
   if (a.directAnswer?.trim()) out.push(`<p><strong>${esc(a.directAnswer.trim())}</strong></p>`)
   for (const intro of a.intro || []) { const t = pTag(intro); if (t) out.push(t) }
 
-  const ids = (a.sections || []).map((s, i) => sectionId(s.heading, i))
-  if ((a.sections || []).length >= 5) {
-    const toc = a.sections.map((s, i) => s.heading?.trim() ? `<li><a href="#${ids[i]}">${esc(s.heading.trim())}</a></li>` : '').filter(Boolean).join('')
+  // Assign section ids up front so an optional manual TOC can link to them.
+  const sections = a.sections || []
+  const sectionIds = sections.map((s, i) => makeId(s.heading, 'section', i))
+  if (includeManualToc) {
+    const toc = sections.map((s, i) => s.heading?.trim() ? `<li><a href="#${sectionIds[i]}">${esc(s.heading.trim())}</a></li>` : '').filter(Boolean).join('')
     if (toc) out.push(`<nav class="toc" aria-label="${language === 'he' ? 'תוכן העניינים' : 'Table of contents'}"><ul>${toc}</ul></nav>`)
   }
 
-  a.sections?.forEach((s, i) => {
-    if (s.heading?.trim()) out.push(`<h2 id="${ids[i]}">${esc(s.heading.trim())}</h2>`)
+  sections.forEach((s, i) => {
+    if (s.heading?.trim()) out.push(`<h2 id="${sectionIds[i]}">${esc(s.heading.trim())}</h2>`)
     if (s.answerFirst?.trim()) out.push(pTag(s.answerFirst))
     for (const para of s.paragraphs || []) { const t = pTag(para); if (t) out.push(t) }
     const bullets = (s.bullets || []).map((b) => (b || '').trim()).filter(Boolean)
     if (bullets.length) out.push(`<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`)
     const tbl = tableHtml(s.table)
     if (tbl) out.push(tbl)
-    for (const sub of s.subsections || []) {
-      if (sub.heading?.trim()) out.push(`<h3>${esc(sub.heading.trim())}</h3>`)
+    ;(s.subsections || []).forEach((sub, j) => {
+      if (sub.heading?.trim()) out.push(`<h3 id="${makeId(sub.heading, `section-${i + 1}-sub`, j)}">${esc(sub.heading.trim())}</h3>`)
       for (const para of sub.paragraphs || []) { const t = pTag(para); if (t) out.push(t) }
-    }
+    })
   })
 
   for (const t of a.comparisonTables || []) { const h = tableHtml(t); if (h) out.push(h) }
 
   if ((a.faq || []).length) {
-    out.push(`<h2>${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}</h2>`)
-    for (const f of a.faq) if (f.question?.trim() && f.answer?.trim()) { out.push(`<h3>${esc(f.question.trim())}</h3>`); const t = pTag(f.answer); if (t) out.push(t) }
+    out.push(`<h2 id="${makeId('faq', 'faq', 0)}">${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}</h2>`)
+    a.faq.forEach((f, k) => {
+      if (f.question?.trim() && f.answer?.trim()) {
+        out.push(`<h3 id="${makeId(f.question, 'faq-q', k)}">${esc(f.question.trim())}</h3>`)
+        const t = pTag(f.answer); if (t) out.push(t)
+      }
+    })
   }
   return out.join('\n')
 }
@@ -333,7 +372,7 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     const g = await callGemini(brief, opts, model)
     if ('error' in g) { if (!best) continue; else break }
 
-    let safe = sanitizeArticleHtml(buildHtml(g.structured, language))
+    let safe = sanitizeArticleHtml(buildHtml(g.structured, language, brief.includeManualToc))
     // Enforce required anchors on the built HTML before auditing.
     const preAnchors = validateAnchorPlacement(brief.anchors, safe)
     if (preAnchors.hasBlockingIssues) {

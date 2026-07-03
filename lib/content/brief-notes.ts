@@ -12,6 +12,9 @@ const MARKER_RE = /\n*\[\[brief:([^\]]*)\]\]\s*$/
 export interface BriefFlags {
   includeBrandName: boolean
   brandNameToInclude: string
+  // Whether to inject a manual <nav> table of contents into the article HTML.
+  // Default false: most WordPress sites have a TOC plugin/theme that builds it.
+  includeManualToc: boolean
 }
 
 function b64(s: string): string {
@@ -29,6 +32,7 @@ export function encodeBriefNotes(notes: string, flags: BriefFlags): string {
   if (flags.includeBrandName && flags.brandNameToInclude.trim()) {
     parts.push(`brand=${b64(flags.brandNameToInclude.trim())}`)
   }
+  if (flags.includeManualToc) parts.push('toc=1')
   const marker = `[[brief:${parts.join(';')}]]`
   return clean ? `${clean}\n\n${marker}` : marker
 }
@@ -42,10 +46,11 @@ export function stripBriefMarker(raw: string | null | undefined): string {
 export function decodeBriefNotes(raw: string | null | undefined): { notes: string; flags: BriefFlags } {
   const text = raw || ''
   const m = text.match(MARKER_RE)
-  const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '' }
+  const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '', includeManualToc: false }
   if (m) {
     const body = m[1]
     if (/includeBrandName=1/.test(body)) flags.includeBrandName = true
+    if (/toc=1/.test(body)) flags.includeManualToc = true
     const brand = body.match(/brand=([^;]*)/)
     if (brand) flags.brandNameToInclude = unb64(brand[1])
   }

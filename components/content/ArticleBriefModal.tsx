@@ -117,6 +117,7 @@ export default function ArticleBriefModal({
   const [briefNotes, setBriefNotes] = useState('')
   const [includeBrandName, setIncludeBrandName] = useState(false)
   const [brandNameToInclude, setBrandNameToInclude] = useState('')
+  const [includeManualToc, setIncludeManualToc] = useState(false)
   const [anchors, setAnchors] = useState<ArticleTopicAnchor[]>([])
   const [keywordFit, setKeywordFit] = useState<'aligned' | 'weak' | 'unrelated' | null>(null)
 
@@ -140,7 +141,7 @@ export default function ArticleBriefModal({
       setSearchIntent(oneOf(editing.search_intent, INTENT_KEYS, DEFAULT_INTENT))
       setSecondaryText((editing.secondary_keywords ?? []).join('\n'))
       setTargetAudience(editing.target_audience ?? '')
-      { const dec = decodeBriefNotes(editing.brief_notes); setBriefNotes(dec.notes); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude) }
+      { const dec = decodeBriefNotes(editing.brief_notes); setBriefNotes(dec.notes); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude); setIncludeManualToc(dec.flags.includeManualToc) }
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
       setAdvancedOpen(true)
       setKeywordFit(null)
@@ -149,7 +150,7 @@ export default function ArticleBriefModal({
       setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null); setSource(null); setFallbackReason(null)
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
-      setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setIncludeBrandName(false); setBrandNameToInclude(''); setAnchors([])
+      setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setIncludeBrandName(false); setBrandNameToInclude(''); setIncludeManualToc(false); setAnchors([])
       setAdvancedOpen(false)
       setKeywordFit(null)
     }
@@ -242,7 +243,7 @@ export default function ArticleBriefModal({
       tone_of_voice: tone,
       desired_word_count: wordCount, // always the user's choice (default 1000)
       cta_preference: cta,
-      brief_notes: encodeBriefNotes(briefNotes, { includeBrandName, brandNameToInclude }),
+      brief_notes: encodeBriefNotes(briefNotes, { includeBrandName, brandNameToInclude, includeManualToc }),
       anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
     }
   }
@@ -484,6 +485,18 @@ export default function ArticleBriefModal({
                   placeholder={t.brandNamePlaceholder}
                 />
               )}
+              <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={includeManualToc}
+                  onChange={(e) => setIncludeManualToc(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  {t.includeManualToc}
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">{t.includeManualTocHint}</span>
+                </span>
+              </label>
             </div>
 
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">

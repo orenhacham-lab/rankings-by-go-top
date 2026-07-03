@@ -2,12 +2,16 @@
 
 /**
  * ArticleContentEditor — lean TipTap editor for article body (Phase 3A).
- * StarterKit + Link only. No image upload, no bucket dependency. Emits HTML.
+ * StarterKit + Link + Table (minimal). No image upload, no bucket dependency.
+ * Table extensions are registered so generated <table> markup renders as a real
+ * table and survives edit/save (StarterKit alone would drop table nodes and
+ * flatten them into plain text). Emits HTML.
  */
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import { useEffect } from 'react'
 
 export default function ArticleContentEditor({
@@ -24,6 +28,10 @@ export default function ArticleContentEditor({
     extensions: [
       StarterKit,
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer' } }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: value || '',
     editorProps: {
@@ -77,6 +85,17 @@ export default function ArticleContentEditor({
         <button type="button" className={btn(editor.isActive('bulletList'))} onClick={() => editor.chain().focus().toggleBulletList().run()}>• List</button>
         <button type="button" className={btn(editor.isActive('orderedList'))} onClick={() => editor.chain().focus().toggleOrderedList().run()}>1. List</button>
         <button type="button" className={btn(editor.isActive('link'))} onClick={setLink}>Link</button>
+        <span className="mx-1 w-px self-stretch bg-slate-200 dark:bg-slate-700" aria-hidden />
+        {editor.isActive('table') ? (
+          <>
+            <button type="button" className={btn(false)} onClick={() => editor.chain().focus().addColumnAfter().run()} title="Add column">+Col</button>
+            <button type="button" className={btn(false)} onClick={() => editor.chain().focus().addRowAfter().run()} title="Add row">+Row</button>
+            <button type="button" className={btn(false)} onClick={() => editor.chain().focus().deleteTable().run()} title="Delete table">⌫Table</button>
+          </>
+        ) : (
+          <button type="button" className={btn(false)} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table">▦ Table</button>
+        )}
+        <span className="mx-1 w-px self-stretch bg-slate-200 dark:bg-slate-700" aria-hidden />
         <button type="button" className={btn(false)} onClick={() => editor.chain().focus().undo().run()}>↶</button>
         <button type="button" className={btn(false)} onClick={() => editor.chain().focus().redo().run()}>↷</button>
       </div>

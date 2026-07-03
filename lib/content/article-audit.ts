@@ -37,6 +37,9 @@ export interface AuditResult {
   checks: AuditCheck[]
   anchorsOk: boolean
   requiredAnchorsMissing: number
+  // "TOC-ready" = enough H2, valid heading hierarchy, no H1. Does NOT require a
+  // manual TOC to be present in the HTML (a WP plugin/theme can build one).
+  tocReady: boolean
 }
 
 export interface AuditInput {
@@ -60,13 +63,13 @@ export interface AuditInput {
 
 // -- length thresholds ------------------------------------------------------
 
-export interface Thresholds { minH2: number; minP: number; minH3: number; minFaq: number; minLists: number; tocRequired: boolean }
+export interface Thresholds { minH2: number; minP: number; minH3: number; minFaq: number; minLists: number }
 export function thresholdsFor(desired: number): Thresholds {
-  if (desired <= 500) return { minH2: 3, minP: 6, minH3: 0, minFaq: 2, minLists: 1, tocRequired: false }
-  if (desired <= 1000) return { minH2: 5, minP: 10, minH3: 0, minFaq: 3, minLists: 1, tocRequired: false }
-  if (desired <= 1500) return { minH2: 6, minP: 14, minH3: 2, minFaq: 4, minLists: 1, tocRequired: false }
-  if (desired <= 2000) return { minH2: 8, minP: 18, minH3: 3, minFaq: 5, minLists: 2, tocRequired: false }
-  return { minH2: 9, minP: 22, minH3: 4, minFaq: 6, minLists: 2, tocRequired: true }
+  if (desired <= 500) return { minH2: 3, minP: 6, minH3: 0, minFaq: 2, minLists: 1 }
+  if (desired <= 1000) return { minH2: 5, minP: 10, minH3: 0, minFaq: 3, minLists: 1 }
+  if (desired <= 1500) return { minH2: 6, minP: 14, minH3: 2, minFaq: 4, minLists: 1 }
+  if (desired <= 2000) return { minH2: 8, minP: 18, minH3: 3, minFaq: 5, minLists: 2 }
+  return { minH2: 9, minP: 22, minH3: 4, minFaq: 6, minLists: 2 }
 }
 
 // -- text helpers -----------------------------------------------------------
@@ -96,6 +99,48 @@ function includesKw(haystack: string, kw: string): boolean {
   return toks.length > 0 && toks.every((t) => h.includes(t))
 }
 
+// -- table helpers ----------------------------------------------------------
+
+interface TableShape { cols: number; rows: number }
+/** Parse each <table> into its column/row counts (robust to thead or th-in-tbody). */
+function parseTables(html: string): TableShape[] {
+  const out: TableShape[] = []
+  const tableRe = /<table[\s\S]*?<\/table>/gi
+  let tm: RegExpExecArray | null
+  while ((tm = tableRe.exec(html)) !== null) {
+    const rows = tm[0].match(/<tr[\s\S]*?<\/tr>/gi) || []
+    let cols = 0
+    for (const r of rows) { const cells = (r.match(/<t[hd][\s>]/gi) || []).length; if (cells > cols) cols = cells }
+    out.push({ cols, rows: rows.length })
+  }
+  return out
+}
+/** A "real" table has >=2 columns AND >=2 rows (header + at least one data row). */
+function isRealTable(t: TableShape): boolean { return t.cols >= 2 && t.rows >= 2 }
+
+// Topics that genuinely call for a comparison/data table.
+const TABLE_WORDS_HE = ['השווא', 'להשוו', 'מחיר', 'עלות', 'עלויות', 'כמה עולה', 'הכי טוב', 'סוגי', 'לבחור', 'בחירת', 'יתרונות', 'חסרונות', 'מדריך קנייה', 'טבלה']
+const TABLE_WORDS_EN = ['compar', 'price', 'cost', 'best', ' vs', 'versus', 'types', 'choose', 'choosing', 'buying guide', 'pros and cons', 'pros/cons', 'cheapest']
+function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
+  const t = (text || '').toLowerCase()
+  const words = lang === 'he' ? TABLE_WORDS_HE : TABLE_WORDS_EN
+  return words.some((w) => t.includes(w))
+}
+
+// Question-style heading detection (so important questions live in the body too).
+const QUESTION_WORDS_HE = ['מה ', 'מהו', 'מהי', 'איך', 'כיצד', 'כמה', 'למה', 'מדוע', 'האם', 'מתי', 'איפה', 'היכן', 'מי ']
+const QUESTION_WORDS_EN = ['how ', 'what ', 'why ', 'when ', 'which ', 'where ', 'who ', 'is ', 'are ', 'should ', 'can ', 'do ']
+function looksLikeQuestion(text: string, lang: SuggestionLanguage): boolean {
+  const t = (text || '').trim().toLowerCase()
+  if (!t) return false
+  if (t.includes('?')) return true
+  const words = lang === 'he' ? QUESTION_WORDS_HE : QUESTION_WORDS_EN
+  return words.some((w) => t.startsWith(w))
+}
+function headingTexts(html: string, tag: 'h2' | 'h3'): string[] {
+  return (html.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi')) || []).map((s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+}
+
 // -- the audit --------------------------------------------------------------
 
 export function runArticleAudit(input: AuditInput): AuditResult {
@@ -107,7 +152,11 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   const lang = input.language
   const kw = (input.primaryKeyword || '').trim()
 
-  const tables = countTag(html, 'table')
+  // counts.tables reflects REAL tables only (>=2 cols, >=2 rows). A present-but-
+  // malformed/collapsed table is flagged separately, not counted as a table.
+  const tableShapes = parseTables(html)
+  const tables = tableShapes.filter(isRealTable).length
+  const malformedTable = tableShapes.length > tables
   const lists = countTag(html, 'ul') + countTag(html, 'ol')
   const h2 = countTag(html, 'h2')
   const h3 = countTag(html, 'h3')
@@ -173,8 +222,19 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   add('enough_paragraphs', 'technical', 'blocker', pCount >= th.minP)
   add('has_list', 'technical', 'warning', lists >= th.minLists)
   add('has_table', 'technical', 'info', tables >= 1)
+  // A table that exists but isn't a real 2x2+ table (collapsed/single row) warns.
+  add('table_structure_valid', 'technical', 'warning', !malformedTable)
+  // Comparison/price/choice topics genuinely need a real table — warn (→ repair) if absent.
+  const tableWorthy = isTableWorthy(`${input.title} ${input.primaryKeyword || ''} ${input.secondaryKeywords.join(' ')} ${input.slug}`, lang)
+  add('table_recommended', 'technical', 'warning', !tableWorthy || tables >= 1)
   add('no_unsafe_html', 'technical', 'blocker', !/<script|<iframe|on\w+\s*=/i.test(html))
-  add('toc_present', 'technical', th.tocRequired ? 'blocker' : 'info', !th.tocRequired || /toc|<nav/i.test(html))
+  // TOC-ready (structure), NOT "manual TOC present" — never a blocker.
+  const h1Count = countTag(html, 'h1')
+  const firstH2 = html.search(/<h2[\s>]/i)
+  const firstH3 = html.search(/<h3[\s>]/i)
+  const hierarchyOk = firstH3 < 0 || (firstH2 >= 0 && firstH2 < firstH3)
+  const tocReady = h1Count === 0 && h2 >= 2 && hierarchyOk
+  add('toc_ready', 'technical', 'info', tocReady)
   // word count band
   const ratio = input.desiredWordCount > 0 ? wordCount / input.desiredWordCount : 1
   add('word_count', 'technical', 'blocker', ratio >= 0.7)
@@ -189,6 +249,14 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // --- GEO / AI search ---
   add('has_faq', 'geo', 'warning', faqCount >= th.minFaq)
   add('faq_present', 'geo', 'info', faqCount > 0)
+  // FAQ answers should carry real value (not thin). faq_json stays ready for a
+  // future FAQ schema at PUBLISH time — no JSON-LD/Yoast/Rank-Math block here.
+  add('faq_answers_have_value', 'geo', 'warning', faqCount === 0 || input.faq.every((f) => words(f.answer).length >= 12))
+  // Questions shouldn't be generic filler ("what is X?").
+  add('faq_not_generic', 'geo', 'info', faqCount === 0 || input.faq.every((f) => words(f.question).length >= 3))
+  // Important questions should also appear in the body as H2/H3, not only in FAQ.
+  const bodyHeadings = [...headingTexts(html, 'h2'), ...headingTexts(html, 'h3')]
+  add('questions_in_body', 'geo', 'info', bodyHeadings.some((h) => looksLikeQuestion(h, lang)))
   // direct answer early + entities/practicality are approximated by structure.
   add('has_early_answer', 'geo', 'warning', pCount > 0 && words(paras[0]).length >= 20)
   add('not_generic', 'geo', 'info', tables >= 1 || lists >= 1 || faqCount >= 2 || h3 >= 1)
@@ -232,5 +300,6 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   return {
     score, blockers, warnings, counts, checks,
     anchorsOk: !anchorVal.hasBlockingIssues, requiredAnchorsMissing: anchorVal.missingRequired.length,
+    tocReady,
   }
 }
