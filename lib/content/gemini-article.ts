@@ -30,6 +30,11 @@ export interface ArticleBrief {
   toneOfVoice: string | null
   desiredWordCount: number | null
   ctaPreference: string | null
+  // Concrete CTA contact details (used only when ctaPreference !== 'none').
+  ctaText: string | null
+  ctaPhone: string | null
+  ctaWhatsApp: string | null
+  ctaUrl: string | null
   briefNotes: string | null
   includeBrandName: boolean
   brandNameToInclude: string | null
@@ -65,7 +70,8 @@ const TONE_HINT: Record<string, string> = {
 }
 const CTA_HINT: Record<string, string> = {
   gentle: 'a gentle call-to-action', contact: 'a "contact us" call-to-action',
-  whatsapp: 'a WhatsApp/phone call-to-action', marketing: 'a stronger marketing call-to-action',
+  whatsapp: 'a WhatsApp call-to-action', phone: 'a phone call-to-action',
+  marketing: 'a stronger marketing call-to-action',
 }
 
 export function articleModel(): { model: string; fellBack: boolean } {
@@ -96,7 +102,9 @@ const FAILURE_HINT: Record<string, string> = {
   primary_keyword_in_h2: 'include the primary keyword naturally in at least one <h2>',
   primary_keyword_in_meta: 'include the primary keyword in metaTitle/metaDescription',
   meta_description_length: 'make metaDescription 120-160 characters',
-  no_cta_when_disabled: 'REMOVE every call-to-action',
+  cta_present_when_disabled: 'REMOVE every call-to-action',
+  cta_details_missing: 'the CTA is missing usable contact details — use only the provided phone/WhatsApp/URL',
+  cta_too_early: 'move the call-to-action to the END of the article, not the opening',
   no_brand_when_disabled: 'REMOVE any business/brand name',
   has_early_answer: 'add a clear direct answer in the first paragraph',
   not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
@@ -110,9 +118,17 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const tone = (brief.toneOfVoice && TONE_HINT[brief.toneOfVoice]) || 'professional and credible'
   const words = brief.desiredWordCount || 1000
   const th = thresholdsFor(words)
-  const ctaLine = brief.ctaPreference === 'none' || !brief.ctaPreference
-    ? 'Do NOT include any call-to-action anywhere.'
-    : `Include ${CTA_HINT[brief.ctaPreference] || 'a gentle call-to-action'} only at the end.`
+  const ctaEnabled = !(brief.ctaPreference === 'none' || !brief.ctaPreference)
+  const ctaDetailLines: string[] = []
+  if (ctaEnabled) {
+    ctaDetailLines.push(`Include ${CTA_HINT[brief.ctaPreference!] || 'a gentle call-to-action'} ONLY near the END of the article, phrased naturally.`)
+    if (brief.ctaText?.trim()) ctaDetailLines.push(`Preferred CTA wording (adapt naturally, keep the intent): "${brief.ctaText.trim()}".`)
+    if (brief.ctaWhatsApp?.trim()) ctaDetailLines.push(`WhatsApp number to use (use EXACTLY this, never invent one): ${brief.ctaWhatsApp.trim()}.`)
+    if (brief.ctaPhone?.trim()) ctaDetailLines.push(`Phone number to use (use EXACTLY this, never invent one): ${brief.ctaPhone.trim()}.`)
+    if (brief.ctaUrl?.trim()) ctaDetailLines.push(`Contact/landing URL to link the CTA to (use EXACTLY this): ${brief.ctaUrl.trim()}.`)
+    ctaDetailLines.push('NEVER fabricate a phone number, WhatsApp number, email, or link. Use only the contact details provided above; if a channel has no value, do not state one.')
+  }
+  const ctaLine = ctaEnabled ? ctaDetailLines.join('\n') : 'Do NOT include any call-to-action anywhere.'
   const brandName = (brief.brandNameToInclude || '').trim()
   const brandLine = brief.includeBrandName && brandName
     ? `You MAY mention the business/brand name "${brandName}" naturally and subtly.`
@@ -146,6 +162,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Use natural transition words (${brief.language === 'he' ? 'בנוסף, לכן, עם זאת, למשל, לסיכום' : 'additionally, therefore, however, for example, in summary'}).`,
     `- Do not start many sentences with the same word.`,
     `- Relevant entities; practical specifics. Include at least 3 of: examples, common mistakes, a checklist, comparison, tips by situation, budget/price considerations, steps, when-to / when-not-to, what to check before deciding.`,
+    `- For any list-worthy section (tips, common mistakes, a checklist, steps, how-to-choose, what-to-check, pros/cons), put the items in the section's "bullets" array — NOT as dash lines inside a paragraph. At least one real list in the article.`,
     `- Weave the most important user questions into the BODY as <h2>/<h3> question-style section headings where natural — do NOT leave all questions only for the FAQ section at the end.`,
     `- FAQ section (end of article): ${th.minFaq}-${th.minFaq + 2} concise pairs; real, specific questions (no generic filler like "what is X?"); answers 40-90 words; never repeat earlier paragraphs word-for-word.`,
     `- Do NOT invent prices/statistics/laws/facts not in this brief; when unsure use hedges ("in most cases", "typically", "prices may vary", "check with the provider").`,
@@ -169,6 +186,44 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
 
 function esc(s: string): string { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 function pTag(text: string): string { const t = (text || '').trim(); return t ? `<p>${esc(t)}</p>` : '' }
+
+// Detect list-like lines that Gemini sometimes emits as plain paragraphs so we
+// can render REAL <ul>/<ol> (the audit only counts real lists; dash-lines in a
+// paragraph don't count and render as flat text).
+const BULLET_RE = /^\s*(?:[-–—•*·])\s+/
+const NUM_RE = /^\s*\d{1,2}[.)]\s+/
+function stripListMarker(s: string): string { return s.replace(BULLET_RE, '').replace(NUM_RE, '').trim() }
+/** Emit paragraphs, converting runs of bullet/numbered lines into real lists. */
+function emitParagraphs(out: string[], paras: string[] | undefined): void {
+  const lines: string[] = []
+  for (const p of paras || []) {
+    const t = (p || '').trim()
+    if (!t) continue
+    for (const ln of t.split(/\n+/).map((x) => x.trim()).filter(Boolean)) lines.push(ln)
+  }
+  let buf: string[] = []
+  let ordered = false
+  const flush = () => {
+    if (!buf.length) return
+    const tag = ordered ? 'ol' : 'ul'
+    out.push(`<${tag}>${buf.map((b) => `<li>${esc(b)}</li>`).join('')}</${tag}>`)
+    buf = []
+  }
+  for (const ln of lines) {
+    const isNum = NUM_RE.test(ln)
+    const isBullet = BULLET_RE.test(ln)
+    if (isNum || isBullet) {
+      if (buf.length && ordered !== isNum) flush()
+      ordered = isNum
+      buf.push(stripListMarker(ln))
+    } else {
+      flush()
+      const tp = pTag(ln)
+      if (tp) out.push(tp)
+    }
+  }
+  flush()
+}
 
 /**
  * Build a factory that mints stable, clean, slug-safe, UNIQUE English ids for
@@ -221,14 +276,14 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
   sections.forEach((s, i) => {
     if (s.heading?.trim()) out.push(`<h2 id="${sectionIds[i]}">${esc(s.heading.trim())}</h2>`)
     if (s.answerFirst?.trim()) out.push(pTag(s.answerFirst))
-    for (const para of s.paragraphs || []) { const t = pTag(para); if (t) out.push(t) }
-    const bullets = (s.bullets || []).map((b) => (b || '').trim()).filter(Boolean)
+    emitParagraphs(out, s.paragraphs)
+    const bullets = (s.bullets || []).map((b) => stripListMarker(b)).filter(Boolean)
     if (bullets.length) out.push(`<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`)
     const tbl = tableHtml(s.table)
     if (tbl) out.push(tbl)
     ;(s.subsections || []).forEach((sub, j) => {
       if (sub.heading?.trim()) out.push(`<h3 id="${makeId(sub.heading, `section-${i + 1}-sub`, j)}">${esc(sub.heading.trim())}</h3>`)
-      for (const para of sub.paragraphs || []) { const t = pTag(para); if (t) out.push(t) }
+      emitParagraphs(out, sub.paragraphs)
     })
   })
 
@@ -451,7 +506,9 @@ function auditFor(brief: ArticleBrief, structured: StructuredArticle, safeHtml: 
   return runArticleAudit({
     language: brief.language, desiredWordCount: brief.desiredWordCount || 1000,
     primaryKeyword: brief.primaryKeyword, secondaryKeywords: brief.secondaryKeywords,
-    ctaPreference: brief.ctaPreference, includeBrandName: brief.includeBrandName,
+    ctaPreference: brief.ctaPreference,
+    ctaDetails: { text: brief.ctaText || '', phone: brief.ctaPhone || '', whatsapp: brief.ctaWhatsApp || '', url: brief.ctaUrl || '' },
+    includeBrandName: brief.includeBrandName,
     brandName: brief.brandNameToInclude, businessName: brief.businessName,
     title: structured.title, metaTitle: structured.metaTitle, metaDescription: structured.metaDescription,
     slug, excerpt: structured.excerpt, contentHtml: safeHtml, faq: structured.faq, anchors: brief.anchors,

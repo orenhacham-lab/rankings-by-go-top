@@ -48,6 +48,7 @@ async function computeAudit(admin: ReturnType<typeof createAdminClient>, article
     primaryKeyword: (topic?.primary_keyword as string) ?? null,
     secondaryKeywords: Array.isArray(topic?.secondary_keywords) ? (topic!.secondary_keywords as string[]) : [],
     ctaPreference: (topic?.cta_preference as string) ?? null,
+    ctaDetails: decoded.flags.cta,
     includeBrandName: decoded.flags.includeBrandName,
     brandName: decoded.flags.brandNameToInclude,
     businessName: (project as { business_name?: string } | null)?.business_name ?? null,

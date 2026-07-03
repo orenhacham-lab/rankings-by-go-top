@@ -83,6 +83,22 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Article generation failed', reason: 'required_anchor_missing_url' }, { status: 400 })
   }
 
+  // Pre-check: a WhatsApp/phone/contact CTA needs real contact details to use
+  // (never invented by Gemini). Missing details → don't generate.
+  const ctaPref = (t.cta_preference as string) || ''
+  if (ctaPref === 'whatsapp' || ctaPref === 'phone' || ctaPref === 'contact') {
+    const c = decodedNotes.flags.cta
+    const enough = ctaPref === 'whatsapp'
+      ? !!(c.whatsapp.trim() || c.url.trim())
+      : ctaPref === 'phone'
+        ? !!(c.phone.trim() || c.url.trim())
+        : !!(c.text.trim() || c.url.trim())
+    if (!enough) {
+      console.log('[content-article-generation] failed reason=cta_details_missing')
+      return Response.json({ error: 'Article generation failed', reason: 'cta_details_missing' }, { status: 400 })
+    }
+  }
+
   const businessName = (project as { business_name?: string } | null)?.business_name ?? null
   const brief: ArticleBrief = {
     language,
@@ -94,6 +110,10 @@ export async function POST(request: Request) {
     toneOfVoice: (t.tone_of_voice as string) ?? null,
     desiredWordCount: (t.desired_word_count as number) ?? null,
     ctaPreference: (t.cta_preference as string) ?? null,
+    ctaText: decodedNotes.flags.cta.text || null,
+    ctaPhone: decodedNotes.flags.cta.phone || null,
+    ctaWhatsApp: decodedNotes.flags.cta.whatsapp || null,
+    ctaUrl: decodedNotes.flags.cta.url || null,
     briefNotes: decodedNotes.notes || null,
     includeBrandName: decodedNotes.flags.includeBrandName,
     // Explicit brand name from the brief; fall back to the project's business name.

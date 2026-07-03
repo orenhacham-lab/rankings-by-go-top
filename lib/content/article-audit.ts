@@ -11,6 +11,7 @@
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import { validateAnchorPlacement, analyzeAnchorQuality, type AnchorQuality } from '@/lib/content/anchors-check'
+import type { CtaDetails } from '@/lib/content/brief-notes'
 
 export type CheckSeverity = 'blocker' | 'warning' | 'info'
 export type CheckCategory = 'seo' | 'readability' | 'geo' | 'technical'
@@ -50,6 +51,7 @@ export interface AuditInput {
   primaryKeyword: string | null
   secondaryKeywords: string[]
   ctaPreference: string | null
+  ctaDetails: CtaDetails
   includeBrandName: boolean
   brandName: string | null
   businessName: string | null
@@ -80,6 +82,17 @@ const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'מצד שני', 
 const TRANSITIONS_EN = ['additionally', 'therefore', 'however', 'on the other hand', 'for example', 'in practice', 'in summary', 'importantly', 'moreover', 'in other words', 'finally', 'first', 'second', 'meanwhile', 'in short']
 const CTA_HE = ['צרו קשר', 'צור קשר', 'חייגו', 'התקשרו', 'לחצו כאן', 'הזמינו', 'וואטסאפ', 'דברו איתנו', 'השאירו פרטים']
 const CTA_EN = ['contact us', 'call now', 'click here', 'order now', 'get in touch', 'buy now', 'sign up', 'book now', 'reach out']
+
+/** Whether the CTA channel the user chose has the contact details it needs. */
+function ctaDetailsSufficient(pref: string, d: CtaDetails): boolean {
+  const text = d.text.trim(), phone = d.phone.trim(), wa = d.whatsapp.trim(), url = d.url.trim()
+  switch (pref) {
+    case 'whatsapp': return !!(wa || url)
+    case 'phone': return !!(phone || url)
+    case 'contact': return !!(text || url)
+    default: return true // gentle / marketing: no hard requirement
+  }
+}
 
 function countTag(html: string, tag: string): number { const m = html.match(new RegExp(`<${tag}[\\s>]`, 'gi')); return m ? m.length : 0 }
 function paragraphs(html: string): string[] {
@@ -275,9 +288,23 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   if (!input.includeBrandName && brandForCheck) {
     add('no_brand_when_disabled', 'seo', 'blocker', !bodyText.toLowerCase().includes(brandForCheck.toLowerCase()))
   }
-  if (input.ctaPreference === 'none' || !input.ctaPreference) {
-    const ctaList = lang === 'he' ? CTA_HE : CTA_EN
-    add('no_cta_when_disabled', 'seo', 'blocker', !ctaList.some((c) => bodyText.toLowerCase().includes(c)))
+  const ctaEnabled = !(input.ctaPreference === 'none' || !input.ctaPreference)
+  const ctaList = lang === 'he' ? CTA_HE : CTA_EN
+  const ctaLower = bodyText.toLowerCase()
+  let ctaFirstWord = -1
+  for (const c of ctaList) {
+    const idx = ctaLower.indexOf(c)
+    if (idx >= 0) { const wi = words(bodyText.slice(0, idx)).length; if (ctaFirstWord < 0 || wi < ctaFirstWord) ctaFirstWord = wi }
+  }
+  const ctaPresent = ctaFirstWord >= 0
+  if (!ctaEnabled) {
+    // "none" chosen → there must be no CTA in the article.
+    add('cta_present_when_disabled', 'seo', 'blocker', !ctaPresent)
+  } else {
+    // A WhatsApp/phone/contact CTA needs real contact details to point at.
+    add('cta_details_missing', 'seo', 'blocker', ctaDetailsSufficient(input.ctaPreference!, input.ctaDetails))
+    // CTA should sit toward the END, not in the opening.
+    add('cta_too_early', 'seo', 'warning', !ctaPresent || ctaFirstWord >= wordCount * 0.5)
   }
 
   // --- required anchors ---

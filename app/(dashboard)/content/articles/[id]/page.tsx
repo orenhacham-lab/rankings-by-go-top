@@ -292,10 +292,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
           <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
           <span className="text-xs text-slate-400 dark:text-slate-600 px-2">{e.publishNextPhase}</span>
-          <Link href={backHref} className="ms-auto"><Button variant="outline">{e.back}</Button></Link>
         </div>
 
-        {/* Prominent, unmistakable return to the Content Hub for this project. */}
+        {/* Single, prominent return to the Content Hub for this project. */}
         <div className="pb-10">
           <Link href={backHref} className="block">
             <Button variant="outline" className="w-full sm:w-auto">{e.backToHub}</Button>
