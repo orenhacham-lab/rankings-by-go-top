@@ -1,28 +1,54 @@
 'use client'
 
 /**
- * ArticleBriefModal — create/edit a manual Article Brief / Topic (Phase 2A).
+ * ArticleBriefModal — create/edit a manual Article Brief / Topic (Phase 2A UX).
  *
- * NO generation. Persists to article_topics via /api/content/topics. Kept
- * prop-driven and routing-agnostic so the same form body can later be lifted
- * onto a full page (e.g. /content/topics/new) without a rewrite.
+ * Simple-by-default: quick mode asks only for project + keyword + a topic
+ * (picked from keyword-based suggestions or typed manually). Everything else
+ * has sensible defaults and lives under "Advanced settings". NO generation.
+ *
+ * Multiple picked suggestions save as multiple article_topics (one POST each)
+ * sharing the same brief — the seed for a future scheduled series/pool.
+ *
+ * Kept prop-driven/routing-agnostic so it can move to /content/topics/new later.
  */
 
 import { useEffect, useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { suggestTopics, type SuggestionLanguage, type SuggestionIntent } from '@/lib/content/topic-suggestions'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
 
-type ProjectOption = { id: string; name: string }
+type ProjectOption = { id: string; name: string; language?: string | null }
 
 const INTENT_KEYS = ['informational', 'commercial', 'local', 'comparison', 'transactional', 'other'] as const
+const TONE_KEYS = ['professional', 'marketing', 'casual', 'luxury', 'informative'] as const
+const CTA_KEYS = ['gentle', 'none', 'contact', 'whatsapp', 'marketing'] as const
+const LENGTHS: { value: number; key: 'short' | 'standard' | 'deep' | 'guide' }[] = [
+  { value: 500, key: 'short' },
+  { value: 1000, key: 'standard' },
+  { value: 1500, key: 'deep' },
+  { value: 2000, key: 'guide' },
+]
 
+// Defaults (per the approved UX).
+const DEFAULT_TONE = 'professional'
+const DEFAULT_CTA = 'gentle'
+const DEFAULT_INTENT: SuggestionIntent = 'commercial'
+const DEFAULT_WORD_COUNT = 1000
+
+function normalizeLang(lang?: string | null): SuggestionLanguage {
+  return (lang || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+}
 function emptyAnchor(): ArticleTopicAnchor {
   return { anchor_text: '', target_url: '', required: false, type: 'internal', note: '' }
+}
+function oneOf<T extends string>(value: string | null | undefined, allowed: readonly T[], fallback: T): T {
+  return value && (allowed as readonly string[]).includes(value) ? (value as T) : fallback
 }
 
 export default function ArticleBriefModal({
@@ -45,93 +71,138 @@ export default function ArticleBriefModal({
   const isHebrew = language === 'he'
 
   const [projectId, setProjectId] = useState(defaultProjectId)
-  const [topic, setTopic] = useState('')
   const [primaryKeyword, setPrimaryKeyword] = useState('')
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [manualTopic, setManualTopic] = useState('')
+
+  const [briefLang, setBriefLang] = useState<SuggestionLanguage>('he')
+  const [tone, setTone] = useState<string>(DEFAULT_TONE)
+  const [wordCount, setWordCount] = useState<number>(DEFAULT_WORD_COUNT)
+  const [cta, setCta] = useState<string>(DEFAULT_CTA)
+  const [searchIntent, setSearchIntent] = useState<SuggestionIntent>(DEFAULT_INTENT)
   const [secondaryText, setSecondaryText] = useState('')
-  const [searchIntent, setSearchIntent] = useState('')
   const [targetAudience, setTargetAudience] = useState('')
-  const [briefLanguage, setBriefLanguage] = useState('')
-  const [toneOfVoice, setToneOfVoice] = useState('')
-  const [wordCount, setWordCount] = useState('')
-  const [ctaPreference, setCtaPreference] = useState('')
   const [briefNotes, setBriefNotes] = useState('')
   const [anchors, setAnchors] = useState<ArticleTopicAnchor[]>([])
 
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const projectLang = projects.find((p) => p.id === projectId)?.language
 
   // (Re)initialize when the modal opens or the edited topic changes.
   useEffect(() => {
     if (!open) return
     if (editing) {
       setProjectId(editing.project_id)
-      setTopic(editing.topic ?? '')
       setPrimaryKeyword(editing.primary_keyword ?? '')
+      setSuggestions([])
+      setSelected(new Set())
+      setManualTopic(editing.topic ?? '')
+      setBriefLang(normalizeLang(editing.language))
+      setTone(oneOf(editing.tone_of_voice, TONE_KEYS, DEFAULT_TONE))
+      setWordCount(LENGTHS.some((l) => l.value === editing.desired_word_count) ? (editing.desired_word_count as number) : DEFAULT_WORD_COUNT)
+      setCta(oneOf(editing.cta_preference, CTA_KEYS, DEFAULT_CTA))
+      setSearchIntent(oneOf(editing.search_intent, INTENT_KEYS, DEFAULT_INTENT))
       setSecondaryText((editing.secondary_keywords ?? []).join('\n'))
-      setSearchIntent(editing.search_intent ?? '')
       setTargetAudience(editing.target_audience ?? '')
-      setBriefLanguage(editing.language ?? '')
-      setToneOfVoice(editing.tone_of_voice ?? '')
-      setWordCount(editing.desired_word_count ? String(editing.desired_word_count) : '')
-      setCtaPreference(editing.cta_preference ?? '')
       setBriefNotes(editing.brief_notes ?? '')
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
+      setAdvancedOpen(true) // editing → reveal everything
     } else {
       setProjectId(defaultProjectId)
-      setTopic(''); setPrimaryKeyword(''); setSecondaryText(''); setSearchIntent('')
-      setTargetAudience(''); setBriefLanguage(''); setToneOfVoice(''); setWordCount('')
-      setCtaPreference(''); setBriefNotes(''); setAnchors([])
+      setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic('')
+      setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
+      setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
+      setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setAnchors([])
+      setAdvancedOpen(false)
     }
     setError(null)
-  }, [open, editing, defaultProjectId])
+  }, [open, editing, defaultProjectId, projects])
+
+  // Follow the selected project's language while creating (not while editing).
+  useEffect(() => {
+    if (open && !editing) setBriefLang(normalizeLang(projectLang))
+  }, [open, editing, projectLang])
+
+  function toggleSuggestion(topic: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(topic)) next.delete(topic)
+      else next.add(topic)
+      return next
+    })
+  }
+
+  function handleSuggest() {
+    setSuggestions(suggestTopics(primaryKeyword, briefLang, searchIntent))
+  }
 
   function updateAnchor(i: number, patch: Partial<ArticleTopicAnchor>) {
     setAnchors((prev) => prev.map((a, idx) => (idx === i ? { ...a, ...patch } : a)))
   }
+  function addAnchor() {
+    setAnchors((prev) => [...prev, emptyAnchor()])
+    setAdvancedOpen(true)
+  }
 
   async function handleSave() {
     if (!projectId) { setError(t.projectRequired); return }
-    if (!topic.trim()) { setError(t.topicRequired); return }
-    setSaving(true)
-    setError(null)
 
-    const secondary_keywords = secondaryText
-      .split(/[\n,]/)
-      .map((s) => s.trim())
-      .filter(Boolean)
+    // Collect the topics to save: picked suggestions + a manual topic if typed.
+    const topics = new Set<string>()
+    selected.forEach((s) => topics.add(s))
+    if (manualTopic.trim()) topics.add(manualTopic.trim())
+    const topicList = Array.from(topics)
+    if (topicList.length === 0) { setError(t.noTopicSelected); return }
 
-    const payload = {
+    const secondary_keywords = secondaryText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
+    const sharedBrief = {
       projectId,
-      topic: topic.trim(),
       primary_keyword: primaryKeyword,
-      secondary_keywords,
-      search_intent: searchIntent || null,
+      secondary_keywords: secondary_keywords,
+      search_intent: searchIntent,
       target_audience: targetAudience,
-      language: briefLanguage,
-      tone_of_voice: toneOfVoice,
-      desired_word_count: wordCount ? Number(wordCount) : null,
-      cta_preference: ctaPreference,
+      language: briefLang,
+      tone_of_voice: tone,
+      desired_word_count: wordCount,
+      cta_preference: cta,
       brief_notes: briefNotes,
-      // Drop fully-empty anchor rows client-side too.
       anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
     }
 
+    setSaving(true)
+    setError(null)
     try {
-      const res = editing
-        ? await fetch(`/api/content/topics/${editing.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-        : await fetch('/api/content/topics', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(data.error || t.genericError)
-        return
+      if (editing) {
+        const res = await fetch(`/api/content/topics/${editing.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...sharedBrief, topic: topicList[0] }),
+        })
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          setError(d.error || t.genericError)
+          return
+        }
+      } else {
+        // One POST per chosen topic — shared brief + anchors.
+        const results = await Promise.all(
+          topicList.map((topic) =>
+            fetch('/api/content/topics', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...sharedBrief, topic }),
+            }).then((r) => r.ok)
+          )
+        )
+        if (results.some((ok) => !ok)) {
+          onSaved() // refresh whatever did save
+          setError(t.genericError)
+          return
+        }
       }
       onSaved()
       onClose()
@@ -144,6 +215,7 @@ export default function ArticleBriefModal({
 
   const inputCls =
     'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+  const selectedCount = selected.size + (manualTopic.trim() ? 1 : 0)
 
   return (
     <Modal open={open} onClose={onClose} title={editing ? t.editTitle : t.newTitle} size="xl">
@@ -154,106 +226,191 @@ export default function ArticleBriefModal({
           </div>
         )}
 
+        {/* Project */}
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.project}</label>
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inputCls}>
+            <option value="">{t.selectProject}</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+
+        {/* Keyword + suggest (hidden in edit mode) */}
+        {!editing && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={t.primaryKeywordPlaceholder} />
+              </div>
+              <Button variant="outline" onClick={handleSuggest} disabled={!primaryKeyword.trim()} className="shrink-0">
+                <Sparkles size={16} /> {t.suggestTopics}
+              </Button>
+            </div>
+
+            {suggestions.length > 0 && (
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t.suggestionsHeading}</div>
+                <div className="space-y-1.5">
+                  {suggestions.map((s) => (
+                    <label key={s} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
+                      <input type="checkbox" checked={selected.has(s)} onChange={() => toggleSuggestion(s)} />
+                      <span>{s}</span>
+                    </label>
+                  ))}
+                </div>
+                {selectedCount > 1 && (
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">{t.poolHint}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Manual topic (also the single topic field in edit mode) */}
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {editing ? t.topic : t.manualTopicLabel}
+          </label>
+          <input
+            type="text"
+            value={manualTopic}
+            onChange={(e) => setManualTopic(e.target.value)}
+            placeholder={t.topicPlaceholder}
+            className={inputCls}
+          />
+        </div>
+
+        {/* Quick defaults: language toggle + intent */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.project}</label>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inputCls}>
-              <option value="">{t.selectProject}</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.language}</label>
+            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden w-fit">
+              {(['he', 'en'] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setBriefLang(l)}
+                  className={`px-4 py-2 text-sm transition ${briefLang === l ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'}`}
+                >
+                  {l === 'he' ? t.languageHe : t.languageEn}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.searchIntent}</label>
-            <select value={searchIntent} onChange={(e) => setSearchIntent(e.target.value)} className={inputCls}>
-              <option value="">{t.selectIntent}</option>
+            <select value={searchIntent} onChange={(e) => setSearchIntent(e.target.value as SuggestionIntent)} className={inputCls}>
               {INTENT_KEYS.map((k) => <option key={k} value={k}>{t.intents[k]}</option>)}
             </select>
           </div>
         </div>
 
-        <Input label={t.topic} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t.topicPlaceholder} />
+        {/* Advanced settings toggle */}
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen((v) => !v)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+        >
+          {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          {t.advancedToggle}
+        </button>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} />
-          <Input label={t.targetAudience} value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.secondaryKeywords}</label>
-          <textarea
-            value={secondaryText}
-            onChange={(e) => setSecondaryText(e.target.value)}
-            rows={2}
-            className={inputCls}
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t.secondaryHint}</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Input label={t.language} value={briefLanguage} onChange={(e) => setBriefLanguage(e.target.value)} />
-          <Input label={t.toneOfVoice} value={toneOfVoice} onChange={(e) => setToneOfVoice(e.target.value)} />
-          <Input label={t.desiredWordCount} type="number" value={wordCount} onChange={(e) => setWordCount(e.target.value)} />
-        </div>
-
-        <Input label={t.ctaPreference} value={ctaPreference} onChange={(e) => setCtaPreference(e.target.value)} />
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.briefNotes}</label>
-          <textarea
-            value={briefNotes}
-            onChange={(e) => setBriefNotes(e.target.value)}
-            rows={3}
-            className={inputCls}
-            placeholder={t.briefNotesPlaceholder}
-          />
-        </div>
-
-        {/* Anchors editor */}
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-          <div className="flex items-center justify-between mb-1">
-            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.anchorsTitle}</h4>
-            <Button size="sm" variant="outline" onClick={() => setAnchors((p) => [...p, emptyAnchor()])}>
-              <Plus size={14} /> {t.addAnchor}
-            </Button>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.anchorsHint}</p>
-
-          <div className="space-y-3">
-            {anchors.map((a, i) => (
-              <div key={i} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2 bg-slate-50/50 dark:bg-slate-800/30">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <Input label={t.anchorText} value={a.anchor_text} onChange={(e) => updateAnchor(i, { anchor_text: e.target.value })} />
-                  <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => updateAnchor(i, { target_url: e.target.value })} placeholder="https://" />
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <select value={a.type} onChange={(e) => updateAnchor(i, { type: e.target.value as 'internal' | 'external' })} className={inputCls + ' max-w-[9rem]'}>
-                    <option value="internal">{t.internal}</option>
-                    <option value="external">{t.external}</option>
-                  </select>
-                  <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                    <input type="checkbox" checked={a.required} onChange={(e) => updateAnchor(i, { required: e.target.checked })} />
-                    {t.required}
-                  </label>
-                  <input
-                    type="text"
-                    value={a.note}
-                    onChange={(e) => updateAnchor(i, { note: e.target.value })}
-                    placeholder={t.note}
-                    className={inputCls + ' flex-1 min-w-[8rem]'}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setAnchors((p) => p.filter((_, idx) => idx !== i))}
-                    className="text-red-600 dark:text-red-400 hover:text-red-700 p-1"
-                    title={t.removeAnchor}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+        {advancedOpen && (
+          <div className="space-y-4 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.toneOfVoice}</label>
+                <select value={tone} onChange={(e) => setTone(e.target.value)} className={inputCls}>
+                  {TONE_KEYS.map((k) => <option key={k} value={k}>{t.tones[k]}</option>)}
+                </select>
               </div>
-            ))}
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.ctaPreference}</label>
+                <select value={cta} onChange={(e) => setCta(e.target.value)} className={inputCls}>
+                  {CTA_KEYS.map((k) => <option key={k} value={k}>{t.ctas[k]}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Length segmented control */}
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.desiredWordCount}</label>
+              <div className="flex flex-wrap gap-2">
+                {LENGTHS.map((l) => (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => setWordCount(l.value)}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition ${
+                      wordCount === l.value
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {t.lengths[l.key]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.secondaryKeywords}</label>
+              <textarea value={secondaryText} onChange={(e) => setSecondaryText(e.target.value)} rows={2} className={inputCls} />
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t.secondaryHint}</p>
+            </div>
+
+            <Input label={t.targetAudience} value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} />
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.briefNotes}</label>
+              <textarea value={briefNotes} onChange={(e) => setBriefNotes(e.target.value)} rows={3} className={inputCls} placeholder={t.briefNotesPlaceholder} />
+            </div>
+
+            {/* Anchors */}
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.anchorsTitle}</h4>
+                <Button size="sm" variant="outline" onClick={addAnchor}>
+                  <Plus size={14} /> {t.addAnchor}
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.anchorsHint}</p>
+              <div className="space-y-3">
+                {anchors.map((a, i) => (
+                  <div key={i} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2 bg-slate-50/50 dark:bg-slate-800/30">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input label={t.anchorText} value={a.anchor_text} onChange={(e) => updateAnchor(i, { anchor_text: e.target.value })} placeholder={t.anchorTextPlaceholder} />
+                      <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => updateAnchor(i, { target_url: e.target.value })} placeholder={t.targetUrlPlaceholder} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <select value={a.type} onChange={(e) => updateAnchor(i, { type: e.target.value as 'internal' | 'external' })} className={inputCls + ' max-w-[9rem]'}>
+                        <option value="internal">{t.internal}</option>
+                        <option value="external">{t.external}</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={a.note}
+                        onChange={(e) => updateAnchor(i, { note: e.target.value })}
+                        placeholder={t.notePlaceholder}
+                        className={inputCls + ' flex-1 min-w-[8rem]'}
+                      />
+                      <button type="button" onClick={() => setAnchors((p) => p.filter((_, idx) => idx !== i))} className="text-red-600 dark:text-red-400 hover:text-red-700 p-1" title={t.removeAnchor}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <input type="checkbox" checked={a.required} onChange={(e) => updateAnchor(i, { required: e.target.checked })} className="mt-0.5" />
+                      <span>
+                        {t.required}
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">{t.requiredHelp}</span>
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose} disabled={saving}>{t.cancel}</Button>

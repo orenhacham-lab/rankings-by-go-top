@@ -26,7 +26,7 @@ import { formatDate } from '@/lib/utils'
 import { ExternalLink, Plus } from 'lucide-react'
 import type { ArticleTopic } from '@/lib/supabase/types'
 
-type ProjectOption = { id: string; name: string; business_name: string | null; target_domain: string | null }
+type ProjectOption = { id: string; name: string; business_name: string | null; target_domain: string | null; language: string | null }
 
 type Counts = {
   total: number; draft: number; ready: number; scheduled: number

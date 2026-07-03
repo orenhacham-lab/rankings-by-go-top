@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   // Projects for the selector (RLS also enforces ownership).
   const { data: projectsData, error: projectsError } = await supabase
     .from('projects')
-    .select('id, name, business_name, target_domain')
+    .select('id, name, business_name, target_domain, language')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .order('name')
