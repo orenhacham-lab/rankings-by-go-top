@@ -389,6 +389,14 @@ export interface WordPressConnection {
 export type ArticleTopicSource = 'manual' | 'ai' | 'keyword' | 'ai_question' | 'competitor'
 export type ArticleTopicStatus = 'suggested' | 'approved' | 'rejected' | 'used'
 
+export interface ArticleTopicAnchor {
+  anchor_text: string
+  target_url: string
+  required: boolean
+  type: 'internal' | 'external'
+  note: string
+}
+
 export interface ArticleTopic {
   id: string
   user_id: string
@@ -400,6 +408,13 @@ export interface ArticleTopic {
   search_intent: string | null
   target_audience: string | null
   status: ArticleTopicStatus
+  // Phase 2A brief fields (additive)
+  anchors_json: ArticleTopicAnchor[]
+  brief_notes: string | null
+  language: string | null
+  tone_of_voice: string | null
+  desired_word_count: number | null
+  cta_preference: string | null
   created_at: string
   updated_at: string
 }

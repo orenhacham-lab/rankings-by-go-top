@@ -18,10 +18,13 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import WordPressConnectionPanel from '@/components/content/WordPressConnectionPanel'
+import ArticleBriefModal from '@/components/content/ArticleBriefModal'
+import TopicsList from '@/components/content/TopicsList'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/utils'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Plus } from 'lucide-react'
+import type { ArticleTopic } from '@/lib/supabase/types'
 
 type ProjectOption = { id: string; name: string; business_name: string | null; target_domain: string | null }
 
@@ -68,6 +71,9 @@ export default function ContentHub() {
   const [activeTab, setActiveTab] = useState<'articles' | 'gbp' | 'scheduled'>('articles')
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [topics, setTopics] = useState<ArticleTopic[]>([])
+  const [briefOpen, setBriefOpen] = useState(false)
+  const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -82,7 +88,21 @@ export default function ContentHub() {
     }
   }, [projectId])
 
+  const loadTopics = useCallback(async () => {
+    if (!projectId) { setTopics([]); return }
+    try {
+      const res = await fetch(`/api/content/topics?projectId=${encodeURIComponent(projectId)}`)
+      if (res.ok) {
+        const json = await res.json()
+        setTopics(json.topics || [])
+      }
+    } catch {
+      // Non-fatal: the topics section simply shows its empty state.
+    }
+  }, [projectId])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadTopics() }, [loadTopics])
 
   // Auto-select when the user has exactly one project and none is chosen yet.
   useEffect(() => {
@@ -183,6 +203,13 @@ export default function ContentHub() {
             </Card>
           ) : (
             <>
+              {/* Primary action */}
+              <div className="flex justify-end mb-4">
+                <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}>
+                  <Plus size={16} /> {t.newTopicButton}
+                </Button>
+              </div>
+
               {/* Stats */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                 {statCards.map((s) => (
@@ -266,12 +293,32 @@ export default function ContentHub() {
                 )}
               </div>
 
+              {/* Topics / Briefs */}
+              <div className="mb-6">
+                <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{t.topicsHeading}</h3>
+                <TopicsList
+                  topics={topics}
+                  projectName={selectedProject?.name ?? '—'}
+                  onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
+                  onChanged={loadTopics}
+                />
+              </div>
+
               {/* WordPress connection — reuse the existing self-contained panel */}
               <WordPressConnectionPanel projectId={projectId} />
             </>
           )}
         </>
       )}
+
+      <ArticleBriefModal
+        open={briefOpen}
+        onClose={() => setBriefOpen(false)}
+        projects={projects}
+        defaultProjectId={projectId}
+        editing={editingTopic}
+        onSaved={loadTopics}
+      />
     </div>
   )
 }
