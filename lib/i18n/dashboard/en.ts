@@ -121,6 +121,7 @@ export const dashboardEn = {
       primaryKeywordPlaceholder: 'e.g. home treadmill',
       suggestTopics: 'Suggest topics',
       suggesting: 'Finding topics…',
+      suggestFailed: 'Couldn\'t suggest topics right now. Try again or write a topic manually.',
       suggestionsHeading: 'Suggested topics — pick one or several',
       manualTopicLabel: 'Or write a topic manually',
       manualTopicOr: 'or',

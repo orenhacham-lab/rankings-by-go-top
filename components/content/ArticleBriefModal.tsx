@@ -3,14 +3,13 @@
 /**
  * ArticleBriefModal — create/edit a manual Article Brief / Topic (Phase 2A UX).
  *
- * Simple-by-default: quick mode asks only for project + keyword + a topic
- * (picked from keyword-based suggestions or typed manually). Everything else
- * has sensible defaults and lives under "Advanced settings". NO generation.
+ * Simple-by-default: quick mode asks only for project + keyword + a topic.
+ * "Suggest topics" calls Gemini (server) for SEO/GEO topic ideas; a template
+ * fallback runs only if Gemini fails. Everything else has sensible defaults
+ * under "Advanced settings". NO article generation.
  *
- * Multiple picked suggestions save as multiple article_topics (one POST each)
- * sharing the same brief — the seed for a future scheduled series/pool.
- *
- * Kept prop-driven/routing-agnostic so it can move to /content/topics/new later.
+ * Multiple picked topics save as multiple article_topics (one POST each),
+ * enriched per-topic from the Gemini suggestion when available.
  */
 
 import { useEffect, useState } from 'react'
@@ -20,7 +19,8 @@ import Button from '@/components/ui/Button'
 import { Trash2, Plus, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { suggestTopics, type SuggestionLanguage, type SuggestionIntent } from '@/lib/content/topic-suggestions'
+import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
+import type { GeminiTopicSuggestion } from '@/lib/content/gemini-topics'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type ProjectOption = { id: string; name: string; language?: string | null }
@@ -35,7 +35,6 @@ const LENGTHS: { value: number; key: 'short' | 'standard' | 'deep' | 'guide' }[]
   { value: 2000, key: 'guide' },
 ]
 
-// Defaults (per the approved UX).
 const DEFAULT_TONE = 'professional'
 const DEFAULT_CTA = 'gentle'
 const DEFAULT_INTENT: SuggestionIntent = 'commercial'
@@ -72,9 +71,11 @@ export default function ArticleBriefModal({
 
   const [projectId, setProjectId] = useState(defaultProjectId)
   const [primaryKeyword, setPrimaryKeyword] = useState('')
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<GeminiTopicSuggestion[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [manualTopic, setManualTopic] = useState('')
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestError, setSuggestError] = useState<string | null>(null)
 
   const [briefLang, setBriefLang] = useState<SuggestionLanguage>('he')
   const [tone, setTone] = useState<string>(DEFAULT_TONE)
@@ -92,14 +93,12 @@ export default function ArticleBriefModal({
 
   const projectLang = projects.find((p) => p.id === projectId)?.language
 
-  // (Re)initialize when the modal opens or the edited topic changes.
   useEffect(() => {
     if (!open) return
     if (editing) {
       setProjectId(editing.project_id)
       setPrimaryKeyword(editing.primary_keyword ?? '')
-      setSuggestions([])
-      setSelected(new Set())
+      setSuggestions([]); setSelected(new Set()); setSuggestError(null)
       setManualTopic(editing.topic ?? '')
       setBriefLang(normalizeLang(editing.language))
       setTone(oneOf(editing.tone_of_voice, TONE_KEYS, DEFAULT_TONE))
@@ -110,10 +109,10 @@ export default function ArticleBriefModal({
       setTargetAudience(editing.target_audience ?? '')
       setBriefNotes(editing.brief_notes ?? '')
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
-      setAdvancedOpen(true) // editing → reveal everything
+      setAdvancedOpen(true)
     } else {
       setProjectId(defaultProjectId)
-      setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic('')
+      setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null)
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
       setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setAnchors([])
@@ -122,22 +121,58 @@ export default function ArticleBriefModal({
     setError(null)
   }, [open, editing, defaultProjectId, projects])
 
-  // Follow the selected project's language while creating (not while editing).
   useEffect(() => {
     if (open && !editing) setBriefLang(normalizeLang(projectLang))
   }, [open, editing, projectLang])
 
-  function toggleSuggestion(topic: string) {
+  function toggleSuggestion(title: string) {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(topic)) next.delete(topic)
-      else next.add(topic)
+      if (next.has(title)) next.delete(title)
+      else next.add(title)
       return next
     })
   }
 
-  function handleSuggest() {
-    setSuggestions(suggestTopics(primaryKeyword, briefLang, searchIntent))
+  async function handleSuggest() {
+    if (!projectId || !primaryKeyword.trim()) return
+    setSuggesting(true)
+    setSuggestError(null)
+    try {
+      const secondary = secondaryText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
+      const res = await fetch('/api/content/topic-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          primaryKeyword: primaryKeyword.trim(),
+          language: briefLang,
+          searchIntent,
+          count: 8,
+          secondaryKeywords: secondary,
+          targetAudience,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !Array.isArray(data.topics)) {
+        setSuggestError(data.error || t.suggestFailed)
+        return
+      }
+      const topics = data.topics as GeminiTopicSuggestion[]
+      setSuggestions(topics)
+      // Convenience: prefill length + secondary from the first suggestion.
+      const first = topics[0]
+      if (first) {
+        if (LENGTHS.some((l) => l.value === first.recommendedWordCount)) setWordCount(first.recommendedWordCount)
+        if (!secondaryText.trim() && first.suggestedSecondaryKeywords.length) {
+          setSecondaryText(first.suggestedSecondaryKeywords.join('\n'))
+        }
+      }
+    } catch {
+      setSuggestError(t.suggestFailed)
+    } finally {
+      setSuggesting(false)
+    }
   }
 
   function updateAnchor(i: number, patch: Partial<ArticleTopicAnchor>) {
@@ -148,30 +183,44 @@ export default function ArticleBriefModal({
     setAdvancedOpen(true)
   }
 
+  // Build the POST/PATCH payload for one topic, enriched from its suggestion.
+  function buildPayload(topicTitle: string) {
+    const sug = suggestions.find((s) => s.title === topicTitle)
+    const formSecondary = secondaryText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
+    let secondary = formSecondary
+    let intent: SuggestionIntent = searchIntent
+    let wc = wordCount
+    if (sug) {
+      if (sug.suggestedSecondaryKeywords.length) {
+        secondary = Array.from(new Set([...formSecondary, ...sug.suggestedSecondaryKeywords]))
+      }
+      if ((INTENT_KEYS as readonly string[]).includes(sug.searchIntent)) intent = sug.searchIntent as SuggestionIntent
+      if (LENGTHS.some((l) => l.value === sug.recommendedWordCount)) wc = sug.recommendedWordCount
+    }
+    return {
+      projectId,
+      topic: topicTitle,
+      primary_keyword: primaryKeyword,
+      secondary_keywords: secondary,
+      search_intent: intent,
+      target_audience: targetAudience,
+      language: briefLang,
+      tone_of_voice: tone,
+      desired_word_count: wc,
+      cta_preference: cta,
+      brief_notes: briefNotes,
+      anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
+    }
+  }
+
   async function handleSave() {
     if (!projectId) { setError(t.projectRequired); return }
 
-    // Collect the topics to save: picked suggestions + a manual topic if typed.
     const topics = new Set<string>()
     selected.forEach((s) => topics.add(s))
     if (manualTopic.trim()) topics.add(manualTopic.trim())
     const topicList = Array.from(topics)
     if (topicList.length === 0) { setError(t.noTopicSelected); return }
-
-    const secondary_keywords = secondaryText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
-    const sharedBrief = {
-      projectId,
-      primary_keyword: primaryKeyword,
-      secondary_keywords: secondary_keywords,
-      search_intent: searchIntent,
-      target_audience: targetAudience,
-      language: briefLang,
-      tone_of_voice: tone,
-      desired_word_count: wordCount,
-      cta_preference: cta,
-      brief_notes: briefNotes,
-      anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
-    }
 
     setSaving(true)
     setError(null)
@@ -180,7 +229,7 @@ export default function ArticleBriefModal({
         const res = await fetch(`/api/content/topics/${editing.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...sharedBrief, topic: topicList[0] }),
+          body: JSON.stringify(buildPayload(topicList[0])),
         })
         if (!res.ok) {
           const d = await res.json().catch(() => ({}))
@@ -188,19 +237,19 @@ export default function ArticleBriefModal({
           return
         }
       } else {
-        // One POST per chosen topic — shared brief + anchors.
         const results = await Promise.all(
           topicList.map((topic) =>
             fetch('/api/content/topics', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...sharedBrief, topic }),
-            }).then((r) => r.ok)
+              body: JSON.stringify(buildPayload(topic)),
+            }).then(async (r) => ({ ok: r.ok, err: r.ok ? null : (await r.json().catch(() => ({}))).error }))
           )
         )
-        if (results.some((ok) => !ok)) {
+        const failed = results.find((r) => !r.ok)
+        if (failed) {
           onSaved() // refresh whatever did save
-          setError(t.genericError)
+          setError(failed.err || t.genericError)
           return
         }
       }
@@ -226,7 +275,6 @@ export default function ArticleBriefModal({
           </div>
         )}
 
-        {/* Project */}
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.project}</label>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inputCls}>
@@ -235,26 +283,32 @@ export default function ArticleBriefModal({
           </select>
         </div>
 
-        {/* Keyword + suggest (hidden in edit mode) */}
         {!editing && (
           <div className="flex flex-col gap-2">
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={t.primaryKeywordPlaceholder} />
               </div>
-              <Button variant="outline" onClick={handleSuggest} disabled={!primaryKeyword.trim()} className="shrink-0">
-                <Sparkles size={16} /> {t.suggestTopics}
+              <Button variant="outline" onClick={handleSuggest} loading={suggesting} disabled={suggesting || !primaryKeyword.trim() || !projectId} className="shrink-0">
+                <Sparkles size={16} /> {suggesting ? t.suggesting : t.suggestTopics}
               </Button>
             </div>
+
+            {suggestError && (
+              <div className="text-sm text-amber-700 dark:text-amber-400">{suggestError}</div>
+            )}
 
             {suggestions.length > 0 && (
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
                 <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t.suggestionsHeading}</div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {suggestions.map((s) => (
-                    <label key={s} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
-                      <input type="checkbox" checked={selected.has(s)} onChange={() => toggleSuggestion(s)} />
-                      <span>{s}</span>
+                    <label key={s.title} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
+                      <input type="checkbox" className="mt-1" checked={selected.has(s.title)} onChange={() => toggleSuggestion(s.title)} />
+                      <span>
+                        {s.title}
+                        {s.angle && <span className="block text-xs text-slate-400 dark:text-slate-500">{s.angle}</span>}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -266,32 +320,19 @@ export default function ArticleBriefModal({
           </div>
         )}
 
-        {/* Manual topic (also the single topic field in edit mode) */}
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {editing ? t.topic : t.manualTopicLabel}
           </label>
-          <input
-            type="text"
-            value={manualTopic}
-            onChange={(e) => setManualTopic(e.target.value)}
-            placeholder={t.topicPlaceholder}
-            className={inputCls}
-          />
+          <input type="text" value={manualTopic} onChange={(e) => setManualTopic(e.target.value)} placeholder={t.topicPlaceholder} className={inputCls} />
         </div>
 
-        {/* Quick defaults: language toggle + intent */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.language}</label>
             <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden w-fit">
               {(['he', 'en'] as const).map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => setBriefLang(l)}
-                  className={`px-4 py-2 text-sm transition ${briefLang === l ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'}`}
-                >
+                <button key={l} type="button" onClick={() => setBriefLang(l)} className={`px-4 py-2 text-sm transition ${briefLang === l ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'}`}>
                   {l === 'he' ? t.languageHe : t.languageEn}
                 </button>
               ))}
@@ -305,12 +346,7 @@ export default function ArticleBriefModal({
           </div>
         </div>
 
-        {/* Advanced settings toggle */}
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((v) => !v)}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-        >
+        <button type="button" onClick={() => setAdvancedOpen((v) => !v)} className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
           {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           {t.advancedToggle}
         </button>
@@ -332,21 +368,11 @@ export default function ArticleBriefModal({
               </div>
             </div>
 
-            {/* Length segmented control */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.desiredWordCount}</label>
               <div className="flex flex-wrap gap-2">
                 {LENGTHS.map((l) => (
-                  <button
-                    key={l.value}
-                    type="button"
-                    onClick={() => setWordCount(l.value)}
-                    className={`px-3 py-1.5 text-sm rounded-lg border transition ${
-                      wordCount === l.value
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
+                  <button key={l.value} type="button" onClick={() => setWordCount(l.value)} className={`px-3 py-1.5 text-sm rounded-lg border transition ${wordCount === l.value ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
                     {t.lengths[l.key]}
                   </button>
                 ))}
@@ -366,7 +392,6 @@ export default function ArticleBriefModal({
               <textarea value={briefNotes} onChange={(e) => setBriefNotes(e.target.value)} rows={3} className={inputCls} placeholder={t.briefNotesPlaceholder} />
             </div>
 
-            {/* Anchors */}
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.anchorsTitle}</h4>
@@ -387,13 +412,7 @@ export default function ArticleBriefModal({
                         <option value="internal">{t.internal}</option>
                         <option value="external">{t.external}</option>
                       </select>
-                      <input
-                        type="text"
-                        value={a.note}
-                        onChange={(e) => updateAnchor(i, { note: e.target.value })}
-                        placeholder={t.notePlaceholder}
-                        className={inputCls + ' flex-1 min-w-[8rem]'}
-                      />
+                      <input type="text" value={a.note} onChange={(e) => updateAnchor(i, { note: e.target.value })} placeholder={t.notePlaceholder} className={inputCls + ' flex-1 min-w-[8rem]'} />
                       <button type="button" onClick={() => setAnchors((p) => p.filter((_, idx) => idx !== i))} className="text-red-600 dark:text-red-400 hover:text-red-700 p-1" title={t.removeAnchor}>
                         <Trash2 size={16} />
                       </button>

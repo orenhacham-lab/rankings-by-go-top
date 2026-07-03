@@ -53,10 +53,14 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
+  console.log('[content-topics] create topic request', { hasBody: !!body, projectIdPresent: typeof body.projectId === 'string' })
+
   const auth = await authContentProject(typeof body.projectId === 'string' ? body.projectId : null)
+  console.log('[content-topics] project ownership ok', !('error' in auth))
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
   const validated = validateTopicBrief(body)
+  console.log('[content-topics] validation ok', !('error' in validated))
   if ('error' in validated) {
     return Response.json({ error: validated.error }, { status: 400 })
   }
@@ -86,10 +90,19 @@ export async function POST(request: Request) {
     .single()
 
   if (error || !data) {
-    console.error('[content topics] create failed:', error?.message)
+    const code = (error as { code?: string })?.code
+    console.error('[content-topics] supabase insert error', { code, message: error?.message })
+    // 42703 = undefined_column, 42P01 = undefined_table → the Phase 2A brief
+    // migration (20260703_add_topic_brief_fields.sql) has not been applied.
+    if (code === '42703' || code === '42P01') {
+      return Response.json(
+        { error: 'Content module not fully migrated on the server. The brief fields migration must be run.' },
+        { status: 503 }
+      )
+    }
     return Response.json({ error: 'Failed to save topic' }, { status: 500 })
   }
 
-  console.log('[content topics] created', { projectId: auth.project.id, anchors: v.anchors_json.length })
+  console.log('[content-topics] created topic id', { id: (data as { id: string }).id, anchors: v.anchors_json.length })
   return Response.json({ topic: data })
 }

@@ -50,7 +50,7 @@ export interface SemanticClassification {
 let geminiClient: GoogleGenerativeAI | null = null
 let initError: string | null = null
 
-function getGeminiClient(): GoogleGenerativeAI | null {
+export function getGeminiClient(): GoogleGenerativeAI | null {
   if (initError) return null
 
   if (!geminiClient) {

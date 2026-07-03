@@ -119,6 +119,7 @@ export const dashboardHe = {
       primaryKeywordPlaceholder: 'לדוגמה: הליכון ביתי',
       suggestTopics: 'הצע נושאים',
       suggesting: 'מחפש נושאים…',
+      suggestFailed: 'לא הצלחנו להציע נושאים כרגע. נסו שוב או כתבו נושא ידנית.',
       suggestionsHeading: 'נושאים מוצעים — בחרו אחד או כמה',
       manualTopicLabel: 'או כתבו נושא ידנית',
       manualTopicOr: 'או',
