@@ -76,12 +76,14 @@ export async function POST(request: Request) {
     targetAudience,
   })
 
-  if (gemini && gemini.length > 0) {
-    return Response.json({ source: 'gemini', topics: gemini })
+  if ('topics' in gemini) {
+    console.log('[content-topic-suggestions] source=gemini count=' + gemini.topics.length)
+    return Response.json({ source: 'gemini', topics: gemini.topics })
   }
 
   // Fallback: deterministic templates (only when Gemini failed).
-  console.log('[content-topic-suggestions] gemini failed, using fallback')
+  const fallbackReason = gemini.error
+  console.log('[content-topic-suggestions] source=fallback reason=' + fallbackReason)
   const fallbackTitles = suggestTopics(primaryKeyword, language, intent, count)
   const topics: GeminiTopicSuggestion[] = fallbackTitles.map((title) => ({
     title,
@@ -92,5 +94,5 @@ export async function POST(request: Request) {
     suggestedSecondaryKeywords: [],
     recommendedWordCount: 1000,
   }))
-  return Response.json({ source: 'fallback', topics })
+  return Response.json({ source: 'fallback', fallbackReason, topics })
 }

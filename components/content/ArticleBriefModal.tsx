@@ -43,6 +43,32 @@ const DEFAULT_WORD_COUNT = 1000
 function normalizeLang(lang?: string | null): SuggestionLanguage {
   return (lang || '').toLowerCase().startsWith('en') ? 'en' : 'he'
 }
+
+// Map Gemini's English "angle" labels to Hebrew for the Hebrew UI. Anything
+// unmapped that still contains Latin letters is hidden rather than shown in
+// English inside a Hebrew interface.
+const ANGLE_MAP_HE: Record<string, string> = {
+  'buying guide': 'מדריך בחירה',
+  'price/cost analysis': 'מחיר ועלויות',
+  'price analysis': 'מחיר ועלויות',
+  'cost analysis': 'מחיר ועלויות',
+  'common mistakes': 'טעויות נפוצות',
+  'comparison': 'השוואה',
+  'how-to/setup guide': 'מדריך מעשי',
+  'how-to': 'מדריך מעשי',
+  'setup guide': 'מדריך מעשי',
+  'faq': 'שאלות נפוצות',
+}
+function localizeAngle(angle: string | undefined, uiLang: 'he' | 'en'): string {
+  const a = (angle || '').trim()
+  if (!a) return ''
+  if (uiLang === 'en') return a
+  const mapped = ANGLE_MAP_HE[a.toLowerCase()]
+  if (mapped) return mapped
+  // Unmapped English text in a Hebrew UI → hide it.
+  if (/[A-Za-z]/.test(a)) return ''
+  return a
+}
 function emptyAnchor(): ArticleTopicAnchor {
   return { anchor_text: '', target_url: '', required: false, type: 'internal', note: '' }
 }
@@ -76,6 +102,7 @@ export default function ArticleBriefModal({
   const [manualTopic, setManualTopic] = useState('')
   const [suggesting, setSuggesting] = useState(false)
   const [suggestError, setSuggestError] = useState<string | null>(null)
+  const [source, setSource] = useState<'gemini' | 'fallback' | null>(null)
 
   const [briefLang, setBriefLang] = useState<SuggestionLanguage>('he')
   const [tone, setTone] = useState<string>(DEFAULT_TONE)
@@ -98,7 +125,7 @@ export default function ArticleBriefModal({
     if (editing) {
       setProjectId(editing.project_id)
       setPrimaryKeyword(editing.primary_keyword ?? '')
-      setSuggestions([]); setSelected(new Set()); setSuggestError(null)
+      setSuggestions([]); setSelected(new Set()); setSuggestError(null); setSource(null)
       setManualTopic(editing.topic ?? '')
       setBriefLang(normalizeLang(editing.language))
       setTone(oneOf(editing.tone_of_voice, TONE_KEYS, DEFAULT_TONE))
@@ -112,7 +139,7 @@ export default function ArticleBriefModal({
       setAdvancedOpen(true)
     } else {
       setProjectId(defaultProjectId)
-      setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null)
+      setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null); setSource(null)
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
       setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setAnchors([])
@@ -138,6 +165,7 @@ export default function ArticleBriefModal({
     if (!projectId || !primaryKeyword.trim()) return
     setSuggesting(true)
     setSuggestError(null)
+    setSource(null)
     try {
       const secondary = secondaryText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
       const res = await fetch('/api/content/topic-suggestions', {
@@ -160,6 +188,7 @@ export default function ArticleBriefModal({
       }
       const topics = data.topics as GeminiTopicSuggestion[]
       setSuggestions(topics)
+      setSource(data.source === 'gemini' ? 'gemini' : 'fallback')
       // Convenience: prefill length + secondary from the first suggestion.
       const first = topics[0]
       if (first) {
@@ -300,17 +329,40 @@ export default function ArticleBriefModal({
 
             {suggestions.length > 0 && (
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t.suggestionsHeading}</div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.suggestionsHeading}</div>
+                  {source && (
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                        source === 'gemini'
+                          ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                          : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                      }`}
+                    >
+                      {source === 'gemini' ? t.sourceGemini : t.sourceFallback}
+                    </span>
+                  )}
+                </div>
+
+                {source === 'fallback' && (
+                  <div className="mb-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-2 py-1.5">
+                    {t.fallbackWarning}
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  {suggestions.map((s) => (
-                    <label key={s.title} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
-                      <input type="checkbox" className="mt-1" checked={selected.has(s.title)} onChange={() => toggleSuggestion(s.title)} />
-                      <span>
-                        {s.title}
-                        {s.angle && <span className="block text-xs text-slate-400 dark:text-slate-500">{s.angle}</span>}
-                      </span>
-                    </label>
-                  ))}
+                  {suggestions.map((s) => {
+                    const angle = localizeAngle(s.angle, isHebrew ? 'he' : 'en')
+                    return (
+                      <label key={s.title} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
+                        <input type="checkbox" className="mt-1" checked={selected.has(s.title)} onChange={() => toggleSuggestion(s.title)} />
+                        <span>
+                          {s.title}
+                          {angle && <span className="block text-xs text-slate-400 dark:text-slate-500">{angle}</span>}
+                        </span>
+                      </label>
+                    )
+                  })}
                 </div>
                 {selectedCount > 1 && (
                   <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">{t.poolHint}</p>

@@ -55,6 +55,7 @@ function buildPrompt(ctx: TopicSuggestionContext): string {
     `- Natural, human titles. No keyword stuffing (do not repeat the keyword more than once per title). No near-duplicate titles. No weird or artificial phrasing.`,
     `- Do NOT overuse the business name; titles should read as helpful content, not ads.`,
     `- Suitable for a marketing/promotional article without being aggressive.`,
+    `- Write the "angle" and "whyThisTopic" fields in ${lang} as well (match the title language).`,
     ``,
     `Return ONLY valid JSON (no markdown, no commentary) in exactly this shape:`,
     `{"topics":[{"title":"...","primaryKeyword":"${ctx.primaryKeyword}","searchIntent":"${ctx.searchIntent}","angle":"...","whyThisTopic":"...","suggestedSecondaryKeywords":["...","..."],"recommendedWordCount":1000}]}`,
@@ -131,17 +132,22 @@ export function filterTopicSuggestions(
   return accepted
 }
 
+/** Result: either topics, or a safe machine-readable failure reason. */
+export type GeminiTopicResult = { topics: GeminiTopicSuggestion[] } | { error: string }
+
 /**
- * Generate topic suggestions via Gemini. Returns null on any failure (missing
- * key, API error, unparseable/empty output) so the caller can fall back.
+ * Generate topic suggestions via Gemini. Returns { topics } on success, or
+ * { error: <safe reason> } on any failure (missing key, API error,
+ * unparseable/empty output) so the caller can fall back and report why.
  */
 export async function generateTopicSuggestionsWithGemini(
   ctx: TopicSuggestionContext
-): Promise<GeminiTopicSuggestion[] | null> {
+): Promise<GeminiTopicResult> {
   const client = getGeminiClient()
   if (!client) {
-    console.warn('[content-topic-suggestions] gemini client unavailable')
-    return null
+    const reason = process.env.GEMINI_API_KEY ? 'gemini_init_failed' : 'missing_gemini_api_key'
+    console.warn('[content-topic-suggestions] gemini client unavailable', { reason })
+    return { error: reason }
   }
 
   const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
@@ -158,28 +164,22 @@ export async function generateTopicSuggestionsWithGemini(
       parsed = JSON.parse(text)
     } catch {
       const m = text.match(/\{[\s\S]*\}/)
-      if (!m) {
-        console.warn('[content-topic-suggestions] no JSON in gemini response')
-        return null
-      }
+      if (!m) return { error: 'gemini_no_json' }
       parsed = JSON.parse(m[0])
     }
 
     if (!parsed || !Array.isArray(parsed.topics)) {
-      console.warn('[content-topic-suggestions] gemini returned no topics array')
-      return null
+      return { error: 'gemini_no_topics' }
     }
 
     const filtered = filterTopicSuggestions(parsed.topics as GeminiTopicSuggestion[], ctx.primaryKeyword, ctx.count)
     if (filtered.length === 0) {
-      console.warn('[content-topic-suggestions] all gemini topics filtered out')
-      return null
+      return { error: 'gemini_all_filtered' }
     }
-    console.log('[content-topic-suggestions] gemini ok', { requested: ctx.count, returned: filtered.length })
-    return filtered
+    return { topics: filtered }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[content-topic-suggestions] gemini error', { message: msg })
-    return null
+    return { error: 'gemini_request_failed' }
   }
 }
