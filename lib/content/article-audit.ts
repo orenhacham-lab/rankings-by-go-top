@@ -10,7 +10,7 @@
 
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
-import { validateAnchorPlacement } from '@/lib/content/anchors-check'
+import { validateAnchorPlacement, analyzeAnchorQuality, type AnchorQuality } from '@/lib/content/anchors-check'
 
 export type CheckSeverity = 'blocker' | 'warning' | 'info'
 export type CheckCategory = 'seo' | 'readability' | 'geo' | 'technical'
@@ -40,6 +40,8 @@ export interface AuditResult {
   // "TOC-ready" = enough H2, valid heading hierarchy, no H1. Does NOT require a
   // manual TOC to be present in the HTML (a WP plugin/theme can build one).
   tocReady: boolean
+  // Placement quality of the links in the article body.
+  anchorQuality: AnchorQuality
 }
 
 export interface AuditInput {
@@ -281,6 +283,13 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // --- required anchors ---
   add('required_anchors_present', 'seo', 'blocker', !anchorVal.hasBlockingIssues)
 
+  // --- anchor PLACEMENT quality (Google link best-practices) ---
+  const anchorQuality = analyzeAnchorQuality(html, lang)
+  // Spammy placement is blocked (also blocks "mark as ready"); spacing warns.
+  add('anchor_too_early', 'seo', 'blocker', !anchorQuality.anchorTooEarly)
+  add('anchor_inserted_mechanically', 'seo', 'blocker', !anchorQuality.mechanicalAnchorPhrase)
+  add('anchor_spacing_too_close', 'seo', 'warning', !(anchorQuality.anchorsTooClose || anchorQuality.anchorsInSameParagraph))
+
   // --- content exists ---
   add('content_exists', 'technical', 'blocker', wordCount >= 50)
 
@@ -300,6 +309,6 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   return {
     score, blockers, warnings, counts, checks,
     anchorsOk: !anchorVal.hasBlockingIssues, requiredAnchorsMissing: anchorVal.missingRequired.length,
-    tocReady,
+    tocReady, anchorQuality,
   }
 }

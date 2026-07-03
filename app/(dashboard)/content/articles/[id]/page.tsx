@@ -20,7 +20,8 @@ import { AlertTriangle } from 'lucide-react'
 
 type Faq = { question: string; answer: string }
 type AuditCounts = { h2: number; h3: number; p: number; words: number; faq: number; tables: number; lists: number }
-type Audit = { score: number; blockers: string[]; warnings: string[]; counts: AuditCounts; tocReady?: boolean }
+type AnchorQuality = { count: number; firstAnchorWordIndex: number; anchorTooEarly: boolean; anchorsTooClose: boolean; anchorsInSameParagraph: boolean; mechanicalAnchorPhrase: boolean }
+type Audit = { score: number; blockers: string[]; warnings: string[]; counts: AuditCounts; tocReady?: boolean; anchorQuality?: AnchorQuality }
 
 export default function ArticleEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -197,6 +198,22 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             </span>
           </div>
 
+          {audit.anchorQuality && audit.anchorQuality.count > 0 && (() => {
+            const aq = audit.anchorQuality
+            const isBlock = aq.anchorTooEarly || aq.mechanicalAnchorPhrase
+            const isWarn = aq.anchorsTooClose || aq.anchorsInSameParagraph
+            const msg = aq.anchorTooEarly ? e.anchorEarly : aq.mechanicalAnchorPhrase ? e.anchorMechanical : isWarn ? e.anchorTooCloseMsg : e.anchorQualityOk
+            const cls = isBlock ? 'text-red-700 dark:text-red-400' : isWarn ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'
+            return (
+              <div className="mb-3 text-xs">
+                <span className={cls}>{`${e.anchorQualityLabel}: ${msg}`}</span>
+                {aq.firstAnchorWordIndex >= 0 && (
+                  <span className="text-slate-400 dark:text-slate-500"> · {e.anchorFirstPos}: {aq.firstAnchorWordIndex}</span>
+                )}
+              </div>
+            )
+          })()}
+
           {audit.blockers.length > 0 && (
             <div className="mb-2">
               <div className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400 mb-1">
@@ -275,7 +292,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
           <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
           <span className="text-xs text-slate-400 dark:text-slate-600 px-2">{e.publishNextPhase}</span>
-          <Link href={backHref} className="ms-auto"><Button variant="ghost">{e.back}</Button></Link>
+          <Link href={backHref} className="ms-auto"><Button variant="outline">{e.back}</Button></Link>
+        </div>
+
+        {/* Prominent, unmistakable return to the Content Hub for this project. */}
+        <div className="pb-10">
+          <Link href={backHref} className="block">
+            <Button variant="outline" className="w-full sm:w-auto">{e.backToHub}</Button>
+          </Link>
         </div>
       </div>
     </div>

@@ -12,7 +12,10 @@
 
 import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
-import { validateAnchorPlacement } from '@/lib/content/anchors-check'
+import {
+  validateAnchorPlacement, scanAnchorHits, isAnchorTooEarly,
+  ANCHOR_MIN_WORDS_BEFORE_FIRST, ANCHOR_MIN_PARAGRAPHS_BEFORE_FIRST, ANCHOR_MIN_WORD_GAP,
+} from '@/lib/content/anchors-check'
 import { runArticleAudit, thresholdsFor, type AuditResult } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
@@ -97,6 +100,9 @@ const FAILURE_HINT: Record<string, string> = {
   no_brand_when_disabled: 'REMOVE any business/brand name',
   has_early_answer: 'add a clear direct answer in the first paragraph',
   not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
+  anchor_too_early: 'move the required link OUT of the direct answer / first paragraph — place it only after the article has established context',
+  anchor_spacing_too_close: 'spread the links across different sections (>=2 paragraphs apart), never two in the same paragraph',
+  anchor_inserted_mechanically: 'integrate each link into a genuinely relevant sentence — no "read more", "click here", "אתר כמו", "למידע נוסף"',
 }
 
 function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
@@ -145,6 +151,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Do NOT invent prices/statistics/laws/facts not in this brief; when unsure use hedges ("in most cases", "typically", "prices may vary", "check with the provider").`,
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
+    anchorTopics.length ? `- LINK PLACEMENT RULES: never place a link in the directAnswer or the first paragraph; place the first link only after the article has established context (after the first <h2> and a couple of paragraphs). If there are multiple links, distribute them across DIFFERENT sections — never two links in the same paragraph or back-to-back. Integrate every link into a genuinely relevant sentence; do NOT use generic phrases like "read more", "click here", "אתר כמו", "למידע נוסף".` : '',
     ``,
     `MINIMUMS (mandatory): >=${th.minH2} sections (<h2>), >=${th.minP} paragraphs total, ${th.minLists} list(s), ${th.minFaq} FAQ pairs${th.minH3 ? `, >=${th.minH3} subsections (<h3>)` : ''}.`,
     `- When the topic involves comparison, pricing/cost, choosing between options, types, or pros/cons, you MUST include a REAL data/comparison TABLE (>=2 columns AND >=2 rows) via the "table" field — never fake it as a paragraph or a single row.`,
@@ -269,23 +276,116 @@ export function toEnglishSlug(geminiSlug: string, primaryKeyword: string | null)
   return ''
 }
 function escAttr(s: string): string { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+function escRe(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+function countWords(html: string): number { return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').split(/\s+/).filter(Boolean).length }
+
+interface ParaBlock { start: number; end: number; full: string; inner: string; index: number; wordStart: number; hasLink: boolean }
+/** Collect every <p> block with char offsets + running word offset + link flag. */
+function collectParagraphs(html: string): ParaBlock[] {
+  const out: ParaBlock[] = []
+  const re = /<p[^>]*>([\s\S]*?)<\/p>/gi
+  let m: RegExpExecArray | null
+  let idx = 0
+  while ((m = re.exec(html)) !== null) {
+    out.push({
+      start: m.index, end: m.index + m[0].length, full: m[0], inner: m[1], index: idx++,
+      wordStart: countWords(html.slice(0, m.index)), hasLink: /<a[\s>]/i.test(m[1]),
+    })
+  }
+  return out
+}
+
+/**
+ * Deterministic anchor insertion that RESPECTS placement quality:
+ * - never inserts in the direct answer or the first paragraphs (waits until the
+ *   article has established context: >=2 paragraphs AND >=120 words AND after
+ *   the first H2),
+ * - keeps anchors spaced apart (>=200 words / different paragraphs),
+ * - integrates the anchor into a real sentence — no "read more" / "אתר כמו".
+ */
 function insertAnchors(html: string, missing: { anchorText: string; targetUrl: string }[], language: SuggestionLanguage): string {
   let out = html
+  // Seed "used" positions with existing anchors so we keep spacing from them.
+  const used: number[] = scanAnchorHits(out).hits.map((h) => h.wordIndex)
+
+  const eligibleParas = (): ParaBlock[] => {
+    const paras = collectParagraphs(out)
+    const firstH2 = out.search(/<h2[\s>]/i)
+    const established = paras.filter((p) =>
+      !p.hasLink &&
+      p.index >= ANCHOR_MIN_PARAGRAPHS_BEFORE_FIRST &&
+      p.wordStart >= ANCHOR_MIN_WORDS_BEFORE_FIRST &&
+      (firstH2 < 0 || p.start > firstH2))
+    if (established.length) return established
+    // Relaxed fallbacks for very short articles (still never the first paragraph).
+    const relaxed = paras.filter((p) => !p.hasLink && p.index >= 1)
+    return relaxed.length ? relaxed : paras.filter((p) => !p.hasLink)
+  }
+  const farEnough = (wordStart: number) => used.every((u) => Math.abs(wordStart - u) >= ANCHOR_MIN_WORD_GAP)
+
   for (const a of missing) {
-    const text = (a.anchorText || '').trim(); const url = (a.targetUrl || '').trim()
+    const text = (a.anchorText || '').trim()
+    const url = (a.targetUrl || '').trim()
     if (!text || !/^https?:\/\//i.test(url)) continue
-    const parts = out.split(/(<[^>]+>)/); let placed = false; let insideLink = false
-    for (let i = 0; i < parts.length; i++) {
-      const seg = parts[i]
-      if (seg.startsWith('<')) { if (/^<a[\s>]/i.test(seg)) insideLink = true; else if (/^<\/a>/i.test(seg)) insideLink = false; continue }
-      if (insideLink) continue
-      const idx = seg.toLowerCase().indexOf(text.toLowerCase())
-      if (idx >= 0) { parts[i] = `${seg.slice(0, idx)}<a href="${escAttr(url)}">${seg.slice(idx, idx + text.length)}</a>${seg.slice(idx + text.length)}`; out = parts.join(''); placed = true; break }
+
+    const paras = eligibleParas()
+    // 1) Link an existing textual mention inside an eligible, well-spaced paragraph.
+    let placed = false
+    for (const p of paras) {
+      if (!farEnough(p.wordStart)) continue
+      const idx = p.inner.toLowerCase().indexOf(text.toLowerCase())
+      if (idx < 0 || p.inner.slice(0, idx).includes('<')) continue // keep it out of any tag
+      const newInner = `${p.inner.slice(0, idx)}<a href="${escAttr(url)}">${p.inner.slice(idx, idx + text.length)}</a>${p.inner.slice(idx + text.length)}`
+      out = out.slice(0, p.start) + `<p>${newInner}</p>` + out.slice(p.end)
+      used.push(p.wordStart)
+      placed = true
+      break
     }
     if (placed) continue
-    const lead = language === 'he' ? 'למידע נוסף: ' : 'Learn more: '
-    out = `${out}\n<p>${lead}<a href="${escAttr(url)}">${escAttr(text)}</a></p>`
+
+    // 2) Append the anchor as a natural sentence into an eligible paragraph.
+    const link = `<a href="${escAttr(url)}">${escAttr(text)}</a>`
+    const sentence = language === 'he'
+      ? ` בהקשר זה, ${link} הוא אחד הגורמים המרכזיים שכדאי להכיר.`
+      : ` In this context, ${link} is a key option worth knowing.`
+    const target = paras.find((p) => farEnough(p.wordStart)) || paras[0]
+    if (target) {
+      out = out.slice(0, target.start) + `<p>${target.inner}${sentence}</p>` + out.slice(target.end)
+      used.push(target.wordStart)
+      continue
+    }
+    // 3) Last resort (tiny article): a standalone natural sentence, not a footer link.
+    out = `${out}\n<p>${language === 'he' ? 'בהקשר זה, ' : 'In this context, '}${link}${language === 'he' ? ' הוא גורם מרכזי שכדאי להכיר.' : ' is a key option worth knowing.'}</p>`
+    used.push(countWords(out))
   }
+  return out
+}
+
+/** Unwrap any anchor that sits too early, then re-insert it with proper placement. */
+function repositionEarlyAnchors(html: string, language: SuggestionLanguage): string {
+  const { hits, firstH2Word } = scanAnchorHits(html)
+  const firstH2Exists = firstH2Word >= 0
+  const early = hits.filter((h) => h.href && isAnchorTooEarly(h, firstH2Exists))
+  if (!early.length) return html
+  let out = html
+  const toReinsert: { anchorText: string; targetUrl: string }[] = []
+  for (const h of early) {
+    const re = new RegExp(`<a\\b[^>]*href\\s*=\\s*["']${escRe(h.href)}["'][^>]*>([\\s\\S]*?)<\\/a>`, 'i')
+    const before = out
+    out = out.replace(re, '$1') // strip the early link, keep its text
+    if (out !== before) toReinsert.push({ anchorText: h.text || '', targetUrl: h.href })
+  }
+  return toReinsert.length ? insertAnchors(out, toReinsert, language) : out
+}
+
+/** Ensure required anchors exist AND are placed with good quality (not too early). */
+function enforceAnchors(html: string, anchors: ArticleTopicAnchor[], language: SuggestionLanguage): string {
+  let out = html
+  const val = validateAnchorPlacement(anchors, out)
+  if (val.hasBlockingIssues) {
+    out = insertAnchors(out, val.missingRequired.map((a) => ({ anchorText: a.anchorText, targetUrl: a.targetUrl })), language)
+  }
+  out = repositionEarlyAnchors(out, language)
   return out
 }
 
@@ -373,17 +473,15 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     if ('error' in g) { if (!best) continue; else break }
 
     let safe = sanitizeArticleHtml(buildHtml(g.structured, language, brief.includeManualToc))
-    // Enforce required anchors on the built HTML before auditing.
-    const preAnchors = validateAnchorPlacement(brief.anchors, safe)
-    if (preAnchors.hasBlockingIssues) {
-      const missing = preAnchors.missingRequired.map((a) => ({ anchorText: a.anchorText, targetUrl: a.targetUrl }))
-      safe = sanitizeArticleHtml(insertAnchors(safe, missing, language))
-    }
+    // Enforce required anchors AND good placement quality (not in the direct
+    // answer / first paragraph, spaced apart, integrated into a real sentence).
+    safe = sanitizeArticleHtml(enforceAnchors(safe, brief.anchors, language))
     const slug = toEnglishSlug(g.structured.slug, brief.primaryKeyword)
     const audit = auditFor(brief, g.structured, safe, slug)
 
     console.log(`[content-article-generation] ${attempt ? 'repair ' : ''}h2=${audit.counts.h2} h3=${audit.counts.h3} p=${audit.counts.p} words=${audit.counts.words} faq=${audit.counts.faq} tables=${audit.counts.tables} score=${audit.score}`)
     console.log(`[content-article-generation] ${attempt ? 'repair ' : ''}blockers=[${audit.blockers.join(',')}]`)
+    console.log(`[content-article-generation] anchors first@${audit.anchorQuality.firstAnchorWordIndex}w tooEarly=${audit.anchorQuality.anchorTooEarly} tooClose=${audit.anchorQuality.anchorsTooClose} mech=${audit.anchorQuality.mechanicalAnchorPhrase}`)
 
     best = { structured: g.structured, usage: g.usage, safe, slug, audit }
     if (audit.blockers.length === 0) break
@@ -392,7 +490,12 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
   if (!best) return { error: 'Article generation failed', reason: 'gemini_request_failed' }
   if (!best.safe) return { error: 'Article generation failed', reason: 'empty_after_sanitize' }
   if (best.audit.blockers.length > 0) {
-    const reason = best.audit.requiredAnchorsMissing > 0 ? 'required_anchor_missing' : 'article_quality_gate_failed'
+    const b = best.audit.blockers
+    const reason = best.audit.requiredAnchorsMissing > 0
+      ? 'required_anchor_missing'
+      : b.includes('anchor_too_early') || b.includes('anchor_inserted_mechanically')
+        ? 'anchor_quality_failed'
+        : 'article_quality_gate_failed'
     return { error: 'Article generation failed', reason }
   }
 
