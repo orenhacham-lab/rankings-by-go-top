@@ -22,6 +22,7 @@ import {
   LogOut,
   MessageCircle,
   Lightbulb,
+  Newspaper,
 } from 'lucide-react'
 
 const navItemKeys = [
@@ -31,6 +32,11 @@ const navItemKeys = [
   { href: '/keyword-research', labelKey: 'keywordResearch' as const, icon: Lightbulb, onboarding: 'keyword-research' },
   { href: '/keywords', labelKey: 'keywords' as const, icon: KeyRound },
   { href: '/ai-visibility', labelKey: 'aiVisibility' as const, icon: Sparkles },
+  // Content Hub — gated by the build-time content flag (same pattern as the
+  // content section in the project page). Hidden entirely when off.
+  ...(process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
+    ? [{ href: '/content', labelKey: 'content' as const, icon: Newspaper }]
+    : []),
   { href: '/scans', labelKey: 'scans' as const, icon: Search },
   { href: '/reports', labelKey: 'reports' as const, icon: FileText, onboarding: 'reports' },
   { href: '/billing', labelKey: 'billing' as const, icon: CreditCard },
