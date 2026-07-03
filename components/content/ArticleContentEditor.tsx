@@ -28,7 +28,7 @@ export default function ArticleContentEditor({
     content: value || '',
     editorProps: {
       attributes: {
-        class: 'prose prose-slate dark:prose-invert max-w-none min-h-[320px] focus:outline-none px-3 py-2',
+        class: 'article-content max-w-none min-h-[320px] focus:outline-none px-3 py-2 text-slate-800 dark:text-slate-100',
         dir,
       },
     },

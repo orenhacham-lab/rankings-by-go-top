@@ -370,3 +370,42 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
 .dark .paypal-button-wrapper {
   filter: invert(1) hue-rotate(180deg);
 }
+/* ── Article content (Content module editor + preview) ────────────── */
+/* Tailwind Preflight resets headings to inherit, and the @tailwindcss/
+   typography plugin is not installed, so generated article HTML needs explicit
+   structure styling. Scoped to .article-content so it never leaks elsewhere. */
+.article-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.6rem;
+}
+.article-content h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 1.1rem 0 0.4rem;
+}
+.article-content p {
+  margin: 0.65rem 0;
+  line-height: 1.75;
+}
+.article-content ul,
+.article-content ol {
+  margin: 0.65rem 0;
+  padding-inline-start: 1.5rem;
+}
+.article-content ul { list-style: disc; }
+.article-content ol { list-style: decimal; }
+.article-content li { margin: 0.25rem 0; }
+.article-content a {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+.dark .article-content a { color: #a5b4fc; }
+.article-content blockquote {
+  border-inline-start: 3px solid #cbd5e1;
+  padding-inline-start: 0.75rem;
+  color: #64748b;
+  margin: 0.75rem 0;
+}

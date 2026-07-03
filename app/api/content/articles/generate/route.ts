@@ -106,13 +106,22 @@ export async function POST(request: Request) {
 
   const gen = await generateValidatedArticle(brief)
   if ('error' in gen) {
-    console.log('[content-article-generation] failed reason=' + gen.error)
-    return Response.json({ error: 'Article generation failed', reason: gen.error }, { status: 502 })
+    const reason = gen.reason || 'unknown'
+    // 400 for user-fixable issues (missing anchor URL is handled earlier); 502
+    // for generation/model failures the user can only retry.
+    console.log('[content-article-generation] failed reason=' + reason)
+    return Response.json({ error: 'Article generation failed', reason }, { status: 502 })
   }
 
   const article = gen.article
   const safeHtml = gen.safeHtml
   const validation = gen.anchorValidation
+
+  // Safe diagnostics (counts + model only, never content or secrets).
+  console.log(
+    `[content-article-generation] model=${gen.model} sanitized h2=${gen.quality.counts.h2} h3=${gen.quality.counts.h3} p=${gen.quality.counts.p} words=${gen.quality.counts.words} faq=${gen.quality.counts.faq}`
+  )
+  console.log(`[content-article-generation] validation passed=${gen.quality.ok} warnings=[${gen.quality.warnings.join(',')}]`)
 
   const baseRow = {
     user_id: auth.user.id,

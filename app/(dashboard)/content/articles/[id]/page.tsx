@@ -220,7 +220,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         </Card>
 
         <Card className="hover:translate-y-0">
-          <Input label={e.imagePrompt} value={imagePrompt} onChange={(ev) => setImagePrompt(ev.target.value)} />
+          <Input label={e.imagePrompt} value={imagePrompt} onChange={(ev) => setImagePrompt(ev.target.value)} hint={e.imagePromptHint} />
         </Card>
 
         <div className="flex flex-wrap items-center gap-2 pb-8">
