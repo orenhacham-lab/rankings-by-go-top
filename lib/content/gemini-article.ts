@@ -108,7 +108,7 @@ const FAILURE_HINT: Record<string, string> = {
   cta_present_when_disabled: 'REMOVE every call-to-action',
   cta_details_missing: 'the CTA is missing usable contact details — use only the provided phone/WhatsApp/URL',
   cta_too_early: 'move the call-to-action to the END of the article, not the opening',
-  no_brand_when_disabled: 'REMOVE any business/brand name',
+  brand_mention_when_disabled: 'remove the business/brand name from the article text — it may appear ONLY inside a requested link, nowhere else',
   has_early_answer: 'add a clear direct answer in the first paragraph',
   not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
   anchor_too_early: 'move the required link OUT of the direct answer / first paragraph — place it only after the article has established context',
@@ -135,7 +135,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const brandName = (brief.brandNameToInclude || '').trim()
   const brandLine = brief.includeBrandName && brandName
     ? `You MAY mention the business/brand name "${brandName}" naturally and subtly.`
-    : 'Do NOT mention any business or brand name.'
+    : 'Do NOT mention any business or brand name in the article text. EXCEPTION: if one of the required link phrases below is (or contains) the business name, use it ONLY inside that exact link and add NO other brand mentions anywhere.'
   const anchorTopics = brief.anchors
     .filter((a) => a.anchor_text?.trim() && a.target_url?.trim())
     .map((a) => `  - naturally use the exact phrase "${a.anchor_text}"` + (a.note ? ` (${a.note})` : ''))

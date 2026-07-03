@@ -328,7 +328,7 @@ export const dashboardEn = {
         questions_in_body: 'Consider adding key questions in the body too (H2/H3)',
         has_early_answer: 'Missing a direct answer in the intro',
         language_matches: 'Content language mismatch',
-        no_brand_when_disabled: 'Brand name appears though not allowed',
+        brand_mention_when_disabled: 'Business name appears in the article text beyond the requested link — enable "mention the business/brand name" to weave it into the body',
         cta_present_when_disabled: 'CTA present though "no CTA" was chosen',
         cta_details_missing: 'CTA is missing contact details (phone/WhatsApp/URL)',
         cta_too_early: 'CTA appears too early — better near the end',

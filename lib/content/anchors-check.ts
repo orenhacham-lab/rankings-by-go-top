@@ -82,6 +82,39 @@ export function validateAnchorPlacement(
   }
 }
 
+/**
+ * Whether the brand/business name appears in the article as a FREE mention —
+ * i.e. outside the links the user explicitly requested. When includeBrandName
+ * is false, brand inside a user-provided anchor (its text matches a supplied
+ * anchor_text, or its href matches a supplied target_url) is allowed; only a
+ * mention elsewhere (plain text, heading, a non-requested link) is disallowed.
+ */
+export function brandMentionedOutsideAnchors(
+  contentHtml: string,
+  anchors: ArticleTopicAnchor[] | null | undefined,
+  brand: string
+): boolean {
+  const b = (brand || '').trim().toLowerCase()
+  if (!b) return false
+  const list = Array.isArray(anchors) ? anchors : []
+  const urls = list.map((a) => normUrl(a.target_url)).filter(Boolean)
+  const texts = list.map((a) => (a.anchor_text || '').trim().toLowerCase()).filter(Boolean)
+
+  // Blank out the inner text of user-provided anchors (brand there is allowed).
+  const stripped = (contentHtml || '').replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (m: string, attrs: string, inner: string) => {
+    const href = (attrs.match(/href\s*=\s*["']([^"']+)["']/i) || [])[1] || ''
+    const hrefN = normUrl(href)
+    const innerText = inner.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+    const isUserAnchor =
+      (!!hrefN && urls.some((u) => u === hrefN || hrefN.startsWith(u) || u.startsWith(hrefN))) ||
+      texts.some((t) => t && innerText.includes(t))
+    return isUserAnchor ? ' ' : m
+  })
+
+  const visible = stripped.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').toLowerCase()
+  return visible.includes(b)
+}
+
 // ---------------------------------------------------------------------------
 // Anchor PLACEMENT quality (Google link best-practices, internal quality rule).
 // Works on the built/edited HTML: required anchors must appear only after the

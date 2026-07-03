@@ -10,7 +10,7 @@
 
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
-import { validateAnchorPlacement, analyzeAnchorQuality, type AnchorQuality } from '@/lib/content/anchors-check'
+import { validateAnchorPlacement, analyzeAnchorQuality, brandMentionedOutsideAnchors, type AnchorQuality } from '@/lib/content/anchors-check'
 import type { CtaDetails } from '@/lib/content/brief-notes'
 
 export type CheckSeverity = 'blocker' | 'warning' | 'info'
@@ -293,7 +293,10 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // --- brand / CTA rules ---
   const brandForCheck = (input.brandName || input.businessName || '').trim()
   if (!input.includeBrandName && brandForCheck) {
-    add('no_brand_when_disabled', 'seo', 'blocker', !bodyText.toLowerCase().includes(brandForCheck.toLowerCase()))
+    // Brand inside a user-provided anchor (required/optional) is allowed — it's
+    // the link the user asked for. Only a FREE mention (plain text, heading, a
+    // non-requested link) blocks.
+    add('brand_mention_when_disabled', 'seo', 'blocker', !brandMentionedOutsideAnchors(html, input.anchors, brandForCheck))
   }
   const ctaEnabled = !(input.ctaPreference === 'none' || !input.ctaPreference)
   const ctaList = lang === 'he' ? CTA_HE : CTA_EN

@@ -326,7 +326,7 @@ export const dashboardHe = {
         questions_in_body: 'כדאי לשלב שאלות חשובות גם בגוף המאמר (H2/H3)',
         has_early_answer: 'חסרה תשובה ישירה בפתיחה',
         language_matches: 'שפת התוכן לא תואמת',
-        no_brand_when_disabled: 'שם העסק מופיע למרות שלא אושר',
+        brand_mention_when_disabled: 'שם העסק מופיע בטקסט המאמר מעבר לקישור שהוגדר — סמנו "לשלב שם עסק/מותג" אם רוצים לשלב אותו בגוף המאמר',
         cta_present_when_disabled: 'יש CTA למרות שנבחר "ללא CTA"',
         cta_details_missing: 'חסרים פרטי קשר ל-CTA (טלפון/וואטסאפ/קישור)',
         cta_too_early: 'ה-CTA מופיע מוקדם מדי — עדיף בסוף המאמר',
