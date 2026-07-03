@@ -42,8 +42,24 @@ export default function TopicsList({
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [creatingId, setCreatingId] = useState<string | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [genError, setGenError] = useState<{ topicId: string; text: string } | null>(null)
+
+  // Build a clear, human failure message from the safe audit debug (no alert).
+  function genErrorMessage(data: { reason?: unknown; audit?: { blockers?: unknown } }): string {
+    const errs = c.genErrors as Record<string, string>
+    const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
+    const blockers = Array.isArray(data.audit?.blockers) ? (data.audit!.blockers as string[]) : []
+    if (blockers.length) {
+      const codes = c.editor.auditCodes as Record<string, string>
+      const list = blockers.map((b) => codes[b] || b).join(', ')
+      return `${errs.qualityIntro} ${list}`
+    }
+    return errs[reason] || errs.unknown
+  }
 
   async function createArticle(topicId: string) {
+    setGenError(null)
     setCreatingId(topicId)
     try {
       const res = await fetch('/api/content/articles/generate', {
@@ -56,11 +72,11 @@ export default function TopicsList({
         router.push(`/content/articles/${data.articleId}`)
         return
       }
-      const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
-      const errs = c.genErrors as Record<string, string>
-      window.alert(errs[reason] || errs.unknown)
+      // Failure: topic is NOT marked as used server-side, so the button stays
+      // "Create article". Show a clear inline reason instead of a browser alert.
+      setGenError({ topicId, text: genErrorMessage(data) })
     } catch {
-      window.alert((c.genErrors as Record<string, string>).unknown)
+      setGenError({ topicId, text: (c.genErrors as Record<string, string>).unknown })
     } finally {
       setCreatingId(null)
     }
@@ -95,6 +111,12 @@ export default function TopicsList({
 
   return (
     <div className="overflow-x-auto">
+      {genError && (
+        <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+          <span>{genError.text}</span>
+          <button type="button" onClick={() => setGenError(null)} className="shrink-0 text-red-500 hover:text-red-700" aria-label="close">✕</button>
+        </div>
+      )}
       <Table>
         <TableHead>
           <tr>
@@ -125,33 +147,12 @@ export default function TopicsList({
                   <Td><span className="text-sm tabular-nums">{anchorCount}</span></Td>
                   <Td><span className="text-xs text-slate-500">{formatDate(topic.created_at)}</span></Td>
                   <Td>
-                    <div className="flex flex-wrap gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => onEdit(topic)} disabled={busy}>
-                        {c.topicActions.edit}
-                      </Button>
-                      {topic.status !== 'approved' && (
-                        <Button size="sm" variant="outline" onClick={() => setStatus(topic.id, 'approved')} disabled={busy}>
-                          {c.topicActions.approve}
-                        </Button>
-                      )}
-                      {topic.status !== 'rejected' && (
-                        <Button size="sm" variant="outline" onClick={() => setStatus(topic.id, 'rejected')} disabled={busy}>
-                          {c.topicActions.reject}
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => remove(topic.id)}
-                        disabled={busy}
-                        className="text-red-600 dark:text-red-400"
-                      >
-                        {c.topicActions.delete}
-                      </Button>
+                    <div className="flex items-center gap-1 justify-end">
+                      {/* Primary action: create OR edit the article. */}
                       {articleByTopic[topic.id] ? (
                         <span className="inline-flex items-center gap-2">
-                          <Link href={`/content/articles/${articleByTopic[topic.id].id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
-                            {c.editArticle}
+                          <Link href={`/content/articles/${articleByTopic[topic.id].id}`}>
+                            <Button size="sm" variant="outline">{c.editArticle}</Button>
                           </Link>
                           <Badge variant={articleByTopic[topic.id].status === 'ready' ? 'success' : 'neutral'}>
                             {(c.status as Record<string, string>)[articleByTopic[topic.id].status] ?? articleByTopic[topic.id].status}
@@ -167,6 +168,43 @@ export default function TopicsList({
                           {creatingId === topic.id ? c.creatingArticle : c.createArticle}
                         </Button>
                       )}
+
+                      {/* Secondary actions tucked into a compact "More" menu. */}
+                      <div className="relative">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setOpenMenuId(openMenuId === topic.id ? null : topic.id)}
+                          disabled={busy}
+                          aria-label={c.topicActions.more}
+                          title={c.topicActions.more}
+                        >
+                          ⋯
+                        </Button>
+                        {openMenuId === topic.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                            <div className="absolute z-20 mt-1 end-0 min-w-[9rem] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1">
+                              <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); onEdit(topic) }}>
+                                {c.topicActions.edit}
+                              </button>
+                              {topic.status !== 'approved' && (
+                                <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); setStatus(topic.id, 'approved') }}>
+                                  {c.topicActions.approve}
+                                </button>
+                              )}
+                              {topic.status !== 'rejected' && (
+                                <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); setStatus(topic.id, 'rejected') }}>
+                                  {c.topicActions.reject}
+                                </button>
+                              )}
+                              <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); remove(topic.id) }}>
+                                {c.topicActions.delete}
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </Td>
                 </TableRow>

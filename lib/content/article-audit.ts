@@ -231,10 +231,17 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   add('secondary_keywords_used', 'seo', 'info', providedSecondary.length === 0 || providedSecondary.some((s) => includesKw(bodyText, s)))
 
   // --- Technical HTML ---
+  // Two-tier structure gating: a BLOCKER only when significantly below the
+  // minimum (a genuinely unusable article); "below ideal but usable" is a
+  // WARNING so decent articles aren't rejected for one strict count.
+  const hardMinH2 = Math.max(2, th.minH2 - 2)
+  const hardMinP = Math.max(4, th.minP - 3)
   add('no_h1', 'technical', 'blocker', countTag(html, 'h1') === 0)
-  add('enough_h2', 'technical', 'blocker', h2 >= th.minH2)
+  add('too_few_h2', 'technical', 'blocker', h2 >= hardMinH2)
+  add('h2_below_ideal', 'technical', 'warning', h2 >= th.minH2)
   add('enough_h3', 'technical', 'warning', th.minH3 === 0 || h3 >= th.minH3)
-  add('enough_paragraphs', 'technical', 'blocker', pCount >= th.minP)
+  add('too_few_paragraphs', 'technical', 'blocker', pCount >= hardMinP)
+  add('paragraphs_below_ideal', 'technical', 'warning', pCount >= th.minP)
   add('has_list', 'technical', 'warning', lists >= th.minLists)
   add('has_table', 'technical', 'info', tables >= 1)
   // A table that exists but isn't a real 2x2+ table (collapsed/single row) warns.
@@ -250,9 +257,9 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   const hierarchyOk = firstH3 < 0 || (firstH2 >= 0 && firstH2 < firstH3)
   const tocReady = h1Count === 0 && h2 >= 2 && hierarchyOk
   add('toc_ready', 'technical', 'info', tocReady)
-  // word count band
+  // word count: blocker only below 70% of target; 70-85% is a warning.
   const ratio = input.desiredWordCount > 0 ? wordCount / input.desiredWordCount : 1
-  add('word_count', 'technical', 'blocker', ratio >= 0.7)
+  add('too_short', 'technical', 'blocker', ratio >= 0.7)
   if (ratio >= 0.7 && ratio < 0.85) add('word_count_band', 'technical', 'warning', false)
 
   // --- Readability ---
@@ -311,10 +318,13 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   add('required_anchors_present', 'seo', 'blocker', !anchorVal.hasBlockingIssues)
 
   // --- anchor PLACEMENT quality (Google link best-practices) ---
+  // Placement quality is a WARNING, not a blocker: the deterministic enforcer
+  // already repositions too-early links, and we don't want to reject an
+  // otherwise-good article over link placement. Missing REQUIRED anchors above
+  // is still a blocker.
   const anchorQuality = analyzeAnchorQuality(html, lang)
-  // Spammy placement is blocked (also blocks "mark as ready"); spacing warns.
-  add('anchor_too_early', 'seo', 'blocker', !anchorQuality.anchorTooEarly)
-  add('anchor_inserted_mechanically', 'seo', 'blocker', !anchorQuality.mechanicalAnchorPhrase)
+  add('anchor_too_early', 'seo', 'warning', !anchorQuality.anchorTooEarly)
+  add('anchor_inserted_mechanically', 'seo', 'warning', !anchorQuality.mechanicalAnchorPhrase)
   add('anchor_spacing_too_close', 'seo', 'warning', !(anchorQuality.anchorsTooClose || anchorQuality.anchorsInSameParagraph))
 
   // --- content exists ---
@@ -337,5 +347,27 @@ export function runArticleAudit(input: AuditInput): AuditResult {
     score, blockers, warnings, counts, checks,
     anchorsOk: !anchorVal.hasBlockingIssues, requiredAnchorsMissing: anchorVal.missingRequired.length,
     tocReady, anchorQuality,
+  }
+}
+
+// -- safe debug summary (returned to the client on failure) -----------------
+
+export interface AuditSummary {
+  score: number
+  counts: { words: number; h2: number; h3: number; paragraphs: number; lists: number; tables: number; faq: number }
+  blockers: string[]
+  warnings: string[]
+}
+
+/** Reduce a full audit to safe, non-sensitive counts/codes (no content). */
+export function auditSummary(a: AuditResult): AuditSummary {
+  return {
+    score: a.score,
+    counts: {
+      words: a.counts.words, h2: a.counts.h2, h3: a.counts.h3,
+      paragraphs: a.counts.p, lists: a.counts.lists, tables: a.counts.tables, faq: a.counts.faq,
+    },
+    blockers: a.blockers,
+    warnings: a.warnings,
   }
 }

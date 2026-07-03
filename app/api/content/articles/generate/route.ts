@@ -129,10 +129,15 @@ export async function POST(request: Request) {
   const gen = await generateValidatedArticle(brief)
   if ('error' in gen) {
     const reason = gen.reason || 'unknown'
-    // 400 for user-fixable issues (missing anchor URL is handled earlier); 502
-    // for generation/model failures the user can only retry.
-    console.log('[content-article-generation] failed reason=' + reason)
-    return Response.json({ error: 'Article generation failed', reason }, { status: 502 })
+    console.log(`[content-article-generation] failed reason=${reason} attempts=${gen.attempts}`)
+    // 422 when the article was generated but didn't pass the quality gate (the
+    // client gets safe debug: counts/blockers/warnings/score). 502 for
+    // model/transport failures the user can only retry.
+    const qualityGate = reason === 'article_quality_gate_failed' || reason === 'required_anchor_missing'
+    return Response.json(
+      { error: 'article_quality_gate_failed', reason, audit: gen.audit ?? null, generationAttempts: gen.attempts },
+      { status: qualityGate ? 422 : 502 },
+    )
   }
 
   const article = gen.article

@@ -16,7 +16,7 @@ import {
   validateAnchorPlacement, scanAnchorHits, isAnchorTooEarly,
   ANCHOR_MIN_WORDS_BEFORE_FIRST, ANCHOR_MIN_PARAGRAPHS_BEFORE_FIRST, ANCHOR_MIN_WORD_GAP,
 } from '@/lib/content/anchors-check'
-import { runArticleAudit, thresholdsFor, type AuditResult } from '@/lib/content/article-audit'
+import { runArticleAudit, thresholdsFor, auditSummary, type AuditResult, type AuditSummary } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 
@@ -84,8 +84,12 @@ export function articleModel(): { model: string; fellBack: boolean } {
 interface GenOpts { repairFailures?: string[] }
 
 const FAILURE_HINT: Record<string, string> = {
-  enough_h2: 'add more distinct <h2> sections',
+  too_few_h2: 'add more distinct <h2> sections',
+  h2_below_ideal: 'add a few more distinct <h2> sections',
   enough_paragraphs: 'add more real paragraphs',
+  too_few_paragraphs: 'add more real paragraphs',
+  paragraphs_below_ideal: 'add a few more real paragraphs',
+  too_short: 'make the article substantially longer to meet the target length',
   enough_h3: 'add <h3> subsections inside broad sections',
   has_list: 'add at least one bulleted list',
   has_faq: 'add more FAQ question/answer pairs',
@@ -93,7 +97,6 @@ const FAILURE_HINT: Record<string, string> = {
   has_table: 'add a comparison/data table where it fits',
   table_recommended: 'this topic needs a real comparison/data table (>=2 columns, >=2 rows) — add one',
   table_structure_valid: 'fix the table to be a real table with >=2 columns and >=2 data rows',
-  word_count: 'make the article substantially longer to meet the target length',
   word_count_band: 'make the article a bit longer',
   has_transition_words: 'use more natural transition words',
   paragraphs_not_too_long: 'break long paragraphs into shorter ones (2-4 sentences)',
@@ -515,17 +518,23 @@ function auditFor(brief: ArticleBrief, structured: StructuredArticle, safeHtml: 
   })
 }
 
+export interface ValidatedArticleError { error: string; reason?: string; audit?: AuditSummary; attempts: number }
+
 /** Generate → build → audit → repair (once) → audit. Never saves a bad draft. */
-export async function generateValidatedArticle(brief: ArticleBrief): Promise<ValidatedArticle | { error: string; reason?: string }> {
+export async function generateValidatedArticle(brief: ArticleBrief): Promise<ValidatedArticle | ValidatedArticleError> {
   const language = brief.language
   const { model, fellBack } = articleModel()
   if (fellBack) console.warn('[content-article-generation] GEMINI_ARTICLE_MODEL missing, falling back to classifier model')
-  console.log(`[content-article-generation] model=${model}`)
 
   let best: { structured: StructuredArticle; usage: GeminiUsage | null; safe: string; slug: string; audit: AuditResult } | null = null
+  let attempts = 0
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const opts: GenOpts = attempt === 0 ? {} : { repairFailures: [...(best?.audit.blockers || []), ...(best?.audit.warnings || [])] }
+    // Repair uses the EXACT unmet checks (blockers first, then warnings).
+    const repairFailures = attempt === 0 ? [] : [...(best?.audit.blockers || []), ...(best?.audit.warnings || [])]
+    if (attempt > 0) console.log(`[content-article-generation] repair attempt=${attempt + 1} reason=quality_blockers failing=[${repairFailures.join(',')}]`)
+    const opts: GenOpts = attempt === 0 ? {} : { repairFailures }
+    attempts = attempt + 1
     const g = await callGemini(brief, opts, model)
     if ('error' in g) { if (!best) continue; else break }
 
@@ -536,24 +545,22 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     const slug = toEnglishSlug(g.structured.slug, brief.primaryKeyword)
     const audit = auditFor(brief, g.structured, safe, slug)
 
-    console.log(`[content-article-generation] ${attempt ? 'repair ' : ''}h2=${audit.counts.h2} h3=${audit.counts.h3} p=${audit.counts.p} words=${audit.counts.words} faq=${audit.counts.faq} tables=${audit.counts.tables} score=${audit.score}`)
-    console.log(`[content-article-generation] ${attempt ? 'repair ' : ''}blockers=[${audit.blockers.join(',')}]`)
-    console.log(`[content-article-generation] anchors first@${audit.anchorQuality.firstAnchorWordIndex}w tooEarly=${audit.anchorQuality.anchorTooEarly} tooClose=${audit.anchorQuality.anchorsTooClose} mech=${audit.anchorQuality.mechanicalAnchorPhrase}`)
+    // Safe, structured logs — counts + codes only, never the article body.
+    const cnt = audit.counts
+    console.log(`[content-article-generation] attempt=${attempt + 1} model=${model}`)
+    console.log(`[content-article-generation] attempt=${attempt + 1} counts words=${cnt.words} h2=${cnt.h2} h3=${cnt.h3} p=${cnt.p} lists=${cnt.lists} tables=${cnt.tables} faq=${cnt.faq}`)
+    console.log(`[content-article-generation] attempt=${attempt + 1} score=${audit.score} blockers=[${audit.blockers.join(',')}] warnings=[${audit.warnings.join(',')}]`)
 
     best = { structured: g.structured, usage: g.usage, safe, slug, audit }
     if (audit.blockers.length === 0) break
   }
 
-  if (!best) return { error: 'Article generation failed', reason: 'gemini_request_failed' }
-  if (!best.safe) return { error: 'Article generation failed', reason: 'empty_after_sanitize' }
+  if (!best) return { error: 'Article generation failed', reason: 'gemini_request_failed', attempts }
+  if (!best.safe) return { error: 'Article generation failed', reason: 'empty_after_sanitize', attempts }
   if (best.audit.blockers.length > 0) {
-    const b = best.audit.blockers
-    const reason = best.audit.requiredAnchorsMissing > 0
-      ? 'required_anchor_missing'
-      : b.includes('anchor_too_early') || b.includes('anchor_inserted_mechanically')
-        ? 'anchor_quality_failed'
-        : 'article_quality_gate_failed'
-    return { error: 'Article generation failed', reason }
+    const reason = best.audit.requiredAnchorsMissing > 0 ? 'required_anchor_missing' : 'article_quality_gate_failed'
+    console.log(`[content-article-generation] gate failed reason=${reason} attempts=${attempts} blockers=[${best.audit.blockers.join(',')}]`)
+    return { error: 'Article generation failed', reason, audit: auditSummary(best.audit), attempts }
   }
 
   const a = best.structured
