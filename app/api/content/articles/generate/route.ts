@@ -12,9 +12,8 @@
  */
 
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
-import { generateArticleWithGemini, type ArticleBrief } from '@/lib/content/gemini-article'
-import { sanitizeArticleHtml, slugify } from '@/lib/content/article-html'
-import { validateAnchorPlacement } from '@/lib/content/anchors-check'
+import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
+import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
 export async function POST(request: Request) {
@@ -72,6 +71,8 @@ export async function POST(request: Request) {
 
   const anchors = (Array.isArray(t.anchors_json) ? t.anchors_json : []) as ArticleTopicAnchor[]
   const language = String(t.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  // brief_notes carries the human notes + hidden flags (includeBrandName).
+  const decodedNotes = decodeBriefNotes((t.brief_notes as string) ?? null)
 
   const brief: ArticleBrief = {
     language,
@@ -83,28 +84,23 @@ export async function POST(request: Request) {
     toneOfVoice: (t.tone_of_voice as string) ?? null,
     desiredWordCount: (t.desired_word_count as number) ?? null,
     ctaPreference: (t.cta_preference as string) ?? null,
-    briefNotes: (t.brief_notes as string) ?? null,
+    briefNotes: decodedNotes.notes || null,
+    includeBrandName: decodedNotes.flags.includeBrandName,
     anchors,
     businessName: (project as { business_name?: string } | null)?.business_name ?? null,
     domain: (project as { target_domain?: string } | null)?.target_domain ?? null,
     category,
   }
 
-  const gen = await generateArticleWithGemini(brief)
+  const gen = await generateValidatedArticle(brief)
   if ('error' in gen) {
     console.log('[content-article-generation] failed reason=' + gen.error)
     return Response.json({ error: 'Article generation failed', reason: gen.error }, { status: 502 })
   }
 
   const article = gen.article
-  const safeHtml = sanitizeArticleHtml(article.contentHtml)
-  if (!safeHtml) {
-    console.log('[content-article-generation] failed reason=empty_after_sanitize')
-    return Response.json({ error: 'Article generation failed', reason: 'empty_after_sanitize' }, { status: 502 })
-  }
-
-  // Anchor validation (live) — informational; article still saves as draft.
-  const validation = validateAnchorPlacement(anchors, safeHtml)
+  const safeHtml = gen.safeHtml
+  const validation = gen.anchorValidation
 
   const baseRow = {
     user_id: auth.user.id,
@@ -123,8 +119,9 @@ export async function POST(request: Request) {
     updated_at: new Date().toISOString(),
   }
 
-  // Unique slug per project: retry with a numeric suffix on 23505.
-  const baseSlug = slugify(article.slug || article.title)
+  // Unique slug per project: English slug (fallback to a stable id) + numeric
+  // suffix retry on 23505.
+  const baseSlug = gen.slug || `article-${Date.now().toString(36)}`
   let inserted: { id: string } | null = null
   let lastError: { code?: string; message?: string } | null = null
   for (let attempt = 0; attempt < 6; attempt++) {

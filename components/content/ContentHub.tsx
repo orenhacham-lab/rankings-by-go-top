@@ -34,7 +34,7 @@ type Counts = {
 }
 
 type ArticleRow = {
-  id: string; title: string; slug: string; status: string
+  id: string; topic_id: string | null; title: string; slug: string; status: string
   wp_post_id: number | null; wp_post_url: string | null
   scheduled_at: string | null; published_at: string | null
   created_at: string; updated_at: string
@@ -119,6 +119,15 @@ export default function ContentHub() {
   const projects = data?.projects ?? []
   const counts = data?.counts
   const selectedProject = projects.find((p) => p.id === projectId) || null
+
+  // Map topic_id → latest article (articles come ordered by updated_at desc).
+  const articleByTopic = useMemo(() => {
+    const map: Record<string, { id: string; status: string }> = {}
+    for (const a of data?.articles ?? []) {
+      if (a.topic_id && !map[a.topic_id]) map[a.topic_id] = { id: a.id, status: a.status }
+    }
+    return map
+  }, [data])
 
   const filteredArticles = (data?.articles ?? []).filter((a) => {
     const matchStatus = !statusFilter || a.status === statusFilter
@@ -283,8 +292,8 @@ export default function ContentHub() {
                                 {t.actions.edit}
                               </Link>
                               {/* Publish/Schedule arrive in later phases. */}
-                              <span className="text-xs text-slate-400 dark:text-slate-600" title={t.actions.comingSoon}>
-                                {t.actions.publish} · {t.actions.comingSoon}
+                              <span className="text-xs text-slate-400 dark:text-slate-600">
+                                {t.publishNextPhase}
                               </span>
                             </div>
                           </Td>
@@ -304,6 +313,7 @@ export default function ContentHub() {
                 <TopicsList
                   topics={topics}
                   projectName={selectedProject?.name ?? '—'}
+                  articleByTopic={articleByTopic}
                   onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
                   onChanged={loadTopics}
                 />

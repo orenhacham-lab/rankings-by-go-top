@@ -8,6 +8,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
@@ -26,11 +27,13 @@ const STATUS_TONE: Record<string, 'neutral' | 'success' | 'danger' | 'info'> = {
 export default function TopicsList({
   topics,
   projectName,
+  articleByTopic = {},
   onEdit,
   onChanged,
 }: {
   topics: ArticleTopic[]
   projectName: string
+  articleByTopic?: Record<string, { id: string; status: string }>
   onEdit: (topic: ArticleTopic) => void
   onChanged: () => void
 }) {
@@ -143,14 +146,25 @@ export default function TopicsList({
                       >
                         {c.topicActions.delete}
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => createArticle(topic.id)}
-                        loading={creatingId === topic.id}
-                        disabled={busy || creatingId === topic.id}
-                      >
-                        {creatingId === topic.id ? c.creatingArticle : c.createArticle}
-                      </Button>
+                      {articleByTopic[topic.id] ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Link href={`/content/articles/${articleByTopic[topic.id].id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                            {c.editArticle}
+                          </Link>
+                          <Badge variant={articleByTopic[topic.id].status === 'ready' ? 'success' : 'neutral'}>
+                            {(c.status as Record<string, string>)[articleByTopic[topic.id].status] ?? articleByTopic[topic.id].status}
+                          </Badge>
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => createArticle(topic.id)}
+                          loading={creatingId === topic.id}
+                          disabled={busy || creatingId === topic.id}
+                        >
+                          {creatingId === topic.id ? c.creatingArticle : c.createArticle}
+                        </Button>
+                      )}
                     </div>
                   </Td>
                 </TableRow>

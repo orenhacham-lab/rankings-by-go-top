@@ -7,7 +7,6 @@
  */
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
@@ -24,7 +23,6 @@ type AnchorPlacement = { anchorText: string; targetUrl: string; required: boolea
 
 export default function ArticleEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const router = useRouter()
   const { language } = useDashboardLanguage()
   const e = useMemo(() => getDashboardDictionary(language).contentHub.editor, [language])
   const isHebrew = language === 'he'
@@ -35,6 +33,10 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [notFound, setNotFound] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  const [projectId, setProjectId] = useState<string | null>(null)
+
+  // Back link returns to the Content Hub for THIS article's project.
+  const backHref = projectId ? `/content?projectId=${projectId}` : '/content'
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -55,6 +57,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       if (!res.ok) return
       const data = await res.json()
       const a = data.article
+      setProjectId(a.project_id ?? null)
       setTitle(a.title ?? '')
       setSlug(a.slug ?? '')
       setMetaTitle(a.meta_title ?? '')
@@ -125,7 +128,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     return (
       <div className="py-20 text-center text-slate-500">
         <p className="mb-4">{e.notFound}</p>
-        <Link href="/content"><Button variant="outline">{e.back}</Button></Link>
+        <Link href={backHref}><Button variant="outline">{e.back}</Button></Link>
       </div>
     )
   }
@@ -136,7 +139,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between gap-3 mb-2">
-        <Link href="/content" className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{e.back}</Link>
+        <Link href={backHref} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{e.back}</Link>
         <Badge variant={status === 'ready' ? 'success' : 'neutral'}>{status === 'ready' ? e.statusReady : e.statusDraft}</Badge>
       </div>
       <Header title={title || '—'} />
@@ -211,9 +214,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         <div className="flex flex-wrap items-center gap-2 pb-8">
           <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
           <Button variant="outline" onClick={() => save('ready')} disabled={saving || missingRequired.length > 0}>{e.markReady}</Button>
-          <span className="text-xs text-slate-400 dark:text-slate-600 px-2" title={e.comingSoon}>{e.publish} · {e.comingSoon}</span>
-          <span className="text-xs text-slate-400 dark:text-slate-600 px-2" title={e.comingSoon}>{e.schedule} · {e.comingSoon}</span>
-          <Link href="/content" className="ms-auto"><Button variant="ghost">{e.back}</Button></Link>
+          <span className="text-xs text-slate-400 dark:text-slate-600 px-2">{e.publishNextPhase}</span>
+          <Link href={backHref} className="ms-auto"><Button variant="ghost">{e.back}</Button></Link>
         </div>
       </div>
     </div>

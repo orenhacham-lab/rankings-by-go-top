@@ -170,6 +170,9 @@ export const dashboardHe = {
       },
       briefNotes: 'הערות לבריף / הנחיות תוכן',
       briefNotesPlaceholder: 'הנחיות חופשיות ליצירת המאמר בהמשך…',
+      includeBrandName: 'לשלב את שם העסק/המותג במאמר',
+      includeBrandNameHint: 'אם מסומן, Gemini רשאי לשלב את שם העסק בצורה טבעית ועדינה.',
+      keywordMismatch: 'מילת המפתח לא נראית תואמת לתחום הפרויקט, לכן ההצעות נוצרו לפי מילת המפתח בלבד.',
       advancedToggle: 'הגדרות מתקדמות',
       anchorsTitle: 'אנקורים וקישורים',
       anchorsHint: 'קישורים שישולבו בגוף המאמר בהמשך.',
@@ -195,8 +198,10 @@ export const dashboardHe = {
       genericError: 'שמירת הנושא נכשלה. נסו שוב.',
     },
     createArticle: 'צור מאמר',
+    editArticle: 'ערוך מאמר',
     creatingArticle: 'יוצר מאמר…',
     createArticleFailed: 'יצירת המאמר נכשלה. ודאו ש-GEMINI_API_KEY מוגדר ונסו שוב.',
+    publishNextPhase: 'פרסום ל-WordPress — בשלב הבא',
     editor: {
       back: '← חזרה למרכז התוכן',
       loading: 'טוען מאמר…',
@@ -228,6 +233,7 @@ export const dashboardHe = {
       publish: 'פרסום',
       schedule: 'תזמון',
       comingSoon: 'בקרוב',
+      publishNextPhase: 'פרסום ל-WordPress — בשלב הבא',
     },
   },
   home: {

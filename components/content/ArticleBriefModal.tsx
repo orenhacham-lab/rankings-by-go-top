@@ -21,6 +21,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
 import type { GeminiTopicSuggestion } from '@/lib/content/gemini-topics'
+import { encodeBriefNotes, decodeBriefNotes } from '@/lib/content/brief-notes'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type ProjectOption = { id: string; name: string; language?: string | null }
@@ -36,8 +37,8 @@ const LENGTHS: { value: number; key: 'short' | 'standard' | 'deep' | 'guide' }[]
 ]
 
 const DEFAULT_TONE = 'professional'
-const DEFAULT_CTA = 'gentle'
-const DEFAULT_INTENT: SuggestionIntent = 'commercial'
+const DEFAULT_CTA = 'none'
+const DEFAULT_INTENT: SuggestionIntent = 'informational'
 const DEFAULT_WORD_COUNT = 1000
 
 function normalizeLang(lang?: string | null): SuggestionLanguage {
@@ -70,7 +71,8 @@ function localizeAngle(angle: string | undefined, uiLang: 'he' | 'en'): string {
   return a
 }
 function emptyAnchor(): ArticleTopicAnchor {
-  return { anchor_text: '', target_url: '', required: false, type: 'internal', note: '' }
+  // Required by default — most anchors the user adds are meant to appear.
+  return { anchor_text: '', target_url: '', required: true, type: 'internal', note: '' }
 }
 function oneOf<T extends string>(value: string | null | undefined, allowed: readonly T[], fallback: T): T {
   return value && (allowed as readonly string[]).includes(value) ? (value as T) : fallback
@@ -112,7 +114,9 @@ export default function ArticleBriefModal({
   const [secondaryText, setSecondaryText] = useState('')
   const [targetAudience, setTargetAudience] = useState('')
   const [briefNotes, setBriefNotes] = useState('')
+  const [includeBrandName, setIncludeBrandName] = useState(false)
   const [anchors, setAnchors] = useState<ArticleTopicAnchor[]>([])
+  const [keywordFit, setKeywordFit] = useState<'aligned' | 'weak' | 'unrelated' | null>(null)
 
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -134,16 +138,18 @@ export default function ArticleBriefModal({
       setSearchIntent(oneOf(editing.search_intent, INTENT_KEYS, DEFAULT_INTENT))
       setSecondaryText((editing.secondary_keywords ?? []).join('\n'))
       setTargetAudience(editing.target_audience ?? '')
-      setBriefNotes(editing.brief_notes ?? '')
+      { const dec = decodeBriefNotes(editing.brief_notes); setBriefNotes(dec.notes); setIncludeBrandName(dec.flags.includeBrandName) }
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
       setAdvancedOpen(true)
+      setKeywordFit(null)
     } else {
       setProjectId(defaultProjectId)
       setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null); setSource(null)
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
-      setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setAnchors([])
+      setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setIncludeBrandName(false); setAnchors([])
       setAdvancedOpen(false)
+      setKeywordFit(null)
     }
     setError(null)
   }, [open, editing, defaultProjectId, projects])
@@ -166,8 +172,10 @@ export default function ArticleBriefModal({
     setSuggesting(true)
     setSuggestError(null)
     setSource(null)
+    setKeywordFit(null)
     try {
-      const secondary = secondaryText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
+      // Do NOT send secondary keywords from the form as project context — the
+      // primary keyword drives suggestions; secondary stay user-controlled.
       const res = await fetch('/api/content/topic-suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,7 +185,6 @@ export default function ArticleBriefModal({
           language: briefLang,
           searchIntent,
           count: 8,
-          secondaryKeywords: secondary,
           targetAudience,
         }),
       })
@@ -189,14 +196,10 @@ export default function ArticleBriefModal({
       const topics = data.topics as GeminiTopicSuggestion[]
       setSuggestions(topics)
       setSource(data.source === 'gemini' ? 'gemini' : 'fallback')
-      // Convenience: prefill length + secondary from the first suggestion.
-      const first = topics[0]
-      if (first) {
-        if (LENGTHS.some((l) => l.value === first.recommendedWordCount)) setWordCount(first.recommendedWordCount)
-        if (!secondaryText.trim() && first.suggestedSecondaryKeywords.length) {
-          setSecondaryText(first.suggestedSecondaryKeywords.join('\n'))
-        }
-      }
+      setKeywordFit(data.projectKeywordFit ?? null)
+      // No auto-fill of length/secondary from suggestions — defaults stay put;
+      // per-topic secondary keywords are merged from the CHOSEN suggestion only,
+      // at save time (see buildPayload).
     } catch {
       setSuggestError(t.suggestFailed)
     } finally {
@@ -218,13 +221,12 @@ export default function ArticleBriefModal({
     const formSecondary = secondaryText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
     let secondary = formSecondary
     let intent: SuggestionIntent = searchIntent
-    let wc = wordCount
     if (sug) {
+      // Secondary keywords may be enriched ONLY from the chosen suggestion.
       if (sug.suggestedSecondaryKeywords.length) {
         secondary = Array.from(new Set([...formSecondary, ...sug.suggestedSecondaryKeywords]))
       }
       if ((INTENT_KEYS as readonly string[]).includes(sug.searchIntent)) intent = sug.searchIntent as SuggestionIntent
-      if (LENGTHS.some((l) => l.value === sug.recommendedWordCount)) wc = sug.recommendedWordCount
     }
     return {
       projectId,
@@ -235,9 +237,9 @@ export default function ArticleBriefModal({
       target_audience: targetAudience,
       language: briefLang,
       tone_of_voice: tone,
-      desired_word_count: wc,
+      desired_word_count: wordCount, // always the user's choice (default 1000)
       cta_preference: cta,
-      brief_notes: briefNotes,
+      brief_notes: encodeBriefNotes(briefNotes, { includeBrandName }),
       anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
     }
   }
@@ -350,6 +352,12 @@ export default function ArticleBriefModal({
                   </div>
                 )}
 
+                {keywordFit === 'unrelated' && (
+                  <div className="mb-2 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1.5">
+                    {t.keywordMismatch}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   {suggestions.map((s) => {
                     const angle = localizeAngle(s.angle, isHebrew ? 'he' : 'en')
@@ -443,6 +451,14 @@ export default function ArticleBriefModal({
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.briefNotes}</label>
               <textarea value={briefNotes} onChange={(e) => setBriefNotes(e.target.value)} rows={3} className={inputCls} placeholder={t.briefNotesPlaceholder} />
             </div>
+
+            <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <input type="checkbox" checked={includeBrandName} onChange={(e) => setIncludeBrandName(e.target.checked)} className="mt-0.5" />
+              <span>
+                {t.includeBrandName}
+                <span className="block text-xs text-slate-500 dark:text-slate-400">{t.includeBrandNameHint}</span>
+              </span>
+            </label>
 
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
               <div className="flex items-center justify-between mb-1">

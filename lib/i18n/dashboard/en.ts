@@ -172,6 +172,9 @@ export const dashboardEn = {
       },
       briefNotes: 'Brief notes / content instructions',
       briefNotesPlaceholder: 'Free-form guidance for the future article…',
+      includeBrandName: 'Mention the business/brand name in the article',
+      includeBrandNameHint: 'If checked, Gemini may weave the business name in naturally and subtly.',
+      keywordMismatch: 'The keyword doesn\'t seem related to the project\'s field, so suggestions were generated from the keyword alone.',
       advancedToggle: 'Advanced settings',
       anchorsTitle: 'Anchors & links',
       anchorsHint: 'Links to weave into the article body later.',
@@ -197,8 +200,10 @@ export const dashboardEn = {
       genericError: 'Failed to save topic. Please try again.',
     },
     createArticle: 'Create article',
+    editArticle: 'Edit article',
     creatingArticle: 'Generating article…',
     createArticleFailed: 'Article generation failed. Ensure GEMINI_API_KEY is set and try again.',
+    publishNextPhase: 'Publish to WordPress — next phase',
     editor: {
       back: '← Back to Content Hub',
       loading: 'Loading article…',
@@ -230,6 +235,7 @@ export const dashboardEn = {
       publish: 'Publish',
       schedule: 'Schedule',
       comingSoon: 'Coming soon',
+      publishNextPhase: 'Publish to WordPress — next phase',
     },
   },
   home: {
