@@ -24,7 +24,7 @@ import type { GeminiTopicSuggestion } from '@/lib/content/gemini-topics'
 import { encodeBriefNotes, decodeBriefNotes } from '@/lib/content/brief-notes'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
 
-type ProjectOption = { id: string; name: string; language?: string | null }
+type ProjectOption = { id: string; name: string; language?: string | null; business_name?: string | null }
 
 const INTENT_KEYS = ['informational', 'commercial', 'local', 'comparison', 'transactional', 'other'] as const
 const TONE_KEYS = ['professional', 'marketing', 'casual', 'luxury', 'informative'] as const
@@ -105,6 +105,7 @@ export default function ArticleBriefModal({
   const [suggesting, setSuggesting] = useState(false)
   const [suggestError, setSuggestError] = useState<string | null>(null)
   const [source, setSource] = useState<'gemini' | 'fallback' | null>(null)
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null)
 
   const [briefLang, setBriefLang] = useState<SuggestionLanguage>('he')
   const [tone, setTone] = useState<string>(DEFAULT_TONE)
@@ -115,6 +116,7 @@ export default function ArticleBriefModal({
   const [targetAudience, setTargetAudience] = useState('')
   const [briefNotes, setBriefNotes] = useState('')
   const [includeBrandName, setIncludeBrandName] = useState(false)
+  const [brandNameToInclude, setBrandNameToInclude] = useState('')
   const [anchors, setAnchors] = useState<ArticleTopicAnchor[]>([])
   const [keywordFit, setKeywordFit] = useState<'aligned' | 'weak' | 'unrelated' | null>(null)
 
@@ -129,7 +131,7 @@ export default function ArticleBriefModal({
     if (editing) {
       setProjectId(editing.project_id)
       setPrimaryKeyword(editing.primary_keyword ?? '')
-      setSuggestions([]); setSelected(new Set()); setSuggestError(null); setSource(null)
+      setSuggestions([]); setSelected(new Set()); setSuggestError(null); setSource(null); setFallbackReason(null)
       setManualTopic(editing.topic ?? '')
       setBriefLang(normalizeLang(editing.language))
       setTone(oneOf(editing.tone_of_voice, TONE_KEYS, DEFAULT_TONE))
@@ -138,16 +140,16 @@ export default function ArticleBriefModal({
       setSearchIntent(oneOf(editing.search_intent, INTENT_KEYS, DEFAULT_INTENT))
       setSecondaryText((editing.secondary_keywords ?? []).join('\n'))
       setTargetAudience(editing.target_audience ?? '')
-      { const dec = decodeBriefNotes(editing.brief_notes); setBriefNotes(dec.notes); setIncludeBrandName(dec.flags.includeBrandName) }
+      { const dec = decodeBriefNotes(editing.brief_notes); setBriefNotes(dec.notes); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude) }
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
       setAdvancedOpen(true)
       setKeywordFit(null)
     } else {
       setProjectId(defaultProjectId)
-      setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null); setSource(null)
+      setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null); setSource(null); setFallbackReason(null)
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
-      setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setIncludeBrandName(false); setAnchors([])
+      setSecondaryText(''); setTargetAudience(''); setBriefNotes(''); setIncludeBrandName(false); setBrandNameToInclude(''); setAnchors([])
       setAdvancedOpen(false)
       setKeywordFit(null)
     }
@@ -171,7 +173,7 @@ export default function ArticleBriefModal({
     if (!projectId || !primaryKeyword.trim()) return
     setSuggesting(true)
     setSuggestError(null)
-    setSource(null)
+    setSource(null); setFallbackReason(null)
     setKeywordFit(null)
     try {
       // Do NOT send secondary keywords from the form as project context — the
@@ -196,6 +198,7 @@ export default function ArticleBriefModal({
       const topics = data.topics as GeminiTopicSuggestion[]
       setSuggestions(topics)
       setSource(data.source === 'gemini' ? 'gemini' : 'fallback')
+      setFallbackReason(typeof data.fallbackReason === 'string' ? data.fallbackReason : null)
       setKeywordFit(data.projectKeywordFit ?? null)
       // No auto-fill of length/secondary from suggestions — defaults stay put;
       // per-topic secondary keywords are merged from the CHOSEN suggestion only,
@@ -239,7 +242,7 @@ export default function ArticleBriefModal({
       tone_of_voice: tone,
       desired_word_count: wordCount, // always the user's choice (default 1000)
       cta_preference: cta,
-      brief_notes: encodeBriefNotes(briefNotes, { includeBrandName }),
+      brief_notes: encodeBriefNotes(briefNotes, { includeBrandName, brandNameToInclude }),
       anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
     }
   }
@@ -348,7 +351,8 @@ export default function ArticleBriefModal({
 
                 {source === 'fallback' && (
                   <div className="mb-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-2 py-1.5">
-                    {t.fallbackWarning}
+                    {/* Only claim "check GEMINI_API_KEY" when that's actually the reason. */}
+                    {fallbackReason === 'missing_gemini_api_key' ? t.fallbackWarning : t.fallbackGeneric}
                   </div>
                 )}
 
@@ -452,13 +456,35 @@ export default function ArticleBriefModal({
               <textarea value={briefNotes} onChange={(e) => setBriefNotes(e.target.value)} rows={3} className={inputCls} placeholder={t.briefNotesPlaceholder} />
             </div>
 
-            <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
-              <input type="checkbox" checked={includeBrandName} onChange={(e) => setIncludeBrandName(e.target.checked)} className="mt-0.5" />
-              <span>
-                {t.includeBrandName}
-                <span className="block text-xs text-slate-500 dark:text-slate-400">{t.includeBrandNameHint}</span>
-              </span>
-            </label>
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={includeBrandName}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setIncludeBrandName(checked)
+                    if (checked && !brandNameToInclude.trim()) {
+                      const proj = projects.find((p) => p.id === projectId)
+                      setBrandNameToInclude((proj?.business_name || proj?.name || '').trim())
+                    }
+                  }}
+                  className="mt-0.5"
+                />
+                <span>
+                  {t.includeBrandName}
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">{t.includeBrandNameHint}</span>
+                </span>
+              </label>
+              {includeBrandName && (
+                <Input
+                  label={t.brandNameToInclude}
+                  value={brandNameToInclude}
+                  onChange={(e) => setBrandNameToInclude(e.target.value)}
+                  placeholder={t.brandNamePlaceholder}
+                />
+              )}
+            </div>
 
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
               <div className="flex items-center justify-between mb-1">

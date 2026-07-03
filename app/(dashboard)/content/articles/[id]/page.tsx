@@ -24,7 +24,8 @@ type AnchorPlacement = { anchorText: string; targetUrl: string; required: boolea
 export default function ArticleEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { language } = useDashboardLanguage()
-  const e = useMemo(() => getDashboardDictionary(language).contentHub.editor, [language])
+  const c = useMemo(() => getDashboardDictionary(language).contentHub, [language])
+  const e = c.editor
   const isHebrew = language === 'he'
 
   const enabled = process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
@@ -115,6 +116,17 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setMessage({ text: e.saveError, ok: false })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function deleteArticle() {
+    if (!window.confirm(c.confirmDeleteArticle)) return
+    try {
+      const res = await fetch(`/api/content/articles/${id}`, { method: 'DELETE' })
+      if (res.ok) { window.location.href = backHref; return }
+      setMessage({ text: c.deleteFailed, ok: false })
+    } catch {
+      setMessage({ text: c.deleteFailed, ok: false })
     }
   }
 
@@ -214,6 +226,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         <div className="flex flex-wrap items-center gap-2 pb-8">
           <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
           <Button variant="outline" onClick={() => save('ready')} disabled={saving || missingRequired.length > 0}>{e.markReady}</Button>
+          <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
           <span className="text-xs text-slate-400 dark:text-slate-600 px-2">{e.publishNextPhase}</span>
           <Link href={backHref} className="ms-auto"><Button variant="ghost">{e.back}</Button></Link>
         </div>

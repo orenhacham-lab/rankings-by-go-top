@@ -56,9 +56,11 @@ export default function TopicsList({
         router.push(`/content/articles/${data.articleId}`)
         return
       }
-      window.alert(c.createArticleFailed)
+      const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
+      const errs = c.genErrors as Record<string, string>
+      window.alert(errs[reason] || errs.unknown)
     } catch {
-      window.alert(c.createArticleFailed)
+      window.alert((c.genErrors as Record<string, string>).unknown)
     } finally {
       setCreatingId(null)
     }

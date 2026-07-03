@@ -1,23 +1,35 @@
 /**
- * Brief-notes encoding (content module, Phase 3A hardening).
+ * Brief-notes encoding (content module, Phase 3A).
  *
  * Phase 3A avoids new columns, so a couple of structured brief flags ride along
  * inside article_topics.brief_notes as an invisible trailing marker. The marker
  * is stripped before the notes are shown to the user and parsed at generation
- * time. Currently carries: includeBrandName (may the article mention the
- * business/brand name).
+ * time. Carries: includeBrandName + the exact brandNameToInclude to weave in.
  */
 
 const MARKER_RE = /\n*\[\[brief:([^\]]*)\]\]\s*$/
 
 export interface BriefFlags {
   includeBrandName: boolean
+  brandNameToInclude: string
+}
+
+function b64(s: string): string {
+  try { return Buffer.from(s, 'utf8').toString('base64') } catch { return '' }
+}
+function unb64(s: string): string {
+  try { return Buffer.from(s, 'base64').toString('utf8') } catch { return '' }
 }
 
 /** Append the flags marker to the user's free-text notes. */
 export function encodeBriefNotes(notes: string, flags: BriefFlags): string {
   const clean = stripBriefMarker(notes)
-  const marker = `[[brief:includeBrandName=${flags.includeBrandName ? '1' : '0'}]]`
+  const parts = [`includeBrandName=${flags.includeBrandName ? '1' : '0'}`]
+  // Base64 the brand name so it can't break the marker syntax or leak oddly.
+  if (flags.includeBrandName && flags.brandNameToInclude.trim()) {
+    parts.push(`brand=${b64(flags.brandNameToInclude.trim())}`)
+  }
+  const marker = `[[brief:${parts.join(';')}]]`
   return clean ? `${clean}\n\n${marker}` : marker
 }
 
@@ -30,10 +42,12 @@ export function stripBriefMarker(raw: string | null | undefined): string {
 export function decodeBriefNotes(raw: string | null | undefined): { notes: string; flags: BriefFlags } {
   const text = raw || ''
   const m = text.match(MARKER_RE)
-  const flags: BriefFlags = { includeBrandName: false }
+  const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '' }
   if (m) {
     const body = m[1]
     if (/includeBrandName=1/.test(body)) flags.includeBrandName = true
+    const brand = body.match(/brand=([^;]*)/)
+    if (brand) flags.brandNameToInclude = unb64(brand[1])
   }
   return { notes: stripBriefMarker(text), flags }
 }

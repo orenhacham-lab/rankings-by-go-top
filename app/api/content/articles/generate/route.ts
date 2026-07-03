@@ -71,9 +71,19 @@ export async function POST(request: Request) {
 
   const anchors = (Array.isArray(t.anchors_json) ? t.anchors_json : []) as ArticleTopicAnchor[]
   const language = String(t.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
-  // brief_notes carries the human notes + hidden flags (includeBrandName).
+  // brief_notes carries the human notes + hidden flags (includeBrandName, brand).
   const decodedNotes = decodeBriefNotes((t.brief_notes as string) ?? null)
 
+  // Pre-check: a required anchor with no usable URL can never be placed.
+  const requiredNoUrl = anchors.some(
+    (a) => a.required && (a.anchor_text?.trim() || a.target_url?.trim()) && !/^https?:\/\//i.test((a.target_url || '').trim())
+  )
+  if (requiredNoUrl) {
+    console.log('[content-article-generation] failed reason=required_anchor_missing_url')
+    return Response.json({ error: 'Article generation failed', reason: 'required_anchor_missing_url' }, { status: 400 })
+  }
+
+  const businessName = (project as { business_name?: string } | null)?.business_name ?? null
   const brief: ArticleBrief = {
     language,
     topic: String(t.topic || ''),
@@ -86,8 +96,10 @@ export async function POST(request: Request) {
     ctaPreference: (t.cta_preference as string) ?? null,
     briefNotes: decodedNotes.notes || null,
     includeBrandName: decodedNotes.flags.includeBrandName,
+    // Explicit brand name from the brief; fall back to the project's business name.
+    brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
     anchors,
-    businessName: (project as { business_name?: string } | null)?.business_name ?? null,
+    businessName,
     domain: (project as { target_domain?: string } | null)?.target_domain ?? null,
     category,
   }

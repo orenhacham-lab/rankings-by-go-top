@@ -27,6 +27,7 @@ export interface ArticleBrief {
   ctaPreference: string | null
   briefNotes: string | null
   includeBrandName: boolean
+  brandNameToInclude: string | null
   anchors: ArticleTopicAnchor[]
   businessName: string | null
   domain: string | null
@@ -72,8 +73,9 @@ function buildArticlePrompt(brief: ArticleBrief, opts: GenOpts): string {
     ? 'Do NOT include any call-to-action.'
     : `End with ${CTA_HINT[brief.ctaPreference] || 'a gentle call-to-action'}.`
 
-  const brandLine = brief.includeBrandName && brief.businessName
-    ? `You MAY mention the business name "${brief.businessName}" naturally and subtly (do not overuse it).`
+  const brandName = (brief.brandNameToInclude || '').trim()
+  const brandLine = brief.includeBrandName && brandName
+    ? `You MAY mention the business/brand name "${brandName}" naturally and subtly (do not overuse it).`
     : 'Do NOT mention any business or brand name.'
 
   const anchorList = brief.anchors
@@ -218,6 +220,58 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts): Promise<{ article
   }
 }
 
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Deterministically ensure required anchors exist as links: link the first
+ * plain-text occurrence of the anchor text (outside any tag), or append one
+ * short natural sentence with the link. Minimal — no weird blocks / footer spam.
+ */
+function deterministicInsertAnchors(
+  html: string,
+  missing: { anchorText: string; targetUrl: string }[],
+  language: SuggestionLanguage
+): string {
+  let out = html
+  for (const a of missing) {
+    const text = (a.anchorText || '').trim()
+    const url = (a.targetUrl || '').trim()
+    if (!text || !/^https?:\/\//i.test(url)) continue
+
+    // Try to link an existing plain-text mention (never inside a tag/existing link).
+    const parts = out.split(/(<[^>]+>)/)
+    let placed = false
+    let insideLink = false
+    for (let i = 0; i < parts.length; i++) {
+      const seg = parts[i]
+      if (seg.startsWith('<')) {
+        if (/^<a[\s>]/i.test(seg)) insideLink = true
+        else if (/^<\/a>/i.test(seg)) insideLink = false
+        continue
+      }
+      if (insideLink) continue
+      const idx = seg.toLowerCase().indexOf(text.toLowerCase())
+      if (idx >= 0) {
+        const before = seg.slice(0, idx)
+        const match = seg.slice(idx, idx + text.length)
+        const after = seg.slice(idx + text.length)
+        parts[i] = `${before}<a href="${escapeAttr(url)}">${match}</a>${after}`
+        out = parts.join('')
+        placed = true
+        break
+      }
+    }
+    if (placed) continue
+
+    // Otherwise append a short, natural sentence carrying the link.
+    const lead = language === 'he' ? 'למידע נוסף: ' : 'Learn more: '
+    out = `${out}\n<p>${lead}<a href="${escapeAttr(url)}">${escapeAttr(text)}</a></p>`
+  }
+  return out
+}
+
 export interface ValidatedArticle {
   article: GeneratedArticleContent
   safeHtml: string
@@ -250,10 +304,13 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
   if (!best.safe) return { error: 'empty_after_sanitize' }
   if (!best.structure.ok) return { error: 'article_structure_invalid' }
 
-  // Required-anchor pass (repair retry if any required anchor is missing).
+  // Required-anchor pass. Three escalating attempts before giving up:
+  //   1. Gemini repair retry, 2. deterministic server-side insertion.
   let safe = best.safe
   let anchorValidation = validateAnchorPlacement(brief.anchors, safe)
+
   if (anchorValidation.hasBlockingIssues) {
+    // Step A — ask Gemini to re-emit the article with the missing links woven in.
     const missing = anchorValidation.missingRequired.map((a) => ({ anchor_text: a.anchorText, target_url: a.targetUrl, required: true, type: a.type, note: '' }))
     const repair = await callGemini(brief, { repairAnchors: missing })
     if ('article' in repair) {
@@ -266,6 +323,21 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
         anchorValidation = rAnchors
       }
     }
+
+    // Step B — deterministic insertion (link an existing mention, else a short
+    // natural sentence). Re-sanitize + re-validate structure and anchors.
+    if (anchorValidation.hasBlockingIssues) {
+      const inserted = deterministicInsertAnchors(safe, anchorValidation.missingRequired, language)
+      const dSafe = sanitizeArticleHtml(inserted)
+      const dStruct = validateArticleStructure(dSafe, { language, desiredWordCount: desired })
+      const dAnchors = validateAnchorPlacement(brief.anchors, dSafe)
+      if (dStruct.ok && !dAnchors.hasBlockingIssues) {
+        safe = dSafe
+        anchorValidation = dAnchors
+      }
+    }
+
+    // Step C — still missing → clear error, no fake-success draft.
     if (anchorValidation.hasBlockingIssues) return { error: 'required_anchor_missing' }
   }
 

@@ -186,3 +186,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   return Response.json({ article: sanitizeArticleRow(write.data as Record<string, unknown>), warnings, anchorValidation: validation })
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
+  const { id } = await params
+
+  const owned = await loadOwnedArticle(id)
+  if ('error' in owned) return Response.json({ error: owned.error }, { status: owned.status })
+
+  // Delete only the generated_articles row. Does NOT touch WordPress, the
+  // global articles table, or /api/articles.
+  const { error } = await owned.admin.from('generated_articles').delete().eq('id', id)
+  if (error) {
+    console.error('[content-articles] delete failed', { message: error.message })
+    return Response.json({ error: 'Failed to delete article' }, { status: 500 })
+  }
+
+  console.log('[content-articles] deleted', { articleId: id, projectId: owned.article.project_id })
+  return Response.json({ success: true, project_id: owned.article.project_id })
+}

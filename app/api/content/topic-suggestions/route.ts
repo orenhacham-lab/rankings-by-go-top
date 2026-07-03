@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     filtered = filterTopicSuggestions(combinedRaw, primaryKeyword, requestedCount, { relaxed: true })
   }
 
-  if (filtered.length === 0) return fallback('gemini_all_filtered')
+  if (filtered.length === 0) return fallback('gemini_all_filtered_after_retry')
 
   console.log('[content-topic-suggestions] source=gemini count=' + filtered.length + ' fit=' + fit)
   return Response.json({

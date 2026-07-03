@@ -104,6 +104,17 @@ export default function ContentHub() {
   useEffect(() => { load() }, [load])
   useEffect(() => { loadTopics() }, [loadTopics])
 
+  async function deleteArticle(id: string) {
+    if (!window.confirm(t.confirmDeleteArticle)) return
+    try {
+      const res = await fetch(`/api/content/articles/${id}`, { method: 'DELETE' })
+      if (res.ok) { load(); loadTopics() }
+      else window.alert(t.deleteFailed)
+    } catch {
+      window.alert(t.deleteFailed)
+    }
+  }
+
   // Auto-select when the user has exactly one project and none is chosen yet.
   useEffect(() => {
     if (!projectId && data && data.projects.length === 1) {
@@ -291,6 +302,13 @@ export default function ContentHub() {
                               <Link href={`/content/articles/${a.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
                                 {t.actions.edit}
                               </Link>
+                              <button
+                                type="button"
+                                onClick={() => deleteArticle(a.id)}
+                                className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                              >
+                                {t.delete}
+                              </button>
                               {/* Publish/Schedule arrive in later phases. */}
                               <span className="text-xs text-slate-400 dark:text-slate-600">
                                 {t.publishNextPhase}
