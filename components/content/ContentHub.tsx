@@ -90,6 +90,15 @@ export default function ContentHub() {
   // second loop while React's batchRunning state is still updating.
   const batchRunningRef = useRef(false)
 
+  // ── Batch WordPress publish/draft (top table, client-side, sequential) ──
+  type ArticleBatchEntry = { status: 'queued' | 'running' | 'success' | 'failed'; error?: string }
+  const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set())
+  const [articleBatchState, setArticleBatchState] = useState<Record<string, ArticleBatchEntry>>({})
+  const [articleBatchRunning, setArticleBatchRunning] = useState(false)
+  const [articleBatchMode, setArticleBatchMode] = useState<'publish' | 'draft' | null>(null)
+  const articleBatchRef = useRef(false)
+  const cancelArticleRef = useRef(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -231,8 +240,18 @@ export default function ContentHub() {
   const selectableTopics = useMemo(() => topics.filter((tp) => !articleByTopic[tp.id]), [topics, articleByTopic])
   const allSelectableSelected = selectableTopics.length > 0 && selectableTopics.every((tp) => selected.has(tp.id))
 
+  // Articles eligible for batch WordPress export = not yet sent + not published.
+  const selectableArticles = filteredArticles.filter((a) => !a.wp_post_id && a.status !== 'published')
+  const allArticlesSelected = selectableArticles.length > 0 && selectableArticles.every((a) => selectedArticles.has(a.id))
+  function toggleArticleSelectAll() {
+    setSelectedArticles(() => (allArticlesSelected ? new Set() : new Set(selectableArticles.map((a) => a.id))))
+  }
+
   // Clear selection/batch state when the project changes.
-  useEffect(() => { setSelected(new Set()); setBatchState({}); setBatchRunning(false); cancelRef.current = false }, [projectId])
+  useEffect(() => {
+    setSelected(new Set()); setBatchState({}); setBatchRunning(false); cancelRef.current = false
+    setSelectedArticles(new Set()); setArticleBatchState({}); setArticleBatchRunning(false); setArticleBatchMode(null); cancelArticleRef.current = false
+  }, [projectId])
 
   function toggleSelect(id: string) {
     setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -334,6 +353,82 @@ export default function ContentHub() {
     if (r.ok) toast.success(t.batch.retrySuccess)
     else toast.error(r.error || t.rowWp.errGeneric)
   }
+
+  // ── Batch WordPress publish/draft (top table) ──
+  // Only articles that were NOT sent to WordPress yet AND aren't published can be
+  // batch-exported (avoids duplicate-post/409; already-exported ones use the
+  // per-row buttons). Reuses the SAME /wordpress route — no route change.
+  function toggleArticleSelect(id: string) {
+    setSelectedArticles((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function clearArticleSelection() { setSelectedArticles(new Set()) }
+
+  // One WordPress export — reuses the existing route (no confirm here; the batch
+  // confirms once). 60s client timeout.
+  async function exportOne(id: string, mode: 'publish' | 'draft'): Promise<{ ok: boolean; error?: string; data?: { wp_post_id: number; wp_post_url: string | null } }> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 60_000)
+    try {
+      const res = await fetch(`/api/content/articles/${id}/wordpress`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: mode, force: false }), signal: controller.signal,
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.wp_post_id) return { ok: true, data: { wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null } }
+      const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
+      return { ok: false, error: reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout }
+      return { ok: false, error: t.rowWp.errGeneric }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  async function runArticleBatch(mode: 'publish' | 'draft') {
+    if (articleBatchRef.current || articleBatchRunning) return // synchronous lock first
+    const ids = Array.from(selectedArticles).filter((id) => {
+      const a = (data?.articles ?? []).find((x) => x.id === id)
+      return !!a && !a.wp_post_id && a.status !== 'published'
+    })
+    if (ids.length === 0) return
+    if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
+    if (mode === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
+    articleBatchRef.current = true
+    cancelArticleRef.current = false
+    setArticleBatchRunning(true); setArticleBatchMode(mode)
+    setArticleBatchState((s) => { const next = { ...s }; ids.forEach((id) => { next[id] = { status: 'queued' } }); return next })
+
+    const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', onUnload)
+
+    let ok = 0, fail = 0
+    for (const id of ids) {
+      if (cancelArticleRef.current) break
+      const a = (data?.articles ?? []).find((x) => x.id === id)
+      if (!a || a.wp_post_id || a.status === 'published') continue // changed meanwhile → skip
+      setArticleBatchState((s) => ({ ...s, [id]: { status: 'running' } }))
+      const r = await exportOne(id, mode)
+      if (r.ok && r.data) {
+        ok++
+        patchArticle(id, { wp_post_id: r.data.wp_post_id, wp_post_url: r.data.wp_post_url, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
+        setArticleBatchState((s) => ({ ...s, [id]: { status: 'success' } }))
+      } else {
+        fail++
+        setArticleBatchState((s) => ({ ...s, [id]: { status: 'failed', error: r.error } }))
+      }
+    }
+
+    window.removeEventListener('beforeunload', onUnload)
+    const wasCancelled = cancelArticleRef.current
+    articleBatchRef.current = false
+    setArticleBatchRunning(false); setArticleBatchMode(null); setSelectedArticles(new Set())
+    await load()
+    if (wasCancelled) toast.success(t.batch.cancelled)
+    else toast.success((mode === 'publish' ? t.batch.publishSummary : t.batch.draftSummary).replace('{ok}', String(ok)).replace('{fail}', String(fail)))
+  }
+
+  function cancelArticleBatch() { cancelArticleRef.current = true }
 
   const statusLabel = (s: string) =>
     (t.status as Record<string, string>)[s] ?? s
@@ -467,11 +562,35 @@ export default function ContentHub() {
                 />
               </div>
 
+              {/* Batch WordPress export bar — only when there are eligible articles. */}
+              {selectableArticles.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3 mb-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                  <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <input type="checkbox" checked={allArticlesSelected} onChange={toggleArticleSelectAll} disabled={articleBatchRunning} className="cursor-pointer" />
+                    {t.batch.selectAll}
+                  </label>
+                  <span className="text-sm text-slate-600 dark:text-slate-300">{t.batch.selected.replace('{n}', String(selectedArticles.size))}</span>
+                  <Button size="sm" onClick={() => runArticleBatch('publish')} loading={articleBatchRunning && articleBatchMode === 'publish'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
+                    {articleBatchRunning && articleBatchMode === 'publish' ? t.rowWp.publishing : t.batch.publishSelected.replace('{n}', String(selectedArticles.size))}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => runArticleBatch('draft')} loading={articleBatchRunning && articleBatchMode === 'draft'} disabled={articleBatchRunning || selectedArticles.size === 0 || selectedArticles.size > BATCH_LIMIT}>
+                    {articleBatchRunning && articleBatchMode === 'draft' ? t.rowWp.sending : t.batch.draftSelected.replace('{n}', String(selectedArticles.size))}
+                  </Button>
+                  {articleBatchRunning ? (
+                    <Button size="sm" variant="ghost" onClick={cancelArticleBatch}>{t.batch.cancel}</Button>
+                  ) : (
+                    selectedArticles.size > 0 && <Button size="sm" variant="ghost" onClick={clearArticleSelection}>{t.batch.clear}</Button>
+                  )}
+                  {selectedArticles.size > BATCH_LIMIT && <span className="text-xs text-amber-600 dark:text-amber-400">{t.batch.tooMany}</span>}
+                </div>
+              )}
+
               {/* Article table */}
               <div className="overflow-x-auto mb-6">
                 <Table>
                   <TableHead>
                     <tr>
+                      <Th> </Th>
                       <Th>{t.table.title}</Th>
                       <Th>{t.table.project}</Th>
                       <Th>{t.table.status}</Th>
@@ -485,10 +604,24 @@ export default function ContentHub() {
                   </TableHead>
                   <TableBody>
                     {filteredArticles.length === 0 ? (
-                      <EmptyRow colSpan={9} message={t.table.emptyTitle} />
+                      <EmptyRow colSpan={10} message={t.table.emptyTitle} />
                     ) : (
-                      filteredArticles.map((a) => (
+                      filteredArticles.map((a) => {
+                        const selectableArticle = !a.wp_post_id && a.status !== 'published'
+                        return (
                         <TableRow key={a.id}>
+                          <Td>
+                            {selectableArticle && (
+                              <input
+                                type="checkbox"
+                                checked={selectedArticles.has(a.id)}
+                                disabled={articleBatchRunning}
+                                onChange={() => toggleArticleSelect(a.id)}
+                                className="cursor-pointer disabled:cursor-not-allowed"
+                                aria-label={t.table.title}
+                              />
+                            )}
+                          </Td>
                           <Td><span className="font-medium">{a.title}</span></Td>
                           <Td><span className="text-sm text-slate-600 dark:text-slate-300">{selectedProject?.name ?? '—'}</span></Td>
                           <Td><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
@@ -514,54 +647,56 @@ export default function ContentHub() {
                             })()}
                           </Td>
                           <Td>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {/* State-based WordPress actions (reuse the editor's route). */}
-                              {a.status !== 'published' && (a.status === 'ready' || a.wp_post_id) && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => exportRow(a, 'publish')}
-                                  loading={rowBusy?.id === a.id && rowBusy.action === 'publish'}
-                                  disabled={!!rowBusy}
-                                >
-                                  {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : t.rowWp.publish}
-                                </Button>
-                              )}
-                              {a.status === 'ready' && !a.wp_post_id && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => exportRow(a, 'draft')}
-                                  loading={rowBusy?.id === a.id && rowBusy.action === 'draft'}
-                                  disabled={!!rowBusy}
-                                >
-                                  {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : t.rowWp.sendDraft}
-                                </Button>
-                              )}
-                              {a.status === 'draft' && !a.wp_post_id && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => markReadyRow(a)}
-                                  loading={rowBusy?.id === a.id && rowBusy.action === 'ready'}
-                                  disabled={!!rowBusy}
-                                >
-                                  {t.rowWp.markReady}
-                                </Button>
-                              )}
-                              <Link href={`/content/articles/${a.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
-                                {t.actions.edit}
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => deleteArticle(a.id)}
-                                className="text-sm text-red-600 dark:text-red-400 hover:underline"
-                              >
-                                {t.delete}
-                              </button>
-                            </div>
+                            {(() => {
+                              const abs = articleBatchState[a.id]
+                              if (abs && abs.status !== 'success') {
+                                if (abs.status === 'running') {
+                                  return (
+                                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                      {articleBatchMode === 'publish' ? t.rowWp.publishing : t.rowWp.sending}
+                                    </span>
+                                  )
+                                }
+                                if (abs.status === 'queued') return <Badge variant="neutral">{t.batch.queued}</Badge>
+                                return (
+                                  <span className="inline-flex items-center gap-2">
+                                    <Badge variant="danger">{t.batch.failed}</Badge>
+                                    {abs.error && <span className="text-[11px] text-red-600 dark:text-red-400 max-w-[14rem] truncate" title={abs.error}>{abs.error}</span>}
+                                  </span>
+                                )
+                              }
+                              return (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {/* State-based WordPress actions (reuse the editor's route). */}
+                                  {a.status !== 'published' && (a.status === 'ready' || a.wp_post_id) && (
+                                    <Button size="sm" onClick={() => exportRow(a, 'publish')} loading={rowBusy?.id === a.id && rowBusy.action === 'publish'} disabled={!!rowBusy || articleBatchRunning}>
+                                      {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : t.rowWp.publish}
+                                    </Button>
+                                  )}
+                                  {a.status === 'ready' && !a.wp_post_id && (
+                                    <Button size="sm" variant="outline" onClick={() => exportRow(a, 'draft')} loading={rowBusy?.id === a.id && rowBusy.action === 'draft'} disabled={!!rowBusy || articleBatchRunning}>
+                                      {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : t.rowWp.sendDraft}
+                                    </Button>
+                                  )}
+                                  {a.status === 'draft' && !a.wp_post_id && (
+                                    <Button size="sm" variant="outline" onClick={() => markReadyRow(a)} loading={rowBusy?.id === a.id && rowBusy.action === 'ready'} disabled={!!rowBusy || articleBatchRunning}>
+                                      {t.rowWp.markReady}
+                                    </Button>
+                                  )}
+                                  <Link href={`/content/articles/${a.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    {t.actions.edit}
+                                  </Link>
+                                  <button type="button" onClick={() => deleteArticle(a.id)} className="text-sm text-red-600 dark:text-red-400 hover:underline">
+                                    {t.delete}
+                                  </button>
+                                </div>
+                              )
+                            })()}
                           </Td>
                         </TableRow>
-                      ))
+                        )
+                      })
                     )}
                   </TableBody>
                 </Table>

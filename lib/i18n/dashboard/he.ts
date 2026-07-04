@@ -124,6 +124,10 @@ export const dashboardHe = {
       stoppedTimeout: 'היצירה נעצרה כי מאמר אחד לקח יותר מדי זמן וייתכן שהוא עדיין נוצר ברקע. נסו שוב מאוחר יותר.',
       cancelled: 'היצירה נעצרה. מאמרים שכבר נוצרו נשמרו.',
       summary: 'נוצרו {ok} מאמרים, {fail} נכשלו',
+      publishSelected: 'פרסם נבחרים ({n})',
+      draftSelected: 'שלח כטיוטה נבחרים ({n})',
+      publishSummary: 'פורסמו {ok} מאמרים, {fail} נכשלו',
+      draftSummary: 'נשלחו {ok} טיוטות, {fail} נכשלו',
     },
     wpState: {
       published: 'פורסם ב-WordPress',

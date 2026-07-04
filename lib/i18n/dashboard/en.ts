@@ -126,6 +126,10 @@ export const dashboardEn = {
       stoppedTimeout: 'Batch stopped because one article took too long and may still be generating in the background. Try again later.',
       cancelled: 'Generation stopped. Articles already created were saved.',
       summary: '{ok} articles created, {fail} failed',
+      publishSelected: 'Publish selected ({n})',
+      draftSelected: 'Send selected as draft ({n})',
+      publishSummary: '{ok} articles published, {fail} failed',
+      draftSummary: '{ok} drafts sent, {fail} failed',
     },
     wpState: {
       published: 'Published on WordPress',
