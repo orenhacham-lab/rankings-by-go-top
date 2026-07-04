@@ -13,7 +13,7 @@
 
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { generateArticleImage } from '@/lib/content/gemini-image'
+import { generateArticleImage, normalizeFeaturedImage } from '@/lib/content/gemini-image'
 
 const BUCKET = 'content-article-images'
 
@@ -66,9 +66,21 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return Response.json({ error: 'image_generation_failed', reason: gen.error }, { status: 502 })
   }
 
-  const ext = extFor(gen.mimeType)
+  // Normalize to a consistent WordPress-friendly JPEG 1600x900 (16:9) before
+  // storing. Falls back to the raw bytes only if sharp fails.
+  let bytes = gen.data
+  let mimeType = gen.mimeType
+  try {
+    const norm = await normalizeFeaturedImage(gen.data)
+    bytes = norm.data
+    mimeType = norm.mimeType
+  } catch (e) {
+    console.warn('[content-article-image] normalize failed, using original', { message: e instanceof Error ? e.message : String(e) })
+  }
+
+  const ext = extFor(mimeType)
   const path = `${article.project_id}/${id}-${Date.now().toString(36)}.${ext}`
-  const up = await admin.storage.from(BUCKET).upload(path, gen.data, { contentType: gen.mimeType, upsert: true })
+  const up = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: mimeType, upsert: true })
   if (up.error) {
     console.error('[content-article-image] storage upload failed', { message: up.error.message })
     return Response.json({ error: 'image_upload_failed' }, { status: 500 })

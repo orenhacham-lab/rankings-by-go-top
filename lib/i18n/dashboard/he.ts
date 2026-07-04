@@ -264,6 +264,7 @@ export const dashboardHe = {
       imagePromptHint: 'הנחיה חופשית לתמונת המאמר. אם ריק, נשתמש בכותרת/נושא.',
       imageTitle: 'תמונת מאמר ראשית',
       imageHint: 'תמונה נקייה ומקצועית בפורמט רוחבי לבלוג, ללא טקסט בתוך התמונה.',
+      imageSafetyNote: 'התמונה נוצרת כהמחשה כללית ללא לוגואים, שמות מותגים או אריזות רשמיות.',
       imageGenerate: 'צור תמונת מאמר',
       imageGenerating: 'יוצר תמונה…',
       imageRegenerate: 'צור מחדש תמונה',

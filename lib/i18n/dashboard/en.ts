@@ -266,6 +266,7 @@ export const dashboardEn = {
       imagePromptHint: 'Free-form guidance for the article image. If empty, we use the title/topic.',
       imageTitle: 'Featured article image',
       imageHint: 'A clean, professional landscape blog image with no text inside it.',
+      imageSafetyNote: 'The image is generated as a generic illustration without logos, brand names, or official packaging.',
       imageGenerate: 'Generate Article Image',
       imageGenerating: 'Generating image…',
       imageRegenerate: 'Regenerate Image',

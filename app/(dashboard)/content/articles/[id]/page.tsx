@@ -369,6 +369,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               <Button size="sm" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageGenerate}</Button>
             </div>
           )}
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{e.imageSafetyNote}</p>
         </Card>
 
         {/* WordPress draft export (requires a featured image; never publishes). */}
