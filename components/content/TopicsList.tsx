@@ -186,7 +186,7 @@ export default function TopicsList({
                       {creatingId === topic.id && (
                         <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                           <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          {c.creatingArticle}
+                          {c.creatingArticleWithImage}
                         </span>
                       )}
                       {/* Primary action: create OR edit the article. */}
@@ -206,7 +206,7 @@ export default function TopicsList({
                           loading={creatingId === topic.id}
                           disabled={busy || creatingId === topic.id}
                         >
-                          {creatingId === topic.id ? c.creatingArticle : c.createArticle}
+                          {creatingId === topic.id ? c.creatingArticleWithImage : c.createArticle}
                         </Button>
                       )}
 

@@ -13,6 +13,7 @@
 
 import { GoogleGenAI } from '@google/genai'
 import sharp from 'sharp'
+import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 export interface GeneratedImage {
   data: Buffer
@@ -110,6 +111,54 @@ export function buildImagePrompt(input: { title: string; topic?: string | null; 
     `If the article is about a specific brand or product, represent the CATEGORY and intent with an unbranded, generic scene instead of the real product. Examples: perfume → elegant unbranded fragrance bottles with blank labels; treadmill/fitness → a generic home-gym or generic treadmill silhouette with no readable screen/UI; flower delivery → a natural bouquet/delivery scene with no shop logo or signage.`,
     `Do NOT make it a cartoon, illustration, or 3D render unless the topic clearly requires it. Avoid distorted hands/faces and unreadable typography. The image must be safe for commercial website use.`,
   ].filter(Boolean).join(' ')
+}
+
+/**
+ * Write a concise, BRAND-NEUTRAL visual concept for the article's hero image
+ * (in the article's language) from title/excerpt/topic/keyword. Uses the cheap
+ * classifier text model, and is instructed to describe a generic, category-based
+ * scene — never a brand/product/model name, logo, packaging, or real product.
+ * On any failure it returns a safe deterministic fallback. This is what gets
+ * stored as featured_image_prompt and fed (sanitized) to the image model.
+ */
+export async function writeCommercialSafeConcept(input: {
+  title: string
+  excerpt?: string | null
+  topic?: string | null
+  primaryKeyword?: string | null
+  language?: 'he' | 'en'
+}): Promise<string> {
+  const lang: 'he' | 'en' = input.language === 'en' ? 'en' : 'he'
+  const fallback = (): string => {
+    const base = sanitizeImageConceptForCommercialUse(input.title || input.topic || '')
+    return lang === 'he'
+      ? `סצנה עריכתית פרימיום, נקייה ופוטוריאליסטית בנושא ${base || 'התוכן'}, גנרית ולא ממותגת, ללא לוגו, ללא טקסט וללא אריזות רשמיות.`
+      : `A premium, clean, photorealistic editorial scene about ${base || 'the topic'}, generic and unbranded, no logo, no text, no official packaging.`
+  }
+
+  const client = getGeminiClient()
+  if (!client) return fallback()
+  const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
+  const outLang = lang === 'he' ? 'Hebrew' : 'English'
+  const ctx = [input.excerpt, input.topic, input.primaryKeyword].map((x) => (x || '').trim()).filter(Boolean).join(' | ')
+  const prompt = [
+    `Write ONE concise ${outLang} visual concept (1-2 sentences) for a PREMIUM EDITORIAL blog hero image about the article below.`,
+    `Article title: ${input.title}`,
+    ctx ? `Context: ${ctx}` : '',
+    `Rules: describe a GENERIC, UNBRANDED, CATEGORY-BASED scene (category + mood + scene + composition). NEVER mention any brand name, product or model name, or SKU-like identifier. NEVER request a real bottle/product, official packaging, logo, label text, or branded object. No text/letters in the image. Editorial, premium, photorealistic, clean, commercial-safe.`,
+    `Output ONLY the concept sentence(s) in ${outLang}. No quotes, no preamble.`,
+  ].filter(Boolean).join('\n')
+
+  try {
+    const model = client.getGenerativeModel({ model: modelName })
+    const res = await model.generateContent(prompt)
+    const text = (res.response.text() || '').trim().replace(/^["'\s]+|["'\s]+$/g, '')
+    if (!text || text.length < 8) return fallback()
+    return text
+  } catch (err) {
+    console.warn('[content-article-image] concept writer failed, using fallback', { message: err instanceof Error ? err.message : String(err), model: modelName })
+    return fallback()
+  }
 }
 
 interface InteractionImage { output_image?: { data?: string; mime_type?: string } }

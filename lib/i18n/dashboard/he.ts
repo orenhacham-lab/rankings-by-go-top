@@ -228,6 +228,7 @@ export const dashboardHe = {
     createArticle: 'צור מאמר',
     editArticle: 'ערוך מאמר',
     creatingArticle: 'יוצר מאמר…',
+    creatingArticleWithImage: 'יוצר מאמר ותמונה…',
     createArticleFailed: 'יצירת המאמר נכשלה. נסו שוב.',
     publishNextPhase: 'פרסום ל-WordPress — בשלב הבא',
     genErrors: {

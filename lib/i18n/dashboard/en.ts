@@ -230,6 +230,7 @@ export const dashboardEn = {
     createArticle: 'Create article',
     editArticle: 'Edit article',
     creatingArticle: 'Generating article…',
+    creatingArticleWithImage: 'Creating article and image…',
     createArticleFailed: 'Article generation failed. Please try again.',
     publishNextPhase: 'Publish to WordPress — next phase',
     genErrors: {

@@ -13,6 +13,7 @@
 
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
+import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
@@ -217,9 +218,24 @@ export async function POST(request: Request) {
     warnings: gen.audit.warnings.length,
   })
 
+  // Auto-generate a brand-neutral featured image (default ON; disable with
+  // CONTENT_AUTO_FEATURED_IMAGE=false). Best-effort: the article is already
+  // saved, so image failure NEVER blocks creation — we just flag it.
+  let imageGenerated = false
+  if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
+    try {
+      const img = await createFeaturedImageForArticle(auth.admin, inserted.id)
+      imageGenerated = !('error' in img)
+      if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: inserted.id, reason: img.error })
+    } catch (e) {
+      console.warn('[content-article-generation] auto image threw', { message: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
   return Response.json({
     articleId: inserted.id,
     warnings: article.warnings,
     audit: gen.audit,
+    imageGenerated,
   })
 }
