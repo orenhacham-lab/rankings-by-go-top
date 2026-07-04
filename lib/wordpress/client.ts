@@ -353,26 +353,45 @@ export async function uploadMedia(
   return { id: media.id, sourceUrl: media.source_url || '' }
 }
 
+export type WordPressPostStatus = 'draft' | 'publish'
+
 /**
- * Create a DRAFT post. status is ALWAYS 'draft' — never publish. Returns the
- * new post id + edit/preview link.
+ * Create a post with an EXPLICIT status ('draft' or 'publish'). The caller
+ * decides the status — this function never defaults to publish. Returns the new
+ * post id + link + the status WordPress reports.
  */
-export async function createDraftPost(
+export async function createPost(
   creds: WordPressCredentials,
-  post: { title: string; content: string; slug?: string; excerpt?: string; featuredMedia?: number }
+  post: { title: string; content: string; status: WordPressPostStatus; slug?: string; excerpt?: string; featuredMedia?: number }
 ): Promise<{ id: number; link: string; status: string }> {
-  const payload: Record<string, unknown> = {
-    title: post.title,
-    content: post.content,
-    status: 'draft', // hard-coded: this flow never publishes.
-  }
+  const status: WordPressPostStatus = post.status === 'publish' ? 'publish' : 'draft'
+  const payload: Record<string, unknown> = { title: post.title, content: post.content, status }
   if (post.slug) payload.slug = post.slug
   if (post.excerpt) payload.excerpt = post.excerpt
   if (typeof post.featuredMedia === 'number') payload.featured_media = post.featuredMedia
 
   const created = await wpPostJson<{ id?: number; link?: string; status?: string }>(creds, '/posts', payload)
   if (!created || typeof created.id !== 'number') throw new WordPressClientError('WordPress did not return a post id.')
-  return { id: created.id, link: created.link || '', status: created.status || 'draft' }
+  return { id: created.id, link: created.link || '', status: created.status || status }
+}
+
+/**
+ * Best-effort SEO meta update (Yoast + Rank Math keys). Registered/protected
+ * meta may be rejected by the REST API — the caller MUST wrap this in try/catch
+ * and never fail the export on its account.
+ */
+export async function updatePostSeoMeta(
+  creds: WordPressCredentials,
+  postId: number,
+  seo: { metaTitle?: string | null; metaDescription?: string | null }
+): Promise<void> {
+  const meta: Record<string, string> = {}
+  const t = (seo.metaTitle || '').trim()
+  const d = (seo.metaDescription || '').trim()
+  if (t) { meta._yoast_wpseo_title = t; meta.rank_math_title = t }
+  if (d) { meta._yoast_wpseo_metadesc = d; meta.rank_math_description = d }
+  if (Object.keys(meta).length === 0) return
+  await wpPostJson(creds, `/posts/${postId}`, { meta })
 }
 
 /**

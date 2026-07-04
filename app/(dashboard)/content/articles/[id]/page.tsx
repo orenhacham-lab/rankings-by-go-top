@@ -56,7 +56,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [imageBusy, setImageBusy] = useState(false)
   const [wpPostId, setWpPostId] = useState<number | null>(null)
   const [wpPostUrl, setWpPostUrl] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
+  const [wpStatus, setWpStatus] = useState<'draft' | 'publish' | null>(null)
+  const [wpBusy, setWpBusy] = useState<'draft' | 'publish' | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,6 +81,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setFeaturedImageUrl(a.featured_image_url ?? null)
       setWpPostId(a.wp_post_id ?? null)
       setWpPostUrl(a.wp_post_url ?? null)
+      setWpStatus(a.status === 'published' ? 'publish' : a.wp_post_id != null ? 'draft' : null)
     } finally {
       setLoading(false)
     }
@@ -176,16 +178,37 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  async function exportToWordPress() {
-    setExporting(true)
+  async function exportWordPress(status: 'draft' | 'publish') {
+    if (wpBusy) return // one export at a time
+    // Publishing goes live → confirm. Draft needs no dangerous confirmation.
+    if (status === 'publish' && !window.confirm(e.wpPublishConfirm)) return
+    // Already exported once → creating a NEW post requires explicit confirmation.
+    let force = false
+    if (wpPostId) {
+      if (!window.confirm(status === 'publish' ? e.wpPublishNewConfirm : e.wpDraftNewConfirm)) return
+      force = true
+    }
+    setWpBusy(status)
     setMessage(null)
     try {
-      const res = await fetch(`/api/content/articles/${id}/wordpress`, { method: 'POST' })
+      const res = await fetch(`/api/content/articles/${id}/wordpress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, force }),
+      })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.wp_post_id) {
         setWpPostId(data.wp_post_id)
         setWpPostUrl(data.wp_post_url ?? null)
-        setMessage({ text: e.wpExported, ok: true })
+        setWpStatus(data.wp_status === 'publish' ? 'publish' : 'draft')
+        const base = status === 'publish' ? e.wpPublished : e.wpExported
+        setMessage({ text: data.imageWarning ? `${base} · ${e.wpImageWarn}` : base, ok: true })
+        return
+      }
+      if (res.status === 409 && data.reason === 'already_exported') {
+        setWpPostId(data.wp_post_id ?? wpPostId)
+        setWpPostUrl(data.wp_post_url ?? wpPostUrl)
+        setMessage({ text: e.wpAlreadyExported, ok: false })
         return
       }
       const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
@@ -193,7 +216,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     } catch {
       setMessage({ text: e.wpFailed, ok: false })
     } finally {
-      setExporting(false)
+      setWpBusy(null)
     }
   }
 
@@ -372,16 +395,23 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{e.imageSafetyNote}</p>
         </Card>
 
-        {/* WordPress draft export (requires a featured image; never publishes). */}
+        {/* WordPress export — draft (safe) or publish now (confirmed). */}
         <Card className="hover:translate-y-0">
           <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.wpTitle}</h3>
-          {!featuredImageUrl && <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.wpNeedsImage}</p>}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button size="sm" onClick={exportToWordPress} loading={exporting} disabled={exporting || !featuredImageUrl}>{exporting ? e.wpExporting : e.wpExport}</Button>
-            {wpPostId && (
+          {!featuredImageUrl && <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.wpNoImageWarn}</p>}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
+              {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
+              {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
+            </Button>
+            {wpPostId && wpPostUrl && (
               <span className="inline-flex items-center gap-2 text-sm">
-                <Badge variant="neutral">{e.wpDraftBadge}</Badge>
-                {wpPostUrl && <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">{e.wpOpen}</a>}
+                <Badge variant={wpStatus === 'publish' ? 'success' : 'neutral'}>{wpStatus === 'publish' ? e.wpPublishedBadge : e.wpDraftBadge}</Badge>
+                <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                  {wpStatus === 'publish' ? e.wpOpenLive : e.wpOpenDraft}
+                </a>
               </span>
             )}
           </div>
