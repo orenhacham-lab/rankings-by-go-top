@@ -18,11 +18,11 @@ export async function GET(request: Request) {
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
   try {
-    const candidates = await loadInternalLinkCandidates(auth.admin, auth.project.id)
-    return Response.json({ candidates })
+    const { candidates, hosts } = await loadInternalLinkCandidates(auth.admin, auth.project.id)
+    return Response.json({ candidates, hosts })
   } catch (e) {
     // Table missing (migration not run) → empty, not a 500.
-    if ((e as { code?: string })?.code === '42P01') return Response.json({ candidates: [] })
+    if ((e as { code?: string })?.code === '42P01') return Response.json({ candidates: [], hosts: [] })
     console.error('[internal-link-candidates] load failed', { message: (e as Error)?.message })
     return Response.json({ error: 'Failed to load candidates' }, { status: 500 })
   }

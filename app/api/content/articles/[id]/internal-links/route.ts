@@ -40,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const auth = await authContentProject((article as { project_id: string }).project_id)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  const candidates = await loadInternalLinkCandidates(auth.admin, auth.project.id, id)
+  const { candidates } = await loadInternalLinkCandidates(auth.admin, auth.project.id, id)
 
   // Approved planned links for THIS article come from its topic's brief_notes.
   let plannedLinks: unknown[] = []

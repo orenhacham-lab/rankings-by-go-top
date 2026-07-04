@@ -111,8 +111,8 @@ export function urlMatchKeys(u: string): string[] {
   s = s.replace(/\/+$/, '').toLowerCase()  // drop trailing slash
   const noWww = s.replace(/^www\./, '')
   const keys = new Set<string>()
+  if (noWww) keys.add(noWww) // no-www host+path is canonical
   if (s) keys.add(s)
-  if (noWww) keys.add(noWww)
   // Path-only (everything from the first slash) so relative hrefs match too.
   const slash = noWww.indexOf('/')
   if (slash >= 0) keys.add(noWww.slice(slash))
@@ -125,6 +125,40 @@ export function normalizeUrlKey(u: string): string {
   return urlMatchKeys(u)[0] ?? ''
 }
 const normUrl = normalizeUrlKey
+
+/**
+ * Stable grouping key for a same-site internal target. Prefers the path-only key
+ * so an absolute link and a relative link to the same page collapse to one
+ * target (paths are unique per page on a single site).
+ */
+export function internalTargetKey(u: string): string {
+  const keys = urlMatchKeys(u)
+  return keys.find((k) => k.startsWith('/')) ?? keys[0] ?? ''
+}
+
+/** Host of a URL (lowercased, no www). Returns null for relative/anchor URLs. */
+export function extractUrlHost(u: string): string | null {
+  const s = decodeEntities(normalizeHref(u)).trim().replace(/^https?:\/\//i, '')
+  if (!s || s.startsWith('/')) return null // relative → same-site
+  const host = (s.split(/[/?#]/)[0] ?? '').toLowerCase().replace(/^www\./, '')
+  return host || null
+}
+
+/** True when `u` is a same-site internal link, given the set of known hosts. */
+export function isInternalUrl(u: string, hosts: string[]): boolean {
+  const lower = (u || '').trim().toLowerCase()
+  if (!lower || lower.startsWith('#') || lower.startsWith('mailto:') || lower.startsWith('tel:') || lower.startsWith('javascript:')) return false
+  const host = extractUrlHost(u)
+  return host === null ? true : hosts.includes(host)
+}
+
+/** Human-ish label from a URL's last path segment ("…/treadmills/" → "treadmills"). */
+export function slugFromUrl(u: string): string {
+  const key = normalizeUrlKey(u).replace(/^[^/]*/, '') // strip host, keep path
+  const segs = key.split('/').filter(Boolean)
+  const last = segs[segs.length - 1] ?? ''
+  try { return decodeURIComponent(last).replace(/[-_]+/g, ' ').trim() } catch { return last.replace(/[-_]+/g, ' ').trim() }
+}
 
 /**
  * Server-safe (regex, no DOM) extraction of <a href="URL">TEXT</a> pairs from
