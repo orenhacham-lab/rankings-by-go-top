@@ -1,38 +1,25 @@
 /**
  * Content module — /api/content/articles/:id/internal-links
  *
- * GET  → candidate articles in the SAME project to link to. Only PUBLISHED
- *        articles with a public wp_post_url (excluding self). For each candidate
- *        we return SEO-defined anchor data: the target topic's primary keyword,
- *        its secondary keywords, and its saved manual-anchor bank. Anchors are
- *        never inferred from title/body — suggestion + exact-match happen
- *        client-side in the editor.
+ * GET  → { candidates, plannedLinks }. `candidates` are other published
+ *        articles in the project usable as link targets (keyword + secondary +
+ *        merged anchor bank/historical anchors), via the shared loader.
+ *        `plannedLinks` are the internal links approved at planning time for
+ *        THIS article, decoded from its topic's brief_notes — the editor uses
+ *        them for QA/insertion.
  *
  * POST → append an editor-approved manual anchor to THIS article's inbound
- *        "anchor bank" (persisted in generated_articles.internal_links_json, an
- *        already-existing jsonb column — no migration). So a manual anchor
- *        approved while editing one article becomes a reusable candidate the
- *        next time this same target is suggested elsewhere.
+ *        anchor bank (generated_articles.internal_links_json — existing column,
+ *        no migration), so it becomes a reusable candidate elsewhere.
  *
  * Both gated by ENABLE_CONTENT + project ownership. Never calls WordPress.
  */
 
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { normalizeHref, manualAnchorShapeValid } from '@/lib/content/internal-links'
-
-/** Read the saved inbound anchor bank out of a row's internal_links_json. */
-function readAnchorBank(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  const out: string[] = []
-  for (const entry of value) {
-    if (entry && typeof entry === 'object' && typeof (entry as { anchor?: unknown }).anchor === 'string') {
-      const a = ((entry as { anchor: string }).anchor).trim()
-      if (a) out.push(a)
-    }
-  }
-  return Array.from(new Set(out))
-}
+import { manualAnchorShapeValid } from '@/lib/content/internal-links'
+import { loadInternalLinkCandidates, readAnchorBank } from '@/lib/content/internal-link-candidates'
+import { decodeBriefNotes } from '@/lib/content/brief-notes'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -41,7 +28,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const admin = createAdminClient()
   const { data: article, error } = await admin
     .from('generated_articles')
-    .select('id, project_id')
+    .select('id, project_id, topic_id')
     .eq('id', id)
     .maybeSingle()
   if (error) {
@@ -53,54 +40,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const auth = await authContentProject((article as { project_id: string }).project_id)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  // Only PUBLISHED articles with a public URL are safe link targets.
-  const { data: rows } = await auth.admin
-    .from('generated_articles')
-    .select('id, title, wp_post_url, topic_id, internal_links_json')
-    .eq('project_id', auth.project.id)
-    .eq('status', 'published')
-    .neq('id', id)
-    .not('wp_post_url', 'is', null)
-    .order('published_at', { ascending: false })
-    .limit(50)
+  const candidates = await loadInternalLinkCandidates(auth.admin, auth.project.id, id)
 
-  const list = (rows ?? []) as {
-    id: string
-    title: string
-    wp_post_url: string | null
-    topic_id: string | null
-    internal_links_json: unknown
-  }[]
-
-  // Keyword + secondary keywords come from the linked topic (no such columns on
-  // the article). We never derive anchors from the title or body.
-  const topicIds = Array.from(new Set(list.map((r) => r.topic_id).filter((x): x is string => !!x)))
-  const kwByTopic: Record<string, { primary: string | null; secondary: string[] }> = {}
-  if (topicIds.length) {
-    const { data: topics } = await auth.admin
-      .from('article_topics')
-      .select('id, primary_keyword, secondary_keywords')
-      .in('id', topicIds)
-    for (const t of (topics ?? []) as { id: string; primary_keyword: string | null; secondary_keywords: string[] | null }[]) {
-      kwByTopic[t.id] = { primary: t.primary_keyword, secondary: Array.isArray(t.secondary_keywords) ? t.secondary_keywords : [] }
-    }
+  // Approved planned links for THIS article come from its topic's brief_notes.
+  let plannedLinks: unknown[] = []
+  const topicId = (article as { topic_id?: string | null }).topic_id
+  if (topicId) {
+    const { data: topic } = await auth.admin.from('article_topics').select('brief_notes').eq('id', topicId).maybeSingle()
+    plannedLinks = decodeBriefNotes((topic as { brief_notes?: string } | null)?.brief_notes ?? null).flags.internalLinks
   }
 
-  const candidates = list
-    .filter((r) => r.wp_post_url)
-    .map((r) => {
-      const topic = r.topic_id ? kwByTopic[r.topic_id] : undefined
-      return {
-        id: r.id,
-        title: r.title,
-        url: normalizeHref(r.wp_post_url as string),
-        keyword: topic?.primary ?? null,
-        secondaryKeywords: topic?.secondary ?? [],
-        manualAnchors: readAnchorBank(r.internal_links_json),
-      }
-    })
-
-  return Response.json({ candidates })
+  return Response.json({ candidates, plannedLinks })
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

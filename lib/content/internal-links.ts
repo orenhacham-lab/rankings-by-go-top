@@ -87,11 +87,38 @@ export function normalizeHref(u: string): string {
 }
 
 /** Normalize a URL for comparison: drop protocol, lowercase host+path, trim trailing slash. */
-function normUrl(u: string): string {
+export function normalizeUrlKey(u: string): string {
   return normalizeHref(u)
     .replace(/^https?:\/\//i, '')
     .replace(/\/+$/, '')
     .toLowerCase()
+}
+const normUrl = normalizeUrlKey
+
+/**
+ * Server-safe (regex, no DOM) extraction of <a href="URL">TEXT</a> pairs from
+ * article HTML. Used to backfill historical anchors: scan a published article's
+ * body for links whose href matches a known target URL. Skips nav/header/footer/
+ * aside regions and empty/generic single-word anchors.
+ */
+export function extractLinkAnchorsFromHtml(html: string): { href: string; text: string }[] {
+  if (!html) return []
+  // Drop obvious non-article regions so sidebar/nav links don't pollute anchors.
+  let body = html
+  for (const tag of ['nav', 'header', 'footer', 'aside']) {
+    body = body.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?</${tag}>`, 'gi'), ' ')
+  }
+  const out: { href: string; text: string }[] = []
+  const re = /<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(body)) !== null) {
+    const href = (m[1] ?? '').trim()
+    const text = (m[2] ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (!href || !text) continue
+    if (wordCount(text) === 1 && GENERIC_WORDS.has(text.toLowerCase())) continue
+    out.push({ href, text })
+  }
+  return out
 }
 
 /** Parse HTML into a document; returns null when DOMParser is unavailable (SSR). */
@@ -171,6 +198,12 @@ export function insertInternalLink(html: string, anchorText: string, url: string
   after.parentNode?.replaceChild(link, after)
 
   return doc.body.innerHTML
+}
+
+/** True when `anchor` occurs exactly in a safe prose location in the body. */
+export function anchorExistsInBody(html: string, anchor: string): boolean {
+  const doc = parse(html)
+  return !!doc && !!locate(doc, anchor)
 }
 
 const wordCount = (p: string) => p.trim().split(/\s+/).filter(Boolean).length

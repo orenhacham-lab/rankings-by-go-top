@@ -16,6 +16,21 @@ export interface CtaDetails {
   url: string
 }
 
+/**
+ * A planned internal link chosen at the topic/planning stage. Phrase-only: the
+ * generator is asked to weave `anchorText` naturally into the body (no link),
+ * and the editor validates + inserts the actual <a> afterward. Stored inside the
+ * brief_notes marker (no new column). `source` records where the anchor came
+ * from so we never invent one.
+ */
+export interface PlannedInternalLink {
+  targetId: string
+  targetUrl: string
+  targetTitle: string
+  anchorText: string
+  source: 'primary_keyword' | 'historical_anchor' | 'secondary_keyword' | 'manual'
+}
+
 export interface BriefFlags {
   includeBrandName: boolean
   brandNameToInclude: string
@@ -26,6 +41,8 @@ export interface BriefFlags {
   // Stored here (not a column) so Gemini can use the REAL number/link and never
   // invents one. base64-encoded JSON so user text can't break the marker.
   cta: CtaDetails
+  // Approved internal links to weave into the article (phrase-only at generation).
+  internalLinks: PlannedInternalLink[]
 }
 
 export const EMPTY_CTA: CtaDetails = { text: '', phone: '', whatsapp: '', url: '' }
@@ -54,6 +71,9 @@ export function encodeBriefNotes(notes: string, flags: BriefFlags): string {
     const trimmed: CtaDetails = { text: c.text.trim(), phone: c.phone.trim(), whatsapp: c.whatsapp.trim(), url: c.url.trim() }
     parts.push(`cta=${b64(JSON.stringify(trimmed))}`)
   }
+  // Approved internal links (phrase-only). base64 JSON so text can't break the marker.
+  const links = (flags.internalLinks || []).filter((l) => l.anchorText.trim() && l.targetUrl.trim())
+  if (links.length) parts.push(`links=${b64(JSON.stringify(links))}`)
   const marker = `[[brief:${parts.join(';')}]]`
   return clean ? `${clean}\n\n${marker}` : marker
 }
@@ -122,7 +142,7 @@ export function decodeBriefSections(notes: string | null | undefined): BriefSect
 export function decodeBriefNotes(raw: string | null | undefined): { notes: string; flags: BriefFlags } {
   const text = raw || ''
   const m = text.match(MARKER_RE)
-  const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '', includeManualToc: false, cta: { ...EMPTY_CTA } }
+  const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '', includeManualToc: false, cta: { ...EMPTY_CTA }, internalLinks: [] }
   if (m) {
     const body = m[1]
     if (/includeBrandName=1/.test(body)) flags.includeBrandName = true
@@ -135,6 +155,24 @@ export function decodeBriefNotes(raw: string | null | undefined): { notes: strin
         const o = JSON.parse(unb64(ctaM[1])) as Partial<CtaDetails>
         flags.cta = { text: String(o.text || ''), phone: String(o.phone || ''), whatsapp: String(o.whatsapp || ''), url: String(o.url || '') }
       } catch { /* ignore malformed cta marker */ }
+    }
+    const linksM = body.match(/links=([^;]*)/)
+    if (linksM) {
+      try {
+        const arr = JSON.parse(unb64(linksM[1])) as unknown[]
+        flags.internalLinks = (Array.isArray(arr) ? arr : [])
+          .map((x) => {
+            const o = (x || {}) as Record<string, unknown>
+            return {
+              targetId: String(o.targetId || ''),
+              targetUrl: String(o.targetUrl || ''),
+              targetTitle: String(o.targetTitle || ''),
+              anchorText: String(o.anchorText || ''),
+              source: (['primary_keyword', 'historical_anchor', 'secondary_keyword', 'manual'].includes(String(o.source)) ? o.source : 'manual') as PlannedInternalLink['source'],
+            }
+          })
+          .filter((l) => l.anchorText.trim() && l.targetUrl.trim())
+      } catch { /* ignore malformed links marker */ }
     }
   }
   return { notes: stripBriefMarker(text), flags }

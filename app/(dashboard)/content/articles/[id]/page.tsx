@@ -16,7 +16,8 @@ import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import { useToasts, ToastHost } from '@/components/content/Toast'
-import { suggestInternalLinks, insertInternalLink, validateManualAnchor, type LinkCandidate, type LinkSuggestion } from '@/lib/content/internal-links'
+import { suggestInternalLinks, insertInternalLink, validateManualAnchor, anchorExistsInBody, extractExistingLinkUrls, normalizeUrlKey, type LinkCandidate, type LinkSuggestion } from '@/lib/content/internal-links'
+import type { PlannedInternalLink } from '@/lib/content/brief-notes'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { AlertTriangle } from 'lucide-react'
@@ -76,6 +77,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [manualText, setManualText] = useState<Record<string, string>>({})
   const [manualError, setManualError] = useState<Record<string, string>>({})
   const [anchorChoice, setAnchorChoice] = useState<Record<string, string>>({})
+  const [plannedLinks, setPlannedLinks] = useState<PlannedInternalLink[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,6 +111,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           const cands: LinkCandidate[] = Array.isArray(ld.candidates) ? ld.candidates : []
           setLinkCandidates(cands)
           setLinkSuggestions(suggestInternalLinks(a.content_html ?? '', cands))
+          setPlannedLinks(Array.isArray(ld.plannedLinks) ? ld.plannedLinks : [])
         }
       } catch {
         // Non-fatal — internal links are optional.
@@ -227,6 +230,44 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     setLinkCandidates((prev) => prev.map((c) => (c.id === sug.targetId
       ? { ...c, manualAnchors: Array.from(new Set([...(c.manualAnchors ?? []), phrase])) }
       : c)))
+    toast.success(e.internal.saveReminder)
+    setMessage({ text: e.internal.saveReminder, ok: true })
+  }
+
+  // ---- Planned internal links (QA after generation) -----------------------
+  function plannedStatus(link: PlannedInternalLink): 'linked' | 'ready' | 'missing' {
+    if (extractExistingLinkUrls(contentHtml).has(normalizeUrlKey(link.targetUrl))) return 'linked'
+    return anchorExistsInBody(contentHtml, link.anchorText) ? 'ready' : 'missing'
+  }
+  function insertPlanned(link: PlannedInternalLink) {
+    const next = insertInternalLink(contentHtml, link.anchorText, link.targetUrl)
+    if (!next) { setMessage({ text: e.internal.addFailed, ok: false }); return }
+    setContentHtml(next)
+    setAddedLinks((prev) => new Set(prev).add(`plan:${link.targetId}`))
+    toast.success(e.internal.saveReminder)
+    setMessage({ text: e.internal.saveReminder, ok: true })
+  }
+  function copyAnchor(text: string) {
+    try { void navigator.clipboard?.writeText(text); toast.success(e.internal.copied) } catch { /* clipboard unavailable */ }
+  }
+  function submitManualPlanned(link: PlannedInternalLink) {
+    const key = `plan:${link.targetId}`
+    const phrase = (manualText[key] ?? '').trim()
+    const v = validateManualAnchor(contentHtml, phrase)
+    if (!v.ok) {
+      const reasonMap: Record<string, string> = { words: e.internal.manualErrWords, generic: e.internal.manualErrGeneric, notfound: e.internal.manualErrNotfound }
+      setManualError((prev) => ({ ...prev, [key]: reasonMap[v.reason ?? 'notfound'] ?? e.internal.manualErrNotfound }))
+      return
+    }
+    const next = insertInternalLink(contentHtml, phrase, link.targetUrl)
+    if (!next) { setManualError((prev) => ({ ...prev, [key]: e.internal.manualErrNotfound })); return }
+    setContentHtml(next)
+    setAddedLinks((prev) => new Set(prev).add(key))
+    setManualError((prev) => { const n = { ...prev }; delete n[key]; return n })
+    setManualOpen((prev) => { const n = new Set(prev); n.delete(key); return n })
+    void fetch(`/api/content/articles/${link.targetId}/internal-links`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anchor: phrase }),
+    }).catch(() => {})
     toast.success(e.internal.saveReminder)
     setMessage({ text: e.internal.saveReminder, ok: true })
   }
@@ -387,6 +428,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
   const inputCls =
     'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+  // General ad-hoc suggestions, minus any target already covered by a planned link.
+  const generalSuggestions = linkSuggestions.filter((s) => !plannedLinks.some((l) => l.targetId === s.targetId))
 
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
@@ -577,13 +621,69 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           {isPublished && (
             <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.internal.publishedNote}</p>
           )}
+
+          {/* Approved-at-planning links — QA: verify the anchor exists, insert it. */}
+          {plannedLinks.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{e.internal.planQaTitle}</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{e.internal.planQaHint}</p>
+              <div className="space-y-2">
+                {plannedLinks.map((link) => {
+                  const key = `plan:${link.targetId}`
+                  const done = addedLinks.has(key)
+                  const st = done ? 'linked' : plannedStatus(link)
+                  const manual = manualOpen.has(key)
+                  return (
+                    <div key={key} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex-1 min-w-[12rem]">
+                          <div className="text-sm text-slate-800 dark:text-slate-100">{link.targetTitle}</div>
+                          <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200 mt-1">
+                            {e.internal.anchorLabel}: {link.anchorText}
+                          </span>
+                          <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetUrl}</a>
+                        </div>
+                        {st === 'linked' && <Badge variant="success">{e.internal.statusLinked}</Badge>}
+                        {st === 'ready' && (
+                          <Button size="sm" variant="outline" onClick={() => insertPlanned(link)}>{e.internal.addOne}</Button>
+                        )}
+                        {st === 'missing' && (
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" variant="ghost" onClick={() => copyAnchor(link.anchorText)}>{e.internal.copy}</Button>
+                            <Button size="sm" variant="ghost" onClick={() => toggleManual(key)}>{e.internal.manualAnchor}</Button>
+                          </div>
+                        )}
+                      </div>
+                      {st === 'missing' && (
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.statusMissing}</p>
+                      )}
+                      {manual && st === 'missing' && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="text"
+                            value={manualText[key] ?? ''}
+                            onChange={(ev) => setManualText((prev) => ({ ...prev, [key]: ev.target.value }))}
+                            placeholder={e.internal.manualPlaceholder}
+                            className="flex-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs"
+                          />
+                          <Button size="sm" variant="outline" onClick={() => submitManualPlanned(link)}>{e.internal.manualConfirm}</Button>
+                          {manualError[key] && <span className="text-[11px] text-red-600 dark:text-red-400 w-full">{manualError[key]}</span>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {linksLoading ? (
             <p className="text-xs text-slate-400">{e.internal.loading}</p>
-          ) : linkSuggestions.length === 0 ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">{e.internal.none}</p>
+          ) : generalSuggestions.length === 0 ? (
+            plannedLinks.length ? null : <p className="text-xs text-slate-500 dark:text-slate-400">{e.internal.none}</p>
           ) : (
             <div className="space-y-2">
-              {linkSuggestions.map((sug) => {
+              {generalSuggestions.map((sug) => {
                 const done = addedLinks.has(sug.targetId)
                 const manual = manualOpen.has(sug.targetId)
                 const existingOptions = sug.options.filter((o) => o.exists)

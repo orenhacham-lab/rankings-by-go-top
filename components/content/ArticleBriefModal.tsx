@@ -21,7 +21,8 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
 import type { GeminiTopicSuggestion } from '@/lib/content/gemini-topics'
-import { encodeBriefNotes, decodeBriefNotes, encodeBriefSections, decodeBriefSections } from '@/lib/content/brief-notes'
+import { encodeBriefNotes, decodeBriefNotes, encodeBriefSections, decodeBriefSections, type PlannedInternalLink } from '@/lib/content/brief-notes'
+import type { InternalLinkCandidate } from '@/lib/content/internal-link-candidates'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type ProjectOption = { id: string; name: string; language?: string | null; business_name?: string | null }
@@ -130,6 +131,11 @@ export default function ArticleBriefModal({
   const [ctaUrl, setCtaUrl] = useState('')
   const [anchors, setAnchors] = useState<ArticleTopicAnchor[]>([])
   const [keywordFit, setKeywordFit] = useState<'aligned' | 'weak' | 'unrelated' | null>(null)
+  // Internal-link planning: approved links + candidates + per-target UI choices.
+  const [internalLinks, setInternalLinks] = useState<PlannedInternalLink[]>([])
+  const [linkCandidates, setLinkCandidates] = useState<InternalLinkCandidate[]>([])
+  const [linkChoice, setLinkChoice] = useState<Record<string, string>>({})
+  const [linkManual, setLinkManual] = useState<Record<string, string>>({})
 
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -162,6 +168,7 @@ export default function ArticleBriefModal({
       setTargetAudience(editing.target_audience ?? '')
       { const dec = decodeBriefNotes(editing.brief_notes); const sec = decodeBriefSections(dec.notes); setArticleAngle(sec.articleAngle); setMustInclude(sec.mustInclude); setMustAvoid(sec.mustAvoid); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude); setIncludeManualToc(dec.flags.includeManualToc); setCtaText(dec.flags.cta.text); setCtaPhone(dec.flags.cta.phone); setCtaWhatsapp(dec.flags.cta.whatsapp); setCtaUrl(dec.flags.cta.url) }
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
+      { const planned = decodeBriefNotes(editing.brief_notes).flags.internalLinks; setInternalLinks(planned); const ch: Record<string, string> = {}, mn: Record<string, string> = {}; for (const l of planned) { if (l.source === 'manual') mn[l.targetId] = l.anchorText; else ch[l.targetId] = l.anchorText } setLinkChoice(ch); setLinkManual(mn) }
       setAdvancedOpen(true)
       setKeywordFit(null)
     } else {
@@ -170,6 +177,7 @@ export default function ArticleBriefModal({
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
       setSecondaryText(''); setTargetAudience(''); setArticleAngle(''); setMustInclude(''); setMustAvoid(''); setIncludeBrandName(false); setBrandNameToInclude(''); setIncludeManualToc(false); setCtaText(''); setCtaPhone(''); setCtaWhatsapp(''); setCtaUrl(''); setAnchors([])
+      setInternalLinks([]); setLinkChoice({}); setLinkManual({})
       setAdvancedOpen(false)
       setKeywordFit(null)
     }
@@ -179,6 +187,63 @@ export default function ArticleBriefModal({
   useEffect(() => {
     if (open && !editing) setBriefLang(normalizeLang(projectLang))
   }, [open, editing, projectLang])
+
+  // Load internal-link candidates for the planning section when a project is set.
+  useEffect(() => {
+    if (!open || !projectId) { setLinkCandidates([]); return }
+    let cancelled = false
+    fetch(`/api/content/internal-link-candidates?projectId=${encodeURIComponent(projectId)}`)
+      .then((r) => (r.ok ? r.json() : { candidates: [] }))
+      .then((d) => { if (!cancelled) setLinkCandidates(Array.isArray(d.candidates) ? d.candidates : []) })
+      .catch(() => { if (!cancelled) setLinkCandidates([]) })
+    return () => { cancelled = true }
+  }, [open, projectId])
+
+  // ---- Internal-link planning helpers -------------------------------------
+  function linkOptionsFor(cand: InternalLinkCandidate): { text: string; source: PlannedInternalLink['source'] }[] {
+    const opts: { text: string; source: PlannedInternalLink['source'] }[] = []
+    if (cand.keyword?.trim()) opts.push({ text: cand.keyword.trim(), source: 'primary_keyword' })
+    for (const a of cand.manualAnchors ?? []) if (a.trim()) opts.push({ text: a.trim(), source: 'historical_anchor' })
+    for (const s of cand.secondaryKeywords ?? []) if (s.trim()) opts.push({ text: s.trim(), source: 'secondary_keyword' })
+    const seen = new Set<string>()
+    return opts.filter((o) => { const k = o.text.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+  }
+  function linkSourceOf(cand: InternalLinkCandidate, text: string): PlannedInternalLink['source'] {
+    const found = linkOptionsFor(cand).find((o) => o.text.toLowerCase() === text.toLowerCase())
+    return found ? found.source : 'manual'
+  }
+  function chosenLinkFor(cand: InternalLinkCandidate): { text: string; source: PlannedInternalLink['source'] } {
+    const manual = (linkManual[cand.id] ?? '').trim()
+    if (manual) return { text: manual, source: 'manual' }
+    const opts = linkOptionsFor(cand)
+    const picked = linkChoice[cand.id]
+    if (picked) return { text: picked, source: linkSourceOf(cand, picked) }
+    return opts[0] ?? { text: '', source: 'manual' }
+  }
+  const isLinkApproved = (id: string) => internalLinks.some((l) => l.targetId === id)
+  function upsertLink(cand: InternalLinkCandidate) {
+    const ch = chosenLinkFor(cand)
+    if (!ch.text) return
+    setInternalLinks((prev) => [
+      ...prev.filter((l) => l.targetId !== cand.id),
+      { targetId: cand.id, targetUrl: cand.url, targetTitle: cand.title, anchorText: ch.text, source: ch.source },
+    ])
+  }
+  function toggleLink(cand: InternalLinkCandidate) {
+    if (isLinkApproved(cand.id)) setInternalLinks((prev) => prev.filter((l) => l.targetId !== cand.id))
+    else upsertLink(cand)
+  }
+
+  // Keep approved links' anchor in sync with the dropdown / manual controls.
+  useEffect(() => {
+    setInternalLinks((prev) => prev.map((l) => {
+      const cand = linkCandidates.find((c) => c.id === l.targetId)
+      if (!cand) return l
+      const ch = chosenLinkFor(cand)
+      return ch.text ? { ...l, anchorText: ch.text, source: ch.source } : l
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkChoice, linkManual, linkCandidates])
 
   function toggleSuggestion(title: string) {
     setSelected((prev) => {
@@ -267,6 +332,7 @@ export default function ArticleBriefModal({
         cta: cta === 'none'
           ? { text: '', phone: '', whatsapp: '', url: '' }
           : { text: ctaText, phone: ctaPhone, whatsapp: ctaWhatsapp, url: ctaUrl },
+        internalLinks,
       }),
       anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
     }
@@ -622,6 +688,61 @@ export default function ArticleBriefModal({
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Internal-link planning — chosen now, woven into the body at
+                generation, then validated + inserted in the editor. */}
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-1">{t.planTitle}</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.planHint}</p>
+              {linkCandidates.length === 0 ? (
+                <p className="text-xs text-slate-400">{t.planNone}</p>
+              ) : (
+                <div className="space-y-2">
+                  {linkCandidates.map((cand) => {
+                    const opts = linkOptionsFor(cand)
+                    const approved = isLinkApproved(cand.id)
+                    const manualVal = linkManual[cand.id] ?? ''
+                    const selectVal = linkChoice[cand.id] ?? (opts[0]?.text ?? '')
+                    const selectExtra = selectVal && !opts.some((o) => o.text === selectVal) ? [selectVal] : []
+                    return (
+                      <div key={cand.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5 space-y-1.5">
+                        <label className="flex items-start gap-2">
+                          <input type="checkbox" checked={approved} onChange={() => toggleLink(cand)} className="mt-1 h-4 w-4 accent-indigo-600" />
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm text-slate-800 dark:text-slate-100">{cand.title}</span>
+                            <a href={cand.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{cand.url}</a>
+                            <span className="block text-[11px] text-slate-500 dark:text-slate-400">{t.planKeyword}: {cand.keyword || '—'}</span>
+                            {(cand.manualAnchors?.length ?? 0) > 0 && (
+                              <span className="block text-[11px] text-slate-500 dark:text-slate-400">{t.planHistory}: {cand.manualAnchors.join(' · ')}</span>
+                            )}
+                          </span>
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2 pl-6">
+                          <select
+                            value={selectVal}
+                            onChange={(e) => { setLinkManual((p) => ({ ...p, [cand.id]: '' })); setLinkChoice((p) => ({ ...p, [cand.id]: e.target.value })) }}
+                            className={inputCls + ' max-w-[16rem]'}
+                          >
+                            {[...selectExtra, ...opts.map((o) => o.text)].map((txt) => (
+                              <option key={txt} value={txt}>{txt}</option>
+                            ))}
+                            {opts.length === 0 && selectExtra.length === 0 && <option value="">—</option>}
+                          </select>
+                          <input
+                            type="text"
+                            value={manualVal}
+                            onChange={(e) => setLinkManual((p) => ({ ...p, [cand.id]: e.target.value }))}
+                            placeholder={t.planManualPlaceholder}
+                            className={inputCls + ' flex-1 min-w-[10rem]'}
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-400 pl-6">{t.planNote}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -122,6 +122,8 @@ export async function POST(request: Request) {
     // Default false: only inject a manual TOC when the brief opted in.
     includeManualToc: decodedNotes.flags.includeManualToc,
     anchors,
+    // Planned internal-link anchors (phrase-only): weave the phrase, no link.
+    plannedInternalAnchors: decodedNotes.flags.internalLinks.map((l) => l.anchorText),
     businessName,
     domain: (project as { target_domain?: string } | null)?.target_domain ?? null,
     category,

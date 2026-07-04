@@ -43,6 +43,9 @@ export interface ArticleBrief {
   // TOC plugin/theme can generate it.
   includeManualToc: boolean
   anchors: ArticleTopicAnchor[]
+  // Planned internal-link anchors (phrase-only): weave each exact phrase into the
+  // body naturally, but do NOT turn it into a link — the editor inserts links.
+  plannedInternalAnchors?: string[]
   businessName: string | null
   domain: string | null
   category: string | null
@@ -140,6 +143,8 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const anchorTopics = brief.anchors
     .filter((a) => a.anchor_text?.trim() && a.target_url?.trim())
     .map((a) => `  - naturally use the exact phrase "${a.anchor_text}"` + (a.note ? ` (${a.note})` : ''))
+  // Phrase-only internal-link anchors: include the exact phrase, do NOT link it.
+  const plannedPhrases = Array.from(new Set((brief.plannedInternalAnchors || []).map((p) => p.trim()).filter(Boolean)))
   const repairLines = (opts.repairFailures || []).map((f) => `  - ${FAILURE_HINT[f] || f}`)
 
   return [
@@ -181,6 +186,8 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     anchorTopics.length ? `- LINK PLACEMENT RULES: never place a link in the directAnswer or the first paragraph; place the first link only after the article has established context (after the first <h2> and a couple of paragraphs). If there are multiple links, distribute them across DIFFERENT sections — never two links in the same paragraph or back-to-back. Integrate every link into a genuinely relevant sentence; do NOT use generic phrases like "read more", "click here", "אתר כמו", "למידע נוסף".` : '',
+    plannedPhrases.length ? `- INTERNAL-LINK PHRASES: include EACH of the following exact phrases verbatim, once, woven naturally into a normal paragraph or list item (NEVER in a heading, table, or the first paragraph). Do NOT wrap them in a link or any markup — they will be linked later by the editor. Only include a phrase if it fits the topic naturally:` : '',
+    ...plannedPhrases.map((p) => `  - "${p}"`),
     ``,
     `MINIMUMS (mandatory): >=${th.minH2} sections (<h2>), >=${th.minP} paragraphs total, ${th.minLists} list(s), ${th.minFaq} FAQ pairs${th.minH3 ? `, >=${th.minH3} subsections (<h3>)` : ''}.`,
     `- When the topic involves comparison, pricing/cost, choosing between options, types, or pros/cons, you MUST include a REAL data/comparison TABLE (>=2 columns AND >=2 rows) via the "table" field — never fake it as a paragraph or a single row.`,
