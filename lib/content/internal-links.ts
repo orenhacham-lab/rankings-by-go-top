@@ -1,25 +1,19 @@
 /**
- * Content module — Internal Linking v1 (client-side, deterministic).
+ * Content module — Internal Linking v1 (client-side, deterministic, SEO-driven).
  *
- * Suggests and inserts links from the current article to OTHER published
- * articles in the same project. Runs entirely in the browser using DOMParser —
- * NO AI, no network calls, no automatic insertion. Every suggestion is opt-in:
- * the editor decides which links to add, and nothing is written until the user
- * saves the article (the PATCH route re-sanitizes the HTML).
+ * Anchors are NOT invented. For each target article the anchor candidates come,
+ * in priority order, from real project data:
+ *   A. the target article's defined keyword (topic primary_keyword),
+ *   B. previously-approved manual anchors saved for that exact target (its
+ *      inbound "anchor bank", persisted on the target row),
+ *   C. the target topic's secondary keywords, if any already exist in the data.
  *
- * Anchor selection is phrase-first:
- *  - For each target we derive topic "seeds" (its keyword/title words + a small
- *    deterministic related-term map) and scan the current article body for a
- *    natural 2–6 word phrase that already contains one of those seeds.
- *  - Only such an exact, existing, non-linked phrase inside a normal paragraph
- *    or list item is insertable. A lone generic word (e.g. "רצפה", "שיפועים")
- *    is NEVER insertable — it is surfaced as informational only.
- *  - When nothing safe is found the target stays visible and the editor can
- *    pick an exact phrase manually (validated the same way).
- *
- * Safety: insert ONLY inside normal <p>/<li> prose — never inside headings,
- * tables, figures/images, nav, existing <a>, buttons, or code; never overwrite
- * an existing link; one link per target URL; one use per anchor.
+ * A candidate is insertable ONLY when that exact phrase already occurs in the
+ * current article body inside safe prose (<p>/<li> — never headings, tables,
+ * buttons, figures, nav, code, or existing links). Nothing is generated from
+ * the target title, from surrounding words, from related-term maps, or from any
+ * body phrase discovery. No AI. Insertion is always a manual editor action and
+ * nothing persists until the article is saved.
  */
 
 export interface LinkCandidate {
@@ -27,12 +21,26 @@ export interface LinkCandidate {
   title: string
   url: string
   keyword: string | null
+  secondaryKeywords?: string[]
+  /** Previously-approved manual anchors for THIS target (its anchor bank). */
+  manualAnchors?: string[]
+}
+
+export interface AnchorOption {
+  text: string
+  source: 'keyword' | 'manual' | 'secondary'
+  exists: boolean
+  weak: boolean
 }
 
 export interface AnchorDebug {
+  targetId: string
   url: string
+  keyword: string | null
+  manualHistory: string[]
+  checked: string[]
   found: string[]
-  rejected: { phrase: string; reason: string }[]
+  rejected: { anchor: string; reason: string }[]
   selected: string | null
 }
 
@@ -40,10 +48,10 @@ export interface LinkSuggestion {
   targetId: string
   targetTitle: string
   url: string
-  anchorText: string
-  reason: 'keyword' | 'contextual' | 'titlePhrase' | 'weakGeneric' | 'manual'
+  keyword: string | null
+  options: AnchorOption[]
   insertable: boolean
-  weak: boolean
+  selectedAnchor: string | null
   debug: AnchorDebug
 }
 
@@ -53,8 +61,8 @@ const FORBIDDEN_ANCESTORS = 'a, h1, h2, h3, h4, h5, h6, table, thead, tbody, tr,
 // Blocks that hold normal, linkable prose.
 const PROSE_BLOCKS = 'p, li'
 
-// Generic single words that must never stand alone as an anchor. They are still
-// perfectly good *inside* a multi-word phrase (e.g. "הליכון עם שיפוע").
+// Generic words that must never stand alone as an anchor unless they ARE the
+// target's defined keyword (and even then the editor approves the insert).
 const GENERIC_WORDS = new Set([
   'יפן', 'סין', 'נעליים', 'הליכון', 'ריצה', 'הליכה', 'בריאות', 'ספורט', 'אימון',
   'רצפה', 'ריצוף', 'משטח', 'שיפוע', 'שיפועים', 'עלייה', 'מדריך', 'בחירה', 'בית', 'ביתי',
@@ -62,36 +70,12 @@ const GENERIC_WORDS = new Set([
   'flooring', 'floor', 'incline', 'treadmill', 'guide', 'home', 'gym',
 ])
 
-// Connectors / function words that must not be the sole content of a phrase and
-// are penalised at the edges of a phrase.
 const STOPWORDS = new Set([
   'של', 'עם', 'על', 'את', 'אל', 'זה', 'זו', 'גם', 'כי', 'אם', 'כדי', 'יותר', 'מאוד',
   'הוא', 'היא', 'הם', 'הן', 'לא', 'כן', 'מה', 'מי', 'למה', 'איך', 'כמו', 'בין', 'אבל',
-  'או', 'רק', 'כל', 'יש', 'אין', 'אלה', 'הזה', 'הזאת', 'וכן', 'וגם', 'אשר', 'כך',
-  // Prepositions that should not open or close a natural anchor phrase.
-  'מתחת', 'מעל', 'ליד', 'בתוך', 'לתוך', 'אחרי', 'לפני', 'מול', 'כלפי', 'אצל', 'ורצוי',
-  'the', 'a', 'an', 'of', 'for', 'and', 'or', 'to', 'in', 'on', 'with', 'is', 'are',
-  'why', 'how', 'best', 'your', 'you',
+  'או', 'רק', 'כל', 'יש', 'אין', 'the', 'a', 'an', 'of', 'for', 'and', 'or', 'to', 'in',
+  'on', 'with', 'is', 'are',
 ])
-
-// Deterministic topic → related terms. Lets us look for phrases "around" a
-// concept, not just the concept word itself (no AI). Keys are lowercased.
-const RELATED: Record<string, string[]> = {
-  // flooring / surface
-  'רצפה': ['משטח', 'ריצוף', 'ביתי', 'בית', 'דירה', 'פרקט', 'שטיח', 'יציב'],
-  'ריצוף': ['רצפה', 'משטח', 'ביתי'],
-  'משטח': ['רצפה', 'ריצוף', 'יציב', 'הליכון'],
-  'flooring': ['floor', 'mat', 'surface', 'home', 'gym'],
-  'floor': ['flooring', 'mat', 'surface'],
-  // incline / slope
-  'שיפוע': ['עלייה', 'מדרון', 'שיפועים', 'אימון', 'הליכון'],
-  'שיפועים': ['שיפוע', 'עלייה', 'מדרון'],
-  'עלייה': ['שיפוע', 'מדרון'],
-  'incline': ['slope', 'elevation', 'climb', 'gradient'],
-  // treadmill
-  'הליכון': ['אימון', 'ריצה', 'הליכה', 'מסלול', 'ביתי'],
-  'treadmill': ['walking', 'running', 'workout'],
-}
 
 /**
  * Defensively repair an href value before it is displayed or written into the
@@ -142,11 +126,10 @@ function inForbidden(node: Node): boolean {
 /**
  * Find the first safe occurrence of `anchorText` inside normal prose (<p>/<li>).
  * Returns the exact text node + offset, or null if the phrase never appears in
- * prose. Matching is case-insensitive and only accepts whole-phrase substring
- * hits within a single text node (so insertion never spans element edges).
+ * prose. Case-insensitive, whole-phrase substring within a single text node.
  */
 function locate(doc: Document, anchorText: string): { node: Text; index: number } | null {
-  const needle = anchorText.toLowerCase()
+  const needle = anchorText.trim().toLowerCase()
   if (!needle) return null
   const blocks = Array.from(doc.querySelectorAll(PROSE_BLOCKS))
   for (const block of blocks) {
@@ -173,11 +156,11 @@ function locate(doc: Document, anchorText: string): { node: Text; index: number 
 export function insertInternalLink(html: string, anchorText: string, url: string): string | null {
   const doc = parse(html)
   if (!doc) return null
-  const hit = locate(doc, anchorText)
+  const hit = locate(doc, anchorText.trim())
   if (!hit) return null
 
   const { node, index } = hit
-  const matchLen = anchorText.length
+  const matchLen = anchorText.trim().length
   const after = node.splitText(index)
   after.splitText(matchLen) // `after` now holds exactly the matched phrase
 
@@ -190,229 +173,43 @@ export function insertInternalLink(html: string, anchorText: string, url: string
   return doc.body.innerHTML
 }
 
-/** Split a string into word tokens with their character offsets. */
-function tokenize(s: string): { w: string; start: number; end: number }[] {
-  const re = /[\p{L}\p{N}]+(?:['’׳״-][\p{L}\p{N}]+)*/gu
-  const out: { w: string; start: number; end: number }[] = []
-  let m: RegExpExecArray | null
-  while ((m = re.exec(s)) !== null) out.push({ w: m[0], start: m.index, end: m.index + m[0].length })
-  return out
-}
-
 const wordCount = (p: string) => p.trim().split(/\s+/).filter(Boolean).length
 
-/** A phrase carries real meaning: 2–6 words with at least one content word. */
-function isContentPhrase(phrase: string): boolean {
+/** A generic single word (blocked as a standalone anchor). */
+function isGenericSingleWord(phrase: string): boolean {
   const p = phrase.trim()
-  if (p.length < 5) return false
-  const words = p.split(/\s+/).filter(Boolean)
-  if (words.length < 2 || words.length > 6) return false
-  // At least one word that is neither a stopword nor trivially short.
-  return words.some((w) => w.length >= 3 && !STOPWORDS.has(w.toLowerCase()))
+  return wordCount(p) === 1 && GENERIC_WORDS.has(p.toLowerCase())
 }
 
-/** A good auto anchor is a natural 2–6 word content phrase. */
-function isGoodAnchor(phrase: string): boolean {
-  return isContentPhrase(phrase)
-}
-
-/** Derive topic seeds for a target: its keyword/title words + related terms. */
-function deriveSeeds(candidate: LinkCandidate): { primary: Set<string>; all: Set<string> } {
-  const primary = new Set<string>()
-  const all = new Set<string>()
-  const source = `${candidate.keyword ?? ''} ${candidate.title ?? ''}`
-  for (const { w } of tokenize(source)) {
-    const lw = w.toLowerCase()
-    if (lw.length < 3 || STOPWORDS.has(lw) || /\d/.test(lw)) continue
-    primary.add(lw)
-    all.add(lw)
-    for (const rel of RELATED[lw] ?? []) all.add(rel.toLowerCase())
-  }
-  return { primary, all }
-}
-
-/** Does a token match a seed (equality or Hebrew/English prefix substring)? */
-function tokenMatchesSeed(token: string, seed: string): boolean {
-  const t = token.toLowerCase()
-  if (t === seed) return true
-  // Hebrew often prefixes ה/ב/ל/מ/ו/ש; accept the seed as a substring when the
-  // seed is reasonably specific (≥3 chars) to catch "ברצפה", "הרצפה", …
-  return seed.length >= 3 && t.includes(seed)
+/** A phrase carries real meaning: at least one content word (not all stopwords). */
+function hasContentWord(phrase: string): boolean {
+  return phrase.trim().split(/\s+/).filter(Boolean).some((w) => w.length >= 3 && !STOPWORDS.has(w.toLowerCase()))
 }
 
 /**
- * Discover natural 2–6 word phrases in the body that sit "around" a target's
- * seeds. Only exact, existing, safely-placed phrases are returned, each scored
- * so the caller can pick the most specific. Deterministic; no AI.
+ * Pure shape check for a manual anchor (no DOM needed — reusable server-side).
+ * A manual anchor must be a 2–6 word content phrase and not a generic word.
  */
-function discoverContextualAnchors(
-  doc: Document,
-  seeds: { primary: Set<string>; all: Set<string> },
-): { phrase: string; score: number }[] {
-  if (seeds.all.size === 0) return []
-  const seedList = Array.from(seeds.all)
-  const blocks = Array.from(doc.querySelectorAll(PROSE_BLOCKS))
-  const best = new Map<string, { phrase: string; score: number }>()
-
-  for (const block of blocks) {
-    if (block.closest(FORBIDDEN_ANCESTORS)) continue
-    const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT)
-    let n = walker.nextNode()
-    while (n) {
-      const text = n as Text
-      if (!inForbidden(text)) collectFromString(text.data, seedList, seeds.primary, best)
-      n = walker.nextNode()
-    }
-  }
-  return Array.from(best.values()).sort((a, b) => b.score - a.score || a.phrase.length - b.phrase.length)
-}
-
-/** Slide windows over one text-node string; keep the best-scoring valid phrase per key. */
-function collectFromString(
-  data: string,
-  seedList: string[],
-  primary: Set<string>,
-  best: Map<string, { phrase: string; score: number }>,
-): void {
-  const toks = tokenize(data)
-  if (toks.length < 2) return
-
-  for (let i = 0; i < toks.length; i++) {
-    const tok = toks[i]
-    if (!tok) continue
-    let matchedSeed: string | null = null
-    for (const seed of seedList) {
-      if (tokenMatchesSeed(tok.w, seed)) { matchedSeed = seed; break }
-    }
-    if (!matchedSeed) continue
-    const seedIsPrimary = primary.has(matchedSeed)
-
-    for (let size = 2; size <= 6; size++) {
-      for (let offset = 0; offset < size; offset++) {
-        const start = i - offset
-        const end = start + size - 1
-        if (start < 0 || end >= toks.length) continue
-        const first = toks[start]
-        const last = toks[end]
-        if (!first || !last) continue
-        // Reject windows that cross punctuation (sentence break, comma, colon,
-        // bullet, brackets…): the only thing allowed between words is whitespace,
-        // so an anchor never spans "…ביתי. כשבוחרים…".
-        let cleanGaps = true
-        for (let k = start; k < end; k++) {
-          const a = toks[k]
-          const b = toks[k + 1]
-          if (!a || !b || /\S/.test(data.slice(a.end, b.start))) { cleanGaps = false; break }
-        }
-        if (!cleanGaps) continue
-        const phrase = data.slice(first.start, last.end).trim()
-        if (!isContentPhrase(phrase)) continue
-
-        const words = phrase.split(/\s+/).filter(Boolean)
-        const firstW = (words[0] ?? '').toLowerCase()
-        const lastW = (words[words.length - 1] ?? '').toLowerCase()
-
-        let score = 0
-        score += [0, 0, 2, 3, 3, 2, 1][words.length] ?? 0 // favour 3–4 words
-        if (seedIsPrimary) score += 2
-        // Strongly prefer a phrase that LEADS with the topic word — that reads as
-        // a natural anchor ("רצפה מתאימה", "שיפוע בהליכון") rather than starting
-        // mid-sentence ("לוודא שיש רצפה").
-        if (seedList.some((s) => tokenMatchesSeed(firstW, s))) score += 3
-        else if (seedList.some((s) => tokenMatchesSeed(lastW, s))) score += 1
-        if (STOPWORDS.has(firstW)) score -= 2
-        if (STOPWORDS.has(lastW)) score -= 1
-        // Each interior stopword makes the phrase read less like a clean anchor.
-        for (const w of words) if (STOPWORDS.has(w.toLowerCase())) score -= 0.5
-        // A phrase that pairs the seed with another content word is more specific.
-        if (words.some((w) => w.toLowerCase() !== matchedSeed && !STOPWORDS.has(w.toLowerCase()) && w.length >= 3)) score += 1
-
-        const key = phrase.toLowerCase()
-        const prev = best.get(key)
-        if (!prev || score > prev.score) best.set(key, { phrase, score })
-      }
-    }
-  }
+export function manualAnchorShapeValid(phrase: string): boolean {
+  const p = (phrase ?? '').trim()
+  const wc = wordCount(p)
+  if (wc < 2 || wc > 6) return false
+  if (isGenericSingleWord(p)) return false
+  return hasContentWord(p)
 }
 
 /**
- * Choose the best anchor for a candidate and return debug detail for the panel.
- * Priority: specific keyword phrase → discovered contextual phrase → title
- * phrase → (informational only) a lone generic keyword word flagged `weak`.
- */
-function pickAnchor(
-  doc: Document,
-  candidate: LinkCandidate,
-): {
-  pick: { anchor: string; reason: LinkSuggestion['reason']; weak: boolean } | null
-  debug: AnchorDebug
-} {
-  const debug: AnchorDebug = { url: normalizeHref(candidate.url), found: [], rejected: [], selected: null }
-  const kw = (candidate.keyword ?? '').trim()
-
-  // 1) The full keyword, when it is already a specific multi-word phrase in prose.
-  if (kw) {
-    if (isGoodAnchor(kw)) {
-      if (locate(doc, kw)) { debug.found.push(kw); debug.selected = kw; return { pick: { anchor: kw, reason: 'keyword', weak: false }, debug } }
-      debug.rejected.push({ phrase: kw, reason: 'keyword-not-in-body' })
-    } else {
-      debug.rejected.push({ phrase: kw, reason: 'keyword-not-a-phrase' })
-    }
-  }
-
-  // 2) Contextual phrase discovery around the target's seeds.
-  const seeds = deriveSeeds(candidate)
-  const discovered = discoverContextualAnchors(doc, seeds)
-  for (const d of discovered.slice(0, 8)) debug.found.push(d.phrase)
-  if (discovered.length > 0) {
-    const top = discovered[0]!
-    debug.selected = top.phrase
-    return { pick: { anchor: top.phrase, reason: 'contextual', weak: false }, debug }
-  }
-
-  // 3) A natural phrase taken from the target title, if present in prose.
-  const titleWords = candidate.title.trim().split(/\s+/).filter(Boolean)
-  const titlePhrases: string[] = []
-  if (titleWords.length >= 2 && titleWords.length <= 6) titlePhrases.push(candidate.title.trim())
-  for (let size = 6; size >= 2; size--) {
-    for (let start = 0; start + size <= titleWords.length; start++) {
-      titlePhrases.push(titleWords.slice(start, start + size).join(' '))
-    }
-  }
-  for (const phrase of titlePhrases) {
-    if (isGoodAnchor(phrase) && locate(doc, phrase)) {
-      debug.found.push(phrase); debug.selected = phrase
-      return { pick: { anchor: phrase, reason: 'titlePhrase', weak: false }, debug }
-    }
-  }
-
-  // 4) Last resort — a lone keyword word present in prose. Informational only:
-  //    generic single words are NEVER auto-insertable.
-  if (kw) {
-    for (const w of kw.split(/\s+/).filter((x) => x.length >= 3)) {
-      if (locate(doc, w)) {
-        debug.rejected.push({ phrase: w, reason: GENERIC_WORDS.has(w.toLowerCase()) ? 'generic-single-word' : 'single-word' })
-        return { pick: { anchor: w, reason: 'weakGeneric', weak: true }, debug }
-      }
-    }
-  }
-
-  return { pick: null, debug }
-}
-
-/**
- * Validate an editor-typed anchor before allowing manual insertion. It must be
- * an exact 2–6 word content phrase that already exists in a safe prose location
- * and is not a single/generic word. (URL-already-linked is enforced separately.)
+ * Validate an editor-typed anchor before manual insertion. It must pass the
+ * shape check AND already exist in a safe prose location in the current body.
  */
 export function validateManualAnchor(
   html: string,
   phrase: string,
 ): { ok: boolean; reason?: 'words' | 'generic' | 'notfound' } {
   const p = (phrase ?? '').trim()
-  const words = p.split(/\s+/).filter(Boolean)
-  if (words.length < 2 || words.length > 6) return { ok: false, reason: 'words' }
-  if (!isContentPhrase(p)) return { ok: false, reason: 'generic' }
+  const wc = wordCount(p)
+  if (wc < 2 || wc > 6) return { ok: false, reason: 'words' }
+  if (isGenericSingleWord(p) || !hasContentWord(p)) return { ok: false, reason: 'generic' }
   const doc = parse(html)
   if (!doc || !locate(doc, p)) return { ok: false, reason: 'notfound' }
   return { ok: true }
@@ -420,10 +217,9 @@ export function validateManualAnchor(
 
 /**
  * Build deterministic link suggestions for the current article body.
- * - One suggestion per target URL, one use per auto anchor text.
- * - Skips target URLs already linked somewhere in the body.
- * - Insertable (a specific, non-weak phrase exists) first, then informational
- *   targets (weak or no safe anchor) so the editor can pick manually. Cap `max`.
+ * Anchor candidates per target = defined keyword → saved manual anchors →
+ * secondary keywords. Each is checked for an EXACT safe occurrence in the body.
+ * A target is insertable only when at least one candidate exists safely.
  */
 export function suggestInternalLinks(
   html: string,
@@ -445,28 +241,70 @@ export function suggestInternalLinks(
     if (!cand.url) continue
     const nUrl = normUrl(cand.url)
     if (shownUrls.has(nUrl) || alreadyLinked.has(nUrl)) continue
+    shownUrls.add(nUrl)
 
-    const { pick, debug } = pickAnchor(doc, cand)
-    const base = {
+    const keyword = (cand.keyword ?? '').trim() || null
+    const manualHistory = (cand.manualAnchors ?? []).map((s) => s.trim()).filter(Boolean)
+    const debug: AnchorDebug = {
+      targetId: cand.id,
+      url: normalizeHref(cand.url),
+      keyword,
+      manualHistory,
+      checked: [],
+      found: [],
+      rejected: [],
+      selected: null,
+    }
+
+    // Ordered raw candidates: A keyword, B manual bank, C secondary keywords.
+    const raw: { text: string; source: AnchorOption['source'] }[] = []
+    if (keyword) raw.push({ text: keyword, source: 'keyword' })
+    for (const m of manualHistory) raw.push({ text: m, source: 'manual' })
+    for (const s of cand.secondaryKeywords ?? []) {
+      const t = (s ?? '').trim()
+      if (t) raw.push({ text: t, source: 'secondary' })
+    }
+
+    const options: AnchorOption[] = []
+    const seen = new Set<string>()
+    for (const r of raw) {
+      const key = r.text.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      debug.checked.push(r.text)
+
+      const weak = wordCount(r.text) === 1
+      // A generic standalone word is allowed ONLY when it is the defined keyword.
+      if (isGenericSingleWord(r.text) && r.source !== 'keyword') {
+        debug.rejected.push({ anchor: r.text, reason: 'generic-single-word' })
+        continue
+      }
+      const exists = !!locate(doc, r.text)
+      if (exists) debug.found.push(r.text)
+      else debug.rejected.push({ anchor: r.text, reason: 'not-in-article' })
+      options.push({ text: r.text, source: r.source, exists, weak })
+    }
+
+    // Default selection: first existing non-weak option, else first existing.
+    const existing = options.filter((o) => o.exists && !usedAnchors.has(o.text.toLowerCase()))
+    const preferred = existing.find((o) => !o.weak) ?? existing[0] ?? null
+    if (preferred) debug.selected = preferred.text
+
+    const sug: LinkSuggestion = {
       targetId: cand.id,
       targetTitle: cand.title,
       url: normalizeHref(cand.url),
+      keyword,
+      options,
+      insertable: !!preferred,
+      selectedAnchor: preferred?.text ?? null,
       debug,
     }
-
-    if (pick && !pick.weak && !usedAnchors.has(pick.anchor.toLowerCase())) {
-      shownUrls.add(nUrl)
-      usedAnchors.add(pick.anchor.toLowerCase())
-      insertable.push({ ...base, anchorText: pick.anchor, reason: pick.reason, insertable: true, weak: false })
+    if (preferred) {
+      usedAnchors.add(preferred.text.toLowerCase())
+      insertable.push(sug)
     } else {
-      shownUrls.add(nUrl)
-      notInsertable.push({
-        ...base,
-        anchorText: pick?.anchor || cand.keyword?.trim() || cand.title.trim(),
-        reason: pick?.reason ?? 'titlePhrase',
-        insertable: false,
-        weak: !!pick?.weak,
-      })
+      notInsertable.push(sug)
     }
   }
 

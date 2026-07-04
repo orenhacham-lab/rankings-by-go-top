@@ -75,6 +75,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [manualOpen, setManualOpen] = useState<Set<string>>(new Set())
   const [manualText, setManualText] = useState<Record<string, string>>({})
   const [manualError, setManualError] = useState<Record<string, string>>({})
+  const [anchorChoice, setAnchorChoice] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -140,9 +141,20 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     })
   }
 
+  // The anchor to insert for a target: the editor's dropdown choice, else the
+  // default selected candidate. Must be an option that exists in the body.
+  function chosenAnchor(sug: LinkSuggestion): string | null {
+    const picked = anchorChoice[sug.targetId] ?? sug.selectedAnchor
+    if (!picked) return null
+    const opt = sug.options.find((o) => o.text === picked && o.exists)
+    return opt ? opt.text : sug.selectedAnchor
+  }
+
   function insertLink(sug: LinkSuggestion): boolean {
     if (!sug.insertable || addedLinks.has(sug.targetId)) return false
-    const next = insertInternalLink(contentHtml, sug.anchorText, sug.url)
+    const anchor = chosenAnchor(sug)
+    if (!anchor) return false
+    const next = insertInternalLink(contentHtml, anchor, sug.url)
     if (!next) {
       setMessage({ text: e.internal.addFailed, ok: false })
       return false
@@ -205,6 +217,16 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     setAddedLinks((prev) => new Set(prev).add(sug.targetId))
     setManualError((prev) => { const n = { ...prev }; delete n[sug.targetId]; return n })
     setManualOpen((prev) => { const n = new Set(prev); n.delete(sug.targetId); return n })
+    // Persist this approved manual anchor to the TARGET's anchor bank so it can
+    // be reused as a candidate the next time this target is suggested.
+    void fetch(`/api/content/articles/${sug.targetId}/internal-links`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anchor: phrase }),
+    }).catch(() => {})
+    setLinkCandidates((prev) => prev.map((c) => (c.id === sug.targetId
+      ? { ...c, manualAnchors: Array.from(new Set([...(c.manualAnchors ?? []), phrase])) }
+      : c)))
     toast.success(e.internal.saveReminder)
     setMessage({ text: e.internal.saveReminder, ok: true })
   }
@@ -564,6 +586,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               {linkSuggestions.map((sug) => {
                 const done = addedLinks.has(sug.targetId)
                 const manual = manualOpen.has(sug.targetId)
+                const existingOptions = sug.options.filter((o) => o.exists)
+                const chosen = anchorChoice[sug.targetId] ?? sug.selectedAnchor ?? ''
+                const manualHistory = sug.debug.manualHistory
                 return (
                   <div key={sug.targetId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -579,22 +604,43 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                       )}
                       <div className="flex-1 min-w-[12rem]">
                         <div className="text-sm text-slate-800 dark:text-slate-100">{sug.targetTitle}</div>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          {sug.insertable ? (
-                            <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200">
-                              {e.internal.anchorLabel}: {sug.anchorText}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.noSafeAnchor}</span>
-                          )}
-                          {sug.weak && <Badge variant="neutral">{e.internal.weak}</Badge>}
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {e.internal.keywordLabel}: {sug.keyword
+                            ? <span className="text-slate-700 dark:text-slate-200">{sug.keyword}</span>
+                            : <span className="italic">{e.internal.debugNone}</span>}
                         </div>
+                        {manualHistory.length > 0 && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {e.internal.manualHistoryLabel}: <span className="text-slate-700 dark:text-slate-200">{manualHistory.join(' · ')}</span>
+                          </div>
+                        )}
+                        {!sug.insertable && (
+                          <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">{e.internal.keywordNotFound}</div>
+                        )}
                         <a href={sug.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="inline-block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{sug.url}</a>
                       </div>
                       {sug.insertable && (
-                        <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={done}>
-                          {done ? e.internal.added : e.internal.addOne}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {existingOptions.length > 1 && !done && (
+                            <select
+                              value={chosen}
+                              onChange={(ev) => setAnchorChoice((prev) => ({ ...prev, [sug.targetId]: ev.target.value }))}
+                              className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs max-w-[14rem]"
+                            >
+                              {existingOptions.map((o) => (
+                                <option key={o.text} value={o.text}>{o.text}{o.weak ? ' ⚠' : ''}</option>
+                              ))}
+                            </select>
+                          )}
+                          {existingOptions.length === 1 && (
+                            <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200">
+                              {chosen}{existingOptions[0]?.weak ? ' ⚠' : ''}
+                            </span>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={done}>
+                            {done ? e.internal.added : e.internal.addOne}
+                          </Button>
+                        </div>
                       )}
                       {!done && (
                         <Button size="sm" variant="ghost" onClick={() => toggleManual(sug.targetId)}>{e.internal.manualAnchor}</Button>
@@ -615,16 +661,18 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                       </div>
                     )}
 
-                    {(sug.debug.found.length > 0 || sug.debug.rejected.length > 0) && (
-                      <details className="pl-6">
-                        <summary className="text-[11px] text-slate-400 cursor-pointer select-none">{e.internal.debugTitle}</summary>
-                        <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5" dir="auto">
-                          <div>{e.internal.debugSelected}: {sug.debug.selected ? <span className="text-slate-700 dark:text-slate-200">{sug.debug.selected}</span> : e.internal.debugNone}</div>
-                          {sug.debug.found.length > 0 && <div>{e.internal.debugFound}: {sug.debug.found.join(' · ')}</div>}
-                          {sug.debug.rejected.length > 0 && <div>{e.internal.debugRejected}: {sug.debug.rejected.map((r) => `${r.phrase} (${r.reason})`).join(' · ')}</div>}
-                        </div>
-                      </details>
-                    )}
+                    <details className="pl-6">
+                      <summary className="text-[11px] text-slate-400 cursor-pointer select-none">{e.internal.debugTitle}</summary>
+                      <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5" dir="auto">
+                        <div dir="ltr" className="text-left">{sug.debug.url}</div>
+                        <div>{e.internal.debugKeyword}: {sug.debug.keyword || e.internal.debugNone}</div>
+                        <div>{e.internal.debugManualHistory}: {manualHistory.length ? manualHistory.join(' · ') : e.internal.debugNone}</div>
+                        <div>{e.internal.debugChecked}: {sug.debug.checked.length ? sug.debug.checked.join(' · ') : e.internal.debugNone}</div>
+                        <div>{e.internal.debugFound}: {sug.debug.found.length ? sug.debug.found.join(' · ') : e.internal.debugNone}</div>
+                        {sug.debug.rejected.length > 0 && <div>{e.internal.debugRejected}: {sug.debug.rejected.map((r) => `${r.anchor} (${r.reason})`).join(' · ')}</div>}
+                        <div>{e.internal.debugSelected}: {sug.debug.selected || e.internal.debugNone}</div>
+                      </div>
+                    </details>
                   </div>
                 )
               })}
