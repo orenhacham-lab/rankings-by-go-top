@@ -18,6 +18,15 @@ export function isContentModuleEnabled(): boolean {
   return process.env.ENABLE_CONTENT === 'true'
 }
 
+/**
+ * Content-automation flag (recommendation engine + auto-generate/publish queue).
+ * Gated independently of the base content module so it can ship dark and be
+ * enabled per environment. Automation requires the content module too.
+ */
+export function isContentAutomationEnabled(): boolean {
+  return isContentModuleEnabled() && process.env.ENABLE_CONTENT_AUTOMATION === 'true'
+}
+
 export type ContentAuthResult =
   | { error: string; status: 401 | 403 | 404 | 400 }
   | {

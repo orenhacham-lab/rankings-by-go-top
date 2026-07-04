@@ -386,7 +386,17 @@ export interface WordPressConnection {
   updated_at: string
 }
 
-export type ArticleTopicSource = 'manual' | 'ai' | 'keyword' | 'ai_question' | 'competitor'
+export type ArticleTopicSource =
+  | 'manual'
+  | 'ai'
+  | 'keyword'
+  | 'ai_question'
+  | 'competitor'
+  // Content-automation recommendation sources (Phase 1).
+  | 'project_data'
+  | 'keyword_research_url'
+  | 'keyword_research_keyword'
+  | 'future_gsc'
 export type ArticleTopicStatus = 'suggested' | 'approved' | 'rejected' | 'used'
 
 export interface ArticleTopicAnchor {
@@ -415,6 +425,9 @@ export interface ArticleTopic {
   tone_of_voice: string | null
   desired_word_count: number | null
   cta_preference: string | null
+  // Content-automation recommendation metadata (Phase 1, additive).
+  suggestion_reason: string | null
+  suggestion_score: number | null
   created_at: string
   updated_at: string
 }
@@ -474,18 +487,33 @@ export interface ArticlePool {
   updated_at: string
 }
 
-export type ArticlePoolItemStatus = 'queued' | 'scheduled' | 'published' | 'skipped' | 'failed'
+export type ArticlePoolItemStatus =
+  | 'queued'
+  | 'scheduled'
+  | 'generating'
+  | 'generated'
+  | 'quality_check_failed'
+  | 'publishing'
+  | 'published'
+  | 'failed'
+  | 'skipped'
+  | 'paused'
 
 export interface ArticlePoolItem {
   id: string
   user_id: string
   project_id: string
   pool_id: string
-  article_id: string
+  // Queue is keyed by topic; the article is created (generate-ahead) later.
+  topic_id: string | null
+  article_id: string | null
   position: number
   status: ArticlePoolItemStatus
   scheduled_at: string | null
   published_at: string | null
+  attempts: number
+  last_error: string | null
+  locked_at: string | null
   created_at: string
   updated_at: string
 }
