@@ -426,6 +426,10 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
 .article-content th { background: #f8fafc; font-weight: 600; }
 .dark .article-content th { background: #1e293b; }
 .article-content caption { caption-side: top; font-weight: 600; margin-bottom: 0.4rem; text-align: start; }
+/* Hebrew tables carry dir="rtl": align the caption to the right like the cells.
+   English (no dir) captions stay left-aligned. */
+.article-content table[dir="rtl"] caption { text-align: right; direction: rtl; }
+.article-content table:not([dir="rtl"]) caption { text-align: left; }
 .article-content nav.toc {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
