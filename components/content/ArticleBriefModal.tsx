@@ -136,6 +136,7 @@ export default function ArticleBriefModal({
   const [linkCandidates, setLinkCandidates] = useState<InternalLinkCandidate[]>([])
   const [linkChoice, setLinkChoice] = useState<Record<string, string>>({})
   const [linkManual, setLinkManual] = useState<Record<string, string>>({})
+  const [linksExpanded, setLinksExpanded] = useState(false)
 
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -181,7 +182,7 @@ export default function ArticleBriefModal({
       setAdvancedOpen(false)
       setKeywordFit(null)
     }
-    setError(null); setFormError(null); setErrProject(false); setErrTopic(false); setBadAnchors(new Set())
+    setError(null); setFormError(null); setErrProject(false); setErrTopic(false); setBadAnchors(new Set()); setLinksExpanded(false)
   }, [open, editing, defaultProjectId, projects])
 
   useEffect(() => {
@@ -200,11 +201,16 @@ export default function ArticleBriefModal({
   }, [open, projectId])
 
   // ---- Internal-link planning helpers -------------------------------------
-  function linkOptionsFor(cand: InternalLinkCandidate): { text: string; source: PlannedInternalLink['source'] }[] {
-    const opts: { text: string; source: PlannedInternalLink['source'] }[] = []
-    if (cand.keyword?.trim()) opts.push({ text: cand.keyword.trim(), source: 'primary_keyword' })
-    for (const a of cand.manualAnchors ?? []) if (a.trim()) opts.push({ text: a.trim(), source: 'historical_anchor' })
-    for (const s of cand.secondaryKeywords ?? []) if (s.trim()) opts.push({ text: s.trim(), source: 'secondary_keyword' })
+  type LinkOpt = { text: string; source: PlannedInternalLink['source']; weak: boolean; label: string }
+  function linkOptionsFor(cand: InternalLinkCandidate): LinkOpt[] {
+    const isWeak = (s: string) => s.trim().split(/\s+/).filter(Boolean).length === 1
+    const opts: LinkOpt[] = []
+    if (cand.keyword?.trim()) opts.push({ text: cand.keyword.trim(), source: 'primary_keyword', weak: false, label: t.planLabelKeyword })
+    for (const a of cand.historicalAnchors ?? []) {
+      const text = a.trim()
+      if (text) opts.push({ text, source: 'historical_anchor', weak: isWeak(text), label: isWeak(text) ? t.planLabelHistoricGeneric : t.planLabelHistoric })
+    }
+    for (const s of cand.secondaryKeywords ?? []) if (s.trim()) opts.push({ text: s.trim(), source: 'secondary_keyword', weak: false, label: t.planLabelSecondary })
     const seen = new Set<string>()
     return opts.filter((o) => { const k = o.text.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
   }
@@ -218,7 +224,9 @@ export default function ArticleBriefModal({
     const opts = linkOptionsFor(cand)
     const picked = linkChoice[cand.id]
     if (picked) return { text: picked, source: linkSourceOf(cand, picked) }
-    return opts[0] ?? { text: '', source: 'manual' }
+    // Default: first non-weak option; only fall back to a weak (single-word) one.
+    const def = opts.find((o) => !o.weak) ?? opts[0]
+    return def ? { text: def.text, source: def.source } : { text: '', source: 'manual' }
   }
   const isLinkApproved = (id: string) => internalLinks.some((l) => l.targetId === id)
   function upsertLink(cand: InternalLinkCandidate) {
@@ -699,11 +707,12 @@ export default function ArticleBriefModal({
                 <p className="text-xs text-slate-400">{t.planNone}</p>
               ) : (
                 <div className="space-y-2">
-                  {linkCandidates.map((cand) => {
+                  {(linksExpanded ? linkCandidates : linkCandidates.slice(0, 2)).map((cand) => {
                     const opts = linkOptionsFor(cand)
                     const approved = isLinkApproved(cand.id)
                     const manualVal = linkManual[cand.id] ?? ''
-                    const selectVal = linkChoice[cand.id] ?? (opts[0]?.text ?? '')
+                    const defaultOpt = opts.find((o) => !o.weak) ?? opts[0]
+                    const selectVal = linkChoice[cand.id] ?? (defaultOpt?.text ?? '')
                     const selectExtra = selectVal && !opts.some((o) => o.text === selectVal) ? [selectVal] : []
                     return (
                       <div key={cand.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5 space-y-1.5">
@@ -713,8 +722,8 @@ export default function ArticleBriefModal({
                             <span className="block text-sm text-slate-800 dark:text-slate-100">{cand.title}</span>
                             <a href={cand.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{cand.url}</a>
                             <span className="block text-[11px] text-slate-500 dark:text-slate-400">{t.planKeyword}: {cand.keyword || '—'}</span>
-                            {(cand.manualAnchors?.length ?? 0) > 0 && (
-                              <span className="block text-[11px] text-slate-500 dark:text-slate-400">{t.planHistory}: {cand.manualAnchors.join(' · ')}</span>
+                            {(cand.historicalAnchors?.length ?? 0) > 0 && (
+                              <span className="block text-[11px] text-slate-500 dark:text-slate-400">{t.planHistory}: {cand.historicalAnchors.join(' · ')}</span>
                             )}
                           </span>
                         </label>
@@ -722,10 +731,11 @@ export default function ArticleBriefModal({
                           <select
                             value={selectVal}
                             onChange={(e) => { setLinkManual((p) => ({ ...p, [cand.id]: '' })); setLinkChoice((p) => ({ ...p, [cand.id]: e.target.value })) }}
-                            className={inputCls + ' max-w-[16rem]'}
+                            className={inputCls + ' max-w-[18rem]'}
                           >
-                            {[...selectExtra, ...opts.map((o) => o.text)].map((txt) => (
-                              <option key={txt} value={txt}>{txt}</option>
+                            {selectExtra.map((txt) => <option key={txt} value={txt}>{txt}</option>)}
+                            {opts.map((o) => (
+                              <option key={o.text} value={o.text}>{o.text} · {o.label}</option>
                             ))}
                             {opts.length === 0 && selectExtra.length === 0 && <option value="">—</option>}
                           </select>
@@ -741,6 +751,11 @@ export default function ArticleBriefModal({
                       </div>
                     )
                   })}
+                  {linkCandidates.length > 2 && (
+                    <button type="button" onClick={() => setLinksExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                      {linksExpanded ? t.planShowLess : t.planShowMore}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

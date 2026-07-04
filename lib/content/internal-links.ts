@@ -86,24 +86,55 @@ export function normalizeHref(u: string): string {
   return String(u || '').trim().replace(/^\/+(?=https?:\/\/)/i, '')
 }
 
-/** Normalize a URL for comparison: drop protocol, lowercase host+path, trim trailing slash. */
+/** Decode the handful of HTML entities that show up in href/anchor text. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/gi, '&')
+    .replace(/&#38;/g, '&')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+}
+
+/**
+ * Match keys for a URL, tolerant of the differences that make two internal links
+ * "the same": protocol, www, trailing slash, query string / UTM, and fragment.
+ * Returns both a host+path key and a path-only key so an absolute link and a
+ * relative link to the same article still match.
+ */
+export function urlMatchKeys(u: string): string[] {
+  let s = decodeEntities(normalizeHref(u)).trim()
+  s = s.replace(/[#?].*$/, '')            // drop fragment + query/UTM
+  s = s.replace(/^https?:\/\//i, '')       // drop protocol
+  s = s.replace(/\/+$/, '').toLowerCase()  // drop trailing slash
+  const noWww = s.replace(/^www\./, '')
+  const keys = new Set<string>()
+  if (s) keys.add(s)
+  if (noWww) keys.add(noWww)
+  // Path-only (everything from the first slash) so relative hrefs match too.
+  const slash = noWww.indexOf('/')
+  if (slash >= 0) keys.add(noWww.slice(slash))
+  else if (noWww.startsWith('/')) keys.add(noWww)
+  return Array.from(keys).filter(Boolean)
+}
+
+/** Canonical single key (host+path, no www/query/fragment/trailing slash). */
 export function normalizeUrlKey(u: string): string {
-  return normalizeHref(u)
-    .replace(/^https?:\/\//i, '')
-    .replace(/\/+$/, '')
-    .toLowerCase()
+  return urlMatchKeys(u)[0] ?? ''
 }
 const normUrl = normalizeUrlKey
 
 /**
  * Server-safe (regex, no DOM) extraction of <a href="URL">TEXT</a> pairs from
- * article HTML. Used to backfill historical anchors: scan a published article's
- * body for links whose href matches a known target URL. Skips nav/header/footer/
- * aside regions and empty/generic single-word anchors.
+ * article HTML. Used to backfill HISTORICAL anchors, so it keeps single-word and
+ * generic anchors (they are real prior usage). Skips nav/header/footer/aside
+ * regions and empty / image-only anchors. HTML entities are decoded.
  */
 export function extractLinkAnchorsFromHtml(html: string): { href: string; text: string }[] {
   if (!html) return []
-  // Drop obvious non-article regions so sidebar/nav links don't pollute anchors.
+  // Drop obvious non-article regions so sidebar/nav/template links don't pollute.
   let body = html
   for (const tag of ['nav', 'header', 'footer', 'aside']) {
     body = body.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?</${tag}>`, 'gi'), ' ')
@@ -112,11 +143,11 @@ export function extractLinkAnchorsFromHtml(html: string): { href: string; text: 
   const re = /<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
   let m: RegExpExecArray | null
   while ((m = re.exec(body)) !== null) {
-    const href = (m[1] ?? '').trim()
-    const text = (m[2] ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    const href = decodeEntities((m[1] ?? '').trim())
+    // Strip inner markup (image-only links collapse to empty and are skipped).
+    const text = decodeEntities((m[2] ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
     if (!href || !text) continue
-    if (wordCount(text) === 1 && GENERIC_WORDS.has(text.toLowerCase())) continue
-    out.push({ href, text })
+    out.push({ href, text }) // keep single-word / generic — real historical usage
   }
   return out
 }
@@ -131,16 +162,22 @@ function parse(html: string): Document | null {
   }
 }
 
-/** Collect the normalized URLs of every existing <a href> in the content. */
+/** Collect all match keys of every existing <a href> in the content. */
 export function extractExistingLinkUrls(html: string): Set<string> {
   const set = new Set<string>()
   const doc = parse(html)
   if (!doc) return set
   doc.querySelectorAll('a[href]').forEach((a) => {
     const href = a.getAttribute('href')
-    if (href) set.add(normUrl(href))
+    if (href) for (const k of urlMatchKeys(href)) set.add(k)
   })
   return set
+}
+
+/** True when any existing link in `html` points at `url` (tolerant matching). */
+export function isUrlAlreadyLinked(html: string, url: string): boolean {
+  const set = extractExistingLinkUrls(html)
+  return urlMatchKeys(url).some((k) => set.has(k))
 }
 
 /** True when the node sits inside a forbidden ancestor (heading/table/link/…). */

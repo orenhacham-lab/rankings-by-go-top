@@ -14,7 +14,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { extractLinkAnchorsFromHtml, normalizeUrlKey, normalizeHref } from '@/lib/content/internal-links'
+import { extractLinkAnchorsFromHtml, urlMatchKeys, normalizeHref } from '@/lib/content/internal-links'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -24,7 +24,8 @@ export interface InternalLinkCandidate {
   url: string
   keyword: string | null
   secondaryKeywords: string[]
-  manualAnchors: string[]
+  /** Previously-used anchors for this target (body-extracted + saved bank). */
+  historicalAnchors: string[]
 }
 
 /** Read the saved inbound anchor bank out of a row's internal_links_json. */
@@ -66,15 +67,16 @@ export async function loadInternalLinkCandidates(
   const rows = (data ?? []) as PublishedRow[]
   const published = rows.filter((r) => r.wp_post_url)
 
-  // Map every known published URL → its article id, for historical extraction.
+  // Map every known published URL (all tolerant match keys) → its article id.
   const urlToId = new Map<string, string>()
-  for (const r of published) urlToId.set(normalizeUrlKey(r.wp_post_url as string), r.id)
+  for (const r of published) for (const k of urlMatchKeys(r.wp_post_url as string)) urlToId.set(k, r.id)
 
   // Backfill: scan EVERY published body for links pointing at a known target.
+  // Historical anchors are kept as-is (including single-word / generic ones).
   const historicalByTarget = new Map<string, string[]>()
   for (const r of published) {
     for (const link of extractLinkAnchorsFromHtml(r.content_html ?? '')) {
-      const targetId = urlToId.get(normalizeUrlKey(link.href))
+      const targetId = urlMatchKeys(link.href).map((k) => urlToId.get(k)).find(Boolean)
       if (!targetId) continue
       const list = historicalByTarget.get(targetId) ?? []
       list.push(link.text)
@@ -101,14 +103,14 @@ export async function loadInternalLinkCandidates(
       const topic = r.topic_id ? topicById[r.topic_id] : undefined
       const bank = readAnchorBank(r.internal_links_json)
       const historical = historicalByTarget.get(r.id) ?? []
-      // Dedupe (case-insensitive) across bank + historical, preserving order.
+      // Dedupe (case-insensitive) across historical + bank, preserving order.
       const seen = new Set<string>()
-      const manualAnchors: string[] = []
-      for (const a of [...bank, ...historical]) {
+      const historicalAnchors: string[] = []
+      for (const a of [...historical, ...bank]) {
         const key = a.trim().toLowerCase()
         if (!key || seen.has(key)) continue
         seen.add(key)
-        manualAnchors.push(a.trim())
+        historicalAnchors.push(a.trim())
       }
       return {
         id: r.id,
@@ -116,7 +118,7 @@ export async function loadInternalLinkCandidates(
         url: normalizeHref(r.wp_post_url as string),
         keyword: topic?.primary ?? null,
         secondaryKeywords: topic?.secondary ?? [],
-        manualAnchors,
+        historicalAnchors,
       }
     })
 }

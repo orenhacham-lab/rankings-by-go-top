@@ -16,7 +16,7 @@ import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import { useToasts, ToastHost } from '@/components/content/Toast'
-import { suggestInternalLinks, insertInternalLink, validateManualAnchor, anchorExistsInBody, extractExistingLinkUrls, normalizeUrlKey, type LinkCandidate, type LinkSuggestion } from '@/lib/content/internal-links'
+import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -66,17 +66,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [wpStatus, setWpStatus] = useState<'draft' | 'publish' | null>(null)
   const [wpBusy, setWpBusy] = useState<'draft' | 'publish' | null>(null)
 
-  // Internal linking (deterministic, manual). Candidates come from the server;
-  // suggestions are computed client-side against the live editor content.
-  const [linkCandidates, setLinkCandidates] = useState<LinkCandidate[]>([])
-  const [linkSuggestions, setLinkSuggestions] = useState<LinkSuggestion[]>([])
-  const [linkApproved, setLinkApproved] = useState<Set<string>>(new Set())
+  // Internal linking — editor is QA-only: verify each planned anchor exists and
+  // insert its link. Planning/selection happens pre-generation in the brief.
   const [addedLinks, setAddedLinks] = useState<Set<string>>(new Set())
-  const [linksLoading, setLinksLoading] = useState(false)
-  const [manualOpen, setManualOpen] = useState<Set<string>>(new Set())
-  const [manualText, setManualText] = useState<Record<string, string>>({})
-  const [manualError, setManualError] = useState<Record<string, string>>({})
-  const [anchorChoice, setAnchorChoice] = useState<Record<string, string>>({})
   const [plannedLinks, setPlannedLinks] = useState<PlannedInternalLink[]>([])
 
   const load = useCallback(async () => {
@@ -103,14 +95,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setWpPostId(a.wp_post_id ?? null)
       setWpPostUrl(a.wp_post_url ?? null)
       setWpStatus(a.status === 'published' ? 'publish' : a.wp_post_id != null ? 'draft' : null)
-      // Load internal-link candidates and compute suggestions against this body.
+      // Load the article's approved planned internal links (editor is QA-only).
       try {
         const lr = await fetch(`/api/content/articles/${id}/internal-links`)
         if (lr.ok) {
           const ld = await lr.json()
-          const cands: LinkCandidate[] = Array.isArray(ld.candidates) ? ld.candidates : []
-          setLinkCandidates(cands)
-          setLinkSuggestions(suggestInternalLinks(a.content_html ?? '', cands))
           setPlannedLinks(Array.isArray(ld.plannedLinks) ? ld.plannedLinks : [])
         }
       } catch {
@@ -123,120 +112,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => { if (enabled) load() }, [enabled, load])
 
-  // Recompute suggestions against the current editor content (excludes anchors
-  // already used and target URLs already linked in the body).
-  const refreshLinks = useCallback(() => {
-    setLinksLoading(true)
-    try {
-      setLinkSuggestions(suggestInternalLinks(contentHtml, linkCandidates))
-      setLinkApproved(new Set())
-    } finally {
-      setLinksLoading(false)
-    }
-  }, [contentHtml, linkCandidates])
-
-  function toggleApprove(targetId: string) {
-    setLinkApproved((prev) => {
-      const next = new Set(prev)
-      if (next.has(targetId)) next.delete(targetId)
-      else next.add(targetId)
-      return next
-    })
-  }
-
-  // The anchor to insert for a target: the editor's dropdown choice, else the
-  // default selected candidate. Must be an option that exists in the body.
-  function chosenAnchor(sug: LinkSuggestion): string | null {
-    const picked = anchorChoice[sug.targetId] ?? sug.selectedAnchor
-    if (!picked) return null
-    const opt = sug.options.find((o) => o.text === picked && o.exists)
-    return opt ? opt.text : sug.selectedAnchor
-  }
-
-  function insertLink(sug: LinkSuggestion): boolean {
-    if (!sug.insertable || addedLinks.has(sug.targetId)) return false
-    const anchor = chosenAnchor(sug)
-    if (!anchor) return false
-    const next = insertInternalLink(contentHtml, anchor, sug.url)
-    if (!next) {
-      setMessage({ text: e.internal.addFailed, ok: false })
-      return false
-    }
-    setContentHtml(next)
-    setAddedLinks((prev) => new Set(prev).add(sug.targetId))
-    return true
-  }
-
-  function addOneLink(sug: LinkSuggestion) {
-    if (insertLink(sug)) {
-      toast.success(e.internal.saveReminder)
-      setMessage({ text: e.internal.saveReminder, ok: true })
-    }
-  }
-
-  function addSelectedLinks() {
-    let count = 0
-    for (const sug of linkSuggestions) {
-      if (linkApproved.has(sug.targetId) && insertLink(sug)) count++
-    }
-    if (count > 0) {
-      const text = e.internal.addedMany.replace('{n}', String(count))
-      toast.success(text)
-      setMessage({ text: `${text} · ${e.internal.saveReminder}`, ok: true })
-    }
-  }
-
-  function toggleManual(targetId: string) {
-    setManualOpen((prev) => {
-      const next = new Set(prev)
-      if (next.has(targetId)) next.delete(targetId)
-      else next.add(targetId)
-      return next
-    })
-    setManualError((prev) => { const n = { ...prev }; delete n[targetId]; return n })
-  }
-
-  // Insert an editor-typed exact phrase. Same safety gate as auto anchors:
-  // must be a 2–6 word content phrase present in safe prose (no headings/tables/
-  // links). Never a generic single word.
-  function submitManual(sug: LinkSuggestion) {
-    const phrase = (manualText[sug.targetId] ?? '').trim()
-    const v = validateManualAnchor(contentHtml, phrase)
-    if (!v.ok) {
-      const reasonMap: Record<string, string> = {
-        words: e.internal.manualErrWords,
-        generic: e.internal.manualErrGeneric,
-        notfound: e.internal.manualErrNotfound,
-      }
-      setManualError((prev) => ({ ...prev, [sug.targetId]: reasonMap[v.reason ?? 'notfound'] ?? e.internal.manualErrNotfound }))
-      return
-    }
-    const next = insertInternalLink(contentHtml, phrase, sug.url)
-    if (!next) {
-      setManualError((prev) => ({ ...prev, [sug.targetId]: e.internal.manualErrNotfound }))
-      return
-    }
-    setContentHtml(next)
-    setAddedLinks((prev) => new Set(prev).add(sug.targetId))
-    setManualError((prev) => { const n = { ...prev }; delete n[sug.targetId]; return n })
-    setManualOpen((prev) => { const n = new Set(prev); n.delete(sug.targetId); return n })
-    // Persist this approved manual anchor to the TARGET's anchor bank so it can
-    // be reused as a candidate the next time this target is suggested.
-    void fetch(`/api/content/articles/${sug.targetId}/internal-links`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ anchor: phrase }),
-    }).catch(() => {})
-    setLinkCandidates((prev) => prev.map((c) => (c.id === sug.targetId
-      ? { ...c, manualAnchors: Array.from(new Set([...(c.manualAnchors ?? []), phrase])) }
-      : c)))
-    toast.success(e.internal.saveReminder)
-    setMessage({ text: e.internal.saveReminder, ok: true })
-  }
-
-  // ---- Planned internal links (QA after generation) -----------------------
+  // ---- Planned internal links — editor QA/insertion -----------------------
   function plannedStatus(link: PlannedInternalLink): 'linked' | 'ready' | 'missing' {
-    if (extractExistingLinkUrls(contentHtml).has(normalizeUrlKey(link.targetUrl))) return 'linked'
+    if (isUrlAlreadyLinked(contentHtml, link.targetUrl)) return 'linked'
     return anchorExistsInBody(contentHtml, link.anchorText) ? 'ready' : 'missing'
   }
   function insertPlanned(link: PlannedInternalLink) {
@@ -249,27 +127,6 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
   function copyAnchor(text: string) {
     try { void navigator.clipboard?.writeText(text); toast.success(e.internal.copied) } catch { /* clipboard unavailable */ }
-  }
-  function submitManualPlanned(link: PlannedInternalLink) {
-    const key = `plan:${link.targetId}`
-    const phrase = (manualText[key] ?? '').trim()
-    const v = validateManualAnchor(contentHtml, phrase)
-    if (!v.ok) {
-      const reasonMap: Record<string, string> = { words: e.internal.manualErrWords, generic: e.internal.manualErrGeneric, notfound: e.internal.manualErrNotfound }
-      setManualError((prev) => ({ ...prev, [key]: reasonMap[v.reason ?? 'notfound'] ?? e.internal.manualErrNotfound }))
-      return
-    }
-    const next = insertInternalLink(contentHtml, phrase, link.targetUrl)
-    if (!next) { setManualError((prev) => ({ ...prev, [key]: e.internal.manualErrNotfound })); return }
-    setContentHtml(next)
-    setAddedLinks((prev) => new Set(prev).add(key))
-    setManualError((prev) => { const n = { ...prev }; delete n[key]; return n })
-    setManualOpen((prev) => { const n = new Set(prev); n.delete(key); return n })
-    void fetch(`/api/content/articles/${link.targetId}/internal-links`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anchor: phrase }),
-    }).catch(() => {})
-    toast.success(e.internal.saveReminder)
-    setMessage({ text: e.internal.saveReminder, ok: true })
   }
 
   function bodyPayload(nextStatus?: 'draft' | 'ready') {
@@ -428,9 +285,6 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
   const inputCls =
     'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
-
-  // General ad-hoc suggestions, minus any target already covered by a planned link.
-  const generalSuggestions = linkSuggestions.filter((s) => !plannedLinks.some((l) => l.targetId === s.targetId))
 
   return (
     <div dir={isHebrew ? 'rtl' : 'ltr'}>
@@ -611,180 +465,47 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           </div>
         </Card>
 
-        {/* Internal links — deterministic, manual, editor-controlled. */}
-        <Card className="hover:translate-y-0">
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.internal.title}</h3>
-            <Button size="sm" variant="ghost" onClick={refreshLinks} disabled={linksLoading}>{e.internal.refresh}</Button>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{e.internal.hint}</p>
-          {isPublished && (
-            <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.internal.publishedNote}</p>
-          )}
-
-          {/* Approved-at-planning links — QA: verify the anchor exists, insert it. */}
-          {plannedLinks.length > 0 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{e.internal.planQaTitle}</h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{e.internal.planQaHint}</p>
-              <div className="space-y-2">
-                {plannedLinks.map((link) => {
-                  const key = `plan:${link.targetId}`
-                  const done = addedLinks.has(key)
-                  const st = done ? 'linked' : plannedStatus(link)
-                  const manual = manualOpen.has(key)
-                  return (
-                    <div key={key} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex-1 min-w-[12rem]">
-                          <div className="text-sm text-slate-800 dark:text-slate-100">{link.targetTitle}</div>
-                          <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200 mt-1">
-                            {e.internal.anchorLabel}: {link.anchorText}
-                          </span>
-                          <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetUrl}</a>
-                        </div>
-                        {st === 'linked' && <Badge variant="success">{e.internal.statusLinked}</Badge>}
-                        {st === 'ready' && (
-                          <Button size="sm" variant="outline" onClick={() => insertPlanned(link)}>{e.internal.addOne}</Button>
-                        )}
-                        {st === 'missing' && (
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant="ghost" onClick={() => copyAnchor(link.anchorText)}>{e.internal.copy}</Button>
-                            <Button size="sm" variant="ghost" onClick={() => toggleManual(key)}>{e.internal.manualAnchor}</Button>
-                          </div>
-                        )}
-                      </div>
-                      {st === 'missing' && (
-                        <p className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.statusMissing}</p>
-                      )}
-                      {manual && st === 'missing' && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            type="text"
-                            value={manualText[key] ?? ''}
-                            onChange={(ev) => setManualText((prev) => ({ ...prev, [key]: ev.target.value }))}
-                            placeholder={e.internal.manualPlaceholder}
-                            className="flex-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs"
-                          />
-                          <Button size="sm" variant="outline" onClick={() => submitManualPlanned(link)}>{e.internal.manualConfirm}</Button>
-                          {manualError[key] && <span className="text-[11px] text-red-600 dark:text-red-400 w-full">{manualError[key]}</span>}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {linksLoading ? (
-            <p className="text-xs text-slate-400">{e.internal.loading}</p>
-          ) : generalSuggestions.length === 0 ? (
-            plannedLinks.length ? null : <p className="text-xs text-slate-500 dark:text-slate-400">{e.internal.none}</p>
-          ) : (
+        {/* Planned internal links — QA/insertion only. Hidden entirely when the
+            article has no planned links (no ad-hoc suggestions here anymore). */}
+        {plannedLinks.length > 0 && (
+          <Card className="hover:translate-y-0">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.internal.planQaTitle}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{e.internal.planQaHint}</p>
+            {isPublished && (
+              <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.internal.publishedNote}</p>
+            )}
             <div className="space-y-2">
-              {generalSuggestions.map((sug) => {
-                const done = addedLinks.has(sug.targetId)
-                const manual = manualOpen.has(sug.targetId)
-                const existingOptions = sug.options.filter((o) => o.exists)
-                const chosen = anchorChoice[sug.targetId] ?? sug.selectedAnchor ?? ''
-                const manualHistory = sug.debug.manualHistory
+              {plannedLinks.map((link) => {
+                const key = `plan:${link.targetId}`
+                const done = addedLinks.has(key)
+                const st = done ? 'linked' : plannedStatus(link)
                 return (
-                  <div key={sug.targetId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+                  <div key={key} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      {sug.insertable && !done ? (
-                        <input
-                          type="checkbox"
-                          checked={linkApproved.has(sug.targetId)}
-                          onChange={() => toggleApprove(sug.targetId)}
-                          className="h-4 w-4 accent-indigo-600"
-                        />
-                      ) : (
-                        <span className="h-4 w-4" aria-hidden />
-                      )}
                       <div className="flex-1 min-w-[12rem]">
-                        <div className="text-sm text-slate-800 dark:text-slate-100">{sug.targetTitle}</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          {e.internal.keywordLabel}: {sug.keyword
-                            ? <span className="text-slate-700 dark:text-slate-200">{sug.keyword}</span>
-                            : <span className="italic">{e.internal.debugNone}</span>}
-                        </div>
-                        {manualHistory.length > 0 && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {e.internal.manualHistoryLabel}: <span className="text-slate-700 dark:text-slate-200">{manualHistory.join(' · ')}</span>
-                          </div>
-                        )}
-                        {!sug.insertable && (
-                          <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">{e.internal.keywordNotFound}</div>
-                        )}
-                        <a href={sug.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="inline-block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{sug.url}</a>
+                        <div className="text-sm text-slate-800 dark:text-slate-100">{link.targetTitle}</div>
+                        <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200 mt-1">
+                          {e.internal.anchorLabel}: {link.anchorText}
+                        </span>
+                        <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetUrl}</a>
                       </div>
-                      {sug.insertable && (
-                        <div className="flex items-center gap-2">
-                          {existingOptions.length > 1 && !done && (
-                            <select
-                              value={chosen}
-                              onChange={(ev) => setAnchorChoice((prev) => ({ ...prev, [sug.targetId]: ev.target.value }))}
-                              className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs max-w-[14rem]"
-                            >
-                              {existingOptions.map((o) => (
-                                <option key={o.text} value={o.text}>{o.text}{o.weak ? ' ⚠' : ''}</option>
-                              ))}
-                            </select>
-                          )}
-                          {existingOptions.length === 1 && (
-                            <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200">
-                              {chosen}{existingOptions[0]?.weak ? ' ⚠' : ''}
-                            </span>
-                          )}
-                          <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={done}>
-                            {done ? e.internal.added : e.internal.addOne}
-                          </Button>
-                        </div>
+                      {st === 'linked' && <Badge variant="success">{e.internal.statusLinked}</Badge>}
+                      {st === 'ready' && (
+                        <Button size="sm" variant="outline" onClick={() => insertPlanned(link)}>{e.internal.addOne}</Button>
                       )}
-                      {!done && (
-                        <Button size="sm" variant="ghost" onClick={() => toggleManual(sug.targetId)}>{e.internal.manualAnchor}</Button>
+                      {st === 'missing' && (
+                        <Button size="sm" variant="ghost" onClick={() => copyAnchor(link.anchorText)}>{e.internal.copy}</Button>
                       )}
                     </div>
-
-                    {manual && !done && (
-                      <div className="flex flex-wrap items-center gap-2 pl-6">
-                        <input
-                          type="text"
-                          value={manualText[sug.targetId] ?? ''}
-                          onChange={(ev) => setManualText((prev) => ({ ...prev, [sug.targetId]: ev.target.value }))}
-                          placeholder={e.internal.manualPlaceholder}
-                          className="flex-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs"
-                        />
-                        <Button size="sm" variant="outline" onClick={() => submitManual(sug)}>{e.internal.manualConfirm}</Button>
-                        {manualError[sug.targetId] && <span className="text-[11px] text-red-600 dark:text-red-400 w-full">{manualError[sug.targetId]}</span>}
-                      </div>
-                    )}
-
-                    <details className="pl-6">
-                      <summary className="text-[11px] text-slate-400 cursor-pointer select-none">{e.internal.debugTitle}</summary>
-                      <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5" dir="auto">
-                        <div dir="ltr" className="text-left">{sug.debug.url}</div>
-                        <div>{e.internal.debugKeyword}: {sug.debug.keyword || e.internal.debugNone}</div>
-                        <div>{e.internal.debugManualHistory}: {manualHistory.length ? manualHistory.join(' · ') : e.internal.debugNone}</div>
-                        <div>{e.internal.debugChecked}: {sug.debug.checked.length ? sug.debug.checked.join(' · ') : e.internal.debugNone}</div>
-                        <div>{e.internal.debugFound}: {sug.debug.found.length ? sug.debug.found.join(' · ') : e.internal.debugNone}</div>
-                        {sug.debug.rejected.length > 0 && <div>{e.internal.debugRejected}: {sug.debug.rejected.map((r) => `${r.anchor} (${r.reason})`).join(' · ')}</div>}
-                        <div>{e.internal.debugSelected}: {sug.debug.selected || e.internal.debugNone}</div>
-                      </div>
-                    </details>
+                    <p className={`text-[11px] ${st === 'missing' ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                      {st === 'ready' ? e.internal.statusReady : st === 'linked' ? e.internal.statusLinked : e.internal.statusMissing}
+                    </p>
                   </div>
                 )
               })}
-              <div className="flex items-center gap-3 pt-1">
-                <Button size="sm" onClick={addSelectedLinks} disabled={linkApproved.size === 0}>
-                  {e.internal.addSelected} ({linkApproved.size})
-                </Button>
-                {addedLinks.size > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{e.internal.saveReminder}</span>}
-              </div>
             </div>
-          )}
-        </Card>
+          </Card>
+        )}
 
         <div className="flex flex-wrap items-center gap-2 pb-8">
           <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
