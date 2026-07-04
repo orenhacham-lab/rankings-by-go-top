@@ -16,7 +16,7 @@ import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import { useToasts, ToastHost } from '@/components/content/Toast'
-import { suggestInternalLinks, insertInternalLink, type LinkCandidate, type LinkSuggestion } from '@/lib/content/internal-links'
+import { suggestInternalLinks, insertInternalLink, validateManualAnchor, type LinkCandidate, type LinkSuggestion } from '@/lib/content/internal-links'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { AlertTriangle } from 'lucide-react'
@@ -72,6 +72,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [linkApproved, setLinkApproved] = useState<Set<string>>(new Set())
   const [addedLinks, setAddedLinks] = useState<Set<string>>(new Set())
   const [linksLoading, setLinksLoading] = useState(false)
+  const [manualOpen, setManualOpen] = useState<Set<string>>(new Set())
+  const [manualText, setManualText] = useState<Record<string, string>>({})
+  const [manualError, setManualError] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -166,6 +169,44 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       toast.success(text)
       setMessage({ text: `${text} · ${e.internal.saveReminder}`, ok: true })
     }
+  }
+
+  function toggleManual(targetId: string) {
+    setManualOpen((prev) => {
+      const next = new Set(prev)
+      if (next.has(targetId)) next.delete(targetId)
+      else next.add(targetId)
+      return next
+    })
+    setManualError((prev) => { const n = { ...prev }; delete n[targetId]; return n })
+  }
+
+  // Insert an editor-typed exact phrase. Same safety gate as auto anchors:
+  // must be a 2–6 word content phrase present in safe prose (no headings/tables/
+  // links). Never a generic single word.
+  function submitManual(sug: LinkSuggestion) {
+    const phrase = (manualText[sug.targetId] ?? '').trim()
+    const v = validateManualAnchor(contentHtml, phrase)
+    if (!v.ok) {
+      const reasonMap: Record<string, string> = {
+        words: e.internal.manualErrWords,
+        generic: e.internal.manualErrGeneric,
+        notfound: e.internal.manualErrNotfound,
+      }
+      setManualError((prev) => ({ ...prev, [sug.targetId]: reasonMap[v.reason ?? 'notfound'] ?? e.internal.manualErrNotfound }))
+      return
+    }
+    const next = insertInternalLink(contentHtml, phrase, sug.url)
+    if (!next) {
+      setManualError((prev) => ({ ...prev, [sug.targetId]: e.internal.manualErrNotfound }))
+      return
+    }
+    setContentHtml(next)
+    setAddedLinks((prev) => new Set(prev).add(sug.targetId))
+    setManualError((prev) => { const n = { ...prev }; delete n[sug.targetId]; return n })
+    setManualOpen((prev) => { const n = new Set(prev); n.delete(sug.targetId); return n })
+    toast.success(e.internal.saveReminder)
+    setMessage({ text: e.internal.saveReminder, ok: true })
   }
 
   function bodyPayload(nextStatus?: 'draft' | 'ready') {
@@ -522,35 +563,67 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <div className="space-y-2">
               {linkSuggestions.map((sug) => {
                 const done = addedLinks.has(sug.targetId)
+                const manual = manualOpen.has(sug.targetId)
                 return (
-                  <div key={sug.targetId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 flex flex-wrap items-center gap-2">
-                    {sug.insertable ? (
-                      <input
-                        type="checkbox"
-                        checked={linkApproved.has(sug.targetId)}
-                        onChange={() => toggleApprove(sug.targetId)}
-                        disabled={done}
-                        className="h-4 w-4 accent-indigo-600"
-                      />
-                    ) : (
-                      <span className="h-4 w-4" aria-hidden />
-                    )}
-                    <div className="flex-1 min-w-[12rem]">
-                      <div className="text-sm text-slate-800 dark:text-slate-100">{sug.targetTitle}</div>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200">
-                          {e.internal.anchorLabel}: {sug.anchorText}
-                        </span>
-                        {sug.weak && <Badge variant="neutral">{e.internal.weak}</Badge>}
-                        {sug.weak && <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.weakNeedsSpecific}</span>}
-                        {!sug.insertable && !sug.weak && <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.notInsertable}</span>}
+                  <div key={sug.targetId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {sug.insertable && !done ? (
+                        <input
+                          type="checkbox"
+                          checked={linkApproved.has(sug.targetId)}
+                          onChange={() => toggleApprove(sug.targetId)}
+                          className="h-4 w-4 accent-indigo-600"
+                        />
+                      ) : (
+                        <span className="h-4 w-4" aria-hidden />
+                      )}
+                      <div className="flex-1 min-w-[12rem]">
+                        <div className="text-sm text-slate-800 dark:text-slate-100">{sug.targetTitle}</div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {sug.insertable ? (
+                            <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200">
+                              {e.internal.anchorLabel}: {sug.anchorText}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.noSafeAnchor}</span>
+                          )}
+                          {sug.weak && <Badge variant="neutral">{e.internal.weak}</Badge>}
+                        </div>
+                        <a href={sug.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="inline-block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{sug.url}</a>
                       </div>
-                      <a href={sug.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="inline-block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{sug.url}</a>
+                      {sug.insertable && (
+                        <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={done}>
+                          {done ? e.internal.added : e.internal.addOne}
+                        </Button>
+                      )}
+                      {!done && (
+                        <Button size="sm" variant="ghost" onClick={() => toggleManual(sug.targetId)}>{e.internal.manualAnchor}</Button>
+                      )}
                     </div>
-                    {sug.insertable && (
-                      <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={done}>
-                        {done ? e.internal.added : e.internal.addOne}
-                      </Button>
+
+                    {manual && !done && (
+                      <div className="flex flex-wrap items-center gap-2 pl-6">
+                        <input
+                          type="text"
+                          value={manualText[sug.targetId] ?? ''}
+                          onChange={(ev) => setManualText((prev) => ({ ...prev, [sug.targetId]: ev.target.value }))}
+                          placeholder={e.internal.manualPlaceholder}
+                          className="flex-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs"
+                        />
+                        <Button size="sm" variant="outline" onClick={() => submitManual(sug)}>{e.internal.manualConfirm}</Button>
+                        {manualError[sug.targetId] && <span className="text-[11px] text-red-600 dark:text-red-400 w-full">{manualError[sug.targetId]}</span>}
+                      </div>
+                    )}
+
+                    {(sug.debug.found.length > 0 || sug.debug.rejected.length > 0) && (
+                      <details className="pl-6">
+                        <summary className="text-[11px] text-slate-400 cursor-pointer select-none">{e.internal.debugTitle}</summary>
+                        <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5" dir="auto">
+                          <div>{e.internal.debugSelected}: {sug.debug.selected ? <span className="text-slate-700 dark:text-slate-200">{sug.debug.selected}</span> : e.internal.debugNone}</div>
+                          {sug.debug.found.length > 0 && <div>{e.internal.debugFound}: {sug.debug.found.join(' · ')}</div>}
+                          {sug.debug.rejected.length > 0 && <div>{e.internal.debugRejected}: {sug.debug.rejected.map((r) => `${r.phrase} (${r.reason})`).join(' · ')}</div>}
+                        </div>
+                      </details>
                     )}
                   </div>
                 )
