@@ -78,7 +78,9 @@ export function thresholdsFor(desired: number): Thresholds {
 
 // -- text helpers -----------------------------------------------------------
 
-const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'מצד שני', 'למשל', 'לדוגמה', 'בפועל', 'לסיכום', 'חשוב לדעת', 'חשוב לזכור', 'מעבר לכך', 'כלומר', 'לעומת זאת', 'בסופו של דבר', 'ראשית', 'שנית', 'לבסוף', 'במקרים רבים', 'בשורה התחתונה', 'לצד זאת', 'מבחינה פרקטית', 'כתוצאה מכך', 'בשלב הבא', 'בהשוואה']
+const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'יחד עם זאת', 'מצד שני', 'מנגד', 'למשל', 'לדוגמה', 'בפועל', 'לסיכום', 'חשוב לדעת', 'חשוב לזכור', 'מעבר לכך', 'מעבר לזה', 'כלומר', 'במילים אחרות', 'לעומת זאת', 'בסופו של דבר', 'ראשית', 'שנית', 'לבסוף', 'לאחר מכן', 'במקרים רבים', 'במקרים אלה', 'בשורה התחתונה', 'לצד זאת', 'מבחינה פרקטית', 'כתוצאה מכך', 'בשלב הבא', 'בהשוואה', 'בהשוואה לכך', 'באופן דומה']
+// Common, natural Hebrew sentence-openers we should NOT penalize for repetition.
+const START_STOPWORDS_HE = new Set(['כדי', 'אם', 'כאשר', 'בנוסף', 'עם', 'מעבר', 'לאחר', 'במקרים', 'חשוב', 'לכן', 'אחד', 'עבור', 'זה', 'זו', 'יש', 'כך'])
 const TRANSITIONS_EN = ['additionally', 'therefore', 'however', 'on the other hand', 'for example', 'in practice', 'in summary', 'importantly', 'moreover', 'in other words', 'finally', 'first', 'second', 'meanwhile', 'in short']
 // Unambiguous, standalone CTA phrases (imperative action + intent). Natural
 // service words like "הזמנה"/"משלוח"/"שירות" are deliberately NOT here.
@@ -232,6 +234,20 @@ export function runArticleAudit(input: AuditInput): AuditResult {
 
   // Readability metrics.
   const transitions = lang === 'he' ? TRANSITIONS_HE : TRANSITIONS_EN
+  const startStop = lang === 'he' ? START_STOPWORDS_HE : new Set<string>()
+  // Count TOTAL transition phrases across the whole body (anywhere in a sentence/
+  // paragraph), including multi-word phrases — not just per-paragraph.
+  const bodyLower = bodyText.toLowerCase()
+  let transitionCount = 0
+  for (const w of transitions) {
+    let from = 0
+    for (;;) {
+      const i = bodyLower.indexOf(w, from)
+      if (i < 0) break
+      transitionCount++
+      from = i + w.length
+    }
+  }
   let transitionParagraphs = 0
   let longParagraphs = 0
   let totalSentences = 0
@@ -244,7 +260,8 @@ export function runArticleAudit(input: AuditInput): AuditResult {
     if (words(p).length > 90 || sents.length > 6) longParagraphs++
     for (const s of sents) {
       const first = (s.split(/\s+/)[0] || '').toLowerCase().replace(/[^a-zא-ת]/g, '')
-      if (first) startCounts[first] = (startCounts[first] || 0) + 1
+      // Don't penalize repetition of natural/common openers.
+      if (first && !startStop.has(first)) startCounts[first] = (startCounts[first] || 0) + 1
     }
   }
   const maxRepeatedStart = Object.values(startCounts).reduce((a, b) => Math.max(a, b), 0)
@@ -319,8 +336,13 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // --- Readability ---
   add('paragraphs_not_too_long', 'readability', 'warning', longParagraphs <= Math.max(1, Math.round(pCount * 0.2)))
   add('sentence_length_ok', 'readability', 'warning', avgSentenceWords === 0 || avgSentenceWords <= 26)
-  add('has_transition_words', 'readability', 'warning', transitionParagraphs >= Math.max(2, Math.round(pCount * 0.25)))
-  add('varied_sentence_starts', 'readability', 'warning', maxRepeatedStart <= 3)
+  // Enough transition phrases anywhere in the article → no warning. Soft, count-
+  // based threshold: >=5 for long articles (>1500w), >=4 for ~1000-1500, >=3 short.
+  const minTransitions = input.desiredWordCount > 1500 ? 5 : input.desiredWordCount >= 1000 ? 4 : 3
+  add('has_transition_words', 'readability', 'warning', transitionCount >= minTransitions || transitionParagraphs >= Math.max(2, Math.round(pCount * 0.25)))
+  // Only flag repeated openings when it's genuinely heavy: same opener >=5 times
+  // AND making up >25% of sentences (natural openers are already excluded above).
+  add('varied_sentence_starts', 'readability', 'warning', !(maxRepeatedStart >= 5 && maxRepeatedStart > totalSentences * 0.25))
 
   // --- GEO / AI search ---
   add('has_faq', 'geo', 'warning', faqCount >= th.minFaq)
@@ -385,8 +407,12 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   const blockers = checks.filter((c) => c.severity === 'blocker' && !c.ok).map((c) => c.code)
   const warnings = checks.filter((c) => c.severity === 'warning' && !c.ok).map((c) => c.code)
 
-  // Score: from warnings/blockers.
-  let score = 100 - blockers.length * 15 - warnings.length * 4
+  // Score: blockers weigh most; soft style/flow warnings barely move the score
+  // so a clean, well-structured article doesn't feel "problematic" over polish.
+  const SOFT_WARNINGS = new Set(['has_transition_words', 'varied_sentence_starts', 'sentence_length_ok', 'paragraphs_not_too_long'])
+  const softWarnings = warnings.filter((w) => SOFT_WARNINGS.has(w)).length
+  const hardWarnings = warnings.length - softWarnings
+  let score = 100 - blockers.length * 15 - hardWarnings * 4 - softWarnings * 1
   if (score < 0) score = 0
   if (score > 100) score = 100
 
