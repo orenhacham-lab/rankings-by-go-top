@@ -8,6 +8,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -32,6 +33,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const isHebrew = language === 'he'
   const auditLabel = (code: string) => (e.auditCodes as Record<string, string>)[code] || code
   const toast = useToasts()
+  const router = useRouter()
 
   const enabled = process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
 
@@ -129,6 +131,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       const okText = nextStatus === 'ready' ? e.markedReady : e.saved
       setMessage({ text: okText, ok: true })
       toast.success(okText)
+      // After "mark ready", return to the Content Hub for this project.
+      if (nextStatus === 'ready') setTimeout(() => router.push(backHref), 900)
     } catch {
       setMessage({ text: e.saveError, ok: false })
     } finally {
@@ -209,6 +213,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         const base = status === 'publish' ? e.wpPublished : e.wpExported
         setMessage({ text: data.imageWarning ? `${base} · ${e.wpImageWarn}` : base, ok: true })
         toast.success(base)
+        // Publish returns to the hub; draft keeps the user here to review/open.
+        if (status === 'publish') setTimeout(() => router.push(backHref), 900)
         return
       }
       if (res.status === 409 && data.reason === 'already_exported') {

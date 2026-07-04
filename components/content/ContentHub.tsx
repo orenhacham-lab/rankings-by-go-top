@@ -77,6 +77,7 @@ export default function ContentHub() {
   const [topics, setTopics] = useState<ArticleTopic[]>([])
   const [briefOpen, setBriefOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
+  const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,6 +124,64 @@ export default function ContentHub() {
       else toast.error(t.deleteFailed)
     } catch {
       toast.error(t.deleteFailed)
+    }
+  }
+
+  // Optimistically patch one article row in local state.
+  function patchArticle(id: string, patch: Partial<ArticleRow>) {
+    setData((d) => (d ? { ...d, articles: d.articles.map((x) => (x.id === id ? { ...x, ...patch } : x)) } : d))
+  }
+
+  // Reuses the SAME server route the editor uses. No WordPress logic here.
+  async function exportRow(a: ArticleRow, wpStatus: 'draft' | 'publish') {
+    if (rowBusy) return
+    if (wpStatus === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
+    let force = false
+    if (a.wp_post_id) {
+      if (!window.confirm(t.rowWp.newPostConfirm)) return
+      force = true
+    }
+    setRowBusy({ id: a.id, action: wpStatus })
+    try {
+      const res = await fetch(`/api/content/articles/${a.id}/wordpress`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: wpStatus, force }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.wp_post_id) {
+        patchArticle(a.id, {
+          wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null,
+          ...(wpStatus === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}),
+        })
+        toast.success(wpStatus === 'publish' ? t.rowWp.published : t.rowWp.draftSent)
+        load() // sync authoritative fields (published_at, etc.)
+        return
+      }
+      const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
+      toast.error(reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric)
+    } catch {
+      toast.error(t.rowWp.errGeneric)
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
+  async function markReadyRow(a: ArticleRow) {
+    if (rowBusy) return
+    setRowBusy({ id: a.id, action: 'ready' })
+    try {
+      const res = await fetch(`/api/content/articles/${a.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ready' }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.status === 409 && d.error === 'quality_blockers') { toast.error(t.rowWp.markBlocked); return }
+      if (res.ok) { patchArticle(a.id, { status: 'ready' }); toast.success(t.rowWp.marked); return }
+      toast.error(t.rowWp.errGeneric)
+    } catch {
+      toast.error(t.rowWp.errGeneric)
+    } finally {
+      setRowBusy(null)
     }
   }
 
@@ -336,7 +395,40 @@ export default function ContentHub() {
                             })()}
                           </Td>
                           <Td>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* State-based WordPress actions (reuse the editor's route). */}
+                              {a.status !== 'published' && (a.status === 'ready' || a.wp_post_id) && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => exportRow(a, 'publish')}
+                                  loading={rowBusy?.id === a.id && rowBusy.action === 'publish'}
+                                  disabled={!!rowBusy}
+                                >
+                                  {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : t.rowWp.publish}
+                                </Button>
+                              )}
+                              {a.status === 'ready' && !a.wp_post_id && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => exportRow(a, 'draft')}
+                                  loading={rowBusy?.id === a.id && rowBusy.action === 'draft'}
+                                  disabled={!!rowBusy}
+                                >
+                                  {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : t.rowWp.sendDraft}
+                                </Button>
+                              )}
+                              {a.status === 'draft' && !a.wp_post_id && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => markReadyRow(a)}
+                                  loading={rowBusy?.id === a.id && rowBusy.action === 'ready'}
+                                  disabled={!!rowBusy}
+                                >
+                                  {t.rowWp.markReady}
+                                </Button>
+                              )}
                               <Link href={`/content/articles/${a.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
                                 {t.actions.edit}
                               </Link>
@@ -367,6 +459,10 @@ export default function ContentHub() {
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
                 </div>
+                <Card className="mb-3 p-3 bg-slate-50/60 dark:bg-slate-800/40 hover:translate-y-0">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.topicsHelpTitle}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.topicsHelpText}</p>
+                </Card>
                 {topics.length === 0 ? (
                   <Card className="p-8 text-center">
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.topicsEmptyTitle}</p>

@@ -18,12 +18,6 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { formatDate } from '@/lib/utils'
 import type { ArticleTopic } from '@/lib/supabase/types'
 
-const STATUS_TONE: Record<string, 'neutral' | 'success' | 'danger' | 'info'> = {
-  suggested: 'neutral',
-  approved: 'success',
-  rejected: 'danger',
-  used: 'info',
-}
 
 export default function TopicsList({
   topics,
@@ -146,7 +140,16 @@ export default function TopicsList({
     await createArticle(topicId)
   }
 
-  const statusLabel = (s: string) => (c.topicStatus as Record<string, string>)[s] ?? s
+  // Topic-FOCUSED state (never the article's status like "used"/"published").
+  const topicState = (topic: ArticleTopic): 'has_article' | 'rejected' | 'approved' | 'waiting' => {
+    if (articleByTopic[topic.id]) return 'has_article'
+    if (topic.status === 'rejected') return 'rejected'
+    if (topic.status === 'approved') return 'approved'
+    return 'waiting'
+  }
+  const TOPIC_STATE_TONE: Record<string, 'neutral' | 'success' | 'danger' | 'info'> = {
+    has_article: 'success', rejected: 'danger', approved: 'info', waiting: 'neutral',
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -176,13 +179,16 @@ export default function TopicsList({
             topics.map((topic) => {
               const anchorCount = Array.isArray(topic.anchors_json) ? topic.anchors_json.length : 0
               const busy = busyId === topic.id
+              const tState = topicState(topic)
+              const hasArticle = tState === 'has_article'
               return (
                 <TableRow key={topic.id}>
                   <Td><span className="text-sm text-slate-600 dark:text-slate-300">{projectName}</span></Td>
-                  <Td><span className="font-medium">{topic.topic}</span></Td>
+                  {/* De-emphasize topics that already produced an article. */}
+                  <Td><span className={hasArticle ? 'text-slate-500 dark:text-slate-400' : 'font-medium'}>{topic.topic}</span></Td>
                   <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.primary_keyword || '—'}</span></Td>
                   <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.search_intent || '—'}</span></Td>
-                  <Td><Badge variant={STATUS_TONE[topic.status] ?? 'neutral'}>{statusLabel(topic.status)}</Badge></Td>
+                  <Td><Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge></Td>
                   <Td><span className="text-sm tabular-nums">{anchorCount}</span></Td>
                   <Td><span className="text-xs text-slate-500">{formatDate(topic.created_at)}</span></Td>
                   <Td>
@@ -197,14 +203,9 @@ export default function TopicsList({
                       )}
                       {/* Primary action: create OR edit the article. */}
                       {articleByTopic[topic.id] ? (
-                        <span className="inline-flex items-center gap-2">
-                          <Link href={`/content/articles/${articleByTopic[topic.id].id}`}>
-                            <Button size="sm" variant="outline">{c.editArticle}</Button>
-                          </Link>
-                          <Badge variant={articleByTopic[topic.id].status === 'ready' ? 'success' : 'neutral'}>
-                            {(c.status as Record<string, string>)[articleByTopic[topic.id].status] ?? articleByTopic[topic.id].status}
-                          </Badge>
-                        </span>
+                        <Link href={`/content/articles/${articleByTopic[topic.id].id}`}>
+                          <Button size="sm" variant="outline">{c.openArticle}</Button>
+                        </Link>
                       ) : (
                         <Button
                           size="sm"
