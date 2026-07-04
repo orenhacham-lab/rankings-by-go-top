@@ -443,10 +443,13 @@ export interface GeneratedArticle {
   internal_links_json: Record<string, unknown>[] | null
   image_prompt: string | null
   featured_image_url: string | null
+  featured_image_storage_path: string | null
+  featured_image_prompt: string | null
   status: GeneratedArticleStatus
   wp_connection_id: string | null
   wp_post_id: number | null
   wp_post_url: string | null
+  wp_featured_media_id: number | null
   scheduled_at: string | null
   published_at: string | null
   last_error: string | null

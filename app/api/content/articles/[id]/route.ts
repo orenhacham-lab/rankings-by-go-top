@@ -97,8 +97,11 @@ function sanitizeArticleRow(a: Record<string, unknown>) {
     content_markdown: a.content_markdown,
     faq_json: a.faq_json,
     image_prompt: a.image_prompt,
+    featured_image_url: a.featured_image_url,
     status: a.status,
+    wp_post_id: a.wp_post_id,
     wp_post_url: a.wp_post_url,
+    wp_featured_media_id: a.wp_featured_media_id,
     created_at: a.created_at,
     updated_at: a.updated_at,
   }

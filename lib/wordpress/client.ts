@@ -237,6 +237,145 @@ function httpsGet(target: URL, authHeader: string): Promise<{ status: number; bo
 }
 
 /**
+ * Low-level authenticated HTTPS POST with the same SSRF connect-time guard,
+ * redirect rejection, timeout and response-size cap as httpsGet. Body is a
+ * Buffer (JSON or raw binary); extra headers set Content-Type / Content-
+ * Disposition. Returns { status, body }.
+ */
+function httpsSend(
+  target: URL,
+  authHeader: string,
+  body: Buffer,
+  extraHeaders: Record<string, string>
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        protocol: 'https:',
+        hostname: target.hostname,
+        port: 443,
+        path: `${target.pathname}${target.search}`,
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          Accept: 'application/json',
+          'User-Agent': 'RankingsByGoTop-Content/1.0',
+          'Content-Length': String(body.length),
+          ...extraHeaders,
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+        lookup: secureLookup as unknown as undefined,
+        servername: target.hostname,
+      },
+      (res: IncomingMessage) => {
+        const status = res.statusCode ?? 0
+        if (status >= 300 && status < 400) {
+          res.destroy()
+          reject(new WordPressClientError('Unexpected redirect from the site.'))
+          return
+        }
+        const chunks: Buffer[] = []
+        let size = 0
+        res.on('data', (chunk: Buffer) => {
+          size += chunk.length
+          if (size > MAX_RESPONSE_BYTES) {
+            req.destroy()
+            reject(new WordPressClientError('WordPress response was too large.'))
+            return
+          }
+          chunks.push(chunk)
+        })
+        res.on('end', () => resolve({ status, body: Buffer.concat(chunks).toString('utf8') }))
+      }
+    )
+    req.on('timeout', () => { req.destroy(new WordPressClientError('WordPress site did not respond in time.')) })
+    req.on('error', (err: Error) => {
+      if (err instanceof WordPressClientError) return reject(err)
+      reject(new WordPressClientError('Could not reach the WordPress site. Check the URL.'))
+    })
+    req.write(body)
+    req.end()
+  })
+}
+
+function assertOkStatus(status: number): void {
+  if (status === 401 || status === 403) throw new WordPressClientError('Authentication failed. Check the username and Application Password.')
+  if (status === 404) throw new WordPressClientError('WordPress REST API not found at this URL. Is this a WordPress site?')
+  if (status < 200 || status >= 300) throw new WordPressClientError(`WordPress returned an error (HTTP ${status}).`)
+}
+
+/** Authenticated JSON POST to the WP REST API. */
+async function wpPostJson<T>(creds: WordPressCredentials, path: string, payload: Record<string, unknown>): Promise<T> {
+  const origin = await assertSafeSiteUrl(creds.siteUrl)
+  const target = new URL(`${origin}/wp-json/wp/v2${path}`)
+  const body = Buffer.from(JSON.stringify(payload), 'utf8')
+  const { status, body: text } = await httpsSend(target, buildAuthHeader(creds), body, { 'Content-Type': 'application/json' })
+  assertOkStatus(status)
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new WordPressClientError('WordPress returned an invalid response.')
+  }
+}
+
+/**
+ * Upload an image to the WordPress Media Library and set its alt text/title.
+ * Returns the media id + public source URL. Credentials are never logged.
+ */
+export async function uploadMedia(
+  creds: WordPressCredentials,
+  file: { data: Buffer; filename: string; mimeType: string; altText: string; title: string }
+): Promise<{ id: number; sourceUrl: string }> {
+  const origin = await assertSafeSiteUrl(creds.siteUrl)
+  if (!/^image\//.test(file.mimeType)) throw new WordPressClientError('Only image uploads are allowed.')
+  const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').slice(0, 100) || 'featured.png'
+
+  const target = new URL(`${origin}/wp-json/wp/v2/media`)
+  const { status, body } = await httpsSend(target, buildAuthHeader(creds), file.data, {
+    'Content-Type': file.mimeType,
+    'Content-Disposition': `attachment; filename="${safeName}"`,
+  })
+  assertOkStatus(status)
+  let media: { id?: number; source_url?: string }
+  try {
+    media = JSON.parse(body)
+  } catch {
+    throw new WordPressClientError('WordPress returned an invalid media response.')
+  }
+  if (!media || typeof media.id !== 'number') throw new WordPressClientError('WordPress did not return a media id.')
+
+  // Best-effort: set alt text + title (never fatal).
+  try {
+    await wpPostJson(creds, `/media/${media.id}`, { alt_text: file.altText, title: file.title })
+  } catch {
+    /* alt text is a nice-to-have; ignore failures */
+  }
+  return { id: media.id, sourceUrl: media.source_url || '' }
+}
+
+/**
+ * Create a DRAFT post. status is ALWAYS 'draft' — never publish. Returns the
+ * new post id + edit/preview link.
+ */
+export async function createDraftPost(
+  creds: WordPressCredentials,
+  post: { title: string; content: string; slug?: string; excerpt?: string; featuredMedia?: number }
+): Promise<{ id: number; link: string; status: string }> {
+  const payload: Record<string, unknown> = {
+    title: post.title,
+    content: post.content,
+    status: 'draft', // hard-coded: this flow never publishes.
+  }
+  if (post.slug) payload.slug = post.slug
+  if (post.excerpt) payload.excerpt = post.excerpt
+  if (typeof post.featuredMedia === 'number') payload.featured_media = post.featuredMedia
+
+  const created = await wpPostJson<{ id?: number; link?: string; status?: string }>(creds, '/posts', payload)
+  if (!created || typeof created.id !== 'number') throw new WordPressClientError('WordPress did not return a post id.')
+  return { id: created.id, link: created.link || '', status: created.status || 'draft' }
+}
+
+/**
  * Perform an authenticated GET against the WP REST API.
  * Returns parsed JSON; throws WordPressClientError with a clean message.
  */

@@ -52,6 +52,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [faq, setFaq] = useState<Faq[]>([])
   const [status, setStatus] = useState<'draft' | 'ready'>('draft')
   const [audit, setAudit] = useState<Audit | null>(null)
+  const [featuredImageUrl, setFeaturedImageUrl] = useState<string | null>(null)
+  const [imageBusy, setImageBusy] = useState(false)
+  const [wpPostId, setWpPostId] = useState<number | null>(null)
+  const [wpPostUrl, setWpPostUrl] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -72,6 +77,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setFaq(Array.isArray(a.faq_json) ? a.faq_json : [])
       setStatus(a.status === 'ready' ? 'ready' : 'draft')
       setAudit(data.audit ?? null)
+      setFeaturedImageUrl(a.featured_image_url ?? null)
+      setWpPostId(a.wp_post_id ?? null)
+      setWpPostUrl(a.wp_post_url ?? null)
     } finally {
       setLoading(false)
     }
@@ -130,6 +138,62 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setMessage({ text: c.deleteFailed, ok: false })
     } catch {
       setMessage({ text: c.deleteFailed, ok: false })
+    }
+  }
+
+  async function generateImage() {
+    setImageBusy(true)
+    setMessage(null)
+    try {
+      const res = await fetch(`/api/content/articles/${id}/image`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.featured_image_url) {
+        setFeaturedImageUrl(data.featured_image_url)
+        setMessage({ text: e.imageGenerated, ok: true })
+        return
+      }
+      const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
+      setMessage({ text: (e.imageErrors as Record<string, string>)[reason] || e.imageFailed, ok: false })
+    } catch {
+      setMessage({ text: e.imageFailed, ok: false })
+    } finally {
+      setImageBusy(false)
+    }
+  }
+
+  async function removeImage() {
+    if (!window.confirm(e.imageRemoveConfirm)) return
+    setImageBusy(true)
+    setMessage(null)
+    try {
+      const res = await fetch(`/api/content/articles/${id}/image`, { method: 'DELETE' })
+      if (res.ok) { setFeaturedImageUrl(null); setMessage({ text: e.imageRemoved, ok: true }); return }
+      setMessage({ text: e.imageFailed, ok: false })
+    } catch {
+      setMessage({ text: e.imageFailed, ok: false })
+    } finally {
+      setImageBusy(false)
+    }
+  }
+
+  async function exportToWordPress() {
+    setExporting(true)
+    setMessage(null)
+    try {
+      const res = await fetch(`/api/content/articles/${id}/wordpress`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.wp_post_id) {
+        setWpPostId(data.wp_post_id)
+        setWpPostUrl(data.wp_post_url ?? null)
+        setMessage({ text: e.wpExported, ok: true })
+        return
+      }
+      const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
+      setMessage({ text: (e.wpErrors as Record<string, string>)[reason] || e.wpFailed, ok: false })
+    } catch {
+      setMessage({ text: e.wpFailed, ok: false })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -285,6 +349,41 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
         <Card className="hover:translate-y-0">
           <Input label={e.imagePrompt} value={imagePrompt} onChange={(ev) => setImagePrompt(ev.target.value)} hint={e.imagePromptHint} />
+        </Card>
+
+        {/* Featured image — generate/regenerate/remove. */}
+        <Card className="hover:translate-y-0">
+          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.imageTitle}</h3>
+          {featuredImageUrl ? (
+            <div className="space-y-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={featuredImageUrl} alt={title} className="w-full max-h-72 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageRegenerate}</Button>
+                <Button size="sm" variant="ghost" onClick={removeImage} disabled={imageBusy} className="text-red-600 dark:text-red-400">{e.imageRemove}</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{e.imageHint}</p>
+              <Button size="sm" onClick={generateImage} loading={imageBusy} disabled={imageBusy}>{imageBusy ? e.imageGenerating : e.imageGenerate}</Button>
+            </div>
+          )}
+        </Card>
+
+        {/* WordPress draft export (requires a featured image; never publishes). */}
+        <Card className="hover:translate-y-0">
+          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.wpTitle}</h3>
+          {!featuredImageUrl && <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.wpNeedsImage}</p>}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="sm" onClick={exportToWordPress} loading={exporting} disabled={exporting || !featuredImageUrl}>{exporting ? e.wpExporting : e.wpExport}</Button>
+            {wpPostId && (
+              <span className="inline-flex items-center gap-2 text-sm">
+                <Badge variant="neutral">{e.wpDraftBadge}</Badge>
+                {wpPostUrl && <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">{e.wpOpen}</a>}
+              </span>
+            )}
+          </div>
         </Card>
 
         <div className="flex flex-wrap items-center gap-2 pb-8">
