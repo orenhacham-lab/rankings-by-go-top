@@ -524,13 +524,17 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                 const done = addedLinks.has(sug.targetId)
                 return (
                   <div key={sug.targetId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 flex flex-wrap items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={linkApproved.has(sug.targetId)}
-                      onChange={() => toggleApprove(sug.targetId)}
-                      disabled={!sug.insertable || done}
-                      className="h-4 w-4 accent-indigo-600"
-                    />
+                    {sug.insertable ? (
+                      <input
+                        type="checkbox"
+                        checked={linkApproved.has(sug.targetId)}
+                        onChange={() => toggleApprove(sug.targetId)}
+                        disabled={done}
+                        className="h-4 w-4 accent-indigo-600"
+                      />
+                    ) : (
+                      <span className="h-4 w-4" aria-hidden />
+                    )}
                     <div className="flex-1 min-w-[12rem]">
                       <div className="text-sm text-slate-800 dark:text-slate-100">{sug.targetTitle}</div>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -538,13 +542,16 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
                           {e.internal.anchorLabel}: {sug.anchorText}
                         </span>
                         {sug.weak && <Badge variant="neutral">{e.internal.weak}</Badge>}
-                        {!sug.insertable && <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.notInsertable}</span>}
+                        {sug.weak && <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.weakNeedsSpecific}</span>}
+                        {!sug.insertable && !sug.weak && <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.notInsertable}</span>}
                       </div>
-                      <a href={sug.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{sug.url}</a>
+                      <a href={sug.url} target="_blank" rel="noopener noreferrer" dir="ltr" className="inline-block text-left text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{sug.url}</a>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={!sug.insertable || done}>
-                      {done ? e.internal.added : e.internal.addOne}
-                    </Button>
+                    {sug.insertable && (
+                      <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={done}>
+                        {done ? e.internal.added : e.internal.addOne}
+                      </Button>
+                    )}
                   </div>
                 )
               })}

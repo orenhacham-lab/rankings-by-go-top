@@ -424,6 +424,7 @@ export const dashboardHe = {
         anchorLabel: 'עוגן',
         reason: 'יעד: {title}',
         weak: 'עוגן חלש',
+        weakNeedsSpecific: 'נדרש עוגן ספציפי יותר לשילוב בטוח',
         notInsertable: 'לא נמצא מקום שילוב בטוח בגוף המאמר',
         addOne: 'הוסף קישור',
         added: 'נוסף',

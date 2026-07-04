@@ -426,6 +426,7 @@ export const dashboardEn = {
         anchorLabel: 'Anchor',
         reason: 'Target: {title}',
         weak: 'Weak anchor',
+        weakNeedsSpecific: 'A more specific anchor is needed for safe insertion',
         notInsertable: 'No safe insertion point found in the article body',
         addOne: 'Add link',
         added: 'Added',

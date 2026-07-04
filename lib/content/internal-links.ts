@@ -38,10 +38,18 @@ export interface LinkSuggestion {
 // Elements a link must NEVER be inserted inside (structural / non-prose / already-linked).
 const FORBIDDEN_ANCESTORS = 'a, h1, h2, h3, h4, h5, h6, table, thead, tbody, tr, td, th, figure, figcaption, nav, button, code, pre'
 
+/**
+ * Defensively repair an href value before it is displayed or written into the
+ * document: strip a stray leading slash before the scheme (e.g. "/https://…"),
+ * and drop surrounding whitespace. Safe to run on server or client (pure string).
+ */
+export function normalizeHref(u: string): string {
+  return String(u || '').trim().replace(/^\/+(?=https?:\/\/)/i, '')
+}
+
 /** Normalize a URL for comparison: drop protocol, lowercase host+path, trim trailing slash. */
 function normUrl(u: string): string {
-  return u
-    .trim()
+  return normalizeHref(u)
     .replace(/^https?:\/\//i, '')
     .replace(/\/+$/, '')
     .toLowerCase()
@@ -118,7 +126,7 @@ export function insertInternalLink(html: string, anchorText: string, url: string
   after.splitText(matchLen) // `after` now holds exactly the matched phrase
 
   const link = doc.createElement('a')
-  link.setAttribute('href', url)
+  link.setAttribute('href', normalizeHref(url))
   link.setAttribute('rel', 'noopener')
   link.textContent = after.data
   after.parentNode?.replaceChild(link, after)
@@ -207,7 +215,7 @@ export function suggestInternalLinks(
   if (!doc) return []
 
   const alreadyLinked = extractExistingLinkUrls(html)
-  const usedUrls = new Set<string>()
+  const shownUrls = new Set<string>()
   const usedAnchors = new Set<string>()
 
   const insertable: LinkSuggestion[] = []
@@ -216,30 +224,34 @@ export function suggestInternalLinks(
   for (const cand of candidates) {
     if (!cand.url) continue
     const nUrl = normUrl(cand.url)
-    if (usedUrls.has(nUrl) || alreadyLinked.has(nUrl)) continue
+    if (shownUrls.has(nUrl) || alreadyLinked.has(nUrl)) continue
 
     const picked = pickAnchor(doc, cand)
-    if (picked && !usedAnchors.has(picked.anchor.toLowerCase())) {
-      usedUrls.add(nUrl)
+    // Only a specific (non-weak) phrase not yet used elsewhere is insertable.
+    if (picked && !picked.weak && !usedAnchors.has(picked.anchor.toLowerCase())) {
+      shownUrls.add(nUrl)
       usedAnchors.add(picked.anchor.toLowerCase())
       insertable.push({
         targetId: cand.id,
         targetTitle: cand.title,
-        url: cand.url,
+        url: normalizeHref(cand.url),
         anchorText: picked.anchor,
         reason: picked.reason,
         insertable: true,
-        weak: picked.weak,
+        weak: false,
       })
-    } else if (!picked) {
+    } else {
+      // Weak single-word anchors and candidates with no safe phrase are shown
+      // as informational only — never auto-insertable in v1.
+      shownUrls.add(nUrl)
       notInsertable.push({
         targetId: cand.id,
         targetTitle: cand.title,
-        url: cand.url,
-        anchorText: cand.keyword?.trim() || cand.title.trim(),
-        reason: 'titlePhrase',
+        url: normalizeHref(cand.url),
+        anchorText: picked?.anchor || cand.keyword?.trim() || cand.title.trim(),
+        reason: picked?.reason ?? 'titlePhrase',
         insertable: false,
-        weak: false,
+        weak: !!picked?.weak,
       })
     }
   }

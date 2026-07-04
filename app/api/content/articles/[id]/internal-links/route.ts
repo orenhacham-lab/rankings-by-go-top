@@ -12,6 +12,7 @@
 
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { normalizeHref } from '@/lib/content/internal-links'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -55,7 +56,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const candidates = list
     .filter((r) => r.wp_post_url)
-    .map((r) => ({ id: r.id, title: r.title, url: r.wp_post_url as string, keyword: (r.topic_id && kwByTopic[r.topic_id]) || null }))
+    .map((r) => ({ id: r.id, title: r.title, url: normalizeHref(r.wp_post_url as string), keyword: (r.topic_id && kwByTopic[r.topic_id]) || null }))
 
   return Response.json({ candidates })
 }
