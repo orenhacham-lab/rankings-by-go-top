@@ -154,7 +154,10 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     brief.searchIntent ? `Search intent: ${brief.searchIntent}.` : '',
     brief.targetAudience ? `Target audience: ${brief.targetAudience}.` : '',
     brief.category ? `Field: ${brief.category}.` : '',
-    brief.briefNotes ? `Extra instructions: ${brief.briefNotes}` : '',
+    brief.briefNotes ? `Extra instructions from the brief (obey these): ${brief.briefNotes}` : '',
+    brief.briefNotes ? `- Treat [ARTICLE ANGLE] as the STRATEGIC angle of the whole article — make it less generic and focus the piece around it.` : '',
+    brief.briefNotes ? `- Treat [MUST INCLUDE] items as important content requirements: don't mention them once and move on — turn them into sections, bullet points, examples, FAQ answers, or comparison-table rows, woven naturally and prominently.` : '',
+    brief.briefNotes ? `- Treat [MUST AVOID] items as hard negative constraints: never make those claims or use those phrases.` : '',
     `Tone: ${tone}. Total length: about ${words} words (between ${Math.round(words * 0.85)} and ${Math.round(words * 1.2)}).`,
     brandLine,
     ctaLine,
@@ -170,6 +173,9 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Weave the most important user questions into the BODY as <h2>/<h3> question-style section headings where natural — do NOT leave all questions only for the FAQ section at the end.`,
     `- FAQ section (end of article): ${th.minFaq}-${th.minFaq + 2} concise pairs; real, specific questions (no generic filler like "what is X?"); answers 40-90 words; never repeat earlier paragraphs word-for-word.`,
     `- Do NOT invent prices/statistics/laws/facts not in this brief; when unsure use hedges ("in most cases", "typically", "prices may vary", "check with the provider").`,
+    `- Never add a year (e.g. 2024/2025/2026) to the title, metaTitle, slug, headings, or content UNLESS that exact year appears in the topic, keyword, or brief above. If the topic is evergreen, keep it evergreen; never use outdated years.`,
+    `- SEO/GEO depth: be practical, specific and useful — never generic. Include concrete criteria, examples, checks, warning signs and decision-making guidance; add related subtopics naturally when relevant. For commercial/comparison/price/cost/choice topics include a useful comparison TABLE.`,
+    `- Avoid generic filler openings (e.g. "בעולם שבו כולם מחפשים…"). Open directly and match search intent — the FIRST paragraph answers the query. Each <h2> should answer a real user question, comparison point, or decision factor. In Hebrew, write naturally for Israeli readers.`,
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     anchorTopics.length ? `- LINK PLACEMENT RULES: never place a link in the directAnswer or the first paragraph; place the first link only after the article has established context (after the first <h2> and a couple of paragraphs). If there are multiple links, distribute them across DIFFERENT sections — never two links in the same paragraph or back-to-back. Integrate every link into a genuinely relevant sentence; do NOT use generic phrases like "read more", "click here", "אתר כמו", "למידע נוסף".` : '',
@@ -248,14 +254,17 @@ function makeIdFactory(): (heading: string, fallbackPrefix: string, i: number) =
     return id
   }
 }
-function tableHtml(t: ArticleTable | null): string {
+function tableHtml(t: ArticleTable | null, language: SuggestionLanguage): string {
   if (!t || !Array.isArray(t.columns) || t.columns.length === 0 || !Array.isArray(t.rows)) return ''
   const rows = t.rows.filter((r) => Array.isArray(r) && r.length)
   if (!rows.length) return ''
   const cap = (t.caption || '').trim() ? `<caption>${esc(t.caption.trim())}</caption>` : ''
   const head = `<thead><tr>${t.columns.map((c) => `<th>${esc(String(c))}</th>`).join('')}</tr></thead>`
   const body = `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody>`
-  return `<table>${cap}${head}${body}</table>`
+  // Hebrew tables render RTL so the first (attribute) column sits on the RIGHT;
+  // English tables stay LTR. dir travels with the HTML to WordPress.
+  const dir = language === 'he' ? ' dir="rtl"' : ''
+  return `<table${dir}>${cap}${head}${body}</table>`
 }
 
 /**
@@ -284,7 +293,7 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
     emitParagraphs(out, s.paragraphs)
     const bullets = (s.bullets || []).map((b) => stripListMarker(b)).filter(Boolean)
     if (bullets.length) out.push(`<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`)
-    const tbl = tableHtml(s.table)
+    const tbl = tableHtml(s.table, language)
     if (tbl) out.push(tbl)
     ;(s.subsections || []).forEach((sub, j) => {
       if (sub.heading?.trim()) out.push(`<h3 id="${makeId(sub.heading, `section-${i + 1}-sub`, j)}">${esc(sub.heading.trim())}</h3>`)
@@ -292,7 +301,7 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
     })
   })
 
-  for (const t of a.comparisonTables || []) { const h = tableHtml(t); if (h) out.push(h) }
+  for (const t of a.comparisonTables || []) { const h = tableHtml(t, language); if (h) out.push(h) }
 
   if ((a.faq || []).length) {
     out.push(`<h2 id="${makeId('faq', 'faq', 0)}">${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}</h2>`)
@@ -328,6 +337,25 @@ function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): stri
 }
 
 // -- English slug + deterministic anchor insertion --------------------------
+
+/** Years the user explicitly asked for (topic/keyword/secondary/brief). */
+function collectAllowedYears(brief: ArticleBrief): Set<string> {
+  const hay = [brief.topic, brief.primaryKeyword || '', (brief.secondaryKeywords || []).join(' '), brief.briefNotes || ''].join(' ')
+  return new Set(hay.match(/\b20\d{2}\b/g) || [])
+}
+/** Remove any 20xx year the user did NOT request, then tidy leftover artifacts. */
+function stripUnrequestedYear(text: string, allowed: Set<string>): string {
+  if (!text) return text
+  let out = text.replace(/\b20\d{2}\b/g, (y) => (allowed.has(y) ? y : ''))
+  out = out
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.:;!?])/g, '$1')
+    .replace(/[([{]\s*[)\]}]/g, '')
+    .replace(/^\s*[|·–—-]\s*/g, '')
+    .replace(/\s*[|·–—-]\s*$/g, '')
+    .trim()
+  return out
+}
 
 export function toEnglishSlug(geminiSlug: string, primaryKeyword: string | null): string {
   const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-').slice(0, 80)
@@ -560,6 +588,7 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
 
   let best: { structured: StructuredArticle; usage: GeminiUsage | null; safe: string; slug: string; audit: AuditResult } | null = null
   let attempts = 0
+  const allowedYears = collectAllowedYears(brief)
 
   for (let attempt = 0; attempt < 2; attempt++) {
     // Repair uses the EXACT unmet checks (blockers first, then warnings).
@@ -569,6 +598,12 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     attempts = attempt + 1
     const g = await callGemini(brief, opts, model)
     if ('error' in g) { if (!best) continue; else break }
+
+    // Safety net: strip an invented year from the highly-visible SEO fields
+    // unless the user asked for it (the prompt already forbids adding one).
+    g.structured.title = stripUnrequestedYear(g.structured.title, allowedYears)
+    g.structured.metaTitle = stripUnrequestedYear(g.structured.metaTitle, allowedYears)
+    g.structured.slug = stripUnrequestedYear(g.structured.slug, allowedYears)
 
     let safe = sanitizeArticleHtml(buildHtml(g.structured, language, brief.includeManualToc))
     // Enforce required anchors AND good placement quality (not in the direct

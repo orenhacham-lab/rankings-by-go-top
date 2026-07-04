@@ -6,7 +6,8 @@
  * explicit confirm. "Create article" is a disabled placeholder (later phase).
  */
 
-import { useState } from 'react'
+import { useState, useEffect, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Badge from '@/components/ui/Badge'
@@ -39,11 +40,35 @@ export default function TopicsList({
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
+  const isHebrew = language === 'he'
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [creatingId, setCreatingId] = useState<string | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  // The "More" menu renders in a portal at fixed coords so it's never clipped by
+  // the table's overflow-x container (even on the last row).
+  const [menu, setMenu] = useState<{ topicId: string; top: number; left: number } | null>(null)
   const [genError, setGenError] = useState<{ topicId: string; text: string } | null>(null)
+
+  // Reposition-safe: close the menu on scroll/resize (coords would go stale).
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(null)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [menu])
+
+  const MENU_WIDTH = 180
+  function openMenu(e: MouseEvent<HTMLButtonElement>, topicId: string) {
+    const r = e.currentTarget.getBoundingClientRect()
+    const left = isHebrew
+      ? Math.max(8, r.right - MENU_WIDTH)
+      : Math.min(r.left, window.innerWidth - MENU_WIDTH - 8)
+    setMenu({ topicId, top: r.bottom + 4, left })
+  }
 
   // Build a clear, human failure message from the safe audit debug (no alert).
   function genErrorMessage(data: { reason?: unknown; audit?: { blockers?: unknown } }): string {
@@ -105,6 +130,13 @@ export default function TopicsList({
     } finally {
       setBusyId(null)
     }
+  }
+
+  // Create a NEW draft article for a topic that already has one. Never deletes
+  // or overwrites the existing article — /generate always inserts a new row.
+  async function regenerateArticle(topicId: string) {
+    if (!window.confirm(c.topicActions.regenerateConfirm)) return
+    await createArticle(topicId)
   }
 
   const statusLabel = (s: string) => (c.topicStatus as Record<string, string>)[s] ?? s
@@ -169,42 +201,17 @@ export default function TopicsList({
                         </Button>
                       )}
 
-                      {/* Secondary actions tucked into a compact "More" menu. */}
-                      <div className="relative">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setOpenMenuId(openMenuId === topic.id ? null : topic.id)}
-                          disabled={busy}
-                          aria-label={c.topicActions.more}
-                          title={c.topicActions.more}
-                        >
-                          ⋯
-                        </Button>
-                        {openMenuId === topic.id && (
-                          <>
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                            <div className="absolute z-20 mt-1 end-0 min-w-[9rem] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1">
-                              <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); onEdit(topic) }}>
-                                {c.topicActions.edit}
-                              </button>
-                              {topic.status !== 'approved' && (
-                                <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); setStatus(topic.id, 'approved') }}>
-                                  {c.topicActions.approve}
-                                </button>
-                              )}
-                              {topic.status !== 'rejected' && (
-                                <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); setStatus(topic.id, 'rejected') }}>
-                                  {c.topicActions.reject}
-                                </button>
-                              )}
-                              <button type="button" className="block w-full text-start px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => { setOpenMenuId(null); remove(topic.id) }}>
-                                {c.topicActions.delete}
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      {/* Secondary actions live in a compact "More" menu (portal). */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => openMenu(e, topic.id)}
+                        disabled={busy}
+                        aria-label={c.topicActions.more}
+                        title={c.topicActions.more}
+                      >
+                        ⋯
+                      </Button>
                     </div>
                   </Td>
                 </TableRow>
@@ -213,6 +220,36 @@ export default function TopicsList({
           )}
         </TableBody>
       </Table>
+
+      {menu && typeof document !== 'undefined' && (() => {
+        const topic = topics.find((t) => t.id === menu.topicId)
+        if (!topic) return null
+        const hasArticle = !!articleByTopic[topic.id]
+        const item = 'block w-full text-start px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800'
+        return createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} />
+            <div
+              dir={isHebrew ? 'rtl' : 'ltr'}
+              style={{ position: 'fixed', top: menu.top, left: menu.left, minWidth: MENU_WIDTH }}
+              className="z-50 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1"
+            >
+              <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); onEdit(topic) }}>{c.topicActions.edit}</button>
+              {topic.status !== 'approved' && (
+                <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); setStatus(topic.id, 'approved') }}>{c.topicActions.approve}</button>
+              )}
+              {topic.status !== 'rejected' && (
+                <button type="button" className={`${item} text-slate-700 dark:text-slate-200`} onClick={() => { setMenu(null); setStatus(topic.id, 'rejected') }}>{c.topicActions.reject}</button>
+              )}
+              {hasArticle && (
+                <button type="button" className={`${item} text-indigo-600 dark:text-indigo-400`} onClick={() => { setMenu(null); regenerateArticle(topic.id) }}>{c.topicActions.regenerate}</button>
+              )}
+              <button type="button" className={`${item} text-red-600 dark:text-red-400`} onClick={() => { setMenu(null); remove(topic.id) }}>{c.topicActions.delete}</button>
+            </div>
+          </>,
+          document.body,
+        )
+      })()}
     </div>
   )
 }

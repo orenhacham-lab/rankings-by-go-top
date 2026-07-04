@@ -69,41 +69,53 @@ export function stripBriefMarker(raw: string | null | undefined): string {
 // headers are fixed ASCII so parsing is language-independent and round-trips.
 // ---------------------------------------------------------------------------
 
+const SECTION_ANGLE = '[ARTICLE ANGLE]'
 const SECTION_INCLUDE = '[MUST INCLUDE]'
 const SECTION_AVOID = '[MUST AVOID]'
 
 export interface BriefSections {
+  articleAngle: string
   mustInclude: string
   mustAvoid: string
 }
 
-/** Compose the two sections into a single plain-text notes string. */
+/** Compose the sections into a single plain-text notes string. */
 export function encodeBriefSections(s: BriefSections): string {
+  const angle = (s.articleAngle || '').trim()
   const inc = (s.mustInclude || '').trim()
   const avoid = (s.mustAvoid || '').trim()
   const parts: string[] = []
+  if (angle) parts.push(`${SECTION_ANGLE}\n${angle}`)
   if (inc) parts.push(`${SECTION_INCLUDE}\n${inc}`)
   if (avoid) parts.push(`${SECTION_AVOID}\n${avoid}`)
   return parts.join('\n\n')
 }
 
 /**
- * Split notes back into the two sections. Legacy free-text notes (no headers)
- * go into mustInclude so nothing is lost. Order-agnostic.
+ * Split notes back into sections. Legacy free-text notes (no headers) go into
+ * mustInclude so nothing is lost. Order-agnostic across any header set.
  */
 export function decodeBriefSections(notes: string | null | undefined): BriefSections {
+  const empty: BriefSections = { articleAngle: '', mustInclude: '', mustAvoid: '' }
   const text = (notes || '').trim()
-  if (!text) return { mustInclude: '', mustAvoid: '' }
-  const incIdx = text.indexOf(SECTION_INCLUDE)
-  const avoidIdx = text.indexOf(SECTION_AVOID)
-  if (incIdx < 0 && avoidIdx < 0) return { mustInclude: text, mustAvoid: '' }
-  const cut = (start: number, headerLen: number, end: number) =>
-    text.slice(start + headerLen, end < 0 ? undefined : end).trim()
-  let mustInclude = ''
-  let mustAvoid = ''
-  if (incIdx >= 0) mustInclude = cut(incIdx, SECTION_INCLUDE.length, avoidIdx > incIdx ? avoidIdx : -1)
-  if (avoidIdx >= 0) mustAvoid = cut(avoidIdx, SECTION_AVOID.length, incIdx > avoidIdx ? incIdx : -1)
-  return { mustInclude, mustAvoid }
+  if (!text) return empty
+  const headers: { key: keyof BriefSections; tag: string }[] = [
+    { key: 'articleAngle', tag: SECTION_ANGLE },
+    { key: 'mustInclude', tag: SECTION_INCLUDE },
+    { key: 'mustAvoid', tag: SECTION_AVOID },
+  ]
+  const found = headers
+    .map((h) => ({ ...h, idx: text.indexOf(h.tag) }))
+    .filter((h) => h.idx >= 0)
+    .sort((a, b) => a.idx - b.idx)
+  if (!found.length) return { ...empty, mustInclude: text } // legacy free text
+  const res: BriefSections = { ...empty }
+  for (let i = 0; i < found.length; i++) {
+    const start = found[i].idx + found[i].tag.length
+    const end = i + 1 < found.length ? found[i + 1].idx : text.length
+    res[found[i].key] = text.slice(start, end).trim()
+  }
+  return res
 }
 
 /** Parse the flags (and clean notes) from a stored brief_notes value. */

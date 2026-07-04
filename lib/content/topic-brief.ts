@@ -62,13 +62,27 @@ export interface ValidatedTopicBrief {
 const MAX_ANCHORS = 30
 const MAX_SECONDARY_KEYWORDS = 30
 
+// Hosts that are never valid public anchor targets.
+const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', 'example.com', 'www.example.com', 'example.org', 'example.net'])
+
+/**
+ * A usable public http(s) URL. Percent-encoding / encoded characters are FINE
+ * (new URL parses them). We only reject: non-http(s), whitespace inside the URL,
+ * unparseable URLs, and placeholder hosts (localhost / example.com).
+ */
 function isHttpUrl(value: string): boolean {
+  const v = (value || '').trim()
+  if (!v || /\s/.test(v)) return false // no spaces/whitespace inside a URL
+  let u: URL
   try {
-    const u = new URL(value)
-    return u.protocol === 'http:' || u.protocol === 'https:'
+    u = new URL(v)
   } catch {
     return false
   }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
+  const host = u.hostname.toLowerCase()
+  if (BLOCKED_HOSTS.has(host) || host.endsWith('.example.com')) return false
+  return true
 }
 
 function str(v: unknown): string {

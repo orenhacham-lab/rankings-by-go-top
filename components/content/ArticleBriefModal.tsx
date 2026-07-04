@@ -116,6 +116,7 @@ export default function ArticleBriefModal({
   const [searchIntent, setSearchIntent] = useState<SuggestionIntent>(DEFAULT_INTENT)
   const [secondaryText, setSecondaryText] = useState('')
   const [targetAudience, setTargetAudience] = useState('')
+  const [articleAngle, setArticleAngle] = useState('')
   const [mustInclude, setMustInclude] = useState('')
   const [mustAvoid, setMustAvoid] = useState('')
   const [includeBrandName, setIncludeBrandName] = useState(false)
@@ -148,7 +149,7 @@ export default function ArticleBriefModal({
       setSearchIntent(oneOf(editing.search_intent, INTENT_KEYS, DEFAULT_INTENT))
       setSecondaryText((editing.secondary_keywords ?? []).join('\n'))
       setTargetAudience(editing.target_audience ?? '')
-      { const dec = decodeBriefNotes(editing.brief_notes); const sec = decodeBriefSections(dec.notes); setMustInclude(sec.mustInclude); setMustAvoid(sec.mustAvoid); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude); setIncludeManualToc(dec.flags.includeManualToc); setCtaText(dec.flags.cta.text); setCtaPhone(dec.flags.cta.phone); setCtaWhatsapp(dec.flags.cta.whatsapp); setCtaUrl(dec.flags.cta.url) }
+      { const dec = decodeBriefNotes(editing.brief_notes); const sec = decodeBriefSections(dec.notes); setArticleAngle(sec.articleAngle); setMustInclude(sec.mustInclude); setMustAvoid(sec.mustAvoid); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude); setIncludeManualToc(dec.flags.includeManualToc); setCtaText(dec.flags.cta.text); setCtaPhone(dec.flags.cta.phone); setCtaWhatsapp(dec.flags.cta.whatsapp); setCtaUrl(dec.flags.cta.url) }
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
       setAdvancedOpen(true)
       setKeywordFit(null)
@@ -157,7 +158,7 @@ export default function ArticleBriefModal({
       setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null); setSource(null); setFallbackReason(null)
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
-      setSecondaryText(''); setTargetAudience(''); setMustInclude(''); setMustAvoid(''); setIncludeBrandName(false); setBrandNameToInclude(''); setIncludeManualToc(false); setCtaText(''); setCtaPhone(''); setCtaWhatsapp(''); setCtaUrl(''); setAnchors([])
+      setSecondaryText(''); setTargetAudience(''); setArticleAngle(''); setMustInclude(''); setMustAvoid(''); setIncludeBrandName(false); setBrandNameToInclude(''); setIncludeManualToc(false); setCtaText(''); setCtaPhone(''); setCtaWhatsapp(''); setCtaUrl(''); setAnchors([])
       setAdvancedOpen(false)
       setKeywordFit(null)
     }
@@ -250,7 +251,7 @@ export default function ArticleBriefModal({
       tone_of_voice: tone,
       desired_word_count: wordCount, // always the user's choice (default 1000)
       cta_preference: cta,
-      brief_notes: encodeBriefNotes(encodeBriefSections({ mustInclude, mustAvoid }), {
+      brief_notes: encodeBriefNotes(encodeBriefSections({ articleAngle, mustInclude, mustAvoid }), {
         includeBrandName, brandNameToInclude, includeManualToc,
         cta: cta === 'none'
           ? { text: '', phone: '', whatsapp: '', url: '' }
@@ -480,6 +481,12 @@ export default function ArticleBriefModal({
             </div>
 
             <Input label={t.targetAudience} value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} />
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.articleAngle}</label>
+              <textarea value={articleAngle} onChange={(e) => setArticleAngle(e.target.value)} rows={2} className={inputCls} placeholder={t.articleAnglePlaceholder} />
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t.articleAngleHelp}</p>
+            </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.mustInclude}</label>
