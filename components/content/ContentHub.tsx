@@ -9,7 +9,7 @@
  * /api/content/overview endpoint (no secrets, RLS-scoped).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
@@ -78,6 +78,14 @@ export default function ContentHub() {
   const [briefOpen, setBriefOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
+
+  // ── Batch article creation (client-side, sequential) ──
+  const BATCH_LIMIT = 10
+  type BatchEntry = { status: 'queued' | 'generating' | 'success' | 'failed'; error?: string }
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchState, setBatchState] = useState<Record<string, BatchEntry>>({})
+  const [batchRunning, setBatchRunning] = useState(false)
+  const cancelRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -215,6 +223,97 @@ export default function ContentHub() {
     const matchSearch = !search || a.title.toLowerCase().includes(search.toLowerCase())
     return matchStatus && matchSearch
   })
+
+  // Topics eligible for batch = those WITHOUT an article yet.
+  const selectableTopics = useMemo(() => topics.filter((tp) => !articleByTopic[tp.id]), [topics, articleByTopic])
+  const allSelectableSelected = selectableTopics.length > 0 && selectableTopics.every((tp) => selected.has(tp.id))
+
+  // Clear selection/batch state when the project changes.
+  useEffect(() => { setSelected(new Set()); setBatchState({}); setBatchRunning(false); cancelRef.current = false }, [projectId])
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function toggleSelectAll() {
+    setSelected(() => (allSelectableSelected ? new Set() : new Set(selectableTopics.map((tp) => tp.id))))
+  }
+  function clearSelection() { setSelected(new Set()) }
+
+  // Readable Hebrew error from the generate endpoint (no raw JSON).
+  function genErrorText(d: { reason?: unknown; audit?: { blockers?: unknown } }): string {
+    const errs = t.genErrors as Record<string, string>
+    const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
+    const blockers = Array.isArray(d.audit?.blockers) ? (d.audit!.blockers as string[]) : []
+    if (blockers.length) {
+      const codes = t.editor.auditCodes as Record<string, string>
+      return `${errs.qualityIntro} ${blockers.map((b) => codes[b] || b).join(', ')}`
+    }
+    return errs[reason] || errs.unknown
+  }
+
+  // One generation request — reuses the EXISTING single endpoint. 90s timeout.
+  async function runOne(topicId: string): Promise<{ ok: boolean; error?: string }> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 90_000)
+    try {
+      const res = await fetch('/api/content/articles/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId }), signal: controller.signal,
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.articleId) return { ok: true }
+      return { ok: false, error: genErrorText(d) }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout }
+      return { ok: false, error: (t.genErrors as Record<string, string>).unknown }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  async function runBatch() {
+    if (batchRunning) return // guard double-click
+    const ids = Array.from(selected).filter((id) => !articleByTopic[id])
+    if (ids.length === 0) return
+    if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
+
+    cancelRef.current = false
+    setBatchRunning(true)
+    setBatchState((s) => { const next = { ...s }; ids.forEach((id) => { next[id] = { status: 'queued' } }); return next })
+
+    const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', onUnload)
+
+    let ok = 0, fail = 0
+    for (const id of ids) {
+      if (cancelRef.current) break
+      if (articleByTopic[id]) continue // got an article meanwhile → skip safely
+      setBatchState((s) => ({ ...s, [id]: { status: 'generating' } }))
+      const r = await runOne(id)
+      if (r.ok) { ok++; setBatchState((s) => ({ ...s, [id]: { status: 'success' } })) }
+      else { fail++; setBatchState((s) => ({ ...s, [id]: { status: 'failed', error: r.error } })) }
+    }
+
+    window.removeEventListener('beforeunload', onUnload)
+    const wasCancelled = cancelRef.current
+    setBatchRunning(false)
+    setSelected(new Set())
+    await load(); await loadTopics() // new articles surface up top; done topics de-select
+    if (wasCancelled) toast.success(t.batch.cancelled)
+    else toast.success(t.batch.summary.replace('{ok}', String(ok)).replace('{fail}', String(fail)))
+  }
+
+  function cancelBatch() { cancelRef.current = true }
+
+  async function retryTopic(id: string) {
+    if (batchRunning) return
+    setBatchState((s) => ({ ...s, [id]: { status: 'generating' } }))
+    const r = await runOne(id)
+    setBatchState((s) => ({ ...s, [id]: r.ok ? { status: 'success' } : { status: 'failed', error: r.error } }))
+    await load(); await loadTopics()
+    if (r.ok) toast.success(t.batch.retrySuccess)
+    else toast.error(r.error || t.rowWp.errGeneric)
+  }
 
   const statusLabel = (s: string) =>
     (t.status as Record<string, string>)[s] ?? s
@@ -463,6 +562,27 @@ export default function ContentHub() {
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.topicsHelpTitle}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.topicsHelpText}</p>
                 </Card>
+
+                {/* Batch action bar — only when there are topics without an article. */}
+                {selectableTopics.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 mb-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+                      <input type="checkbox" checked={allSelectableSelected} onChange={toggleSelectAll} disabled={batchRunning} className="cursor-pointer" />
+                      {t.batch.selectAll}
+                    </label>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{t.batch.selected.replace('{n}', String(selected.size))}</span>
+                    <Button size="sm" onClick={runBatch} loading={batchRunning} disabled={batchRunning || selected.size === 0 || selected.size > BATCH_LIMIT}>
+                      {batchRunning ? t.batch.running : t.batch.createSelected.replace('{n}', String(selected.size))}
+                    </Button>
+                    {batchRunning ? (
+                      <Button size="sm" variant="ghost" onClick={cancelBatch}>{t.batch.cancel}</Button>
+                    ) : (
+                      selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection}>{t.batch.clear}</Button>
+                    )}
+                    {selected.size > BATCH_LIMIT && <span className="text-xs text-amber-600 dark:text-amber-400">{t.batch.tooMany}</span>}
+                  </div>
+                )}
+
                 {topics.length === 0 ? (
                   <Card className="p-8 text-center">
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.topicsEmptyTitle}</p>
@@ -476,6 +596,11 @@ export default function ContentHub() {
                     onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
                     onChanged={loadTopics}
                     onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+                    selectedIds={selected}
+                    onToggleSelect={toggleSelect}
+                    batchState={batchState}
+                    batchRunning={batchRunning}
+                    onRetry={retryTopic}
                   />
                 )}
               </div>

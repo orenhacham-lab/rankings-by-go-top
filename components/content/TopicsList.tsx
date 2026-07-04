@@ -26,6 +26,11 @@ export default function TopicsList({
   onEdit,
   onChanged,
   onToast,
+  selectedIds,
+  onToggleSelect,
+  batchState = {},
+  batchRunning = false,
+  onRetry,
 }: {
   topics: ArticleTopic[]
   projectName: string
@@ -33,6 +38,11 @@ export default function TopicsList({
   onEdit: (topic: ArticleTopic) => void
   onChanged: () => void
   onToast?: (kind: 'success' | 'error', text: string) => void
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
+  batchState?: Record<string, { status: 'queued' | 'generating' | 'success' | 'failed'; error?: string }>
+  batchRunning?: boolean
+  onRetry?: (id: string) => void
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
@@ -162,6 +172,7 @@ export default function TopicsList({
       <Table>
         <TableHead>
           <tr>
+            <Th> </Th>
             <Th>{c.topicsTable.project}</Th>
             <Th>{c.topicsTable.topic}</Th>
             <Th>{c.topicsTable.primaryKeyword}</Th>
@@ -174,21 +185,57 @@ export default function TopicsList({
         </TableHead>
         <TableBody>
           {topics.length === 0 ? (
-            <EmptyRow colSpan={8} message={c.topicsTable.empty} />
+            <EmptyRow colSpan={9} message={c.topicsTable.empty} />
           ) : (
             topics.map((topic) => {
               const anchorCount = Array.isArray(topic.anchors_json) ? topic.anchors_json.length : 0
               const busy = busyId === topic.id
               const tState = topicState(topic)
               const hasArticle = tState === 'has_article'
+              const bs = batchState[topic.id]
+              const selectable = !hasArticle
               return (
                 <TableRow key={topic.id}>
+                  {/* Batch selection — only for topics without an article. */}
+                  <Td>
+                    {selectable && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds?.has(topic.id) ?? false}
+                        disabled={batchRunning}
+                        onChange={() => onToggleSelect?.(topic.id)}
+                        className="cursor-pointer disabled:cursor-not-allowed"
+                        aria-label={c.topicsTable.topic}
+                      />
+                    )}
+                  </Td>
                   <Td><span className="text-sm text-slate-600 dark:text-slate-300">{projectName}</span></Td>
                   {/* De-emphasize topics that already produced an article. */}
                   <Td><span className={hasArticle ? 'text-slate-500 dark:text-slate-400' : 'font-medium'}>{topic.topic}</span></Td>
                   <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.primary_keyword || '—'}</span></Td>
                   <Td><span className="text-sm text-slate-600 dark:text-slate-300">{topic.search_intent || '—'}</span></Td>
-                  <Td><Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge></Td>
+                  <Td>
+                    {bs && bs.status !== 'success' ? (
+                      bs.status === 'generating' ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          {c.batch.generating}
+                        </span>
+                      ) : bs.status === 'queued' ? (
+                        <Badge variant="neutral">{c.batch.queued}</Badge>
+                      ) : (
+                        <span className="inline-flex flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-2">
+                            <Badge variant="danger">{c.batch.failed}</Badge>
+                            <button type="button" onClick={() => onRetry?.(topic.id)} disabled={batchRunning} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50">{c.batch.retry}</button>
+                          </span>
+                          {bs.error && <span className="text-[11px] text-red-600 dark:text-red-400 max-w-[16rem] truncate" title={bs.error}>{bs.error}</span>}
+                        </span>
+                      )
+                    ) : (
+                      <Badge variant={TOPIC_STATE_TONE[tState]}>{(c.topicState as Record<string, string>)[tState]}</Badge>
+                    )}
+                  </Td>
                   <Td><span className="text-sm tabular-nums">{anchorCount}</span></Td>
                   <Td><span className="text-xs text-slate-500">{formatDate(topic.created_at)}</span></Td>
                   <Td>
@@ -211,7 +258,7 @@ export default function TopicsList({
                           size="sm"
                           onClick={() => createArticle(topic.id)}
                           loading={creatingId === topic.id}
-                          disabled={busy || creatingId === topic.id}
+                          disabled={busy || creatingId === topic.id || batchRunning}
                         >
                           {creatingId === topic.id ? c.creatingArticleWithImage : c.createArticle}
                         </Button>
@@ -222,7 +269,7 @@ export default function TopicsList({
                         size="sm"
                         variant="ghost"
                         onClick={(e) => openMenu(e, topic.id)}
-                        disabled={busy}
+                        disabled={busy || batchRunning}
                         aria-label={c.topicActions.more}
                         title={c.topicActions.more}
                       >
