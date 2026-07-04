@@ -16,6 +16,7 @@ import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import { useToasts, ToastHost } from '@/components/content/Toast'
+import { suggestInternalLinks, insertInternalLink, type LinkCandidate, type LinkSuggestion } from '@/lib/content/internal-links'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { AlertTriangle } from 'lucide-react'
@@ -64,6 +65,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [wpStatus, setWpStatus] = useState<'draft' | 'publish' | null>(null)
   const [wpBusy, setWpBusy] = useState<'draft' | 'publish' | null>(null)
 
+  // Internal linking (deterministic, manual). Candidates come from the server;
+  // suggestions are computed client-side against the live editor content.
+  const [linkCandidates, setLinkCandidates] = useState<LinkCandidate[]>([])
+  const [linkSuggestions, setLinkSuggestions] = useState<LinkSuggestion[]>([])
+  const [linkApproved, setLinkApproved] = useState<Set<string>>(new Set())
+  const [addedLinks, setAddedLinks] = useState<Set<string>>(new Set())
+  const [linksLoading, setLinksLoading] = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -88,12 +97,76 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setWpPostId(a.wp_post_id ?? null)
       setWpPostUrl(a.wp_post_url ?? null)
       setWpStatus(a.status === 'published' ? 'publish' : a.wp_post_id != null ? 'draft' : null)
+      // Load internal-link candidates and compute suggestions against this body.
+      try {
+        const lr = await fetch(`/api/content/articles/${id}/internal-links`)
+        if (lr.ok) {
+          const ld = await lr.json()
+          const cands: LinkCandidate[] = Array.isArray(ld.candidates) ? ld.candidates : []
+          setLinkCandidates(cands)
+          setLinkSuggestions(suggestInternalLinks(a.content_html ?? '', cands))
+        }
+      } catch {
+        // Non-fatal — internal links are optional.
+      }
     } finally {
       setLoading(false)
     }
   }, [id])
 
   useEffect(() => { if (enabled) load() }, [enabled, load])
+
+  // Recompute suggestions against the current editor content (excludes anchors
+  // already used and target URLs already linked in the body).
+  const refreshLinks = useCallback(() => {
+    setLinksLoading(true)
+    try {
+      setLinkSuggestions(suggestInternalLinks(contentHtml, linkCandidates))
+      setLinkApproved(new Set())
+    } finally {
+      setLinksLoading(false)
+    }
+  }, [contentHtml, linkCandidates])
+
+  function toggleApprove(targetId: string) {
+    setLinkApproved((prev) => {
+      const next = new Set(prev)
+      if (next.has(targetId)) next.delete(targetId)
+      else next.add(targetId)
+      return next
+    })
+  }
+
+  function insertLink(sug: LinkSuggestion): boolean {
+    if (!sug.insertable || addedLinks.has(sug.targetId)) return false
+    const next = insertInternalLink(contentHtml, sug.anchorText, sug.url)
+    if (!next) {
+      setMessage({ text: e.internal.addFailed, ok: false })
+      return false
+    }
+    setContentHtml(next)
+    setAddedLinks((prev) => new Set(prev).add(sug.targetId))
+    return true
+  }
+
+  function addOneLink(sug: LinkSuggestion) {
+    if (insertLink(sug)) {
+      toast.success(e.internal.saveReminder)
+      setMessage({ text: e.internal.saveReminder, ok: true })
+    }
+  }
+
+  function addSelectedLinks() {
+    let count = 0
+    for (const sug of linkSuggestions) {
+      if (linkApproved.has(sug.targetId) && insertLink(sug)) count++
+    }
+    if (count > 0) {
+      const text = e.internal.addedMany.replace('{n}', String(count))
+      toast.success(text)
+      setMessage({ text: `${text} · ${e.internal.saveReminder}`, ok: true })
+    }
+  }
 
   function bodyPayload(nextStatus?: 'draft' | 'ready') {
     return {
@@ -429,6 +502,60 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               </span>
             )}
           </div>
+        </Card>
+
+        {/* Internal links — deterministic, manual, editor-controlled. */}
+        <Card className="hover:translate-y-0">
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{e.internal.title}</h3>
+            <Button size="sm" variant="ghost" onClick={refreshLinks} disabled={linksLoading}>{e.internal.refresh}</Button>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{e.internal.hint}</p>
+          {isPublished && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.internal.publishedNote}</p>
+          )}
+          {linksLoading ? (
+            <p className="text-xs text-slate-400">{e.internal.loading}</p>
+          ) : linkSuggestions.length === 0 ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">{e.internal.none}</p>
+          ) : (
+            <div className="space-y-2">
+              {linkSuggestions.map((sug) => {
+                const done = addedLinks.has(sug.targetId)
+                return (
+                  <div key={sug.targetId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 flex flex-wrap items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={linkApproved.has(sug.targetId)}
+                      onChange={() => toggleApprove(sug.targetId)}
+                      disabled={!sug.insertable || done}
+                      className="h-4 w-4 accent-indigo-600"
+                    />
+                    <div className="flex-1 min-w-[12rem]">
+                      <div className="text-sm text-slate-800 dark:text-slate-100">{sug.targetTitle}</div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-200">
+                          {e.internal.anchorLabel}: {sug.anchorText}
+                        </span>
+                        {sug.weak && <Badge variant="neutral">{e.internal.weak}</Badge>}
+                        {!sug.insertable && <span className="text-[11px] text-amber-700 dark:text-amber-400">{e.internal.notInsertable}</span>}
+                      </div>
+                      <a href={sug.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{sug.url}</a>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => addOneLink(sug)} disabled={!sug.insertable || done}>
+                      {done ? e.internal.added : e.internal.addOne}
+                    </Button>
+                  </div>
+                )
+              })}
+              <div className="flex items-center gap-3 pt-1">
+                <Button size="sm" onClick={addSelectedLinks} disabled={linkApproved.size === 0}>
+                  {e.internal.addSelected} ({linkApproved.size})
+                </Button>
+                {addedLinks.size > 0 && <span className="text-xs text-slate-500 dark:text-slate-400">{e.internal.saveReminder}</span>}
+              </div>
+            </div>
+          )}
         </Card>
 
         <div className="flex flex-wrap items-center gap-2 pb-8">
