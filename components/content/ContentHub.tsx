@@ -86,6 +86,9 @@ export default function ContentHub() {
   const [batchState, setBatchState] = useState<Record<string, BatchEntry>>({})
   const [batchRunning, setBatchRunning] = useState(false)
   const cancelRef = useRef(false)
+  // Synchronous lock — set BEFORE any await so rapid double-clicks can't start a
+  // second loop while React's batchRunning state is still updating.
+  const batchRunningRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -251,10 +254,12 @@ export default function ContentHub() {
     return errs[reason] || errs.unknown
   }
 
-  // One generation request — reuses the EXISTING single endpoint. 90s timeout.
-  async function runOne(topicId: string): Promise<{ ok: boolean; error?: string }> {
+  // One generation request — reuses the EXISTING single endpoint. A generous
+  // client timeout only guards a truly stuck request; on timeout the batch STOPS
+  // (a client abort can't stop the server, so we never start the next topic).
+  async function runOne(topicId: string): Promise<{ ok: boolean; error?: string; timedOut?: boolean }> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 90_000)
+    const timer = setTimeout(() => controller.abort(), 180_000)
     try {
       const res = await fetch('/api/content/articles/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -264,7 +269,7 @@ export default function ContentHub() {
       if (res.ok && d.articleId) return { ok: true }
       return { ok: false, error: genErrorText(d) }
     } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout }
+      if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout, timedOut: true }
       return { ok: false, error: (t.genErrors as Record<string, string>).unknown }
     } finally {
       clearTimeout(timer)
@@ -272,10 +277,12 @@ export default function ContentHub() {
   }
 
   async function runBatch() {
-    if (batchRunning) return // guard double-click
+    // Synchronous lock FIRST — before any state update or await.
+    if (batchRunningRef.current || batchRunning) return
     const ids = Array.from(selected).filter((id) => !articleByTopic[id])
     if (ids.length === 0) return
     if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
+    batchRunningRef.current = true
 
     cancelRef.current = false
     setBatchRunning(true)
@@ -285,31 +292,44 @@ export default function ContentHub() {
     window.addEventListener('beforeunload', onUnload)
 
     let ok = 0, fail = 0
+    let stoppedByTimeout = false
     for (const id of ids) {
       if (cancelRef.current) break
       if (articleByTopic[id]) continue // got an article meanwhile → skip safely
       setBatchState((s) => ({ ...s, [id]: { status: 'generating' } }))
       const r = await runOne(id)
       if (r.ok) { ok++; setBatchState((s) => ({ ...s, [id]: { status: 'success' } })) }
-      else { fail++; setBatchState((s) => ({ ...s, [id]: { status: 'failed', error: r.error } })) }
+      else {
+        fail++
+        setBatchState((s) => ({ ...s, [id]: { status: 'failed', error: r.error } }))
+        // A timeout means the server MAY still be generating — never start N+1.
+        if (r.timedOut) { stoppedByTimeout = true; break }
+      }
     }
 
     window.removeEventListener('beforeunload', onUnload)
     const wasCancelled = cancelRef.current
+    batchRunningRef.current = false
     setBatchRunning(false)
     setSelected(new Set())
     await load(); await loadTopics() // new articles surface up top; done topics de-select
-    if (wasCancelled) toast.success(t.batch.cancelled)
+    if (stoppedByTimeout) toast.error(t.batch.stoppedTimeout)
+    else if (wasCancelled) toast.success(t.batch.cancelled)
     else toast.success(t.batch.summary.replace('{ok}', String(ok)).replace('{fail}', String(fail)))
   }
 
   function cancelBatch() { cancelRef.current = true }
 
   async function retryTopic(id: string) {
-    if (batchRunning) return
+    // Never overlap a batch or another retry.
+    if (batchRunningRef.current || batchRunning) return
+    batchRunningRef.current = true
+    setBatchRunning(true) // lock the topics UI (checkboxes / single create) too
     setBatchState((s) => ({ ...s, [id]: { status: 'generating' } }))
     const r = await runOne(id)
     setBatchState((s) => ({ ...s, [id]: r.ok ? { status: 'success' } : { status: 'failed', error: r.error } }))
+    batchRunningRef.current = false
+    setBatchRunning(false)
     await load(); await loadTopics()
     if (r.ok) toast.success(t.batch.retrySuccess)
     else toast.error(r.error || t.rowWp.errGeneric)
@@ -583,14 +603,14 @@ export default function ContentHub() {
                   </div>
                 )}
 
-                {topics.length === 0 ? (
+                {selectableTopics.length === 0 ? (
                   <Card className="p-8 text-center">
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.topicsEmptyTitle}</p>
                     <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
                   </Card>
                 ) : (
                   <TopicsList
-                    topics={topics}
+                    topics={selectableTopics}
                     projectName={selectedProject?.name ?? '—'}
                     articleByTopic={articleByTopic}
                     onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}

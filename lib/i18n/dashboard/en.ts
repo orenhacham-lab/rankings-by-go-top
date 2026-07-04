@@ -123,6 +123,7 @@ export const dashboardEn = {
       retry: 'Retry',
       retrySuccess: 'Article created',
       timeout: 'Generation took too long. You can try again.',
+      stoppedTimeout: 'Batch stopped because one article took too long and may still be generating in the background. Try again later.',
       cancelled: 'Generation stopped. Articles already created were saved.',
       summary: '{ok} articles created, {fail} failed',
     },

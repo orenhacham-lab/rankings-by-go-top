@@ -179,6 +179,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // Status transition (draft/ready). Block "ready" while required anchors miss.
+  // Never downgrade a WordPress-PUBLISHED article back to draft/ready — the
+  // status change is ignored (all other edited fields still save).
+  if ('status' in body && (owned.article as { status?: string }).status === 'published') {
+    console.log('[content-articles] status change ignored — already published', { articleId: id })
+    delete body.status
+  }
   if ('status' in body) {
     const status = String(body.status ?? '')
     if (!(EDITABLE_STATUSES as readonly string[]).includes(status)) {

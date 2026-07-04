@@ -55,6 +55,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [imagePrompt, setImagePrompt] = useState('')
   const [faq, setFaq] = useState<Faq[]>([])
   const [status, setStatus] = useState<'draft' | 'ready'>('draft')
+  const [isPublished, setIsPublished] = useState(false)
   const [audit, setAudit] = useState<Audit | null>(null)
   const [featuredImageUrl, setFeaturedImageUrl] = useState<string | null>(null)
   const [imageBusy, setImageBusy] = useState(false)
@@ -81,6 +82,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setImagePrompt(a.image_prompt ?? '')
       setFaq(Array.isArray(a.faq_json) ? a.faq_json : [])
       setStatus(a.status === 'ready' ? 'ready' : 'draft')
+      setIsPublished(a.status === 'published')
       setAudit(data.audit ?? null)
       setFeaturedImageUrl(a.featured_image_url ?? null)
       setWpPostId(a.wp_post_id ?? null)
@@ -431,7 +433,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
         <div className="flex flex-wrap items-center gap-2 pb-8">
           <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
-          <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
+          {/* Hidden once the article is published to WordPress — "ready" must not
+              downgrade a live published article. */}
+          {!isPublished && (
+            <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
+          )}
           <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
         </div>
 
