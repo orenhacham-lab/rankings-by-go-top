@@ -22,7 +22,6 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
 import type { GeminiTopicSuggestion } from '@/lib/content/gemini-topics'
 import { encodeBriefNotes, decodeBriefNotes, encodeBriefSections, decodeBriefSections, type PlannedInternalLink } from '@/lib/content/brief-notes'
-import { extractUrlHost, internalTargetKey, normalizeUrlKey, normalizeHref, slugFromUrl } from '@/lib/content/internal-links'
 import type { InternalLinkCandidate } from '@/lib/content/internal-link-candidates'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
 
@@ -138,11 +137,6 @@ export default function ArticleBriefModal({
   const [linkChoice, setLinkChoice] = useState<Record<string, string>>({})
   const [linkManual, setLinkManual] = useState<Record<string, string>>({})
   const [linksExpanded, setLinksExpanded] = useState(false)
-  const [siteHosts, setSiteHosts] = useState<string[]>([])
-  const [extraTargets, setExtraTargets] = useState<InternalLinkCandidate[]>([])
-  const [manualTargetOpen, setManualTargetOpen] = useState(false)
-  const [manualTargetUrl, setManualTargetUrl] = useState('')
-  const [manualTargetError, setManualTargetError] = useState<string | null>(null)
 
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -156,11 +150,19 @@ export default function ArticleBriefModal({
   const projectRef = useRef<HTMLSelectElement>(null)
   const topicRef = useRef<HTMLInputElement>(null)
   const anchorsRef = useRef<HTMLDivElement>(null)
+  // Guards the one-time init so re-renders (e.g. a new `projects` array identity
+  // or candidate fetch) never re-reset local state — advanced options stay open.
+  const initKeyRef = useRef<string | null>(null)
 
   const projectLang = projects.find((p) => p.id === projectId)?.language
 
   useEffect(() => {
-    if (!open) return
+    if (!open) { initKeyRef.current = null; return }
+    // Only initialize once per open session (or when switching which topic is
+    // being edited) — NOT on every parent re-render / prop identity change.
+    const initKey = editing ? `edit:${editing.id}` : 'new'
+    if (initKeyRef.current === initKey) return
+    initKeyRef.current = initKey
     if (editing) {
       setProjectId(editing.project_id)
       setPrimaryKeyword(editing.primary_keyword ?? '')
@@ -189,7 +191,6 @@ export default function ArticleBriefModal({
       setKeywordFit(null)
     }
     setError(null); setFormError(null); setErrProject(false); setErrTopic(false); setBadAnchors(new Set()); setLinksExpanded(false)
-    setExtraTargets([]); setManualTargetOpen(false); setManualTargetUrl(''); setManualTargetError(null)
   }, [open, editing, defaultProjectId, projects])
 
   useEffect(() => {
@@ -198,41 +199,14 @@ export default function ArticleBriefModal({
 
   // Load internal-link candidates for the planning section when a project is set.
   useEffect(() => {
-    if (!open || !projectId) { setLinkCandidates([]); setSiteHosts([]); return }
+    if (!open || !projectId) { setLinkCandidates([]); return }
     let cancelled = false
     fetch(`/api/content/internal-link-candidates?projectId=${encodeURIComponent(projectId)}`)
-      .then((r) => (r.ok ? r.json() : { candidates: [], hosts: [] }))
-      .then((d) => {
-        if (cancelled) return
-        setLinkCandidates(Array.isArray(d.candidates) ? d.candidates : [])
-        setSiteHosts(Array.isArray(d.hosts) ? d.hosts : [])
-      })
-      .catch(() => { if (!cancelled) { setLinkCandidates([]); setSiteHosts([]) } })
+      .then((r) => (r.ok ? r.json() : { candidates: [] }))
+      .then((d) => { if (!cancelled) setLinkCandidates(Array.isArray(d.candidates) ? d.candidates : []) })
+      .catch(() => { if (!cancelled) setLinkCandidates([]) })
     return () => { cancelled = true }
   }, [open, projectId])
-
-  // All planning targets = discovered candidates + user-added internal URLs.
-  const allLinkCandidates: InternalLinkCandidate[] = (() => {
-    const byId = new Map<string, InternalLinkCandidate>()
-    for (const c of [...linkCandidates, ...extraTargets]) byId.set(c.id, c)
-    return Array.from(byId.values())
-  })()
-
-  // Add a manually-pasted same-site internal URL as a link target.
-  function addManualTarget() {
-    const raw = manualTargetUrl.trim()
-    if (!raw) { setManualTargetError(t.planManualTargetInvalid); return }
-    const host = extractUrlHost(raw)
-    const ok = host !== null && (siteHosts.length === 0 || siteHosts.includes(host))
-    if (!ok) { setManualTargetError(t.planManualTargetInvalid); return }
-    const key = internalTargetKey(raw)
-    const id = `url:${key}`
-    const existing = allLinkCandidates.find((c) => c.id === id || internalTargetKey(c.url) === key)
-    if (!existing) {
-      setExtraTargets((p) => [...p, { id, kind: 'internal_url', title: slugFromUrl(raw), url: normalizeHref(raw), keyword: null, secondaryKeywords: [], historicalAnchors: [] }])
-    }
-    setManualTargetOpen(false); setManualTargetUrl(''); setManualTargetError(null); setLinksExpanded(true)
-  }
 
   // ---- Internal-link planning helpers -------------------------------------
   type LinkOpt = { text: string; source: PlannedInternalLink['source']; weak: boolean; label: string }
@@ -279,13 +253,13 @@ export default function ArticleBriefModal({
   // Keep approved links' anchor in sync with the dropdown / manual controls.
   useEffect(() => {
     setInternalLinks((prev) => prev.map((l) => {
-      const cand = allLinkCandidates.find((c) => c.id === l.targetId)
+      const cand = linkCandidates.find((c) => c.id === l.targetId)
       if (!cand) return l
       const ch = chosenLinkFor(cand)
       return ch.text ? { ...l, anchorText: ch.text, source: ch.source } : l
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkChoice, linkManual, linkCandidates, extraTargets])
+  }, [linkChoice, linkManual, linkCandidates])
 
   function toggleSuggestion(title: string) {
     setSelected((prev) => {
@@ -737,11 +711,11 @@ export default function ArticleBriefModal({
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
               <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-1">{t.planTitle}</h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.planHint}</p>
-              {allLinkCandidates.length === 0 ? (
-                <p className="text-xs text-slate-400 mb-2">{t.planNone}</p>
+              {linkCandidates.length === 0 ? (
+                <p className="text-xs text-slate-400">{t.planNone}</p>
               ) : (
-                <div className="space-y-2 mb-2">
-                  {(linksExpanded ? allLinkCandidates : allLinkCandidates.slice(0, 2)).map((cand) => {
+                <div className="space-y-2">
+                  {(linksExpanded ? linkCandidates : linkCandidates.slice(0, 2)).map((cand) => {
                     const opts = linkOptionsFor(cand)
                     const approved = isLinkApproved(cand.id)
                     const manualVal = linkManual[cand.id] ?? ''
@@ -790,33 +764,12 @@ export default function ArticleBriefModal({
                       </div>
                     )
                   })}
-                  {allLinkCandidates.length > 2 && (
+                  {linkCandidates.length > 2 && (
                     <button type="button" onClick={() => setLinksExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                       {linksExpanded ? t.planShowLess : t.planShowMore}
                     </button>
                   )}
                 </div>
-              )}
-
-              {/* Manually add any same-site internal URL (category / product / page). */}
-              {manualTargetOpen ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="url"
-                    value={manualTargetUrl}
-                    onChange={(e) => { setManualTargetUrl(e.target.value); setManualTargetError(null) }}
-                    placeholder={t.planManualTargetPlaceholder}
-                    dir="ltr"
-                    className={inputCls + ' flex-1 min-w-[14rem] text-left'}
-                  />
-                  <Button size="sm" variant="outline" onClick={addManualTarget}>{t.planAddManualTarget}</Button>
-                  <button type="button" onClick={() => { setManualTargetOpen(false); setManualTargetError(null) }} className="text-xs text-slate-500 hover:underline">{t.cancel}</button>
-                  {manualTargetError && <span className="text-[11px] text-red-600 dark:text-red-400 w-full">{manualTargetError}</span>}
-                </div>
-              ) : (
-                <button type="button" onClick={() => setManualTargetOpen(true)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                  {t.planAddManualTarget}
-                </button>
               )}
             </div>
           </div>
