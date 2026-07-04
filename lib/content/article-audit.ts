@@ -78,7 +78,7 @@ export function thresholdsFor(desired: number): Thresholds {
 
 // -- text helpers -----------------------------------------------------------
 
-const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'מצד שני', 'למשל', 'בפועל', 'לסיכום', 'חשוב לדעת', 'מעבר לכך', 'כלומר', 'לעומת זאת', 'בסופו של דבר', 'ראשית', 'שנית', 'לבסוף']
+const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'מצד שני', 'למשל', 'לדוגמה', 'בפועל', 'לסיכום', 'חשוב לדעת', 'חשוב לזכור', 'מעבר לכך', 'כלומר', 'לעומת זאת', 'בסופו של דבר', 'ראשית', 'שנית', 'לבסוף', 'במקרים רבים', 'בשורה התחתונה', 'לצד זאת', 'מבחינה פרקטית', 'כתוצאה מכך', 'בשלב הבא', 'בהשוואה']
 const TRANSITIONS_EN = ['additionally', 'therefore', 'however', 'on the other hand', 'for example', 'in practice', 'in summary', 'importantly', 'moreover', 'in other words', 'finally', 'first', 'second', 'meanwhile', 'in short']
 // Unambiguous, standalone CTA phrases (imperative action + intent). Natural
 // service words like "הזמנה"/"משלוח"/"שירות" are deliberately NOT here.

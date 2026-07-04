@@ -176,6 +176,8 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Never add a year (e.g. 2024/2025/2026) to the title, metaTitle, slug, headings, or content UNLESS that exact year appears in the topic, keyword, or brief above. If the topic is evergreen, keep it evergreen; never use outdated years.`,
     `- SEO/GEO depth: be practical, specific and useful — never generic. Include concrete criteria, examples, checks, warning signs and decision-making guidance; add related subtopics naturally when relevant. For commercial/comparison/price/cost/choice topics include a useful comparison TABLE.`,
     `- Avoid generic filler openings (e.g. "בעולם שבו כולם מחפשים…"). Open directly and match search intent — the FIRST paragraph answers the query. Each <h2> should answer a real user question, comparison point, or decision factor. In Hebrew, write naturally for Israeli readers.`,
+    brief.language === 'he' ? `- Hebrew writing quality: VARY sentence and paragraph openings — do not start many consecutive sentences/paragraphs with the same word (avoid over-using "בנוסף", "אחד", "היתרון", "המשמעות", "כדי", "כאשר"). Mix openings like "מעבר לכך", "בפועל", "לכן", "מצד שני", "במקרים רבים", "בשלב הבא", "חשוב לזכור", "בשורה התחתונה", "לצד זאת", "מבחינה פרקטית", "עבור משתמשים ביתיים", "בהשוואה לדגמים רגילים" — but naturally, NOT a transition word in every sentence. Prefer clear, practical, promotional SEO writing over poetic language; avoid repetitive paragraph structure.` : '',
+    brief.language === 'he' ? `- Keep brand/product names in their proper English casing (e.g. "Kingsmith WalkingPad X21", not "kingsmith walkingpad x21"). Never write the hyphenated Hebrew article before a name ("ה-Kingsmith", "ה-הליכון") — write "Kingsmith…", "הליכון…", or "דגם/מכשיר Kingsmith…".` : '',
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     anchorTopics.length ? `- LINK PLACEMENT RULES: never place a link in the directAnswer or the first paragraph; place the first link only after the article has established context (after the first <h2> and a couple of paragraphs). If there are multiple links, distribute them across DIFFERENT sections — never two links in the same paragraph or back-to-back. Integrate every link into a genuinely relevant sentence; do NOT use generic phrases like "read more", "click here", "אתר כמו", "למידע נוסף".` : '',
@@ -340,6 +342,80 @@ function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): stri
 }
 
 // -- English slug + deterministic anchor insertion --------------------------
+
+function escapeRegExp(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+
+/** Extract maximal runs of Latin/number tokens (brand/product names) from a source. */
+function extractLatinPhrases(src: string): string[] {
+  const out: string[] = []
+  const re = /[A-Za-z0-9][A-Za-z0-9&'’./+-]*(?:\s+[A-Za-z0-9&'’./+-]+)*/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src || '')) !== null) {
+    const phrase = m[0].trim()
+    if (/[A-Za-z]/.test(phrase)) out.push(phrase)
+  }
+  return out
+}
+
+interface CasingTerm { re: RegExp; replacement: string }
+/**
+ * Build case-restoring rules from the user's own inputs (topic / keyword /
+ * secondary / anchor text / brand). Gemini often lowercases brand/product names
+ * ("kingsmith walkingpad x21"); we restore the exact casing the user typed
+ * ("Kingsmith WalkingPad X21"). Longest phrases first so multi-word names win.
+ */
+function buildCasingTerms(brief: ArticleBrief): CasingTerm[] {
+  const sources = [
+    brief.topic,
+    brief.primaryKeyword || '',
+    ...(brief.secondaryKeywords || []),
+    ...(brief.anchors || []).map((a) => a.anchor_text || ''),
+    brief.brandNameToInclude || '',
+  ]
+  const map = new Map<string, string>() // lowercase → original casing (first wins)
+  for (const src of sources) {
+    for (const phrase of extractLatinPhrases(src)) {
+      const add = (term: string) => {
+        const key = term.toLowerCase()
+        if (term.length >= 2 && /[A-Za-z]/.test(term) && !map.has(key)) map.set(key, term)
+      }
+      add(phrase)
+      for (const tok of phrase.split(/\s+/)) if (tok !== '&') add(tok)
+    }
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[0].length - a[0].length)
+    .map(([, original]) => ({ re: new RegExp('(?<![A-Za-z0-9])' + escapeRegExp(original) + '(?![A-Za-z0-9])', 'gi'), replacement: original }))
+}
+
+/** Restore brand casing + remove the artifact hyphenated definite article "ה-". */
+function polishText(s: string, terms: CasingTerm[]): string {
+  if (!s) return s
+  let out = s
+  for (const t of terms) out = out.replace(t.re, t.replacement)
+  // "ה-Kingsmith" → "Kingsmith", "ה-הליכון" → "הליכון" (only the hyphenated form;
+  // a normal attached definite article like "המכשיר" is never touched).
+  out = out.replace(/ה-(?=[A-Za-zא-ת])/g, '')
+  return out
+}
+
+function polishTable(t: ArticleTable, terms: CasingTerm[]): ArticleTable {
+  return { caption: polishText(t.caption, terms), columns: t.columns.map((c) => polishText(c, terms)), rows: t.rows.map((r) => r.map((c) => polishText(c, terms))) }
+}
+/** Apply brand-casing + "ה-" cleanup to every text field of the article. */
+function polishStructured(a: StructuredArticle, terms: CasingTerm[]): void {
+  const f = (s: string) => polishText(s, terms)
+  a.title = f(a.title); a.metaTitle = f(a.metaTitle); a.metaDescription = f(a.metaDescription)
+  a.excerpt = f(a.excerpt); a.directAnswer = f(a.directAnswer); a.imagePrompt = f(a.imagePrompt)
+  a.intro = a.intro.map(f)
+  a.sections = a.sections.map((s) => ({
+    ...s, heading: f(s.heading), answerFirst: f(s.answerFirst), paragraphs: s.paragraphs.map(f), bullets: s.bullets.map(f),
+    table: s.table ? polishTable(s.table, terms) : null,
+    subsections: s.subsections.map((ss) => ({ heading: f(ss.heading), paragraphs: ss.paragraphs.map(f) })),
+  }))
+  a.comparisonTables = a.comparisonTables.map((t) => polishTable(t, terms))
+  a.faq = a.faq.map((x) => ({ question: f(x.question), answer: f(x.answer) }))
+}
 
 /** Years the user explicitly asked for (topic/keyword/secondary/brief). */
 function collectAllowedYears(brief: ArticleBrief): Set<string> {
@@ -592,6 +668,7 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
   let best: { structured: StructuredArticle; usage: GeminiUsage | null; safe: string; slug: string; audit: AuditResult } | null = null
   let attempts = 0
   const allowedYears = collectAllowedYears(brief)
+  const casingTerms = buildCasingTerms(brief)
 
   for (let attempt = 0; attempt < 2; attempt++) {
     // Repair uses the EXACT unmet checks (blockers first, then warnings).
@@ -607,6 +684,10 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     g.structured.title = stripUnrequestedYear(g.structured.title, allowedYears)
     g.structured.metaTitle = stripUnrequestedYear(g.structured.metaTitle, allowedYears)
     g.structured.slug = stripUnrequestedYear(g.structured.slug, allowedYears)
+    // Restore brand/product casing (e.g. "kingsmith walkingpad x21" →
+    // "Kingsmith WalkingPad X21") and remove the artifact "ה-" before names.
+    // Runs on plain-text fields only, before buildHtml — never touches hrefs/URLs.
+    polishStructured(g.structured, casingTerms)
 
     let safe = sanitizeArticleHtml(buildHtml(g.structured, language, brief.includeManualToc))
     // Enforce required anchors AND good placement quality (not in the direct
