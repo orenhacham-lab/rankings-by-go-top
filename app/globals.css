@@ -430,6 +430,10 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
    English (no dir) captions stay left-aligned. */
 .article-content table[dir="rtl"] caption { text-align: right; direction: rtl; }
 .article-content table:not([dir="rtl"]) caption { text-align: left; }
+/* Table title rendered as a sibling <p> ABOVE the table (not a <caption>). */
+.article-content .article-table-title { font-weight: 600; margin: 1.25rem 0 0.4rem; }
+.article-content .article-table-title[dir="rtl"] { text-align: right; direction: rtl; }
+.article-content .article-table-title[dir="ltr"] { text-align: left; direction: ltr; }
 .article-content nav.toc {
   background: #f8fafc;
   border: 1px solid #e2e8f0;

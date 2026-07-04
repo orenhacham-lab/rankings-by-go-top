@@ -258,13 +258,16 @@ function tableHtml(t: ArticleTable | null, language: SuggestionLanguage): string
   if (!t || !Array.isArray(t.columns) || t.columns.length === 0 || !Array.isArray(t.rows)) return ''
   const rows = t.rows.filter((r) => Array.isArray(r) && r.length)
   if (!rows.length) return ''
-  const cap = (t.caption || '').trim() ? `<caption>${esc(t.caption.trim())}</caption>` : ''
   const head = `<thead><tr>${t.columns.map((c) => `<th>${esc(String(c))}</th>`).join('')}</tr></thead>`
   const body = `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody>`
   // Hebrew tables render RTL so the first (attribute) column sits on the RIGHT;
   // English tables stay LTR. dir travels with the HTML to WordPress.
   const dir = language === 'he' ? ' dir="rtl"' : ''
-  return `<table${dir}>${cap}${head}${body}</table>`
+  // The table TITLE is a sibling <p> ABOVE the table — NOT a <caption> (TipTap's
+  // table schema has no caption and would push it into a stray first row).
+  const titleText = (t.caption || '').trim()
+  const title = titleText ? `<p class="article-table-title"${dir || ' dir="ltr"'}>${esc(titleText)}</p>` : ''
+  return `${title}<table${dir}>${head}${body}</table>`
 }
 
 /**
