@@ -278,6 +278,7 @@ export const dashboardEn = {
         missing_gemini_api_key: 'Image generation failed — GEMINI_API_KEY is not set.',
         gemini_init_failed: 'Failed to initialize the image engine. Please try again.',
         image_generation_failed: 'The image engine returned no image. Please try again.',
+        image_model_unavailable: 'The image model is not available on the current Gemini key. Set a supported image model in GEMINI_IMAGE_MODEL.',
         image_upload_failed: 'Saving the image failed. Please try again.',
         image_save_failed: 'Saving the image failed. Please try again.',
         unknown: 'Image generation failed. Please try again.',

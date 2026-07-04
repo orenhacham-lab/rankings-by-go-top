@@ -276,6 +276,7 @@ export const dashboardHe = {
         missing_gemini_api_key: 'יצירת התמונה נכשלה — GEMINI_API_KEY לא מוגדר.',
         gemini_init_failed: 'שגיאה באתחול מנוע התמונות. נסו שוב.',
         image_generation_failed: 'מנוע התמונות לא החזיר תמונה. נסו שוב.',
+        image_model_unavailable: 'מודל יצירת התמונה לא זמין במפתח ה-Gemini הנוכחי. יש לבחור מודל תמונה נתמך ב-GEMINI_IMAGE_MODEL.',
         image_upload_failed: 'שמירת התמונה נכשלה. נסו שוב.',
         image_save_failed: 'שמירת התמונה נכשלה. נסו שוב.',
         unknown: 'יצירת התמונה נכשלה. נסו שוב.',

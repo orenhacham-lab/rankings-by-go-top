@@ -84,6 +84,7 @@ export default function TopicsList({
   }
 
   async function createArticle(topicId: string) {
+    if (creatingId) return // guard against double-click / concurrent generation
     setGenError(null)
     setCreatingId(topicId)
     try {
@@ -180,6 +181,14 @@ export default function TopicsList({
                   <Td><span className="text-xs text-slate-500">{formatDate(topic.created_at)}</span></Td>
                   <Td>
                     <div className="flex items-center gap-1 justify-end">
+                      {/* Visible feedback while (re)generating — the primary button
+                          may be "Edit article" during a regenerate. */}
+                      {creatingId === topic.id && (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          {c.creatingArticle}
+                        </span>
+                      )}
                       {/* Primary action: create OR edit the article. */}
                       {articleByTopic[topic.id] ? (
                         <span className="inline-flex items-center gap-2">
