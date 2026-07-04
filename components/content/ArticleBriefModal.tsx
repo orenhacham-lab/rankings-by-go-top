@@ -12,7 +12,7 @@
  * enriched per-topic from the Gemini suggestion when available.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -87,6 +87,7 @@ export default function ArticleBriefModal({
   defaultProjectId,
   editing,
   onSaved,
+  onToast,
 }: {
   open: boolean
   onClose: () => void
@@ -94,6 +95,7 @@ export default function ArticleBriefModal({
   defaultProjectId: string
   editing?: ArticleTopic | null
   onSaved: () => void
+  onToast?: (kind: 'success' | 'error', text: string) => void
 }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).contentHub.brief
@@ -132,6 +134,15 @@ export default function ArticleBriefModal({
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Field-level validation + a bottom (near-button) error so it's noticed even
+  // when scrolled down.
+  const [formError, setFormError] = useState<string | null>(null)
+  const [errProject, setErrProject] = useState(false)
+  const [errTopic, setErrTopic] = useState(false)
+  const [badAnchors, setBadAnchors] = useState<Set<number>>(new Set())
+  const projectRef = useRef<HTMLSelectElement>(null)
+  const topicRef = useRef<HTMLInputElement>(null)
+  const anchorsRef = useRef<HTMLDivElement>(null)
 
   const projectLang = projects.find((p) => p.id === projectId)?.language
 
@@ -162,7 +173,7 @@ export default function ArticleBriefModal({
       setAdvancedOpen(false)
       setKeywordFit(null)
     }
-    setError(null)
+    setError(null); setFormError(null); setErrProject(false); setErrTopic(false); setBadAnchors(new Set())
   }, [open, editing, defaultProjectId, projects])
 
   useEffect(() => {
@@ -261,14 +272,41 @@ export default function ArticleBriefModal({
     }
   }
 
+  function isBadAnchorUrl(url: string): boolean {
+    const u = (url || '').trim()
+    if (!u) return false // empty is fine (optional)
+    if (/\s/.test(u)) return true
+    try { const p = new URL(u); return p.protocol !== 'http:' && p.protocol !== 'https:' } catch { return true }
+  }
+
   async function handleSave() {
-    if (!projectId) { setError(t.projectRequired); return }
+    // Reset validation state.
+    setError(null); setFormError(null); setErrProject(false); setErrTopic(false); setBadAnchors(new Set())
+
+    if (!projectId) {
+      setErrProject(true); setFormError(t.fixErrors)
+      projectRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); projectRef.current?.focus()
+      return
+    }
 
     const topics = new Set<string>()
     selected.forEach((s) => topics.add(s))
     if (manualTopic.trim()) topics.add(manualTopic.trim())
     const topicList = Array.from(topics)
-    if (topicList.length === 0) { setError(t.noTopicSelected); return }
+    if (topicList.length === 0) {
+      setErrTopic(true); setFormError(t.fixErrors)
+      topicRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); topicRef.current?.focus()
+      return
+    }
+
+    // Client-side anchor URL validation (server also validates).
+    const bad = new Set<number>()
+    anchors.forEach((a, i) => { if (isBadAnchorUrl(a.target_url)) bad.add(i) })
+    if (bad.size > 0) {
+      setBadAnchors(bad); setFormError(t.fixErrors); setAdvancedOpen(true)
+      setTimeout(() => anchorsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+      return
+    }
 
     setSaving(true)
     setError(null)
@@ -281,7 +319,8 @@ export default function ArticleBriefModal({
         })
         if (!res.ok) {
           const d = await res.json().catch(() => ({}))
-          setError(d.error || t.genericError)
+          console.warn('[brief-modal] update failed', { error: d?.error })
+          setError(t.genericError); setFormError(t.genericError)
           return
         }
       } else {
@@ -297,14 +336,16 @@ export default function ArticleBriefModal({
         const failed = results.find((r) => !r.ok)
         if (failed) {
           onSaved() // refresh whatever did save
-          setError(failed.err || t.genericError)
+          console.warn('[brief-modal] create failed', { error: failed.err })
+          setError(t.genericError); setFormError(t.genericError)
           return
         }
       }
       onSaved()
+      onToast?.('success', editing ? t.toasts.topicUpdated : t.toasts.topicSaved)
       onClose()
     } catch {
-      setError(t.genericError)
+      setError(t.genericError); setFormError(t.genericError)
     } finally {
       setSaving(false)
     }
@@ -325,10 +366,11 @@ export default function ArticleBriefModal({
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.project}</label>
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inputCls}>
+          <select ref={projectRef} value={projectId} onChange={(e) => { setProjectId(e.target.value); setErrProject(false) }} className={`${inputCls} ${errProject ? 'border-red-400 dark:border-red-500' : ''}`}>
             <option value="">{t.selectProject}</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          {errProject && <p className="text-xs text-red-600 dark:text-red-400">{t.projectRequired}</p>}
         </div>
 
         {!editing && (
@@ -402,7 +444,8 @@ export default function ArticleBriefModal({
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {editing ? t.topic : t.manualTopicLabel}
           </label>
-          <input type="text" value={manualTopic} onChange={(e) => setManualTopic(e.target.value)} placeholder={t.topicPlaceholder} className={inputCls} />
+          <input ref={topicRef} type="text" value={manualTopic} onChange={(e) => { setManualTopic(e.target.value); setErrTopic(false) }} placeholder={t.topicPlaceholder} className={`${inputCls} ${errTopic ? 'border-red-400 dark:border-red-500' : ''}`} />
+          {errTopic && <p className="text-xs text-red-600 dark:text-red-400">{t.noTopicSelected}</p>}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -542,21 +585,23 @@ export default function ArticleBriefModal({
               </label>
             </div>
 
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <div ref={anchorsRef} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.anchorsTitle}</h4>
                 <Button size="sm" variant="outline" onClick={addAnchor}>
                   <Plus size={14} /> {t.addAnchor}
                 </Button>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.anchorsHint}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t.anchorsHint}</p>
+              {badAnchors.size > 0 && <p className="text-xs text-red-600 dark:text-red-400 mb-2">{t.anchorUrlInvalid}</p>}
               <div className="space-y-3">
                 {anchors.map((a, i) => (
-                  <div key={i} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2 bg-slate-50/50 dark:bg-slate-800/30">
+                  <div key={i} className={`rounded-lg border p-3 space-y-2 ${badAnchors.has(i) ? 'border-red-300 dark:border-red-600 bg-red-50/40 dark:bg-red-900/10' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30'}`}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input label={t.anchorText} value={a.anchor_text} onChange={(e) => updateAnchor(i, { anchor_text: e.target.value })} placeholder={t.anchorTextPlaceholder} />
-                      <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => updateAnchor(i, { target_url: e.target.value })} placeholder={t.targetUrlPlaceholder} />
+                      <Input label={t.targetUrl} type="url" value={a.target_url} onChange={(e) => { updateAnchor(i, { target_url: e.target.value }); if (badAnchors.has(i)) setBadAnchors((p) => { const n = new Set(p); n.delete(i); return n }) }} placeholder={t.targetUrlPlaceholder} />
                     </div>
+                    {badAnchors.has(i) && <p className="text-xs text-red-600 dark:text-red-400">{t.anchorUrlInvalid}</p>}
                     <div className="flex flex-wrap items-center gap-3">
                       <select value={a.type} onChange={(e) => updateAnchor(i, { type: e.target.value as 'internal' | 'external' })} className={inputCls + ' max-w-[9rem]'}>
                         <option value="internal">{t.internal}</option>
@@ -581,9 +626,14 @@ export default function ArticleBriefModal({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>{t.cancel}</Button>
-          <Button onClick={handleSave} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
+        <div className="pt-2">
+          {formError && (
+            <p className="mb-2 text-sm text-red-600 dark:text-red-400 text-end">{formError}</p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose} disabled={saving}>{t.cancel}</Button>
+            <Button onClick={handleSave} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
+          </div>
         </div>
       </div>
     </Modal>

@@ -34,6 +34,8 @@ type ArticleRow = {
   status: keyof typeof EMPTY_COUNTS | string
   wp_post_id: number | null
   wp_post_url: string | null
+  wp_featured_media_id: number | null
+  featured_image_url: string | null
   scheduled_at: string | null
   published_at: string | null
   created_at: string
@@ -81,7 +83,7 @@ export async function GET(request: Request) {
   let articles: ArticleRow[] = []
   const { data: articlesData, error: articlesError } = await supabase
     .from('generated_articles')
-    .select('id, topic_id, title, slug, status, wp_post_id, wp_post_url, scheduled_at, published_at, created_at, updated_at')
+    .select('id, topic_id, title, slug, status, wp_post_id, wp_post_url, wp_featured_media_id, featured_image_url, scheduled_at, published_at, created_at, updated_at')
     .eq('project_id', projectId)
     .order('updated_at', { ascending: false })
     .limit(1000)

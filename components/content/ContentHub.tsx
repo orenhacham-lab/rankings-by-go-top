@@ -20,6 +20,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import WordPressConnectionPanel from '@/components/content/WordPressConnectionPanel'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
+import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/utils'
@@ -35,7 +36,8 @@ type Counts = {
 
 type ArticleRow = {
   id: string; topic_id: string | null; title: string; slug: string; status: string
-  wp_post_id: number | null; wp_post_url: string | null
+  wp_post_id: number | null; wp_post_url: string | null; wp_featured_media_id: number | null
+  featured_image_url: string | null
   scheduled_at: string | null; published_at: string | null
   created_at: string; updated_at: string
 }
@@ -65,6 +67,7 @@ export default function ContentHub() {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).contentHub, [language])
   const isHebrew = language === 'he'
+  const toast = useToasts()
 
   const [data, setData] = useState<Overview | null>(null)
   const [loading, setLoading] = useState(true)
@@ -104,14 +107,22 @@ export default function ContentHub() {
   useEffect(() => { load() }, [load])
   useEffect(() => { loadTopics() }, [loadTopics])
 
+  // Refetch when the user returns to the tab (e.g. after publishing in the
+  // editor) so WordPress/status changes are reflected without a manual reload.
+  useEffect(() => {
+    const onFocus = () => { load(); loadTopics() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [load, loadTopics])
+
   async function deleteArticle(id: string) {
     if (!window.confirm(t.confirmDeleteArticle)) return
     try {
       const res = await fetch(`/api/content/articles/${id}`, { method: 'DELETE' })
-      if (res.ok) { load(); loadTopics() }
-      else window.alert(t.deleteFailed)
+      if (res.ok) { load(); loadTopics(); toast.success(t.toasts.articleDeleted) }
+      else toast.error(t.deleteFailed)
     } catch {
-      window.alert(t.deleteFailed)
+      toast.error(t.deleteFailed)
     }
   }
 
@@ -148,6 +159,10 @@ export default function ContentHub() {
 
   const statusLabel = (s: string) =>
     (t.status as Record<string, string>)[s] ?? s
+
+  // WordPress state for an article row (from already-saved fields).
+  const wpState = (a: ArticleRow): 'published' | 'exported' | 'none' =>
+    a.wp_post_id && a.status === 'published' ? 'published' : a.wp_post_id ? 'exported' : 'none'
 
   const statCards = counts
     ? [
@@ -240,6 +255,19 @@ export default function ContentHub() {
                 ))}
               </div>
 
+              {/* ── Section 1: generated articles ── */}
+              <div className="mt-2 mb-3 border-t border-slate-200 dark:border-slate-800 pt-5">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.articlesHeading}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t.articlesSubtitle}</p>
+              </div>
+
+              {(data?.articles?.length ?? 0) === 0 ? (
+                <Card className="p-8 text-center mb-6">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.articlesEmptyTitle}</p>
+                  <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
+                </Card>
+              ) : (
+              <>
               {/* Filters */}
               <div className="flex flex-wrap gap-3 mb-3">
                 <select
@@ -291,11 +319,21 @@ export default function ContentHub() {
                           <Td><span className="text-xs text-slate-500">{a.scheduled_at ? formatDate(a.scheduled_at) : '—'}</span></Td>
                           <Td><span className="text-xs text-slate-500">{a.published_at ? formatDate(a.published_at) : '—'}</span></Td>
                           <Td>
-                            {a.wp_post_url ? (
-                              <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
-                                {t.table.openInWordpress}<ExternalLink size={12} />
-                              </a>
-                            ) : '—'}
+                            {(() => {
+                              const s = wpState(a)
+                              if (s === 'none') return <span className="text-xs text-slate-400 dark:text-slate-500">{t.wpState.notSent}</span>
+                              const published = s === 'published'
+                              return (
+                                <span className="inline-flex items-center gap-2">
+                                  <Badge variant={published ? 'success' : 'neutral'}>{published ? t.wpState.published : t.wpState.exported}</Badge>
+                                  {a.wp_post_url && (
+                                    <a href={a.wp_post_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+                                      {published ? t.wpState.openLive : t.wpState.openWp}<ExternalLink size={12} />
+                                    </a>
+                                  )}
+                                </span>
+                              )
+                            })()}
                           </Td>
                           <Td>
                             <div className="flex items-center gap-2">
@@ -309,10 +347,6 @@ export default function ContentHub() {
                               >
                                 {t.delete}
                               </button>
-                              {/* Publish/Schedule arrive in later phases. */}
-                              <span className="text-xs text-slate-400 dark:text-slate-600">
-                                {t.publishNextPhase}
-                              </span>
                             </div>
                           </Td>
                         </TableRow>
@@ -324,17 +358,30 @@ export default function ContentHub() {
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">{t.table.emptyHint}</p>
                 )}
               </div>
+              </>
+              )}
 
-              {/* Topics / Briefs */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{t.topicsHeading}</h3>
-                <TopicsList
-                  topics={topics}
-                  projectName={selectedProject?.name ?? '—'}
-                  articleByTopic={articleByTopic}
-                  onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
-                  onChanged={loadTopics}
-                />
+              {/* ── Section 2: topics / briefs (pre-article) ── */}
+              <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
+                <div className="mb-3">
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
+                </div>
+                {topics.length === 0 ? (
+                  <Card className="p-8 text-center">
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.topicsEmptyTitle}</p>
+                    <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
+                  </Card>
+                ) : (
+                  <TopicsList
+                    topics={topics}
+                    projectName={selectedProject?.name ?? '—'}
+                    articleByTopic={articleByTopic}
+                    onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
+                    onChanged={loadTopics}
+                    onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+                  />
+                )}
               </div>
 
               {/* WordPress connection — reuse the existing self-contained panel */}
@@ -351,7 +398,10 @@ export default function ContentHub() {
         defaultProjectId={projectId}
         editing={editingTopic}
         onSaved={loadTopics}
+        onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
       />
+
+      <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />
     </div>
   )
 }

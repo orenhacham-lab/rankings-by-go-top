@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
+import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { AlertTriangle } from 'lucide-react'
@@ -30,6 +31,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const e = c.editor
   const isHebrew = language === 'he'
   const auditLabel = (code: string) => (e.auditCodes as Record<string, string>)[code] || code
+  const toast = useToasts()
 
   const enabled = process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
 
@@ -124,7 +126,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       }
       if (data.article?.status) setStatus(data.article.status === 'ready' ? 'ready' : 'draft')
       if (data.audit) setAudit(data.audit)
-      setMessage({ text: e.saved, ok: true })
+      const okText = nextStatus === 'ready' ? e.markedReady : e.saved
+      setMessage({ text: okText, ok: true })
+      toast.success(okText)
     } catch {
       setMessage({ text: e.saveError, ok: false })
     } finally {
@@ -152,6 +156,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       if (res.ok && data.featured_image_url) {
         setFeaturedImageUrl(data.featured_image_url)
         setMessage({ text: e.imageGenerated, ok: true })
+        toast.success(e.imageGenerated)
         return
       }
       const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
@@ -169,7 +174,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     setMessage(null)
     try {
       const res = await fetch(`/api/content/articles/${id}/image`, { method: 'DELETE' })
-      if (res.ok) { setFeaturedImageUrl(null); setMessage({ text: e.imageRemoved, ok: true }); return }
+      if (res.ok) { setFeaturedImageUrl(null); setMessage({ text: e.imageRemoved, ok: true }); toast.success(e.imageRemoved); return }
       setMessage({ text: e.imageFailed, ok: false })
     } catch {
       setMessage({ text: e.imageFailed, ok: false })
@@ -203,6 +208,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         setWpStatus(data.wp_status === 'publish' ? 'publish' : 'draft')
         const base = status === 'publish' ? e.wpPublished : e.wpExported
         setMessage({ text: data.imageWarning ? `${base} · ${e.wpImageWarn}` : base, ok: true })
+        toast.success(base)
         return
       }
       if (res.status === 409 && data.reason === 'already_exported') {
@@ -421,7 +427,6 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
           <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
           <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
-          <span className="text-xs text-slate-400 dark:text-slate-600 px-2">{e.publishNextPhase}</span>
         </div>
 
         {/* Single, prominent return to the Content Hub for this project. */}
@@ -431,6 +436,8 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           </Link>
         </div>
       </div>
+
+      <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />
     </div>
   )
 }

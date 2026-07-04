@@ -31,12 +31,14 @@ export default function TopicsList({
   articleByTopic = {},
   onEdit,
   onChanged,
+  onToast,
 }: {
   topics: ArticleTopic[]
   projectName: string
   articleByTopic?: Record<string, { id: string; status: string }>
   onEdit: (topic: ArticleTopic) => void
   onChanged: () => void
+  onToast?: (kind: 'success' | 'error', text: string) => void
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
@@ -116,7 +118,10 @@ export default function TopicsList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
-      if (res.ok) onChanged()
+      if (res.ok) { onChanged(); onToast?.('success', status === 'approved' ? c.toasts.topicApproved : c.toasts.topicRejected) }
+      else onToast?.('error', (c.genErrors as Record<string, string>).unknown)
+    } catch {
+      onToast?.('error', (c.genErrors as Record<string, string>).unknown)
     } finally {
       setBusyId(null)
     }
@@ -127,7 +132,8 @@ export default function TopicsList({
     setBusyId(id)
     try {
       const res = await fetch(`/api/content/topics/${id}`, { method: 'DELETE' })
-      if (res.ok) onChanged()
+      if (res.ok) { onChanged(); onToast?.('success', c.toasts.topicDeleted) }
+      else onToast?.('error', (c.genErrors as Record<string, string>).unknown)
     } finally {
       setBusyId(null)
     }
