@@ -28,6 +28,7 @@ import type {
   WordPressTestResult,
   WordPressContentItem,
   WordPressListOptions,
+  SeoKeywordSource,
 } from './types'
 
 const REQUEST_TIMEOUT_MS = 15_000
@@ -481,7 +482,31 @@ function stripRendered(v: unknown): string {
   return s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Probe the post `meta` object for an SEO-plugin focus keyword IF the site
+ * happens to expose it via REST. Standard installs do NOT expose these
+ * (protected meta), so this returns null far more often than not — by design.
+ * Never assumes the fields exist; never requires a plugin.
+ */
+function extractFocusKeyword(meta: unknown): { keyword: string; source: SeoKeywordSource } | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  const m = meta as Record<string, unknown>
+  const pick = (v: unknown): string => {
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (Array.isArray(v) && typeof v[0] === 'string' && v[0].trim()) return v[0].trim()
+    return ''
+  }
+  const yoast = pick(m._yoast_wpseo_focuskw)
+  if (yoast) return { keyword: yoast, source: 'yoast_focus_keyword' }
+  const rankmath = pick(m.rank_math_focus_keyword)
+  if (rankmath) return { keyword: rankmath.split(',')[0]!.trim(), source: 'rankmath_focus_keyword' }
+  const aioseo = pick(m._aioseo_keywords ?? m.aioseo_keywords)
+  if (aioseo) return { keyword: aioseo.split(',')[0]!.trim(), source: 'aioseo_focus_keyword' }
+  return null
+}
+
 function mapContentItem(r: any): WordPressContentItem {
+  const focus = extractFocusKeyword(r?.meta)
   return {
     id: Number(r?.id) || 0,
     type: String(r?.type ?? 'post'),
@@ -495,6 +520,8 @@ function mapContentItem(r: any): WordPressContentItem {
     modified: r?.modified ?? null,
     categories: Array.isArray(r?.categories) ? r.categories.map(Number).filter((n: number) => !Number.isNaN(n)) : [],
     tags: Array.isArray(r?.tags) ? r.tags.map(Number).filter((n: number) => !Number.isNaN(n)) : [],
+    seoFocusKeyword: focus?.keyword ?? null,
+    seoKeywordSource: focus?.source ?? null,
   }
 }
 
@@ -508,7 +535,9 @@ function buildContentPath(base: '/posts' | '/pages', opts: WordPressListOptions)
     status: 'publish',
     orderby: 'modified',
     order: 'desc',
-    _fields: 'id,type,link,slug,status,date,modified,categories,tags,title,excerpt,content',
+    // `meta` is requested so we can OPPORTUNISTICALLY read an SEO focus keyword
+    // if the site exposes one; it is empty/absent on standard installs.
+    _fields: 'id,type,link,slug,status,date,modified,categories,tags,title,excerpt,content,meta',
   })
   if (opts.modifiedAfter) params.set('modified_after', opts.modifiedAfter)
   return `${base}?${params.toString()}`

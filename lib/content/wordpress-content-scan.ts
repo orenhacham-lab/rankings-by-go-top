@@ -23,6 +23,7 @@ import {
   internalTargetKey,
   slugFromUrl,
 } from '@/lib/content/internal-links'
+import { tokens } from '@/lib/content/recommendations/dedupe'
 
 // ── MVP safety limits (capped, published-only, no parallel hammering) ──
 const DEFAULT_PER_PAGE = 20
@@ -69,21 +70,78 @@ function isDomainOrUrlLike(a: string): boolean {
 
 const anchorWordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
 
+export type PlanningUsability = 'yes' | 'no' | 'caution'
+
+/** True when the URL is the site homepage (no path after the host). */
+function isHomepageUrl(url: string): boolean {
+  const key = normalizeUrlKey(url)
+  return !!key && !key.includes('/')
+}
+
+/** A single word is an "entity" for a target if it appears in the title/slug. */
+function entityMatchesTarget(word: string, targetTitle: string, targetUrl: string): boolean {
+  const w = word.trim().toLowerCase()
+  if (!w) return false
+  const bag = new Set<string>([...tokens(targetTitle), ...tokens(slugFromUrl(targetUrl))])
+  return bag.has(w)
+}
+
+export interface AnchorContext {
+  targetTitle: string
+  targetUrl: string
+  isHomepage: boolean
+}
+
 /**
- * Classify whether an anchor is usable for internal-link PLANNING. Read-only —
- * the raw anchor is always preserved; this only labels quality so the report can
- * separate useful anchors from generic/boilerplate ones. Mirrors the planner's
- * strictness (natural 2–6 word phrases; no generic single words / URLs / domains).
+ * Classify anchor usability for PLANNING (read-only; raw anchor always kept).
+ * Three states so single-word ENTITY anchors ("טוקיו" → /tokyo/) are usable,
+ * broad homepage entities ("יפן" → /) are caution, and boilerplate/URLs are no.
  */
-export function classifyAnchorForPlanning(anchor: string): { usable: boolean; reason?: string } {
+export function classifyAnchorForPlanning(anchor: string, ctx: AnchorContext): { usability: PlanningUsability; reason: string } {
   const norm = normalizeAnchor(anchor)
-  if (!norm || norm.length < 2) return { usable: false, reason: 'too_short' }
-  if (isDomainOrUrlLike(norm)) return { usable: false, reason: 'url_or_domain' }
-  if (BOILERPLATE_ANCHORS.has(norm.toLowerCase())) return { usable: false, reason: 'generic_boilerplate' }
+  if (!norm || norm.length < 2) return { usability: 'no', reason: 'too_short' }
+  if (isDomainOrUrlLike(norm)) return { usability: 'no', reason: 'url_or_domain' }
+  if (BOILERPLATE_ANCHORS.has(norm.toLowerCase())) return { usability: 'no', reason: 'generic_boilerplate' }
   const wc = anchorWordCount(norm)
-  if (wc === 1) return { usable: false, reason: 'generic_single_word' } // incl. broad words like "יפן"
-  if (wc > 8) return { usable: false, reason: 'too_long' }
-  return { usable: true }
+  if (wc === 1) {
+    // Broad homepage entity (e.g. "יפן" → homepage): preserve but flag caution.
+    if (ctx.isHomepage) return { usability: 'caution', reason: 'broad_homepage_entity_anchor' }
+    // Named entity/location matching the target (e.g. "טוקיו" → /tokyo/): usable.
+    if (entityMatchesTarget(norm, ctx.targetTitle, ctx.targetUrl)) return { usability: 'yes', reason: 'entity_single_word_matches_target' }
+    return { usability: 'no', reason: 'generic_single_word' }
+  }
+  if (wc > 8) return { usability: 'no', reason: 'too_long' }
+  return { usability: 'yes', reason: 'natural_phrase' }
+}
+
+export type TargetEligibility = 'yes' | 'no' | 'caution'
+
+// Utility/legal/contact pages that should NOT be internal-link planning targets.
+const UTILITY_EN = [/privacy/i, /\bcontact\b/i, /accessibility/i, /\bterms\b/i, /\blegal\b/i, /cookie/i, /sitemap/i, /disclaimer/i, /\brefund\b/i, /\breturns?\b/i, /shipping/i]
+const UTILITY_HE = ['מדיניות פרטיות', 'פרטיות', 'יצירת קשר', 'צור קשר', 'צרו קשר', 'נגישות', 'הצהרת נגישות', 'תקנון', 'תנאי שימוש', 'מפת אתר', 'החזרות', 'מדיניות משלוח', 'מדיניות ביטול']
+
+/**
+ * Classify whether a TARGET is eligible for internal-link planning. Homepage is
+ * caution (main topic page — valid but not a normal content page); privacy/
+ * contact/legal/utility are ineligible even if their anchor phrase is valid.
+ */
+export function classifyTargetEligibility(url: string, title: string, type: ScannedTarget['targetType']): { eligibility: TargetEligibility; reason: string } {
+  if (isHomepageUrl(url)) return { eligibility: 'caution', reason: 'homepage_main_topic_page' }
+  const hay = `${slugFromUrl(url)} ${title} ${url}`.toLowerCase()
+  if (UTILITY_EN.some((re) => re.test(hay)) || UTILITY_HE.some((w) => hay.includes(w))) {
+    return { eligibility: 'no', reason: 'utility_or_legal_page' }
+  }
+  if (type === 'post' || type === 'page' || type === 'category' || type === 'tag' || type === 'product') {
+    return { eligibility: 'yes', reason: `content_${type}` }
+  }
+  return { eligibility: 'caution', reason: 'unknown_target_type' }
+}
+
+/** First H2/H3 text of a post body (a heading-derived keyword candidate). */
+function firstHeadingText(html: string): string {
+  const m = (html || '').match(/<h[23][^>]*>([\s\S]*?)<\/h[23]>/i)
+  if (!m) return ''
+  return (m[1] ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 }
 
 export interface RejectCounts {
@@ -99,23 +157,41 @@ export interface RejectCounts {
 export interface ScannedAnchor {
   text: string
   count: number
-  usableForPlanning: boolean
-  /** Present when usableForPlanning is false. */
-  rejectedReason?: string
+  /** yes = usable · caution = broad/homepage entity · no = boilerplate/generic. */
+  usability: PlanningUsability
+  reason: string
 }
+
+export type TargetKeywordSource =
+  | 'yoast_focus_keyword'
+  | 'rankmath_focus_keyword'
+  | 'aioseo_focus_keyword'
+  | 'generated_article_primary_keyword'
+  | 'title'
+  | 'slug'
+  | 'heading'
+  | 'inferred'
+  | 'unavailable'
 
 export interface ScannedTarget {
   targetUrl: string
   targetType: 'post' | 'page' | 'category' | 'tag' | 'product' | 'unknown'
   targetTitle: string
   inboundLinkCount: number
+  /** Whether this target is a good internal-link PLANNING destination. */
+  eligibility: TargetEligibility
+  eligibilityReason: string
+  /** Best available keyword signal + where it came from + real-vs-inferred. */
+  keywordSource: TargetKeywordSource
+  primaryKeywordCandidate: string
+  keywordAvailable: boolean
   usableAnchorsCount: number
+  cautionAnchorsCount: number
   rejectedAnchorsCount: number
-  /** True when the target has anchors but NONE are usable for planning. */
+  /** True when the target has anchors but NONE are usable/caution. */
   onlyGenericAnchors: boolean
-  /** Usable planning anchors (natural phrases), most-used first. */
   usableAnchors: ScannedAnchor[]
-  /** Generic/boilerplate/URL anchors, kept for diagnostics, most-used first. */
+  cautionAnchors: ScannedAnchor[]
   rejectedAnchors: ScannedAnchor[]
   exampleSources: { url: string; title: string }[]
   matchedGeneratedArticleId: string | null
@@ -131,9 +207,9 @@ export interface SampleLink {
   anchor: string
   /** How the link itself was classified (internal vs a rejection bucket). */
   linkClass: SampleLinkClass
-  /** For internal links: whether the anchor is usable for planning. */
-  anchorUsableForPlanning: boolean
-  anchorRejectReason?: string
+  /** For internal links: anchor usability (yes/no/caution) + reason. */
+  anchorUsability: PlanningUsability | 'n/a'
+  anchorReason: string
   context: string
 }
 
@@ -153,6 +229,12 @@ export interface SiteScanReport {
   targetsWithUsableAnchors: number
   /** Targets whose anchors are ALL generic/boilerplate/URL. */
   targetsGenericOnly: number
+  /** Targets eligible / caution / ineligible for planning. */
+  targetsEligible: number
+  targetsEligibilityCaution: number
+  targetsIneligible: number
+  /** How many scanned items exposed an SEO-plugin focus keyword via REST. */
+  seoFocusKeywordsFound: number
   targets: ScannedTarget[]
   sampleLinks: SampleLink[]
   notes: string[]
@@ -167,7 +249,7 @@ export interface ScanOptions {
   includePages?: boolean
   modifiedAfter?: string
   /** Our own published articles, for target↔generated_article matching. */
-  generatedArticles?: { url: string; id: string; title: string }[]
+  generatedArticles?: { url: string; id: string; title: string; primaryKeyword?: string | null }[]
 }
 
 const clean = (s: string) => s.trim()
@@ -248,8 +330,6 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   const maxItems = Math.min(Math.max(opts.maxItems ?? DEFAULT_MAX_ITEMS, 1), 500)
   const includePages = opts.includePages !== false
 
-  // Standard REST never exposes Yoast/RankMath/AIOSEO focus keywords — say so.
-  notes.push('SEO plugin focus keywords (Yoast/RankMath/AIOSEO) are NOT available via the standard WordPress REST API and were not used.')
   notes.push('Only PUBLISHED posts/pages were scanned; drafts/private/trash are excluded.')
 
   // 1) Fetch published posts, then pages (sequential — no parallel hammering).
@@ -261,6 +341,15 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
 
   const items = [...posts.items, ...pagesRes.items]
   const truncated = posts.hitLimit || pagesRes.hitLimit
+
+  // SEO focus-keyword availability: we opportunistically checked the exposed
+  // post `meta` for Yoast/RankMath/AIOSEO focus keywords. Report what we found.
+  const seoFocusKeywordsFound = items.filter((it) => (it.seoFocusKeyword || '').trim()).length
+  notes.push(
+    seoFocusKeywordsFound > 0
+      ? `SEO plugin focus keywords were found via REST for ${seoFocusKeywordsFound} item(s) and used as the highest-priority keyword signal where present.`
+      : 'The scanner checked the exposed post meta for Yoast/RankMath/AIOSEO focus keywords and found none available via the standard WordPress REST API (this is normal — they are usually protected meta). No custom plugin was required or used.',
+  )
 
   // 2) Category/tag id→name (best-effort; failure is non-fatal).
   let catMap = new Map<number, string>()
@@ -276,16 +365,24 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   for (const it of items) { const h = extractUrlHost(it.link); if (h) hostSet.add(h) }
   const hosts = Array.from(hostSet)
 
-  // Our own item URLs → type/title (for target classification).
-  const ownByKey = new Map<string, { type: string; title: string }>()
+  // Our own fetched item URLs → context used for target typing + keyword source.
+  interface OwnItem { type: string; title: string; slug: string; headingKw: string; seoFocusKeyword: string; seoKeywordSource: string | null }
+  const ownByKey = new Map<string, OwnItem>()
   for (const it of items) {
     if (!it.link) continue
-    ownByKey.set(internalTargetKey(it.link), { type: it.type, title: it.title })
+    ownByKey.set(internalTargetKey(it.link), {
+      type: it.type,
+      title: it.title,
+      slug: it.slug,
+      headingKw: firstHeadingText(it.contentHtml),
+      seoFocusKeyword: (it.seoFocusKeyword || '').trim(),
+      seoKeywordSource: it.seoKeywordSource,
+    })
   }
-  // Generated-article URLs → {id,title} for matching.
-  const genByKey = new Map<string, { id: string; title: string }>()
+  // Generated-article URLs → {id,title,primaryKeyword} for matching.
+  const genByKey = new Map<string, { id: string; title: string; primaryKeyword: string }>()
   for (const g of opts.generatedArticles ?? []) {
-    if (g.url) genByKey.set(internalTargetKey(g.url), { id: g.id, title: g.title })
+    if (g.url) genByKey.set(internalTargetKey(g.url), { id: g.id, title: g.title, primaryKeyword: (g.primaryKeyword || '').trim() })
   }
 
   // 4) Extract + classify links; aggregate targets.
@@ -305,15 +402,24 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
       // Sample the first N links across ALL classes (internal + rejected) so QA
       // can see external/protocol-relative rejects too.
       if (sampleLinks.length < MAX_SAMPLE_LINKS) {
-        const ac = kind === 'internal' ? classifyAnchorForPlanning(anchor) : { usable: false, reason: undefined as string | undefined }
+        let anchorUsability: PlanningUsability | 'n/a' = 'n/a'
+        let anchorReason = ''
+        if (kind === 'internal') {
+          const skey = internalTargetKey(link.href)
+          const own = ownByKey.get(skey)
+          const ctx: AnchorContext = { targetTitle: own?.title || slugFromUrl(link.href), targetUrl: normalizeHref(link.href), isHomepage: isHomepageUrl(link.href) }
+          const ac = classifyAnchorForPlanning(anchor, ctx)
+          anchorUsability = ac.usability
+          anchorReason = ac.reason
+        }
         sampleLinks.push({
           sourceTitle: it.title,
           sourceUrl: it.link,
           targetUrl: normalizeHref(link.href),
           anchor,
           linkClass: kind,
-          anchorUsableForPlanning: kind === 'internal' ? ac.usable : false,
-          anchorRejectReason: kind === 'internal' ? ac.reason : undefined,
+          anchorUsability,
+          anchorReason,
           context: kind === 'internal' ? contextAround(it.contentHtml, anchor) : '',
         })
       }
@@ -347,30 +453,69 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     }
   }
 
-  // 5) Shape the target list: classify every anchor, split usable vs rejected.
+  // 5) Shape the target list: eligibility, keyword source, anchor tri-state.
   const targetList: ScannedTarget[] = Array.from(targets.entries())
     .map(([key, agg]) => {
+      const own = ownByKey.get(key)
       const gen = genByKey.get(key)
+      const ctx: AnchorContext = { targetTitle: agg.title, targetUrl: agg.url, isHomepage: isHomepageUrl(agg.url) }
+
+      // Anchor tri-state classification (context-aware entity handling).
       const classified: ScannedAnchor[] = Array.from(agg.anchors.values())
         .map(({ text, count }) => {
-          const c = classifyAnchorForPlanning(text)
-          return { text, count, usableForPlanning: c.usable, rejectedReason: c.reason }
+          const c = classifyAnchorForPlanning(text, ctx)
+          return { text, count, usability: c.usability, reason: c.reason }
         })
         .sort((a, b) => b.count - a.count)
-      const usableAnchors = classified.filter((a) => a.usableForPlanning).slice(0, TOP_ANCHORS_PER_TARGET)
-      const rejectedAnchors = classified.filter((a) => !a.usableForPlanning).slice(0, TOP_ANCHORS_PER_TARGET)
-      const usableAnchorsCount = classified.filter((a) => a.usableForPlanning).length
-      const rejectedAnchorsCount = classified.length - usableAnchorsCount
+      const usableAnchors = classified.filter((a) => a.usability === 'yes').slice(0, TOP_ANCHORS_PER_TARGET)
+      const cautionAnchors = classified.filter((a) => a.usability === 'caution').slice(0, TOP_ANCHORS_PER_TARGET)
+      const rejectedAnchors = classified.filter((a) => a.usability === 'no').slice(0, TOP_ANCHORS_PER_TARGET)
+      const usableAnchorsCount = classified.filter((a) => a.usability === 'yes').length
+      const cautionAnchorsCount = classified.filter((a) => a.usability === 'caution').length
+      const rejectedAnchorsCount = classified.filter((a) => a.usability === 'no').length
+
+      // Target eligibility (homepage = caution; privacy/contact/legal = no).
+      const elig = classifyTargetEligibility(agg.url, agg.title, agg.type)
+
+      // Keyword source priority: SEO focus kw → our primary_keyword → title →
+      // slug → heading → inferred → unavailable. Only the first two are "available".
+      let keywordSource: TargetKeywordSource = 'unavailable'
+      let primaryKeywordCandidate = ''
+      let keywordAvailable = false
+      const slugKw = slugFromUrl(agg.url)
+      if (own?.seoFocusKeyword) {
+        keywordSource = (own.seoKeywordSource as TargetKeywordSource) || 'yoast_focus_keyword'
+        primaryKeywordCandidate = own.seoFocusKeyword
+        keywordAvailable = true
+      } else if (gen?.primaryKeyword) {
+        keywordSource = 'generated_article_primary_keyword'
+        primaryKeywordCandidate = gen.primaryKeyword
+        keywordAvailable = true
+      } else if (own?.title) {
+        keywordSource = 'title'; primaryKeywordCandidate = own.title
+      } else if (slugKw) {
+        keywordSource = 'slug'; primaryKeywordCandidate = slugKw
+      } else if (own?.headingKw) {
+        keywordSource = 'heading'; primaryKeywordCandidate = own.headingKw
+      }
+
       const exampleSources = Array.from(agg.sources.entries()).slice(0, MAX_EXAMPLE_SOURCES).map(([url, title]) => ({ url, title }))
       return {
         targetUrl: agg.url,
         targetType: agg.type,
         targetTitle: agg.title,
         inboundLinkCount: agg.inbound,
+        eligibility: elig.eligibility,
+        eligibilityReason: elig.reason,
+        keywordSource,
+        primaryKeywordCandidate,
+        keywordAvailable,
         usableAnchorsCount,
+        cautionAnchorsCount,
         rejectedAnchorsCount,
-        onlyGenericAnchors: classified.length > 0 && usableAnchorsCount === 0,
+        onlyGenericAnchors: classified.length > 0 && usableAnchorsCount === 0 && cautionAnchorsCount === 0,
         usableAnchors,
+        cautionAnchors,
         rejectedAnchors,
         exampleSources,
         matchedGeneratedArticleId: gen?.id ?? null,
@@ -393,6 +538,10 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     uniqueTargets: targetList.length,
     targetsWithUsableAnchors: targetList.filter((t) => t.usableAnchorsCount > 0).length,
     targetsGenericOnly: targetList.filter((t) => t.onlyGenericAnchors).length,
+    targetsEligible: targetList.filter((t) => t.eligibility === 'yes').length,
+    targetsEligibilityCaution: targetList.filter((t) => t.eligibility === 'caution').length,
+    targetsIneligible: targetList.filter((t) => t.eligibility === 'no').length,
+    seoFocusKeywordsFound,
     targets: targetList.slice(0, TOP_TARGETS),
     sampleLinks,
     notes,

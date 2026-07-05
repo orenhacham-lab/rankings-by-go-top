@@ -47,6 +47,8 @@ export interface WordPressTestResult {
  * rendered HTML we parse for internal links. Focus keywords are intentionally
  * absent — standard REST does not expose Yoast/RankMath/AIOSEO focus keywords.
  */
+export type SeoKeywordSource = 'yoast_focus_keyword' | 'rankmath_focus_keyword' | 'aioseo_focus_keyword'
+
 export interface WordPressContentItem {
   id: number
   type: string
@@ -60,6 +62,14 @@ export interface WordPressContentItem {
   modified: string | null
   categories: number[]
   tags: number[]
+  /**
+   * SEO plugin focus keyword IF the site exposes it via REST post meta
+   * (Yoast/RankMath/AIOSEO). Null when not exposed — never assumed, never
+   * required. AIOSEO usually stores keywords outside post meta, so it is often
+   * unavailable even when the plugin is active.
+   */
+  seoFocusKeyword: string | null
+  seoKeywordSource: SeoKeywordSource | null
 }
 
 export interface WordPressListOptions {
