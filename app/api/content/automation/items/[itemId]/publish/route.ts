@@ -11,6 +11,9 @@ import { isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { authItem } from '@/lib/content/automation/api'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
 
+// Image upload + WordPress createPost can take longer than the default budget.
+export const maxDuration = 300
+
 export async function POST(_request: Request, { params }: { params: Promise<{ itemId: string }> }) {
   if (!isContentAutomationEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
   const { itemId } = await params
