@@ -1,25 +1,22 @@
 /**
  * Content-automation topic recommendation engine (source-agnostic).
  *
- * Given a project + a source, produce deduped TopicSuggestion[]:
- *   - 'keyword'             → Gemini topic ideas from a keyword seed (reuses the
- *                             existing gemini-topics generator + filter).
- *   - 'project_data'        → Gemini over existing project context (missing /
- *                             supporting topics).
+ * Given a project + a source, produce a USEFUL BATCH of new, non-duplicate
+ * TopicSuggestion[]:
+ *   - 'keyword'             → expand a broad seed keyword into many distinct
+ *                             long-tail article ideas (Gemini).
+ *   - 'project_data'        → gap-based ideas from existing project context.
  *   - 'keyword_research_url'→ Google Ads by domain → cluster → Gemini.
  *
- * Deterministic dedupe removes anything close to an existing topic or published
- * article. Never invents keywords beyond what the source produced. No auto-save
- * here — the route persists only what the user approves.
+ * It loops (bounded) until it reaches a target of new ideas, feeding already-seen
+ * titles back so each round produces DIFFERENT ideas. Dedupe is title-based and
+ * near-duplicate-only, so broad topical overlap (many "Japan" ideas) is allowed.
+ * No auto-save — the route persists only what the user approves.
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
-import {
-  generateRawTopics,
-  filterTopicSuggestions,
-  assessProjectKeywordFit,
-} from '@/lib/content/gemini-topics'
+import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { recommendFromKeywordResearch } from './keyword-research'
@@ -27,7 +24,10 @@ import type { RecommendationSource, RecommendationResult, TopicSuggestion, Sugge
 
 type Admin = ReturnType<typeof createAdminClient>
 
-const MAX_SUGGESTIONS = 20
+const TARGET_NEW = 15
+const MAX_ATTEMPTS = 4
+const MAX_SUGGESTIONS = 30
+const BATCH_SIZE = 15
 
 interface ProjectRow {
   id: string
@@ -43,6 +43,17 @@ export interface GenerateInput {
   source: RecommendationSource
   /** Required for the 'keyword' source. */
   keyword?: string
+}
+
+/** Raw idea shape returned by the Gemini prompts below. */
+interface GeminiIdea {
+  title?: string
+  primaryKeyword?: string
+  secondaryKeywords?: string[]
+  searchIntent?: string
+  angle?: string
+  recommendedWordCount?: number
+  reason?: string
 }
 
 /** Build https://host/ from a stored target_domain (bare host or full URL). */
@@ -71,39 +82,12 @@ function attachInternalLinks(
   return scored.slice(0, 2).map((c) => ({ url: c.url, anchor: c.anchor }))
 }
 
-interface GeminiProjectTopic {
-  title: string
-  primaryKeyword: string
-  secondaryKeywords?: string[]
-  searchIntent?: string
-  angle?: string
-  recommendedWordCount?: number
-  reason?: string
-}
-
-/** Gemini over existing project context → missing/supporting topics. */
-async function projectDataTopics(
-  project: ProjectRow,
-  language: 'he' | 'en',
-  existingTitles: string[],
-): Promise<GeminiProjectTopic[]> {
+async function callGeminiIdeas(prompt: string): Promise<GeminiIdea[]> {
   const client = getGeminiClient()
   if (!client) return []
   const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
-  const langLabel = language === 'he' ? 'Hebrew' : 'English'
-  const prompt = [
-    `You are an SEO content strategist. Suggest NEW article topics for a website, based only on its own context.`,
-    `Business: ${project.business_name || '(unknown)'} — domain: ${project.target_domain || '(unknown)'}.`,
-    `Write ALL output in ${langLabel}.`,
-    existingTitles.length ? `The site ALREADY has these topics/articles — do NOT repeat or closely overlap them:` : '',
-    existingTitles.length ? existingTitles.slice(0, 30).map((t) => `- ${t}`).join('\n') : '',
-    `Suggest up to 8 NEW or SUPPORTING article topics that fill real gaps and fit this business. Each must be genuinely useful, specific, and not a duplicate of the list above.`,
-    `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason"}]}.`,
-    `searchIntent ∈ informational|commercial|comparison|transactional|local|other. recommendedWordCount 800-1600. reason = one short plain-language sentence for a non-SEO owner.`,
-  ].filter(Boolean).join('\n')
-
   try {
-    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
+    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.95 } })
     const result = await model.generateContent(prompt)
     const text = result.response.text()
     let parsed: { topics?: unknown }
@@ -114,11 +98,92 @@ async function projectDataTopics(
       if (!m) return []
       parsed = JSON.parse(m[0])
     }
-    return Array.isArray(parsed.topics) ? (parsed.topics as GeminiProjectTopic[]) : []
+    return Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : []
   } catch (err) {
-    console.error('[recommendations] projectDataTopics gemini error', { message: err instanceof Error ? err.message : String(err) })
+    console.error('[recommendations] gemini ideas error', { message: err instanceof Error ? err.message : String(err) })
     return []
   }
+}
+
+/** Expand a BROAD seed keyword into many distinct long-tail article ideas. */
+function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string, count: number, avoid: string[]): string {
+  return [
+    `You generate specific SEO article ideas for a website.`,
+    businessCtx ? `Website context: ${businessCtx}.` : '',
+    `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic.`,
+    `Write ALL output in ${langLabel}.`,
+    `Produce up to ${count} DISTINCT, specific, long-tail article ideas a real site in this area would publish — vary the angle: subtopics, regions, itineraries, comparisons, how-tos, costs/budgets, seasons, audiences (families/couples/first-timers), tips, and deep dives.`,
+    `Each idea MUST be a concrete article (e.g. for seed "יפן": "מסלול ביפן ל-14 יום", "יפן עם ילדים", "קיוטו בפעם הראשונה", "אוכל רחוב ביפן", "עלויות טיול ביפן"), NOT a rephrasing of the seed.`,
+    `Give each a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own.`,
+    avoid.length ? `Do NOT repeat or closely overlap these existing titles: ${avoid.slice(0, 40).map((t) => `"${t}"`).join(', ')}.` : '',
+    `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason"}]}. searchIntent ∈ informational|commercial|comparison|transactional|local|other. recommendedWordCount 800-1600. reason = one short plain-language sentence.`,
+  ].filter(Boolean).join('\n')
+}
+
+/** Gap-based ideas from existing project context (missing / adjacent / deeper). */
+function projectDataPrompt(project: ProjectRow, langLabel: string, count: number, avoid: string[]): string {
+  return [
+    `You are an SEO content strategist finding CONTENT GAPS for a website.`,
+    `Business: ${project.business_name || '(unknown)'} — domain: ${project.target_domain || '(unknown)'}.`,
+    `Write ALL output in ${langLabel}.`,
+    avoid.length ? `The site ALREADY covers these — do NOT repeat or closely overlap them:\n${avoid.slice(0, 40).map((t) => `- ${t}`).join('\n')}` : '',
+    `Suggest up to ${count} NEW article ideas that fill real gaps: missing adjacent topics, deeper sub-topics of what already exists, supporting/comparison/how-to articles, and audience- or season-specific angles. Each must be specific and genuinely useful — not a variant of the existing list.`,
+    `Give each a SPECIFIC long-tail primaryKeyword.`,
+    `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason"}]}. searchIntent ∈ informational|commercial|comparison|transactional|local|other. recommendedWordCount 800-1600. reason = one short plain-language sentence.`,
+  ].filter(Boolean).join('\n')
+}
+
+function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number): TopicSuggestion | null {
+  const title = (g.title || '').trim()
+  const primaryKeyword = (g.primaryKeyword || title).trim()
+  if (!title || !primaryKeyword) return null
+  return {
+    id: `${source}:${slugKey(title)}`,
+    title,
+    primaryKeyword,
+    secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : [],
+    searchIntent: g.searchIntent || 'informational',
+    recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000,
+    angle: g.angle || '',
+    suggestedInternalLinks: [],
+    source,
+    suggestionReason: g.reason?.trim() || '',
+    suggestionScore: score,
+  }
+}
+
+/**
+ * Loop a Gemini idea generator until we reach `target` NEW (non-duplicate)
+ * suggestions or run out of attempts. Feeds seen titles back so each round is
+ * different. Dedup is TITLE-based only (broad keyword overlap is allowed).
+ */
+async function accumulate(
+  genBatch: (avoid: string[]) => Promise<TopicSuggestion[]>,
+  corpus: ExistingCorpus,
+  existingTitles: string[],
+  target: number,
+): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number }> {
+  const acc: TopicSuggestion[] = []
+  const seenTitles = new Set<string>()
+  let raw = 0
+  let dupes = 0
+  let attempts = 0
+  while (acc.length < target && attempts < MAX_ATTEMPTS) {
+    attempts++
+    const avoid = [...existingTitles, ...acc.map((a) => a.title)]
+    const batch = await genBatch(avoid)
+    if (batch.length === 0) break
+    raw += batch.length
+    for (const s of batch) {
+      const key = s.title.trim().toLowerCase()
+      if (!key || seenTitles.has(key)) { dupes++; continue }
+      if (corpus.isDuplicate(s.title)) { dupes++; continue }
+      seenTitles.add(key)
+      acc.push(s)
+      if (acc.length >= target) break
+    }
+  }
+  return { acc, raw, dupes, attempts }
 }
 
 export async function generateRecommendations(admin: Admin, input: GenerateInput): Promise<RecommendationResult> {
@@ -130,24 +195,20 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     .maybeSingle()
   const project = (projRow as ProjectRow | null) ?? { id: input.projectId, business_name: null, target_domain: null, country: null, language: null }
   const language: 'he' | 'en' = String(project.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  const langLabel = language === 'he' ? 'Hebrew' : 'English'
   const country = (project.country || 'IL').toUpperCase()
+  const businessCtx = [project.business_name, project.target_domain].filter(Boolean).join(' — ')
 
-  // 2) Existing-content corpus (dedupe) + existing titles (project-data prompt).
+  // 2) Existing-content corpus (dedupe) + existing titles (prompt avoid list).
   const corpus = new ExistingCorpus()
   const existingTitles: string[] = []
-  const { data: topicRows } = await admin
-    .from('article_topics')
-    .select('topic, primary_keyword, secondary_keywords')
-    .eq('project_id', input.projectId)
+  const { data: topicRows } = await admin.from('article_topics').select('topic, primary_keyword, secondary_keywords').eq('project_id', input.projectId)
   for (const t of (topicRows ?? []) as { topic: string; primary_keyword: string | null; secondary_keywords: string[] | null }[]) {
     corpus.add(t.topic); corpus.add(t.primary_keyword)
     for (const s of t.secondary_keywords ?? []) corpus.add(s)
     if (t.topic) existingTitles.push(t.topic)
   }
-  const { data: articleRows } = await admin
-    .from('generated_articles')
-    .select('title, slug')
-    .eq('project_id', input.projectId)
+  const { data: articleRows } = await admin.from('generated_articles').select('title, slug').eq('project_id', input.projectId)
   for (const a of (articleRows ?? []) as { title: string; slug: string | null }[]) {
     corpus.add(a.title); corpus.add(a.slug)
     if (a.title) existingTitles.push(a.title)
@@ -158,96 +219,73 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   try {
     const { candidates } = await loadInternalLinkCandidates(admin, input.projectId)
     linkCandidates = candidates
-  } catch {
-    linkCandidates = []
-  }
+  } catch { linkCandidates = [] }
 
-  // 4) Run the requested source → raw suggestions.
-  let raw: TopicSuggestion[] = []
-  let meta: RecommendationResult['meta'] = { source: input.source, generated: 0, skippedDuplicates: 0 }
+  // 4) Run the requested source into a deduped batch.
+  let suggestions: TopicSuggestion[] = []
+  let meta: RecommendationResult['meta']
 
   if (input.source === 'keyword') {
     const keyword = (input.keyword || '').trim()
-    if (keyword) {
-      const res = await generateRawTopics({
-        primaryKeyword: keyword,
-        language,
-        searchIntent: 'informational',
-        count: 8,
-        businessName: project.business_name,
-        domain: project.target_domain,
-        category: null,
-        useProjectContext: true,
-      })
-      if ('raw' in res) {
-        const filtered = filterTopicSuggestions(res.raw, keyword, 8)
-        const list = filtered.length ? filtered : filterTopicSuggestions(res.raw, keyword, 8, { relaxed: true })
-        raw = list.map((g) => ({
-          id: `keyword:${slugKey(g.primaryKeyword || g.title)}`,
-          title: g.title,
-          primaryKeyword: g.primaryKeyword || keyword,
-          secondaryKeywords: Array.isArray(g.suggestedSecondaryKeywords) ? g.suggestedSecondaryKeywords : [],
-          searchIntent: g.searchIntent || 'informational',
-          recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000,
-          angle: g.angle || '',
-          suggestedInternalLinks: [],
-          source: 'keyword',
-          suggestionReason: g.whyThisTopic || (language === 'he' ? 'רעיון שנוצר לפי מילת המפתח שהוזנה' : 'Generated from the entered keyword'),
-          suggestionScore: 0.7,
-        }))
-      }
-    }
+    const { acc, raw, dupes, attempts } = await accumulate(
+      async (avoid) => {
+        const ideas = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
+        return ideas.map((g) => mapIdea(g, 'keyword', 0.7)).filter((x): x is TopicSuggestion => !!x)
+      },
+      corpus, existingTitles, TARGET_NEW,
+    )
+    suggestions = acc
+    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason: acc.length === 0 ? (raw === 0 ? 'model_empty' : 'all_duplicates') : undefined }
   } else if (input.source === 'project_data') {
-    const topics = await projectDataTopics(project, language, existingTitles)
-    raw = topics.map((g) => {
-      const primaryKeyword = (g.primaryKeyword || g.title || '').trim()
-      const fit = assessProjectKeywordFit(primaryKeyword, { businessName: project.business_name, category: null })
-      const score = Math.min(1, 0.6 + (fit === 'aligned' ? 0.2 : fit === 'weak' ? 0.1 : 0))
-      return {
-        id: `project_data:${slugKey(primaryKeyword)}`,
-        title: (g.title || primaryKeyword).trim(),
-        primaryKeyword,
-        secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords : [],
-        searchIntent: g.searchIntent || 'informational',
-        recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000,
-        angle: g.angle || '',
-        suggestedInternalLinks: [],
-        source: 'project_data' as const,
-        suggestionReason: g.reason?.trim() || (language === 'he' ? 'נושא משלים לפי נתוני האתר הקיימים' : 'A supporting topic based on the site’s existing content'),
-        suggestionScore: Number(score.toFixed(2)),
-      }
-    }).filter((s) => s.primaryKeyword)
+    const { acc, raw, dupes, attempts } = await accumulate(
+      async (avoid) => {
+        const ideas = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid))
+        return ideas.map((g) => {
+          const s = mapIdea(g, 'project_data', 0)
+          if (!s) return null
+          const fit = assessProjectKeywordFit(s.primaryKeyword, { businessName: project.business_name, category: null })
+          s.suggestionScore = Number(Math.min(1, 0.6 + (fit === 'aligned' ? 0.2 : fit === 'weak' ? 0.1 : 0)).toFixed(2))
+          if (!s.suggestionReason) s.suggestionReason = language === 'he' ? 'נושא משלים לפי נתוני האתר' : 'A supporting topic based on the site data'
+          return s
+        }).filter((x): x is TopicSuggestion => !!x)
+      },
+      corpus, existingTitles, TARGET_NEW,
+    )
+    suggestions = acc
+    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason: acc.length === 0 ? (raw === 0 ? 'model_empty' : 'all_duplicates') : undefined }
   } else {
-    // keyword_research_url
+    // keyword_research_url — one Google Ads pass → clusters → topics, then dedupe.
     const seedUrls = [homepageFromDomain(project.target_domain), ...linkCandidates.map((c) => c.url)].filter((u): u is string => !!u)
     const res = await recommendFromKeywordResearch(admin, {
-      userId: input.userId,
-      projectId: input.projectId,
-      seedUrls,
-      country,
-      language,
-      businessName: project.business_name,
-      category: null,
+      userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
     })
-    raw = res.suggestions
-    meta = { source: input.source, generated: res.meta.generated, skippedDuplicates: 0, keywordResearchFailed: res.meta.keywordResearchFailed, failureReason: res.meta.failureReason, adsCalls: res.meta.adsCalls }
+    const seenTitles = new Set<string>()
+    let dupes = 0
+    for (const s of res.suggestions) {
+      const key = s.title.trim().toLowerCase()
+      if (!key || seenTitles.has(key)) { dupes++; continue }
+      if (corpus.isDuplicate(s.title)) { dupes++; continue }
+      seenTitles.add(key)
+      suggestions.push(s)
+    }
+    meta = {
+      source: 'keyword_research_url',
+      generated: res.meta.generated,
+      skippedDuplicates: dupes,
+      finalCount: suggestions.length,
+      attempts: 1,
+      keywordResearchFailed: res.meta.keywordResearchFailed,
+      failureReason: res.meta.failureReason,
+      adsCalls: res.meta.adsCalls,
+      reason: suggestions.length === 0 ? (res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
+    }
   }
 
-  // 5) Dedupe against existing content + within the batch; enrich internal links.
-  const seenIds = new Set<string>()
-  const suggestions: TopicSuggestion[] = []
-  let skipped = 0
-  for (const s of raw) {
-    if (!s.primaryKeyword || !s.title) continue
-    if (seenIds.has(s.id)) continue
-    if (corpus.isDuplicate(s.primaryKeyword) || corpus.isDuplicate(s.title)) { skipped++; continue }
-    seenIds.add(s.id)
-    suggestions.push({ ...s, suggestedInternalLinks: s.suggestedInternalLinks.length ? s.suggestedInternalLinks : attachInternalLinks(s.primaryKeyword, linkCandidates) })
-    if (suggestions.length >= MAX_SUGGESTIONS) break
-  }
+  // 5) Enrich internal links + cap + sort.
+  const enriched = suggestions
+    .slice(0, MAX_SUGGESTIONS)
+    .map((s) => ({ ...s, suggestedInternalLinks: s.suggestedInternalLinks.length ? s.suggestedInternalLinks : attachInternalLinks(s.primaryKeyword, linkCandidates) }))
+  enriched.sort((a, b) => b.suggestionScore - a.suggestionScore)
 
-  suggestions.sort((a, b) => b.suggestionScore - a.suggestionScore)
-  meta.generated = raw.length
-  meta.skippedDuplicates = skipped
-  return { suggestions, meta }
+  return { suggestions: enriched, meta }
 }

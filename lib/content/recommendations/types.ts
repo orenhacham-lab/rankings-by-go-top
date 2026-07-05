@@ -34,8 +34,16 @@ export interface TopicSuggestion {
 
 export interface RecommendationMeta {
   source: RecommendationSource
+  /** Raw ideas produced by the model(s) across all attempts (before dedupe). */
   generated: number
+  /** How many raw ideas were dropped as duplicates / near-duplicates. */
   skippedDuplicates: number
+  /** Final new, non-duplicate ideas returned. */
+  finalCount: number
+  /** How many generation attempts (loop rounds) were spent. */
+  attempts: number
+  /** Machine reason when finalCount is 0 (e.g. 'all_duplicates', 'model_empty'). */
+  reason?: string
   /** True when the keyword-research (Google Ads) leg failed but we still return. */
   keywordResearchFailed?: boolean
   failureReason?: string

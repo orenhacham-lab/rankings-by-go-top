@@ -41,8 +41,14 @@ export class ExistingCorpus {
     this.phrases.push({ text: t, set: tokens(t) })
   }
 
-  /** True when `candidate` closely matches something already covered. */
-  isDuplicate(candidate: string, threshold = 0.6): boolean {
+  /**
+   * True only when `candidate` is a NEAR-DUPLICATE of something already covered
+   * — exact match, or very high token overlap (default 0.82). Deliberately does
+   * NOT flag broad topical overlap: a seed like "יפן" must still allow many
+   * distinct long-tail titles even when the site already has Japan content. The
+   * old substring-containment rule was removed for exactly this reason.
+   */
+  isDuplicate(candidate: string, threshold = 0.82): boolean {
     const c = (candidate || '').trim().toLowerCase()
     if (!c) return true
     if (this.exact.has(c)) return true
@@ -50,8 +56,6 @@ export class ExistingCorpus {
     if (cset.size === 0) return true
     for (const p of this.phrases) {
       if (jaccard(cset, p.set) >= threshold) return true
-      // Whole-phrase containment either direction (short titles vs long ones).
-      if (c.length >= 6 && (p.text.toLowerCase().includes(c) || c.includes(p.text.toLowerCase()))) return true
     }
     return false
   }

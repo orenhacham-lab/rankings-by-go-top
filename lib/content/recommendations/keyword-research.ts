@@ -18,12 +18,12 @@ import { GoogleAdsError } from '@/lib/google-ads/client'
 import { isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
 import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/keyword-research-cache'
 import { clusterByTokens, tokens, slugKey } from './dedupe'
-import type { TopicSuggestion, RecommendationMeta } from './types'
+import type { TopicSuggestion } from './types'
 
 const MAX_URL_SEEDS = 3
 const MAX_ADS_CALLS = 3
-const MAX_KEYWORDS = 60
-const MAX_CLUSTERS = 12
+const MAX_KEYWORDS = 80
+const MAX_CLUSTERS = 20
 const MIN_MONTHLY = 30
 
 const SUPPORT_TERMS = [
@@ -137,10 +137,17 @@ async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en',
  * Produce raw keyword-research topic suggestions (NOT yet deduped against
  * existing content — the engine does that). Never throws.
  */
+export interface KeywordResearchMeta {
+  generated: number
+  adsCalls: number
+  keywordResearchFailed?: boolean
+  failureReason?: string
+}
+
 export async function recommendFromKeywordResearch(
   admin: ReturnType<typeof createAdminClient>,
   input: KeywordResearchInput,
-): Promise<{ suggestions: TopicSuggestion[]; meta: Omit<RecommendationMeta, 'source' | 'skippedDuplicates'> }> {
+): Promise<{ suggestions: TopicSuggestion[]; meta: KeywordResearchMeta }> {
   const country = isValidCountry(input.country) ? input.country : 'IL'
   const language = (isValidLanguage(input.language) ? input.language : 'he') as 'he' | 'en'
   const seeds = input.seedUrls.filter(Boolean).slice(0, MAX_URL_SEEDS)
@@ -179,7 +186,8 @@ export async function recommendFromKeywordResearch(
 
   // 3) Cluster and pick primary (highest volume) + secondary keywords.
   const volumeByKw = new Map(filtered.map((r) => [r.keyword.trim().toLowerCase(), r.avgMonthlySearches ?? 0]))
-  const clusters = clusterByTokens(filtered.map((r) => r.keyword), 0.5).slice(0, MAX_CLUSTERS)
+  // Higher threshold = less merging = MORE distinct clusters = more article ideas.
+  const clusters = clusterByTokens(filtered.map((r) => r.keyword), 0.6).slice(0, MAX_CLUSTERS)
   const clusterInputs: ClusterInput[] = clusters
     .map((members) => {
       const sorted = [...members].sort((a, b) => (volumeByKw.get(b.toLowerCase()) ?? 0) - (volumeByKw.get(a.toLowerCase()) ?? 0))

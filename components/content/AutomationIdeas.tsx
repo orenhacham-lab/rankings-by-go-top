@@ -54,7 +54,7 @@ export default function AutomationIdeas({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; keywordResearchFailed?: boolean } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean } | null>(null)
 
   const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : t.badgeResearch)
 
@@ -76,7 +76,12 @@ export default function AutomationIdeas({
       const list: Suggestion[] = Array.isArray(data.suggestions) ? data.suggestions : []
       setSuggestions(list)
       setSelected(new Set(list.map((s) => s.id))) // pre-select all for quick bulk approve
-      setMeta({ skippedDuplicates: data.meta?.skippedDuplicates ?? 0, keywordResearchFailed: data.meta?.keywordResearchFailed })
+      setMeta({
+        skippedDuplicates: data.meta?.skippedDuplicates ?? 0,
+        finalCount: data.meta?.finalCount ?? list.length,
+        reason: data.meta?.reason,
+        keywordResearchFailed: data.meta?.keywordResearchFailed,
+      })
     } catch {
       setMessage({ text: 'error', ok: false })
     } finally {
@@ -200,11 +205,20 @@ export default function AutomationIdeas({
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
       )}
-      {meta?.keywordResearchFailed && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{t.researchFailed}</p>
+      {/* Batch feedback: what was found vs. filtered, or a helpful empty reason. */}
+      {meta && suggestions.length > 0 && (
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+          {t.foundSummary.replace('{found}', String(suggestions.length)).replace('{skipped}', String(meta.skippedDuplicates))}
+        </p>
       )}
-      {meta && meta.skippedDuplicates > 0 && (
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">{t.skippedDuplicates.replace('{n}', String(meta.skippedDuplicates))}</p>
+      {meta && suggestions.length === 0 && !loading && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+          {meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
+            ? t.researchFailed
+            : meta.reason === 'all_duplicates'
+              ? t.allDuplicates
+              : t.tryOther}
+        </p>
       )}
       {lastCreatedIds.length > 0 && (
         <div className="mb-3 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/5 px-3 py-2 flex items-center gap-2">
@@ -214,7 +228,7 @@ export default function AutomationIdeas({
       )}
 
       {suggestions.length === 0 && !loading ? (
-        <p className="text-xs text-slate-400">{meta ? t.none : ''}</p>
+        null
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 mb-2">
