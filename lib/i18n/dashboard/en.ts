@@ -67,6 +67,7 @@ export const dashboardEn = {
     autoSchedule: {
       title: 'Automatic publishing schedule',
       intro: 'Pick approved topics, set a publishing frequency, and the system publishes articles automatically from the queue.',
+      settingsTitle: 'Schedule settings',
       cadenceLabel: 'Publishing frequency',
       weekly1: 'One article per week',
       weekly2: 'Two articles per week',
@@ -914,6 +915,8 @@ export const dashboardEn = {
       ],
       guideWarning: 'Do not use your regular WordPress login password. Use an application password only.',
       guideClose: 'Close',
+      editConnection: 'Edit',
+      connectionDetails: 'Details',
       testSuccess: 'Connection is working!',
       genericError: 'Something went wrong. Please try again.',
       confirmDisconnect: 'Disconnect WordPress? Generated articles will remain in the system.',

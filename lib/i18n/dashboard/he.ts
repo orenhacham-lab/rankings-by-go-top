@@ -65,6 +65,7 @@ export const dashboardHe = {
     autoSchedule: {
       title: 'תזמון פרסום אוטומטי',
       intro: 'בחר נושאים שאושרו, קבע תדירות פרסום, והמערכת תפרסם מאמרים אוטומטית לפי התור.',
+      settingsTitle: 'הגדרות תזמון',
       cadenceLabel: 'תדירות פרסום',
       weekly1: 'מאמר אחד בשבוע',
       weekly2: 'שני מאמרים בשבוע',
@@ -912,6 +913,8 @@ export const dashboardHe = {
       ],
       guideWarning: 'אל תשתמשו בסיסמת ההתחברות הרגילה של WordPress. יש להשתמש בסיסמת אפליקציה בלבד.',
       guideClose: 'סגור',
+      editConnection: 'ערוך',
+      connectionDetails: 'פרטים',
       testSuccess: 'החיבור תקין!',
       genericError: 'משהו השתבש. נסו שוב.',
       confirmDisconnect: 'לנתק את חיבור ה-WordPress? המאמרים שנוצרו יישארו במערכת.',

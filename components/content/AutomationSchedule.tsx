@@ -300,9 +300,11 @@ export default function AutomationSchedule({
 
       {message && <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>}
 
-      {/* Settings — compact single row (cadence · publish day(s) · actions);
-          stacks cleanly on mobile. Exact time/timezone stay internal (hidden). */}
-      <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+      {/* Part א — schedule settings. Compact single row (cadence · publish day(s) ·
+          actions); stacks on mobile. Exact time/timezone stay internal (hidden).
+          Subtle tint marks it as a distinct panel without adding a heavy card. */}
+      <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">{t.settingsTitle}</div>
+      <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 p-3 space-y-2">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
           {/* Cadence */}
           <div className="min-w-[11rem]">
@@ -361,8 +363,9 @@ export default function AutomationSchedule({
         </div>
       </div>
 
-      {/* Add approved topics */}
-      <div className="mt-4">
+      {/* Part ב — publishing queue (add approved topics + the queue list below).
+          A thin top divider separates it from the settings panel above. */}
+      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
         <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.addApprovedTitle}</div>
         {approved.length === 0 ? (
           <p className="text-xs text-slate-400">{t.noApproved}</p>

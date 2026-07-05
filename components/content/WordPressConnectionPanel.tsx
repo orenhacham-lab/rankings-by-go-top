@@ -196,36 +196,48 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
       ) : (
         <div className="space-y-4">
           {connection && !showForm && (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-2">
-              <div className="font-mono text-sm text-slate-800 dark:text-slate-100" dir="ltr">
-                {connection.site_url}
-              </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                {t.wpUsername}: <span className="font-medium">{connection.wp_username}</span>
-              </div>
-              {connection.last_tested_at && (
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  {t.lastTestedAt}: {formatDateTime(connection.last_tested_at)}
+            // Compact connected state: URL + actions on one row; username /
+            // last-tested tucked into a collapsed "details" so a set-once
+            // connection doesn't dominate the page.
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm text-slate-800 dark:text-slate-100 truncate max-w-full min-w-0" dir="ltr">
+                  {connection.site_url}
+                </span>
+                <div className="flex flex-wrap items-center gap-2 ms-auto">
+                  <Button size="sm" variant="outline" onClick={handleTest} loading={testing} disabled={testing}>
+                    {testing ? t.testing : t.testConnection}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={openForm}>
+                    {t.editConnection}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleDisconnect}
+                    loading={disconnecting}
+                    disabled={disconnecting}
+                    className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                  >
+                    {disconnecting ? t.disconnecting : t.disconnect}
+                  </Button>
                 </div>
-              )}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button size="sm" variant="outline" onClick={handleTest} loading={testing} disabled={testing}>
-                  {testing ? t.testing : t.testConnection}
-                </Button>
-                <Button size="sm" variant="outline" onClick={openForm}>
-                  {t.wpConnectionTitle}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleDisconnect}
-                  loading={disconnecting}
-                  disabled={disconnecting}
-                  className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
-                >
-                  {disconnecting ? t.disconnecting : t.disconnect}
-                </Button>
               </div>
+              {(connection.wp_username || connection.last_tested_at) && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer select-none text-xs text-slate-500 dark:text-slate-400">{t.connectionDetails}</summary>
+                  <div className="mt-1.5 space-y-1">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      {t.wpUsername}: <span className="font-medium">{connection.wp_username}</span>
+                    </div>
+                    {connection.last_tested_at && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {t.lastTestedAt}: {formatDateTime(connection.last_tested_at)}
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )}
             </div>
           )}
 

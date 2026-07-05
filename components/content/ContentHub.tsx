@@ -724,33 +724,38 @@ export default function ContentHub() {
               </>
               )}
 
-              {/* ── Section 2: topics / briefs (pre-article) ── */}
+              {/* ── Section 2: content automation — ideas + publishing schedule
+                  (flag-gated). Stands as its own group so the pending/manual
+                  heading below labels only the manual list. ── */}
+              {process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' && (
+                <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
+                  <AutomationIdeas
+                    projectId={projectId}
+                    language={language}
+                    onCreated={loadTopics}
+                    onScheduled={() => setAutomationRefresh((k) => k + 1)}
+                  />
+                  <AutomationSchedule
+                    projectId={projectId}
+                    language={language}
+                    refreshKey={automationRefresh}
+                    onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
+                  />
+                </div>
+              )}
+
+              {/* ── Section 3: pending / manual article topics ── */}
               <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
                 <div className="mb-3">
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
                 </div>
-                {/* Content automation — ideas + publishing schedule (flag-gated). */}
-                {process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' && (
-                  <div className="mb-4 space-y-4">
-                    <AutomationIdeas
-                      projectId={projectId}
-                      language={language}
-                      onCreated={loadTopics}
-                      onScheduled={() => setAutomationRefresh((k) => k + 1)}
-                    />
-                    <AutomationSchedule
-                      projectId={projectId}
-                      language={language}
-                      refreshKey={automationRefresh}
-                      onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
-                    />
-                  </div>
-                )}
-                <Card className="mb-3 p-3 bg-slate-50/60 dark:bg-slate-800/40 hover:translate-y-0">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.topicsHelpTitle}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.topicsHelpText}</p>
-                </Card>
+                {/* Workflow help — collapsed by default so it doesn't add standing
+                    vertical weight. Wraps ONLY the help text. */}
+                <details className="mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 px-3 py-2">
+                  <summary className="cursor-pointer select-none text-sm font-medium text-slate-700 dark:text-slate-200">{t.topicsHelpTitle}</summary>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">{t.topicsHelpText}</p>
+                </details>
 
                 {/* Batch action bar — only when there are topics without an article. */}
                 {selectableTopics.length > 0 && (
