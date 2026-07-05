@@ -80,25 +80,33 @@ function esc(s: unknown): string {
 
 function renderHtml(r: SiteScanReport & { projectId: string }): string {
   const rj = r.rejectedReasons
+  const anchorList = (list: SiteScanReport['targets'][number]['usableAnchors'], cls: string) =>
+    list.length
+      ? list.map((a) => `<span class="${cls}">${esc(a.text)} <i>(${a.count})</i>${a.rejectedReason ? ` <small>${esc(a.rejectedReason)}</small>` : ''}</span>`).join('<br>')
+      : '<i>—</i>'
   const targetRows = r.targets.map((t) => `
-    <tr>
+    <tr${t.onlyGenericAnchors ? ' class="generic-only"' : ''}>
       <td>${esc(t.inboundLinkCount)}</td>
       <td>${esc(t.targetType)}</td>
-      <td><a href="${esc(t.targetUrl)}" target="_blank" rel="noopener">${esc(t.targetTitle || t.targetUrl)}</a>${t.matchedGeneratedArticleId ? ' <b>[ours]</b>' : ''}</td>
-      <td>${t.anchors.map((a) => `${esc(a.text)} <i>(${a.count})</i>`).join('<br>')}</td>
+      <td><a href="${esc(t.targetUrl)}" target="_blank" rel="noopener">${esc(t.targetTitle || t.targetUrl)}</a>${t.matchedGeneratedArticleId ? ' <b>[ours]</b>' : ''}<br><small>${esc(t.targetUrl)}</small></td>
+      <td>${anchorList(t.usableAnchors, 'ok')}${t.onlyGenericAnchors ? '<br><b class="warn">no usable anchors</b>' : ''}<br><small>usable: ${esc(t.usableAnchorsCount)}</small></td>
+      <td>${anchorList(t.rejectedAnchors, 'bad')}<br><small>rejected: ${esc(t.rejectedAnchorsCount)}</small></td>
       <td>${t.exampleSources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || s.url)}</a>`).join('<br>')}</td>
     </tr>`).join('')
   const sampleRows = r.sampleLinks.map((s) => `
     <tr>
+      <td class="${s.linkClass === 'internal' ? 'ok' : 'bad'}">${esc(s.linkClass)}</td>
       <td>${esc(s.sourceTitle)}</td>
       <td>${esc(s.anchor)}</td>
+      <td>${s.linkClass === 'internal' ? (s.anchorUsableForPlanning ? '<span class="ok">usable</span>' : `<span class="bad">no${s.anchorRejectReason ? ` · ${esc(s.anchorRejectReason)}` : ''}</span>`) : '<i>n/a</i>'}</td>
       <td><a href="${esc(s.targetUrl)}" target="_blank" rel="noopener">${esc(s.targetUrl)}</a></td>
       <td>${esc(s.context)}</td>
     </tr>`).join('')
   return `<!doctype html><meta charset="utf-8"><title>WP site scan (read-only)</title>
 <style>body{font:14px/1.5 system-ui,sans-serif;margin:24px;color:#111}table{border-collapse:collapse;width:100%;margin:12px 0}
 th,td{border:1px solid #ddd;padding:6px 8px;text-align:start;vertical-align:top;font-size:12px}th{background:#f5f5f5}
-.k{display:inline-block;margin:2px 10px 2px 0}.note{color:#a15c00}.err{color:#b00020}code{background:#f2f2f2;padding:1px 4px}</style>
+.k{display:inline-block;margin:2px 10px 2px 0}.note{color:#a15c00}.err{color:#b00020}code{background:#f2f2f2;padding:1px 4px}
+.ok{color:#0a7a2f}.bad{color:#8a6d00}.warn{color:#b00020}small{color:#777}tr.generic-only{background:#fff8e6}</style>
 <h2>WordPress site scan — read-only report</h2>
 <p><b>Site:</b> <code>${esc(r.siteUrl)}</code> · <b>hosts:</b> ${esc(r.hosts.join(', '))} · <b>truncated:</b> ${esc(r.truncated)} · <b>${esc(r.timingMs)}ms</b></p>
 <p>
@@ -108,8 +116,10 @@ th,td{border:1px solid #ddd;padding:6px 8px;text-align:start;vertical-align:top;
   <span class="k"><b>internal links:</b> ${esc(r.internalLinksExtracted)}</span>
   <span class="k"><b>external/rejected:</b> ${esc(r.externalOrRejected)}</span>
   <span class="k"><b>unique targets:</b> ${esc(r.uniqueTargets)}</span>
+  <span class="k"><b>targets w/ usable anchors:</b> ${esc(r.targetsWithUsableAnchors)}</span>
+  <span class="k"><b>generic-only targets:</b> ${esc(r.targetsGenericOnly)}</span>
 </p>
-<p><b>rejected:</b>
+<p><b>rejected links:</b>
   <span class="k">external ${esc(rj.external)}</span><span class="k">mailto ${esc(rj.mailto)}</span>
   <span class="k">tel ${esc(rj.tel)}</span><span class="k">hash ${esc(rj.hash)}</span>
   <span class="k">javascript ${esc(rj.javascript)}</span><span class="k">empty ${esc(rj.empty)}</span><span class="k">other ${esc(rj.other)}</span>
@@ -117,7 +127,7 @@ th,td{border:1px solid #ddd;padding:6px 8px;text-align:start;vertical-align:top;
 ${r.notes.map((n) => `<p class="note">ℹ ${esc(n)}</p>`).join('')}
 ${r.errors.map((e) => `<p class="err">⚠ ${esc(e)}</p>`).join('')}
 <h3>Top internal-link targets (${esc(r.targets.length)})</h3>
-<table><tr><th>inbound</th><th>type</th><th>target</th><th>top anchors (count)</th><th>example sources</th></tr>${targetRows}</table>
-<h3>Sample extracted internal links (${esc(r.sampleLinks.length)})</h3>
-<table><tr><th>source</th><th>anchor</th><th>target</th><th>context</th></tr>${sampleRows}</table>`
+<table><tr><th>inbound</th><th>type</th><th>target URL</th><th>usable anchors</th><th>rejected / generic anchors</th><th>example sources</th></tr>${targetRows}</table>
+<h3>Sample extracted links (${esc(r.sampleLinks.length)}) — internal + rejected</h3>
+<table><tr><th>class</th><th>source</th><th>anchor</th><th>anchor usable?</th><th>target</th><th>context</th></tr>${sampleRows}</table>`
 }

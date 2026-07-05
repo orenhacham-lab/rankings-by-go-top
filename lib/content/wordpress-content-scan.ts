@@ -29,9 +29,62 @@ const DEFAULT_PER_PAGE = 20
 const DEFAULT_MAX_PAGES = 10 // per content type
 const DEFAULT_MAX_ITEMS = 200 // combined posts + pages
 const TOP_TARGETS = 100
-const TOP_ANCHORS_PER_TARGET = 6
+const TOP_ANCHORS_PER_TARGET = 8
 const MAX_EXAMPLE_SOURCES = 3
-const MAX_SAMPLE_LINKS = 25
+const MAX_SAMPLE_LINKS = 40
+
+/**
+ * Generic/boilerplate anchor phrases that are NOT useful for internal-link
+ * planning (they carry no topical meaning). Normalized + lowercased for lookup.
+ */
+const BOILERPLATE_ANCHORS = new Set([
+  // Hebrew
+  'קרא עוד', 'קראו עוד', 'עמוד הבית', 'דף הבית', 'כאן', 'לחצו כאן', 'לחץ כאן', 'לחצו', 'לאתר',
+  'האתר', 'לאתר שלנו', 'למידע נוסף', 'מידע נוסף', 'לפרטים', 'לפרטים נוספים', 'להמשך', 'להמשך קריאה',
+  'עוד', 'ראו כאן', 'ראה כאן', 'המשך', 'המשך קריאה', 'צרו קשר', 'צור קשר', 'ראשי', 'לצפייה',
+  // English
+  'read more', 'here', 'click here', 'home', 'homepage', 'home page', 'learn more', 'more',
+  'more info', 'for more information', 'contact', 'contact us', 'link', 'this page', 'website',
+  'our website', 'visit', 'see more', 'continue reading',
+])
+
+/** Strip decorative arrows/ellipsis/separators so "קרא עוד »" → "קרא עוד". */
+function normalizeAnchor(a: string): string {
+  return (a || '')
+    .replace(/[»«›‹→←▸►◄▶◀•·…]+/g, ' ')
+    .replace(/[|/\\\-–—]+\s*$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** True for anchors that look like a URL or bare domain (booking.com, https://…). */
+function isDomainOrUrlLike(a: string): boolean {
+  const s = a.trim().toLowerCase()
+  if (!s) return false
+  if (/^(https?:)?\/\//.test(s) || s.startsWith('http') || s.includes('://') || s.startsWith('www.')) return true
+  // Bare domain: no spaces, has a dot + TLD (e.g. booking.com, japan4u.co.il).
+  if (!/\s/.test(s) && /^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+([/?#].*)?$/.test(s)) return true
+  return false
+}
+
+const anchorWordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
+
+/**
+ * Classify whether an anchor is usable for internal-link PLANNING. Read-only —
+ * the raw anchor is always preserved; this only labels quality so the report can
+ * separate useful anchors from generic/boilerplate ones. Mirrors the planner's
+ * strictness (natural 2–6 word phrases; no generic single words / URLs / domains).
+ */
+export function classifyAnchorForPlanning(anchor: string): { usable: boolean; reason?: string } {
+  const norm = normalizeAnchor(anchor)
+  if (!norm || norm.length < 2) return { usable: false, reason: 'too_short' }
+  if (isDomainOrUrlLike(norm)) return { usable: false, reason: 'url_or_domain' }
+  if (BOILERPLATE_ANCHORS.has(norm.toLowerCase())) return { usable: false, reason: 'generic_boilerplate' }
+  const wc = anchorWordCount(norm)
+  if (wc === 1) return { usable: false, reason: 'generic_single_word' } // incl. broad words like "יפן"
+  if (wc > 8) return { usable: false, reason: 'too_long' }
+  return { usable: true }
+}
 
 export interface RejectCounts {
   external: number
@@ -46,6 +99,9 @@ export interface RejectCounts {
 export interface ScannedAnchor {
   text: string
   count: number
+  usableForPlanning: boolean
+  /** Present when usableForPlanning is false. */
+  rejectedReason?: string
 }
 
 export interface ScannedTarget {
@@ -53,17 +109,31 @@ export interface ScannedTarget {
   targetType: 'post' | 'page' | 'category' | 'tag' | 'product' | 'unknown'
   targetTitle: string
   inboundLinkCount: number
-  anchors: ScannedAnchor[]
+  usableAnchorsCount: number
+  rejectedAnchorsCount: number
+  /** True when the target has anchors but NONE are usable for planning. */
+  onlyGenericAnchors: boolean
+  /** Usable planning anchors (natural phrases), most-used first. */
+  usableAnchors: ScannedAnchor[]
+  /** Generic/boilerplate/URL anchors, kept for diagnostics, most-used first. */
+  rejectedAnchors: ScannedAnchor[]
   exampleSources: { url: string; title: string }[]
   matchedGeneratedArticleId: string | null
   matchedGeneratedArticleTitle: string | null
 }
+
+export type SampleLinkClass = 'internal' | 'external' | 'mailto' | 'tel' | 'hash' | 'javascript' | 'empty' | 'other'
 
 export interface SampleLink {
   sourceTitle: string
   sourceUrl: string
   targetUrl: string
   anchor: string
+  /** How the link itself was classified (internal vs a rejection bucket). */
+  linkClass: SampleLinkClass
+  /** For internal links: whether the anchor is usable for planning. */
+  anchorUsableForPlanning: boolean
+  anchorRejectReason?: string
   context: string
 }
 
@@ -79,6 +149,10 @@ export interface SiteScanReport {
   externalOrRejected: number
   rejectedReasons: RejectCounts
   uniqueTargets: number
+  /** Targets that have at least one usable (non-generic) planning anchor. */
+  targetsWithUsableAnchors: number
+  /** Targets whose anchors are ALL generic/boilerplate/URL. */
+  targetsGenericOnly: number
   targets: ScannedTarget[]
   sampleLinks: SampleLink[]
   notes: string[]
@@ -220,12 +294,30 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   let externalOrRejected = 0
   const sampleLinks: SampleLink[] = []
 
-  interface Agg { url: string; type: ScannedTarget['targetType']; title: string; anchors: Map<string, number>; sources: Map<string, string>; inbound: number }
+  interface Agg { url: string; type: ScannedTarget['targetType']; title: string; anchors: Map<string, { text: string; count: number }>; sources: Map<string, string>; inbound: number }
   const targets = new Map<string, Agg>()
 
   for (const it of items) {
     for (const link of extractLinkAnchorsFromHtml(it.contentHtml)) {
       const kind = classifyHref(link.href, hosts)
+      const anchor = clean(link.text)
+
+      // Sample the first N links across ALL classes (internal + rejected) so QA
+      // can see external/protocol-relative rejects too.
+      if (sampleLinks.length < MAX_SAMPLE_LINKS) {
+        const ac = kind === 'internal' ? classifyAnchorForPlanning(anchor) : { usable: false, reason: undefined as string | undefined }
+        sampleLinks.push({
+          sourceTitle: it.title,
+          sourceUrl: it.link,
+          targetUrl: normalizeHref(link.href),
+          anchor,
+          linkClass: kind,
+          anchorUsableForPlanning: kind === 'internal' ? ac.usable : false,
+          anchorRejectReason: kind === 'internal' ? ac.reason : undefined,
+          context: kind === 'internal' ? contextAround(it.contentHtml, anchor) : '',
+        })
+      }
+
       if (kind !== 'internal') {
         externalOrRejected++
         rejectedReasons[kind]++
@@ -234,42 +326,52 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
       internalLinksExtracted++
       const key = internalTargetKey(link.href)
       if (!key) { rejectedReasons.other++; continue }
-      const anchor = clean(link.text)
       const own = ownByKey.get(key)
       const agg = targets.get(key) ?? {
         url: normalizeHref(link.href),
         type: guessType(key, link.href, own?.type),
         title: own?.title || slugFromUrl(link.href),
-        anchors: new Map<string, number>(),
+        anchors: new Map<string, { text: string; count: number }>(),
         sources: new Map<string, string>(),
         inbound: 0,
       }
       agg.inbound++
-      if (anchor) agg.anchors.set(anchor.toLowerCase(), (agg.anchors.get(anchor.toLowerCase()) ?? 0) + 1)
+      if (anchor) {
+        const ak = anchor.toLowerCase()
+        const prev = agg.anchors.get(ak)
+        if (prev) prev.count++
+        else agg.anchors.set(ak, { text: anchor, count: 1 })
+      }
       if (it.link && !agg.sources.has(it.link)) agg.sources.set(it.link, it.title)
       targets.set(key, agg)
-
-      if (sampleLinks.length < MAX_SAMPLE_LINKS) {
-        sampleLinks.push({ sourceTitle: it.title, sourceUrl: it.link, targetUrl: normalizeHref(link.href), anchor, context: contextAround(it.contentHtml, anchor) })
-      }
     }
   }
 
-  // 5) Shape the target list (sorted by inbound link count).
+  // 5) Shape the target list: classify every anchor, split usable vs rejected.
   const targetList: ScannedTarget[] = Array.from(targets.entries())
     .map(([key, agg]) => {
       const gen = genByKey.get(key)
-      const anchors = Array.from(agg.anchors.entries())
-        .map(([text, count]) => ({ text, count }))
+      const classified: ScannedAnchor[] = Array.from(agg.anchors.values())
+        .map(({ text, count }) => {
+          const c = classifyAnchorForPlanning(text)
+          return { text, count, usableForPlanning: c.usable, rejectedReason: c.reason }
+        })
         .sort((a, b) => b.count - a.count)
-        .slice(0, TOP_ANCHORS_PER_TARGET)
+      const usableAnchors = classified.filter((a) => a.usableForPlanning).slice(0, TOP_ANCHORS_PER_TARGET)
+      const rejectedAnchors = classified.filter((a) => !a.usableForPlanning).slice(0, TOP_ANCHORS_PER_TARGET)
+      const usableAnchorsCount = classified.filter((a) => a.usableForPlanning).length
+      const rejectedAnchorsCount = classified.length - usableAnchorsCount
       const exampleSources = Array.from(agg.sources.entries()).slice(0, MAX_EXAMPLE_SOURCES).map(([url, title]) => ({ url, title }))
       return {
         targetUrl: agg.url,
         targetType: agg.type,
         targetTitle: agg.title,
         inboundLinkCount: agg.inbound,
-        anchors,
+        usableAnchorsCount,
+        rejectedAnchorsCount,
+        onlyGenericAnchors: classified.length > 0 && usableAnchorsCount === 0,
+        usableAnchors,
+        rejectedAnchors,
         exampleSources,
         matchedGeneratedArticleId: gen?.id ?? null,
         matchedGeneratedArticleTitle: gen?.title ?? null,
@@ -289,6 +391,8 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     externalOrRejected,
     rejectedReasons,
     uniqueTargets: targetList.length,
+    targetsWithUsableAnchors: targetList.filter((t) => t.usableAnchorsCount > 0).length,
+    targetsGenericOnly: targetList.filter((t) => t.onlyGenericAnchors).length,
     targets: targetList.slice(0, TOP_TARGETS),
     sampleLinks,
     notes,

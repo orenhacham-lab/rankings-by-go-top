@@ -138,8 +138,16 @@ export function internalTargetKey(u: string): string {
 
 /** Host of a URL (lowercased, no www). Returns null for relative/anchor URLs. */
 export function extractUrlHost(u: string): string | null {
-  const s = decodeEntities(normalizeHref(u)).trim().replace(/^https?:\/\//i, '')
-  if (!s || s.startsWith('/')) return null // relative → same-site
+  const raw = decodeEntities(normalizeHref(u)).trim()
+  // Protocol-relative ("//host/path", e.g. "//www.booking.com?aid=…") is an
+  // ABSOLUTE URL to `host`, NOT a same-site relative path. Parse the host after
+  // the leading "//" so external protocol-relative links are detected correctly.
+  if (/^\/\//.test(raw)) {
+    const host = (raw.replace(/^\/\//, '').split(/[/?#]/)[0] ?? '').toLowerCase().replace(/^www\./, '')
+    return host || null
+  }
+  const s = raw.replace(/^https?:\/\//i, '')
+  if (!s || s.startsWith('/')) return null // real relative path → same-site
   const host = (s.split(/[/?#]/)[0] ?? '').toLowerCase().replace(/^www\./, '')
   return host || null
 }
