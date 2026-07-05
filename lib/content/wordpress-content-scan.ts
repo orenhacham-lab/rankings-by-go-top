@@ -13,7 +13,7 @@
  */
 
 import type { WordPressCredentials, WordPressContentItem } from '@/lib/wordpress/types'
-import { getPosts, getPages, getCategories, getTags, WordPressClientError } from '@/lib/wordpress/client'
+import { getPosts, getPages, getItemContentHtml, getCategories, getTags, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
 import {
   extractLinkAnchorsFromHtml,
   isInternalUrl,
@@ -26,13 +26,23 @@ import {
 import { tokens } from '@/lib/content/recommendations/dedupe'
 
 // ── MVP safety limits (capped, published-only, no parallel hammering) ──
-const DEFAULT_PER_PAGE = 20
-const DEFAULT_MAX_PAGES = 10 // per content type
+const DEFAULT_PER_PAGE = 25
+const DEFAULT_MAX_PAGES = 12 // per content type (metadata is light, so allow more)
 const DEFAULT_MAX_ITEMS = 200 // combined posts + pages
 const TOP_TARGETS = 100
 const TOP_ANCHORS_PER_TARGET = 8
 const MAX_EXAMPLE_SOURCES = 3
 const MAX_SAMPLE_LINKS = 40
+// Adaptive per_page ladder for metadata list requests (shrinks on "too large").
+const PER_PAGE_LADDER = [25, 10, 5, 1]
+// Soft wall-clock budget for per-item content fetches; remaining items keep
+// their metadata target but skip anchor extraction (partial-but-useful scan).
+const CONTENT_TIME_BUDGET_MS = 220_000
+
+/** True when a client error is specifically the response-size cap. */
+function isTooLarge(e: unknown): boolean {
+  return e instanceof WordPressClientError && /too large/i.test(e.message)
+}
 
 /**
  * Generic/boilerplate anchor phrases that are NOT useful for internal-link
@@ -196,6 +206,9 @@ export interface ScannedTarget {
   exampleSources: { url: string; title: string }[]
   matchedGeneratedArticleId: string | null
   matchedGeneratedArticleTitle: string | null
+  /** True when this is one of our fetched items whose content couldn't be read. */
+  contentSkipped: boolean
+  contentSkippedReason?: string
 }
 
 export type SampleLinkClass = 'internal' | 'external' | 'mailto' | 'tel' | 'hash' | 'javascript' | 'empty' | 'other'
@@ -221,6 +234,15 @@ export interface SiteScanReport {
   itemsScanned: number
   postsPagesRequested: number
   truncated: boolean
+  // Metadata-first / adaptive fetch stats (large-site handling).
+  metadataItemsFetched: number
+  postsMetadataFetched: number
+  pagesMetadataFetched: number
+  contentItemsFetched: number
+  postsContentFetched: number
+  pagesContentFetched: number
+  contentItemsSkipped: number
+  contentTooLargeCount: number
   internalLinksExtracted: number
   externalOrRejected: number
   rejectedReasons: RejectCounts
@@ -255,30 +277,55 @@ export interface ScanOptions {
 const clean = (s: string) => s.trim()
 
 /** Fetch published items of one type, paginating until short page / caps. */
-async function fetchAll(
+/**
+ * Fetch item METADATA (no content) with adaptive pagination. If a page is still
+ * too large (rare for metadata), it retries the SAME page with progressively
+ * smaller per_page (25→10→5→1); the working size is then reused for the rest.
+ * Never throws — reports failures and returns whatever was gathered.
+ */
+async function fetchMetadataAll(
   fetcher: (opts: { page: number; perPage: number; modifiedAfter?: string }) => Promise<WordPressContentItem[]>,
-  perPage: number,
+  startPerPage: number,
   maxPages: number,
   remaining: number,
   modifiedAfter: string | undefined,
   onError: (msg: string) => void,
+  onNote: (msg: string) => void,
 ): Promise<{ items: WordPressContentItem[]; hitLimit: boolean }> {
+  const ladder = Array.from(new Set([startPerPage, ...PER_PAGE_LADDER])).filter((n) => n >= 1 && n <= 50).sort((a, b) => b - a)
   const items: WordPressContentItem[] = []
   let hitLimit = false
-  for (let page = 1; page <= maxPages; page++) {
+  let perPage = 0
+
+  // Resolve a working per_page on page 1 (shrinking on "too large").
+  for (const pp of ladder) {
+    try {
+      const rows = await fetcher({ page: 1, perPage: pp, modifiedAfter })
+      perPage = pp
+      items.push(...rows)
+      if (rows.length < pp) return { items: items.slice(0, remaining), hitLimit: items.length > remaining }
+      break
+    } catch (e) {
+      if (isTooLarge(e)) { onNote(`metadata list too large at per_page=${pp}; retrying smaller`); continue }
+      onError(e instanceof WordPressClientError ? e.message : 'metadata fetch failed')
+      return { items, hitLimit: false }
+    }
+  }
+  if (perPage === 0) { onError('metadata list too large even at per_page=1'); return { items, hitLimit: false } }
+
+  // Continue pagination at the resolved per_page.
+  for (let page = 2; page <= maxPages; page++) {
     if (items.length >= remaining) { hitLimit = true; break }
     let rows: WordPressContentItem[]
     try {
       rows = await fetcher({ page, perPage, modifiedAfter })
     } catch (e) {
-      // A 400 on page>1 is WP's "no more pages" — treat as clean end. Anything
-      // else is surfaced as an error note and stops this type's pagination.
-      if (page > 1) break
-      onError(e instanceof WordPressClientError ? e.message : 'content fetch failed')
+      // 400 on page>1 = "no more pages" → clean end. Too-large → stop (partial).
+      if (isTooLarge(e)) onError(`metadata list page ${page} too large at per_page=${perPage}; stopping (partial)`)
       break
     }
     items.push(...rows)
-    if (rows.length < perPage) break // short page → last page
+    if (rows.length < perPage) break
     if (page === maxPages) hitLimit = true
   }
   return { items: items.slice(0, remaining), hitLimit: hitLimit || items.length > remaining }
@@ -332,15 +379,21 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
 
   notes.push('Only PUBLISHED posts/pages were scanned; drafts/private/trash are excluded.')
 
-  // 1) Fetch published posts, then pages (sequential — no parallel hammering).
-  const posts = await fetchAll((o) => getPosts(creds, o), perPage, maxPages, maxItems, opts.modifiedAfter, (m) => errors.push(`posts: ${m}`))
-  const remainingForPages = Math.max(0, maxItems - posts.items.length)
-  const pagesRes = includePages && remainingForPages > 0
-    ? await fetchAll((o) => getPages(creds, o), perPage, maxPages, remainingForPages, opts.modifiedAfter, (m) => errors.push(`pages: ${m}`))
+  // 1) METADATA-FIRST fetch (NO content.rendered) with adaptive pagination, so
+  // even huge Elementor/WooCommerce sites still return the item list.
+  const postsMeta = await fetchMetadataAll((o) => getPosts(creds, o), perPage, maxPages, maxItems, opts.modifiedAfter, (m) => errors.push(`posts: ${m}`), (m) => notes.push(`posts: ${m}`))
+  const remainingForPages = Math.max(0, maxItems - postsMeta.items.length)
+  const pagesMeta = includePages && remainingForPages > 0
+    ? await fetchMetadataAll((o) => getPages(creds, o), perPage, maxPages, remainingForPages, opts.modifiedAfter, (m) => errors.push(`pages: ${m}`), (m) => notes.push(`pages: ${m}`))
     : { items: [] as WordPressContentItem[], hitLimit: false }
 
-  const items = [...posts.items, ...pagesRes.items]
-  const truncated = posts.hitLimit || pagesRes.hitLimit
+  // Tag each item with its content endpoint for per-item content fetching.
+  const metaItems: { item: WordPressContentItem; endpoint: WpContentEndpoint }[] = [
+    ...postsMeta.items.map((item) => ({ item, endpoint: '/posts' as WpContentEndpoint })),
+    ...pagesMeta.items.map((item) => ({ item, endpoint: '/pages' as WpContentEndpoint })),
+  ]
+  const items = metaItems.map((m) => m.item)
+  const truncated = postsMeta.hitLimit || pagesMeta.hitLimit
 
   // SEO focus-keyword availability: we opportunistically checked the exposed
   // post `meta` for Yoast/RankMath/AIOSEO focus keywords. Report what we found.
@@ -385,22 +438,73 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     if (g.url) genByKey.set(internalTargetKey(g.url), { id: g.id, title: g.title, primaryKeyword: (g.primaryKeyword || '').trim() })
   }
 
-  // 4) Extract + classify links; aggregate targets.
+  // 4) Seed the target index with EVERY fetched item so posts/pages appear as
+  // known targets even when their content can't be read or nothing links to them.
+  interface Agg { url: string; type: ScannedTarget['targetType']; title: string; anchors: Map<string, { text: string; count: number }>; sources: Map<string, string>; inbound: number; contentSkipped: boolean; contentSkippedReason?: string }
+  const targets = new Map<string, Agg>()
+  for (const { item } of metaItems) {
+    if (!item.link) continue
+    const key = internalTargetKey(item.link)
+    if (!key || targets.has(key)) continue
+    targets.set(key, {
+      url: normalizeHref(item.link),
+      type: item.type === 'page' ? 'page' : item.type === 'post' ? 'post' : guessType(key, item.link, item.type),
+      title: item.title || slugFromUrl(item.link),
+      anchors: new Map<string, { text: string; count: number }>(),
+      sources: new Map<string, string>(),
+      inbound: 0,
+      contentSkipped: false,
+    })
+  }
+
+  // 5) Fetch each item's content INDIVIDUALLY and extract links. A huge single
+  // item is skipped (kept as a metadata target) instead of failing the scan.
   const rejectedReasons: RejectCounts = { external: 0, mailto: 0, tel: 0, hash: 0, javascript: 0, empty: 0, other: 0 }
   let internalLinksExtracted = 0
   let externalOrRejected = 0
   const sampleLinks: SampleLink[] = []
+  let contentItemsFetched = 0
+  let contentItemsSkipped = 0
+  let contentTooLargeCount = 0
+  let postsContentFetched = 0
+  let pagesContentFetched = 0
+  let budgetNoted = false
 
-  interface Agg { url: string; type: ScannedTarget['targetType']; title: string; anchors: Map<string, { text: string; count: number }>; sources: Map<string, string>; inbound: number }
-  const targets = new Map<string, Agg>()
+  for (const { item, endpoint } of metaItems) {
+    const itemKey = item.link ? internalTargetKey(item.link) : ''
+    const ownTarget = itemKey ? targets.get(itemKey) : undefined
 
-  for (const it of items) {
-    for (const link of extractLinkAnchorsFromHtml(it.contentHtml)) {
+    // Soft time budget: keep remaining items as metadata targets, skip content.
+    if (Date.now() - startedAt > CONTENT_TIME_BUDGET_MS) {
+      contentItemsSkipped++
+      if (ownTarget) { ownTarget.contentSkipped = true; ownTarget.contentSkippedReason = 'time_budget' }
+      if (!budgetNoted) { notes.push('Content time budget reached — remaining items kept as metadata targets without anchor extraction.'); budgetNoted = true }
+      continue
+    }
+
+    let html = ''
+    try {
+      html = await getItemContentHtml(creds, endpoint, item.id)
+      contentItemsFetched++
+      if (endpoint === '/posts') postsContentFetched++
+      else pagesContentFetched++
+    } catch (e) {
+      contentItemsSkipped++
+      const tooLarge = isTooLarge(e)
+      if (tooLarge) contentTooLargeCount++
+      if (ownTarget) { ownTarget.contentSkipped = true; ownTarget.contentSkippedReason = tooLarge ? 'response_too_large' : 'content_fetch_failed' }
+      continue
+    }
+
+    // Heading-derived keyword candidate for this item-as-target.
+    const ownMeta = itemKey ? ownByKey.get(itemKey) : undefined
+    if (ownMeta && !ownMeta.headingKw) ownMeta.headingKw = firstHeadingText(html)
+
+    for (const link of extractLinkAnchorsFromHtml(html)) {
       const kind = classifyHref(link.href, hosts)
       const anchor = clean(link.text)
 
-      // Sample the first N links across ALL classes (internal + rejected) so QA
-      // can see external/protocol-relative rejects too.
+      // Sample the first N links across ALL classes (internal + rejected).
       if (sampleLinks.length < MAX_SAMPLE_LINKS) {
         let anchorUsability: PlanningUsability | 'n/a' = 'n/a'
         let anchorReason = ''
@@ -413,14 +517,14 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
           anchorReason = ac.reason
         }
         sampleLinks.push({
-          sourceTitle: it.title,
-          sourceUrl: it.link,
+          sourceTitle: item.title,
+          sourceUrl: item.link,
           targetUrl: normalizeHref(link.href),
           anchor,
           linkClass: kind,
           anchorUsability,
           anchorReason,
-          context: kind === 'internal' ? contextAround(it.contentHtml, anchor) : '',
+          context: kind === 'internal' ? contextAround(html, anchor) : '',
         })
       }
 
@@ -440,6 +544,7 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
         anchors: new Map<string, { text: string; count: number }>(),
         sources: new Map<string, string>(),
         inbound: 0,
+        contentSkipped: false,
       }
       agg.inbound++
       if (anchor) {
@@ -448,7 +553,7 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
         if (prev) prev.count++
         else agg.anchors.set(ak, { text: anchor, count: 1 })
       }
-      if (it.link && !agg.sources.has(it.link)) agg.sources.set(it.link, it.title)
+      if (item.link && !agg.sources.has(item.link)) agg.sources.set(item.link, item.title)
       targets.set(key, agg)
     }
   }
@@ -520,18 +625,29 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
         exampleSources,
         matchedGeneratedArticleId: gen?.id ?? null,
         matchedGeneratedArticleTitle: gen?.title ?? null,
+        contentSkipped: agg.contentSkipped,
+        contentSkippedReason: agg.contentSkippedReason,
       }
     })
-    .sort((a, b) => b.inboundLinkCount - a.inboundLinkCount)
+    // Linked targets first; among equal inbound, content-readable before skipped.
+    .sort((a, b) => b.inboundLinkCount - a.inboundLinkCount || Number(a.contentSkipped) - Number(b.contentSkipped))
 
   return {
     siteUrl: creds.siteUrl,
     hosts,
-    postsFetched: posts.items.length,
-    pagesFetched: pagesRes.items.length,
+    postsFetched: postsMeta.items.length,
+    pagesFetched: pagesMeta.items.length,
     itemsScanned: items.length,
     postsPagesRequested: maxItems,
     truncated,
+    metadataItemsFetched: items.length,
+    postsMetadataFetched: postsMeta.items.length,
+    pagesMetadataFetched: pagesMeta.items.length,
+    contentItemsFetched,
+    postsContentFetched,
+    pagesContentFetched,
+    contentItemsSkipped,
+    contentTooLargeCount,
     internalLinksExtracted,
     externalOrRejected,
     rejectedReasons,

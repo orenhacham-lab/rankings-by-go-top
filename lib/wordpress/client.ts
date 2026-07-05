@@ -535,9 +535,11 @@ function buildContentPath(base: '/posts' | '/pages', opts: WordPressListOptions)
     status: 'publish',
     orderby: 'modified',
     order: 'desc',
-    // `meta` is requested so we can OPPORTUNISTICALLY read an SEO focus keyword
-    // if the site exposes one; it is empty/absent on standard installs.
-    _fields: 'id,type,link,slug,status,date,modified,categories,tags,title,excerpt,content,meta',
+    // METADATA-FIRST: content.rendered is intentionally EXCLUDED here — on large
+    // Elementor/WooCommerce sites a single list page with content can exceed the
+    // response-size cap and return nothing. Content is fetched per-item later.
+    // `meta` is requested so we can OPPORTUNISTICALLY read an SEO focus keyword.
+    _fields: 'id,type,link,slug,status,date,modified,categories,tags,title,excerpt,meta',
   })
   if (opts.modifiedAfter) params.set('modified_after', opts.modifiedAfter)
   return `${base}?${params.toString()}`
@@ -556,4 +558,17 @@ export async function getPosts(creds: WordPressCredentials, opts: WordPressListO
 export async function getPages(creds: WordPressCredentials, opts: WordPressListOptions = {}): Promise<WordPressContentItem[]> {
   const rows = await wpGet<any[]>(creds, buildContentPath('/pages', opts))
   return (Array.isArray(rows) ? rows : []).map(mapContentItem)
+}
+
+export type WpContentEndpoint = '/posts' | '/pages'
+
+/**
+ * Read-only: fetch the rendered content HTML of ONE item by id. Kept as a
+ * minimal per-item request (`_fields=id,content`) so a huge single item throws
+ * a size-cap error the caller can skip — without failing the whole scan.
+ * Throws WordPressClientError (incl. "response was too large") like every read.
+ */
+export async function getItemContentHtml(creds: WordPressCredentials, endpoint: WpContentEndpoint, id: number): Promise<string> {
+  const obj = await wpGet<any>(creds, `${endpoint}/${id}?_fields=id,content`)
+  return typeof obj?.content === 'string' ? obj.content : String(obj?.content?.rendered ?? '')
 }

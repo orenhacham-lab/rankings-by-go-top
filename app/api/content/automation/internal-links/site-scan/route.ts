@@ -103,7 +103,7 @@ function renderHtml(r: SiteScanReport & { projectId: string }): string {
       <td>${esc(t.inboundLinkCount)}</td>
       <td>${esc(t.targetType)}</td>
       <td class="${eligCls(t.eligibility)}"><b>${esc(t.eligibility)}</b><br><small>${esc(t.eligibilityReason)}</small></td>
-      <td><a href="${esc(t.targetUrl)}" target="_blank" rel="noopener">${esc(t.targetTitle || t.targetUrl)}</a>${t.matchedGeneratedArticleId ? ' <b>[ours]</b>' : ''}<br><small>${esc(t.targetUrl)}</small></td>
+      <td><a href="${esc(t.targetUrl)}" target="_blank" rel="noopener">${esc(t.targetTitle || t.targetUrl)}</a>${t.matchedGeneratedArticleId ? ' <b>[ours]</b>' : ''}${t.contentSkipped ? ` <b class="warn">[content skipped: ${esc(t.contentSkippedReason || '')}]</b>` : ''}<br><small>${esc(t.targetUrl)}</small></td>
       <td><b>${esc(t.primaryKeywordCandidate || '—')}</b><br><small>${esc(t.keywordSource)}${t.keywordAvailable ? ' (available)' : ' (inferred)'}</small></td>
       <td>${anchorList(t.usableAnchors, 'ok')}<br><small>usable: ${esc(t.usableAnchorsCount)}</small></td>
       <td>${anchorList(t.cautionAnchors, 'caut')}<br><small>caution: ${esc(t.cautionAnchorsCount)}</small></td>
@@ -129,12 +129,17 @@ tr.ineligible{background:#fdeeee}tr.caution-row{background:#fff8e6}</style>
 <h2>WordPress site scan — read-only report</h2>
 <p><b>Site:</b> <code>${esc(r.siteUrl)}</code> · <b>hosts:</b> ${esc(r.hosts.join(', '))} · <b>truncated:</b> ${esc(r.truncated)} · <b>${esc(r.timingMs)}ms</b></p>
 <p>
-  <span class="k"><b>posts:</b> ${esc(r.postsFetched)}</span>
-  <span class="k"><b>pages:</b> ${esc(r.pagesFetched)}</span>
+  <span class="k"><b>posts (meta):</b> ${esc(r.postsMetadataFetched)}</span>
+  <span class="k"><b>pages (meta):</b> ${esc(r.pagesMetadataFetched)}</span>
   <span class="k"><b>items scanned:</b> ${esc(r.itemsScanned)}</span>
   <span class="k"><b>internal links:</b> ${esc(r.internalLinksExtracted)}</span>
   <span class="k"><b>external/rejected:</b> ${esc(r.externalOrRejected)}</span>
   <span class="k"><b>unique targets:</b> ${esc(r.uniqueTargets)}</span>
+</p>
+<p>
+  <span class="k"><b>content fetched:</b> ${esc(r.contentItemsFetched)} (posts ${esc(r.postsContentFetched)} / pages ${esc(r.pagesContentFetched)})</span>
+  <span class="k"><b>content skipped:</b> ${esc(r.contentItemsSkipped)}</span>
+  <span class="k"><b>too-large items:</b> ${esc(r.contentTooLargeCount)}</span>
 </p>
 <p>
   <span class="k"><b>targets eligible:</b> ${esc(r.targetsEligible)}</span>
