@@ -53,6 +53,7 @@ export default function AutomationIdeas({
   const [creating, setCreating] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [ideasExpanded, setIdeasExpanded] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean } | null>(null)
 
@@ -253,7 +254,7 @@ export default function AutomationIdeas({
           </div>
 
           <div className="space-y-2">
-            {suggestions.map((s) => (
+            {(ideasExpanded ? suggestions : suggestions.slice(0, 3)).map((s) => (
               <div key={s.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
                 <label className="flex items-start gap-2">
                   <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="mt-1 h-4 w-4 accent-indigo-600" />
@@ -284,6 +285,11 @@ export default function AutomationIdeas({
                 </label>
               </div>
             ))}
+            {suggestions.length > 3 && (
+              <button type="button" onClick={() => setIdeasExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                {ideasExpanded ? t.showLess : t.showMoreIdeas}
+              </button>
+            )}
           </div>
 
           <p className="text-[11px] text-slate-400 mt-3">{t.nextStepHint}</p>

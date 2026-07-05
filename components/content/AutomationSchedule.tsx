@@ -45,7 +45,6 @@ interface QueueItem {
 }
 interface ApprovedTopic { id: string; topic: string; status: string }
 
-const TZ_OPTIONS = ['Asia/Jerusalem', 'UTC', 'Europe/London', 'America/New_York']
 
 export default function AutomationSchedule({
   projectId,
@@ -76,6 +75,8 @@ export default function AutomationSchedule({
   const [publishTime, setPublishTime] = useState('09:00')
   const [timezone, setTimezone] = useState('Asia/Jerusalem')
   const [weekdays, setWeekdays] = useState<number[]>(DEFAULT_DAYS_1)
+  const [approvedExpanded, setApprovedExpanded] = useState(false)
+  const [queueExpanded, setQueueExpanded] = useState(false)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -275,9 +276,14 @@ export default function AutomationSchedule({
     onChanged?.()
   }
 
-  const fmt = (iso: string | null) => {
+  // Date-only (no exact hour, since a daily cron can't guarantee the minute).
+  // For still-pending items we append "· during the day".
+  const fmtDay = (iso: string | null, pending = false) => {
     if (!iso) return t.notScheduled
-    try { return new Date(iso).toLocaleString(locale, { timeZone: pool?.timezone || timezone, dateStyle: 'medium', timeStyle: 'short' }) } catch { return iso }
+    try {
+      const d = new Date(iso).toLocaleDateString(locale, { timeZone: pool?.timezone || timezone, weekday: 'long', day: 'numeric', month: 'long' })
+      return pending ? `${d} ${t.duringDay}` : d
+    } catch { return iso }
   }
   const statusLabel = (s: string) => (t.status as Record<string, string>)[s] ?? s
   const toggle = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -333,27 +339,17 @@ export default function AutomationSchedule({
             </div>
           </div>
         )}
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="text-xs text-slate-600 dark:text-slate-300">
-            <span className="block mb-1">{t.publishTime}</span>
-            <input type="time" value={publishTime} onChange={(e) => setPublishTime(e.target.value)}
-              className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs" />
-          </label>
-          <label className="text-xs text-slate-600 dark:text-slate-300">
-            <span className="block mb-1">{t.timezone}</span>
-            <select value={timezone} onChange={(e) => setTimezone(e.target.value)}
-              className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
-              {TZ_OPTIONS.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-            </select>
-          </label>
+        {/* Exact publish time / timezone are kept internally (default 09:00
+            Asia/Jerusalem) but hidden — on a daily cron we can't guarantee the
+            exact hour, so we only expose the weekday and avoid misleading users. */}
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.publishDayNote}</p>
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
           <Button size="sm" variant="outline" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
-          <Button size="sm" variant="ghost" onClick={runNow} disabled={saving} title={t.runNowHint}>{t.runNow}</Button>
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400">
-          {t.nextPublish}: <span className="font-medium">{fmt(pool?.nextPublishAt ?? null)}</span>
+          {t.nextPublish}: <span className="font-medium">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
         </div>
-        <p className="text-[11px] text-slate-400">{t.runNowHint}</p>
       </div>
 
       {/* Add approved topics */}
@@ -363,12 +359,17 @@ export default function AutomationSchedule({
           <p className="text-xs text-slate-400">{t.noApproved}</p>
         ) : (
           <div className="space-y-1.5">
-            {approved.map((tp) => (
+            {(approvedExpanded ? approved : approved.slice(0, 3)).map((tp) => (
               <label key={tp.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                 <input type="checkbox" checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} className="h-4 w-4 accent-indigo-600" />
                 <span className="truncate">{tp.topic}</span>
               </label>
             ))}
+            {approved.length > 3 && (
+              <button type="button" onClick={() => setApprovedExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                {approvedExpanded ? t.showLess : t.showMore}
+              </button>
+            )}
             <Button size="sm" onClick={addSelected} loading={saving} disabled={saving || selected.size === 0}>
               {t.addSelected} ({selected.size})
             </Button>
@@ -385,7 +386,7 @@ export default function AutomationSchedule({
           <p className="text-xs text-slate-400">{t.queueEmpty}</p>
         ) : (
           <div className="space-y-2">
-            {items.map((it, idx) => (
+            {(queueExpanded ? items : items.slice(0, 3)).map((it, idx) => (
               <div key={it.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5 flex flex-wrap items-center gap-2">
                 <div className="flex flex-col gap-0.5">
                   <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} className="text-slate-400 hover:text-slate-600 disabled:opacity-30 leading-none">↑</button>
@@ -393,7 +394,7 @@ export default function AutomationSchedule({
                 </div>
                 <div className="flex-1 min-w-[10rem]">
                   <div className="text-sm text-slate-800 dark:text-slate-100 truncate">{it.topicTitle}</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{fmt(it.projectedPublishAt)}{it.lastError ? ` · ${it.lastError}` : ''}</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{fmtDay(it.projectedPublishAt, ['queued', 'scheduled', 'generated', 'generating', 'publishing'].includes(it.status))}{it.lastError ? ` · ${it.lastError}` : ''}</div>
                 </div>
                 <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
                 <div className="flex items-center gap-1">
@@ -438,9 +439,24 @@ export default function AutomationSchedule({
                 </div>
               </div>
             ))}
+            {items.length > 3 && (
+              <button type="button" onClick={() => setQueueExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                {queueExpanded ? t.showLess : t.showMore}
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Admin/QA tools — collapsed by default so normal clients aren't confused
+          by the manual run action. */}
+      <details className="mt-4">
+        <summary className="text-xs text-slate-500 dark:text-slate-400 cursor-pointer select-none">{t.advancedTitle}</summary>
+        <div className="mt-2 rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+          <Button size="sm" variant="outline" onClick={runNow} disabled={saving}>{t.runNowLabel}</Button>
+          <p className="text-[11px] text-slate-400">{t.runNowHelper}</p>
+        </div>
+      </details>
     </Card>
   )
 }
