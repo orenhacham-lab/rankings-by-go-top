@@ -63,6 +63,14 @@ export async function GET(request: Request) {
     for (const t of (topics ?? []) as { id: string; topic: string }[]) titleById[t.id] = t.topic
   }
 
+  // Join WordPress URLs for items whose article was published.
+  const articleIds = Array.from(new Set(items.map((i) => i.article_id).filter((x): x is string => !!x)))
+  const wpUrlByArticle: Record<string, string | null> = {}
+  if (articleIds.length) {
+    const { data: arts } = await auth.admin.from('generated_articles').select('id, wp_post_url').in('id', articleIds)
+    for (const a of (arts ?? []) as { id: string; wp_post_url: string | null }[]) wpUrlByArticle[a.id] = a.wp_post_url
+  }
+
   // Projected publish dates for still-pending items, in queue order.
   const base = pool.nextPublishAt || (pool.isActive ? computeNextPublishAt(pool.publishTime || DEFAULT_PUBLISH_TIME, pool.timezone) : null)
   let pendingIndex = 0
@@ -74,6 +82,7 @@ export async function GET(request: Request) {
       id: i.id,
       topicId: i.topic_id,
       articleId: i.article_id,
+      wpPostUrl: (i.article_id && wpUrlByArticle[i.article_id]) || null,
       topicTitle: (i.topic_id && titleById[i.topic_id]) || '—',
       status: i.status,
       position: i.position,

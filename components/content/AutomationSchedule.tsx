@@ -31,6 +31,7 @@ interface QueueItem {
   id: string
   topicId: string | null
   articleId: string | null
+  wpPostUrl: string | null
   topicTitle: string
   status: string
   position: number
@@ -210,6 +211,20 @@ export default function AutomationSchedule({
     }
   }
 
+  async function publishItem(itemId: string) {
+    setBusyItem(itemId); setMessage(null)
+    try {
+      const res = await fetch(`/api/content/automation/items/${itemId}/publish`, { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (d?.status === 'failed' || d?.status === 'quality_check_failed') {
+        setMessage({ text: `${d.status}${d.reason ? `: ${d.reason}` : ''}`, ok: false })
+      }
+      await load(); onChanged?.()
+    } finally {
+      setBusyItem(null)
+    }
+  }
+
   async function move(index: number, dir: -1 | 1) {
     const next = [...items]
     const j = index + dir
@@ -326,15 +341,31 @@ export default function AutomationSchedule({
                 </div>
                 <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
                 <div className="flex items-center gap-1">
-                  {it.status === 'generated' && (
+                  {it.status === 'publishing' && <span className="text-[11px] text-slate-500 dark:text-slate-400">{t.publishingNow}</span>}
+                  {it.status === 'published' && (
                     <>
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400">{t.generatedReady}</span>
-                      {it.articleId && (
-                        <a href={`/content/articles/${it.articleId}`} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">{t.openEditor}</a>
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400">{t.publishedDone}</span>
+                      {it.wpPostUrl && (
+                        <a href={it.wpPostUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">{t.openPost}</a>
                       )}
                     </>
                   )}
-                  {['queued', 'failed', 'quality_check_failed'].includes(it.status) && (
+                  {it.status === 'generated' && (
+                    <>
+                      {it.articleId && (
+                        <a href={`/content/articles/${it.articleId}`} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">{t.openEditor}</a>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                        {busyItem === it.id ? t.publishingNow : t.publishNow}
+                      </Button>
+                    </>
+                  )}
+                  {it.status === 'failed' && it.articleId && (
+                    <Button size="sm" variant="outline" onClick={() => publishItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                      {busyItem === it.id ? t.publishingNow : t.publishNow}
+                    </Button>
+                  )}
+                  {(it.status === 'queued' || it.status === 'quality_check_failed' || (it.status === 'failed' && !it.articleId)) && (
                     <Button size="sm" variant="outline" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
                       {busyItem === it.id ? t.generatingArticle : t.generateNow}
                     </Button>
@@ -345,7 +376,9 @@ export default function AutomationSchedule({
                   {it.status === 'queued' && (
                     <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'skip')} disabled={busyItem === it.id}>{t.skip}</Button>
                   )}
-                  <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'remove')} disabled={busyItem === it.id} className="text-red-600 dark:text-red-400">{t.remove}</Button>
+                  {it.status !== 'publishing' && (
+                    <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'remove')} disabled={busyItem === it.id} className="text-red-600 dark:text-red-400">{t.remove}</Button>
+                  )}
                 </div>
               </div>
             ))}

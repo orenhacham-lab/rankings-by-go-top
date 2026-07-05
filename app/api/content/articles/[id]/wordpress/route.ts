@@ -18,17 +18,8 @@
 
 import { authContentProject, isContentModuleEnabled, loadWordPressCredentials } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { uploadMedia, createPost, updatePostSeoMeta, WordPressClientError, type WordPressPostStatus } from '@/lib/wordpress/client'
-
-const BUCKET = 'content-article-images'
-
-function extFromPath(path: string): string {
-  const m = path.toLowerCase().match(/\.(png|webp|jpe?g)$/)
-  return m ? m[1].replace('jpeg', 'jpg') : 'jpg'
-}
-function mimeFromExt(ext: string): string {
-  return ext === 'webp' ? 'image/webp' : ext === 'png' ? 'image/png' : 'image/jpeg'
-}
+import { updatePostSeoMeta, WordPressClientError, type WordPressPostStatus } from '@/lib/wordpress/client'
+import { wpCreatePost } from '@/lib/content/wordpress-publish'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -80,60 +71,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const connId = loaded.connection.id
   const title = String(a.title || 'article')
-  const slug = String(a.slug || 'article')
   const logBase = { articleId: id, projectId: auth.project.id, connId, status }
 
-  // Featured image (optional). Upload it when present.
-  let featuredMedia: number | undefined
-  let imageWarning = false
-  const storagePath = a.featured_image_storage_path as string | null
-  if (a.featured_image_url && storagePath) {
-    const dl = await auth.admin.storage.from(BUCKET).download(storagePath)
-    if (dl.error || !dl.data) {
-      console.warn('[content-wp-export] image download failed', { ...logBase, step: 'media_upload' })
-      if (status === 'publish') return Response.json({ error: 'wordpress_media_upload_failed', reason: 'wordpress_media_upload_failed' }, { status: 502 })
-      imageWarning = true
-    } else {
-      try {
-        const ext = extFromPath(storagePath)
-        const media = await uploadMedia(loaded.creds, {
-          data: Buffer.from(await dl.data.arrayBuffer()),
-          filename: `${slug}.${ext}`,
-          mimeType: dl.data.type && dl.data.type.startsWith('image/') ? dl.data.type : mimeFromExt(ext),
-          altText: title,
-          title,
-        })
-        featuredMedia = media.id
-      } catch (err) {
-        const detail = err instanceof WordPressClientError ? err.message : 'Media upload failed.'
-        console.warn('[content-wp-export] media upload failed', { ...logBase, step: 'media_upload' })
-        // Publish must NOT silently go live without the intended image.
-        if (status === 'publish') return Response.json({ error: 'wordpress_media_upload_failed', reason: 'wordpress_media_upload_failed', detail }, { status: 502 })
-        imageWarning = true
-      }
+  // Featured image + createPost via the shared WordPress core (same behavior:
+  // publish blocks on image-upload failure; draft proceeds with a warning).
+  const created = await wpCreatePost(auth.admin, loaded.creds, a as never, { status })
+  if (!created.ok) {
+    if (created.kind === 'media_upload_failed') {
+      console.warn('[content-wp-export] media upload failed', { ...logBase, step: 'media_upload' })
+      return Response.json({ error: 'wordpress_media_upload_failed', reason: 'wordpress_media_upload_failed', ...(created.detail ? { detail: created.detail } : {}) }, { status: 502 })
     }
-  }
-
-  // Create the post with the requested status.
-  let post: { id: number; link: string; status: string }
-  try {
-    post = await createPost(loaded.creds, {
-      title,
-      content: String(a.content_html || ''),
-      status,
-      slug,
-      excerpt: String(a.excerpt || a.meta_description || '') || undefined,
-      featuredMedia,
-    })
-  } catch (err) {
-    const detail = err instanceof WordPressClientError ? err.message : 'Post creation failed.'
     console.log('[content-wp-export] post create failed', { ...logBase, step: 'post_create' })
-    return Response.json({ error: 'wordpress_post_failed', reason: 'wordpress_post_failed', detail }, { status: 502 })
+    return Response.json({ error: 'wordpress_post_failed', reason: 'wordpress_post_failed', ...(created.detail ? { detail: created.detail } : {}) }, { status: 502 })
   }
+  const featuredMedia = created.featuredMediaId ?? undefined
 
   // Best-effort SEO meta — never fails the export.
   try {
-    await updatePostSeoMeta(loaded.creds, post.id, { metaTitle: (a.meta_title as string) || title, metaDescription: (a.meta_description as string) || null })
+    await updatePostSeoMeta(loaded.creds, created.wpPostId, { metaTitle: (a.meta_title as string) || title, metaDescription: (a.meta_description as string) || null })
   } catch (err) {
     console.warn('[content-wp-export] seo meta skipped', { ...logBase, step: 'seo_meta', message: err instanceof WordPressClientError ? err.message : 'seo meta rejected' })
   }
@@ -141,8 +96,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Save WordPress references. Only a successful PUBLISH marks the local row
   // 'published'; draft leaves the local status unchanged.
   const update: Record<string, unknown> = {
-    wp_post_id: post.id,
-    wp_post_url: post.link || null,
+    wp_post_id: created.wpPostId,
+    wp_post_url: created.wpPostUrl,
     wp_connection_id: connId,
     last_error: null,
     updated_at: new Date().toISOString(),
@@ -151,12 +106,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (status === 'publish') { update.status = 'published'; update.published_at = new Date().toISOString() }
   await auth.admin.from('generated_articles').update(update).eq('id', id)
 
-  console.log('[content-wp-export] done', { ...logBase, step: 'post_create', wpPostId: post.id, wpStatus: post.status, imageWarning })
+  console.log('[content-wp-export] done', { ...logBase, step: 'post_create', wpPostId: created.wpPostId, imageWarning: created.imageWarning })
   return Response.json({
-    wp_post_id: post.id,
-    wp_post_url: post.link || null,
+    wp_post_id: created.wpPostId,
+    wp_post_url: created.wpPostUrl,
     wp_featured_media_id: featuredMedia ?? null,
     wp_status: status,
-    imageWarning,
+    imageWarning: created.imageWarning,
   })
 }
