@@ -101,7 +101,8 @@ function renderHtml(r: SiteScanReport & { projectId: string }): string {
   const targetRows = r.targets.map((t) => `
     <tr${t.eligibility === 'no' ? ' class="ineligible"' : t.eligibility === 'caution' ? ' class="caution-row"' : ''}>
       <td>${esc(t.inboundLinkCount)}</td>
-      <td>${esc(t.targetType)}</td>
+      <td>${esc(t.targetType)}<br><small>${esc(t.targetRole)}</small></td>
+      <td><small>${esc(t.targetPriority)}</small></td>
       <td class="${eligCls(t.eligibility)}"><b>${esc(t.eligibility)}</b><br><small>${esc(t.eligibilityReason)}</small></td>
       <td><a href="${esc(t.targetUrl)}" target="_blank" rel="noopener">${esc(t.targetTitle || t.targetUrl)}</a>${t.matchedGeneratedArticleId ? ' <b>[ours]</b>' : ''}${t.contentSkipped ? ` <b class="warn">[content skipped: ${esc(t.contentSkippedReason || '')}]</b>` : ''}<br><small>${esc(t.targetUrl)}</small></td>
       <td><b>${esc(t.primaryKeywordCandidate || '—')}</b><br><small>${esc(t.keywordSource)}${t.keywordAvailable ? ' (available)' : ' (inferred)'}</small></td>
@@ -145,6 +146,7 @@ tr.ineligible{background:#fdeeee}tr.caution-row{background:#fff8e6}</style>
   <span class="k"><b>targets eligible:</b> ${esc(r.targetsEligible)}</span>
   <span class="k"><b>caution:</b> ${esc(r.targetsEligibilityCaution)}</span>
   <span class="k"><b>ineligible:</b> ${esc(r.targetsIneligible)}</span>
+  <span class="k"><b>utility/system targets:</b> ${esc(r.utilityTargetsIneligible)}</span>
   <span class="k"><b>targets w/ usable anchors:</b> ${esc(r.targetsWithUsableAnchors)}</span>
   <span class="k"><b>generic-only targets:</b> ${esc(r.targetsGenericOnly)}</span>
   <span class="k"><b>SEO focus keywords found:</b> ${esc(r.seoFocusKeywordsFound)}</span>
@@ -152,12 +154,16 @@ tr.ineligible{background:#fdeeee}tr.caution-row{background:#fff8e6}</style>
 <p><b>rejected links:</b>
   <span class="k">external ${esc(rj.external)}</span><span class="k">mailto ${esc(rj.mailto)}</span>
   <span class="k">tel ${esc(rj.tel)}</span><span class="k">hash ${esc(rj.hash)}</span>
-  <span class="k">javascript ${esc(rj.javascript)}</span><span class="k">empty ${esc(rj.empty)}</span><span class="k">other ${esc(rj.other)}</span>
+  <span class="k">javascript ${esc(rj.javascript)}</span><span class="k">empty ${esc(rj.empty)}</span>
+  <span class="k"><b>add-to-cart/action</b> ${esc(r.ecommerceActionLinksRejected)}</span>
+  <span class="k"><b>wp-json/API</b> ${esc(r.wordpressApiUrlsRejected)}</span>
+  <span class="k">other ${esc(rj.other)}</span>
 </p>
+<p><b>anchor noise:</b> <span class="k">product-card noise anchors rejected: ${esc(r.productCardNoiseAnchorsRejected)}</span></p>
 ${r.notes.map((n) => `<p class="note">ℹ ${esc(n)}</p>`).join('')}
 ${r.errors.map((e) => `<p class="err">⚠ ${esc(e)}</p>`).join('')}
 <h3>Top internal-link targets (${esc(r.targets.length)})</h3>
-<table><tr><th>inbound</th><th>type</th><th>target eligible?</th><th>target URL</th><th>keyword candidate (source)</th><th>usable anchors</th><th>caution anchors</th><th>rejected anchors</th><th>example sources</th></tr>${targetRows}</table>
+<table><tr><th>inbound</th><th>type / role</th><th>priority</th><th>target eligible?</th><th>target URL</th><th>keyword candidate (source)</th><th>usable anchors</th><th>caution anchors</th><th>rejected anchors</th><th>example sources</th></tr>${targetRows}</table>
 <h3>Sample extracted links (${esc(r.sampleLinks.length)}) — internal + rejected</h3>
 <table><tr><th>link class</th><th>source</th><th>anchor</th><th>anchor usable?</th><th>target</th><th>context</th></tr>${sampleRows}</table>`
 }

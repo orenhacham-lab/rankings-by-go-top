@@ -59,6 +59,29 @@ const BOILERPLATE_ANCHORS = new Set([
   'our website', 'visit', 'see more', 'continue reading',
 ])
 
+/**
+ * E-commerce / "read more" ACTION anchors — generic (multilingual), structural,
+ * not site-specific. These are UI actions, never useful SEO planning anchors.
+ */
+const ECOMMERCE_ACTION_ANCHORS = new Set([
+  // Hebrew
+  'הוספה לסל', 'הוסף לסל', 'הוסיפו לסל', 'הוסף לעגלה', 'הוספה לעגלה', 'בחר/י אפשרויות', 'בחר אפשרויות',
+  'בחרו אפשרויות', 'בחירת אפשרויות', 'למוצר', 'צפייה במוצר', 'צפה במוצר', 'לצפייה במוצר', 'קנה עכשיו',
+  'הזמן עכשיו', 'קרא עוד', 'קראו עוד', 'למידע נוסף', 'מידע נוסף', 'לפרטים נוספים', 'לפרטים',
+  // English
+  'add to cart', 'add to basket', 'select options', 'choose options', 'buy now', 'view product',
+  'read more', 'continue reading', 'shop now', 'more info', 'learn more',
+])
+
+/** Generic price / rating / review signals (currency symbols + en/he terms). */
+function hasPriceOrRatingNoise(s: string): boolean {
+  if (/[₪$€£]/.test(s)) return true
+  if (/\b\d[\d.,]*\s*(ils|nis|usd|eur|gbp|ש"ח|שח)\b/i.test(s)) return true
+  if (/(דורג|מתוך\s*5|כוכב|ביקורת|ביקורות|בסטוק|במלאי|אזל)/.test(s)) return true
+  if (/\b(rating|reviews?|out of 5|stars?|in stock|out of stock|sale)\b/i.test(s)) return true
+  return false
+}
+
 /** Strip decorative arrows/ellipsis/separators so "קרא עוד »" → "קרא עוד". */
 function normalizeAnchor(a: string): string {
   return (a || '')
@@ -111,7 +134,10 @@ export function classifyAnchorForPlanning(anchor: string, ctx: AnchorContext): {
   const norm = normalizeAnchor(anchor)
   if (!norm || norm.length < 2) return { usability: 'no', reason: 'too_short' }
   if (isDomainOrUrlLike(norm)) return { usability: 'no', reason: 'url_or_domain' }
+  if (ECOMMERCE_ACTION_ANCHORS.has(norm.toLowerCase())) return { usability: 'no', reason: 'ecommerce_or_boilerplate_action' }
   if (BOILERPLATE_ANCHORS.has(norm.toLowerCase())) return { usability: 'no', reason: 'generic_boilerplate' }
+  // WooCommerce product-card noise: price/rating/review-laden anchor text.
+  if (hasPriceOrRatingNoise(norm)) return { usability: 'no', reason: anchorWordCount(norm) > 8 ? 'too_long_product_card' : 'product_card_noise' }
   const wc = anchorWordCount(norm)
   if (wc === 1) {
     // Broad homepage entity (e.g. "יפן" → homepage): preserve but flag caution.
@@ -126,25 +152,125 @@ export function classifyAnchorForPlanning(anchor: string, ctx: AnchorContext): {
 
 export type TargetEligibility = 'yes' | 'no' | 'caution'
 
-// Utility/legal/contact pages that should NOT be internal-link planning targets.
-const UTILITY_EN = [/privacy/i, /\bcontact\b/i, /accessibility/i, /\bterms\b/i, /\blegal\b/i, /cookie/i, /sitemap/i, /disclaimer/i, /\brefund\b/i, /\breturns?\b/i, /shipping/i]
-const UTILITY_HE = ['מדיניות פרטיות', 'פרטיות', 'יצירת קשר', 'צור קשר', 'צרו קשר', 'נגישות', 'הצהרת נגישות', 'תקנון', 'תנאי שימוש', 'מפת אתר', 'החזרות', 'מדיניות משלוח', 'מדיניות ביטול']
+export type TargetPriority =
+  | 'homepage'
+  | 'commercial_category_or_service_hub'
+  | 'strategic_content_page'
+  | 'post_or_article'
+  | 'product_or_specific_offer'
+  | 'other_caution'
+  | 'ineligible'
+
+export type TargetRole =
+  | 'homepage'
+  | 'commercial_category_or_service_hub'
+  | 'strategic_content_page'
+  | 'post_or_article'
+  | 'product_or_specific_offer'
+  | 'utility_system'
+  | 'malformed_action_api'
+  | 'unknown'
+
+export interface TargetClassification {
+  targetType: ScannedTarget['targetType']
+  targetRole: TargetRole
+  targetPriority: TargetPriority
+  eligibility: TargetEligibility
+  reason: string
+}
+
+// ── Generic, site-agnostic structural signals (NO niche/brand keywords) ──
+// Utility/system/legal pages (path slugs + multilingual title terms).
+const UTILITY_SLUGS = ['cart', 'checkout', 'my-account', 'account', 'login', 'signin', 'sign-in', 'register', 'signup', 'sign-up', 'lost-password', 'wishlist', 'privacy', 'privacy-policy', 'terms', 'terms-and-conditions', 'tos', 'legal', 'accessibility', 'refund', 'refund-policy', 'returns', 'return-policy', 'cancellation', 'shipping', 'shipping-policy', 'contact', 'contact-us', 'faq', 'sitemap', 'disclaimer', 'cookie', 'cookies', 'thank-you', 'order-received']
+const UTILITY_TITLE = [
+  // Hebrew (generic commerce/legal/utility concepts, not niche keywords)
+  'סל הקניות', 'עגלת הקניות', 'עגלת קניות', 'עמוד לתשלום', 'לתשלום', 'קופה', 'החשבון שלי', 'התחברות', 'הרשמה',
+  'רשימת משאלות', 'מדיניות פרטיות', 'פרטיות', 'תקנון', 'תנאי שימוש', 'הצהרת נגישות', 'נגישות', 'ביטול עסקה',
+  'דרכי ביטול', 'מדיניות החזרות', 'מדיניות ביטול', 'מדיניות משלוח', 'משלוחים', 'יצירת קשר', 'צור קשר', 'צרו קשר',
+  'שאלות נפוצות', 'מפת אתר',
+  // English
+  'shopping cart', 'checkout', 'my account', 'login', 'sign in', 'register', 'wishlist', 'privacy policy',
+  'terms', 'terms of service', 'accessibility', 'refund policy', 'return policy', 'cancellation', 'shipping policy',
+  'contact us', 'contact', 'faq', 'sitemap', 'cookie policy',
+]
+const CATEGORY_PATH = ['/category/', '/product-category/', '/product_cat/', '/collection/', '/collections/', '/shop/', '/store/', '/catalog/', '/services/', '/service/', '/topics/', '/topic/', '/guides/']
+const PRODUCT_PATH = ['/product/', '/products/', '/item/']
+// Filter/sort/tracking query params → filtered/tracking URL (never a clean target).
+const NOISE_QUERY = ['orderby', 'filter_', 'min_price', 'max_price', 'query_type_', 'rating_filter', 'utm_', 'fbclid', 'gclid', 'mc_cid', 'mc_eid', 'replytocom', 'sort', 'per_page']
+
+function seg(pathname: string): string[] { return pathname.toLowerCase().split('/').filter(Boolean) }
 
 /**
- * Classify whether a TARGET is eligible for internal-link planning. Homepage is
- * caution (main topic page — valid but not a normal content page); privacy/
- * contact/legal/utility are ineligible even if their anchor phrase is valid.
+ * Generic, site-agnostic target classification by STRUCTURAL/SEO role — never by
+ * niche keywords from any one site. Produces a role, a planning priority, and an
+ * eligibility (yes/caution/no) with a reason.
  */
-export function classifyTargetEligibility(url: string, title: string, type: ScannedTarget['targetType']): { eligibility: TargetEligibility; reason: string } {
-  if (isHomepageUrl(url)) return { eligibility: 'caution', reason: 'homepage_main_topic_page' }
-  const hay = `${slugFromUrl(url)} ${title} ${url}`.toLowerCase()
-  if (UTILITY_EN.some((re) => re.test(hay)) || UTILITY_HE.some((w) => hay.includes(w))) {
-    return { eligibility: 'no', reason: 'utility_or_legal_page' }
+export function classifyTarget(rawUrl: string, title: string, wpType: string | undefined): TargetClassification {
+  const ineligible = (role: TargetRole, reason: string, targetType: ScannedTarget['targetType'] = 'unknown'): TargetClassification =>
+    ({ targetType, targetRole: role, targetPriority: 'ineligible', eligibility: 'no', reason })
+
+  // Non-content/action/API first (fully rejected — never caution).
+  if (isWordPressApiUrl(rawUrl)) return ineligible('malformed_action_api', 'wordpress_api_url')
+  if (isEcommerceActionUrl(rawUrl)) return ineligible('malformed_action_api', 'ecommerce_action_link')
+
+  let u: URL | null = null
+  try { u = new URL(rawUrl) } catch { u = null }
+  const key = normalizeUrlKey(rawUrl)
+  // Malformed: unparseable, or a numeric-only key (bad normalization artifact).
+  if (!u || !key || /^[0-9]+$/.test(key.replace(/^[^/]*\//, '')) || /^[0-9]+$/.test(key)) {
+    return ineligible('malformed_action_api', 'malformed_url')
   }
-  if (type === 'post' || type === 'page' || type === 'category' || type === 'tag' || type === 'product') {
-    return { eligibility: 'yes', reason: `content_${type}` }
+
+  const path = u.pathname.toLowerCase()
+  const segs = seg(path)
+  const query = u.search.toLowerCase()
+  const titleL = (title || '').toLowerCase()
+
+  // System / archive / search / feed / pagination / tracking → ineligible.
+  if (/\/wp-login|\/wp-admin/.test(path)) return ineligible('utility_system', 'system_page')
+  if (segs.includes('feed') || /\/feed\/?$/.test(path)) return ineligible('utility_system', 'feed_url')
+  if (segs[0] === 'author') return ineligible('utility_system', 'author_archive')
+  if (segs[0] === 'search' || /[?&]s=/.test(query)) return ineligible('utility_system', 'search_page')
+  if (segs[0] === 'tag' || segs[0] === 'tags' || wpType === 'tag' || wpType === 'post_tag') return ineligible('utility_system', 'tag_archive', 'tag')
+  if (/^(19|20)\d{2}$/.test(segs[0] ?? '')) return ineligible('utility_system', 'date_archive')
+  if (segs.length && segs[0] === 'page' && /^\d+$/.test(segs[1] ?? '')) return ineligible('utility_system', 'pagination_url')
+  if (NOISE_QUERY.some((p) => query.includes(p))) return ineligible('utility_system', 'filtered_or_tracking_url')
+  if (query && segs.length === 0) return ineligible('utility_system', 'query_only_url')
+
+  // Utility/legal/commerce-system pages (by slug OR multilingual title).
+  const utilBySlug = segs.some((s) => UTILITY_SLUGS.includes(s))
+  const utilByTitle = UTILITY_TITLE.some((w) => titleL.includes(w))
+  if (utilBySlug || utilByTitle) return ineligible('utility_system', 'ecommerce_or_utility_page')
+
+  // Homepage — valid broad target, but caution (not a normal content page).
+  if (isHomepageUrl(rawUrl)) {
+    return { targetType: 'page', targetRole: 'homepage', targetPriority: 'homepage', eligibility: 'caution', reason: 'homepage_main_topic_page' }
   }
-  return { eligibility: 'caution', reason: 'unknown_target_type' }
+
+  // Commercial category / service / topic hub — high priority.
+  if (CATEGORY_PATH.some((p) => path.includes(p)) || wpType === 'category' || wpType === 'product_cat' || wpType === 'product_category') {
+    return { targetType: 'category', targetRole: 'commercial_category_or_service_hub', targetPriority: 'commercial_category_or_service_hub', eligibility: 'yes', reason: 'category_or_hub' }
+  }
+
+  // Product / specific offer — eligible, lower priority than hubs.
+  if (PRODUCT_PATH.some((p) => path.includes(p)) || wpType === 'product') {
+    return { targetType: 'product', targetRole: 'product_or_specific_offer', targetPriority: 'product_or_specific_offer', eligibility: 'yes', reason: 'product_or_offer' }
+  }
+
+  // Known WordPress page → strategic content page.
+  if (wpType === 'page') {
+    return { targetType: 'page', targetRole: 'strategic_content_page', targetPriority: 'strategic_content_page', eligibility: 'yes', reason: 'content_page' }
+  }
+  // Known WordPress post → article.
+  if (wpType === 'post') {
+    return { targetType: 'post', targetRole: 'post_or_article', targetPriority: 'post_or_article', eligibility: 'yes', reason: 'post_or_article' }
+  }
+
+  // Unknown but clean, public-looking content URL → caution (diagnostics only).
+  if (segs.length >= 1 && /[a-z֐-׿]/i.test(segs.join(''))) {
+    return { targetType: 'unknown', targetRole: 'unknown', targetPriority: 'other_caution', eligibility: 'caution', reason: 'unknown_content_url' }
+  }
+  return ineligible('malformed_action_api', 'non_content_url')
 }
 
 /** First H2/H3 text of a post body (a heading-derived keyword candidate). */
@@ -161,6 +287,8 @@ export interface RejectCounts {
   hash: number
   javascript: number
   empty: number
+  ecommerce_action: number
+  wordpress_api: number
   other: number
 }
 
@@ -191,6 +319,9 @@ export interface ScannedTarget {
   /** Whether this target is a good internal-link PLANNING destination. */
   eligibility: TargetEligibility
   eligibilityReason: string
+  /** Generic structural/SEO role + planning priority (site-agnostic). */
+  targetRole: TargetRole
+  targetPriority: TargetPriority
   /** Best available keyword signal + where it came from + real-vs-inferred. */
   keywordSource: TargetKeywordSource
   primaryKeywordCandidate: string
@@ -211,7 +342,7 @@ export interface ScannedTarget {
   contentSkippedReason?: string
 }
 
-export type SampleLinkClass = 'internal' | 'external' | 'mailto' | 'tel' | 'hash' | 'javascript' | 'empty' | 'other'
+export type SampleLinkClass = 'internal' | 'external' | 'mailto' | 'tel' | 'hash' | 'javascript' | 'empty' | 'ecommerce_action' | 'wordpress_api' | 'other'
 
 export interface SampleLink {
   sourceTitle: string
@@ -255,6 +386,11 @@ export interface SiteScanReport {
   targetsEligible: number
   targetsEligibilityCaution: number
   targetsIneligible: number
+  /** Rejected-link + noise summary (large-site / e-commerce clarity). */
+  ecommerceActionLinksRejected: number
+  wordpressApiUrlsRejected: number
+  utilityTargetsIneligible: number
+  productCardNoiseAnchorsRejected: number
   /** How many scanned items exposed an SEO-plugin focus keyword via REST. */
   seoFocusKeywordsFound: number
   targets: ScannedTarget[]
@@ -331,15 +467,45 @@ async function fetchMetadataAll(
   return { items: items.slice(0, remaining), hitLimit: hitLimit || items.length > remaining }
 }
 
-/** Classify a raw href into internal or a rejection bucket. */
-function classifyHref(href: string, hosts: string[]): 'internal' | keyof RejectCounts {
-  const h = (href || '').trim().toLowerCase()
+/**
+ * Resolve a link href against the PUBLIC source page URL (never the REST API
+ * URL). WooCommerce/WordPress build some links (e.g. ?add-to-cart=…) against the
+ * current request URI — which, when content is fetched via REST, becomes a
+ * /wp-json/… path. Resolving against the public source (and rejecting wp-json /
+ * add-to-cart below) prevents those from being treated as content targets.
+ */
+function resolveHref(href: string, sourceUrl: string): string {
+  const h = (href || '').trim()
+  if (!h) return ''
+  if (/^(mailto:|tel:|javascript:)/i.test(h) || h.startsWith('#')) return h
+  if (/^https?:\/\//i.test(h) || h.startsWith('//')) return h // absolute / protocol-relative
+  try { return new URL(h, sourceUrl).toString() } catch { return h }
+}
+
+/** True when a URL is a WordPress REST/API URL (never a content target). */
+function isWordPressApiUrl(url: string): boolean {
+  return /\/wp-json\//i.test(url) || /\/xmlrpc\.php/i.test(url) || /\/wp-admin\//i.test(url)
+}
+
+/** True when a URL carries a WooCommerce/e-commerce ACTION query (add-to-cart…). */
+function isEcommerceActionUrl(url: string): boolean {
+  return /[?&](add-to-cart|remove_item|added-to-cart|wc-ajax)=/i.test(url)
+}
+
+/**
+ * Classify a RESOLVED href into internal or a rejection bucket. Assumes the href
+ * has already been resolved against the public source URL.
+ */
+function classifyHref(url: string, hosts: string[]): 'internal' | keyof RejectCounts {
+  const h = (url || '').trim().toLowerCase()
   if (!h) return 'empty'
   if (h.startsWith('mailto:')) return 'mailto'
   if (h.startsWith('tel:')) return 'tel'
   if (h.startsWith('javascript:')) return 'javascript'
   if (h.startsWith('#')) return 'hash'
-  if (isInternalUrl(href, hosts)) return 'internal'
+  if (isWordPressApiUrl(url)) return 'wordpress_api'
+  if (isEcommerceActionUrl(url)) return 'ecommerce_action'
+  if (isInternalUrl(url, hosts)) return 'internal'
   return 'external'
 }
 
@@ -459,7 +625,7 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
 
   // 5) Fetch each item's content INDIVIDUALLY and extract links. A huge single
   // item is skipped (kept as a metadata target) instead of failing the scan.
-  const rejectedReasons: RejectCounts = { external: 0, mailto: 0, tel: 0, hash: 0, javascript: 0, empty: 0, other: 0 }
+  const rejectedReasons: RejectCounts = { external: 0, mailto: 0, tel: 0, hash: 0, javascript: 0, empty: 0, ecommerce_action: 0, wordpress_api: 0, other: 0 }
   let internalLinksExtracted = 0
   let externalOrRejected = 0
   const sampleLinks: SampleLink[] = []
@@ -501,7 +667,9 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     if (ownMeta && !ownMeta.headingKw) ownMeta.headingKw = firstHeadingText(html)
 
     for (const link of extractLinkAnchorsFromHtml(html)) {
-      const kind = classifyHref(link.href, hosts)
+      // Resolve against the PUBLIC source URL (item.link) — never the REST URL.
+      const resolved = resolveHref(link.href, item.link)
+      const kind = classifyHref(resolved, hosts)
       const anchor = clean(link.text)
 
       // Sample the first N links across ALL classes (internal + rejected).
@@ -509,9 +677,9 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
         let anchorUsability: PlanningUsability | 'n/a' = 'n/a'
         let anchorReason = ''
         if (kind === 'internal') {
-          const skey = internalTargetKey(link.href)
+          const skey = internalTargetKey(resolved)
           const own = ownByKey.get(skey)
-          const ctx: AnchorContext = { targetTitle: own?.title || slugFromUrl(link.href), targetUrl: normalizeHref(link.href), isHomepage: isHomepageUrl(link.href) }
+          const ctx: AnchorContext = { targetTitle: own?.title || slugFromUrl(resolved), targetUrl: normalizeHref(resolved), isHomepage: isHomepageUrl(resolved) }
           const ac = classifyAnchorForPlanning(anchor, ctx)
           anchorUsability = ac.usability
           anchorReason = ac.reason
@@ -519,7 +687,7 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
         sampleLinks.push({
           sourceTitle: item.title,
           sourceUrl: item.link,
-          targetUrl: normalizeHref(link.href),
+          targetUrl: normalizeHref(resolved),
           anchor,
           linkClass: kind,
           anchorUsability,
@@ -534,13 +702,13 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
         continue
       }
       internalLinksExtracted++
-      const key = internalTargetKey(link.href)
+      const key = internalTargetKey(resolved)
       if (!key) { rejectedReasons.other++; continue }
       const own = ownByKey.get(key)
       const agg = targets.get(key) ?? {
-        url: normalizeHref(link.href),
-        type: guessType(key, link.href, own?.type),
-        title: own?.title || slugFromUrl(link.href),
+        url: normalizeHref(resolved),
+        type: guessType(key, resolved, own?.type),
+        title: own?.title || slugFromUrl(resolved),
         anchors: new Map<string, { text: string; count: number }>(),
         sources: new Map<string, string>(),
         inbound: 0,
@@ -579,8 +747,8 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
       const cautionAnchorsCount = classified.filter((a) => a.usability === 'caution').length
       const rejectedAnchorsCount = classified.filter((a) => a.usability === 'no').length
 
-      // Target eligibility (homepage = caution; privacy/contact/legal = no).
-      const elig = classifyTargetEligibility(agg.url, agg.title, agg.type)
+      // Generic structural classification: role + priority + eligibility.
+      const cls = classifyTarget(agg.url, agg.title, own?.type)
 
       // Keyword source priority: SEO focus kw → our primary_keyword → title →
       // slug → heading → inferred → unavailable. Only the first two are "available".
@@ -607,11 +775,13 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
       const exampleSources = Array.from(agg.sources.entries()).slice(0, MAX_EXAMPLE_SOURCES).map(([url, title]) => ({ url, title }))
       return {
         targetUrl: agg.url,
-        targetType: agg.type,
+        targetType: cls.targetType,
         targetTitle: agg.title,
         inboundLinkCount: agg.inbound,
-        eligibility: elig.eligibility,
-        eligibilityReason: elig.reason,
+        eligibility: cls.eligibility,
+        eligibilityReason: cls.reason,
+        targetRole: cls.targetRole,
+        targetPriority: cls.targetPriority,
         keywordSource,
         primaryKeywordCandidate,
         keywordAvailable,
@@ -657,6 +827,10 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     targetsEligible: targetList.filter((t) => t.eligibility === 'yes').length,
     targetsEligibilityCaution: targetList.filter((t) => t.eligibility === 'caution').length,
     targetsIneligible: targetList.filter((t) => t.eligibility === 'no').length,
+    ecommerceActionLinksRejected: rejectedReasons.ecommerce_action,
+    wordpressApiUrlsRejected: rejectedReasons.wordpress_api,
+    utilityTargetsIneligible: targetList.filter((t) => t.targetRole === 'utility_system').length,
+    productCardNoiseAnchorsRejected: targetList.reduce((n, t) => n + t.rejectedAnchors.filter((a) => a.reason === 'product_card_noise' || a.reason === 'too_long_product_card').length, 0),
     seoFocusKeywordsFound,
     targets: targetList.slice(0, TOP_TARGETS),
     sampleLinks,
