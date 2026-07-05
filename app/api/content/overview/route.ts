@@ -102,6 +102,25 @@ export async function GET(request: Request) {
     if (a.status in counts) counts[a.status as keyof typeof EMPTY_COUNTS] += 1
   }
 
+  // "Scheduled" (מתוזמנים) must reflect the AUTOMATION QUEUE, not only articles.
+  // Count article_pool_items that are planned/in-flight for this project — i.e.
+  // still heading toward publish. Deliberately excludes published / skipped /
+  // failed / quality_check_failed / paused so finished or halted work is never
+  // shown as "scheduled". Tolerates the automation table not existing yet.
+  const PENDING_QUEUE_STATUSES = ['queued', 'scheduled', 'generating', 'generated', 'publishing']
+  const { count: queueCount, error: queueError } = await supabase
+    .from('article_pool_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .in('status', PENDING_QUEUE_STATUSES)
+  if (queueError) {
+    if ((queueError as { code?: string }).code !== '42P01') {
+      console.error('[content overview] pool items count failed:', queueError.message)
+    }
+  } else {
+    counts.scheduled += queueCount ?? 0
+  }
+
   // WordPress connection status — SAFE FIELDS ONLY. The encrypted password
   // column is deliberately never selected.
   let wordpress: { connected: boolean; siteUrl: string | null; status: string | null; lastTestedAt: string | null } = {

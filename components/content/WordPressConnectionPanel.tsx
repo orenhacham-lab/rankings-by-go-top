@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import Modal from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -32,6 +33,7 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
   const [loading, setLoading] = useState(true)
   const [connection, setConnection] = useState<SanitizedConnection | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   const [siteUrl, setSiteUrl] = useState('')
   const [username, setUsername] = useState('')
@@ -186,7 +188,10 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
       ) : !connection && !showForm ? (
         <div className="text-center py-6">
           <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.notConnected}</p>
-          <Button size="sm" onClick={openForm}>{t.connectButton}</Button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button size="sm" onClick={openForm}>{t.connectButton}</Button>
+            <Button size="sm" variant="outline" onClick={() => setGuideOpen(true)}>{t.guideButton}</Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -282,6 +287,22 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
           )}
         </div>
       )}
+
+      {/* Help-only modal: how to create a WordPress Application Password and
+          connect. Pure guidance — no connection logic runs here. */}
+      <Modal open={guideOpen} onClose={() => setGuideOpen(false)} title={t.guideTitle} size="md">
+        <ol className="list-decimal space-y-2 pe-5 text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+          {t.guideSteps.map((step, i) => (
+            <li key={i}>{step}</li>
+          ))}
+        </ol>
+        <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          {t.guideWarning}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button size="sm" onClick={() => setGuideOpen(false)}>{t.guideClose}</Button>
+        </div>
+      </Modal>
     </Card>
   )
 }

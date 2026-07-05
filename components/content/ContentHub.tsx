@@ -81,6 +81,8 @@ export default function ContentHub() {
   const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
   const [automationRefresh, setAutomationRefresh] = useState(0)
+  const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
+  const [helpExpanded, setHelpExpanded] = useState(false) // "when to use this area" collapses
 
   // ── Batch article creation (client-side, sequential) ──
   const BATCH_LIMIT = 10
@@ -611,7 +613,7 @@ export default function ContentHub() {
                     {filteredArticles.length === 0 ? (
                       <EmptyRow colSpan={10} message={t.table.emptyTitle} />
                     ) : (
-                      filteredArticles.map((a) => {
+                      (articlesExpanded ? filteredArticles : filteredArticles.slice(0, 3)).map((a) => {
                         const selectableArticle = !a.wp_post_id && a.status !== 'published'
                         return (
                         <TableRow key={a.id}>
@@ -708,6 +710,17 @@ export default function ContentHub() {
                 {filteredArticles.length === 0 && (
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">{t.table.emptyHint}</p>
                 )}
+                {filteredArticles.length > 3 && (
+                  <div className="mt-3 px-1">
+                    <button
+                      type="button"
+                      onClick={() => setArticlesExpanded((v) => !v)}
+                      className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                    >
+                      {articlesExpanded ? t.showLess : `${t.showMoreArticles} (${filteredArticles.length - 3})`}
+                    </button>
+                  </div>
+                )}
               </div>
               </>
               )}
@@ -737,7 +750,22 @@ export default function ContentHub() {
                 )}
                 <Card className="mb-3 p-3 bg-slate-50/60 dark:bg-slate-800/40 hover:translate-y-0">
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.topicsHelpTitle}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.topicsHelpText}</p>
+                  <ul className="mt-1.5 space-y-1 text-xs text-slate-500 dark:text-slate-400 list-disc pe-4">
+                    {(helpExpanded ? t.topicsHelpItems : t.topicsHelpItems.slice(0, 3)).map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                  {t.topicsHelpItems.length > 3 && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setHelpExpanded((v) => !v)}
+                        className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                      >
+                        {helpExpanded ? t.showLess : t.showMore}
+                      </button>
+                    </div>
+                  )}
                 </Card>
 
                 {/* Batch action bar — only when there are topics without an article. */}

@@ -47,7 +47,8 @@ export default function AutomationIdeas({
   const [lastCreatedIds, setLastCreatedIds] = useState<string[]>([])
   const [scheduling, setScheduling] = useState(false)
 
-  const [source, setSource] = useState<Source>('project_data')
+  // Default to the most SEO-grounded source (real Google Ads keyword data).
+  const [source, setSource] = useState<Source>('keyword_research_url')
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -184,10 +185,11 @@ export default function AutomationIdeas({
     }
   }
 
+  // Strongest SEO source first (site keyword research), then keyword, then project data.
   const sourceTabs: { key: Source; label: string }[] = [
+    { key: 'keyword_research_url', label: t.sourceResearch },
     { key: 'keyword', label: t.sourceKeyword },
     { key: 'project_data', label: t.sourceProject },
-    { key: 'keyword_research_url', label: t.sourceResearch },
   ]
 
   return (
@@ -303,9 +305,15 @@ export default function AutomationIdeas({
               </div>
             ))}
             {suggestions.length > 3 && (
-              <button type="button" onClick={() => setIdeasExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                {ideasExpanded ? t.showLess : t.showMoreIdeas}
-              </button>
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIdeasExpanded((v) => !v)}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                >
+                  {ideasExpanded ? t.showLess : `${t.showMoreIdeas} (${suggestions.length - 3})`}
+                </button>
+              </div>
             )}
           </div>
 

@@ -366,9 +366,15 @@ export default function AutomationSchedule({
               </label>
             ))}
             {approved.length > 3 && (
-              <button type="button" onClick={() => setApprovedExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                {approvedExpanded ? t.showLess : t.showMore}
-              </button>
+              <div className="pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setApprovedExpanded((v) => !v)}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                >
+                  {approvedExpanded ? t.showLess : `${t.showMore} (${approved.length - 3})`}
+                </button>
+              </div>
             )}
             <Button size="sm" onClick={addSelected} loading={saving} disabled={saving || selected.size === 0}>
               {t.addSelected} ({selected.size})
@@ -440,9 +446,15 @@ export default function AutomationSchedule({
               </div>
             ))}
             {items.length > 3 && (
-              <button type="button" onClick={() => setQueueExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                {queueExpanded ? t.showLess : t.showMore}
-              </button>
+              <div className="pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setQueueExpanded((v) => !v)}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                >
+                  {queueExpanded ? t.showLess : `${t.showMore} (${items.length - 3})`}
+                </button>
+              </div>
             )}
           </div>
         )}
