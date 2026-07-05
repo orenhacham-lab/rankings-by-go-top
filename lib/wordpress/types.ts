@@ -40,3 +40,31 @@ export interface WordPressTestResult {
   /** Human-readable failure reason (present when not ok). Never contains credentials. */
   error?: string
 }
+
+/**
+ * A published post/page fetched from the WP REST API (read-only content scan).
+ * title/excerpt are tag-stripped for readability; contentHtml is the raw
+ * rendered HTML we parse for internal links. Focus keywords are intentionally
+ * absent — standard REST does not expose Yoast/RankMath/AIOSEO focus keywords.
+ */
+export interface WordPressContentItem {
+  id: number
+  type: string
+  link: string
+  slug: string
+  title: string
+  excerpt: string
+  contentHtml: string
+  status: string
+  date: string | null
+  modified: string | null
+  categories: number[]
+  tags: number[]
+}
+
+export interface WordPressListOptions {
+  page?: number
+  perPage?: number
+  /** ISO date — only items modified after this (incremental scans). */
+  modifiedAfter?: string
+}

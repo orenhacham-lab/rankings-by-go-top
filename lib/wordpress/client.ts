@@ -26,6 +26,8 @@ import type {
   WordPressCategory,
   WordPressTag,
   WordPressTestResult,
+  WordPressContentItem,
+  WordPressListOptions,
 } from './types'
 
 const REQUEST_TIMEOUT_MS = 15_000
@@ -471,4 +473,58 @@ export async function getAuthors(creds: WordPressCredentials): Promise<WordPress
     name: u.name,
     slug: u.slug,
   }))
+}
+
+/** Strip tags + collapse whitespace from a rendered field (title/excerpt). */
+function stripRendered(v: unknown): string {
+  const s = typeof v === 'string' ? v : (v && typeof v === 'object' && 'rendered' in (v as Record<string, unknown>) ? String((v as { rendered?: unknown }).rendered ?? '') : '')
+  return s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function mapContentItem(r: any): WordPressContentItem {
+  return {
+    id: Number(r?.id) || 0,
+    type: String(r?.type ?? 'post'),
+    link: String(r?.link ?? ''),
+    slug: String(r?.slug ?? ''),
+    title: stripRendered(r?.title),
+    excerpt: stripRendered(r?.excerpt),
+    contentHtml: typeof r?.content === 'string' ? r.content : String(r?.content?.rendered ?? ''),
+    status: String(r?.status ?? ''),
+    date: r?.date ?? null,
+    modified: r?.modified ?? null,
+    categories: Array.isArray(r?.categories) ? r.categories.map(Number).filter((n: number) => !Number.isNaN(n)) : [],
+    tags: Array.isArray(r?.tags) ? r.tags.map(Number).filter((n: number) => !Number.isNaN(n)) : [],
+  }
+}
+
+/** Build a read-only, published-only content list path with safe bounds. */
+function buildContentPath(base: '/posts' | '/pages', opts: WordPressListOptions): string {
+  const perPage = Math.min(Math.max(opts.perPage ?? 20, 1), 50)
+  const page = Math.max(opts.page ?? 1, 1)
+  const params = new URLSearchParams({
+    per_page: String(perPage),
+    page: String(page),
+    status: 'publish',
+    orderby: 'modified',
+    order: 'desc',
+    _fields: 'id,type,link,slug,status,date,modified,categories,tags,title,excerpt,content',
+  })
+  if (opts.modifiedAfter) params.set('modified_after', opts.modifiedAfter)
+  return `${base}?${params.toString()}`
+}
+
+/**
+ * Read-only: fetch ONE page of published posts. Never writes. Reuses the same
+ * SSRF-guarded, timeout- and size-capped GET path as every other read call.
+ */
+export async function getPosts(creds: WordPressCredentials, opts: WordPressListOptions = {}): Promise<WordPressContentItem[]> {
+  const rows = await wpGet<any[]>(creds, buildContentPath('/posts', opts))
+  return (Array.isArray(rows) ? rows : []).map(mapContentItem)
+}
+
+/** Read-only: fetch ONE page of published pages. */
+export async function getPages(creds: WordPressCredentials, opts: WordPressListOptions = {}): Promise<WordPressContentItem[]> {
+  const rows = await wpGet<any[]>(creds, buildContentPath('/pages', opts))
+  return (Array.isArray(rows) ? rows : []).map(mapContentItem)
 }
