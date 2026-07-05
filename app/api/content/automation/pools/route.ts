@@ -73,6 +73,7 @@ export async function GET(request: Request) {
     return {
       id: i.id,
       topicId: i.topic_id,
+      articleId: i.article_id,
       topicTitle: (i.topic_id && titleById[i.topic_id]) || '—',
       status: i.status,
       position: i.position,

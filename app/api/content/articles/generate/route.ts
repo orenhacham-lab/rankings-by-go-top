@@ -7,15 +7,14 @@
  * draft, records best-effort AI usage, and returns the new article id + anchor
  * warnings.
  *
- * Gated by ENABLE_CONTENT + auth + project ownership. Never touches /api/articles
- * or the global articles table. No publish/schedule.
+ * The generation core lives in lib/content/article-generation.ts (shared with
+ * the content-automation service). This route keeps its exact previous behavior:
+ * ENABLE_CONTENT gate + auth + project ownership, then delegates. Never touches
+ * /api/articles or the global articles table. No publish/schedule.
  */
 
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
-import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
-import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
-import { decodeBriefNotes } from '@/lib/content/brief-notes'
-import type { ArticleTopicAnchor } from '@/lib/supabase/types'
+import { generateArticleForTopic } from '@/lib/content/article-generation'
 
 export async function POST(request: Request) {
   if (!isContentModuleEnabled()) {
@@ -36,7 +35,7 @@ export async function POST(request: Request) {
   const admin = (await import('@/lib/supabase/admin')).createAdminClient()
   const { data: topic, error: topicError } = await admin
     .from('article_topics')
-    .select('*')
+    .select('project_id')
     .eq('id', body.topicId)
     .maybeSingle()
 
@@ -49,195 +48,33 @@ export async function POST(request: Request) {
   }
   if (!topic) return Response.json({ error: 'Topic not found' }, { status: 404 })
 
-  const t = topic as Record<string, unknown>
-  const auth = await authContentProject(t.project_id as string)
+  const auth = await authContentProject((topic as { project_id: string }).project_id)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  // Project context (safe fields only).
-  const { data: project } = await auth.admin
-    .from('projects')
-    .select('business_name, target_domain, ai_business_profile')
-    .eq('id', auth.project.id)
-    .maybeSingle()
+  const result = await generateArticleForTopic(auth.admin, { topicId: body.topicId, userId: auth.user.id })
 
-  const category =
-    (project as { ai_business_profile?: { primaryCategory?: string } } | null)?.ai_business_profile?.primaryCategory ?? null
-
-  // Optional WordPress connection (to stamp wp_connection_id; no secrets read).
-  const { data: wpConn } = await auth.admin
-    .from('wordpress_connections')
-    .select('id')
-    .eq('project_id', auth.project.id)
-    .maybeSingle()
-
-  const anchors = (Array.isArray(t.anchors_json) ? t.anchors_json : []) as ArticleTopicAnchor[]
-  const language = String(t.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
-  // brief_notes carries the human notes + hidden flags (includeBrandName, brand).
-  const decodedNotes = decodeBriefNotes((t.brief_notes as string) ?? null)
-
-  // Pre-check: a required anchor with no usable URL can never be placed.
-  const requiredNoUrl = anchors.some(
-    (a) => a.required && (a.anchor_text?.trim() || a.target_url?.trim()) && !/^https?:\/\//i.test((a.target_url || '').trim())
-  )
-  if (requiredNoUrl) {
-    console.log('[content-article-generation] failed reason=required_anchor_missing_url')
-    return Response.json({ error: 'Article generation failed', reason: 'required_anchor_missing_url' }, { status: 400 })
+  if (result.ok) {
+    return Response.json({ articleId: result.articleId, warnings: result.warnings, audit: result.audit, imageGenerated: result.imageGenerated })
   }
 
-  // Pre-check: a WhatsApp/phone/contact CTA needs real contact details to use
-  // (never invented by Gemini). Missing details → don't generate.
-  const ctaPref = (t.cta_preference as string) || ''
-  if (ctaPref === 'whatsapp' || ctaPref === 'phone' || ctaPref === 'contact') {
-    const c = decodedNotes.flags.cta
-    const enough = ctaPref === 'whatsapp'
-      ? !!(c.whatsapp.trim() || c.url.trim())
-      : ctaPref === 'phone'
-        ? !!(c.phone.trim() || c.url.trim())
-        : !!(c.text.trim() || c.url.trim())
-    if (!enough) {
+  switch (result.kind) {
+    case 'topic_not_found':
+      return Response.json({ error: 'Topic not found' }, { status: 404 })
+    case 'required_anchor_missing_url':
+      console.log('[content-article-generation] failed reason=required_anchor_missing_url')
+      return Response.json({ error: 'Article generation failed', reason: 'required_anchor_missing_url' }, { status: 400 })
+    case 'cta_details_missing':
       console.log('[content-article-generation] failed reason=cta_details_missing')
       return Response.json({ error: 'Article generation failed', reason: 'cta_details_missing' }, { status: 400 })
+    case 'generation': {
+      const qualityGate = result.reason === 'article_quality_gate_failed' || result.reason === 'required_anchor_missing'
+      return Response.json(
+        { error: 'article_quality_gate_failed', reason: result.reason, audit: result.audit ?? null, generationAttempts: result.attempts },
+        { status: qualityGate ? 422 : 502 },
+      )
     }
+    case 'insert_failed':
+    default:
+      return Response.json({ error: 'Failed to save article' }, { status: 500 })
   }
-
-  const businessName = (project as { business_name?: string } | null)?.business_name ?? null
-  const brief: ArticleBrief = {
-    language,
-    topic: String(t.topic || ''),
-    primaryKeyword: (t.primary_keyword as string) ?? null,
-    secondaryKeywords: Array.isArray(t.secondary_keywords) ? (t.secondary_keywords as string[]) : [],
-    searchIntent: (t.search_intent as string) ?? null,
-    targetAudience: (t.target_audience as string) ?? null,
-    toneOfVoice: (t.tone_of_voice as string) ?? null,
-    desiredWordCount: (t.desired_word_count as number) ?? null,
-    ctaPreference: (t.cta_preference as string) ?? null,
-    ctaText: decodedNotes.flags.cta.text || null,
-    ctaPhone: decodedNotes.flags.cta.phone || null,
-    ctaWhatsApp: decodedNotes.flags.cta.whatsapp || null,
-    ctaUrl: decodedNotes.flags.cta.url || null,
-    briefNotes: decodedNotes.notes || null,
-    includeBrandName: decodedNotes.flags.includeBrandName,
-    // Explicit brand name from the brief; fall back to the project's business name.
-    brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
-    // Default false: only inject a manual TOC when the brief opted in.
-    includeManualToc: decodedNotes.flags.includeManualToc,
-    anchors,
-    // Planned internal-link anchors (phrase-only): weave the phrase, no link.
-    plannedInternalAnchors: decodedNotes.flags.internalLinks.map((l) => l.anchorText),
-    businessName,
-    domain: (project as { target_domain?: string } | null)?.target_domain ?? null,
-    category,
-  }
-
-  const gen = await generateValidatedArticle(brief)
-  if ('error' in gen) {
-    const reason = gen.reason || 'unknown'
-    console.log(`[content-article-generation] failed reason=${reason} attempts=${gen.attempts}`)
-    // 422 when the article was generated but didn't pass the quality gate (the
-    // client gets safe debug: counts/blockers/warnings/score). 502 for
-    // model/transport failures the user can only retry.
-    const qualityGate = reason === 'article_quality_gate_failed' || reason === 'required_anchor_missing'
-    return Response.json(
-      { error: 'article_quality_gate_failed', reason, audit: gen.audit ?? null, generationAttempts: gen.attempts },
-      { status: qualityGate ? 422 : 502 },
-    )
-  }
-
-  const article = gen.article
-  const safeHtml = gen.safeHtml
-  // Audit already logged model + counts + blockers inside the lib.
-
-  const baseRow = {
-    user_id: auth.user.id,
-    project_id: auth.project.id,
-    topic_id: body.topicId,
-    title: article.title,
-    meta_title: article.metaTitle || null,
-    meta_description: article.metaDescription || null,
-    excerpt: article.excerpt || null,
-    content_html: safeHtml,
-    content_markdown: article.contentMarkdown || null,
-    faq_json: article.faq.length ? article.faq : null,
-    image_prompt: article.imagePrompt || null,
-    status: 'draft' as const,
-    wp_connection_id: (wpConn as { id?: string } | null)?.id ?? null,
-    updated_at: new Date().toISOString(),
-  }
-
-  // Unique slug per project: English slug (fallback to a stable id) + numeric
-  // suffix retry on 23505.
-  const baseSlug = gen.slug || `article-${Date.now().toString(36)}`
-  let inserted: { id: string } | null = null
-  let lastError: { code?: string; message?: string } | null = null
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`.slice(0, 90)
-    const { data, error } = await auth.admin
-      .from('generated_articles')
-      .insert({ ...baseRow, slug })
-      .select('id')
-      .single()
-    if (!error && data) { inserted = data as { id: string }; break }
-    lastError = error as { code?: string; message?: string }
-    if ((error as { code?: string })?.code !== '23505') break // only retry slug conflicts
-  }
-
-  if (!inserted) {
-    console.error('[content-article-generation] insert failed', { code: lastError?.code, message: lastError?.message })
-    return Response.json({ error: 'Failed to save article' }, { status: 500 })
-  }
-
-  // Best-effort AI usage logging (never blocks).
-  if (gen.usage) {
-    try {
-      await auth.admin.from('ai_usage_logs').insert({
-        user_id: auth.user.id,
-        project_id: auth.project.id,
-        article_id: inserted.id,
-        provider: 'gemini',
-        model: gen.usage.model,
-        input_tokens: gen.usage.inputTokens,
-        output_tokens: gen.usage.outputTokens,
-        estimated_cost: 0,
-        operation: 'article_generation',
-        updated_at: new Date().toISOString(),
-      })
-    } catch (e) {
-      console.warn('[content-article-generation] usage log skipped:', e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  // Mark the topic as used (best-effort).
-  try {
-    await auth.admin.from('article_topics').update({ status: 'used', updated_at: new Date().toISOString() }).eq('id', body.topicId)
-  } catch {
-    // non-fatal
-  }
-
-  console.log('[content-article-generation] created', {
-    articleId: inserted.id,
-    projectId: auth.project.id,
-    score: gen.audit.score,
-    warnings: gen.audit.warnings.length,
-  })
-
-  // Auto-generate a brand-neutral featured image (default ON; disable with
-  // CONTENT_AUTO_FEATURED_IMAGE=false). Best-effort: the article is already
-  // saved, so image failure NEVER blocks creation — we just flag it.
-  let imageGenerated = false
-  if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
-    try {
-      const img = await createFeaturedImageForArticle(auth.admin, inserted.id)
-      imageGenerated = !('error' in img)
-      if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: inserted.id, reason: img.error })
-    } catch (e) {
-      console.warn('[content-article-generation] auto image threw', { message: e instanceof Error ? e.message : String(e) })
-    }
-  }
-
-  return Response.json({
-    articleId: inserted.id,
-    warnings: article.warnings,
-    audit: gen.audit,
-    imageGenerated,
-  })
 }

@@ -30,6 +30,7 @@ interface Pool {
 interface QueueItem {
   id: string
   topicId: string | null
+  articleId: string | null
   topicTitle: string
   status: string
   position: number
@@ -195,6 +196,20 @@ export default function AutomationSchedule({
     }
   }
 
+  async function generateItem(itemId: string) {
+    setBusyItem(itemId); setMessage(null)
+    try {
+      const res = await fetch(`/api/content/automation/items/${itemId}/generate`, { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (d?.status === 'failed' || d?.status === 'quality_check_failed') {
+        setMessage({ text: `${d.status}${d.reason ? `: ${d.reason}` : ''}`, ok: false })
+      }
+      await load(); onChanged?.()
+    } finally {
+      setBusyItem(null)
+    }
+  }
+
   async function move(index: number, dir: -1 | 1) {
     const next = [...items]
     const j = index + dir
@@ -309,9 +324,22 @@ export default function AutomationSchedule({
                   <div className="text-sm text-slate-800 dark:text-slate-100 truncate">{it.topicTitle}</div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">{fmt(it.projectedPublishAt)}{it.lastError ? ` · ${it.lastError}` : ''}</div>
                 </div>
-                <Badge variant={it.status === 'published' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
+                <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
                 <div className="flex items-center gap-1">
-                  {(it.status === 'failed' || it.status === 'quality_check_failed' || it.status === 'skipped' || it.status === 'paused') && (
+                  {it.status === 'generated' && (
+                    <>
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400">{t.generatedReady}</span>
+                      {it.articleId && (
+                        <a href={`/content/articles/${it.articleId}`} className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">{t.openEditor}</a>
+                      )}
+                    </>
+                  )}
+                  {['queued', 'failed', 'quality_check_failed'].includes(it.status) && (
+                    <Button size="sm" variant="outline" onClick={() => generateItem(it.id)} loading={busyItem === it.id} disabled={busyItem === it.id}>
+                      {busyItem === it.id ? t.generatingArticle : t.generateNow}
+                    </Button>
+                  )}
+                  {(it.status === 'skipped' || it.status === 'paused') && (
                     <Button size="sm" variant="ghost" onClick={() => itemAction(it.id, 'unskip')} disabled={busyItem === it.id}>{t.retry}</Button>
                   )}
                   {it.status === 'queued' && (
