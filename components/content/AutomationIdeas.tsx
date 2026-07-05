@@ -9,7 +9,7 @@
  * list. No scheduling here (Phase 4). Gated by the caller (automation flag).
  */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -59,19 +59,32 @@ export default function AutomationIdeas({
 
   const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : t.badgeResearch)
 
+  // Monotonic request id: only the latest generate() call is allowed to write
+  // state, so a slow earlier response can never overwrite a newer one.
+  const reqRef = useRef(0)
+
   async function generate() {
     if (loading) return
-    setLoading(true); setMessage(null); setMeta(null); setSelected(new Set())
+    const reqId = ++reqRef.current
+    setLoading(true); setMessage(null); setMeta(null); setSelected(new Set()); setSuggestions([])
     try {
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, source, keyword: keyword.trim() }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (reqId !== reqRef.current) return // a newer request superseded this one
       if (!res.ok) {
-        setMessage({ text: data?.error === 'keyword_required' ? t.keywordPlaceholder : (data?.error || 'error'), ok: false })
-        setSuggestions([])
+        // keyword_required is a real validation error; anything else (5xx /
+        // timeout / transient) must NOT read as "no ideas found".
+        if (data?.error === 'keyword_required') {
+          setMessage({ text: t.keywordPlaceholder, ok: false })
+          setSuggestions([])
+        } else {
+          setSuggestions([])
+          setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error' })
+        }
         return
       }
       const list: Suggestion[] = Array.isArray(data.suggestions) ? data.suggestions : []
@@ -84,9 +97,11 @@ export default function AutomationIdeas({
         keywordResearchFailed: data.meta?.keywordResearchFailed,
       })
     } catch {
-      setMessage({ text: 'error', ok: false })
+      if (reqId !== reqRef.current) return
+      setSuggestions([])
+      setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error' })
     } finally {
-      setLoading(false)
+      if (reqId === reqRef.current) setLoading(false)
     }
   }
 
@@ -223,11 +238,13 @@ export default function AutomationIdeas({
       )}
       {meta && suggestions.length === 0 && !loading && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
-          {meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
-            ? t.researchFailed
-            : meta.reason === 'all_duplicates'
-              ? t.allDuplicates
-              : t.tryOther}
+          {meta.reason === 'model_error' || meta.reason === 'http_error'
+            ? t.temporaryError
+            : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
+              ? t.researchFailed
+              : meta.reason === 'all_duplicates'
+                ? t.allDuplicates
+                : t.tryOther}
         </p>
       )}
       {lastCreatedIds.length > 0 && (

@@ -82,9 +82,16 @@ function attachInternalLinks(
   return scored.slice(0, 2).map((c) => ({ url: c.url, anchor: c.anchor }))
 }
 
-async function callGeminiIdeas(prompt: string): Promise<GeminiIdea[]> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * One Gemini call. `ok` distinguishes a successful response (topics may legit be
+ * empty) from a transient failure (no client / thrown request / unparseable
+ * output) so the caller can RETRY on failure instead of reporting "no ideas".
+ */
+async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; ok: boolean }> {
   const client = getGeminiClient()
-  if (!client) return []
+  if (!client) return { ideas: [], ok: false }
   const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
   try {
     const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.95 } })
@@ -95,13 +102,13 @@ async function callGeminiIdeas(prompt: string): Promise<GeminiIdea[]> {
       parsed = JSON.parse(text)
     } catch {
       const m = text.match(/\{[\s\S]*\}/)
-      if (!m) return []
+      if (!m) return { ideas: [], ok: false } // unparseable → treat as transient, retry
       parsed = JSON.parse(m[0])
     }
-    return Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : []
+    return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : [], ok: true }
   } catch (err) {
     console.error('[recommendations] gemini ideas error', { message: err instanceof Error ? err.message : String(err) })
-    return []
+    return { ideas: [], ok: false }
   }
 }
 
@@ -156,25 +163,43 @@ function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number): To
  * Loop a Gemini idea generator until we reach `target` NEW (non-duplicate)
  * suggestions or run out of attempts. Feeds seen titles back so each round is
  * different. Dedup is TITLE-based only (broad keyword overlap is allowed).
+ *
+ * `genBatch` returns `{ items, ok }` where `ok=false` marks a TRANSIENT failure
+ * (no client / thrown request / unparseable output). On transient failure we
+ * back off and retry within the attempt budget instead of stopping — that's the
+ * fix for "first click 0 ideas, second click 15". We only stop early on a
+ * genuine successful-but-empty response. `reason` explains a 0 result:
+ *   - 'model_error'    → every attempt failed transiently (retry later)
+ *   - 'all_duplicates' → the model produced ideas but all were duplicates
+ *   - 'model_empty'    → the model succeeded but returned no ideas
  */
 async function accumulate(
-  genBatch: (avoid: string[]) => Promise<TopicSuggestion[]>,
+  genBatch: (avoid: string[]) => Promise<{ items: TopicSuggestion[]; ok: boolean }>,
   corpus: ExistingCorpus,
   existingTitles: string[],
   target: number,
-): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number }> {
+): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string }> {
   const acc: TopicSuggestion[] = []
   const seenTitles = new Set<string>()
   let raw = 0
   let dupes = 0
   let attempts = 0
+  let hadSuccess = false
+  let hadError = false
   while (acc.length < target && attempts < MAX_ATTEMPTS) {
     attempts++
     const avoid = [...existingTitles, ...acc.map((a) => a.title)]
-    const batch = await genBatch(avoid)
-    if (batch.length === 0) break
-    raw += batch.length
-    for (const s of batch) {
+    const { items, ok } = await genBatch(avoid)
+    if (!ok) {
+      // Transient failure — back off and retry (do NOT report "no ideas").
+      hadError = true
+      await sleep(300 * attempts)
+      continue
+    }
+    hadSuccess = true
+    if (items.length === 0) break // genuine empty response → stop looping
+    raw += items.length
+    for (const s of items) {
       const key = s.title.trim().toLowerCase()
       if (!key || seenTitles.has(key)) { dupes++; continue }
       if (corpus.isDuplicate(s.title)) { dupes++; continue }
@@ -183,7 +208,14 @@ async function accumulate(
       if (acc.length >= target) break
     }
   }
-  return { acc, raw, dupes, attempts }
+  const reason = acc.length > 0
+    ? undefined
+    : !hadSuccess && hadError
+      ? 'model_error'
+      : raw > 0
+        ? 'all_duplicates'
+        : 'model_empty'
+  return { acc, raw, dupes, attempts, reason }
 }
 
 export async function generateRecommendations(admin: Admin, input: GenerateInput): Promise<RecommendationResult> {
@@ -227,20 +259,20 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
 
   if (input.source === 'keyword') {
     const keyword = (input.keyword || '').trim()
-    const { acc, raw, dupes, attempts } = await accumulate(
+    const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const ideas = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
-        return ideas.map((g) => mapIdea(g, 'keyword', 0.7)).filter((x): x is TopicSuggestion => !!x)
+        const { ideas, ok } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
+        return { items: ideas.map((g) => mapIdea(g, 'keyword', 0.7)).filter((x): x is TopicSuggestion => !!x), ok }
       },
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason: acc.length === 0 ? (raw === 0 ? 'model_empty' : 'all_duplicates') : undefined }
+    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
   } else if (input.source === 'project_data') {
-    const { acc, raw, dupes, attempts } = await accumulate(
+    const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const ideas = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid))
-        return ideas.map((g) => {
+        const { ideas, ok } = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid))
+        const items = ideas.map((g) => {
           const s = mapIdea(g, 'project_data', 0)
           if (!s) return null
           const fit = assessProjectKeywordFit(s.primaryKeyword, { businessName: project.business_name, category: null })
@@ -248,11 +280,12 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
           if (!s.suggestionReason) s.suggestionReason = language === 'he' ? 'נושא משלים לפי נתוני האתר' : 'A supporting topic based on the site data'
           return s
         }).filter((x): x is TopicSuggestion => !!x)
+        return { items, ok }
       },
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason: acc.length === 0 ? (raw === 0 ? 'model_empty' : 'all_duplicates') : undefined }
+    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
   } else {
     // keyword_research_url — one Google Ads pass → clusters → topics, then dedupe.
     const seedUrls = [homepageFromDomain(project.target_domain), ...linkCandidates.map((c) => c.url)].filter((u): u is string => !!u)
