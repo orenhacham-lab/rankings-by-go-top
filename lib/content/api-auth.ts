@@ -27,6 +27,16 @@ export function isContentAutomationEnabled(): boolean {
   return isContentModuleEnabled() && process.env.ENABLE_CONTENT_AUTOMATION === 'true'
 }
 
+/**
+ * Internal-link planning flag (Phase 1 = dry-run only). Independent + default
+ * off so the read-only diagnostic can ship dark. Requires the automation module.
+ * NOTE: this flag currently gates ONLY the read-only dry-run — it never causes
+ * any insertion, persistence, or generation/publishing change.
+ */
+export function isInternalLinkPlanningEnabled(): boolean {
+  return isContentAutomationEnabled() && process.env.ENABLE_INTERNAL_LINK_PLANNING === 'true'
+}
+
 export type ContentAuthResult =
   | { error: string; status: 401 | 403 | 404 | 400 }
   | {
