@@ -26,7 +26,11 @@ interface Pool {
   timezone: string
   isActive: boolean
   nextPublishAt: string | null
+  publishDays: number[]
 }
+
+const DEFAULT_DAYS_1 = [0]      // Sunday
+const DEFAULT_DAYS_2 = [0, 3]   // Sunday + Wednesday (never Saturday by default)
 interface QueueItem {
   id: string
   topicId: string | null
@@ -71,6 +75,7 @@ export default function AutomationSchedule({
   const [customDays, setCustomDays] = useState(3)
   const [publishTime, setPublishTime] = useState('09:00')
   const [timezone, setTimezone] = useState('Asia/Jerusalem')
+  const [weekdays, setWeekdays] = useState<number[]>(DEFAULT_DAYS_1)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -86,8 +91,12 @@ export default function AutomationSchedule({
       setPool(p)
       setItems(Array.isArray(pd.items) ? pd.items : [])
       if (p) {
-        setPreset(p.intervalDays === 7 ? 'weekly1' : p.intervalDays === 3 ? 'weekly2' : 'custom')
-        if (p.intervalDays !== 7 && p.intervalDays !== 3) setCustomDays(p.intervalDays)
+        const days = Array.isArray(p.publishDays) ? p.publishDays : []
+        // Preset from weekday count first, else fall back to interval-days.
+        const nextPreset: Preset = days.length === 1 ? 'weekly1' : days.length === 2 ? 'weekly2' : p.intervalDays === 7 ? 'weekly1' : p.intervalDays === 3 ? 'weekly2' : 'custom'
+        setPreset(nextPreset)
+        if (nextPreset === 'custom') setCustomDays(p.intervalDays)
+        setWeekdays(days.length ? days : nextPreset === 'weekly2' ? DEFAULT_DAYS_2 : DEFAULT_DAYS_1)
         setPublishTime(p.publishTime || '09:00')
         setTimezone(p.timezone || 'Asia/Jerusalem')
       }
@@ -103,21 +112,24 @@ export default function AutomationSchedule({
 
   useEffect(() => { load() }, [load, refreshKey])
 
-  function presetToCadence(): { cadence: Cadence; intervalDays: number } {
-    if (preset === 'weekly1') return { cadence: 'weekly', intervalDays: 7 }
-    if (preset === 'weekly2') return { cadence: 'custom', intervalDays: 3 }
-    return { cadence: 'custom', intervalDays: Math.max(1, Math.min(365, customDays)) }
+  function presetToCadence(): { cadence: Cadence; intervalDays: number; publishDays: number[] } {
+    if (preset === 'weekly1') return { cadence: 'weekly', intervalDays: 7, publishDays: [weekdays[0] ?? 0] }
+    if (preset === 'weekly2') {
+      const two = [weekdays[0] ?? DEFAULT_DAYS_2[0]!, weekdays[1] ?? DEFAULT_DAYS_2[1]!]
+      return { cadence: 'custom', intervalDays: 3, publishDays: Array.from(new Set(two)) }
+    }
+    return { cadence: 'custom', intervalDays: Math.max(1, Math.min(365, customDays)), publishDays: [] }
   }
 
   async function saveSettings(activate?: boolean) {
     setSaving(true); setMessage(null)
     try {
-      const { cadence, intervalDays } = presetToCadence()
+      const { cadence, intervalDays, publishDays } = presetToCadence()
       const isActive = activate ?? pool?.isActive ?? false
       const res = await fetch('/api/content/automation/pools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, cadence, intervalDays, publishTime, timezone, isActive }),
+        body: JSON.stringify({ projectId, cadence, intervalDays, publishDays, publishTime, timezone, isActive }),
       })
       if (res.status === 503) { setMessage({ text: t.migrationRequired, ok: false }); return }
       if (!res.ok) { setMessage({ text: 'error', ok: false }); return }
@@ -164,10 +176,16 @@ export default function AutomationSchedule({
 
   async function ensurePoolId(): Promise<string | null> {
     if (pool) return pool.id
-    const { cadence, intervalDays } = presetToCadence()
+    // GET-first so we NEVER mutate (e.g. pause) an existing pool just to get its
+    // id. Only create a new paused pool when none exists.
+    try {
+      const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
+      if (gr.ok) { const gd = await gr.json(); if (gd.pool?.id) return gd.pool.id }
+    } catch { /* fall through to create */ }
+    const { cadence, intervalDays, publishDays } = presetToCadence()
     const res = await fetch('/api/content/automation/pools', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, cadence, intervalDays, publishTime, timezone, isActive: false }),
+      body: JSON.stringify({ projectId, cadence, intervalDays, publishDays, publishTime, timezone, isActive: false }),
     })
     if (!res.ok) return null
     const d = await res.json()
@@ -296,6 +314,25 @@ export default function AutomationSchedule({
             )}
           </div>
         </div>
+        {(preset === 'weekly1' || preset === 'weekly2') && (
+          <div>
+            <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.weekdayLabel}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={weekdays[0] ?? 0}
+                onChange={(e) => setWeekdays(preset === 'weekly1' ? [Number(e.target.value)] : [Number(e.target.value), weekdays[1] ?? DEFAULT_DAYS_2[1]!])}
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
+                {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
+              </select>
+              {preset === 'weekly2' && (
+                <select value={weekdays[1] ?? DEFAULT_DAYS_2[1]!}
+                  onChange={(e) => setWeekdays([weekdays[0] ?? DEFAULT_DAYS_2[0]!, Number(e.target.value)])}
+                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
+                  {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
+                </select>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-xs text-slate-600 dark:text-slate-300">
             <span className="block mb-1">{t.publishTime}</span>
@@ -310,13 +347,13 @@ export default function AutomationSchedule({
             </select>
           </label>
           <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
-          <Button size="sm" variant="outline" onClick={togglePause} disabled={saving}>{active ? t.pause : t.resume}</Button>
-          <Button size="sm" variant="ghost" onClick={runNow} disabled={saving}>{t.runNow}</Button>
+          <Button size="sm" variant="outline" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
+          <Button size="sm" variant="ghost" onClick={runNow} disabled={saving} title={t.runNowHint}>{t.runNow}</Button>
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400">
           {t.nextPublish}: <span className="font-medium">{fmt(pool?.nextPublishAt ?? null)}</span>
         </div>
-        <p className="text-[11px] text-slate-400">{t.weekdayNote}</p>
+        <p className="text-[11px] text-slate-400">{t.runNowHint}</p>
       </div>
 
       {/* Add approved topics */}

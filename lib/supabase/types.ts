@@ -483,6 +483,8 @@ export interface ArticlePool {
   timezone: string
   is_active: boolean
   next_publish_at: string | null
+  // Optional weekday schedule (0=Sun … 6=Sat). NULL = interval-days behavior.
+  publish_days: number[] | null
   created_at: string
   updated_at: string
 }

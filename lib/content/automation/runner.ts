@@ -13,7 +13,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generatePoolItem } from '@/lib/content/automation/generate-item'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
-import { advanceNextPublishAt, resolveIntervalDays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { advanceNextPublishAt, nextPublishAtWeekdays, resolveIntervalDays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -42,6 +42,7 @@ interface PoolRow {
   publish_time: string | null
   timezone: string
   next_publish_at: string | null
+  publish_days: number[] | null
 }
 
 /** (C) Recover items stuck in generating/publishing past the lock timeout. */
@@ -83,7 +84,7 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string } =
 
   await recoverStaleLocks(admin, opts.projectId, cutoffIso, summary)
 
-  let poolQ = admin.from('article_pools').select('id, project_id, cadence, interval_days, publish_time, timezone, next_publish_at').eq('is_active', true)
+  let poolQ = admin.from('article_pools').select('id, project_id, cadence, interval_days, publish_time, timezone, next_publish_at, publish_days').eq('is_active', true)
   if (opts.projectId) poolQ = poolQ.eq('project_id', opts.projectId)
   const { data: pools } = await poolQ
   const poolRows = (pools ?? []) as PoolRow[]
@@ -111,8 +112,12 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string } =
         const res = await publishPoolItem(admin, (gen as { id: string }).id)
         if (res.status === 'published') {
           summary.published++
-          // (F) Advance next slot only on a successful publish.
-          const nextIso = advanceNextPublishAt(pool.next_publish_at!, tz, publishTime, intervalDays, nowMs)
+          // (F) Advance next slot only on a successful publish — weekday-aware
+          // when the pool has a weekday schedule, else by interval.
+          const days = Array.isArray(pool.publish_days) ? pool.publish_days : []
+          const nextIso = days.length
+            ? nextPublishAtWeekdays(publishTime, tz, days, nowMs)
+            : advanceNextPublishAt(pool.next_publish_at!, tz, publishTime, intervalDays, nowMs)
           await admin.from('article_pools').update({ next_publish_at: nextIso, updated_at: nowIso() }).eq('id', pool.id)
           summary.details.push(`pool ${pool.id}: published ${res.articleId ?? '?'} → next ${nextIso}`)
         } else {

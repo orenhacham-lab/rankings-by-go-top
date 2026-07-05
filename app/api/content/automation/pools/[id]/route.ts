@@ -8,10 +8,17 @@
 
 import { isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { authPool, toPoolDTO, type PoolRow } from '@/lib/content/automation/api'
-import { computeNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
+import { computeNextPublishAt, nextPublishAtWeekdays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
 
 const CADENCES: Cadence[] = ['daily', 'weekly', 'monthly', 'custom']
-const POOL_SELECT = 'id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at'
+const POOL_SELECT = 'id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at, publish_days'
+
+function cleanPublishDays(v: unknown): number[] {
+  if (!Array.isArray(v)) return []
+  const set = new Set<number>()
+  for (const d of v) { const n = Number(d); if (Number.isInteger(n) && n >= 0 && n <= 6) set.add(n) }
+  return Array.from(set).sort((a, b) => a - b)
+}
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isContentAutomationEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -38,12 +45,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if ('timezone' in body && typeof body.timezone === 'string' && body.timezone.trim()) patch.timezone = body.timezone.trim()
   if ('name' in body && typeof body.name === 'string' && body.name.trim()) patch.name = body.name.trim()
   if ('isActive' in body) patch.is_active = body.isActive === true
+  if ('publishDays' in body) { const days = cleanPublishDays(body.publishDays); patch.publish_days = days.length ? days : null }
 
   // Resulting active state + schedule fields → recompute next_publish_at.
   const nextActive = 'is_active' in patch ? (patch.is_active as boolean) : pool.is_active
   const nextTime = (patch.publish_time as string) ?? pool.publish_time ?? DEFAULT_PUBLISH_TIME
   const nextTz = (patch.timezone as string) ?? pool.timezone ?? DEFAULT_TIMEZONE
-  patch.next_publish_at = nextActive ? computeNextPublishAt(nextTime, nextTz) : null
+  const nextDays = 'publish_days' in patch ? ((patch.publish_days as number[] | null) ?? []) : (Array.isArray(pool.publish_days) ? pool.publish_days : [])
+  patch.next_publish_at = nextActive ? (nextDays.length ? nextPublishAtWeekdays(nextTime, nextTz, nextDays) : computeNextPublishAt(nextTime, nextTz)) : null
 
   const { data, error } = await auth.admin.from('article_pools').update(patch).eq('id', id).select(POOL_SELECT).single()
   if (error || !data) {

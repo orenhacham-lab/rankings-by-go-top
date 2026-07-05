@@ -96,6 +96,34 @@ export function projectedPublishAt(
 }
 
 /**
+ * The next publish instant (ISO) at `publishTime` on one of the given weekdays
+ * (0=Sun … 6=Sat) in `timeZone`, strictly after `from`. Falls back to the plain
+ * publish-time logic when no weekdays are given. Used for both the first slot and
+ * post-publish advancement when a pool has a weekday schedule.
+ */
+export function nextPublishAtWeekdays(
+  publishTime: string,
+  timeZone: string,
+  weekdays: number[] | null | undefined,
+  from: number = Date.now(),
+): string {
+  const days = (weekdays ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+  if (days.length === 0) return computeNextPublishAt(publishTime, timeZone, from)
+  const set = new Set(days)
+  const [h, mi] = parseTime(publishTime)
+  const { y, mo, d } = localDateParts(from, timeZone)
+  // The weekday of a calendar date is timezone-independent.
+  for (let k = 0; k < 21; k++) {
+    const wd = new Date(Date.UTC(y, mo - 1, d + k)).getUTCDay()
+    if (set.has(wd)) {
+      const inst = zonedWallToUtc(y, mo, d + k, h, mi, timeZone)
+      if (inst > from) return new Date(inst).toISOString()
+    }
+  }
+  return computeNextPublishAt(publishTime, timeZone, from)
+}
+
+/**
  * After a publish, the next slot: step forward from `fromIso` by `intervalDays`
  * (at the same wall time) until strictly after `now`. Catches up correctly even
  * when the cron ran late (e.g. a daily cron for an hourly-ish cadence).

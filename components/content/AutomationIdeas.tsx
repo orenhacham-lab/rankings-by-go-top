@@ -139,14 +139,23 @@ export default function AutomationIdeas({
     if (scheduling || lastCreatedIds.length === 0) return
     setScheduling(true); setMessage(null)
     try {
-      // Ensure the project's pool exists (paused), then queue the created topics.
-      const pr = await fetch('/api/content/automation/pools', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
-      })
-      if (!pr.ok) { setMessage({ text: 'error', ok: false }); return }
-      const pd = await pr.json()
-      const poolId = pd.pool?.id
+      // Ensure the project's pool exists WITHOUT mutating an existing one: GET
+      // first, and only create a new (paused) pool when none exists. This never
+      // flips an already-active pool to paused.
+      let poolId: string | null = null
+      try {
+        const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
+        if (gr.ok) { const gd = await gr.json(); poolId = gd.pool?.id ?? null }
+      } catch { /* fall through to create */ }
+      if (!poolId) {
+        const pr = await fetch('/api/content/automation/pools', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
+        })
+        if (!pr.ok) { setMessage({ text: 'error', ok: false }); return }
+        const pd = await pr.json()
+        poolId = pd.pool?.id ?? null
+      }
       if (!poolId) { setMessage({ text: 'error', ok: false }); return }
       await fetch(`/api/content/automation/pools/${poolId}/items`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -221,9 +230,11 @@ export default function AutomationIdeas({
         </p>
       )}
       {lastCreatedIds.length > 0 && (
-        <div className="mb-3 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/5 px-3 py-2 flex items-center gap-2">
-          <span className="text-xs text-slate-600 dark:text-slate-300 flex-1">{t.nextStepHint}</span>
-          <Button size="sm" variant="outline" onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
+        <div className="mb-3 rounded-lg border border-indigo-300 dark:border-indigo-500/40 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-2.5 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-indigo-800 dark:text-indigo-200 flex-1">
+            {t.approvedCta.replace('{n}', String(lastCreatedIds.length))}
+          </span>
+          <Button onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
         </div>
       )}
 

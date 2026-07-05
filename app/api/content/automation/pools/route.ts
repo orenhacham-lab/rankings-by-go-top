@@ -14,6 +14,7 @@ import { authContentProject, isContentAutomationEnabled } from '@/lib/content/ap
 import { toPoolDTO, isMigrationMissing, type PoolRow } from '@/lib/content/automation/api'
 import {
   computeNextPublishAt,
+  nextPublishAtWeekdays,
   projectedPublishAt,
   DEFAULT_TIMEZONE,
   DEFAULT_PUBLISH_TIME,
@@ -21,7 +22,20 @@ import {
 } from '@/lib/content/automation/schedule'
 
 const CADENCES: Cadence[] = ['daily', 'weekly', 'monthly', 'custom']
-const POOL_SELECT = 'id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at'
+const POOL_SELECT = 'id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at, publish_days'
+
+/** Sanitize an incoming weekday array (0=Sun … 6=Sat), unique + sorted. */
+function cleanPublishDays(v: unknown): number[] {
+  if (!Array.isArray(v)) return []
+  const set = new Set<number>()
+  for (const d of v) { const n = Number(d); if (Number.isInteger(n) && n >= 0 && n <= 6) set.add(n) }
+  return Array.from(set).sort((a, b) => a - b)
+}
+
+/** First/next publish slot honoring weekday schedule when present. */
+function firstSlot(publishTime: string, timezone: string, publishDays: number[]): string {
+  return publishDays.length ? nextPublishAtWeekdays(publishTime, timezone, publishDays) : computeNextPublishAt(publishTime, timezone)
+}
 
 export async function GET(request: Request) {
   if (!isContentAutomationEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -72,11 +86,21 @@ export async function GET(request: Request) {
   }
 
   // Projected publish dates for still-pending items, in queue order.
-  const base = pool.nextPublishAt || (pool.isActive ? computeNextPublishAt(pool.publishTime || DEFAULT_PUBLISH_TIME, pool.timezone) : null)
+  const ptime = pool.publishTime || DEFAULT_PUBLISH_TIME
+  const base = pool.nextPublishAt || (pool.isActive ? firstSlot(ptime, pool.timezone, pool.publishDays) : null)
   let pendingIndex = 0
+  let weekdayCursor = base // sequential weekday projection cursor
   const dtoItems = items.map((i) => {
     const pending = ['queued', 'scheduled'].includes(i.status)
-    const projected = pending && base ? projectedPublishAt(base, pool.publishTime || DEFAULT_PUBLISH_TIME, pool.timezone, pool.intervalDays, pendingIndex) : (i.published_at ?? i.scheduled_at ?? null)
+    let projected: string | null
+    if (!pending || !base) {
+      projected = i.published_at ?? i.scheduled_at ?? null
+    } else if (pool.publishDays.length) {
+      projected = weekdayCursor
+      weekdayCursor = weekdayCursor ? nextPublishAtWeekdays(ptime, pool.timezone, pool.publishDays, Date.parse(weekdayCursor) + 60000) : null
+    } else {
+      projected = projectedPublishAt(base, ptime, pool.timezone, pool.intervalDays, pendingIndex)
+    }
     if (pending) pendingIndex++
     return {
       id: i.id,
@@ -114,15 +138,13 @@ export async function POST(request: Request) {
   const intervalDays = intervalDaysRaw && intervalDaysRaw > 0 ? Math.min(365, intervalDaysRaw) : null
   const publishTime = typeof body.publishTime === 'string' && /^\d{1,2}:\d{2}$/.test(body.publishTime) ? body.publishTime : DEFAULT_PUBLISH_TIME
   const timezone = typeof body.timezone === 'string' && body.timezone.trim() ? body.timezone.trim() : DEFAULT_TIMEZONE
-  const isActive = body.isActive === true
   const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'תזמון פרסום אוטומטי'
 
-  const nextPublishAt = isActive ? computeNextPublishAt(publishTime, timezone) : null
-
-  // Upsert the project's single pool.
+  // Find the project's single pool (to PRESERVE is_active / publish_days that the
+  // caller didn't explicitly send — never silently pause an active pool).
   const { data: existing, error: findErr } = await auth.admin
     .from('article_pools')
-    .select('id')
+    .select('id, is_active, publish_days')
     .eq('project_id', auth.project.id)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -130,8 +152,14 @@ export async function POST(request: Request) {
   if (findErr && isMigrationMissing((findErr as { code?: string }).code)) {
     return Response.json({ error: 'automation_migration_required' }, { status: 503 })
   }
+  const prev = existing as { id: string; is_active: boolean; publish_days: number[] | null } | null
 
-  const patch = { name, cadence, interval_days: intervalDays, publish_time: publishTime, timezone, is_active: isActive, next_publish_at: nextPublishAt, updated_at: new Date().toISOString() }
+  // is_active / publish_days are only changed when explicitly present in the body.
+  const isActive = 'isActive' in body ? body.isActive === true : (prev?.is_active ?? false)
+  const publishDays = 'publishDays' in body ? cleanPublishDays(body.publishDays) : (Array.isArray(prev?.publish_days) ? prev!.publish_days : [])
+  const nextPublishAt = isActive ? firstSlot(publishTime, timezone, publishDays) : null
+
+  const patch = { name, cadence, interval_days: intervalDays, publish_time: publishTime, timezone, is_active: isActive, publish_days: publishDays.length ? publishDays : null, next_publish_at: nextPublishAt, updated_at: new Date().toISOString() }
 
   let poolRow: PoolRow | null = null
   if (existing) {

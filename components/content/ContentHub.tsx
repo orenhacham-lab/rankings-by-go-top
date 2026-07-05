@@ -495,7 +495,9 @@ export default function ContentHub() {
             >
               {t.tabs.articles}
             </button>
-            {(['gbpPosts', 'scheduled'] as const).map((key) => (
+            {/* Scheduling now exists (automation section below) → drop its
+                "coming soon" placeholder tab when the automation flag is on. */}
+            {(process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' ? (['gbpPosts'] as const) : (['gbpPosts', 'scheduled'] as const)).map((key) => (
               <span
                 key={key}
                 className="px-4 py-2 text-sm font-medium text-slate-400 dark:text-slate-600 cursor-not-allowed inline-flex items-center gap-1.5"

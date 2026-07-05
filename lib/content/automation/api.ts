@@ -23,6 +23,7 @@ export interface PoolRow {
   timezone: string
   is_active: boolean
   next_publish_at: string | null
+  publish_days: number[] | null
 }
 
 export interface PoolDTO {
@@ -35,6 +36,7 @@ export interface PoolDTO {
   timezone: string
   isActive: boolean
   nextPublishAt: string | null
+  publishDays: number[]
 }
 
 export function toPoolDTO(row: PoolRow): PoolDTO {
@@ -48,6 +50,7 @@ export function toPoolDTO(row: PoolRow): PoolDTO {
     timezone: row.timezone,
     isActive: row.is_active,
     nextPublishAt: row.next_publish_at,
+    publishDays: Array.isArray(row.publish_days) ? row.publish_days : [],
   }
 }
 
@@ -59,7 +62,7 @@ export async function authPool(poolId: string): Promise<OwnedPool | { error: str
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('article_pools')
-    .select('id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at')
+    .select('id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at, publish_days')
     .eq('id', poolId)
     .maybeSingle()
   if (error) {
