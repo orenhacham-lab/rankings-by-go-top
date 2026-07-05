@@ -91,6 +91,8 @@ export const dashboardHe = {
       publishingNow: 'מפרסם…',
       publishedDone: 'פורסם',
       openPost: 'פתח בוורדפרס',
+      runNow: 'רוץ אוטומציה עכשיו',
+      ranSummary: 'הרצה הושלמה — פורסמו {published}, נוצרו {generated}, כשלים {failures}',
       addedToast: 'נוספו {n} נושאים לתור',
       alreadyQueuedToast: '{n} כבר היו בתור',
       migrationRequired: 'יש להחיל את מיגרציית האוטומציה (Phase 1) כדי להשתמש בתזמון.',

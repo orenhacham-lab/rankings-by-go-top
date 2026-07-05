@@ -94,3 +94,26 @@ export function projectedPublishAt(
   const { y, mo, d } = localDateParts(base, timeZone)
   return new Date(zonedWallToUtc(y, mo, d + index * Math.max(1, intervalDays), h, mi, timeZone)).toISOString()
 }
+
+/**
+ * After a publish, the next slot: step forward from `fromIso` by `intervalDays`
+ * (at the same wall time) until strictly after `now`. Catches up correctly even
+ * when the cron ran late (e.g. a daily cron for an hourly-ish cadence).
+ */
+export function advanceNextPublishAt(
+  fromIso: string,
+  timeZone: string,
+  publishTime: string,
+  intervalDays: number,
+  now: number = Date.now(),
+): string {
+  const [h, mi] = parseTime(publishTime)
+  const start = Number.isFinite(Date.parse(fromIso)) ? Date.parse(fromIso) : now
+  const { y, mo, d } = localDateParts(start, timeZone)
+  const step = Math.max(1, intervalDays)
+  let k = step
+  let inst = zonedWallToUtc(y, mo, d + k, h, mi, timeZone)
+  let guard = 0
+  while (inst <= now && guard < 500) { k += step; inst = zonedWallToUtc(y, mo, d + k, h, mi, timeZone); guard++ }
+  return new Date(inst).toISOString()
+}

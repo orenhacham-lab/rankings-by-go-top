@@ -93,6 +93,8 @@ export const dashboardEn = {
       publishingNow: 'Publishing…',
       publishedDone: 'Published',
       openPost: 'Open in WordPress',
+      runNow: 'Run automation now',
+      ranSummary: 'Run complete — published {published}, generated {generated}, failures {failures}',
       addedToast: 'Added {n} topics to the queue',
       alreadyQueuedToast: '{n} were already queued',
       migrationRequired: 'Apply the automation migration (Phase 1) to use scheduling.',

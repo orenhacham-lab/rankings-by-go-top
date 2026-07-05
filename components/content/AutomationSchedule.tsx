@@ -129,6 +129,24 @@ export default function AutomationSchedule({
     }
   }
 
+  async function runNow() {
+    setSaving(true); setMessage(null)
+    try {
+      const res = await fetch('/api/content/automation/run', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setMessage({ text: t.ranSummary.replace('{published}', String(d.published ?? 0)).replace('{generated}', String(d.generated ?? 0)).replace('{failures}', String(d.failures ?? 0)), ok: true })
+      } else {
+        setMessage({ text: d?.error === 'automation_migration_required' ? t.migrationRequired : 'error', ok: false })
+      }
+      await load(); onChanged?.()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function togglePause() {
     if (!pool) { await saveSettings(true); return }
     setSaving(true)
@@ -293,6 +311,7 @@ export default function AutomationSchedule({
           </label>
           <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
           <Button size="sm" variant="outline" onClick={togglePause} disabled={saving}>{active ? t.pause : t.resume}</Button>
+          <Button size="sm" variant="ghost" onClick={runNow} disabled={saving}>{t.runNow}</Button>
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400">
           {t.nextPublish}: <span className="font-medium">{fmt(pool?.nextPublishAt ?? null)}</span>
