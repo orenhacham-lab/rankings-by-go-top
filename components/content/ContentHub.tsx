@@ -21,6 +21,7 @@ import WordPressConnectionPanel from '@/components/content/WordPressConnectionPa
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
 import AutomationIdeas from '@/components/content/AutomationIdeas'
+import AutomationSchedule from '@/components/content/AutomationSchedule'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -79,6 +80,7 @@ export default function ContentHub() {
   const [briefOpen, setBriefOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
+  const [automationRefresh, setAutomationRefresh] = useState(0)
 
   // ── Batch article creation (client-side, sequential) ──
   const BATCH_LIMIT = 10
@@ -714,10 +716,21 @@ export default function ContentHub() {
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
                 </div>
-                {/* Content automation — automatic article ideas (flag-gated). */}
+                {/* Content automation — ideas + publishing schedule (flag-gated). */}
                 {process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' && (
-                  <div className="mb-4">
-                    <AutomationIdeas projectId={projectId} language={language} onCreated={loadTopics} />
+                  <div className="mb-4 space-y-4">
+                    <AutomationIdeas
+                      projectId={projectId}
+                      language={language}
+                      onCreated={loadTopics}
+                      onScheduled={() => setAutomationRefresh((k) => k + 1)}
+                    />
+                    <AutomationSchedule
+                      projectId={projectId}
+                      language={language}
+                      refreshKey={automationRefresh}
+                      onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
+                    />
                   </div>
                 )}
                 <Card className="mb-3 p-3 bg-slate-50/60 dark:bg-slate-800/40 hover:translate-y-0">

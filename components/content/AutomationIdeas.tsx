@@ -35,13 +35,17 @@ export default function AutomationIdeas({
   projectId,
   language,
   onCreated,
+  onScheduled,
 }: {
   projectId: string
   language: 'he' | 'en'
   onCreated: () => void
+  onScheduled?: () => void
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
+  const [lastCreatedIds, setLastCreatedIds] = useState<string[]>([])
+  const [scheduling, setScheduling] = useState(false)
 
   const [source, setSource] = useState<Source>('project_data')
   const [keyword, setKeyword] = useState('')
@@ -117,11 +121,36 @@ export default function AutomationIdeas({
       // Remove the created ones from the list and refresh the topics table.
       setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
       setSelected(new Set())
+      setLastCreatedIds(Array.isArray(data.ids) ? data.ids : [])
       onCreated()
     } catch {
       setMessage({ text: 'error', ok: false })
     } finally {
       setCreating(false)
+    }
+  }
+
+  async function addCreatedToSchedule() {
+    if (scheduling || lastCreatedIds.length === 0) return
+    setScheduling(true); setMessage(null)
+    try {
+      // Ensure the project's pool exists (paused), then queue the created topics.
+      const pr = await fetch('/api/content/automation/pools', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
+      })
+      if (!pr.ok) { setMessage({ text: 'error', ok: false }); return }
+      const pd = await pr.json()
+      const poolId = pd.pool?.id
+      if (!poolId) { setMessage({ text: 'error', ok: false }); return }
+      await fetch(`/api/content/automation/pools/${poolId}/items`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicIds: lastCreatedIds }),
+      })
+      setLastCreatedIds([])
+      onScheduled?.()
+    } finally {
+      setScheduling(false)
     }
   }
 
@@ -176,6 +205,12 @@ export default function AutomationIdeas({
       )}
       {meta && meta.skippedDuplicates > 0 && (
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">{t.skippedDuplicates.replace('{n}', String(meta.skippedDuplicates))}</p>
+      )}
+      {lastCreatedIds.length > 0 && (
+        <div className="mb-3 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/5 px-3 py-2 flex items-center gap-2">
+          <span className="text-xs text-slate-600 dark:text-slate-300 flex-1">{t.nextStepHint}</span>
+          <Button size="sm" variant="outline" onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
+        </div>
       )}
 
       {suggestions.length === 0 && !loading ? (
