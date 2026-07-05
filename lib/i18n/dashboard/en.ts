@@ -186,12 +186,6 @@ export const dashboardEn = {
     topicsSubtitle: 'Briefs and ideas that have not become an article yet. Once an article is generated, manage it in the articles table above.',
     topicsHelpTitle: 'When do you use this area?',
     topicsHelpText: 'Keep ideas and briefs here before an article exists. After an article is generated, manage it from the table above: edit, image, send to WordPress, and publish.',
-    topicsHelpItems: [
-      'Keep ideas and briefs here before an article is created.',
-      'Each approved topic can become an article or join the publishing queue.',
-      'After an article is created, keep managing it from the articles table above.',
-      'From that table you can edit, add an image, send to WordPress, and publish.',
-    ],
     showMore: 'Show more',
     showLess: 'Show less',
     showMoreArticles: 'Show more articles',

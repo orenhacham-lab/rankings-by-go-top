@@ -300,55 +300,64 @@ export default function AutomationSchedule({
 
       {message && <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>}
 
-      {/* Settings */}
-      <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-3">
-        <div>
-          <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.cadenceLabel}</div>
-          <div className="flex flex-wrap items-center gap-2">
-            {([['weekly1', t.weekly1], ['weekly2', t.weekly2], ['custom', t.customLabel]] as [Preset, string][]).map(([key, label]) => (
-              <button key={key} type="button" onClick={() => setPreset(key)}
-                className={`text-xs font-medium rounded-full px-3 py-1.5 border ${preset === key ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                {label}
-              </button>
-            ))}
-            {preset === 'custom' && (
-              <label className="text-xs text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
-                {t.customDays}
-                <input type="number" min={1} max={365} value={customDays} onChange={(e) => setCustomDays(Number(e.target.value) || 1)}
-                  className="w-16 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs" />
-              </label>
-            )}
-          </div>
-        </div>
-        {(preset === 'weekly1' || preset === 'weekly2') && (
-          <div>
-            <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.weekdayLabel}</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select value={weekdays[0] ?? 0}
-                onChange={(e) => setWeekdays(preset === 'weekly1' ? [Number(e.target.value)] : [Number(e.target.value), weekdays[1] ?? DEFAULT_DAYS_2[1]!])}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
-                {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
-              </select>
-              {preset === 'weekly2' && (
-                <select value={weekdays[1] ?? DEFAULT_DAYS_2[1]!}
-                  onChange={(e) => setWeekdays([weekdays[0] ?? DEFAULT_DAYS_2[0]!, Number(e.target.value)])}
-                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
-                  {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
-                </select>
+      {/* Settings — compact single row (cadence · publish day(s) · actions);
+          stacks cleanly on mobile. Exact time/timezone stay internal (hidden). */}
+      <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+          {/* Cadence */}
+          <div className="min-w-[11rem]">
+            <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.cadenceLabel}</div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {([['weekly1', t.weekly1], ['weekly2', t.weekly2], ['custom', t.customLabel]] as [Preset, string][]).map(([key, label]) => (
+                <button key={key} type="button" onClick={() => setPreset(key)}
+                  className={`text-xs font-medium rounded-full px-3 py-1.5 border ${preset === key ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                  {label}
+                </button>
+              ))}
+              {preset === 'custom' && (
+                <label className="text-xs text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
+                  {t.customDays}
+                  <input type="number" min={1} max={365} value={customDays} onChange={(e) => setCustomDays(Number(e.target.value) || 1)}
+                    className="w-16 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs" />
+                </label>
               )}
             </div>
           </div>
-        )}
-        {/* Exact publish time / timezone are kept internally (default 09:00
-            Asia/Jerusalem) but hidden — on a daily cron we can't guarantee the
-            exact hour, so we only expose the weekday and avoid misleading users. */}
-        <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.publishDayNote}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
-          <Button size="sm" variant="outline" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
+
+          {/* Publish day(s) — only for the weekly presets */}
+          {(preset === 'weekly1' || preset === 'weekly2') && (
+            <div>
+              <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.weekdayLabel}</div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <select value={weekdays[0] ?? 0}
+                  onChange={(e) => setWeekdays(preset === 'weekly1' ? [Number(e.target.value)] : [Number(e.target.value), weekdays[1] ?? DEFAULT_DAYS_2[1]!])}
+                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
+                  {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
+                </select>
+                {preset === 'weekly2' && (
+                  <select value={weekdays[1] ?? DEFAULT_DAYS_2[1]!}
+                    onChange={(e) => setWeekdays([weekdays[0] ?? DEFAULT_DAYS_2[0]!, Number(e.target.value)])}
+                    className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs">
+                    {t.weekdays.map((d: string, i: number) => <option key={i} value={i}>{d}</option>)}
+                  </select>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 ms-auto">
+            <Button size="sm" onClick={() => saveSettings()} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
+            <Button size="sm" variant="outline" onClick={togglePause} disabled={saving} title={t.resumeHint}>{active ? t.pause : t.resume}</Button>
+          </div>
         </div>
-        <div className="text-[11px] text-slate-500 dark:text-slate-400">
-          {t.nextPublish}: <span className="font-medium">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
+
+        {/* Publish-day note + next publish on one compact line */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-0.5">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.publishDayNote}</p>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+            {t.nextPublish}: <span className="font-medium">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
+          </div>
         </div>
       </div>
 

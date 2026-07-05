@@ -50,6 +50,7 @@ export default function TopicsList({
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [creatingId, setCreatingId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false) // show first 3 rows by default
   // The "More" menu renders in a portal at fixed coords so it's never clipped by
   // the table's overflow-x container (even on the last row).
   const [menu, setMenu] = useState<{ topicId: string; top: number; left: number } | null>(null)
@@ -161,6 +162,10 @@ export default function TopicsList({
     has_article: 'success', rejected: 'danger', approved: 'info', waiting: 'neutral',
   }
 
+  // Collapse long lists to the first 3 rows (batch selection still applies to
+  // the full set via "select all" in the parent — hidden rows remain selectable).
+  const visibleTopics = expanded ? topics : topics.slice(0, 3)
+
   return (
     <div className="overflow-x-auto">
       {genError && (
@@ -187,7 +192,7 @@ export default function TopicsList({
           {topics.length === 0 ? (
             <EmptyRow colSpan={9} message={c.topicsTable.empty} />
           ) : (
-            topics.map((topic) => {
+            visibleTopics.map((topic) => {
               const anchorCount = Array.isArray(topic.anchors_json) ? topic.anchors_json.length : 0
               const busy = busyId === topic.id
               const tState = topicState(topic)
@@ -283,6 +288,18 @@ export default function TopicsList({
           )}
         </TableBody>
       </Table>
+
+      {topics.length > 3 && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+          >
+            {expanded ? c.showLess : `${c.showMore} (${topics.length - 3})`}
+          </button>
+        </div>
+      )}
 
       {menu && typeof document !== 'undefined' && (() => {
         const topic = topics.find((t) => t.id === menu.topicId)
