@@ -1,0 +1,234 @@
+'use client'
+
+/**
+ * AutomationIdeas — "רעיונות אוטומטיים למאמרים" (content automation, Phase 3).
+ *
+ * Simple, non-SEO-user flow: pick a source (keyword / project data / site
+ * keyword research), generate ideas, review cards, bulk-approve selected → they
+ * become article_topics (status 'approved'). Rejecting just clears them from the
+ * list. No scheduling here (Phase 4). Gated by the caller (automation flag).
+ */
+
+import { useState } from 'react'
+import { Card } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+
+type Source = 'keyword' | 'project_data' | 'keyword_research_url'
+
+interface Suggestion {
+  id: string
+  title: string
+  primaryKeyword: string
+  secondaryKeywords: string[]
+  searchIntent: string
+  recommendedWordCount: number
+  angle: string
+  suggestedInternalLinks: { url: string; anchor: string }[]
+  source: Source
+  suggestionReason: string
+  suggestionScore: number
+}
+
+export default function AutomationIdeas({
+  projectId,
+  language,
+  onCreated,
+}: {
+  projectId: string
+  language: 'he' | 'en'
+  onCreated: () => void
+}) {
+  const t = getDashboardDictionary(language).contentHub.autoIdeas
+  const isHebrew = language === 'he'
+
+  const [source, setSource] = useState<Source>('project_data')
+  const [keyword, setKeyword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; keywordResearchFailed?: boolean } | null>(null)
+
+  const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : t.badgeResearch)
+
+  async function generate() {
+    if (loading) return
+    setLoading(true); setMessage(null); setMeta(null); setSelected(new Set())
+    try {
+      const res = await fetch('/api/content/automation/recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, source, keyword: keyword.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMessage({ text: data?.error === 'keyword_required' ? t.keywordPlaceholder : (data?.error || 'error'), ok: false })
+        setSuggestions([])
+        return
+      }
+      const list: Suggestion[] = Array.isArray(data.suggestions) ? data.suggestions : []
+      setSuggestions(list)
+      setSelected(new Set(list.map((s) => s.id))) // pre-select all for quick bulk approve
+      setMeta({ skippedDuplicates: data.meta?.skippedDuplicates ?? 0, keywordResearchFailed: data.meta?.keywordResearchFailed })
+    } catch {
+      setMessage({ text: 'error', ok: false })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const selectAll = () => setSelected(new Set(suggestions.map((s) => s.id)))
+  const clearSel = () => setSelected(new Set())
+
+  function rejectSelected() {
+    setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
+    setSelected(new Set())
+  }
+
+  async function approveSelected() {
+    if (creating) return
+    const chosen = suggestions.filter((s) => selected.has(s.id))
+    if (chosen.length === 0) return
+    setCreating(true); setMessage(null)
+    try {
+      const res = await fetch('/api/content/automation/topics/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, status: 'approved', topics: chosen }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMessage({ text: data?.error === 'automation_migration_required' ? 'automation_migration_required' : (data?.error || 'error'), ok: false })
+        return
+      }
+      const created = data.created ?? 0
+      const skipped = data.skipped ?? 0
+      setMessage({ text: skipped > 0 ? t.createdSkipped.replace('{n}', String(created)).replace('{m}', String(skipped)) : t.createdToast.replace('{n}', String(created)), ok: true })
+      // Remove the created ones from the list and refresh the topics table.
+      setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
+      setSelected(new Set())
+      onCreated()
+    } catch {
+      setMessage({ text: 'error', ok: false })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const sourceTabs: { key: Source; label: string }[] = [
+    { key: 'keyword', label: t.sourceKeyword },
+    { key: 'project_data', label: t.sourceProject },
+    { key: 'keyword_research_url', label: t.sourceResearch },
+  ]
+
+  return (
+    <Card className="hover:translate-y-0">
+      <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-3">{t.intro}</p>
+
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        {sourceTabs.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => setSource(s.key)}
+            className={`text-xs font-medium rounded-full px-3 py-1.5 border ${
+              source === s.key
+                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        {source === 'keyword' && (
+          <input
+            type="text"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder={t.keywordPlaceholder}
+            className="flex-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-sm"
+          />
+        )}
+        <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
+          {loading ? t.generating : t.generate}
+        </Button>
+      </div>
+
+      {message && (
+        <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
+      )}
+      {meta?.keywordResearchFailed && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{t.researchFailed}</p>
+      )}
+      {meta && meta.skippedDuplicates > 0 && (
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">{t.skippedDuplicates.replace('{n}', String(meta.skippedDuplicates))}</p>
+      )}
+
+      {suggestions.length === 0 && !loading ? (
+        <p className="text-xs text-slate-400">{meta ? t.none : ''}</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <Button size="sm" variant="ghost" onClick={selectAll}>{t.selectAll}</Button>
+            <Button size="sm" variant="ghost" onClick={clearSel}>{t.clear}</Button>
+            <div className="flex-1" />
+            <Button size="sm" variant="outline" onClick={rejectSelected} disabled={selected.size === 0}>{t.rejectSelected}</Button>
+            <Button size="sm" onClick={approveSelected} loading={creating} disabled={creating || selected.size === 0}>
+              {creating ? t.creating : `${t.approveSelected} (${selected.size})`}
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {suggestions.map((s) => (
+              <div key={s.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="mt-1 h-4 w-4 accent-indigo-600" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.title}</span>
+                      <Badge variant="neutral">{sourceBadge(s.source)}</Badge>
+                      {typeof s.suggestionScore === 'number' && (
+                        <span className="text-[10px] text-slate-400">{Math.round(s.suggestionScore * 100)}%</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">
+                      {t.keywordLabel}: <span className="font-medium">{s.primaryKeyword}</span>
+                      {s.searchIntent ? <> · {t.intentLabel}: {s.searchIntent}</> : null}
+                    </div>
+                    {s.secondaryKeywords.length > 0 && (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.secondaryLabel}: {s.secondaryKeywords.join(' · ')}</div>
+                    )}
+                    {s.suggestionReason && (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.reasonLabel}: {s.suggestionReason}</div>
+                    )}
+                    {s.suggestedInternalLinks.length > 0 && (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5" dir={isHebrew ? 'rtl' : 'ltr'}>
+                        {t.internalLinksLabel}: {s.suggestedInternalLinks.map((l) => l.anchor).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-slate-400 mt-3">{t.nextStepHint}</p>
+        </>
+      )}
+    </Card>
+  )
+}

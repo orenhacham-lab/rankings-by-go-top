@@ -20,6 +20,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import WordPressConnectionPanel from '@/components/content/WordPressConnectionPanel'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
+import AutomationIdeas from '@/components/content/AutomationIdeas'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -713,6 +714,12 @@ export default function ContentHub() {
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
                 </div>
+                {/* Content automation — automatic article ideas (flag-gated). */}
+                {process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' && (
+                  <div className="mb-4">
+                    <AutomationIdeas projectId={projectId} language={language} onCreated={loadTopics} />
+                  </div>
+                )}
                 <Card className="mb-3 p-3 bg-slate-50/60 dark:bg-slate-800/40 hover:translate-y-0">
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.topicsHelpTitle}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.topicsHelpText}</p>

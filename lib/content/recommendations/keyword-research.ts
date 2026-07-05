@@ -1,0 +1,224 @@
+/**
+ * Recommendation source — keyword research by website URL (Google Ads).
+ *
+ * Flow: project domain (+ a small capped list of known URLs) → generateKeywordIdeas
+ * (Phase 2 service, cached) → filter brand/support/irrelevant → cluster similar
+ * keywords → Gemini turns each cluster into ONE article-topic suggestion.
+ *
+ * Safeguards: caps the number of URL seeds and Google Ads calls per run, reuses
+ * the 30-day cache, and fails gracefully (returns a `keywordResearchFailed` meta
+ * so project-data suggestions can still work independently). No AI keyword
+ * invention — every anchor/keyword comes from Google Ads data.
+ */
+
+import type { createAdminClient } from '@/lib/supabase/admin'
+import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { generateKeywordIdeas, type KeywordIdeaResult } from '@/lib/google-ads/keyword-ideas'
+import { GoogleAdsError } from '@/lib/google-ads/client'
+import { isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
+import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/keyword-research-cache'
+import { clusterByTokens, tokens, slugKey } from './dedupe'
+import type { TopicSuggestion, RecommendationMeta } from './types'
+
+const MAX_URL_SEEDS = 3
+const MAX_ADS_CALLS = 3
+const MAX_KEYWORDS = 60
+const MAX_CLUSTERS = 12
+const MIN_MONTHLY = 30
+
+const SUPPORT_TERMS = [
+  'טלפון', 'משלוח', 'משלוחים', 'אחריות', 'קופון', 'קופונים', 'סניף', 'סניפים', 'ביטול',
+  'החזר', 'החזרים', 'החזרה', 'שירות', 'לקוחות', 'יצירת קשר', 'כתובת', 'שעות', 'מבצע', 'מבצעים',
+  'phone', 'shipping', 'delivery', 'warranty', 'coupon', 'branch', 'return', 'refund', 'contact',
+]
+
+export interface KeywordResearchInput {
+  userId: string
+  projectId: string
+  seedUrls: string[]
+  country: string
+  language: string
+  businessName: string | null
+  category: string | null
+}
+
+interface ClusterInput {
+  primaryKeyword: string
+  secondaryKeywords: string[]
+  volume: number
+}
+
+function isBrandOrSupport(keyword: string, brandTokens: Set<string>): boolean {
+  const lower = keyword.toLowerCase()
+  if (SUPPORT_TERMS.some((t) => lower.includes(t))) return true
+  const kt = tokens(keyword)
+  // Brand: the keyword is dominated by business-name tokens (e.g. "עידו ספורט …").
+  if (brandTokens.size > 0) {
+    let brandHits = 0
+    for (const t of kt) if (brandTokens.has(t)) brandHits++
+    if (brandHits > 0 && brandHits >= kt.size - 1) return true
+  }
+  return false
+}
+
+function scoreFromVolume(volume: number): number {
+  const s = 0.4 + 0.6 * (Math.log10(volume + 1) / 4)
+  return Math.max(0.4, Math.min(1, Number(s.toFixed(2))))
+}
+
+/** Fetch keyword ideas for one URL seed (cache-first). Throws GoogleAdsError. */
+async function fetchSeed(
+  admin: ReturnType<typeof createAdminClient>,
+  input: KeywordResearchInput,
+  url: string,
+): Promise<KeywordIdeaResult[]> {
+  const key = { projectId: input.projectId, seedType: 'url' as const, seedValue: url, country: input.country, language: input.language }
+  const cached = await getCachedKeywordResults(admin, key)
+  if (cached) return cached
+  const { results } = await generateKeywordIdeas({
+    researchType: 'url',
+    keywords: [],
+    url,
+    country: input.country,
+    language: input.language,
+    minMonthlySearches: MIN_MONTHLY,
+    resultsLimit: 100,
+  })
+  await setCachedKeywordResults(admin, input.userId, key, results)
+  return results
+}
+
+interface GeminiClusterTopic {
+  primaryKeyword: string
+  title: string
+  angle: string
+  searchIntent: string
+  recommendedWordCount: number
+  reason: string
+}
+
+/** One Gemini call: clusters (primary + secondary keywords) → article topics. */
+async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string): Promise<GeminiClusterTopic[]> {
+  const client = getGeminiClient()
+  if (!client) return []
+  const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
+  const langLabel = language === 'he' ? 'Hebrew' : 'English'
+  const prompt = [
+    `You turn keyword clusters (from Google Search data) into practical SEO article topics for a website.`,
+    businessCtx ? `Business context: ${businessCtx}` : '',
+    `Write ALL output in ${langLabel}.`,
+    `For EACH cluster below, produce ONE article topic that would naturally rank for those keywords.`,
+    `Rules: the title is a natural, clickable article title (NOT a bare keyword); keep the given primaryKeyword EXACTLY as-is; searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600; reason = one short plain-language sentence a non-SEO business owner understands.`,
+    `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason"}]} — one entry per cluster, same order.`,
+    `Clusters:`,
+    JSON.stringify(clusters.map((c) => ({ primaryKeyword: c.primaryKeyword, secondaryKeywords: c.secondaryKeywords }))),
+  ].filter(Boolean).join('\n')
+
+  try {
+    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.8 } })
+    const result = await model.generateContent(prompt)
+    const text = result.response.text()
+    let parsed: { topics?: unknown }
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      const m = text.match(/\{[\s\S]*\}/)
+      if (!m) return []
+      parsed = JSON.parse(m[0])
+    }
+    return Array.isArray(parsed.topics) ? (parsed.topics as GeminiClusterTopic[]) : []
+  } catch (err) {
+    console.error('[recommendations] clustersToTopics gemini error', { message: err instanceof Error ? err.message : String(err) })
+    return []
+  }
+}
+
+/**
+ * Produce raw keyword-research topic suggestions (NOT yet deduped against
+ * existing content — the engine does that). Never throws.
+ */
+export async function recommendFromKeywordResearch(
+  admin: ReturnType<typeof createAdminClient>,
+  input: KeywordResearchInput,
+): Promise<{ suggestions: TopicSuggestion[]; meta: Omit<RecommendationMeta, 'source' | 'skippedDuplicates'> }> {
+  const country = isValidCountry(input.country) ? input.country : 'IL'
+  const language = (isValidLanguage(input.language) ? input.language : 'he') as 'he' | 'en'
+  const seeds = input.seedUrls.filter(Boolean).slice(0, MAX_URL_SEEDS)
+
+  // 1) Fetch keyword ideas (capped calls, graceful failure).
+  const merged = new Map<string, KeywordIdeaResult>()
+  let adsCalls = 0
+  let failureReason: string | undefined
+  for (const url of seeds) {
+    if (adsCalls >= MAX_ADS_CALLS) break
+    try {
+      adsCalls++
+      const rows = await fetchSeed(admin, { ...input, country, language }, url)
+      for (const r of rows) {
+        const k = r.keyword.trim().toLowerCase()
+        if (!k) continue
+        const prev = merged.get(k)
+        if (!prev || (r.avgMonthlySearches ?? 0) > (prev.avgMonthlySearches ?? 0)) merged.set(k, r)
+      }
+    } catch (e) {
+      failureReason = e instanceof GoogleAdsError ? e.code : 'keyword_research_failed'
+      break // stop hitting Google after the first failure
+    }
+  }
+
+  if (merged.size === 0) {
+    return { suggestions: [], meta: { generated: 0, adsCalls, keywordResearchFailed: !!failureReason, failureReason } }
+  }
+
+  // 2) Filter brand/support + sort by volume + cap.
+  const brandTokens = tokens(input.businessName || '')
+  const filtered = Array.from(merged.values())
+    .filter((r) => !isBrandOrSupport(r.keyword, brandTokens))
+    .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
+    .slice(0, MAX_KEYWORDS)
+
+  // 3) Cluster and pick primary (highest volume) + secondary keywords.
+  const volumeByKw = new Map(filtered.map((r) => [r.keyword.trim().toLowerCase(), r.avgMonthlySearches ?? 0]))
+  const clusters = clusterByTokens(filtered.map((r) => r.keyword), 0.5).slice(0, MAX_CLUSTERS)
+  const clusterInputs: ClusterInput[] = clusters
+    .map((members) => {
+      const sorted = [...members].sort((a, b) => (volumeByKw.get(b.toLowerCase()) ?? 0) - (volumeByKw.get(a.toLowerCase()) ?? 0))
+      const primaryKeyword = sorted[0]!
+      return {
+        primaryKeyword,
+        secondaryKeywords: sorted.slice(1, 5),
+        volume: volumeByKw.get(primaryKeyword.toLowerCase()) ?? 0,
+      }
+    })
+    .filter((c) => c.primaryKeyword)
+
+  // 4) Gemini clusters → topics (with a deterministic fallback title).
+  const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
+  const geminiTopics = await clustersToTopics(clusterInputs, language, businessCtx)
+  const byPrimary = new Map(geminiTopics.map((t) => [(t.primaryKeyword || '').trim().toLowerCase(), t]))
+
+  const suggestions: TopicSuggestion[] = clusterInputs.map((c) => {
+    const g = byPrimary.get(c.primaryKeyword.toLowerCase())
+    const title = g?.title?.trim() || c.primaryKeyword
+    const intent = g?.searchIntent?.trim() || 'informational'
+    const wc = typeof g?.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000
+    const reasonBase = language === 'he'
+      ? `נמצא בנתוני חיפוש עם כ-${c.volume.toLocaleString('he-IL')} חיפושים חודשיים`
+      : `Found in search data with ~${c.volume.toLocaleString('en-US')} monthly searches`
+    return {
+      id: `keyword_research_url:${slugKey(c.primaryKeyword)}`,
+      title,
+      primaryKeyword: c.primaryKeyword,
+      secondaryKeywords: c.secondaryKeywords,
+      searchIntent: intent,
+      recommendedWordCount: wc,
+      angle: g?.angle?.trim() || '',
+      suggestedInternalLinks: [],
+      source: 'keyword_research_url',
+      suggestionReason: g?.reason?.trim() ? `${g.reason.trim()} · ${reasonBase}` : reasonBase,
+      suggestionScore: scoreFromVolume(c.volume),
+    }
+  })
+
+  return { suggestions, meta: { generated: suggestions.length, adsCalls, keywordResearchFailed: !!failureReason, failureReason } }
+}
