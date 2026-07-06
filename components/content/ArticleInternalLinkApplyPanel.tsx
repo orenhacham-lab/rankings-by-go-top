@@ -52,6 +52,8 @@ const PREVIEW_URL = '/api/content/automation/internal-links/plan/insert/preview'
 const APPLY_URL = '/api/content/automation/internal-links/plan/insert/apply'
 const ROLLBACK_URL = '/api/content/automation/internal-links/plan/insert/rollback'
 
+export interface ApplyOutcome { applied: number; skipped: number; snapshotId: string | null }
+
 export default function ArticleInternalLinkApplyPanel({
   projectId,
   generatedArticleId,
@@ -60,6 +62,15 @@ export default function ArticleInternalLinkApplyPanel({
   contentHtml,
   language,
   onContentReplaced,
+  // Session outcome is LIFTED to the parent so it survives the re-render/remount
+  // caused by resyncContentHtml after a successful apply — the rollback button
+  // must stay visible until rollback / reload / non-draft.
+  applyOutcome,
+  rollbackAvailable,
+  notice,
+  onApplyOutcomeChange,
+  onRollbackAvailableChange,
+  onNoticeChange,
 }: {
   projectId: string
   generatedArticleId: string
@@ -68,6 +79,12 @@ export default function ArticleInternalLinkApplyPanel({
   contentHtml: string
   language: 'he' | 'en'
   onContentReplaced: () => void | Promise<void>
+  applyOutcome: ApplyOutcome | null
+  rollbackAvailable: boolean
+  notice: string | null
+  onApplyOutcomeChange: (o: ApplyOutcome | null) => void
+  onRollbackAvailableChange: (b: boolean) => void
+  onNoticeChange: (s: string | null) => void
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.linkApply, [language])
   const isHebrew = language === 'he'
@@ -79,11 +96,8 @@ export default function ArticleInternalLinkApplyPanel({
   const [previewToken, setPreviewToken] = useState<string | null>(null)
   const [previewedForHtml, setPreviewedForHtml] = useState<string>('')
   const [applying, setApplying] = useState(false)
-  const [applyResult, setApplyResult] = useState<{ applied: number; skipped: number; snapshotId: string | null } | null>(null)
-  const [rollbackAvailable, setRollbackAvailable] = useState(false)
   const [rollingBack, setRollingBack] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
 
   const reasonLabel = useCallback((r?: string | null): string => {
     if (!r) return ''
@@ -96,7 +110,9 @@ export default function ArticleInternalLinkApplyPanel({
 
   const runPreview = useCallback(async () => {
     if (loadingPreview) return
-    setLoadingPreview(true); setError(null); setNotice(null); setApplyResult(null)
+    // A fresh preview replaces the apply-result banner + notice, but does NOT
+    // clear a session rollback (the snapshot still exists until rolled back).
+    setLoadingPreview(true); setError(null); onNoticeChange(null); onApplyOutcomeChange(null)
     try {
       const res = await fetch(PREVIEW_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -132,7 +148,7 @@ export default function ArticleInternalLinkApplyPanel({
   const apply = useCallback(async () => {
     if (applying || !canApply || !previewToken) return
     if (!window.confirm(t.applyConfirm)) return
-    setApplying(true); setError(null); setNotice(null)
+    setApplying(true); setError(null); onNoticeChange(null)
     try {
       const res = await fetch(APPLY_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -145,14 +161,16 @@ export default function ArticleInternalLinkApplyPanel({
       if (res.status === 409 && data.error === 'article_not_draft') { setError(t.draftOnly); return }
       if (!res.ok) { setError(t.applyError); return }
       if (data.contentChanged && (data.applied ?? 0) > 0) {
-        setApplyResult({ applied: data.applied, skipped: data.skipped ?? 0, snapshotId: data.snapshotId ?? null })
-        setRollbackAvailable(true)
+        // Persist the session outcome to the PARENT before resync so the rollback
+        // button survives the contentHtml-driven re-render that follows.
+        onApplyOutcomeChange({ applied: data.applied, skipped: data.skipped ?? 0, snapshotId: data.snapshotId ?? null })
+        onRollbackAvailableChange(true)
         setPreviewResult(null); setPreviewToken(null)
         await onContentReplaced()
       } else {
         // nothing_inserted / no-op — no snapshot, no content change, not an error.
-        setApplyResult(null)
-        setNotice(t.nothingInserted)
+        onApplyOutcomeChange(null)
+        onNoticeChange(t.nothingInserted)
         setPreviewResult(null); setPreviewToken(null)
       }
     } catch {
@@ -160,12 +178,12 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setApplying(false)
     }
-  }, [applying, canApply, previewToken, projectId, generatedArticleId, onContentReplaced, t])
+  }, [applying, canApply, previewToken, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, t])
 
   const rollback = useCallback(async () => {
     if (rollingBack) return
     if (!window.confirm(t.rollbackConfirm)) return
-    setRollingBack(true); setError(null); setNotice(null)
+    setRollingBack(true); setError(null); onNoticeChange(null)
     try {
       const res = await fetch(ROLLBACK_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -175,20 +193,20 @@ export default function ArticleInternalLinkApplyPanel({
       if (res.status === 409 && data.error === 'article_not_draft') { setError(t.draftOnly); return }
       if (!res.ok) { setError(t.rollbackError); return }
       if (data.ok && data.rolledBack) {
-        setNotice(t.rollbackDone)
-        setRollbackAvailable(false)
-        setApplyResult(null)
+        onNoticeChange(t.rollbackDone)
+        onRollbackAvailableChange(false)
+        onApplyOutcomeChange(null)
         setPreviewResult(null); setPreviewToken(null)
         await onContentReplaced()
       } else if (data.reason === 'no_snapshot') {
-        setNotice(t.rollbackNoSnapshot); setRollbackAvailable(false)
+        onNoticeChange(t.rollbackNoSnapshot); onRollbackAvailableChange(false)
       }
     } catch {
       setError(t.rollbackError)
     } finally {
       setRollingBack(false)
     }
-  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, t])
+  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, t])
 
   if (process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING !== 'true') return null
 
@@ -199,6 +217,11 @@ export default function ArticleInternalLinkApplyPanel({
           : previewResult.cacheVersionStale ? t.cacheVersionStaleWarn
             : null
       : null
+
+  // Force the panel open whenever there is an active session outcome so the
+  // apply-success message + rollback stay visible even if a re-render/remount
+  // resets the local `collapsed` flag.
+  const open = !collapsed || rollbackAvailable || !!applyOutcome
 
   return (
     <Card className="hover:translate-y-0 border-indigo-100 dark:border-indigo-500/20">
@@ -211,11 +234,11 @@ export default function ArticleInternalLinkApplyPanel({
           </span>
           <span className="inline-flex items-center gap-2 text-slate-400">
             {rollbackAvailable && <Badge variant="neutral">{t.rollbackAvailable}</Badge>}
-            {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </span>
         </button>
 
-        {!collapsed && (
+        {open && (
           <div className="mt-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.subtitle}</p>
 
@@ -252,11 +275,12 @@ export default function ArticleInternalLinkApplyPanel({
                 )}
 
                 {/* Apply result */}
-                {applyResult && (
+                {applyOutcome && (
                   <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
                     <span className="font-medium">{t.appliedTitle}</span>
-                    {' · '}{t.appliedCount}: {applyResult.applied} · {t.skippedCount}: {applyResult.skipped}
-                    {applyResult.snapshotId && <span className="text-emerald-600/80 dark:text-emerald-400/70"> · {t.snapshotLabel}: {applyResult.snapshotId.slice(0, 8)}</span>}
+                    {' · '}{t.appliedCount}: {applyOutcome.applied} · {t.skippedCount}: {applyOutcome.skipped}
+                    {applyOutcome.snapshotId && <span className="text-emerald-600/80 dark:text-emerald-400/70"> · {t.snapshotLabel}: {applyOutcome.snapshotId.slice(0, 8)}</span>}
+                    {rollbackAvailable && <span className="font-medium"> · {t.rollbackAvailable}</span>}
                   </div>
                 )}
 

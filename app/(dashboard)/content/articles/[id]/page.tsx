@@ -72,6 +72,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [addedLinks, setAddedLinks] = useState<Set<string>>(new Set())
   const [plannedLinks, setPlannedLinks] = useState<PlannedInternalLink[]>([])
 
+  // Phase 2E.3 apply-panel SESSION state, lifted here so a successful apply's
+  // outcome + session rollback survive the contentHtml resync re-render (the
+  // panel itself may re-render/remount; this parent does not). Session-only —
+  // reset on navigation/reload, never persisted.
+  const [ilpApplyOutcome, setIlpApplyOutcome] = useState<{ applied: number; skipped: number; snapshotId: string | null } | null>(null)
+  const [ilpRollbackAvailable, setIlpRollbackAvailable] = useState(false)
+  const [ilpNotice, setIlpNotice] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -535,6 +543,12 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             contentHtml={contentHtml}
             language={language}
             onContentReplaced={resyncContentHtml}
+            applyOutcome={ilpApplyOutcome}
+            rollbackAvailable={ilpRollbackAvailable}
+            notice={ilpNotice}
+            onApplyOutcomeChange={setIlpApplyOutcome}
+            onRollbackAvailableChange={setIlpRollbackAvailable}
+            onNoticeChange={setIlpNotice}
           />
         )}
 
