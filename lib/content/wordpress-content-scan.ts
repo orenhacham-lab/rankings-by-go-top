@@ -113,13 +113,66 @@ function hasPriceOrRatingNoise(s: string): boolean {
   return false
 }
 
-/** Strip decorative arrows/ellipsis/separators so "קרא עוד »" → "קרא עוד". */
+/** Strip decorative arrows/ellipsis/separators so "לקריאה >>" → "לקריאה". */
 function normalizeAnchor(a: string): string {
   return (a || '')
-    .replace(/[»«›‹→←▸►◄▶◀•·…]+/g, ' ')
+    .replace(/[»«›‹→←▸►◄▶◀•·…<>]+/g, ' ')
     .replace(/[|/\\\-–—]+\s*$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/**
+ * Generic CTA / navigation / action vocabulary (STEMS, multilingual). A hit is a
+ * word that carries no topic — used to detect "pure CTA" anchors where EVERY
+ * token is such a word (e.g. "להמשך קריאה", "לכל המוצרים"). Real topical anchors
+ * keep at least one non-vocabulary word (a product/place/topic) and survive.
+ */
+const CTA_GENERIC_STEMS = new Set([
+  // Hebrew (reading / navigation / generic action + fillers)
+  'קריאה', 'לקרוא', 'קרא', 'קראו', 'המשך', 'המשיכו', 'עוד', 'נוסף', 'נוספת', 'נוספים', 'נוספות',
+  'פרטים', 'מידע', 'כאן', 'לחצו', 'לחץ', 'לחיצה', 'צפייה', 'צפו', 'צפה', 'הצגה', 'מעבר', 'עבור',
+  'כניסה', 'קישור', 'פתח', 'פתחו', 'ראו', 'ראה', 'כתבות', 'כתבה', 'מאמרים', 'מאמר', 'פוסטים',
+  'פוסט', 'עמוד', 'דף', 'בלוג', 'כל',
+  // English
+  'read', 'reading', 'more', 'continue', 'learn', 'details', 'detail', 'info', 'information', 'see',
+  'view', 'all', 'open', 'click', 'here', 'link', 'go', 'page', 'pages', 'posts', 'post', 'articles',
+  'article', 'blog', 'next', 'previous', 'back',
+])
+const CTA_COMMERCE_STEMS = new Set([
+  // Hebrew (buy / cart / shop / product / options)
+  'רכישה', 'לרכוש', 'קנייה', 'קניות', 'קנה', 'קנו', 'הזמן', 'הזמינו', 'הזמנה', 'סל', 'עגלה', 'חנות',
+  'מוצר', 'מוצרים', 'אפשרויות', 'אופציות', 'מבצע', 'הוספה', 'הוסף', 'הוסיפו', 'בחר', 'בחרו', 'בחירת',
+  'בחירה', 'רשימת', 'משאלות',
+  // English
+  'buy', 'purchase', 'order', 'cart', 'basket', 'shop', 'store', 'product', 'products', 'options',
+  'option', 'select', 'choose', 'wishlist', 'add', 'checkout', 'sale',
+])
+
+/** Classify one token as a generic/commerce CTA word (handling ל/ה/ב/… prefix), or null. */
+function ctaWordKind(token: string): 'generic' | 'commerce' | null {
+  const t = token.toLowerCase()
+  const stem = t.replace(/^[להבומכש]־?/, '') // strip a single Hebrew prefix (incl. maqaf)
+  if (CTA_COMMERCE_STEMS.has(t) || CTA_COMMERCE_STEMS.has(stem)) return 'commerce'
+  if (CTA_GENERIC_STEMS.has(t) || CTA_GENERIC_STEMS.has(stem)) return 'generic'
+  return null
+}
+
+/**
+ * True when the anchor is composed ENTIRELY of CTA/navigation/commerce/filler
+ * words (no real topic/product/category token) → a pure CTA, not a planning
+ * anchor. `commerce` marks whether any commerce word appeared.
+ */
+function isPureCtaAnchor(norm: string): { cta: boolean; commerce: boolean } {
+  const toks = norm.split(/\s+/).filter(Boolean)
+  if (toks.length === 0) return { cta: false, commerce: false }
+  let commerce = false
+  for (const tk of toks) {
+    const kind = ctaWordKind(tk)
+    if (!kind) return { cta: false, commerce: false } // a real topical token survives
+    if (kind === 'commerce') commerce = true
+  }
+  return { cta: true, commerce }
 }
 
 /** True for anchors that look like a URL or bare domain (booking.com, https://…). */
@@ -171,6 +224,11 @@ export function classifyAnchorForPlanning(anchor: string, ctx: AnchorContext): {
   if (BOILERPLATE_ANCHORS.has(lower)) return { usability: 'no', reason: 'generic_boilerplate' }
   // WooCommerce product-card noise: price/rating/review-laden anchor text.
   if (hasPriceOrRatingNoise(norm)) return { usability: 'no', reason: anchorWordCount(norm) > 8 ? 'too_long_product_card' : 'product_card_noise' }
+  // Pure CTA/navigation phrase (every token is a CTA/nav/commerce/filler word),
+  // e.g. "להמשך קריאה", "לכל המוצרים", "לצפייה במוצר". Handles ל/ה/… prefixes and
+  // arrow/space variants (normalized above). Real topical anchors survive.
+  const pureCta = isPureCtaAnchor(norm)
+  if (pureCta.cta) return { usability: 'no', reason: pureCta.commerce ? 'ecommerce_or_boilerplate_action' : 'generic_cta_anchor' }
   const wc = anchorWordCount(norm)
   if (wc === 1) {
     // Broad homepage entity (e.g. "יפן" → homepage): preserve but flag caution.
