@@ -15,6 +15,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
+import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
@@ -111,6 +112,22 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }, [id])
 
   useEffect(() => { if (enabled) load() }, [enabled, load])
+
+  // Phase 2E.3: after a successful internal-link apply/rollback the server has
+  // already written content_html/internal_links_json. Re-sync ONLY content_html
+  // from the server so the open editor reflects it — without clobbering other
+  // unsaved field edits (title/meta/faq/etc.). Uses the existing article GET.
+  const linkPlanningOn = process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true'
+  const resyncContentHtml = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/content/articles/${id}`)
+      if (!res.ok) return
+      const data = await res.json().catch(() => ({}))
+      if (typeof data.article?.content_html === 'string') setContentHtml(data.article.content_html)
+    } catch {
+      // Non-fatal — the server write already succeeded; a manual refresh re-syncs.
+    }
+  }, [id])
 
   // ---- Planned internal links — editor QA/insertion -----------------------
   function plannedStatus(link: PlannedInternalLink): 'linked' | 'ready' | 'missing' {
@@ -505,6 +522,20 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               })}
             </div>
           </Card>
+        )}
+
+        {/* Phase 2E.3 — automation/draft apply flow (distinct from the QA card
+            above). Flag-gated, collapsed by default, draft-only, manual only. */}
+        {linkPlanningOn && projectId && (
+          <ArticleInternalLinkApplyPanel
+            projectId={projectId}
+            generatedArticleId={id}
+            status={status}
+            isPublished={isPublished}
+            contentHtml={contentHtml}
+            language={language}
+            onContentReplaced={resyncContentHtml}
+          />
         )}
 
         <div className="flex flex-wrap items-center gap-2 pb-8">
