@@ -28,7 +28,7 @@ import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { TopicForPlanning } from '@/lib/content/internal-link-planner'
 
 /** Bump when the cache-planner scoring/guards change (stamped on saved plans). */
-export const CACHE_PLANNER_VERSION = '2b.1'
+export const CACHE_PLANNER_VERSION = '2b.2'
 
 // --- Tunable thresholds (explicit for review) --------------------------------
 export const CACHE_PLANNER_RELEVANCE_MIN = 0.3
@@ -56,6 +56,8 @@ export const PRIORITY_BONUS: Record<string, number> = {
 
 export type CacheAnchorSource = 'usable_anchor' | 'target_keyword'
 
+export type RelevanceMethod = 'jaccard' | 'containment'
+
 export interface CachePlannedLink {
   targetUrl: string
   targetTitle: string
@@ -70,6 +72,10 @@ export interface CachePlannedLink {
   selected: boolean
   reason: string
   rejectedReasons: string[]
+  // Backend diagnostics (additive; not persisted, not required by any UI).
+  matchedTokens: string[]
+  missingTokens: string[]
+  relevanceMethod: RelevanceMethod
 }
 
 export interface CacheTopicPlan {
@@ -87,6 +93,69 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 /** Normalize a title/keyword for comparison: lowercase, strip punctuation, collapse spaces. */
 function normText(s: string | null | undefined): string {
   return (s || '').toLowerCase().replace(/[?!.,:;"“”׳״()[\]{}<>«»\-–—/|]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+// --- Planner-local Hebrew/English normalization (RELEVANCE SCORING ONLY) ------
+// Deliberately NOT exported and NOT shared with dedupe.ts `tokens()`: topic
+// suggestion dedupe must keep its current, un-normalized tokenizer. This feeds
+// only the relevance/containment signal below. Goal is CONSISTENCY between the
+// topic and target token sets (so morphological variants of the same root
+// match), not perfect linguistic stemming.
+
+const HE_FINALS: Record<string, string> = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' }
+const HE_PREFIXES = new Set(['ב', 'ל', 'מ', 'ה', 'ו', 'ש', 'כ'])
+
+/** Generic connectors / question words / guide-boilerplate — never niche terms. */
+const REL_STOPWORDS = new Set([
+  // Hebrew
+  'של', 'עם', 'על', 'את', 'זה', 'או', 'גם', 'כל', 'יש', 'לא', 'אם', 'כי',
+  'איך', 'מה', 'למה', 'מתי', 'איפה', 'איזה', 'מדריך', 'המדריך', 'מלא', 'המלא',
+  'בחירה', 'בחירת', 'לבחור', 'טיפים', 'טיפ', 'מומלץ', 'מומלצים', 'מול',
+  // English
+  'the', 'a', 'an', 'of', 'for', 'to', 'in', 'on', 'with', 'guide', 'best',
+  'tips', 'how', 'what', 'why', 'when',
+])
+
+const foldFinals = (w: string): string => Array.from(w, (c) => HE_FINALS[c] ?? c).join('')
+
+/** Strip up to 2 stacked 1-letter Hebrew prefixes, keeping the stem ≥3 chars. */
+function stripHebrewPrefixes(w: string): string {
+  let x = w
+  for (let i = 0; i < 2; i++) {
+    if (x.length >= 4 && HE_PREFIXES.has(x[0]!)) x = x.slice(1)
+    else break
+  }
+  return x
+}
+
+/** Conservative plural/suffix stem: ים/ות when long enough; ה/ת only when longer. */
+function stemHebrew(w: string): string {
+  if (w.length >= 5 && (w.endsWith('ות') || w.endsWith('ים'))) return w.slice(0, -2)
+  if (w.length >= 4 && (w.endsWith('ה') || w.endsWith('ת'))) return w.slice(0, -1)
+  return w
+}
+
+/**
+ * Planner-local normalized token set for relevance/containment ONLY. Handles the
+ * Hebrew morphology plain token Jaccard misses: 1-letter prefixes (ב/ל/מ/ה/ו/ש/כ),
+ * light plural stemming, final-letter folding, and generic stopword removal.
+ * English/mixed tokens and useful numbers (len>1) pass through unchanged.
+ */
+function normTokens(s: string): Set<string> {
+  const raw = (s || '')
+    .toLowerCase()
+    .replace(/[?!.,:;"'“”׳״()[\]{}<>«»\-–—/|]+/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 1)
+  const out = new Set<string>()
+  for (const w0 of raw) {
+    if (REL_STOPWORDS.has(w0)) continue
+    const isHebrew = /[֐-׿]/.test(w0)
+    // Stem/strip on the original-final form (so ים/ן are detectable), THEN fold finals.
+    const w = isHebrew ? foldFinals(stemHebrew(stripHebrewPrefixes(w0))) : w0
+    if (w.length > 1 && !REL_STOPWORDS.has(w)) out.add(w)
+  }
+  return out
 }
 
 /** Fraction of the SMALLER token set contained in the larger (subset signal). */
@@ -151,8 +220,8 @@ export function planFromCachedTargets(
   opts: { allowCaution?: boolean } = {},
 ): CacheTopicPlan {
   const allowCaution = opts.allowCaution === true
-  const topicTokens = tokens([topic.primaryKeyword ?? '', topic.title, ...(topic.secondaryKeywords ?? [])].join(' '))
-  const topicKeyTokens = tokens(topic.primaryKeyword || topic.title)
+  const topicTokens = normTokens([topic.primaryKeyword ?? '', topic.title, ...(topic.secondaryKeywords ?? [])].join(' '))
+  const topicKeyTokens = normTokens(topic.primaryKeyword || topic.title)
 
   const scored: CachePlannedLink[] = []
 
@@ -168,17 +237,30 @@ export function planFromCachedTargets(
     if (!url || !isInternalUrl(url, hosts)) rejectedReasons.push('off_domain_or_empty_url')
 
     // 2b) Self / duplicate-topic guard — never link a topic to itself or to an
-    // existing article/target that represents the SAME topic.
+    // existing article/target that represents the SAME topic. (Raw tokenizer —
+    // unchanged behavior on purpose.)
     const selfReason = selfOrDuplicateReason(topic, t)
     if (selfReason) rejectedReasons.push(selfReason)
 
-    // 3) Token relevance topic ↔ target.
-    const candTokens = tokens([t.targetTitle, t.primaryKeywordCandidate ?? '', ...(t.usableAnchors ?? []).map((a) => a.text)].join(' '))
-    const relevance = round2(jaccard(topicTokens, candTokens))
+    // 3) Blended relevance topic ↔ target (normalized tokens). Jaccard alone
+    // penalizes long descriptive topic titles, so a candidate whose meaningful
+    // tokens are largely a SUBSET of the topic's concepts is also credited via
+    // containment — but ONLY when ≥2 meaningful tokens overlap, so a shared
+    // single entity/place token (e.g. only "יפן") can never carry it through.
+    const candTokens = normTokens([t.targetTitle, t.primaryKeywordCandidate ?? '', ...(t.usableAnchors ?? []).map((a) => a.text)].join(' '))
+    const matchedTokens: string[] = []
+    for (const x of candTokens) if (topicTokens.has(x)) matchedTokens.push(x)
+    const missingTokens: string[] = []
+    for (const x of candTokens) if (!topicTokens.has(x)) missingTokens.push(x)
+    const jac = jaccard(topicTokens, candTokens)
+    const cont = containment(topicTokens, candTokens)
+    const useContainment = matchedTokens.length >= 2 && cont > jac
+    const relevance = round2(useContainment ? cont : jac)
+    const relevanceMethod: RelevanceMethod = useContainment ? 'containment' : 'jaccard'
     if (relevance < CACHE_PLANNER_RELEVANCE_MIN) rejectedReasons.push(`low_relevance(${relevance} < ${CACHE_PLANNER_RELEVANCE_MIN})`)
 
-    // 4) Near-self guard.
-    const selfSim = round2(jaccard(topicKeyTokens, tokens(`${t.targetTitle} ${t.primaryKeywordCandidate ?? ''}`)))
+    // 4) Near-self guard (normalized, so morphological near-duplicates are still caught).
+    const selfSim = round2(jaccard(topicKeyTokens, normTokens(`${t.targetTitle} ${t.primaryKeywordCandidate ?? ''}`)))
     if (selfSim > CACHE_PLANNER_SELF_SIMILARITY_MAX) rejectedReasons.push(`too_similar_self_link(${selfSim})`)
 
     // 5) Anchor (vetted usable anchor, or a clean available keyword).
@@ -195,7 +277,7 @@ export function planFromCachedTargets(
 
     const selected = rejectedReasons.length === 0
     const reason = selected
-      ? `relevance ${relevance} + priority ${priorityBonus >= 0 ? '+' : ''}${priorityBonus} (${t.targetPriority}); anchor "${anchor!.text}" from ${anchor!.source} (confidence ${confidence})`
+      ? `relevance ${relevance} (${relevanceMethod}) + priority ${priorityBonus >= 0 ? '+' : ''}${priorityBonus} (${t.targetPriority}); anchor "${anchor!.text}" from ${anchor!.source} (confidence ${confidence})`
       : ''
 
     scored.push({
@@ -212,6 +294,9 @@ export function planFromCachedTargets(
       selected,
       reason,
       rejectedReasons,
+      matchedTokens,
+      missingTokens,
+      relevanceMethod,
     })
   }
 
