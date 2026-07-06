@@ -45,32 +45,45 @@ function isTooLarge(e: unknown): boolean {
 }
 
 /**
- * Generic/boilerplate anchor phrases that are NOT useful for internal-link
- * planning (they carry no topical meaning). Normalized + lowercased for lookup.
+ * Pure navigational/boilerplate anchors (no topical meaning). Generic,
+ * multilingual, not site-specific.
  */
 const BOILERPLATE_ANCHORS = new Set([
-  // Hebrew
-  'קרא עוד', 'קראו עוד', 'עמוד הבית', 'דף הבית', 'כאן', 'לחצו כאן', 'לחץ כאן', 'לחצו', 'לאתר',
-  'האתר', 'לאתר שלנו', 'למידע נוסף', 'מידע נוסף', 'לפרטים', 'לפרטים נוספים', 'להמשך', 'להמשך קריאה',
-  'עוד', 'ראו כאן', 'ראה כאן', 'המשך', 'המשך קריאה', 'צרו קשר', 'צור קשר', 'ראשי', 'לצפייה',
-  // English
-  'read more', 'here', 'click here', 'home', 'homepage', 'home page', 'learn more', 'more',
-  'more info', 'for more information', 'contact', 'contact us', 'link', 'this page', 'website',
-  'our website', 'visit', 'see more', 'continue reading',
+  'עמוד הבית', 'דף הבית', 'ראשי', 'בית', 'לאתר', 'האתר', 'לאתר שלנו', 'this page', 'website',
+  'our website', 'home', 'homepage', 'home page',
 ])
 
 /**
- * E-commerce / "read more" ACTION anchors — generic (multilingual), structural,
- * not site-specific. These are UI actions, never useful SEO planning anchors.
+ * COMMERCE CTA/action anchors (cart/product/buy/shop). Generic, multilingual —
+ * UI actions, never useful SEO planning anchors. Reason: ecommerce_or_boilerplate_action.
  */
-const ECOMMERCE_ACTION_ANCHORS = new Set([
+const CTA_COMMERCE_ANCHORS = new Set([
   // Hebrew
   'הוספה לסל', 'הוסף לסל', 'הוסיפו לסל', 'הוסף לעגלה', 'הוספה לעגלה', 'בחר/י אפשרויות', 'בחר אפשרויות',
-  'בחרו אפשרויות', 'בחירת אפשרויות', 'למוצר', 'צפייה במוצר', 'צפה במוצר', 'לצפייה במוצר', 'קנה עכשיו',
-  'הזמן עכשיו', 'קרא עוד', 'קראו עוד', 'למידע נוסף', 'מידע נוסף', 'לפרטים נוספים', 'לפרטים',
+  'בחרו אפשרויות', 'בחירת אפשרויות', 'קנה עכשיו', 'קנו עכשיו', 'הזמן עכשיו', 'הזמינו עכשיו', 'למוצר',
+  'למוצרים', 'לכל המוצרים', 'כל המוצרים', 'צפייה במוצר', 'צפה במוצר', 'צפייה במוצרים', 'לצפייה במוצר',
+  'לצפייה במוצרים', 'לחנות', 'למעבר לחנות', 'לרכישה', 'לרכישת המוצר', 'אפשרויות רכישה', 'אפשרויות קנייה',
+  'הוסף לרשימה',
   // English
-  'add to cart', 'add to basket', 'select options', 'choose options', 'buy now', 'view product',
-  'read more', 'continue reading', 'shop now', 'more info', 'learn more',
+  'add to cart', 'add to basket', 'select options', 'choose options', 'buy now', 'order now', 'shop now',
+  'view product', 'view products', 'all products', 'go to shop', 'go to store', 'purchase options',
+  'buying options', 'add to wishlist',
+])
+
+/**
+ * GENERIC CTA anchors (read-more / click-here / open / link). Generic,
+ * multilingual — no topical meaning. Reason: generic_cta_anchor.
+ */
+const CTA_GENERIC_ANCHORS = new Set([
+  // Hebrew
+  'קרא עוד', 'קראו עוד', 'המשך קריאה', 'המשך לקרוא', 'המשך', 'להמשך', 'להמשך קריאה', 'למידע נוסף',
+  'מידע נוסף', 'לפרטים', 'לפרטים נוספים', 'לקריאה', 'לקריאה נוספת', 'עוד', 'פתח', 'פתחו', 'לצפייה',
+  'להצגה', 'ראו עוד', 'ראה עוד', 'ראו כאן', 'ראה כאן', 'למעבר', 'עבור', 'כניסה', 'כאן', 'לחצו כאן',
+  'לחץ כאן', 'לחצו', 'קישור', 'צרו קשר', 'צור קשר',
+  // English
+  'read more', 'continue reading', 'learn more', 'more details', 'more detail', 'more info',
+  'more information', 'for more information', 'see more', 'see all', 'view all', 'open', 'click here',
+  'here', 'link', 'details', 'go', 'read on', 'more', 'visit',
 ])
 
 /**
@@ -152,8 +165,10 @@ export function classifyAnchorForPlanning(anchor: string, ctx: AnchorContext): {
   const norm = normalizeAnchor(anchor)
   if (!norm || norm.length < 2) return { usability: 'no', reason: 'too_short' }
   if (isDomainOrUrlLike(norm)) return { usability: 'no', reason: 'url_or_domain' }
-  if (ECOMMERCE_ACTION_ANCHORS.has(norm.toLowerCase())) return { usability: 'no', reason: 'ecommerce_or_boilerplate_action' }
-  if (BOILERPLATE_ANCHORS.has(norm.toLowerCase())) return { usability: 'no', reason: 'generic_boilerplate' }
+  const lower = norm.toLowerCase()
+  if (CTA_COMMERCE_ANCHORS.has(lower)) return { usability: 'no', reason: 'ecommerce_or_boilerplate_action' }
+  if (CTA_GENERIC_ANCHORS.has(lower)) return { usability: 'no', reason: 'generic_cta_anchor' }
+  if (BOILERPLATE_ANCHORS.has(lower)) return { usability: 'no', reason: 'generic_boilerplate' }
   // WooCommerce product-card noise: price/rating/review-laden anchor text.
   if (hasPriceOrRatingNoise(norm)) return { usability: 'no', reason: anchorWordCount(norm) > 8 ? 'too_long_product_card' : 'product_card_noise' }
   const wc = anchorWordCount(norm)
@@ -182,6 +197,7 @@ export type TargetPriority =
 export type TargetRole =
   | 'homepage'
   | 'commercial_category_or_service_hub'
+  | 'content_hub'
   | 'strategic_content_page'
   | 'post_or_article'
   | 'product_or_specific_offer'
@@ -200,19 +216,24 @@ export interface TargetClassification {
 // ── Generic, site-agnostic structural signals (NO niche/brand keywords) ──
 // Utility/system/legal pages (path slugs + multilingual title terms).
 const UTILITY_SLUGS = ['cart', 'checkout', 'my-account', 'account', 'login', 'signin', 'sign-in', 'register', 'signup', 'sign-up', 'lost-password', 'wishlist', 'privacy', 'privacy-policy', 'terms', 'terms-and-conditions', 'tos', 'legal', 'accessibility', 'refund', 'refund-policy', 'returns', 'return-policy', 'cancellation', 'shipping', 'shipping-policy', 'contact', 'contact-us', 'faq', 'sitemap', 'disclaimer', 'cookie', 'cookies', 'thank-you', 'order-received']
+// SPECIFIC statement/policy titles only — NOT bare topic words. A content
+// article that merely mentions "accessibility"/"privacy" as a topic must stay
+// eligible; only a real statement/policy/utility PAGE is rejected.
 const UTILITY_TITLE = [
-  // Hebrew (generic commerce/legal/utility concepts, not niche keywords)
-  'סל הקניות', 'עגלת הקניות', 'עגלת קניות', 'עמוד לתשלום', 'לתשלום', 'קופה', 'החשבון שלי', 'התחברות', 'הרשמה',
-  'רשימת משאלות', 'מדיניות פרטיות', 'פרטיות', 'תקנון', 'תנאי שימוש', 'הצהרת נגישות', 'נגישות', 'ביטול עסקה',
-  'דרכי ביטול', 'מדיניות החזרות', 'מדיניות ביטול', 'מדיניות משלוח', 'משלוחים', 'יצירת קשר', 'צור קשר', 'צרו קשר',
-  'שאלות נפוצות', 'מפת אתר',
+  // Hebrew
+  'סל הקניות', 'עגלת הקניות', 'עגלת קניות', 'עמוד לתשלום', 'החשבון שלי', 'רשימת משאלות', 'מדיניות פרטיות',
+  'תקנון', 'תנאי שימוש', 'הצהרת נגישות', 'ביטול עסקה', 'דרכי ביטול', 'מדיניות החזרות', 'מדיניות ביטול',
+  'מדיניות משלוח', 'מפת אתר',
   // English
-  'shopping cart', 'checkout', 'my account', 'login', 'sign in', 'register', 'wishlist', 'privacy policy',
-  'terms', 'terms of service', 'accessibility', 'refund policy', 'return policy', 'cancellation', 'shipping policy',
-  'contact us', 'contact', 'faq', 'sitemap', 'cookie policy',
+  'shopping cart', 'checkout', 'my account', 'wishlist', 'privacy policy', 'terms of service',
+  'terms and conditions', 'terms of use', 'accessibility statement', 'refund policy', 'return policy',
+  'cancellation policy', 'shipping policy', 'contact us', 'cookie policy',
 ]
-const CATEGORY_PATH = ['/category/', '/product-category/', '/product_cat/', '/collection/', '/collections/', '/shop/', '/store/', '/catalog/', '/services/', '/service/', '/topics/', '/topic/', '/guides/']
+const CATEGORY_PATH = ['/category/', '/product-category/', '/product_cat/', '/collection/', '/collections/', '/shop/', '/store/', '/catalog/', '/services/', '/service/']
 const PRODUCT_PATH = ['/product/', '/products/', '/item/']
+// Blog/article/resource HUB path segments + title words (generic, multilingual).
+const HUB_SEGS = ['blog', 'articles', 'article', 'resources', 'resource', 'guides', 'guide', 'news', 'insights', 'magazine', 'knowledge', 'tips', 'stories', 'posts', 'topics', 'topic']
+const HUB_TITLE = ['בלוג', 'מאמרים', 'מדריכים', 'חדשות', 'טיפים', 'מגזין', 'כתבות', 'ידע', 'משאבים', 'blog', 'articles', 'resources', 'guides', 'news', 'insights', 'magazine', 'knowledge base']
 // Filter/sort/tracking query params → filtered/tracking URL (never a clean target).
 const NOISE_QUERY = ['orderby', 'filter_', 'min_price', 'max_price', 'query_type_', 'rating_filter', 'utm_', 'fbclid', 'gclid', 'mc_cid', 'mc_eid', 'replytocom', 'sort', 'per_page']
 
@@ -250,14 +271,19 @@ export function classifyTarget(rawUrl: string, title: string, wpType: string | u
   if (segs[0] === 'author') return ineligible('utility_system', 'author_archive')
   if (segs[0] === 'search' || /[?&]s=/.test(query)) return ineligible('utility_system', 'search_page')
   if (segs[0] === 'tag' || segs[0] === 'tags' || wpType === 'tag' || wpType === 'post_tag') return ineligible('utility_system', 'tag_archive', 'tag')
-  if (/^(19|20)\d{2}$/.test(segs[0] ?? '')) return ineligible('utility_system', 'date_archive')
-  if (segs.length && segs[0] === 'page' && /^\d+$/.test(segs[1] ?? '')) return ineligible('utility_system', 'pagination_url')
+  // Date ARCHIVE only when the WHOLE path is numeric (/2024/ or /2024/05/) — a
+  // dated POST permalink (/2024/05/my-post/) has a non-numeric slug and survives.
+  if (/^(19|20)\d{2}$/.test(segs[0] ?? '') && segs.every((s) => /^\d+$/.test(s))) return ineligible('utility_system', 'date_archive')
+  // Pagination (top-level /page/N or nested /…/page/N).
+  if (segs.some((s, i) => s === 'page' && /^\d+$/.test(segs[i + 1] ?? ''))) return ineligible('utility_system', 'pagination_url')
   if (NOISE_QUERY.some((p) => query.includes(p))) return ineligible('utility_system', 'filtered_or_tracking_url')
   if (query && segs.length === 0) return ineligible('utility_system', 'query_only_url')
 
-  // Utility/legal/commerce-system pages (by slug OR multilingual title).
+  // Utility/legal/commerce-system pages. Slug match applies to any type; TITLE
+  // match is skipped for POSTS (an article that merely discusses accessibility/
+  // privacy/etc. is content, not a utility page).
   const utilBySlug = segs.some((s) => UTILITY_SLUGS.includes(s))
-  const utilByTitle = UTILITY_TITLE.some((w) => titleL.includes(w))
+  const utilByTitle = wpType !== 'post' && UTILITY_TITLE.some((w) => titleL.includes(w))
   if (utilBySlug || utilByTitle) return ineligible('utility_system', 'ecommerce_or_utility_page')
 
   // Homepage — valid broad target, but caution (not a normal content page).
@@ -282,6 +308,18 @@ export function classifyTarget(rawUrl: string, title: string, wpType: string | u
   // Known WordPress post → article.
   if (wpType === 'post') {
     return { targetType: 'post', targetRole: 'post_or_article', targetPriority: 'post_or_article', eligibility: 'yes', reason: 'post_or_article' }
+  }
+
+  // Blog/article/resource HUB (unknown type). A clean 1-segment hub listing
+  // (/blog, /articles, /guides…) → strong content hub; deeper/ambiguous content
+  // under a hub path or hub-suggesting title → strategic content, caution.
+  const hubBySeg = segs.length >= 1 && HUB_SEGS.includes(segs[0]!)
+  const hubByTitle = HUB_TITLE.some((w) => titleL.includes(w))
+  if (hubBySeg && segs.length === 1) {
+    return { targetType: 'page', targetRole: 'content_hub', targetPriority: 'strategic_content_page', eligibility: 'yes', reason: 'content_hub' }
+  }
+  if (hubBySeg || hubByTitle) {
+    return { targetType: 'unknown', targetRole: 'strategic_content_page', targetPriority: 'strategic_content_page', eligibility: 'caution', reason: 'content_page_inferred' }
   }
 
   // Unknown but clean, public-looking content URL → caution (diagnostics only).
