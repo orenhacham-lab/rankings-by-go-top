@@ -18,6 +18,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import WordPressConnectionPanel from '@/components/content/WordPressConnectionPanel'
+import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
 import AutomationIdeas from '@/components/content/AutomationIdeas'
@@ -801,6 +802,13 @@ export default function ContentHub() {
 
               {/* WordPress connection — reuse the existing self-contained panel */}
               <WordPressConnectionPanel projectId={projectId} />
+
+              {/* Internal-link index status (Phase 2E.1) — flag-gated, read-only + manual refresh */}
+              {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && (
+                <div className="mt-4">
+                  <InternalLinkIndexStatus projectId={projectId} language={language} />
+                </div>
+              )}
             </>
           )}
         </>
