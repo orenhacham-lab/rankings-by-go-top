@@ -26,7 +26,7 @@ const TABLE = 'wordpress_content_index'
  * Bump when the scan classification logic changes so a cached index built by an
  * older version can be flagged as needing a refresh (versionStale).
  */
-export const SCAN_INDEX_VERSION = '2a.1'
+export const SCAN_INDEX_VERSION = '2a.2'
 
 /** TTL for a cached index (app-enforced). Configurable; default 7 days. */
 export function indexTtlDays(): number {

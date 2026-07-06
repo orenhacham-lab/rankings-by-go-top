@@ -272,20 +272,32 @@ export interface TargetClassification {
 }
 
 // ── Generic, site-agnostic structural signals (NO niche/brand keywords) ──
-// Utility/system/legal pages (path slugs + multilingual title terms).
-const UTILITY_SLUGS = ['cart', 'checkout', 'my-account', 'account', 'login', 'signin', 'sign-in', 'register', 'signup', 'sign-up', 'lost-password', 'wishlist', 'privacy', 'privacy-policy', 'terms', 'terms-and-conditions', 'tos', 'legal', 'accessibility', 'refund', 'refund-policy', 'returns', 'return-policy', 'cancellation', 'shipping', 'shipping-policy', 'contact', 'contact-us', 'faq', 'sitemap', 'disclaimer', 'cookie', 'cookies', 'thank-you', 'order-received']
+// Utility/system/legal page slugs (exact path-segment match, decoded). English +
+// common Hebrew hyphenated forms so localized WordPress slugs are caught too.
+const UTILITY_SLUGS = [
+  // English
+  'cart', 'checkout', 'my-account', 'account', 'login', 'signin', 'sign-in', 'register', 'signup', 'sign-up',
+  'lost-password', 'wishlist', 'privacy', 'privacy-policy', 'terms', 'terms-and-conditions', 'tos', 'legal',
+  'accessibility', 'refund', 'refund-policy', 'returns', 'return-policy', 'cancellation', 'shipping',
+  'shipping-policy', 'contact', 'contact-us', 'get-in-touch', 'faq', 'sitemap', 'disclaimer', 'cookie',
+  'cookies', 'thank-you', 'order-received',
+  // Hebrew (decoded, hyphenated) — contact + common utility/legal pages
+  'צור-קשר', 'צרו-קשר', 'יצירת-קשר', 'סל-הקניות', 'עגלת-קניות', 'עמוד-לתשלום', 'החשבון-שלי', 'רשימת-משאלות',
+  'מדיניות-פרטיות', 'תקנון', 'תנאי-שימוש', 'הצהרת-נגישות', 'מדיניות-החזרות', 'ביטול-עסקה', 'דרכי-ביטול',
+  'מדיניות-ביטול', 'מדיניות-משלוח', 'מפת-אתר', 'שאלות-נפוצות',
+]
 // SPECIFIC statement/policy titles only — NOT bare topic words. A content
 // article that merely mentions "accessibility"/"privacy" as a topic must stay
 // eligible; only a real statement/policy/utility PAGE is rejected.
 const UTILITY_TITLE = [
-  // Hebrew
-  'סל הקניות', 'עגלת הקניות', 'עגלת קניות', 'עמוד לתשלום', 'החשבון שלי', 'רשימת משאלות', 'מדיניות פרטיות',
-  'תקנון', 'תנאי שימוש', 'הצהרת נגישות', 'ביטול עסקה', 'דרכי ביטול', 'מדיניות החזרות', 'מדיניות ביטול',
-  'מדיניות משלוח', 'מפת אתר',
+  // Hebrew (contact + specific statement/policy titles)
+  'צור קשר', 'צרו קשר', 'יצירת קשר', 'סל הקניות', 'עגלת הקניות', 'עגלת קניות', 'עמוד לתשלום', 'החשבון שלי',
+  'רשימת משאלות', 'מדיניות פרטיות', 'תקנון', 'תנאי שימוש', 'הצהרת נגישות', 'ביטול עסקה', 'דרכי ביטול',
+  'מדיניות החזרות', 'מדיניות ביטול', 'מדיניות משלוח', 'מפת אתר',
   // English
-  'shopping cart', 'checkout', 'my account', 'wishlist', 'privacy policy', 'terms of service',
-  'terms and conditions', 'terms of use', 'accessibility statement', 'refund policy', 'return policy',
-  'cancellation policy', 'shipping policy', 'contact us', 'cookie policy',
+  'contact us', 'get in touch', 'shopping cart', 'checkout', 'my account', 'wishlist', 'privacy policy',
+  'terms of service', 'terms and conditions', 'terms of use', 'accessibility statement', 'refund policy',
+  'return policy', 'cancellation policy', 'shipping policy', 'cookie policy',
 ]
 const CATEGORY_PATH = ['/category/', '/product-category/', '/product_cat/', '/collection/', '/collections/', '/shop/', '/store/', '/catalog/', '/services/', '/service/']
 const PRODUCT_PATH = ['/product/', '/products/', '/item/']
@@ -320,6 +332,9 @@ export function classifyTarget(rawUrl: string, title: string, wpType: string | u
 
   const path = u.pathname.toLowerCase()
   const segs = seg(path)
+  // Decoded segments so percent-encoded non-ASCII slugs (e.g. Hebrew
+  // "%d7%99%a6…" == "יצירת-קשר") match the utility slug list uniformly.
+  const decodedSegs = segs.map((s) => { try { return decodeURIComponent(s) } catch { return s } })
   const query = u.search.toLowerCase()
   const titleL = (title || '').toLowerCase()
 
@@ -340,7 +355,7 @@ export function classifyTarget(rawUrl: string, title: string, wpType: string | u
   // Utility/legal/commerce-system pages. Slug match applies to any type; TITLE
   // match is skipped for POSTS (an article that merely discusses accessibility/
   // privacy/etc. is content, not a utility page).
-  const utilBySlug = segs.some((s) => UTILITY_SLUGS.includes(s))
+  const utilBySlug = decodedSegs.some((s) => UTILITY_SLUGS.includes(s))
   const utilByTitle = wpType !== 'post' && UTILITY_TITLE.some((w) => titleL.includes(w))
   if (utilBySlug || utilByTitle) return ineligible('utility_system', 'ecommerce_or_utility_page')
 

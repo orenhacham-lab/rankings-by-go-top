@@ -108,7 +108,12 @@ export function urlMatchKeys(u: string): string[] {
   let s = decodeEntities(normalizeHref(u)).trim()
   s = s.replace(/[#?].*$/, '')            // drop fragment + query/UTM
   s = s.replace(/^https?:\/\//i, '')       // drop protocol
-  s = s.replace(/\/+$/, '').toLowerCase()  // drop trailing slash
+  s = s.replace(/\/+$/, '')                // drop trailing slash
+  // Percent-decode so an encoded and a decoded link to the SAME page (common for
+  // Hebrew/non-ASCII slugs, e.g. "/יצירת-קשר/" vs "/%d7%99%a6…/") collapse to one
+  // canonical key. Best-effort: malformed escapes keep the raw form.
+  try { s = decodeURIComponent(s) } catch { /* keep as-is on malformed % */ }
+  s = s.toLowerCase()
   const noWww = s.replace(/^www\./, '')
   const keys = new Set<string>()
   if (noWww) keys.add(noWww) // no-www host+path is canonical
