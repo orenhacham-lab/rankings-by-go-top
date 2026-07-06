@@ -11,7 +11,7 @@
  * No content mutation, no apply UI, no auto actions — every call is a button.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -79,6 +79,10 @@ export default function TopicPlanDrawer({
   const [running, setRunning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [busyLink, setBusyLink] = useState<string | null>(null)
+  // Guards against the /plan/saved refetch loop: reqIdRef ignores stale
+  // responses; abortRef cancels an in-flight load when topic/open changes.
+  const reqIdRef = useRef(0)
+  const abortRef = useRef<AbortController | null>(null)
 
   const emitStatus = useCallback((s: { exists: boolean; links: SavedLink[]; batch: SavedBatch | null; stale: boolean }) => {
     if (!topic) return
@@ -92,24 +96,44 @@ export default function TopicPlanDrawer({
 
   const loadSaved = useCallback(async () => {
     if (!topic) return
+    const myId = ++reqIdRef.current
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true); setError(null)
     try {
-      const res = await fetch(`/api/content/automation/internal-links/plan/saved?projectId=${encodeURIComponent(projectId)}&topicId=${encodeURIComponent(topic.id)}`)
+      const res = await fetch(`/api/content/automation/internal-links/plan/saved?projectId=${encodeURIComponent(projectId)}&topicId=${encodeURIComponent(topic.id)}`, { signal: controller.signal })
       const data = await res.json().catch(() => ({}))
+      if (reqIdRef.current !== myId) return
       if (!res.ok) { setError(t.loadError); setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); return }
       if (!data.exists) { setSaved({ exists: false, batch: null, links: [], stale: false, staleReasons: [] }); emitStatus({ exists: false, links: [], batch: null, stale: false }); return }
       const batch: SavedBatch = { id: data.batch.id, status: data.batch.status, linkCount: data.batch.linkCount ?? 0, cacheState: data.batch.cacheState }
       const links: SavedLink[] = Array.isArray(data.links) ? data.links : []
       setSaved({ exists: true, batch, links, stale: !!data.stale, staleReasons: Array.isArray(data.staleReasons) ? data.staleReasons : [] })
       emitStatus({ exists: true, links, batch, stale: !!data.stale })
-    } catch {
+    } catch (e) {
+      if (reqIdRef.current !== myId || (e as { name?: string })?.name === 'AbortError') return
       setError(t.loadError)
     } finally {
-      setLoading(false)
+      if (reqIdRef.current === myId) setLoading(false)
     }
   }, [projectId, topic, t.loadError, emitStatus])
 
-  useEffect(() => { if (open && topic) { setDry(null); loadSaved() } }, [open, topic, loadSaved])
+  // Keep a stable pointer to the latest loadSaved so the load effect can fire
+  // it without depending on its (churning) identity — that dependency was the
+  // source of the /plan/saved refetch loop.
+  const loadSavedRef = useRef(loadSaved)
+  loadSavedRef.current = loadSaved
+
+  // Load the saved plan exactly once per (open, project, topic). Depends only on
+  // primitives — parent re-renders / callback-identity churn can no longer
+  // retrigger it. Cleanup aborts any in-flight request on topic/open change.
+  useEffect(() => {
+    if (!open || !topic) return
+    setDry(null)
+    loadSavedRef.current()
+    return () => { abortRef.current?.abort() }
+  }, [open, projectId, topic?.id])
 
   const runPlan = useCallback(async () => {
     if (!topic || running) return

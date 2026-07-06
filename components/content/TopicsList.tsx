@@ -6,7 +6,7 @@
  * explicit confirm. "Create article" is a disabled placeholder (later phase).
  */
 
-import { useState, useEffect, type MouseEvent } from 'react'
+import { useState, useEffect, useCallback, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -58,6 +58,11 @@ export default function TopicsList({
   const planningOn = process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && !!projectId
   const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
   const [planTopic, setPlanTopic] = useState<{ id: string; topic: string; primary_keyword: string | null } | null>(null)
+  // Stable identity: passing an inline arrow here made the drawer's load effect
+  // re-run on every parent render, causing a /plan/saved refetch loop.
+  const handlePlanStatus = useCallback((id: string, summary: TopicPlanSummary) => {
+    setPlanStatus((prev) => ({ ...prev, [id]: summary }))
+  }, [])
   const [creatingId, setCreatingId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false) // show first 3 rows by default
   // The "More" menu renders in a portal at fixed coords so it's never clipped by
@@ -353,7 +358,7 @@ export default function TopicsList({
           projectId={projectId}
           topic={planTopic}
           language={language}
-          onStatusChange={(id, summary) => setPlanStatus((prev) => ({ ...prev, [id]: summary }))}
+          onStatusChange={handlePlanStatus}
         />
       )}
     </div>
