@@ -73,6 +73,7 @@ function sentencePreview(html: string, ranges: { start: number; end: number }[],
 export type PlacementSkipReason = 'empty_anchor' | 'anchor_not_found_in_safe_prose' | 'placement_too_early' | 'placement_too_close'
 
 export type OccurrenceResult = 'selected' | 'skipped_forbidden' | 'skipped_non_prose' | 'too_early' | 'too_close'
+export type ForbiddenReason = 'heading' | 'existing_link' | 'table' | 'button_nav_cta' | 'non_prose' | 'unknown'
 
 export interface OccurrenceEval {
   /** Char index in the ORIGINAL html. */
@@ -80,6 +81,49 @@ export interface OccurrenceEval {
   inProse: boolean
   wordOffset: number | null
   result: OccurrenceResult
+  // Rich diagnostics for skipped/forbidden occurrences (response-only).
+  forbiddenReason?: ForbiddenReason
+  href?: string | null
+  insideHeading?: boolean
+  insideExistingLink?: boolean
+  insideTable?: boolean
+  insideButtonNavCta?: boolean
+  insideParagraph?: boolean
+  htmlSnippet?: string
+  textSnippet?: string
+}
+
+interface RegionInfo {
+  forbiddenReason: ForbiddenReason
+  href: string | null
+  insideHeading: boolean
+  insideExistingLink: boolean
+  insideTable: boolean
+  insideButtonNavCta: boolean
+  insideParagraph: boolean
+}
+
+function spansOf(html: string, re: RegExp): { start: number; end: number; open: string }[] {
+  const out: { start: number; end: number; open: string }[] = []
+  let m: RegExpExecArray | null
+  re.lastIndex = 0
+  while ((m = re.exec(html)) !== null) out.push({ start: m.index, end: m.index + m[0].length, open: m[0].slice(0, m[0].indexOf('>') + 1) })
+  return out
+}
+
+/** Classify which forbidden/non-prose region a char index sits inside (diagnostics). */
+function classifyRegion(html: string, index: number): RegionInfo {
+  const within = (spans: { start: number; end: number; open: string }[]) => spans.find((s) => index >= s.start && index < s.end)
+  const inHeading = !!within(spansOf(html, /<(h[1-6])\b[^>]*>[\s\S]*?<\/\1>/gi))
+  const linkSpan = within(spansOf(html, /<a\b[^>]*>[\s\S]*?<\/a>/gi))
+  const inTable = !!within(spansOf(html, /<(table|thead|tbody|tr|td|th)\b[^>]*>[\s\S]*?<\/\1>/gi))
+  const inBncta = !!within(spansOf(html, /<(button|nav|header|footer|aside|figure|figcaption)\b[^>]*>[\s\S]*?<\/\1>/gi))
+  const inPara = !!within(spansOf(html, /<(p|li)\b[^>]*>[\s\S]*?<\/\1>/gi))
+  let href: string | null = null
+  if (linkSpan) { const hm = /href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(linkSpan.open); href = hm ? (hm[2] ?? hm[3] ?? hm[4] ?? null) : null }
+  const forbiddenReason: ForbiddenReason =
+    linkSpan ? 'existing_link' : inHeading ? 'heading' : inTable ? 'table' : inBncta ? 'button_nav_cta' : !inPara ? 'non_prose' : 'unknown'
+  return { forbiddenReason, href, insideHeading: inHeading, insideExistingLink: !!linkSpan, insideTable: inTable, insideButtonNavCta: inBncta, insideParagraph: inPara }
 }
 
 export interface PlacementResult {
@@ -101,11 +145,12 @@ export interface PlacementResult {
  *
  * Scans EVERY occurrence in the original HTML (not just the first): an occurrence
  * inside a heading / table / existing link / button / nav / other forbidden
- * region is skipped and scanning continues to later occurrences. A valid prose
- * (<p>/<li>) occurrence that is not in the intro (before the first <h2>) and not
- * too close to another planned link is selected. Only when NO occurrence
- * qualifies does it report a skip reason. `usedWordOffsets` are the word
- * positions of other planned insertions in this same preview. Read-only.
+ * region is skipped (with a classified reason) and scanning continues. A valid
+ * prose (<p>/<li>) occurrence past a modest word floor (so links don't land in
+ * the opening snippet) and not too close to another planned link is selected.
+ * There is NO "must be after the first <h2>" requirement — for manual approved
+ * links a normal paragraph well into the intro is a fine target. Only when NO
+ * occurrence qualifies does it report a skip reason. Read-only.
  */
 export function findNaturalAnchorPlacement(html: string, anchor: string, usedWordOffsets: number[] = []): PlacementResult {
   const needle = (anchor || '').trim()
@@ -117,7 +162,6 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
   const hay = blanked.toLowerCase()
   const rawHay = html.toLowerCase()
   const nl = needle.toLowerCase()
-  const h2 = html.search(/<h2[\s>]/i)
 
   const evaluated: OccurrenceEval[] = []
   let occurrenceCount = 0
@@ -134,16 +178,30 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
     occurrenceCount++
     occIdx++
 
+    const snippet = () => {
+      const s = Math.max(0, k - 30)
+      const htmlSnippet = html.slice(s, k + nl.length + 30)
+      return { htmlSnippet, textSnippet: plainText(htmlSnippet).trim().slice(0, 140) }
+    }
+
     // Blanked at k ⇒ inside a forbidden region (heading/table/link/nav/button…).
-    if (!hay.startsWith(nl, k)) { evaluated.push({ index: k, inProse: false, wordOffset: null, result: 'skipped_forbidden' }); continue }
-    if (!inProse(k)) { evaluated.push({ index: k, inProse: false, wordOffset: null, result: 'skipped_non_prose' }); continue }
+    if (!hay.startsWith(nl, k)) {
+      const reg = classifyRegion(html, k)
+      evaluated.push({ index: k, inProse: false, wordOffset: null, result: 'skipped_forbidden', ...reg, ...snippet() })
+      continue
+    }
+    if (!inProse(k)) {
+      const reg = classifyRegion(html, k)
+      evaluated.push({ index: k, inProse: false, wordOffset: null, result: 'skipped_non_prose', ...reg, ...snippet() })
+      continue
+    }
 
     sawProse = true
     const wordOffset = wordsBefore(html, k)
-    // "Too early" = in the intro (before the first <h2>). With no heading at all,
-    // fall back to a modest word floor so links don't land in the opening lines.
-    const early = h2 >= 0 ? k < h2 : wordOffset < INSERTION_MIN_WORDS_BEFORE_FIRST
-    if (early) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_early' }); tooEarly = true; continue }
+    // "Too early" = only the very opening snippet (below a modest manual floor).
+    // NO first-<h2> gate — a paragraph 100+ words in is a valid manual target.
+    const early = wordOffset < INSERTION_MIN_WORDS_BEFORE_FIRST
+    if (early) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_early', insideParagraph: true }); tooEarly = true; continue }
     if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < ANCHOR_MIN_WORD_GAP)) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_close' }); tooClose = true; continue }
 
     evaluated.push({ index: k, inProse: true, wordOffset, result: 'selected' })

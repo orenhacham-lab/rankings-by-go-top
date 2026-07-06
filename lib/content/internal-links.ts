@@ -213,11 +213,22 @@ function parse(html: string): Document | null {
 export function extractExistingLinkUrls(html: string): Set<string> {
   const set = new Set<string>()
   const doc = parse(html)
-  if (!doc) return set
-  doc.querySelectorAll('a[href]').forEach((a) => {
-    const href = a.getAttribute('href')
+  if (doc) {
+    doc.querySelectorAll('a[href]').forEach((a) => {
+      const href = a.getAttribute('href')
+      if (href) for (const k of urlMatchKeys(href)) set.add(k)
+    })
+    return set
+  }
+  // Server-safe fallback: DOMParser is unavailable in Node (route handlers), so
+  // parse hrefs with a regex — otherwise isUrlAlreadyLinked would ALWAYS return
+  // false server-side and duplicate links could never be detected.
+  const re = /<a\b[^>]*?\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html)) !== null) {
+    const href = m[2] ?? m[3] ?? m[4] ?? ''
     if (href) for (const k of urlMatchKeys(href)) set.add(k)
-  })
+  }
   return set
 }
 
