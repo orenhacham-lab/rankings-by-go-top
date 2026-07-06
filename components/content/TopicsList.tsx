@@ -34,6 +34,8 @@ export default function TopicsList({
   batchState = {},
   batchRunning = false,
   onRetry,
+  planStatus: planStatusExternal,
+  onPlanStatusChange,
 }: {
   topics: ArticleTopic[]
   projectId?: string
@@ -47,6 +49,10 @@ export default function TopicsList({
   batchState?: Record<string, { status: 'queued' | 'generating' | 'success' | 'failed'; error?: string }>
   batchRunning?: boolean
   onRetry?: (id: string) => void
+  // Phase 2F.1: optional CONTROLLED plan-status map (so the "new topics" panel
+  // can seed row badges). Falls back to internal state when not provided.
+  planStatus?: Record<string, TopicPlanSummary>
+  onPlanStatusChange?: (id: string, summary: TopicPlanSummary) => void
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
@@ -56,13 +62,16 @@ export default function TopicsList({
   // Phase 2E.2: internal-link planning (flag-gated). Status is loaded lazily by
   // the drawer (never per-row), so rendering the list triggers zero plan fetches.
   const planningOn = process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && !!projectId
-  const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
+  const [internalPlanStatus, setInternalPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
+  const planStatus = planStatusExternal ?? internalPlanStatus
   const [planTopic, setPlanTopic] = useState<{ id: string; topic: string; primary_keyword: string | null } | null>(null)
   // Stable identity: passing an inline arrow here made the drawer's load effect
-  // re-run on every parent render, causing a /plan/saved refetch loop.
+  // re-run on every parent render, causing a /plan/saved refetch loop. Uses the
+  // controlled setter when provided, else the internal map.
   const handlePlanStatus = useCallback((id: string, summary: TopicPlanSummary) => {
-    setPlanStatus((prev) => ({ ...prev, [id]: summary }))
-  }, [])
+    if (onPlanStatusChange) onPlanStatusChange(id, summary)
+    else setInternalPlanStatus((prev) => ({ ...prev, [id]: summary }))
+  }, [onPlanStatusChange])
   const [creatingId, setCreatingId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false) // show first 3 rows by default
   // The "More" menu renders in a portal at fixed coords so it's never clipped by

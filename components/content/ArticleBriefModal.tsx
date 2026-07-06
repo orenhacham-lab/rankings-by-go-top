@@ -89,6 +89,7 @@ export default function ArticleBriefModal({
   editing,
   onSaved,
   onToast,
+  onTopicsCreated,
 }: {
   open: boolean
   onClose: () => void
@@ -97,6 +98,9 @@ export default function ArticleBriefModal({
   editing?: ArticleTopic | null
   onSaved: () => void
   onToast?: (kind: 'success' | 'error', text: string) => void
+  // Phase 2F.1 — fires with the newly-created topics (create flow only) so the
+  // hub can offer an internal-link planning step. Never fires when editing.
+  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[]) => void
 }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).contentHub.brief
@@ -412,7 +416,10 @@ export default function ArticleBriefModal({
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(buildPayload(topic)),
-            }).then(async (r) => ({ ok: r.ok, err: r.ok ? null : (await r.json().catch(() => ({}))).error }))
+            }).then(async (r) => {
+              const d = await r.json().catch(() => ({}))
+              return { ok: r.ok, err: r.ok ? null : d?.error, topic: r.ok ? d?.topic : null }
+            })
           )
         )
         const failed = results.find((r) => !r.ok)
@@ -422,6 +429,12 @@ export default function ArticleBriefModal({
           setError(t.genericError); setFormError(t.genericError)
           return
         }
+        // Surface the newly-created topics for the internal-link planning step.
+        const created = results
+          .map((r) => r.topic as { id?: string; topic?: string; primary_keyword?: string | null } | null)
+          .filter((tp): tp is { id: string; topic: string; primary_keyword: string | null } => !!tp && typeof tp.id === 'string')
+          .map((tp) => ({ id: tp.id, topic: tp.topic ?? '', primary_keyword: tp.primary_keyword ?? null }))
+        if (created.length) onTopicsCreated?.(created)
       }
       onSaved()
       onToast?.('success', editing ? t.toasts.topicUpdated : t.toasts.topicSaved)

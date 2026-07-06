@@ -48,6 +48,27 @@ export async function getLatestBatchForTopic(admin: Admin, projectId: string, to
   }
 }
 
+/**
+ * Approve (review-status only) the still-'planned' links of a saved batch. Sets
+ * status planned→approved. NEVER touches article content / generation / apply.
+ * Returns the count approved. Never throws.
+ */
+export async function approveBatchLinks(admin: Admin, projectId: string, batchId: string): Promise<number> {
+  const nowIso = new Date().toISOString()
+  try {
+    const { data } = await admin
+      .from(LINKS)
+      .update({ status: 'approved', updated_at: nowIso })
+      .eq('project_id', projectId)
+      .eq('batch_id', batchId)
+      .eq('status', 'planned')
+      .select('id')
+    return ((data ?? []) as { id: string }[]).length
+  } catch {
+    return 0
+  }
+}
+
 export async function getBatchLinks(admin: Admin, batchId: string): Promise<InternalLinkPlanLinkRow[]> {
   try {
     const { data } = await admin.from(LINKS).select('*').eq('batch_id', batchId).order('confidence', { ascending: false })

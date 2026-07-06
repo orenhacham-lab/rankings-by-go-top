@@ -21,6 +21,8 @@ import WordPressConnectionPanel from '@/components/content/WordPressConnectionPa
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
+import NewTopicsLinkPlanPanel, { type NewTopic } from '@/components/content/NewTopicsLinkPlanPanel'
+import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import AutomationIdeas from '@/components/content/AutomationIdeas'
 import AutomationSchedule from '@/components/content/AutomationSchedule'
 import { useToasts, ToastHost } from '@/components/content/Toast'
@@ -80,6 +82,10 @@ export default function ContentHub() {
   const [topics, setTopics] = useState<ArticleTopic[]>([])
   const [briefOpen, setBriefOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<ArticleTopic | null>(null)
+  // Phase 2F.1: internal-link planning step for freshly-created topics. Lifted
+  // planStatus so the panel can seed the topic-row badges for those IDs only.
+  const [newTopics, setNewTopics] = useState<NewTopic[] | null>(null)
+  const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
   const [automationRefresh, setAutomationRefresh] = useState(0)
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
@@ -784,20 +790,40 @@ export default function ContentHub() {
                     <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
                   </Card>
                 ) : (
-                  <TopicsList
-                    topics={selectableTopics}
-                    projectId={projectId}
-                    projectName={selectedProject?.name ?? '—'}
-                    articleByTopic={articleByTopic}
-                    onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
-                    onChanged={loadTopics}
-                    onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
-                    selectedIds={selected}
-                    onToggleSelect={toggleSelect}
-                    batchState={batchState}
-                    batchRunning={batchRunning}
-                    onRetry={retryTopic}
-                  />
+                  <>
+                    {/* Phase 2F.1 — internal-link suggestions for just-created topics.
+                        Flag-gated; mounts only after topic creation. */}
+                    {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && projectId && newTopics && newTopics.length > 0 && (
+                      <NewTopicsLinkPlanPanel
+                        key={newTopics.map((tp) => tp.id).join(',')}
+                        projectId={projectId}
+                        language={language}
+                        topics={newTopics}
+                        onClose={() => setNewTopics(null)}
+                        onSaved={(summaries) => setPlanStatus((prev) => {
+                          const next = { ...prev }
+                          for (const s of summaries) next[s.topicId] = s.summary
+                          return next
+                        })}
+                      />
+                    )}
+                    <TopicsList
+                      topics={selectableTopics}
+                      projectId={projectId}
+                      projectName={selectedProject?.name ?? '—'}
+                      articleByTopic={articleByTopic}
+                      onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
+                      onChanged={loadTopics}
+                      onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+                      selectedIds={selected}
+                      onToggleSelect={toggleSelect}
+                      batchState={batchState}
+                      batchRunning={batchRunning}
+                      onRetry={retryTopic}
+                      planStatus={planStatus}
+                      onPlanStatusChange={(id, summary) => setPlanStatus((prev) => ({ ...prev, [id]: summary }))}
+                    />
+                  </>
                 )}
               </div>
 
@@ -823,6 +849,7 @@ export default function ContentHub() {
         editing={editingTopic}
         onSaved={loadTopics}
         onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+        onTopicsCreated={(created) => { if (created.length) setNewTopics(created) }}
       />
 
       <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />
