@@ -545,6 +545,60 @@ export interface WordPressContentIndexRow {
   updated_at: string
 }
 
+export type InternalLinkPlanStatus = 'planned' | 'approved' | 'rejected' | 'superseded'
+export type InternalLinkPlanSubjectType = 'topic' | 'pool_item' | 'generated_article'
+
+/** Parent plan batch (Phase 2C) — one planning run per subject, even zero-link. INERT. */
+export interface InternalLinkPlanBatchRow {
+  id: string
+  user_id: string
+  project_id: string
+  topic_id: string | null
+  article_pool_item_id: string | null
+  generated_article_id: string | null
+  subject_type: InternalLinkPlanSubjectType
+  subject_title_snapshot: string | null
+  primary_keyword_snapshot: string | null
+  planner_version: string | null
+  cache_scanner_version: string | null
+  cache_scan_completed_at: string | null
+  cache_state: string | null
+  allow_caution: boolean
+  strict: boolean
+  stale_at_creation: boolean
+  status: InternalLinkPlanStatus
+  link_count: number
+  selected_count: number
+  rejected_count: number
+  diagnostics_summary: Record<string, unknown>
+  warnings: string[]
+  created_at: string
+  updated_at: string
+}
+
+/** Child plan link (Phase 2C) — one proposed link. INERT (review-only). */
+export interface InternalLinkPlanLinkRow {
+  id: string
+  batch_id: string
+  user_id: string
+  project_id: string
+  topic_id: string | null
+  article_pool_item_id: string | null
+  generated_article_id: string | null
+  target_url: string
+  target_title: string | null
+  target_role: string | null
+  target_priority: string | null
+  anchor_text: string | null
+  anchor_source: string | null
+  confidence: number | null
+  relevance: number | null
+  reason: string | null
+  status: InternalLinkPlanStatus
+  created_at: string
+  updated_at: string
+}
+
 export type AIUsageOperation =
   | 'topic_generation'
   | 'outline'

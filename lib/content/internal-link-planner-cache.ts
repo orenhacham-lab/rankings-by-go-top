@@ -27,6 +27,9 @@ import { manualAnchorShapeValid, isInternalUrl, normalizeHref, normalizeUrlKey }
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { TopicForPlanning } from '@/lib/content/internal-link-planner'
 
+/** Bump when the cache-planner scoring/guards change (stamped on saved plans). */
+export const CACHE_PLANNER_VERSION = '2b.1'
+
 // --- Tunable thresholds (explicit for review) --------------------------------
 export const CACHE_PLANNER_RELEVANCE_MIN = 0.3
 export const CACHE_PLANNER_SELF_SIMILARITY_MAX = 0.85
