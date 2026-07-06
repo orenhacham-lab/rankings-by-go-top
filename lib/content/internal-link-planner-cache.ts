@@ -107,7 +107,7 @@ const SELF_CONTAINMENT_MAX = 0.8
  * blocks merely-related pages (a broad category, or a different-angle article).
  * Returns a rejection reason, or null.
  */
-function selfOrDuplicateReason(topic: TopicForPlanning, t: ScannedTarget): string | null {
+export function selfOrDuplicateReason(topic: TopicForPlanning, t: ScannedTarget): string | null {
   const topicTitle = normText(topic.title)
   const targetTitle = normText(t.targetTitle)
   if (topicTitle && targetTitle && topicTitle === targetTitle) return 'self_target'
