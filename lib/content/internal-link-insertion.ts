@@ -12,8 +12,18 @@
  */
 
 import { createHash } from 'crypto'
-import { ANCHOR_MIN_WORDS_BEFORE_FIRST, ANCHOR_MIN_WORD_GAP } from '@/lib/content/anchors-check'
+import { ANCHOR_MIN_WORD_GAP } from '@/lib/content/anchors-check'
 import { normalizeHref } from '@/lib/content/internal-links'
+
+/**
+ * "Too early" for NATURAL-occurrence INSERTION is defined by structure, not the
+ * generation-time 120-word audit floor (ANCHOR_MIN_WORDS_BEFORE_FIRST, which
+ * governs article generation and must stay untouched). When the article has an
+ * <h2>, any safe prose occurrence AFTER the first heading is acceptable — the
+ * "not before the first section" rule already keeps links out of the intro. This
+ * word floor is a fallback used ONLY for articles with no headings at all.
+ */
+const INSERTION_MIN_WORDS_BEFORE_FIRST = 40
 
 // Regions a link must NEVER be placed inside. Blanked (equal-length spaces) so
 // their inner text can't match while character offsets stay aligned.
@@ -62,6 +72,16 @@ function sentencePreview(html: string, ranges: { start: number; end: number }[],
 
 export type PlacementSkipReason = 'empty_anchor' | 'anchor_not_found_in_safe_prose' | 'placement_too_early' | 'placement_too_close'
 
+export type OccurrenceResult = 'selected' | 'skipped_forbidden' | 'skipped_non_prose' | 'too_early' | 'too_close'
+
+export interface OccurrenceEval {
+  /** Char index in the ORIGINAL html. */
+  index: number
+  inProse: boolean
+  wordOffset: number | null
+  result: OccurrenceResult
+}
+
 export interface PlacementResult {
   found: boolean
   /** Char index (in the ORIGINAL html) where the chosen occurrence starts. */
@@ -70,43 +90,73 @@ export interface PlacementResult {
   wordOffset?: number
   sentence?: string
   skipReason?: PlacementSkipReason
+  // Diagnostics (response-only; no UI depends on these).
+  occurrenceCount?: number
+  evaluatedOccurrences?: OccurrenceEval[]
+  selectedOccurrenceIndex?: number
 }
 
 /**
  * Find the first SAFE, well-placed natural occurrence of `anchor` in the body.
- * `usedWordOffsets` are the word positions of other planned insertions in this
- * same preview (so two links aren't placed too close). Read-only.
+ *
+ * Scans EVERY occurrence in the original HTML (not just the first): an occurrence
+ * inside a heading / table / existing link / button / nav / other forbidden
+ * region is skipped and scanning continues to later occurrences. A valid prose
+ * (<p>/<li>) occurrence that is not in the intro (before the first <h2>) and not
+ * too close to another planned link is selected. Only when NO occurrence
+ * qualifies does it report a skip reason. `usedWordOffsets` are the word
+ * positions of other planned insertions in this same preview. Read-only.
  */
 export function findNaturalAnchorPlacement(html: string, anchor: string, usedWordOffsets: number[] = []): PlacementResult {
   const needle = (anchor || '').trim()
-  if (!needle) return { found: false, skipReason: 'empty_anchor' }
+  if (!needle) return { found: false, skipReason: 'empty_anchor', occurrenceCount: 0, evaluatedOccurrences: [] }
 
   const blanked = blankForbidden(html)
   const ranges = proseRanges(html)
   const inProse = (i: number) => ranges.some((r) => i >= r.start && i < r.end)
   const hay = blanked.toLowerCase()
+  const rawHay = html.toLowerCase()
   const nl = needle.toLowerCase()
   const h2 = html.search(/<h2[\s>]/i)
 
-  let sawOccurrence = false
+  const evaluated: OccurrenceEval[] = []
+  let occurrenceCount = 0
+  let occIdx = -1
+  let sawProse = false
   let tooEarly = false
   let tooClose = false
   let from = 0
   for (;;) {
-    const i = hay.indexOf(nl, from)
-    if (i < 0) break
-    from = i + nl.length
-    if (!inProse(i)) continue // inside a blanked/forbidden region or outside prose
-    sawOccurrence = true
-    const wordOffset = wordsBefore(html, i)
-    if (wordOffset < ANCHOR_MIN_WORDS_BEFORE_FIRST || (h2 >= 0 && i < h2)) { tooEarly = true; continue }
-    if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < ANCHOR_MIN_WORD_GAP)) { tooClose = true; continue }
-    return { found: true, index: i, matchLength: needle.length, wordOffset, sentence: sentencePreview(html, ranges, i, needle) }
+    // Iterate raw occurrences so forbidden ones are counted + classified too.
+    const k = rawHay.indexOf(nl, from)
+    if (k < 0) break
+    from = k + nl.length
+    occurrenceCount++
+    occIdx++
+
+    // Blanked at k ⇒ inside a forbidden region (heading/table/link/nav/button…).
+    if (!hay.startsWith(nl, k)) { evaluated.push({ index: k, inProse: false, wordOffset: null, result: 'skipped_forbidden' }); continue }
+    if (!inProse(k)) { evaluated.push({ index: k, inProse: false, wordOffset: null, result: 'skipped_non_prose' }); continue }
+
+    sawProse = true
+    const wordOffset = wordsBefore(html, k)
+    // "Too early" = in the intro (before the first <h2>). With no heading at all,
+    // fall back to a modest word floor so links don't land in the opening lines.
+    const early = h2 >= 0 ? k < h2 : wordOffset < INSERTION_MIN_WORDS_BEFORE_FIRST
+    if (early) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_early' }); tooEarly = true; continue }
+    if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < ANCHOR_MIN_WORD_GAP)) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_close' }); tooClose = true; continue }
+
+    evaluated.push({ index: k, inProse: true, wordOffset, result: 'selected' })
+    return { found: true, index: k, matchLength: needle.length, wordOffset, sentence: sentencePreview(html, ranges, k, needle), occurrenceCount, evaluatedOccurrences: evaluated, selectedOccurrenceIndex: occIdx }
   }
 
-  if (!sawOccurrence) return { found: false, skipReason: 'anchor_not_found_in_safe_prose' }
-  if (tooClose) return { found: false, skipReason: 'placement_too_close' }
-  return { found: false, skipReason: 'placement_too_early' }
+  // No occurrence qualified — report the most actionable reason. A spacing block
+  // (too_close) means an otherwise-valid prose occurrence existed, so it takes
+  // precedence over too_early (which then means ALL prose occurrences were early).
+  const skipReason: PlacementSkipReason = !sawProse
+    ? 'anchor_not_found_in_safe_prose'
+    : tooClose ? 'placement_too_close' : 'placement_too_early'
+  return { found: false, skipReason, occurrenceCount, evaluatedOccurrences: evaluated }
 }
 
 function escAttr(s: string): string {
