@@ -16,11 +16,14 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/utils'
+import TopicPlanBadge, { type TopicPlanSummary } from '@/components/content/TopicPlanBadge'
+import TopicPlanDrawer from '@/components/content/TopicPlanDrawer'
 import type { ArticleTopic } from '@/lib/supabase/types'
 
 
 export default function TopicsList({
   topics,
+  projectId,
   projectName,
   articleByTopic = {},
   onEdit,
@@ -33,6 +36,7 @@ export default function TopicsList({
   onRetry,
 }: {
   topics: ArticleTopic[]
+  projectId?: string
   projectName: string
   articleByTopic?: Record<string, { id: string; status: string }>
   onEdit: (topic: ArticleTopic) => void
@@ -49,6 +53,11 @@ export default function TopicsList({
   const isHebrew = language === 'he'
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Phase 2E.2: internal-link planning (flag-gated). Status is loaded lazily by
+  // the drawer (never per-row), so rendering the list triggers zero plan fetches.
+  const planningOn = process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && !!projectId
+  const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
+  const [planTopic, setPlanTopic] = useState<{ id: string; topic: string; primary_keyword: string | null } | null>(null)
   const [creatingId, setCreatingId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false) // show first 3 rows by default
   // The "More" menu renders in a portal at fixed coords so it's never clipped by
@@ -245,6 +254,11 @@ export default function TopicsList({
                   <Td><span className="text-xs text-slate-500">{formatDate(topic.created_at)}</span></Td>
                   <Td>
                     <div className="flex items-center gap-1 justify-end">
+                      {/* Internal-link planning entry point (flag-gated). Opens the
+                          drawer; status is loaded there, never per row. */}
+                      {planningOn && (
+                        <TopicPlanBadge summary={planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} />
+                      )}
                       {/* Visible feedback while (re)generating — the primary button
                           may be "Edit article" during a regenerate. */}
                       {creatingId === topic.id && (
@@ -330,6 +344,18 @@ export default function TopicsList({
           document.body,
         )
       })()}
+
+      {/* Internal-link planning drawer (one at a time, flag-gated). */}
+      {planningOn && projectId && (
+        <TopicPlanDrawer
+          open={!!planTopic}
+          onClose={() => setPlanTopic(null)}
+          projectId={projectId}
+          topic={planTopic}
+          language={language}
+          onStatusChange={(id, summary) => setPlanStatus((prev) => ({ ...prev, [id]: summary }))}
+        />
+      )}
     </div>
   )
 }

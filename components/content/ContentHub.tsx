@@ -786,6 +786,7 @@ export default function ContentHub() {
                 ) : (
                   <TopicsList
                     topics={selectableTopics}
+                    projectId={projectId}
                     projectName={selectedProject?.name ?? '—'}
                     articleByTopic={articleByTopic}
                     onEdit={(topic) => { setEditingTopic(topic); setBriefOpen(true) }}
