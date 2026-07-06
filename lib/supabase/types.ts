@@ -520,6 +520,31 @@ export interface ArticlePoolItem {
   updated_at: string
 }
 
+export type WordPressContentIndexStatus = 'running' | 'completed' | 'partial' | 'failed'
+
+/** Cached WordPress content/link index (Phase 2A) — one row per project. */
+export interface WordPressContentIndexRow {
+  id: string
+  user_id: string
+  project_id: string
+  site_url: string | null
+  site_host: string | null
+  scan_status: WordPressContentIndexStatus
+  scanner_version: string | null
+  scan_params: Record<string, unknown>
+  summary: Record<string, unknown>
+  targets: unknown[]
+  sample_links: unknown[]
+  warnings: { notes?: string[]; errors?: string[] }
+  error_message: string | null
+  scan_started_at: string | null
+  scan_completed_at: string | null
+  scan_duration_ms: number | null
+  expires_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type AIUsageOperation =
   | 'topic_generation'
   | 'outline'
