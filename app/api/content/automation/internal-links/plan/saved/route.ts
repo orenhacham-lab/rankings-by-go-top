@@ -45,12 +45,14 @@ export async function GET(request: Request) {
   // Current cache + topic for staleness comparison.
   const row = await getCachedIndex(admin, project.id)
   const targets = row ? ((reassembleReport(row).targets ?? []) as ScannedTarget[]) : []
-  const { data: topicRow } = await admin.from('article_topics').select('updated_at').eq('id', topicId).maybeSingle()
+  const { data: topicRow } = await admin.from('article_topics').select('topic, primary_keyword').eq('id', topicId).maybeSingle()
+  const topic = topicRow as { topic?: string; primary_keyword?: string | null } | null
 
   const staleness = evaluateStaleness(batch, links, {
     cacheScanCompletedAt: row?.scan_completed_at ?? null,
     cacheScannerVersion: row?.scanner_version ?? null,
-    topicUpdatedAt: (topicRow as { updated_at?: string } | null)?.updated_at ?? null,
+    topicTitle: topic?.topic ?? null,
+    topicPrimaryKeyword: topic?.primary_keyword ?? null,
     targets,
   })
 

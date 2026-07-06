@@ -85,7 +85,8 @@ export async function evaluateApprovedLinks(admin: Admin, projectId: string, art
   const staleness = evaluateStaleness(batch, allLinks, {
     cacheScanCompletedAt: cacheRow?.scan_completed_at ?? null,
     cacheScannerVersion: cacheRow?.scanner_version ?? null,
-    topicUpdatedAt: topic?.updated_at ?? null,
+    topicTitle: topic?.topic ?? null,
+    topicPrimaryKeyword: topic?.primary_keyword ?? null,
     targets,
   })
 

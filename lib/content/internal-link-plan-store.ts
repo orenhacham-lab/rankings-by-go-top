@@ -186,7 +186,8 @@ export function evaluateStaleness(
   current: {
     cacheScanCompletedAt: string | null
     cacheScannerVersion: string | null
-    topicUpdatedAt: string | null
+    topicTitle: string | null
+    topicPrimaryKeyword: string | null
     targets: ScannedTarget[]
   },
 ): StalenessResult {
@@ -200,9 +201,18 @@ export function evaluateStaleness(
     reasons.push('cache_version_changed')
   }
 
-  const topicUpd = current.topicUpdatedAt ? new Date(current.topicUpdatedAt).getTime() : 0
-  const created = batch.created_at ? new Date(batch.created_at).getTime() : 0
-  if (topicUpd && created && topicUpd > created) reasons.push('topic_changed')
+  // Topic changed = PLANNING-RELEVANT fields differ from the batch snapshots.
+  // NOT article_topics.updated_at — that bumps for operational reasons (e.g. a
+  // generated article being linked to the topic) without touching title/keyword,
+  // which must not invalidate an approved plan.
+  const normSnap = (s: string | null | undefined) => (s || '').replace(/\s+/g, ' ').trim()
+  const curTitle = normSnap(current.topicTitle)
+  const snapTitle = normSnap(batch.subject_title_snapshot)
+  const curKw = normSnap(current.topicPrimaryKeyword)
+  const snapKw = normSnap(batch.primary_keyword_snapshot)
+  const titleChanged = !!snapTitle && !!curTitle && curTitle !== snapTitle
+  const keywordChanged = curKw !== snapKw
+  if (titleChanged || keywordChanged) reasons.push('topic_changed')
 
   // Target URL disappeared from / became ineligible in the current cache.
   const byKey = new Map<string, ScannedTarget>()
