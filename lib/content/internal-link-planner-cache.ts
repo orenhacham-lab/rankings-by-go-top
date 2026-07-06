@@ -14,6 +14,9 @@
  *     target keyword when keywordAvailable and the shape is valid.
  *   - priority is a BONUS (hub/category > product > post; homepage penalized),
  *     never a floor override — an irrelevant hub still fails the relevance floor.
+ *   - SELF/DUPLICATE guard: never link a topic to itself or to an existing
+ *     article/target representing the same topic (exact title/keyword, [ours],
+ *     or one title contained in the other). Related pages are NOT blocked.
  *   - de-duplicate by URL + anchor, cap per topic, and ZERO links is valid.
  *
  * No AI. No I/O. Reuses the shared deterministic helpers.
@@ -78,6 +81,51 @@ export interface CacheTopicPlan {
 const round2 = (n: number) => Math.round(n * 100) / 100
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 
+/** Normalize a title/keyword for comparison: lowercase, strip punctuation, collapse spaces. */
+function normText(s: string | null | undefined): string {
+  return (s || '').toLowerCase().replace(/[?!.,:;"“”׳״()[\]{}<>«»\-–—/|]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** Fraction of the SMALLER token set contained in the larger (subset signal). */
+function containment(a: Set<string>, b: Set<string>): number {
+  const min = Math.min(a.size, b.size)
+  if (!min) return 0
+  let inter = 0
+  for (const x of a) if (b.has(x)) inter++
+  return inter / min
+}
+
+/** Containment above this ⇒ one title is (almost) fully inside the other ⇒ same subject. */
+const SELF_CONTAINMENT_MAX = 0.8
+
+/**
+ * Detect when a candidate target IS the topic being planned (self-link) or an
+ * existing article/duplicate of the same topic. Generic signals only — never
+ * blocks merely-related pages (a broad category, or a different-angle article).
+ * Returns a rejection reason, or null.
+ */
+function selfOrDuplicateReason(topic: TopicForPlanning, t: ScannedTarget): string | null {
+  const topicTitle = normText(topic.title)
+  const targetTitle = normText(t.targetTitle)
+  if (topicTitle && targetTitle && topicTitle === targetTitle) return 'self_target'
+
+  const topicKw = normText(topic.primaryKeyword)
+  const targetKw = normText(t.primaryKeywordCandidate)
+  if (topicKw && targetKw && topicKw === targetKw) {
+    return t.matchedGeneratedArticleId ? 'existing_same_topic_article' : 'duplicate_topic_target'
+  }
+
+  // One title (almost) fully contained in the other — e.g. the topic title plus a
+  // generic subtitle ("…: המדריך המלא"). Needs ≥2 shared-scope tokens so a broad
+  // one-word target (e.g. a "קיוטו" hub) is NOT caught.
+  const a = tokens(topic.title)
+  const b = tokens(t.targetTitle)
+  if (Math.min(a.size, b.size) >= 2 && containment(a, b) >= SELF_CONTAINMENT_MAX) {
+    return t.matchedGeneratedArticleId ? 'existing_same_topic_article' : 'too_similar_to_planned_topic'
+  }
+  return null
+}
+
 /** Best anchor for a target: vetted usableAnchors first, else a clean keyword. */
 function chooseAnchor(t: ScannedTarget): { text: string; source: CacheAnchorSource } | null {
   const usable = Array.isArray(t.usableAnchors) ? t.usableAnchors : []
@@ -115,6 +163,11 @@ export function planFromCachedTargets(
 
     // 2) Internal-only (defensive; scanner already guaranteed it).
     if (!url || !isInternalUrl(url, hosts)) rejectedReasons.push('off_domain_or_empty_url')
+
+    // 2b) Self / duplicate-topic guard — never link a topic to itself or to an
+    // existing article/target that represents the SAME topic.
+    const selfReason = selfOrDuplicateReason(topic, t)
+    if (selfReason) rejectedReasons.push(selfReason)
 
     // 3) Token relevance topic ↔ target.
     const candTokens = tokens([t.targetTitle, t.primaryKeywordCandidate ?? '', ...(t.usableAnchors ?? []).map((a) => a.text)].join(' '))
