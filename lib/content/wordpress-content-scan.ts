@@ -73,12 +73,30 @@ const ECOMMERCE_ACTION_ANCHORS = new Set([
   'read more', 'continue reading', 'shop now', 'more info', 'learn more',
 ])
 
-/** Generic price / rating / review signals (currency symbols + en/he terms). */
+/**
+ * Generic price / rating / promo / review signals — currency symbols (literal
+ * AND HTML entities), price phrases, sale/shipping badges, and rating text, in
+ * Hebrew + English. Site-agnostic (no product/brand names). Any hit means the
+ * anchor is product-card noise and must not be a usable planning anchor.
+ */
 function hasPriceOrRatingNoise(s: string): boolean {
-  if (/[₪$€£]/.test(s)) return true
-  if (/\b\d[\d.,]*\s*(ils|nis|usd|eur|gbp|ש"ח|שח)\b/i.test(s)) return true
-  if (/(דורג|מתוך\s*5|כוכב|ביקורת|ביקורות|בסטוק|במלאי|אזל)/.test(s)) return true
-  if (/\b(rating|reviews?|out of 5|stars?|in stock|out of stock|sale)\b/i.test(s)) return true
+  const t = (s || '').toLowerCase()
+  // Currency symbols — literal and common HTML numeric/named entities.
+  if (/[₪$€£¥]/.test(s)) return true
+  if (/&#(8362|36|8364|163|165);/.test(s)) return true // ₪ $ € £ ¥
+  if (/&(shekel|dollar|euro|pound|yen|curren);/i.test(s)) return true
+  if (/\b(nis|ils|usd|eur|gbp)\b/i.test(t)) return true
+  if (/ש"ח|שקל|שקלים/.test(s)) return true
+  // Digits adjacent to a currency symbol/entity → a price.
+  if (/\d[\d.,]*\s*(₪|\$|€|£|¥|&#8362;|ש"ח|שח)/.test(s) || /(₪|\$|€|£|¥|&#8362;)\s*\d/.test(s)) return true
+  // Explicit price / promo / shipping phrases.
+  if (/החל\s*מ-?|מחיר|המחיר|מבצע|במבצע|הנחה|משלוח\s*חינם|חינם/.test(s)) return true
+  if (/\b(from|sale|save|discount|free shipping|price|priced|now\s+\d|was\s+\d)\b/i.test(t)) return true
+  // Rating / reviews.
+  if (/דורג|דירוג|ביקורת|ביקורות|מתוך\s*5|כוכב/.test(s)) return true
+  if (/\b(rated|rating|reviews?|out of 5|stars?)\b/i.test(t)) return true
+  // Stock/availability badges.
+  if (/בסטוק|במלאי|אזל|אזל\s*המלאי/.test(s) || /\b(in stock|out of stock)\b/i.test(t)) return true
   return false
 }
 
