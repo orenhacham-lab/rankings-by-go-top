@@ -599,6 +599,42 @@ export interface InternalLinkPlanLinkRow {
   updated_at: string
 }
 
+/** Pre-apply content snapshot (Phase 2D.2) — for verbatim rollback. */
+export interface GeneratedArticleContentSnapshotRow {
+  id: string
+  user_id: string
+  project_id: string
+  generated_article_id: string
+  batch_id: string | null
+  reason: string
+  content_html_before: string | null
+  content_markdown_before: string | null
+  internal_links_json_before: Record<string, unknown>[] | null
+  article_status_before: string | null
+  checksum_before: string | null
+  restored_at: string | null
+  created_at: string
+}
+
+export type InternalLinkInsertionOutcome = 'inserted' | 'skipped' | 'failed' | 'rolled_back'
+
+/** One apply-attempt-per-link audit row (Phase 2D.2). */
+export interface InternalLinkInsertionRow {
+  id: string
+  user_id: string
+  project_id: string
+  batch_id: string | null
+  link_id: string | null
+  generated_article_id: string | null
+  outcome: InternalLinkInsertionOutcome
+  reason: string | null
+  anchor_text: string | null
+  target_url: string | null
+  checksum_before: string | null
+  checksum_after: string | null
+  created_at: string
+}
+
 export type AIUsageOperation =
   | 'topic_generation'
   | 'outline'

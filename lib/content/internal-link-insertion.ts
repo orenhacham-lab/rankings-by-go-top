@@ -11,7 +11,9 @@
  * This is the read-only half of the eventual insertion pass — no apply here.
  */
 
+import { createHash } from 'crypto'
 import { ANCHOR_MIN_WORDS_BEFORE_FIRST, ANCHOR_MIN_WORD_GAP } from '@/lib/content/anchors-check'
+import { normalizeHref } from '@/lib/content/internal-links'
 
 // Regions a link must NEVER be placed inside. Blanked (equal-length spaces) so
 // their inner text can't match while character offsets stay aligned.
@@ -62,6 +64,9 @@ export type PlacementSkipReason = 'empty_anchor' | 'anchor_not_found_in_safe_pro
 
 export interface PlacementResult {
   found: boolean
+  /** Char index (in the ORIGINAL html) where the chosen occurrence starts. */
+  index?: number
+  matchLength?: number
   wordOffset?: number
   sentence?: string
   skipReason?: PlacementSkipReason
@@ -96,10 +101,76 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
     const wordOffset = wordsBefore(html, i)
     if (wordOffset < ANCHOR_MIN_WORDS_BEFORE_FIRST || (h2 >= 0 && i < h2)) { tooEarly = true; continue }
     if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < ANCHOR_MIN_WORD_GAP)) { tooClose = true; continue }
-    return { found: true, wordOffset, sentence: sentencePreview(html, ranges, i, needle) }
+    return { found: true, index: i, matchLength: needle.length, wordOffset, sentence: sentencePreview(html, ranges, i, needle) }
   }
 
   if (!sawOccurrence) return { found: false, skipReason: 'anchor_not_found_in_safe_prose' }
   if (tooClose) return { found: false, skipReason: 'placement_too_close' }
   return { found: false, skipReason: 'placement_too_early' }
 }
+
+function escAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+export interface ApplyResult {
+  ok: boolean
+  html?: string
+  anchorText?: string
+  wordOffset?: number
+  skipReason?: PlacementSkipReason
+}
+
+/**
+ * NATURAL-ONLY insertion: wrap the FIRST safe, well-placed existing occurrence of
+ * `anchor` in an <a href> — nothing else. Never appends/rewrites/forces; returns
+ * ok:false + skipReason when no safe occurrence exists. Caller must sanitize the
+ * returned html. Pure (no I/O).
+ */
+export function applyNaturalAnchor(html: string, anchor: string, url: string, usedWordOffsets: number[] = []): ApplyResult {
+  const p = findNaturalAnchorPlacement(html, anchor, usedWordOffsets)
+  if (!p.found || p.index === undefined || p.matchLength === undefined) {
+    return { ok: false, skipReason: p.skipReason }
+  }
+  const i = p.index
+  const len = p.matchLength
+  const matched = html.slice(i, i + len) // keep the article's original casing
+  const link = `<a href="${escAttr(normalizeHref(url))}" rel="noopener">${matched}</a>`
+  return { ok: true, html: html.slice(0, i) + link + html.slice(i + len), anchorText: matched, wordOffset: p.wordOffset }
+}
+
+// ── Preview-token integrity (apply must match a FRESH preview) ────────────────
+
+export function sha256(s: string): string {
+  return createHash('sha256').update(s || '', 'utf8').digest('hex')
+}
+
+export interface PreviewTokenInput {
+  generatedArticleId: string
+  batchId: string
+  contentChecksum: string
+  linksChecksum: string
+  cacheScanCompletedAt: string | null
+  cacheScannerVersion: string | null
+  wouldInsert: { linkId: string; anchorText: string; targetUrl: string }[]
+}
+
+/**
+ * Deterministic integrity token over everything apply must not have changed since
+ * the preview. Apply recomputes it from CURRENT server state and refuses on any
+ * mismatch (stale_preview).
+ */
+export function computePreviewToken(i: PreviewTokenInput): string {
+  const canonical = JSON.stringify({
+    v: 1,
+    a: i.generatedArticleId,
+    b: i.batchId,
+    c: i.contentChecksum,
+    l: i.linksChecksum,
+    s: i.cacheScanCompletedAt,
+    sv: i.cacheScannerVersion,
+    w: [...i.wouldInsert].map((x) => [x.linkId, x.anchorText, x.targetUrl]).sort((p, q) => (p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : 0)),
+  })
+  return sha256(canonical)
+}
+
