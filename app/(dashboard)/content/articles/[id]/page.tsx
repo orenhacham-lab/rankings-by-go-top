@@ -79,6 +79,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [ilpApplyOutcome, setIlpApplyOutcome] = useState<{ applied: number; skipped: number; snapshotId: string | null } | null>(null)
   const [ilpRollbackAvailable, setIlpRollbackAvailable] = useState(false)
   const [ilpNotice, setIlpNotice] = useState<string | null>(null)
+  // Session-only preview summary (from the last manual preview) — powers the
+  // client-side "mark ready" guard. Never fetched automatically.
+  const [ilpPreviewSummary, setIlpPreviewSummary] = useState<{ hasPreview: boolean; approvedLinks: number; wouldInsert: number; wouldSkip: number } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -169,6 +172,12 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   }
 
   async function save(nextStatus?: 'draft' | 'ready') {
+    // Client-side guard only (does NOT change ready/publish backend behavior):
+    // if the last manual preview this session found approved links not yet
+    // applied, confirm before marking ready. Never triggers a fetch.
+    if (nextStatus === 'ready' && linkPlanningOn && ilpPreviewSummary && ilpPreviewSummary.wouldInsert > 0) {
+      if (!window.confirm(c.editor.linkApply.readyHasUnappliedConfirm)) return
+    }
     setSaving(true)
     setMessage(null)
     try {
@@ -549,17 +558,25 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             onApplyOutcomeChange={setIlpApplyOutcome}
             onRollbackAvailableChange={setIlpRollbackAvailable}
             onNoticeChange={setIlpNotice}
+            onPreviewSummaryChange={setIlpPreviewSummary}
           />
         )}
 
-        <div className="flex flex-wrap items-center gap-2 pb-8">
-          <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
-          {/* Hidden once the article is published to WordPress — "ready" must not
-              downgrade a live published article. */}
-          {!isPublished && (
-            <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
+        <div className="pb-8">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
+            {/* Hidden once the article is published to WordPress — "ready" must not
+                downgrade a live published article. */}
+            {!isPublished && (
+              <Button variant="outline" onClick={() => save('ready')} disabled={saving || (audit ? audit.blockers.length > 0 : false)}>{e.markReady}</Button>
+            )}
+            <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
+          </div>
+          {/* Client-side neutral hint — no fetch. Nudges a manual preview before
+              marking ready when the planning feature is on and nothing was applied. */}
+          {linkPlanningOn && !isPublished && status === 'draft' && !ilpApplyOutcome && (
+            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{c.editor.linkApply.readyHint}</p>
           )}
-          <Button variant="ghost" onClick={deleteArticle} className="text-red-600 dark:text-red-400">{c.deleteArticle}</Button>
         </div>
 
         {/* Single, prominent return to the Content Hub for this project. */}

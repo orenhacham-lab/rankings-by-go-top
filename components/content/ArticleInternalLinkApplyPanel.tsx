@@ -53,6 +53,7 @@ const APPLY_URL = '/api/content/automation/internal-links/plan/insert/apply'
 const ROLLBACK_URL = '/api/content/automation/internal-links/plan/insert/rollback'
 
 export interface ApplyOutcome { applied: number; skipped: number; snapshotId: string | null }
+export interface PreviewSummary { hasPreview: boolean; approvedLinks: number; wouldInsert: number; wouldSkip: number }
 
 export default function ArticleInternalLinkApplyPanel({
   projectId,
@@ -71,6 +72,9 @@ export default function ArticleInternalLinkApplyPanel({
   onApplyOutcomeChange,
   onRollbackAvailableChange,
   onNoticeChange,
+  // Lifted so the editor's "mark ready" guard can see, session-only, whether a
+  // preview found approved links not yet applied. Never fetched automatically.
+  onPreviewSummaryChange,
 }: {
   projectId: string
   generatedArticleId: string
@@ -85,6 +89,7 @@ export default function ArticleInternalLinkApplyPanel({
   onApplyOutcomeChange: (o: ApplyOutcome | null) => void
   onRollbackAvailableChange: (b: boolean) => void
   onNoticeChange: (s: string | null) => void
+  onPreviewSummaryChange?: (s: PreviewSummary | null) => void
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.linkApply, [language])
   const isHebrew = language === 'he'
@@ -120,11 +125,14 @@ export default function ArticleInternalLinkApplyPanel({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(t.loadError); setPreviewResult(null); setPreviewToken(null); return }
+      const wouldInsert = data.wouldInsert ?? 0
+      const approvedLinks = data.approvedLinks ?? 0
+      const wouldSkip = data.wouldSkip ?? 0
       setPreviewResult({
         reason: data.reason,
-        approvedLinks: data.approvedLinks ?? 0,
-        wouldInsert: data.wouldInsert ?? 0,
-        wouldSkip: data.wouldSkip ?? 0,
+        approvedLinks,
+        wouldInsert,
+        wouldSkip,
         planStale: !!data.planStale,
         cacheStale: !!data.cacheStale,
         cacheVersionStale: !!data.cacheVersionStale,
@@ -133,12 +141,13 @@ export default function ArticleInternalLinkApplyPanel({
       })
       setPreviewToken(typeof data.previewToken === 'string' ? data.previewToken : null)
       setPreviewedForHtml(contentHtml)
+      onPreviewSummaryChange?.({ hasPreview: true, approvedLinks, wouldInsert, wouldSkip })
     } catch {
       setError(t.loadError)
     } finally {
       setLoadingPreview(false)
     }
-  }, [loadingPreview, projectId, generatedArticleId, contentHtml, t])
+  }, [loadingPreview, projectId, generatedArticleId, contentHtml, t, onPreviewSummaryChange])
 
   const canApply =
     isDraft && !!previewToken && !!previewResult && !previewResult.reason &&
@@ -165,12 +174,14 @@ export default function ArticleInternalLinkApplyPanel({
         // button survives the contentHtml-driven re-render that follows.
         onApplyOutcomeChange({ applied: data.applied, skipped: data.skipped ?? 0, snapshotId: data.snapshotId ?? null })
         onRollbackAvailableChange(true)
+        onPreviewSummaryChange?.(null) // links applied → no longer "unapplied"
         setPreviewResult(null); setPreviewToken(null)
         await onContentReplaced()
       } else {
         // nothing_inserted / no-op — no snapshot, no content change, not an error.
         onApplyOutcomeChange(null)
         onNoticeChange(t.nothingInserted)
+        onPreviewSummaryChange?.(null)
         setPreviewResult(null); setPreviewToken(null)
       }
     } catch {
@@ -178,7 +189,7 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setApplying(false)
     }
-  }, [applying, canApply, previewToken, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, t])
+  }, [applying, canApply, previewToken, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
 
   const rollback = useCallback(async () => {
     if (rollingBack) return
@@ -196,6 +207,7 @@ export default function ArticleInternalLinkApplyPanel({
         onNoticeChange(t.rollbackDone)
         onRollbackAvailableChange(false)
         onApplyOutcomeChange(null)
+        onPreviewSummaryChange?.(null)
         setPreviewResult(null); setPreviewToken(null)
         await onContentReplaced()
       } else if (data.reason === 'no_snapshot') {
@@ -206,7 +218,7 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setRollingBack(false)
     }
-  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, t])
+  }, [rollingBack, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
 
   if (process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING !== 'true') return null
 
@@ -223,6 +235,26 @@ export default function ArticleInternalLinkApplyPanel({
   // resets the local `collapsed` flag.
   const open = !collapsed || rollbackAvailable || !!applyOutcome
 
+  // Compact status chip so the current state is obvious at a glance.
+  const s = t.state as Record<string, string>
+  const chipTones: Record<string, string> = {
+    neutral: 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300',
+    amber: 'border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400',
+    emerald: 'border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300',
+    indigo: 'border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300',
+  }
+  let chip: { label: string; tone: string }
+  if (!isDraft) chip = { label: s.nonDraft, tone: 'amber' }
+  else if (applyOutcome) chip = { label: s.applied.replace('{n}', String(applyOutcome.applied)), tone: 'emerald' }
+  else if (contentChanged) chip = { label: s.contentChanged, tone: 'amber' }
+  else if (previewResult?.reason === 'no_plan_batch') chip = { label: s.noPlan, tone: 'neutral' }
+  else if (previewResult?.reason === 'no_approved_links') chip = { label: s.noApproved, tone: 'neutral' }
+  else if (previewResult && !previewResult.reason) {
+    if (previewResult.planStale || previewResult.cacheStale || previewResult.cacheVersionStale) chip = { label: s.stale, tone: 'amber' }
+    else if (previewResult.wouldInsert > 0) chip = { label: s.wouldInsert.replace('{n}', String(previewResult.wouldInsert)), tone: 'indigo' }
+    else chip = { label: s.nothingToInsert, tone: 'neutral' }
+  } else chip = { label: s.readyToPreview, tone: 'neutral' }
+
   return (
     <Card className="hover:translate-y-0 border-indigo-100 dark:border-indigo-500/20">
       <div dir={isHebrew ? 'rtl' : 'ltr'}>
@@ -232,7 +264,8 @@ export default function ArticleInternalLinkApplyPanel({
             <Link2 size={16} className="text-indigo-600 dark:text-indigo-400" />
             <span className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</span>
           </span>
-          <span className="inline-flex items-center gap-2 text-slate-400">
+          <span className="inline-flex items-center gap-2 text-slate-400 flex-wrap justify-end">
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${chipTones[chip.tone]}`}>{chip.label}</span>
             {rollbackAvailable && <Badge variant="neutral">{t.rollbackAvailable}</Badge>}
             {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </span>
@@ -269,6 +302,11 @@ export default function ArticleInternalLinkApplyPanel({
                   )}
                 </div>
 
+                {/* Session-only rollback explanation (shown once rollback is available). */}
+                {rollbackAvailable && (
+                  <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">{t.rollbackSessionOnly}</p>
+                )}
+
                 {/* Content-edited-since-preview invalidation */}
                 {contentChanged && (
                   <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.contentChangedRepreview}</p>
@@ -303,14 +341,16 @@ export default function ArticleInternalLinkApplyPanel({
                     </p>
                     {staleWarn && <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{staleWarn}{previewResult.planStale && previewResult.planStaleReasons.length ? ` (${previewResult.planStaleReasons.join(', ')})` : ''}</p>}
                     <div className="space-y-2">
-                      {previewResult.items.map((it) => (
+                      {previewResult.items.map((it) => {
+                        const alreadyLinked = (it.reason || '').startsWith('target_already_linked')
+                        return (
                         <div key={it.linkId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{it.anchorText || '—'}</span>
-                            <Badge variant={it.status === 'would_insert' ? 'success' : 'neutral'}>
+                            <span className="text-sm font-medium text-slate-800 dark:text-slate-100 break-words">{it.anchorText || '—'}</span>
+                            <Badge variant={it.status === 'would_insert' || alreadyLinked ? 'success' : 'neutral'}>
                               {it.status === 'would_insert' ? t.statusWouldInsert : t.statusSkipped}
                             </Badge>
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400">{reasonLabel(it.reason)}</span>
+                            <span className={`text-[11px] ${alreadyLinked ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>{reasonLabel(it.reason)}</span>
                           </div>
                           <a href={it.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="mt-1 block text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{it.targetUrl}</a>
                           {it.sentencePreview && (
@@ -330,7 +370,8 @@ export default function ArticleInternalLinkApplyPanel({
                             </details>
                           )}
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 )}
