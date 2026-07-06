@@ -123,58 +123,54 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
   const c = status?.counts ?? {}
 
   return (
-    <Card className="hover:translate-y-0 mb-4">
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+    <Card className="hover:translate-y-0 mb-4 p-4">
+      {/* Header — title + status badge + manual refresh grouped together */}
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
         <Badge variant={tone}>{headline}</Badge>
+        <Button size="sm" variant="outline" onClick={onRefresh} loading={refreshing} disabled={refreshing}>
+          {refreshing ? t.refreshing : t.refresh}
+        </Button>
       </div>
 
       {loading ? (
-        <div className="py-3 text-sm text-slate-500 dark:text-slate-400">
+        <div className="pt-2">
           <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <>
-          {/* Warnings */}
-          {!refreshing && exists && status?.stale && <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{t.stale}</p>}
-          {!refreshing && exists && status?.versionStale && <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{t.versionStale}</p>}
+          {/* Warnings (compact, single line) */}
+          {!refreshing && exists && (status?.stale || status?.versionStale) && (
+            <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+              {status?.stale ? t.stale : ''}{status?.stale && status?.versionStale ? ' · ' : ''}{status?.versionStale ? t.versionStale : ''}
+            </div>
+          )}
           {!refreshing && exists && scanStatus === 'failed' && status?.errorMessage && (
-            <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t.errorPrefix}: {status.errorMessage}</p>
+            <div className="mt-1 text-[11px] text-red-600 dark:text-red-400">{t.errorPrefix}: {status.errorMessage}</div>
           )}
 
-          {/* Counts (guarded for empty) */}
-          {exists && (
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+          {/* Counts + scan meta — one compact wrapping line (no big empty gaps) */}
+          {exists ? (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
               <span><b className="text-slate-700 dark:text-slate-200">{c.uniqueTargets ?? c.targetsStored ?? 0}</b> {t.cUnique}</span>
               <span><b className="text-slate-700 dark:text-slate-200">{c.targetsEligible ?? 0}</b> {t.cEligible}</span>
               <span><b className="text-slate-700 dark:text-slate-200">{c.targetsWithUsableAnchors ?? 0}</b> {t.cAnchors}</span>
               {(c.contentItemsSkipped ?? 0) > 0 && <span><b className="text-slate-700 dark:text-slate-200">{c.contentItemsSkipped}</b> {t.cSkipped}</span>}
-            </div>
-          )}
-
-          {/* Last scanned / expires */}
-          {exists && (
-            <div className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              {(status?.scanCompletedAt || status?.scannerVersion) && <span className="text-slate-300 dark:text-slate-600">·</span>}
               {status?.scanCompletedAt && <span>{t.lastScanned}: {formatDateTime(status.scanCompletedAt)}</span>}
-              {status?.scannerVersion && <span> · {t.scannerVersion} {status.scannerVersion}</span>}
-              {status?.truncated ? <span> · <span className="text-amber-700 dark:text-amber-400">{t.truncated}</span></span> : null}
+              {status?.scannerVersion && <span>{t.scannerVersion} {status.scannerVersion}</span>}
+              {status?.truncated ? <span className="text-amber-700 dark:text-amber-400">{t.truncated}</span> : null}
             </div>
+          ) : (
+            !refreshing && <p className="mt-1 text-[11px] text-slate-400">{t.notScannedHint}</p>
           )}
 
-          {/* Manual refresh — never automatic */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={onRefresh} loading={refreshing} disabled={refreshing}>
-              {refreshing ? t.refreshing : t.refresh}
-            </Button>
-            {!exists && !refreshing && <span className="text-[11px] text-slate-400">{t.notScannedHint}</span>}
-          </div>
-
-          {/* Advanced diagnostics — collapsed, labeled fields (no raw JSON) */}
+          {/* Advanced diagnostics — collapsed; 2-col grid keeps it compact + connected */}
           {exists && (
-            <details className="mt-2">
+            <details className="mt-1.5">
               <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.techDetails}</summary>
-              <div className="mt-1.5 space-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                {status?.siteUrl && <div dir="ltr">{t.siteUrl}: <span className="font-mono">{status.siteUrl}</span></div>}
+              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                {status?.siteUrl && <div dir="ltr" className="sm:col-span-2">{t.siteUrl}: <span className="font-mono">{status.siteUrl}</span></div>}
                 <div>{t.scannerVersion}: {status?.scannerVersion ?? '—'} · {t.currentVersion}: {status?.currentScannerVersion ?? '—'}</div>
                 <div>{t.ttlDays}: {status?.ttlDays ?? '—'}</div>
                 {status?.scanStartedAt && <div>{t.startedAt}: {formatDateTime(status.scanStartedAt)}</div>}

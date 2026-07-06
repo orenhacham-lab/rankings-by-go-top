@@ -210,7 +210,7 @@ export const dashboardEn = {
       errorPrefix: 'Error',
       cUnique: 'targets',
       cEligible: 'eligible',
-      cAnchors: 'with anchors',
+      cAnchors: 'targets with anchors',
       cSkipped: 'content skipped',
       cStored: 'targets stored',
     },
