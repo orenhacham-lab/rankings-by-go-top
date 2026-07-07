@@ -230,6 +230,9 @@ export const dashboardHe = {
       cAnchors: 'יעדים עם עוגנים',
       cSkipped: 'תוכן שדולג',
       cStored: 'יעדים שנשמרו',
+      // Phase 3F.1.1 — clarify that the index intentionally covers the most useful
+      // link destinations (from posts/pages), not necessarily every WooCommerce product.
+      coverageNote: 'האינדקס כולל את העמודים השימושיים ביותר לקישורים פנימיים, ולא בהכרח את כל מוצרי האתר.',
     },
     // Phase 2F.1 — internal-link suggestions right after topic creation.
     newTopicsPlan: {

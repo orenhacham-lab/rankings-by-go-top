@@ -165,6 +165,11 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
             !refreshing && <p className="mt-1 text-[11px] text-slate-400">{t.notScannedHint}</p>
           )}
 
+          {/* Coverage clarification (Phase 3F.1.1) — the index intentionally covers
+              the most useful link destinations from posts/pages, not the full
+              product catalog, so "partial" on large WooCommerce sites is expected. */}
+          {exists && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.coverageNote}</p>}
+
           {/* Advanced diagnostics — collapsed; 2-col grid keeps it compact + connected */}
           {exists && (
             <details className="mt-1.5">
