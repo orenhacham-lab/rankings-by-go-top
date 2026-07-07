@@ -28,7 +28,7 @@ import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { TopicForPlanning } from '@/lib/content/internal-link-planner'
 
 /** Bump when the cache-planner scoring/guards change (stamped on saved plans). */
-export const CACHE_PLANNER_VERSION = '2b.2'
+export const CACHE_PLANNER_VERSION = '2b.3'
 
 // --- Tunable thresholds (explicit for review) --------------------------------
 export const CACHE_PLANNER_RELEVANCE_MIN = 0.3
@@ -56,7 +56,7 @@ export const PRIORITY_BONUS: Record<string, number> = {
 
 export type CacheAnchorSource = 'usable_anchor' | 'target_keyword'
 
-export type RelevanceMethod = 'jaccard' | 'containment'
+export type RelevanceMethod = 'jaccard' | 'containment' | 'entity_single_token'
 
 export interface CachePlannedLink {
   targetUrl: string
@@ -75,6 +75,9 @@ export interface CachePlannedLink {
   // Backend diagnostics (additive; not persisted, not required by any UI).
   matchedTokens: string[]
   missingTokens: string[]
+  entityMatchedTokens: string[]
+  normalizedTopicTokens: string[]
+  normalizedCandidateTokens: string[]
   relevanceMethod: RelevanceMethod
 }
 
@@ -210,6 +213,32 @@ function chooseAnchor(t: ScannedTarget): { text: string; source: CacheAnchorSour
   return null
 }
 
+// --- Entity single-token relevance (2b.3) ------------------------------------
+// Generic/broad tokens that must NOT carry a candidate on their own (place-only
+// or trip-boilerplate). Normalized through the SAME pipeline as scoring tokens.
+const GENERIC_ENTITY_TOKENS = normTokens(
+  'יפן יפנ טיול טיולים מדריך המלצה תיירות נסיעה נסיעות טיסה טיסות מחיר מחירים זול זולות חופשה מסלול מסלולים יום ימים עונה עונות',
+)
+/** A single shared token strong enough to carry relevance: a specific (≥4-char,
+ * non-generic) entity like a city/landmark name — never a broad place/topic word. */
+function isStrongEntityToken(tk: string): boolean {
+  return tk.length >= 4 && !GENERIC_ENTITY_TOKENS.has(tk)
+}
+/** A single strong entity match still needs to clear the relevance floor. */
+const ENTITY_MATCH_RELEVANCE = 0.45
+
+/** Normalized tokens from a URL's last path segment (slug), for entity matching. */
+function urlSlugTokens(url: string): Set<string> {
+  try {
+    const path = (url || '').replace(/[?#].*$/, '').replace(/\/+$/, '')
+    let last = path.split('/').pop() || ''
+    try { last = decodeURIComponent(last) } catch { /* keep raw on malformed % */ }
+    return normTokens(last.replace(/[-_]+/g, ' '))
+  } catch {
+    return new Set()
+  }
+}
+
 /**
  * Plan internal links for ONE topic against the project's CACHED targets. Pure.
  */
@@ -254,9 +283,23 @@ export function planFromCachedTargets(
     for (const x of candTokens) if (!topicTokens.has(x)) missingTokens.push(x)
     const jac = jaccard(topicTokens, candTokens)
     const cont = containment(topicTokens, candTokens)
+
+    // Strong-entity single-token match: a specific city/landmark/entity token
+    // shared between topic and candidate (title/keyword/anchor OR URL slug) may
+    // carry relevance even without a 2nd shared token — but a generic place word
+    // (e.g. "יפן") never does (excluded by GENERIC_ENTITY_TOKENS + ≥4-char rule).
+    const candEntityTokens = new Set([...candTokens, ...urlSlugTokens(url)])
+    const entityMatchedTokens: string[] = []
+    for (const x of topicTokens) if (isStrongEntityToken(x) && candEntityTokens.has(x)) entityMatchedTokens.push(x)
+
     const useContainment = matchedTokens.length >= 2 && cont > jac
-    const relevance = round2(useContainment ? cont : jac)
-    const relevanceMethod: RelevanceMethod = useContainment ? 'containment' : 'jaccard'
+    let relevance = round2(useContainment ? cont : jac)
+    let relevanceMethod: RelevanceMethod = useContainment ? 'containment' : 'jaccard'
+    // Rescue a strong single-entity match that the ≥2-token rule would reject.
+    if (relevance < CACHE_PLANNER_RELEVANCE_MIN && matchedTokens.length < 2 && entityMatchedTokens.length >= 1) {
+      relevance = round2(Math.max(relevance, cont, ENTITY_MATCH_RELEVANCE))
+      relevanceMethod = 'entity_single_token'
+    }
     if (relevance < CACHE_PLANNER_RELEVANCE_MIN) rejectedReasons.push(`low_relevance(${relevance} < ${CACHE_PLANNER_RELEVANCE_MIN})`)
 
     // 4) Near-self guard (normalized, so morphological near-duplicates are still caught).
@@ -296,6 +339,9 @@ export function planFromCachedTargets(
       rejectedReasons,
       matchedTokens,
       missingTokens,
+      entityMatchedTokens,
+      normalizedTopicTokens: Array.from(topicTokens),
+      normalizedCandidateTokens: Array.from(candTokens),
       relevanceMethod,
     })
   }
