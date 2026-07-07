@@ -118,6 +118,7 @@ export default function ArticleInternalLinkApplyPanel({
   const [reanchorLinks, setReanchorLinks] = useState<ReanchorLink[] | null>(null)
   const [reanchorSel, setReanchorSel] = useState<Record<string, string>>({})
   const [reanchorApplying, setReanchorApplying] = useState(false)
+  const [copiedAnchor, setCopiedAnchor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const reasonLabel = useCallback((r?: string | null): string => {
@@ -220,6 +221,16 @@ export default function ArticleInternalLinkApplyPanel({
 
   const chooseReanchor = useCallback((linkId: string, anchorText: string) => {
     setReanchorSel((prev) => ({ ...prev, [linkId]: anchorText }))
+  }, [])
+
+  // Copy an original anchor so the user can paste it into the body manually when
+  // no in-draft alternative exists. Best-effort; silent if clipboard is blocked.
+  const copyAnchor = useCallback(async (linkId: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedAnchor(linkId)
+      window.setTimeout(() => setCopiedAnchor((c) => (c === linkId ? null : c)), 1500)
+    } catch { /* clipboard unavailable — no-op */ }
   }, [])
 
   // Record the chosen alternative anchors (plan anchor_text update only — no
@@ -500,14 +511,26 @@ export default function ArticleInternalLinkApplyPanel({
                           </div>
                         )}
 
-                        {reanchorLinks && (
+                        {reanchorLinks && (() => {
+                          // Only offer the approve/select flow when at least one
+                          // skipped link actually has a selectable in-draft
+                          // alternative; otherwise there is nothing to submit.
+                          const hasAnyAlternatives = reanchorLinks.some((l) => l.suggestions.length > 0)
+                          return (
                           <div className="mt-2 space-y-2">
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.reanchorSelectHint}</p>
+                            {hasAnyAlternatives
+                              ? <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.reanchorSelectHint}</p>
+                              : <p className="text-[11px] text-slate-700 dark:text-slate-300">{t.reanchorNoneAll}</p>}
                             {reanchorLinks.map((link) => (
                               <div key={link.linkId} className="rounded-md border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/30 p-2">
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                  <span className="text-slate-400">{t.reanchorOriginalLabel}:</span>{' '}
-                                  <span className="line-through decoration-slate-300">{link.originalAnchor || '—'}</span>
+                                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                  <span className="text-slate-400">{t.reanchorOriginalLabel}:</span>
+                                  <span className="font-medium text-slate-700 dark:text-slate-200 break-words">{link.originalAnchor || '—'}</span>
+                                  {link.originalAnchor && (
+                                    <button type="button" onClick={() => copyAnchor(link.linkId, link.originalAnchor)} className="inline-flex items-center rounded border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                                      {copiedAnchor === link.linkId ? t.reanchorCopied : t.reanchorCopy}
+                                    </button>
+                                  )}
                                 </div>
                                 <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="mt-0.5 block text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetTitle || link.targetUrl}</a>
                                 {link.suggestions.length === 0 ? (
@@ -537,13 +560,17 @@ export default function ArticleInternalLinkApplyPanel({
                                 )}
                               </div>
                             ))}
-                            <div>
-                              <Button size="sm" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>
-                                {reanchorApplying ? t.reanchorApproving : t.reanchorApprove}
-                              </Button>
-                            </div>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500">{t.reanchorFutureNote}</p>
+                            {hasAnyAlternatives && (
+                              <div>
+                                <Button size="sm" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>
+                                  {reanchorApplying ? t.reanchorApproving : t.reanchorApprove}
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        )}
+                          )
+                        })()}
                       </div>
                     )}
                   </div>

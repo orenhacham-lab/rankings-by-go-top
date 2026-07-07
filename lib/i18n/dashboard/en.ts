@@ -750,6 +750,11 @@ export const dashboardEn = {
         reanchorSuggestLabel: 'Alternative anchors found in the draft',
         reanchorSelectHint: 'Pick one alternative anchor per target, then approve and preview insertion.',
         reanchorNone: 'No suitable alternative anchors were found in the draft. You can manually add one of the anchor texts to the article body and check again.',
+        // Phase 3B.4.1 — clearer no-alternatives-at-all state + manual next step.
+        reanchorNoneAll: 'No suitable alternative anchors were found in the draft. To insert these links, manually add one of the suggested anchor texts to the article body, then run the insertion check again.',
+        reanchorFutureNote: 'For future articles, approve links before generating the article, or enable approve-after-save, so the anchors are included during article generation.',
+        reanchorCopy: 'Copy anchor',
+        reanchorCopied: 'Copied',
         reanchorApprove: 'Approve alternative anchors and preview insertion',
         reanchorApproving: 'Updating…',
         reanchorApproveError: 'Updating the alternative anchors failed',

@@ -751,6 +751,11 @@ export const dashboardHe = {
         reanchorSuggestLabel: 'עוגנים חלופיים שנמצאו בטיוטה',
         reanchorSelectHint: 'בחרו עוגן חלופי אחד לכל יעד, ואז אשרו ובדקו הטמעה.',
         reanchorNone: 'לא נמצאו עוגנים חלופיים מתאימים בטיוטה. אפשר להוסיף ידנית את אחד מטקסטי העוגן לגוף המאמר ואז לבדוק שוב.',
+        // Phase 3B.4.1 — clearer no-alternatives-at-all state + manual next step.
+        reanchorNoneAll: 'לא נמצאו עוגנים חלופיים מתאימים בטיוטה. כדי להטמיע את הקישורים, הוסף ידנית לגוף המאמר אחד מטקסטי העוגן המוצעים ואז לחץ שוב על בדיקת הטמעה.',
+        reanchorFutureNote: 'בעתיד, כדי שהקישורים יוטמעו אוטומטית בזמן יצירת המאמר, אשר את הקישורים לפני יצירת המאמר או סמן אישור אוטומטי לאחר שמירת התכנון.',
+        reanchorCopy: 'העתק עוגן',
+        reanchorCopied: 'הועתק',
         reanchorApprove: 'אשר עוגנים חלופיים ובדוק הטמעה',
         reanchorApproving: 'מעדכן…',
         reanchorApproveError: 'עדכון העוגנים החלופיים נכשל',
