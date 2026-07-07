@@ -69,6 +69,9 @@ export default function AutomationSchedule({
   const [saving, setSaving] = useState(false)
   const [busyItem, setBusyItem] = useState<string | null>(null)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  // Dedicated state for the manual "check & run due publish" tool.
+  const [runningNow, setRunningNow] = useState(false)
+  const [runMsg, setRunMsg] = useState<{ text: string; tone: 'ok' | 'info' | 'error' } | null>(null)
 
   // Settings form.
   const [preset, setPreset] = useState<Preset>('weekly1')
@@ -145,20 +148,34 @@ export default function AutomationSchedule({
   }
 
   async function runNow() {
-    setSaving(true); setMessage(null)
+    if (runningNow) return
+    setRunningNow(true); setRunMsg({ text: t.runNowLoading, tone: 'info' })
     try {
       const res = await fetch('/api/content/automation/run', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
       })
       const d = await res.json().catch(() => ({}))
-      if (res.ok) {
-        setMessage({ text: t.ranSummary.replace('{published}', String(d.published ?? 0)).replace('{generated}', String(d.generated ?? 0)).replace('{failures}', String(d.failures ?? 0)), ok: true })
-      } else {
-        setMessage({ text: d?.error === 'automation_migration_required' ? t.migrationRequired : 'error', ok: false })
+      if (!res.ok) {
+        setRunMsg({ text: d?.error === 'automation_migration_required' ? t.migrationRequired : t.runResFailure, tone: 'error' })
+        return
       }
+      // Build a clear outcome message from the existing run-response fields.
+      const gen = d.generated ?? 0
+      const pub = d.published ?? 0
+      const fail = d.failures ?? 0
+      const diags = Array.isArray(d.diagnostics) ? d.diagnostics : []
+      const notDue = diags.length > 0 && diags.every((x: { due?: boolean }) => x?.due === false)
+      if (pub > 0 && gen > 0) setRunMsg({ text: t.runResGeneratedPublished, tone: 'ok' })
+      else if (pub > 0) setRunMsg({ text: t.runResPublished, tone: 'ok' })
+      else if (gen > 0) setRunMsg({ text: t.runResGeneratedOnly, tone: 'ok' })
+      else if (fail > 0) setRunMsg({ text: t.runResFailure, tone: 'error' })
+      else if (notDue) setRunMsg({ text: t.runResNotDue, tone: 'info' })
+      else setRunMsg({ text: t.runResNothing, tone: 'info' })
       await load(); onChanged?.()
+    } catch {
+      setRunMsg({ text: t.runResFailure, tone: 'error' })
     } finally {
-      setSaving(false)
+      setRunningNow(false)
     }
   }
 
@@ -496,9 +513,19 @@ export default function AutomationSchedule({
           by the manual run action. */}
       <details className="mt-4">
         <summary className="text-xs text-slate-500 dark:text-slate-400 cursor-pointer select-none">{t.advancedTitle}</summary>
-        <div className="mt-2 rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-2">
-          <Button size="sm" variant="outline" onClick={runNow} disabled={saving}>{t.runNowLabel}</Button>
-          <p className="text-[11px] text-slate-400">{t.runNowHelper}</p>
+        {/* Distinct soft block: this acts on the EXISTING publishing queue only —
+            visually separated from the "add approved topics to queue" area above. */}
+        <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/40 dark:bg-indigo-900/10 p-3 space-y-2">
+          <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.runNowSectionTitle}</p>
+          <Button size="sm" variant="outline" onClick={runNow} loading={runningNow} disabled={runningNow}>
+            {runningNow ? t.runNowRunning : t.runNowLabel}
+          </Button>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.runNowHelper}</p>
+          {runMsg && (
+            <p className={`text-[11px] ${runMsg.tone === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : runMsg.tone === 'error' ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
+              {runMsg.text}
+            </p>
+          )}
         </div>
       </details>
     </Card>
