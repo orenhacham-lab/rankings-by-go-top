@@ -157,6 +157,7 @@ export default function NewTopicsLinkPlanPanel({
           <button type="button" onClick={onClose} aria-label={t.close} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={16} /></button>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t.intro}</p>
+        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.sessionOnlyNote} {t.alsoFromRow}</p>
 
         {warnNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{warnNote}</p>}
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}

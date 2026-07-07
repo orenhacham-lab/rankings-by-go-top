@@ -217,7 +217,9 @@ export const dashboardEn = {
     // Phase 2F.1 — internal-link suggestions right after topic creation.
     newTopicsPlan: {
       title: 'Internal-link suggestions for the new topics',
-      intro: 'Found internal-link suggestions for the new topics. Review, select and save — nothing is inserted into articles at this step.',
+      intro: 'These are suggestions / a plan only. Review, select and save — nothing is inserted into articles at this step. During article generation the approved anchor may appear as plain text; actual link insertion is done manually in the article editor.',
+      sessionOnlyNote: 'This panel appears only right after creating/approving new topics in the current session.',
+      alsoFromRow: 'You can also open link planning from any topic row later.',
       loading: 'Computing suggestions…',
       loadError: 'Failed to load suggestions',
       cacheMissing: 'Site index missing — refresh the index and try again.',
@@ -670,7 +672,7 @@ export const dashboardEn = {
       // Phase 2E.3 — automation/draft apply flow (separate from the QA card above).
       linkApply: {
         title: 'Apply internal links to draft',
-        subtitle: 'Preview, manual apply and rollback — based on the approved link plan for this topic. Nothing is written without a click.',
+        subtitle: 'Preview, manual apply and rollback — based on the approved link plan for this topic. Link insertion happens here only, manually; nothing is written without a click. The article stays a draft until you save / mark ready / publish.',
         expand: 'Open',
         collapse: 'Close',
         draftOnly: 'Applying internal links is available for drafts only.',
