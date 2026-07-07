@@ -61,12 +61,13 @@ export async function GET(request: Request) {
 
   const { data: itemRows } = await auth.admin
     .from('article_pool_items')
-    .select('id, topic_id, article_id, status, position, attempts, last_error, scheduled_at, published_at')
+    .select('id, topic_id, article_id, status, position, attempts, last_error, scheduled_at, published_at, locked_at, updated_at')
     .eq('pool_id', pool.id)
     .order('position', { ascending: true })
   const items = (itemRows ?? []) as {
     id: string; topic_id: string | null; article_id: string | null; status: string
     position: number; attempts: number; last_error: string | null; scheduled_at: string | null; published_at: string | null
+    locked_at: string | null; updated_at: string | null
   }[]
 
   // Join topic titles.
@@ -116,7 +117,33 @@ export async function GET(request: Request) {
     }
   })
 
-  return Response.json({ pool: { ...pool, nextPublishAt: base }, items: dtoItems })
+  // ── Pool health summary (Phase 3C) — for a visible "queue stuck / publish
+  // failed" alert. Computed from the items already loaded; no schema change. ──
+  const nowMs = Date.now()
+  const STUCK_MS = 45 * 60 * 1000
+  const failedItems = items.filter((i) => i.status === 'failed' || i.status === 'quality_check_failed')
+  const stuckItems = items.filter((i) => (i.status === 'generating' || i.status === 'publishing') && i.locked_at != null && Date.parse(i.locked_at) < nowMs - STUCK_MS)
+  const readyCount = items.filter((i) => i.status === 'generated').length
+  const queuedCount = items.filter((i) => i.status === 'queued').length
+  const overdue = pool.isActive && !!base && Date.parse(base) < nowMs
+  // Most recent error among failed/stuck items (by updated_at).
+  const errorCandidates = [...failedItems, ...stuckItems].filter((i) => i.last_error)
+    .sort((a, b) => Date.parse(b.updated_at ?? '') - Date.parse(a.updated_at ?? ''))
+  const latestError = errorCandidates[0]?.last_error ?? null
+  const health = {
+    overdue,
+    dueAt: base,
+    failedCount: failedItems.length,
+    stuckCount: stuckItems.length,
+    readyCount,
+    queuedCount,
+    latestError,
+    // Needs attention when something failed/stuck, or the queue is overdue with
+    // nothing able to publish (empty of ready + queued items).
+    needsAttention: failedItems.length > 0 || stuckItems.length > 0 || (overdue && readyCount === 0 && queuedCount === 0),
+  }
+
+  return Response.json({ pool: { ...pool, nextPublishAt: base }, items: dtoItems, health })
 }
 
 export async function POST(request: Request) {

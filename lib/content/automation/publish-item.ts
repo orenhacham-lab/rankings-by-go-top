@@ -11,6 +11,7 @@ import { loadWordPressCredentials } from '@/lib/content/api-auth'
 import { updatePostSeoMeta } from '@/lib/wordpress/client'
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
+import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -20,7 +21,7 @@ export interface PublishItemResult {
   articleId: string | null
   wpPostUrl?: string | null
   reason?: string
-  noop?: 'already_published' | 'reconciled' | 'no_article' | 'item_not_found' | 'already_claimed'
+  noop?: 'already_published' | 'reconciled' | 'no_article' | 'item_not_found' | 'already_claimed' | 'max_attempts'
 }
 
 const nowIso = () => new Date().toISOString()
@@ -52,10 +53,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
   try {
     const { data: itemData } = await admin
       .from('article_pool_items')
-      .select('id, project_id, topic_id, article_id, status')
+      .select('id, project_id, topic_id, article_id, status, attempts')
       .eq('id', itemId)
       .maybeSingle()
-    const item = itemData as { id: string; project_id: string; topic_id: string | null; article_id: string | null; status: string } | null
+    const item = itemData as { id: string; project_id: string; topic_id: string | null; article_id: string | null; status: string; attempts: number } | null
     if (!item) return { itemId, status: 'failed', articleId: null, noop: 'item_not_found' }
     if (!item.article_id) return { itemId, status: item.status, articleId: null, noop: 'no_article' }
 
@@ -102,12 +103,20 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       return { itemId, status: 'quality_check_failed', articleId: article.id, reason: 'no_wordpress_connection' }
     }
 
+    // Retry cap: a repeatedly-failing publish stops after AUTOMATION_MAX_ATTEMPTS
+    // and stays 'failed' for a human (never an infinite loop). First publish of a
+    // freshly 'generated' item is unaffected (its attempts came from generation).
+    if (item.status === 'failed' && (item.attempts ?? 0) >= AUTOMATION_MAX_ATTEMPTS) {
+      return { itemId, status: item.status, articleId: article.id, noop: 'max_attempts' }
+    }
+
     // (B) Atomic claim: only one worker flips the item to 'publishing'. Allowed
     // from 'generated' (normal) or 'failed' (retry). Recovery above already
-    // handled the wp_post_id case, so this is a fresh publish.
+    // handled the wp_post_id case, so this is a fresh publish. Increment attempts
+    // so publish retries are bounded by the same cap.
     const { data: claimed } = await admin
       .from('article_pool_items')
-      .update({ status: 'publishing', locked_at: nowIso(), updated_at: nowIso() })
+      .update({ status: 'publishing', locked_at: nowIso(), attempts: (item.attempts ?? 0) + 1, updated_at: nowIso() })
       .eq('id', itemId)
       .in('status', ['generated', 'failed'])
       .select('id')

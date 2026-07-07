@@ -17,12 +17,15 @@ type Admin = ReturnType<typeof createAdminClient>
 // generateValidatedArticle reasons that mean "content quality" vs. "model/transport".
 const QUALITY_REASONS = new Set(['article_quality_gate_failed', 'required_anchor_missing'])
 
+/** Max total processing attempts per item before it stays 'failed' for a human. */
+export const AUTOMATION_MAX_ATTEMPTS = Math.max(1, Number(process.env.AUTOMATION_MAX_ATTEMPTS) || 3)
+
 export interface GenerateItemResult {
   itemId: string
   status: string
   articleId: string | null
   reason?: string
-  noop?: 'already_claimed' | 'reconciled' | 'already_generated' | 'item_not_found'
+  noop?: 'already_claimed' | 'reconciled' | 'already_generated' | 'item_not_found' | 'max_attempts'
 }
 
 interface ItemRow {
@@ -82,6 +85,13 @@ export async function generatePoolItem(
       }
       // Article was deleted — clear the stale link and continue.
       await admin.from('article_pool_items').update({ article_id: null, updated_at: nowIso() }).eq('id', itemId)
+    }
+
+    // Retry cap: a failed/quality_check_failed item stops retrying after
+    // AUTOMATION_MAX_ATTEMPTS and stays 'failed' (visible for a human) — never
+    // an infinite loop. Fresh 'queued' items are unaffected.
+    if (opts.allowRetry !== false && ['failed', 'quality_check_failed'].includes(item.status) && (item.attempts ?? 0) >= AUTOMATION_MAX_ATTEMPTS) {
+      return { itemId, status: item.status, articleId: item.article_id, noop: 'max_attempts' }
     }
 
     // (C) Atomic claim: only one worker may flip a claimable item to 'generating'.

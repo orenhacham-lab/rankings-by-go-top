@@ -11,7 +11,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { generatePoolItem } from '@/lib/content/automation/generate-item'
+import { generatePoolItem, AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
 import { advanceNextPublishAt, nextPublishAtWeekdays, resolveIntervalDays, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
 
@@ -104,17 +104,9 @@ async function countItems(admin: Admin, poolId: string, status: string): Promise
   return count ?? 0
 }
 
-/** Earliest item of a status in a pool (+ its topic title), or null. */
-async function earliestItem(admin: Admin, poolId: string, status: string): Promise<{ id: string; topicId: string | null; topicTitle: string | null } | null> {
-  const { data } = await admin
-    .from('article_pool_items')
-    .select('id, topic_id')
-    .eq('pool_id', poolId)
-    .eq('status', status)
-    .order('position', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  const row = data as { id: string; topic_id: string | null } | null
+interface PickedItem { id: string; topicId: string | null; topicTitle: string | null }
+
+async function withTitle(admin: Admin, row: { id: string; topic_id: string | null } | null): Promise<PickedItem | null> {
   if (!row) return null
   let topicTitle: string | null = null
   if (row.topic_id) {
@@ -122,6 +114,36 @@ async function earliestItem(admin: Admin, poolId: string, status: string): Promi
     topicTitle = (t as { topic?: string } | null)?.topic ?? null
   }
   return { id: row.id, topicId: row.topic_id, topicTitle }
+}
+
+/** Earliest item eligible for GENERATION: a fresh 'queued', or a failed
+ * generation (no article yet) still under the retry cap. */
+async function pickForGenerate(admin: Admin, poolId: string): Promise<PickedItem | null> {
+  const { data } = await admin
+    .from('article_pool_items')
+    .select('id, topic_id, status, article_id, attempts')
+    .eq('pool_id', poolId)
+    .in('status', ['queued', 'failed', 'quality_check_failed'])
+    .order('position', { ascending: true })
+    .limit(20)
+  const rows = (data ?? []) as { id: string; topic_id: string | null; status: string; article_id: string | null; attempts: number }[]
+  const row = rows.find((r) => r.status === 'queued' || (!r.article_id && (r.attempts ?? 0) < AUTOMATION_MAX_ATTEMPTS))
+  return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id } : null)
+}
+
+/** Earliest item eligible for PUBLISH: a 'generated' item, or a failed publish
+ * (has an article) still under the retry cap. */
+async function pickForPublish(admin: Admin, poolId: string): Promise<PickedItem | null> {
+  const { data } = await admin
+    .from('article_pool_items')
+    .select('id, topic_id, status, article_id, attempts')
+    .eq('pool_id', poolId)
+    .in('status', ['generated', 'failed', 'quality_check_failed'])
+    .order('position', { ascending: true })
+    .limit(20)
+  const rows = (data ?? []) as { id: string; topic_id: string | null; status: string; article_id: string | null; attempts: number }[]
+  const row = rows.find((r) => r.status === 'generated' || (!!r.article_id && (r.attempts ?? 0) < AUTOMATION_MAX_ATTEMPTS))
+  return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id } : null)
 }
 
 export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean } = {}): Promise<AutomationSummary> {
@@ -167,32 +189,33 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
 
     // ── DRY RUN: report what WOULD happen; mutate nothing. ──
     if (dryRun) {
-      if (due && diag.generatedCount > 0) {
-        const g = await earliestItem(admin, pool.id, 'generated')
-        diag.selectedTopicId = g?.topicId ?? null; diag.selectedTopicTitle = g?.topicTitle ?? null
-        diag.note = 'would_publish_generated_item'
-      } else if (diag.queuedCount > 0) {
-        const q = await earliestItem(admin, pool.id, 'queued')
-        diag.selectedTopicId = q?.topicId ?? null; diag.selectedTopicTitle = q?.topicTitle ?? null
+      const pub = await pickForPublish(admin, pool.id)
+      const gen = await pickForGenerate(admin, pool.id)
+      if (due && pub) {
+        diag.selectedTopicId = pub.topicId; diag.selectedTopicTitle = pub.topicTitle
+        diag.note = 'would_publish_ready_or_retry_item'
+      } else if (gen) {
+        diag.selectedTopicId = gen.topicId; diag.selectedTopicTitle = gen.topicTitle
         diag.note = due ? 'would_generate_then_publish' : 'would_generate_ahead'
       } else {
-        diag.note = due ? 'due_but_no_queued_or_generated_items' : 'not_due_no_work'
+        diag.note = due ? 'due_but_no_eligible_items' : 'not_due_no_work'
       }
       summary.diagnostics.push(diag)
       continue
     }
 
     // (D) Generate-ahead FIRST so a DUE pool with only queued items can generate
-    // AND publish in the SAME run (previously it took two cron runs → a missed day).
+    // AND publish in the SAME run. Includes retrying a failed generation (no
+    // article yet) under the attempt cap.
     if (genBudget > 0) {
       const need = due ? Math.max(DESIRED_READY_AHEAD, 1) : DESIRED_READY_AHEAD
-      if (diag.generatedCount < need && diag.queuedCount > 0) {
-        const q = await earliestItem(admin, pool.id, 'queued')
+      if (diag.generatedCount < need) {
+        const q = await pickForGenerate(admin, pool.id)
         if (q) {
           diag.selectedTopicId = q.topicId; diag.selectedTopicTitle = q.topicTitle; diag.generateAttempted = true
-          const res = await generatePoolItem(admin, q.id, { allowRetry: false })
-          diag.generateResult = res.status + (res.reason ? ` (${res.reason})` : '')
-          if (res.noop !== 'already_claimed') genBudget--
+          const res = await generatePoolItem(admin, q.id, { allowRetry: true })
+          diag.generateResult = res.status + (res.reason ? ` (${res.reason})` : '') + (res.noop ? ` [${res.noop}]` : '')
+          if (res.noop !== 'already_claimed' && res.noop !== 'max_attempts') genBudget--
           if (res.status === 'generated') { summary.generated++; diag.generatedCount++ }
           else if (res.status === 'quality_check_failed' || res.status === 'failed') { summary.failures++; diag.error = res.reason ?? res.status }
           summary.details.push(`pool ${pool.id}: generate ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
@@ -200,9 +223,9 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
       }
     }
 
-    // (E) Publish the earliest generated item if the pool is due — ≤1 per pool per run.
+    // (E) Publish the earliest READY (or retryable failed-publish) item if due — ≤1 per pool per run.
     if (due) {
-      const gen = await earliestItem(admin, pool.id, 'generated')
+      const gen = await pickForPublish(admin, pool.id)
       if (gen) {
         diag.publishAttempted = true
         const res = await publishPoolItem(admin, gen.id)

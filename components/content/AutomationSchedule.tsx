@@ -62,6 +62,7 @@ export default function AutomationSchedule({
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [items, setItems] = useState<QueueItem[]>([])
+  const [health, setHealth] = useState<{ needsAttention: boolean; overdue: boolean; failedCount: number; stuckCount: number; latestError: string | null } | null>(null)
   const [approved, setApproved] = useState<ApprovedTopic[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -91,6 +92,7 @@ export default function AutomationSchedule({
       const p: Pool | null = pd.pool ?? null
       setPool(p)
       setItems(Array.isArray(pd.items) ? pd.items : [])
+      setHealth(pd.health ?? null)
       if (p) {
         const days = Array.isArray(p.publishDays) ? p.publishDays : []
         // Preset from weekday count first, else fall back to interval-days.
@@ -361,6 +363,24 @@ export default function AutomationSchedule({
             {t.nextPublish}: <span className="font-medium">{fmtDay(pool?.nextPublishAt ?? null, true)}</span>
           </div>
         </div>
+
+        {/* Phase 3C — visible alert when the automatic-publishing queue needs
+            attention (a scheduled publish/generation failed, an item is stuck, or
+            the queue is overdue with nothing to publish). */}
+        {health?.needsAttention && (
+          <div className="mt-2 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{t.alertNeedsAttention}</p>
+            <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+              {[
+                health.failedCount > 0 ? t.alertFailed.replace('{n}', String(health.failedCount)) : null,
+                health.stuckCount > 0 ? t.alertStuck.replace('{n}', String(health.stuckCount)) : null,
+                health.overdue ? t.alertOverdue : null,
+              ].filter(Boolean).join(' · ')}
+            </p>
+            {health.latestError && <p className="mt-0.5 text-[11px] text-amber-700/90 dark:text-amber-400/90 break-words" dir="ltr">{health.latestError}</p>}
+            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{t.alertHint}</p>
+          </div>
+        )}
       </div>
 
       {/* Part ב — publishing queue (add approved topics + the queue list below).
