@@ -18,6 +18,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
+import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -87,6 +88,28 @@ export async function generateArticleForTopic(
   }
 
   const businessName = (project as { business_name?: string } | null)?.business_name ?? null
+
+  // Phase 2F.2: fold the topic's APPROVED saved-plan anchors into the phrase-only
+  // internal-link guidance (max 3, stale plans skipped). Guidance ONLY — the model
+  // is asked to include the phrase as plain text; nothing here inserts <a> tags or
+  // writes internal_links_json. If none/stale, generation proceeds unchanged.
+  const approvedGuidance = await loadApprovedPlanAnchors(
+    admin, projectId, topicId,
+    { title: String(t.topic || ''), primaryKeyword: (t.primary_keyword as string) ?? null },
+    3,
+  )
+  const plannedInternalAnchors = Array.from(new Set([
+    ...decodedNotes.flags.internalLinks.map((l) => l.anchorText),
+    ...approvedGuidance.anchors,
+  ].map((s) => (s || '').trim()).filter(Boolean)))
+  console.log('[content-article-generation] internal-link guidance', {
+    topicId,
+    approvedPlanLinksLoaded: approvedGuidance.diagnostics.approvedPlanLinksLoaded,
+    approvedAnchorsPassedToPrompt: approvedGuidance.diagnostics.approvedAnchorsPassedToPrompt,
+    anchorsRequestedInPrompt: plannedInternalAnchors.length,
+    planStale: approvedGuidance.diagnostics.planStale,
+  })
+
   const brief: ArticleBrief = {
     language,
     topic: String(t.topic || ''),
@@ -106,7 +129,7 @@ export async function generateArticleForTopic(
     brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
     includeManualToc: decodedNotes.flags.includeManualToc,
     anchors,
-    plannedInternalAnchors: decodedNotes.flags.internalLinks.map((l) => l.anchorText),
+    plannedInternalAnchors,
     businessName,
     domain: (project as { target_domain?: string } | null)?.target_domain ?? null,
     category,
