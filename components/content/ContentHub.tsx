@@ -741,6 +741,7 @@ export default function ContentHub() {
                     language={language}
                     onCreated={loadTopics}
                     onScheduled={() => setAutomationRefresh((k) => k + 1)}
+                    onTopicsCreated={(created) => { if (created.length) setNewTopics(created) }}
                   />
                   <AutomationSchedule
                     projectId={projectId}
@@ -784,6 +785,23 @@ export default function ContentHub() {
                   </div>
                 )}
 
+                {/* Phase 2F.1 — internal-link suggestions for just-created topics.
+                    Flag-gated; mounts only after topic creation (manual brief OR
+                    approved automatic ideas), independent of the list's empty state. */}
+                {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && projectId && newTopics && newTopics.length > 0 && (
+                  <NewTopicsLinkPlanPanel
+                    key={newTopics.map((tp) => tp.id).join(',')}
+                    projectId={projectId}
+                    language={language}
+                    topics={newTopics}
+                    onClose={() => setNewTopics(null)}
+                    onSaved={(summaries) => setPlanStatus((prev) => {
+                      const next = { ...prev }
+                      for (const s of summaries) next[s.topicId] = s.summary
+                      return next
+                    })}
+                  />
+                )}
                 {selectableTopics.length === 0 ? (
                   <Card className="p-8 text-center">
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.topicsEmptyTitle}</p>
@@ -791,22 +809,6 @@ export default function ContentHub() {
                   </Card>
                 ) : (
                   <>
-                    {/* Phase 2F.1 — internal-link suggestions for just-created topics.
-                        Flag-gated; mounts only after topic creation. */}
-                    {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && projectId && newTopics && newTopics.length > 0 && (
-                      <NewTopicsLinkPlanPanel
-                        key={newTopics.map((tp) => tp.id).join(',')}
-                        projectId={projectId}
-                        language={language}
-                        topics={newTopics}
-                        onClose={() => setNewTopics(null)}
-                        onSaved={(summaries) => setPlanStatus((prev) => {
-                          const next = { ...prev }
-                          for (const s of summaries) next[s.topicId] = s.summary
-                          return next
-                        })}
-                      />
-                    )}
                     <TopicsList
                       topics={selectableTopics}
                       projectId={projectId}

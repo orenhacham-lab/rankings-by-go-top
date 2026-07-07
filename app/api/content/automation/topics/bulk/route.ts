@@ -109,9 +109,12 @@ export async function POST(request: Request) {
     })
   }
 
-  if (rows.length === 0) return Response.json({ created: 0, skipped, ids: [] })
+  if (rows.length === 0) return Response.json({ created: 0, skipped, ids: [], topics: [] })
 
-  const { data, error } = await auth.admin.from('article_topics').insert(rows).select('id')
+  // Return id + topic + primary_keyword of the created rows so the caller can
+  // offer the Phase 2F.1 internal-link planning step without refetching all
+  // topics or inferring which ones are new.
+  const { data, error } = await auth.admin.from('article_topics').insert(rows).select('id, topic, primary_keyword')
   if (error) {
     const code = (error as { code?: string }).code
     if (code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
@@ -123,6 +126,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to create topics' }, { status: 500 })
   }
 
-  const ids = ((data ?? []) as { id: string }[]).map((r) => r.id)
-  return Response.json({ created: ids.length, skipped, ids })
+  const createdRows = (data ?? []) as { id: string; topic: string; primary_keyword: string | null }[]
+  const ids = createdRows.map((r) => r.id)
+  return Response.json({ created: ids.length, skipped, ids, topics: createdRows })
 }

@@ -36,11 +36,15 @@ export default function AutomationIdeas({
   language,
   onCreated,
   onScheduled,
+  onTopicsCreated,
 }: {
   projectId: string
   language: 'he' | 'en'
   onCreated: () => void
   onScheduled?: () => void
+  // Phase 2F.1 — fires with the newly-created topics so the hub can offer the
+  // internal-link planning step for exactly those new topic IDs.
+  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[]) => void
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
@@ -144,6 +148,12 @@ export default function AutomationIdeas({
       setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
       setSelected(new Set())
       setLastCreatedIds(Array.isArray(data.ids) ? data.ids : [])
+      const createdTopics = Array.isArray(data.topics)
+        ? (data.topics as { id?: unknown; topic?: unknown; primary_keyword?: unknown }[])
+            .filter((r): r is { id: string; topic: string; primary_keyword: string | null } => typeof r?.id === 'string')
+            .map((r) => ({ id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }))
+        : []
+      if (createdTopics.length) onTopicsCreated?.(createdTopics)
       onCreated()
     } catch {
       setMessage({ text: 'error', ok: false })
