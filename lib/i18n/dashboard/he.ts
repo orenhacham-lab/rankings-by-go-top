@@ -616,6 +616,7 @@ export const dashboardHe = {
       wpExported: 'המאמר נשלח ל-WordPress כטיוטה.',
       wpPublished: 'המאמר פורסם ב-WordPress.',
       wpImageWarn: 'התמונה הראשית לא הועלתה — המאמר נשלח בלעדיה.',
+      wpKeywordAdded: 'המילה נוספה למילות המפתח של הפרויקט',
       wpNoImageWarn: 'אין תמונה ראשית. אפשר להמשיך בכל זאת.',
       wpAlreadyExported: 'המאמר כבר יוצא ל-WordPress. הקישור הקיים מוצג למטה.',
       wpFailed: 'הפעולה מול WordPress נכשלה. נסו שוב.',

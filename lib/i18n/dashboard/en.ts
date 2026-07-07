@@ -615,6 +615,7 @@ export const dashboardEn = {
       wpExported: 'The article was sent to WordPress as a draft.',
       wpPublished: 'The article was published to WordPress.',
       wpImageWarn: 'The featured image was not uploaded — the article was sent without it.',
+      wpKeywordAdded: 'The keyword was added to the project keywords',
       wpNoImageWarn: 'No featured image. You can continue anyway.',
       wpAlreadyExported: 'This article was already exported to WordPress. The existing link is shown below.',
       wpFailed: 'The WordPress action failed. Please try again.',

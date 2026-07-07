@@ -20,6 +20,7 @@ import { authContentProject, isContentModuleEnabled, loadWordPressCredentials } 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { updatePostSeoMeta, WordPressClientError, type WordPressPostStatus } from '@/lib/wordpress/client'
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
+import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -106,12 +107,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (status === 'publish') { update.status = 'published'; update.published_at = new Date().toISOString() }
   await auth.admin.from('generated_articles').update(update).eq('id', id)
 
-  console.log('[content-wp-export] done', { ...logBase, step: 'post_create', wpPostId: created.wpPostId, imageWarning: created.imageWarning })
+  // Phase 3E — on a successful PUBLISH only (never draft), add the topic's
+  // primary keyword to the project's tracked keywords. Best-effort: never fails
+  // or blocks the publish.
+  let keywordAdded = false
+  let keywordAddedText: string | null = null
+  if (status === 'publish') {
+    const kw = await ensureProjectKeywordFromPublishedArticle(auth.admin, id)
+    keywordAdded = kw.added
+    keywordAddedText = kw.added ? (kw.keyword ?? null) : null
+    if (!kw.ok) console.warn('[content-wp-export] keyword add failed', { ...logBase, reason: kw.reason })
+  }
+
+  console.log('[content-wp-export] done', { ...logBase, step: 'post_create', wpPostId: created.wpPostId, imageWarning: created.imageWarning, keywordAdded })
   return Response.json({
     wp_post_id: created.wpPostId,
     wp_post_url: created.wpPostUrl,
     wp_featured_media_id: featuredMedia ?? null,
     wp_status: status,
     imageWarning: created.imageWarning,
+    keywordAdded,
+    keyword: keywordAddedText,
   })
 }

@@ -280,8 +280,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         setWpPostId(data.wp_post_id)
         setWpPostUrl(data.wp_post_url ?? null)
         setWpStatus(data.wp_status === 'publish' ? 'publish' : 'draft')
-        const base = status === 'publish' ? e.wpPublished : e.wpExported
-        setMessage({ text: data.imageWarning ? `${base} · ${e.wpImageWarn}` : base, ok: true })
+        let base: string = status === 'publish' ? e.wpPublished : e.wpExported
+        if (data.imageWarning) base = `${base} · ${e.wpImageWarn}`
+        // Phase 3E — subtle note when the article's primary keyword was added.
+        if (status === 'publish' && data.keywordAdded) base = `${base} · ${e.wpKeywordAdded}`
+        setMessage({ text: base, ok: true })
         toast.success(base)
         // Publish returns to the hub; draft keeps the user here to review/open.
         if (status === 'publish') setTimeout(() => router.push(backHref), 900)

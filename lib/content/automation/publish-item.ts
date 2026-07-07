@@ -12,6 +12,7 @@ import { updatePostSeoMeta } from '@/lib/wordpress/client'
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
+import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -71,6 +72,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       if (article.status !== 'published') artUpdate.published_at = nowIso()
       await admin.from('generated_articles').update(artUpdate).eq('id', article.id)
       await admin.from('article_pool_items').update({ status: 'published', published_at: nowIso(), last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', itemId)
+      // Phase 3E — first time this item reaches published, ensure its keyword.
+      // Idempotent (deduped), so the already_published path is a cheap no-op too.
+      await ensureProjectKeywordFromPublishedArticle(admin, article.id)
       return { itemId, status: 'published', articleId: article.id, wpPostUrl: article.wp_post_url, noop: item.status === 'published' ? 'already_published' : 'reconciled' }
     }
     if (item.status === 'published') return { itemId, status: 'published', articleId: article.id, noop: 'already_published' }
@@ -167,6 +171,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // Finalize: article + item published.
     await admin.from('generated_articles').update({ status: 'published', published_at: nowIso(), last_error: null, updated_at: nowIso() }).eq('id', article.id)
     await admin.from('article_pool_items').update({ status: 'published', published_at: nowIso(), last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', itemId)
+
+    // Phase 3E — add the topic's primary keyword to the project's tracked
+    // keywords. Best-effort + idempotent; never affects the publish outcome.
+    await ensureProjectKeywordFromPublishedArticle(admin, article.id)
 
     return { itemId, status: 'published', articleId: article.id, wpPostUrl: created.wpPostUrl }
   } catch (e) {
