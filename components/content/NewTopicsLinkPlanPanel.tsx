@@ -79,6 +79,16 @@ export default function NewTopicsLinkPlanPanel({
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'approved' | 'zero' | 'failed'>>({})
 
+  // Bring the panel into view once when it first appears (after topic creation).
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const scrolled = useRef(false)
+  useEffect(() => {
+    if (scrolled.current) return
+    scrolled.current = true
+    const id = window.setTimeout(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+    return () => window.clearTimeout(id)
+  }, [])
+
   // Single dry-run on mount (this component only mounts after topic creation).
   const ran = useRef(false)
   useEffect(() => {
@@ -164,8 +174,11 @@ export default function NewTopicsLinkPlanPanel({
   // Summary counts (session-only, from the dry-run + save results).
   const topicsWithLinks = Object.values(plans).filter((p) => p.selected.length > 0).length
   const linksSuggested = Object.values(plans).reduce((n, p) => n + p.selected.length, 0)
+  const reviewableTotal = Object.values(plans).reduce((n, p) => n + p.reviewable.length, 0)
   const plansSaved = Object.values(saveStatus).filter((s) => s !== 'failed').length
   const linksApproved = Object.entries(saveStatus).filter(([, s]) => s === 'approved').length
+  // Calm empty state: no recommended AND no reviewable across all new topics.
+  const nothingFound = Object.keys(plans).length > 0 && linksSuggested === 0 && reviewableTotal === 0
 
   const statusBadge = (id: string) => {
     const s = saveStatus[id]
@@ -177,8 +190,8 @@ export default function NewTopicsLinkPlanPanel({
   }
 
   return (
-    <Card className="mb-4 hover:translate-y-0 border-indigo-100 dark:border-indigo-500/20">
-      <div dir={isHebrew ? 'rtl' : 'ltr'}>
+    <Card className="mb-4 hover:translate-y-0 border-indigo-200 dark:border-indigo-500/30 ring-1 ring-indigo-100 dark:ring-indigo-500/20">
+      <div ref={rootRef} dir={isHebrew ? 'rtl' : 'ltr'} className="scroll-mt-4">
         <div className="flex items-start justify-between gap-3">
           <span className="inline-flex items-center gap-2">
             <Link2 size={16} className="text-indigo-600 dark:text-indigo-400" />
@@ -200,9 +213,14 @@ export default function NewTopicsLinkPlanPanel({
           <>
             {/* Summary */}
             <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
-              {t.sumTopicsChecked}: {topicIdsToSave.length} · {t.sumTopicsWithLinks}: {topicsWithLinks} · {t.sumLinksSuggested}: {linksSuggested}
+              {t.sumTopicsChecked}: {topicIdsToSave.length} · {t.sumTopicsWithLinks}: {topicsWithLinks} · {t.sumLinksSuggested}: {linksSuggested} · {t.sumReviewable}: {reviewableTotal}
               {plansSaved > 0 && <> · {t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</>}
             </p>
+
+            {/* Calm empty state — not an error. */}
+            {nothingFound && (
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">{t.noneFound}</p>
+            )}
 
             <div className="mt-3 space-y-2">
               {topics.map((tp) => {
