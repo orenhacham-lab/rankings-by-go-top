@@ -57,7 +57,8 @@ interface SavedLink {
   status: string
 }
 interface SavedBatch { id: string; status: string; linkCount: number; cacheState?: string | null }
-interface DryItem { targetUrl: string; targetTitle: string; targetRole: string; targetPriority: string; eligibility: string; anchorText: string | null; anchorSource: string | null; relevance: number; priorityBonus: number; confidence: number; reason: string; rejectedReasons: string[] }
+interface DryItem { targetUrl: string; targetTitle: string; targetRole: string; targetPriority: string; eligibility: string; anchorText: string | null; anchorSource: string | null; relevance: number; priorityBonus: number; confidence: number; reason: string; rejectedReasons: string[]; reviewability?: string; canManualApprove?: boolean }
+const dmkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targetUrl}||${(l.anchorText ?? '').toLowerCase()}`
 
 export interface DrawerTopic { id: string; topic: string; primary_keyword: string | null }
 
@@ -76,6 +77,8 @@ export default function TopicPlanDrawer({
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<{ exists: boolean; batch: SavedBatch | null; links: SavedLink[]; stale: boolean; staleReasons: string[] } | null>(null)
   const [dry, setDry] = useState<{ selected: DryItem[]; rejected: DryItem[]; summary: string; cacheState: string; warnings: string[] } | null>(null)
+  // Manually-selected reviewable candidates for the current dry-run (mkey set).
+  const [manualSel, setManualSel] = useState<Set<string>>(new Set())
   const [running, setRunning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [busyLink, setBusyLink] = useState<string | null>(null)
@@ -143,6 +146,7 @@ export default function TopicPlanDrawer({
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setDry({ selected: [], rejected: [], summary: '', cacheState: data.cacheState || 'missing', warnings: data.warnings || [data.warning].filter(Boolean) }); return }
       const plan = Array.isArray(data.topics) ? data.topics[0] : null
+      setManualSel(new Set())
       setDry({
         selected: plan?.selected ?? [],
         rejected: plan?.rejected ?? [],
@@ -158,18 +162,22 @@ export default function TopicPlanDrawer({
   const savePlan = useCallback(async () => {
     if (!topic || saving) return
     setSaving(true); setError(null)
+    // Include server-revalidated manual reviewable overrides picked in this dry-run.
+    const manualCandidates = (dry?.rejected ?? [])
+      .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && r.anchorText)
+      .map((r) => ({ targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
     try {
       const res = await fetch('/api/content/automation/internal-links/plan/save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicId: topic.id }),
+        body: JSON.stringify({ projectId, topicId: topic.id, manualCandidates }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError) }
-      setDry(null)
+      setDry(null); setManualSel(new Set())
       await loadSaved()
     } finally {
       setSaving(false)
     }
-  }, [projectId, topic, saving, loadSaved, t.saveError])
+  }, [projectId, topic, saving, dry, manualSel, loadSaved, t.saveError])
 
   const setLinkStatus = useCallback(async (linkId: string, status: 'approved' | 'rejected') => {
     if (busyLink) return
@@ -264,23 +272,56 @@ export default function TopicPlanDrawer({
             </div>
 
             {/* Dry-run result (preview before save) */}
-            {dry && (
+            {dry && (() => {
+              const reviewable = dry.rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
+              const blocked = dry.rejected.filter((r) => r.reviewability !== 'reviewable')
+              return (
               <div className="mt-4">
-                <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.dryRunTitle}</div>
+                <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.recommendedTitle}</div>
                 {dry.selected.length === 0 ? (
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
                 ) : (
                   <div className="space-y-1.5">{dry.selected.map((d) => dryItemRow(d, false))}</div>
                 )}
                 {dry.selected.length > 0 && <p className="mt-1 text-[11px] text-slate-400">{t.saveHint}</p>}
-                {dry.rejected.length > 0 && (
+
+                {/* Reviewable — manual-override candidates */}
+                {reviewable.length > 0 && (
+                  <details className="mt-3" open={dry.selected.length === 0}>
+                    <summary className="cursor-pointer select-none text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</summary>
+                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableNote}</p>
+                    <div className="mt-1.5 space-y-1.5">
+                      {reviewable.map((d, i) => {
+                        const k = dmkey(d)
+                        return (
+                          <label key={`${d.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 p-2 text-[11px] cursor-pointer">
+                            <input type="checkbox" checked={manualSel.has(k)} onChange={() => setManualSel((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })} className="mt-0.5 accent-indigo-600" />
+                            <span className="flex-1 min-w-0">
+                              <span className="flex flex-wrap items-center gap-2">
+                                <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{d.anchorText || '—'}</span>
+                                <Badge variant="neutral">{t.manualBadge}</Badge>
+                                <span className="text-amber-700 dark:text-amber-400">{d.rejectedReasons.map(reasonLabel).join(' · ')}</span>
+                                <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+                              </span>
+                              <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </details>
+                )}
+
+                {/* Blocked — advanced diagnostics, not selectable */}
+                {blocked.length > 0 && (
                   <details className="mt-2">
-                    <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.rejectedTitle} ({dry.rejected.length})</summary>
-                    <div className="mt-1.5 space-y-1.5">{dry.rejected.slice(0, 30).map((d) => dryItemRow(d, true))}</div>
+                    <summary className="cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400">{t.blockedTitle} ({blocked.length})</summary>
+                    <div className="mt-1.5 space-y-1.5 opacity-70">{blocked.slice(0, 30).map((d) => dryItemRow(d, true))}</div>
                   </details>
                 )}
               </div>
-            )}
+              )
+            })()}
 
             {/* Advanced diagnostics */}
             {(saved?.exists || dry) && (

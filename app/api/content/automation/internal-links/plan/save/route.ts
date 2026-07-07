@@ -16,7 +16,7 @@
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
-import { planFromCachedTargets, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
+import { planFromCachedTargets, promoteManualCandidates, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
 import { savePlanBatch, getBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { InternalLinkPlanSubjectType } from '@/lib/supabase/types'
@@ -33,11 +33,19 @@ interface TopicRow {
 export async function POST(request: Request) {
   if (!isInternalLinkPlanningEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  let body: { projectId?: unknown; topicId?: unknown; articlePoolItemId?: unknown; generatedArticleId?: unknown; allowCaution?: unknown; force?: unknown }
+  let body: { projectId?: unknown; topicId?: unknown; articlePoolItemId?: unknown; generatedArticleId?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown }
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const allowCaution = body.allowCaution === true
   const force = body.force === true
+  // Phase 2I — optional manually-selected reviewable candidates (server re-validated).
+  const manualCandidates: { targetUrl: string; anchorText: string }[] = Array.isArray(body.manualCandidates)
+    ? body.manualCandidates
+        .slice(0, 50)
+        .map((raw) => raw as { targetUrl?: unknown; anchorText?: unknown })
+        .filter((m): m is { targetUrl: string; anchorText: string } => typeof m?.targetUrl === 'string' && typeof m.anchorText === 'string')
+        .map((m) => ({ targetUrl: m.targetUrl, anchorText: m.anchorText }))
+    : []
   let topicId = typeof body.topicId === 'string' ? body.topicId : null
   const articlePoolItemId = typeof body.articlePoolItemId === 'string' ? body.articlePoolItemId : null
   const generatedArticleId = typeof body.generatedArticleId === 'string' ? body.generatedArticleId : null
@@ -92,10 +100,12 @@ export async function POST(request: Request) {
   const targets = (report.targets ?? []) as ScannedTarget[]
   const hosts = report.hosts ?? []
 
-  const plan = planFromCachedTargets(
+  const basePlan = planFromCachedTargets(
     { id: topicRow.id, title: topicRow.topic, primaryKeyword: topicRow.primary_keyword, secondaryKeywords: Array.isArray(topicRow.secondary_keywords) ? topicRow.secondary_keywords : [] },
     targets, hosts, { allowCaution },
   )
+  // Merge server-validated manual reviewable overrides (if the client sent any).
+  const { plan, promoted: manualApplied } = promoteManualCandidates(basePlan, manualCandidates)
 
   const subject: PlanSubject = { subjectType, topicId, articlePoolItemId, generatedArticleId }
   const batchId = await savePlanBatch(admin, {
@@ -127,6 +137,7 @@ export async function POST(request: Request) {
     warnings,
     linkCount: plan.selected.length,
     rejectedCount: plan.rejected.length,
+    manualApplied,
     summary: plan.summary,
     links,
   })

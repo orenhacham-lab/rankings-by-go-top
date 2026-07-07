@@ -23,7 +23,7 @@
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
-import { planFromCachedTargets, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
+import { planFromCachedTargets, promoteManualCandidates, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
 import { savePlanBatch, approveBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
@@ -31,12 +31,12 @@ export const dynamic = 'force-dynamic'
 
 interface TopicRow { id: string; topic: string; primary_keyword: string | null; secondary_keywords: string[] | null }
 
-interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCount: number; approvedCount: number; staleAtCreation?: boolean; reason?: string }
+interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCount: number; approvedCount: number; manualApplied?: number; staleAtCreation?: boolean; reason?: string }
 
 export async function POST(request: Request) {
   if (!isInternalLinkPlanningEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  let body: { projectId?: unknown; topicIds?: unknown; approve?: unknown; allowCaution?: unknown; force?: unknown }
+  let body: { projectId?: unknown; topicIds?: unknown; approve?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown }
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const approve = body.approve === true
@@ -45,6 +45,19 @@ export async function POST(request: Request) {
   const topicIds = Array.isArray(body.topicIds)
     ? Array.from(new Set(body.topicIds.filter((x): x is string => typeof x === 'string' && x.length > 0))).slice(0, 50)
     : []
+  // Phase 2I — optional manually-selected reviewable candidates, RE-VALIDATED
+  // server-side (never trusted). Grouped by topic; capped defensively.
+  const manualByTopic = new Map<string, { targetUrl: string; anchorText: string }[]>()
+  if (Array.isArray(body.manualCandidates)) {
+    for (const raw of body.manualCandidates.slice(0, 200)) {
+      const m = raw as { topicId?: unknown; targetUrl?: unknown; anchorText?: unknown }
+      if (typeof m?.topicId === 'string' && typeof m.targetUrl === 'string' && typeof m.anchorText === 'string') {
+        const arr = manualByTopic.get(m.topicId) ?? []
+        arr.push({ targetUrl: m.targetUrl, anchorText: m.anchorText })
+        manualByTopic.set(m.topicId, arr)
+      }
+    }
+  }
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
@@ -89,10 +102,12 @@ export async function POST(request: Request) {
     const topicRow = byId.get(id)
     if (!topicRow) { results.push({ topicId: id, ok: false, linkCount: 0, approvedCount: 0, reason: 'topic_not_found' }); continue }
 
-    const plan = planFromCachedTargets(
+    const basePlan = planFromCachedTargets(
       { id: topicRow.id, title: topicRow.topic, primaryKeyword: topicRow.primary_keyword, secondaryKeywords: Array.isArray(topicRow.secondary_keywords) ? topicRow.secondary_keywords : [] },
       targets, hosts, { allowCaution },
     )
+    // Merge server-validated manual reviewable overrides (if any) for this topic.
+    const { plan, promoted: manualApplied } = promoteManualCandidates(basePlan, manualByTopic.get(id) ?? [])
     const subject: PlanSubject = { subjectType: 'topic', topicId: id, articlePoolItemId: null, generatedArticleId: null }
     const batchId = await savePlanBatch(admin, {
       projectId: project.id, userId: user.id, subject,
@@ -108,7 +123,7 @@ export async function POST(request: Request) {
     topicsSaved++
     linksSaved += plan.selected.length
     linksApproved += approvedCount
-    results.push({ topicId: id, ok: true, batchId, linkCount: plan.selected.length, approvedCount, staleAtCreation })
+    results.push({ topicId: id, ok: true, batchId, linkCount: plan.selected.length, approvedCount, manualApplied, staleAtCreation })
   }
 
   return Response.json({

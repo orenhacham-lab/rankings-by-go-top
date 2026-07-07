@@ -79,6 +79,29 @@ export interface CachePlannedLink {
   normalizedTopicTokens: string[]
   normalizedCandidateTokens: string[]
   relevanceMethod: RelevanceMethod
+  // Phase 2I candidate tiers (response-only diagnostics; not persisted):
+  //  recommended = auto-selected; reviewable = rejected ONLY for soft scoring
+  //  reasons and safe to manually approve; blocked = a hard-safety failure that
+  //  must never be manually approvable.
+  reviewability: CandidateTier
+  canManualApprove: boolean
+  blockReason: string | null
+}
+
+export type CandidateTier = 'recommended' | 'reviewable' | 'blocked'
+
+/**
+ * Soft rejection reasons a human may override. Anything NOT in this set is a
+ * HARD-safety failure (ineligible / external / self-dup / no-anchor / duplicate)
+ * and can never be manually approved.
+ */
+const SOFT_REJECTION_BASES = new Set(['low_relevance', 'low_confidence', 'target_caution_excluded', 'over_cap'])
+function isSoftRejection(reason: string): boolean {
+  return SOFT_REJECTION_BASES.has(reason.split('(')[0]!)
+}
+/** True when EVERY rejection reason is soft (⇒ safe to manually approve). */
+export function isReviewableRejection(rejectedReasons: string[]): boolean {
+  return rejectedReasons.length > 0 && rejectedReasons.every(isSoftRejection)
 }
 
 export interface CacheTopicPlan {
@@ -343,6 +366,10 @@ export function planFromCachedTargets(
       normalizedTopicTokens: Array.from(topicTokens),
       normalizedCandidateTokens: Array.from(candTokens),
       relevanceMethod,
+      // Finalized after the dedup/cap pass below (it can add more reasons).
+      reviewability: 'recommended',
+      canManualApprove: false,
+      blockReason: null,
     })
   }
 
@@ -362,10 +389,59 @@ export function planFromCachedTargets(
     finalSelected.push(s)
   }
 
+  // Finalize candidate tiers AFTER dedup/cap (which can add duplicate_url /
+  // duplicate_anchor / over_cap). recommended = auto-selected; reviewable = soft
+  // reasons only (safe manual override); blocked = any hard-safety reason.
+  for (const s of scored) {
+    if (finalSelected.includes(s)) { s.reviewability = 'recommended'; s.canManualApprove = false; s.blockReason = null; continue }
+    const soft = isReviewableRejection(s.rejectedReasons)
+    s.reviewability = soft ? 'reviewable' : 'blocked'
+    s.canManualApprove = soft
+    s.blockReason = soft ? null : (s.rejectedReasons.find((r) => !isSoftRejection(r)) ?? 'blocked')
+  }
+
   const rejected = scored.filter((s) => !finalSelected.includes(s)).sort((a, b) => b.confidence - a.confidence)
   const summary = finalSelected.length
     ? `${finalSelected.length} internal link(s) would be planned (of ${targets.length} cached targets).`
     : `0 relevant internal links — this topic would publish WITHOUT internal links (of ${targets.length} cached targets).`
 
   return { topicId: topic.id, topicTitle: topic.title, primaryKeyword: topic.primaryKeyword, selected: finalSelected, rejected, summary }
+}
+
+/**
+ * Phase 2I — promote MANUALLY-selected reviewable candidates into a plan's
+ * selected set, SERVER-SIDE VALIDATED. The client only names candidates by
+ * (targetUrl, anchorText); a candidate is promoted ONLY if the server's own
+ * freshly-computed plan classified it as `reviewable` (soft reasons only) — hard
+ * safety (ineligible / external / self-dup / no-anchor / duplicate) is never
+ * promotable. Client data is a lookup key, never trusted link content.
+ */
+export function promoteManualCandidates(
+  plan: CacheTopicPlan,
+  manual: { targetUrl: string; anchorText: string }[],
+): { plan: CacheTopicPlan; promoted: number; rejectedManual: number } {
+  if (!Array.isArray(manual) || manual.length === 0) return { plan, promoted: 0, rejectedManual: 0 }
+  const keyOf = (u: string, a: string | null | undefined) => `${normalizeUrlKey(u)}::${(a ?? '').trim().toLowerCase()}`
+  const selectedKeys = new Set(plan.selected.map((s) => keyOf(s.targetUrl, s.anchorText)))
+  const promotedLinks: CachePlannedLink[] = []
+  let rejectedManual = 0
+  for (const m of manual) {
+    const key = keyOf(m.targetUrl, m.anchorText)
+    if (selectedKeys.has(key)) continue // already recommended → nothing to do
+    const cand = plan.rejected.find((r) => keyOf(r.targetUrl, r.anchorText) === key && r.reviewability === 'reviewable' && r.canManualApprove)
+    if (!cand) { rejectedManual++; continue } // not found OR blocked → refuse
+    selectedKeys.add(key)
+    promotedLinks.push({ ...cand, selected: true, reason: `manual_override (${cand.rejectedReasons.join(', ')})` })
+  }
+  if (promotedLinks.length === 0) return { plan, promoted: 0, rejectedManual }
+  const promotedSet = new Set(promotedLinks.map((p) => keyOf(p.targetUrl, p.anchorText)))
+  return {
+    plan: {
+      ...plan,
+      selected: [...plan.selected, ...promotedLinks],
+      rejected: plan.rejected.filter((r) => !promotedSet.has(keyOf(r.targetUrl, r.anchorText))),
+    },
+    promoted: promotedLinks.length,
+    rejectedManual,
+  }
 }

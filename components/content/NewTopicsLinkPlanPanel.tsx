@@ -24,8 +24,10 @@ import { Link2, X } from 'lucide-react'
 
 export interface NewTopic { id: string; topic: string; primary_keyword: string | null }
 
-interface DryLink { targetUrl: string; targetTitle: string; anchorText: string | null; confidence: number; relevance: number; reason: string; rejectedReasons: string[] }
-interface DryPlan { topicId: string; selected: DryLink[]; rejected: DryLink[]; summary: string }
+interface DryLink { targetUrl: string; targetTitle: string; anchorText: string | null; confidence: number; relevance: number; reason: string; rejectedReasons: string[]; reviewability?: string; canManualApprove?: boolean }
+interface DryPlan { topicId: string; selected: DryLink[]; rejected: DryLink[]; reviewable: DryLink[]; summary: string }
+
+const mkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targetUrl}||${(l.anchorText ?? '').toLowerCase()}`
 
 interface BulkResult { topicId: string; ok: boolean; linkCount: number; approvedCount: number; reason?: string }
 
@@ -60,13 +62,19 @@ export default function NewTopicsLinkPlanPanel({
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.newTopicsPlan, [language])
   const isHebrew = language === 'he'
-  const titleById = useMemo(() => new Map(topics.map((tp) => [tp.id, tp])), [topics])
+  // Locale-aware label for soft (reviewable) reasons; falls back to REASON_HE.
+  const revLabel = useCallback((r?: string | null) => {
+    const base = (r || '').split('(')[0]!
+    return (t.reviewReasons as Record<string, string>)[base] ?? reasonLabel(r)
+  }, [t])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [warnNote, setWarnNote] = useState<string | null>(null)
   const [plans, setPlans] = useState<Record<string, DryPlan>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Manually-selected reviewable candidates, keyed by topicId → set of mkey().
+  const [manualSel, setManualSel] = useState<Record<string, Set<string>>>({})
   const [autoApprove, setAutoApprove] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'approved' | 'zero' | 'failed'>>({})
@@ -86,7 +94,9 @@ export default function NewTopicsLinkPlanPanel({
         const map: Record<string, DryPlan> = {}
         const preselect = new Set<string>()
         for (const p of Array.isArray(data.topics) ? data.topics : []) {
-          const plan: DryPlan = { topicId: p.topicId, selected: p.selected ?? [], rejected: p.rejected ?? [], summary: p.summary ?? '' }
+          const rejected: DryLink[] = Array.isArray(p.rejected) ? p.rejected : []
+          const reviewable = rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
+          const plan: DryPlan = { topicId: p.topicId, selected: p.selected ?? [], rejected, reviewable, summary: p.summary ?? '' }
           map[p.topicId] = plan
           if (plan.selected.length > 0) preselect.add(p.topicId)
         }
@@ -103,14 +113,34 @@ export default function NewTopicsLinkPlanPanel({
   const toggle = useCallback((id: string) => {
     setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }, [])
+  const toggleManual = useCallback((topicId: string, key: string) => {
+    setManualSel((prev) => {
+      const set = new Set(prev[topicId] ?? [])
+      set.has(key) ? set.delete(key) : set.add(key)
+      return { ...prev, [topicId]: set }
+    })
+  }, [])
+
+  // A topic is saved if its recommended box is checked OR it has ≥1 manual pick.
+  const topicIdsToSave = useMemo(() => {
+    const ids = new Set(selected)
+    for (const [tid, set] of Object.entries(manualSel)) if (set.size > 0) ids.add(tid)
+    return Array.from(ids)
+  }, [selected, manualSel])
 
   const save = useCallback(async () => {
-    if (saving || selected.size === 0) return
+    if (saving || topicIdsToSave.length === 0) return
     setSaving(true); setError(null)
+    // Build server-revalidated manual candidates (targetUrl + anchorText only).
+    const manualCandidates: { topicId: string; targetUrl: string; anchorText: string }[] = []
+    for (const [tid, set] of Object.entries(manualSel)) {
+      const rev = plans[tid]?.reviewable ?? []
+      for (const l of rev) if (set.has(mkey(l)) && l.anchorText) manualCandidates.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
+    }
     try {
       const res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicIds: Array.from(selected), approve: autoApprove }),
+        body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: autoApprove, manualCandidates }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return }
@@ -129,7 +159,7 @@ export default function NewTopicsLinkPlanPanel({
     } finally {
       setSaving(false)
     }
-  }, [saving, selected, projectId, autoApprove, t, onSaved])
+  }, [saving, topicIdsToSave, manualSel, plans, projectId, autoApprove, t, onSaved])
 
   // Summary counts (session-only, from the dry-run + save results).
   const topicsWithLinks = Object.values(plans).filter((p) => p.selected.length > 0).length
@@ -170,7 +200,7 @@ export default function NewTopicsLinkPlanPanel({
           <>
             {/* Summary */}
             <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
-              {t.sumTopicsChecked}: {selected.size} · {t.sumTopicsWithLinks}: {topicsWithLinks} · {t.sumLinksSuggested}: {linksSuggested}
+              {t.sumTopicsChecked}: {topicIdsToSave.length} · {t.sumTopicsWithLinks}: {topicsWithLinks} · {t.sumLinksSuggested}: {linksSuggested}
               {plansSaved > 0 && <> · {t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</>}
             </p>
 
@@ -178,7 +208,9 @@ export default function NewTopicsLinkPlanPanel({
               {topics.map((tp) => {
                 const plan = plans[tp.id]
                 const links = plan?.selected ?? []
-                const rejected = plan?.rejected ?? []
+                const reviewable = plan?.reviewable ?? []
+                const blocked = (plan?.rejected ?? []).filter((r) => r.reviewability !== 'reviewable')
+                const mset = manualSel[tp.id] ?? new Set<string>()
                 return (
                   <div key={tp.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
                     <div className="flex flex-wrap items-center gap-2">
@@ -189,30 +221,62 @@ export default function NewTopicsLinkPlanPanel({
                     </div>
                     {tp.primary_keyword && <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t.primaryKeyword}: {tp.primary_keyword}</p>}
 
+                    {/* Recommended */}
                     {links.length === 0 ? (
                       <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
                     ) : (
-                      <div className="mt-1.5 space-y-1.5">
-                        {links.map((l, i) => (
-                          <div key={`${l.targetUrl}-${i}`} className="rounded-md bg-slate-50 dark:bg-slate-800/60 p-2 text-[11px]">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
-                              <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                      <>
+                        <div className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{t.recommendedTitle}</div>
+                        <div className="mt-1 space-y-1.5">
+                          {links.map((l, i) => (
+                            <div key={`${l.targetUrl}-${i}`} className="rounded-md bg-slate-50 dark:bg-slate-800/60 p-2 text-[11px]">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
+                                <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                              </div>
+                              <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
                             </div>
-                            <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      </>
                     )}
 
-                    {rejected.length > 0 && (
+                    {/* Reviewable — collapsed manual-override options */}
+                    {reviewable.length > 0 && (
+                      <details className="mt-2" open={links.length === 0}>
+                        <summary className="cursor-pointer select-none text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</summary>
+                        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableNote}</p>
+                        <div className="mt-1.5 space-y-1.5">
+                          {reviewable.map((l, i) => {
+                            const k = mkey(l)
+                            return (
+                              <label key={`${l.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-md border border-indigo-100 dark:border-indigo-500/20 p-2 text-[11px] cursor-pointer">
+                                <input type="checkbox" checked={mset.has(k)} onChange={() => toggleManual(tp.id, k)} disabled={saving} className="mt-0.5 accent-indigo-600" />
+                                <span className="flex-1 min-w-0">
+                                  <span className="flex flex-wrap items-center gap-2">
+                                    <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
+                                    <Badge variant="neutral">{t.manualBadge}</Badge>
+                                    <span className="text-amber-700 dark:text-amber-400">{l.rejectedReasons.map(revLabel).join(' · ')}</span>
+                                    <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                                  </span>
+                                  <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </details>
+                    )}
+
+                    {/* Blocked — advanced diagnostics, not selectable */}
+                    {blocked.length > 0 && (
                       <details className="mt-1.5">
-                        <summary className="cursor-pointer select-none text-[10px] text-slate-400">{t.rejectedTitle} ({rejected.length})</summary>
+                        <summary className="cursor-pointer select-none text-[10px] text-slate-400">{t.blockedTitle} ({blocked.length})</summary>
                         <div className="mt-1 space-y-1">
-                          {rejected.slice(0, 20).map((l, i) => (
-                            <div key={`${l.targetUrl}-r-${i}`} className="text-[10px] text-slate-500 dark:text-slate-400">
-                              <span className="break-words">{l.anchorText || l.targetTitle || l.targetUrl}</span>
-                              {l.rejectedReasons?.length ? <span className="text-amber-700 dark:text-amber-400"> · {l.rejectedReasons.map(reasonLabel).join(' · ')}</span> : null}
+                          {blocked.slice(0, 20).map((l, i) => (
+                            <div key={`${l.targetUrl}-b-${i}`} className="text-[10px] text-slate-400 line-through decoration-slate-300">
+                              <span className="break-words no-underline">{l.anchorText || l.targetTitle || l.targetUrl}</span>
+                              {l.rejectedReasons?.length ? <span className="text-slate-400"> · {l.rejectedReasons.map(revLabel).join(' · ')}</span> : null}
                             </div>
                           ))}
                         </div>
@@ -228,7 +292,7 @@ export default function NewTopicsLinkPlanPanel({
                 <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving} className="accent-indigo-600" />
                 {t.autoApprove}
               </label>
-              <Button size="sm" onClick={save} loading={saving} disabled={saving || selected.size === 0} className="ms-auto">
+              <Button size="sm" onClick={save} loading={saving} disabled={saving || topicIdsToSave.length === 0} className="ms-auto">
                 {saving ? t.saving : t.save}
               </Button>
             </div>
