@@ -37,6 +37,16 @@ export function isInternalLinkPlanningEnabled(): boolean {
   return isContentAutomationEnabled() && process.env.ENABLE_INTERNAL_LINK_PLANNING === 'true'
 }
 
+/**
+ * Phase 2F.3 — auto-apply approved internal links into a NEWLY GENERATED DRAFT,
+ * once, right after generation. Default OFF: when absent/false, generation is
+ * byte-for-byte unchanged. Requires the planning flag (same insertion engine +
+ * safety rules as manual apply). Draft-only; never publishes / touches WordPress.
+ */
+export function isInternalLinkAutoApplyAfterGenerationEnabled(): boolean {
+  return isInternalLinkPlanningEnabled() && process.env.ENABLE_INTERNAL_LINK_AUTO_APPLY_AFTER_GENERATION === 'true'
+}
+
 export type ContentAuthResult =
   | { error: string; status: 401 | 403 | 404 | 400 }
   | {

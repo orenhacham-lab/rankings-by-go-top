@@ -51,10 +51,12 @@ export async function POST(request: Request) {
   const auth = await authContentProject((topic as { project_id: string }).project_id)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  const result = await generateArticleForTopic(auth.admin, { topicId: body.topicId, userId: auth.user.id })
+  // Manual "generate now" opts INTO Phase 2F.3 auto-apply (still gated by the
+  // server flag, default OFF). The automation/cron path does NOT pass this.
+  const result = await generateArticleForTopic(auth.admin, { topicId: body.topicId, userId: auth.user.id, autoApplyInternalLinks: true })
 
   if (result.ok) {
-    return Response.json({ articleId: result.articleId, warnings: result.warnings, audit: result.audit, imageGenerated: result.imageGenerated })
+    return Response.json({ articleId: result.articleId, warnings: result.warnings, audit: result.audit, imageGenerated: result.imageGenerated, autoInternalLinks: result.autoInternalLinks })
   }
 
   switch (result.kind) {

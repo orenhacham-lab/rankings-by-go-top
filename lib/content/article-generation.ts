@@ -19,6 +19,8 @@ import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemin
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
+import { autoApplyApprovedLinksToDraft, type AutoApplyResult } from '@/lib/content/internal-link-apply'
+import { isInternalLinkAutoApplyAfterGenerationEnabled } from '@/lib/content/api-auth'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -29,6 +31,8 @@ export interface GenerateForTopicSuccess {
   warnings: string[]
   audit: unknown
   imageGenerated: boolean
+  // Phase 2F.3 — present only when auto-apply ran (flag ON + opted-in path).
+  autoInternalLinks?: AutoApplyResult
 }
 export type GenerateForTopicFailure =
   | { ok: false; kind: 'topic_not_found' }
@@ -45,7 +49,7 @@ export type GenerateForTopicResult = GenerateForTopicSuccess | GenerateForTopicF
  */
 export async function generateArticleForTopic(
   admin: Admin,
-  opts: { topicId: string; userId: string },
+  opts: { topicId: string; userId: string; autoApplyInternalLinks?: boolean },
 ): Promise<GenerateForTopicResult> {
   const { topicId, userId } = opts
 
@@ -204,6 +208,25 @@ export async function generateArticleForTopic(
 
   console.log('[content-article-generation] created', { articleId: inserted.id, projectId, score: gen.audit.score, warnings: gen.audit.warnings.length })
 
+  // Phase 2F.3 — OPTIONAL auto-apply of approved internal links into the fresh
+  // DRAFT, once. Requires BOTH the opted-in path (autoApplyInternalLinks, set
+  // only by the manual "generate now" route) AND the server flag. Cron/queue
+  // never opt in, so scheduled generation is unaffected. Draft-only; best-effort
+  // (never fails generation); never publishes / touches WordPress.
+  let autoInternalLinks: AutoApplyResult | undefined
+  if (opts.autoApplyInternalLinks && isInternalLinkAutoApplyAfterGenerationEnabled()) {
+    autoInternalLinks = await autoApplyApprovedLinksToDraft(admin, { projectId, userId, generatedArticleId: inserted.id })
+    console.log('[content-article-generation] auto internal-links', {
+      articleId: inserted.id,
+      autoInternalLinksEnabled: true,
+      autoInternalLinksAttempted: autoInternalLinks.attempted,
+      autoInternalLinksApplied: autoInternalLinks.applied,
+      autoInternalLinksSkipped: autoInternalLinks.skipped,
+      autoInternalLinksReasons: autoInternalLinks.reasons,
+      snapshotId: autoInternalLinks.snapshotId,
+    })
+  }
+
   // Auto-generate a brand-neutral featured image (default ON). Best-effort.
   let imageGenerated = false
   if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
@@ -216,5 +239,5 @@ export async function generateArticleForTopic(
     }
   }
 
-  return { ok: true, articleId: inserted.id, warnings: article.warnings, audit: gen.audit, imageGenerated }
+  return { ok: true, articleId: inserted.id, warnings: article.warnings, audit: gen.audit, imageGenerated, autoInternalLinks }
 }
