@@ -9,7 +9,7 @@
  * list. No scheduling here (Phase 4). Gated by the caller (automation flag).
  */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -19,6 +19,8 @@ type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan'
 
 interface Suggestion {
   id: string
+  /** Persisted idea id (Phase 3F.3) — present when the idea is stored server-side. */
+  ideaId?: string
   title: string
   primaryKeyword: string
   secondaryKeywords: string[]
@@ -61,6 +63,28 @@ export default function AutomationIdeas({
   const [ideasExpanded, setIdeasExpanded] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean } | null>(null)
+  // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
+  const [initialLoaded, setInitialLoaded] = useState(false)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+
+  // Load the project's previously-saved PENDING ideas so they appear without the
+  // user clicking generate again (survives page refresh). Best-effort/read-only.
+  useEffect(() => {
+    let cancelled = false
+    setInitialLoaded(false); setSuggestions([]); setSelected(new Set()); setMeta(null); setMessage(null)
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/content/automation/topic-ideas?projectId=${encodeURIComponent(projectId)}`)
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        const list: Suggestion[] = Array.isArray(data.suggestions) ? data.suggestions : []
+        if (list.length) setSuggestions(list)
+      } catch { /* ignore — falls back to empty */ } finally {
+        if (!cancelled) setInitialLoaded(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [projectId])
 
   const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : s === 'site_scan' ? t.badgeSiteScan : t.badgeResearch)
 
@@ -71,7 +95,9 @@ export default function AutomationIdeas({
   async function generate() {
     if (loading) return
     const reqId = ++reqRef.current
-    setLoading(true); setMessage(null); setMeta(null); setSelected(new Set()); setSuggestions([])
+    // Do NOT clear the current list up-front — "find more" keeps existing pending
+    // ideas visible and the response returns the combined active pending set.
+    setLoading(true); setMessage(null); setMeta(null)
     try {
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
@@ -85,16 +111,16 @@ export default function AutomationIdeas({
         // timeout / transient) must NOT read as "no ideas found".
         if (data?.error === 'keyword_required') {
           setMessage({ text: t.keywordPlaceholder, ok: false })
-          setSuggestions([])
         } else {
-          setSuggestions([])
           setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error' })
         }
         return
       }
       const list: Suggestion[] = Array.isArray(data.suggestions) ? data.suggestions : []
       setSuggestions(list)
-      setSelected(new Set(list.map((s) => s.id))) // pre-select all for quick bulk approve
+      // No auto-select: persisted ideas accumulate, so approval must be explicit
+      // to avoid bulk-approving previously-seen ideas.
+      setSelected(new Set())
       setMeta({
         skippedDuplicates: data.meta?.skippedDuplicates ?? 0,
         finalCount: data.meta?.finalCount ?? list.length,
@@ -103,7 +129,6 @@ export default function AutomationIdeas({
       })
     } catch {
       if (reqId !== reqRef.current) return
-      setSuggestions([])
       setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error' })
     } finally {
       if (reqId === reqRef.current) setLoading(false)
@@ -120,9 +145,30 @@ export default function AutomationIdeas({
   const selectAll = () => setSelected(new Set(suggestions.map((s) => s.id)))
   const clearSel = () => setSelected(new Set())
 
+  // Durable reject: mark ideas rejected server-side so they don't come back, then
+  // drop them from the active list. Best-effort — for non-persisted (table
+  // missing) ideas the endpoint no-ops and we still remove them from the session.
+  async function rejectIds(ids: string[]) {
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
+    try {
+      await fetch('/api/content/automation/topic-ideas/reject', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, ideaIds: ids }),
+      })
+    } catch { /* still remove locally */ }
+    setSuggestions((prev) => prev.filter((s) => !idSet.has(s.id)))
+    setSelected((prev) => { const next = new Set(prev); for (const id of ids) next.delete(id); return next })
+  }
+
+  async function rejectOne(id: string) {
+    if (rejectingId) return
+    setRejectingId(id)
+    try { await rejectIds([id]) } finally { setRejectingId(null) }
+  }
+
   function rejectSelected() {
-    setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
-    setSelected(new Set())
+    void rejectIds(suggestions.filter((s) => selected.has(s.id)).map((s) => s.id))
   }
 
   async function approveSelected() {
@@ -236,20 +282,25 @@ export default function AutomationIdeas({
           />
         )}
         <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
-          {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : t.generate}
+          {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate)}
         </Button>
       </div>
 
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
       )}
+      {/* "All newly generated ideas were already saved/approved/rejected" — shown
+          even when existing pending ideas remain visible below. */}
+      {meta && meta.reason === 'all_known' && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{t.allKnown}</p>
+      )}
       {/* Batch feedback: what was found vs. filtered, or a helpful empty reason. */}
-      {meta && suggestions.length > 0 && (
+      {meta && meta.reason !== 'all_known' && suggestions.length > 0 && (
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
           {t.foundSummary.replace('{found}', String(suggestions.length)).replace('{skipped}', String(meta.skippedDuplicates))}
         </p>
       )}
-      {meta && suggestions.length === 0 && !loading && (
+      {meta && meta.reason !== 'all_known' && suggestions.length === 0 && !loading && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
           {meta.reason === 'no_scan'
             ? t.noScan
@@ -263,6 +314,10 @@ export default function AutomationIdeas({
                     ? t.allDuplicates
                     : t.tryOther}
         </p>
+      )}
+      {/* No saved ideas yet (fresh project / after clearing all) — calm prompt. */}
+      {initialLoaded && !loading && !meta && suggestions.length === 0 && (
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.noSavedIdeas}</p>
       )}
       {lastCreatedIds.length > 0 && (
         <div className="mb-3 rounded-lg border border-indigo-300 dark:border-indigo-500/40 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-2.5 flex flex-wrap items-center gap-2">
@@ -299,6 +354,14 @@ export default function AutomationIdeas({
                       {typeof s.suggestionScore === 'number' && (
                         <span className="text-[10px] text-slate-400">{Math.round(s.suggestionScore * 100)}%</span>
                       )}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); rejectOne(s.id) }}
+                        disabled={rejectingId === s.id}
+                        className="ms-auto text-[11px] text-slate-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                      >
+                        {rejectingId === s.id ? t.rejecting : t.reject}
+                      </button>
                     </div>
                     <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">
                       {t.keywordLabel}: <span className="font-medium">{s.primaryKeyword}</span>

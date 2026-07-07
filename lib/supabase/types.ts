@@ -576,6 +576,35 @@ export interface InternalLinkPlanBatchRow {
   updated_at: string
 }
 
+/** Persisted topic-idea suggestion (Phase 3F.3). */
+export type ContentTopicIdeaStatus = 'pending' | 'approved' | 'rejected' | 'duplicate'
+
+export interface ContentTopicIdeaRow {
+  id: string
+  user_id: string
+  project_id: string
+  source: string
+  batch_id: string
+  title: string
+  primary_keyword: string | null
+  secondary_keywords: string[]
+  search_intent: string | null
+  angle: string | null
+  recommended_word_count: number | null
+  suggested_internal_links: { url: string; anchor: string }[]
+  suggestion_reason: string | null
+  source_context: string | null
+  source_url: string | null
+  score: number | null
+  fingerprint: string
+  status: ContentTopicIdeaStatus
+  approved_topic_id: string | null
+  rejected_at: string | null
+  approved_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 /** Child plan link (Phase 2C) — one proposed link. INERT (review-only). */
 export interface InternalLinkPlanLinkRow {
   id: string

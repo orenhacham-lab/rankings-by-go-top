@@ -11,6 +11,8 @@
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
+import { loadKnownFingerprints, insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, topicIdeaFingerprint } from '@/lib/content/recommendations/topic-idea-store'
+import { randomUUID } from 'crypto'
 
 const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan']
 
@@ -45,7 +47,40 @@ export async function POST(request: Request) {
       source,
       keyword,
     })
-    return Response.json(result)
+
+    // Phase 3F.3 — persist NEW ideas as pending and return the project's active
+    // pending set (so ideas survive refresh and "find more" appends). Best-effort:
+    // if the ideas table is missing (migration not applied) fall back to the
+    // previous session-only response with no regression.
+    const known = await loadKnownFingerprints(auth.admin, auth.project.id)
+    if (known === null) return Response.json(result)
+
+    // Also treat existing project keywords (tracking_targets) as "known" so a
+    // topic identical to a tracked keyword is not re-offered.
+    try {
+      const { data: kwRows } = await auth.admin.from('tracking_targets').select('keyword').eq('project_id', auth.project.id)
+      for (const r of (kwRows ?? []) as { keyword: string }[]) { const fp = topicIdeaFingerprint(r.keyword, null); if (fp) known.add(fp) }
+    } catch { /* keyword table optional */ }
+
+    const fresh = result.suggestions.filter((s) => {
+      const fp = topicIdeaFingerprint(s.primaryKeyword, s.title)
+      if (!fp || known.has(fp)) return false
+      known.add(fp)
+      return true
+    })
+    await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
+
+    const pending = await loadPendingIdeas(auth.admin, auth.project.id)
+    if (pending === null) return Response.json(result)
+    const suggestions = pending.map(ideaToSuggestion)
+    const filteredExisting = result.suggestions.length - fresh.length
+    const reason = suggestions.length === 0
+      ? (result.meta.reason ?? undefined)
+      : (fresh.length === 0 && result.suggestions.length > 0 ? 'all_known' : undefined)
+    return Response.json({
+      suggestions,
+      meta: { ...result.meta, persisted: true, newlySaved: fresh.length, filteredExisting, pendingCount: suggestions.length, reason },
+    })
   } catch (e) {
     if ((e as { code?: string })?.code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
     console.error('[automation-recommendations] failed', { message: (e as Error)?.message })

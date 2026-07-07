@@ -60,6 +60,12 @@ export const dashboardHe = {
       clear: 'נקה בחירה',
       approveSelected: 'אשר נבחרים',
       rejectSelected: 'דחה נבחרים',
+      // Phase 3F.3 — persisted ideas: find-more, per-card reject, empty states.
+      findMore: 'מצא רעיונות נוספים',
+      reject: 'דחה',
+      rejecting: 'דוחה…',
+      noSavedIdeas: 'אין רעיונות שמורים כרגע. אפשר ליצור רעיונות חדשים.',
+      allKnown: 'לא נמצאו רעיונות חדשים מעבר למה שכבר נשמר, אושר או נדחה.',
       creating: 'שומר…',
       createdToast: 'נוספו {n} נושאים מאושרים',
       createdSkipped: 'נוספו {n} · {m} כבר היו קיימים',

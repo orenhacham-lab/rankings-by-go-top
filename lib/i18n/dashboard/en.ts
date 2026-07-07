@@ -62,6 +62,12 @@ export const dashboardEn = {
       clear: 'Clear',
       approveSelected: 'Approve selected',
       rejectSelected: 'Reject selected',
+      // Phase 3F.3 — persisted ideas: find-more, per-card reject, empty states.
+      findMore: 'Find more ideas',
+      reject: 'Reject',
+      rejecting: 'Rejecting…',
+      noSavedIdeas: 'No saved ideas yet. Generate new ideas to get started.',
+      allKnown: 'No new ideas were found beyond what is already saved, approved, or rejected.',
       creating: 'Saving…',
       createdToast: 'Added {n} approved topics',
       createdSkipped: 'Added {n} · {m} already existed',
