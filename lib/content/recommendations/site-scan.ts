@@ -27,15 +27,25 @@ export interface SiteScanRecoInput {
   langLabel: string
 }
 
+export type SiteScanReason = 'no_scan' | 'insufficient_data' | 'model_error' | 'model_empty'
+
 export interface SiteScanRecoResult {
   suggestions: TopicSuggestion[]
   meta: {
+    /** Raw suggestion count BEFORE the engine's corpus dedupe (model + fallback). */
     generated: number
-    /** 'no_scan' when there is no cached scan/index to analyze. */
-    reason?: 'no_scan' | 'model_error' | 'model_empty'
-    /** Compact digest sizes (diagnostics). */
-    targetsAnalyzed?: number
-    clustersFound?: number
+    reason?: SiteScanReason
+    /** Rich diagnostics for the debug response. */
+    debug: {
+      scanFound: boolean
+      targetCount: number
+      digestCounts: { importantPages: number; categories: number; orphans: number; clusters: number }
+      modelCalled: boolean
+      modelOk: boolean
+      modelRawCount: number
+      usedFallback: boolean
+      rawSuggestionCount: number
+    }
   }
 }
 
@@ -161,21 +171,45 @@ function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string
   ].filter(Boolean).join('\n')
 }
 
+/**
+ * Robust JSON extraction: tolerate code fences, leading prose, a top-level array
+ * instead of {topics:[]}, and trailing junk. Returns null only when nothing
+ * parseable is found. Never throws.
+ */
+function extractIdeas(text: string): SiteScanIdea[] | null {
+  const raw = (text || '').trim()
+  if (!raw) return null
+  const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+  const tryParse = (s: string): SiteScanIdea[] | null => {
+    try {
+      const v = JSON.parse(s)
+      if (Array.isArray(v)) return v as SiteScanIdea[]
+      if (v && typeof v === 'object' && Array.isArray((v as { topics?: unknown }).topics)) return (v as { topics: SiteScanIdea[] }).topics
+      return null
+    } catch { return null }
+  }
+  // 1) whole thing, 2) first {...} object, 3) first [...] array.
+  return (
+    tryParse(stripped) ??
+    tryParse(stripped.match(/\{[\s\S]*\}/)?.[0] ?? '') ??
+    tryParse(stripped.match(/\[[\s\S]*\]/)?.[0] ?? '')
+  )
+}
+
 async function callModel(prompt: string): Promise<{ ideas: SiteScanIdea[]; ok: boolean }> {
   const client = getGeminiClient()
-  if (!client) return { ideas: [], ok: false }
+  if (!client) { console.warn('[reco-site-scan] no gemini client configured'); return { ideas: [], ok: false } }
   const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
   try {
-    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
+    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 8192 } })
     const result = await model.generateContent(prompt)
     const text = result.response.text()
-    let parsed: { topics?: unknown }
-    try { parsed = JSON.parse(text) } catch {
-      const m = text.match(/\{[\s\S]*\}/)
-      if (!m) return { ideas: [], ok: false }
-      parsed = JSON.parse(m[0])
+    const ideas = extractIdeas(text)
+    if (ideas === null) {
+      console.error('[reco-site-scan] unparseable model output', { sample: (text || '').slice(0, 200) })
+      return { ideas: [], ok: false }
     }
-    return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as SiteScanIdea[]) : [], ok: true }
+    return { ideas, ok: true }
   } catch (err) {
     console.error('[reco-site-scan] model error', { message: err instanceof Error ? err.message : String(err) })
     return { ideas: [], ok: false }
@@ -184,22 +218,81 @@ async function callModel(prompt: string): Promise<{ ideas: SiteScanIdea[]; ok: b
 
 const MAX_SITE_SCAN_IDEAS = 20
 
+/**
+ * Deterministic scan-derived suggestions used when the model is unavailable /
+ * fails / returns nothing — so a project with a usable scan still gets useful,
+ * non-crashing ideas. Built from important pages + categories (a "complete
+ * guide" supporting-article angle). No AI. 3–5 items when possible.
+ */
+function deterministicFallback(digest: ReturnType<typeof buildDigest>, language: 'he' | 'en'): TopicSuggestion[] {
+  const he = language === 'he'
+  const guide = (name: string) => (he ? `המדריך המלא: ${name}` : `The complete guide to ${name}`)
+  const tips = (name: string) => (he ? `${name} — טעויות נפוצות וטיפים` : `${name} — common mistakes and tips`)
+  const prefix = he ? 'לפי סריקת האתר' : 'From the site scan'
+  const supportReason = (name: string) => (he ? `נושא תומך לעמוד/קטגוריה קיימים באתר: ${name} (${prefix})` : `A supporting topic for an existing page/category: ${name} (${prefix})`)
+
+  const seeds: { name: string; keyword: string; url?: string }[] = []
+  for (const c of digest.categories) seeds.push({ name: c.title, keyword: c.title, url: c.url })
+  for (const p of digest.importantPages) seeds.push({ name: p.title, keyword: p.keyword || p.title, url: p.url })
+
+  const out: TopicSuggestion[] = []
+  const seenTitles = new Set<string>()
+  for (const s of seeds) {
+    const name = (s.name || '').trim()
+    const keyword = (s.keyword || name).trim()
+    if (!name || !keyword) continue
+    for (const makeTitle of [guide, tips]) {
+      const title = makeTitle(name)
+      const key = title.toLowerCase()
+      if (seenTitles.has(key)) continue
+      seenTitles.add(key)
+      out.push({
+        id: `site_scan:${slugKey(title)}`,
+        title,
+        primaryKeyword: keyword,
+        secondaryKeywords: [],
+        searchIntent: 'informational',
+        recommendedWordCount: 1200,
+        angle: '',
+        suggestedInternalLinks: s.url ? [{ url: s.url, anchor: name }] : [],
+        source: 'site_scan',
+        suggestionReason: supportReason(name),
+        suggestionScore: 0.5,
+      })
+      if (out.length >= 6) return out
+    }
+  }
+  return out
+}
+
 /** Generate topic ideas from the cached site scan. Read-only; never rescans. */
 export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInput, businessCtx: string): Promise<SiteScanRecoResult> {
+  const emptyDebug = { scanFound: false, targetCount: 0, digestCounts: { importantPages: 0, categories: 0, orphans: 0, clusters: 0 }, modelCalled: false, modelOk: false, modelRawCount: 0, usedFallback: false, rawSuggestionCount: 0 }
+
   const cacheRow = await getCachedIndex(admin, input.projectId)
-  if (!cacheRow) return { suggestions: [], meta: { reason: 'no_scan', generated: 0 } }
+  if (!cacheRow) return { suggestions: [], meta: { reason: 'no_scan', generated: 0, debug: emptyDebug } }
   const report = reassembleReport(cacheRow)
   const targets = (report.targets ?? []) as ScannedTarget[]
-  if (targets.length === 0) return { suggestions: [], meta: { reason: 'no_scan', generated: 0 } }
+  if (targets.length === 0) return { suggestions: [], meta: { reason: 'no_scan', generated: 0, debug: { ...emptyDebug, scanFound: true } } }
 
   const digest = buildDigest(targets)
+  const digestCounts = { importantPages: digest.importantPages.length, categories: digest.categories.length, orphans: digest.orphans.length, clusters: digest.clusters.length }
+  const debug = { scanFound: true, targetCount: targets.length, digestCounts, modelCalled: false, modelOk: false, modelRawCount: 0, usedFallback: false, rawSuggestionCount: 0 }
+
+  // A scan with no eligible pages/categories can't seed either the prompt or the
+  // deterministic fallback → a clean "not enough data", not an error.
+  if (digest.importantPages.length === 0 && digest.categories.length === 0) {
+    return { suggestions: [], meta: { reason: 'insufficient_data', generated: 0, debug } }
+  }
+
   const urlList = sourceUrlList(digest)
   const urlByKey = new Map(urlList.map((u) => [u.url, u.title]))
   const prompt = buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, MAX_SITE_SCAN_IDEAS)
 
   const { ideas, ok } = await callModel(prompt)
-  if (!ok) return { suggestions: [], meta: { reason: 'model_error', generated: 0, targetsAnalyzed: targets.length, clustersFound: digest.clusters.length } }
-  if (ideas.length === 0) return { suggestions: [], meta: { reason: 'model_empty', generated: 0, targetsAnalyzed: targets.length, clustersFound: digest.clusters.length } }
+  debug.modelCalled = true
+  debug.modelOk = ok
+  debug.modelRawCount = ideas.length
 
   const reasonPrefix = input.language === 'he' ? 'לפי סריקת האתר' : 'From the site scan'
   const suggestions: TopicSuggestion[] = []
@@ -230,5 +323,16 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     if (suggestions.length >= MAX_SITE_SCAN_IDEAS) break
   }
 
-  return { suggestions, meta: { generated: ideas.length, targetsAnalyzed: targets.length, clustersFound: digest.clusters.length } }
+  // Model failed or produced nothing usable → deterministic scan-derived ideas
+  // so the user is never stuck with a bare error on a project that HAS a scan.
+  if (suggestions.length === 0) {
+    const fallback = deterministicFallback(digest, input.language)
+    debug.usedFallback = fallback.length > 0
+    debug.rawSuggestionCount = fallback.length
+    if (fallback.length > 0) return { suggestions: fallback, meta: { generated: fallback.length, debug } }
+    return { suggestions: [], meta: { reason: ok ? 'model_empty' : 'model_error', generated: 0, debug } }
+  }
+
+  debug.rawSuggestionCount = suggestions.length
+  return { suggestions, meta: { generated: suggestions.length, debug } }
 }

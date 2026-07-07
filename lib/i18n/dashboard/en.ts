@@ -39,6 +39,7 @@ export const dashboardEn = {
       generating: 'Finding ideas…',
       siteScanAnalyzing: 'Analyzing the site scan and looking for new topic opportunities…',
       noScan: 'No site scan is available yet. Run a WordPress scan before generating site-based topics.',
+      insufficientScan: 'A site scan exists, but there was not enough data to generate ideas.',
       none: 'No new ideas found (they may already exist in your project).',
       researchFailed: 'Keyword research is unavailable right now. Try "By project data" or "By keyword".',
       skippedDuplicates: '{n} similar ideas already exist and were filtered out.',

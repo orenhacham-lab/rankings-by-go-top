@@ -253,13 +253,15 @@ export default function AutomationIdeas({
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
           {meta.reason === 'no_scan'
             ? t.noScan
-            : meta.reason === 'model_error' || meta.reason === 'http_error'
-              ? t.temporaryError
-              : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
-                ? t.researchFailed
-                : meta.reason === 'all_duplicates'
-                  ? t.allDuplicates
-                  : t.tryOther}
+            : meta.reason === 'insufficient_data'
+              ? t.insufficientScan
+              : meta.reason === 'model_error' || meta.reason === 'http_error'
+                ? t.temporaryError
+                : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
+                  ? t.researchFailed
+                  : meta.reason === 'all_duplicates'
+                    ? t.allDuplicates
+                    : t.tryOther}
         </p>
       )}
       {lastCreatedIds.length > 0 && (

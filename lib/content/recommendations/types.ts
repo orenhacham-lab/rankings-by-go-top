@@ -48,6 +48,8 @@ export interface RecommendationMeta {
   keywordResearchFailed?: boolean
   failureReason?: string
   adsCalls?: number
+  /** Non-production diagnostics (Phase 3F.1) — safe counters, no secrets. */
+  debug?: Record<string, unknown>
 }
 
 export interface RecommendationResult {

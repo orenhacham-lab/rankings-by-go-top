@@ -299,15 +299,23 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       seenTitles.add(key)
       suggestions.push(s)
     }
+    // Precise empty reason: no scan / not enough data / model failure / all
+    // ideas were duplicates of existing topics. Never a bare generic error.
+    const reason = suggestions.length > 0
+      ? undefined
+      : res.meta.reason
+        ? res.meta.reason // no_scan | insufficient_data | model_error | model_empty
+        : res.meta.generated > 0
+          ? 'all_duplicates'
+          : 'model_empty'
     meta = {
       source: 'site_scan',
       generated: res.meta.generated,
       skippedDuplicates: dupes,
       finalCount: suggestions.length,
       attempts: 1,
-      reason: suggestions.length === 0
-        ? (res.meta.reason === 'no_scan' ? 'no_scan' : res.meta.reason === 'model_error' ? 'model_error' : res.meta.generated > 0 ? 'all_duplicates' : 'model_empty')
-        : undefined,
+      reason,
+      debug: process.env.NODE_ENV !== 'production' ? { ...res.meta.debug, afterDedupeCount: suggestions.length, noResultsReason: reason ?? null } : undefined,
     }
   } else {
     // keyword_research_url — one Google Ads pass → clusters → topics, then dedupe.
