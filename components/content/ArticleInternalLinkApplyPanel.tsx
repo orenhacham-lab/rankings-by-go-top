@@ -51,10 +51,17 @@ interface PreviewResult {
   items: PreviewItem[]
 }
 
+// Phase 3B.4 — safe in-draft alternative anchors for approved links whose anchor
+// text is missing from the generated body.
+interface ReanchorSuggestion { anchorText: string; sentence: string | null; wordOffset: number | null }
+interface ReanchorLink { linkId: string; targetUrl: string; targetTitle: string | null; originalAnchor: string; suggestions: ReanchorSuggestion[] }
+
 const PREVIEW_URL = '/api/content/automation/internal-links/plan/insert/preview'
 const APPLY_URL = '/api/content/automation/internal-links/plan/insert/apply'
 const ROLLBACK_URL = '/api/content/automation/internal-links/plan/insert/rollback'
 const APPROVE_PLANNED_URL = '/api/content/automation/internal-links/plan/insert/approve-planned'
+const REANCHOR_SUGGEST_URL = '/api/content/automation/internal-links/plan/insert/reanchor/suggest'
+const REANCHOR_SELECT_URL = '/api/content/automation/internal-links/plan/insert/reanchor/select'
 
 export interface ApplyOutcome { applied: number; skipped: number; snapshotId: string | null }
 export interface PreviewSummary { hasPreview: boolean; approvedLinks: number; wouldInsert: number; wouldSkip: number }
@@ -107,6 +114,10 @@ export default function ArticleInternalLinkApplyPanel({
   const [applying, setApplying] = useState(false)
   const [rollingBack, setRollingBack] = useState(false)
   const [approvingPlanned, setApprovingPlanned] = useState(false)
+  const [reanchorLoading, setReanchorLoading] = useState(false)
+  const [reanchorLinks, setReanchorLinks] = useState<ReanchorLink[] | null>(null)
+  const [reanchorSel, setReanchorSel] = useState<Record<string, string>>({})
+  const [reanchorApplying, setReanchorApplying] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const reasonLabel = useCallback((r?: string | null): string => {
@@ -123,6 +134,7 @@ export default function ArticleInternalLinkApplyPanel({
     // A fresh preview replaces the apply-result banner + notice, but does NOT
     // clear a session rollback (the snapshot still exists until rolled back).
     setLoadingPreview(true); setError(null); onNoticeChange(null); onApplyOutcomeChange(null)
+    setReanchorLinks(null); setReanchorSel({}) // a fresh preview supersedes any re-anchor suggestions
     try {
       const res = await fetch(PREVIEW_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -177,6 +189,62 @@ export default function ArticleInternalLinkApplyPanel({
       setApprovingPlanned(false)
     }
   }, [approvingPlanned, loadingPreview, projectId, generatedArticleId, runPreview, t])
+
+  // Phase 3B.4 — approved links skipped because their exact anchor text is
+  // missing from the draft body. These are the only ones the re-anchor recovery
+  // targets; links that place normally are shown as-is.
+  const missingAnchorItems = useMemo(
+    () => (previewResult && !previewResult.reason ? previewResult.items.filter((it) => it.status === 'skipped' && (it.reason || '').startsWith('anchor_not_found_in_safe_prose')) : []),
+    [previewResult],
+  )
+
+  // Fetch SAFE alternative anchors that already exist in the draft (read-only;
+  // suggests only vetted anchor phrases present as natural prose — invents none).
+  const findReanchors = useCallback(async () => {
+    if (reanchorLoading) return
+    setReanchorLoading(true); setError(null); setReanchorLinks(null); setReanchorSel({})
+    try {
+      const res = await fetch(REANCHOR_SUGGEST_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, generatedArticleId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) { setError(t.reanchorError); return }
+      setReanchorLinks(Array.isArray(data.links) ? data.links : [])
+    } catch {
+      setError(t.reanchorError)
+    } finally {
+      setReanchorLoading(false)
+    }
+  }, [reanchorLoading, projectId, generatedArticleId, t])
+
+  const chooseReanchor = useCallback((linkId: string, anchorText: string) => {
+    setReanchorSel((prev) => ({ ...prev, [linkId]: anchorText }))
+  }, [])
+
+  // Record the chosen alternative anchors (plan anchor_text update only — no
+  // content mutation), then re-run the normal read-only preview so they surface
+  // as would_insert and the existing confirmed apply flow becomes available.
+  const applyReanchors = useCallback(async () => {
+    if (reanchorApplying) return
+    const selections = Object.entries(reanchorSel).map(([linkId, anchorText]) => ({ linkId, anchorText })).filter((s) => s.anchorText)
+    if (selections.length === 0) return
+    setReanchorApplying(true); setError(null)
+    try {
+      const res = await fetch(REANCHOR_SELECT_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, generatedArticleId, selections }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) { setError(t.reanchorApproveError); return }
+      setReanchorLinks(null); setReanchorSel({})
+      await runPreview()
+    } catch {
+      setError(t.reanchorApproveError)
+    } finally {
+      setReanchorApplying(false)
+    }
+  }, [reanchorApplying, reanchorSel, projectId, generatedArticleId, runPreview, t])
 
   const canApply =
     isDraft && !!previewToken && !!previewResult && !previewResult.reason &&
@@ -415,6 +483,69 @@ export default function ArticleInternalLinkApplyPanel({
                         )
                       })}
                     </div>
+
+                    {/* Re-anchor recovery (Phase 3B.4) — approved links whose exact
+                        anchor text is missing from the draft body. Links that place
+                        normally are shown above unchanged. */}
+                    {missingAnchorItems.length > 0 && (
+                      <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
+                        <p className="text-sm text-amber-800 dark:text-amber-300">{t.reanchorExplain}</p>
+                        <p className="mt-1 text-[11px] text-amber-700/80 dark:text-amber-400/70">{t.reanchorGuidance}</p>
+
+                        {!reanchorLinks && (
+                          <div className="mt-2">
+                            <Button size="sm" variant="outline" onClick={findReanchors} loading={reanchorLoading} disabled={reanchorLoading || applying || rollingBack}>
+                              {reanchorLoading ? t.reanchorFinding : t.reanchorFind}
+                            </Button>
+                          </div>
+                        )}
+
+                        {reanchorLinks && (
+                          <div className="mt-2 space-y-2">
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.reanchorSelectHint}</p>
+                            {reanchorLinks.map((link) => (
+                              <div key={link.linkId} className="rounded-md border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/30 p-2">
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  <span className="text-slate-400">{t.reanchorOriginalLabel}:</span>{' '}
+                                  <span className="line-through decoration-slate-300">{link.originalAnchor || '—'}</span>
+                                </div>
+                                <a href={link.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="mt-0.5 block text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline break-all">{link.targetTitle || link.targetUrl}</a>
+                                {link.suggestions.length === 0 ? (
+                                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t.reanchorNone}</p>
+                                ) : (
+                                  <>
+                                    <div className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{t.reanchorSuggestLabel}</div>
+                                    <div className="mt-1 space-y-1">
+                                      {link.suggestions.map((s, i) => (
+                                        <label key={`${link.linkId}-${i}`} className="flex flex-wrap items-start gap-2 rounded-md bg-slate-50 dark:bg-slate-800/60 p-1.5 text-[11px] cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`reanchor-${link.linkId}`}
+                                            checked={reanchorSel[link.linkId] === s.anchorText}
+                                            onChange={() => chooseReanchor(link.linkId, s.anchorText)}
+                                            disabled={reanchorApplying}
+                                            className="mt-0.5 accent-indigo-600"
+                                          />
+                                          <span className="flex-1 min-w-0">
+                                            <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{s.anchorText}</span>
+                                            {s.sentence && <span className="mt-0.5 block text-[10px] text-slate-400 dark:text-slate-500">“{s.sentence}”</span>}
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                            <div>
+                              <Button size="sm" onClick={applyReanchors} loading={reanchorApplying} disabled={reanchorApplying || Object.keys(reanchorSel).length === 0}>
+                                {reanchorApplying ? t.reanchorApproving : t.reanchorApprove}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
