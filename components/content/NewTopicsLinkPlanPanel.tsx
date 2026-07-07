@@ -102,16 +102,18 @@ export default function NewTopicsLinkPlanPanel({
         if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.loadError); return }
         if (Array.isArray(data.warnings) && (data.warnings.includes('cache_stale') || data.warnings.includes('cache_version_stale'))) setWarnNote(t.cacheStale)
         const map: Record<string, DryPlan> = {}
-        const preselect = new Set<string>()
         for (const p of Array.isArray(data.topics) ? data.topics : []) {
           const rejected: DryLink[] = Array.isArray(p.rejected) ? p.rejected : []
           const reviewable = rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
           const plan: DryPlan = { topicId: p.topicId, selected: p.selected ?? [], rejected, reviewable, summary: p.summary ?? '' }
           map[p.topicId] = plan
-          if (plan.selected.length > 0) preselect.add(p.topicId)
         }
         setPlans(map)
-        setSelected(preselect)
+        // Check ALL newly-created topics by default (not only those with
+        // recommended links) so a zero-link/no-recommendation topic is still part
+        // of the batch — it saves an auditable zero-link plan and its row badge
+        // updates. Users can uncheck any topic they don't want saved.
+        setSelected(new Set(topics.map((tp) => tp.id)))
       } catch {
         setError(t.loadError)
       } finally {
