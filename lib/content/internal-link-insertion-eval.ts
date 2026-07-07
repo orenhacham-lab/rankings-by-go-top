@@ -47,6 +47,9 @@ export interface EvalResult {
   contentChecksum: string
   linksChecksum: string
   reason?: 'no_plan_batch' | 'no_approved_links'
+  // Phase 3B.3 — count of PLANNED (saved-but-unapproved) links in the topic's
+  // latest batch, so the article panel can offer to approve them.
+  plannedLinks?: number
 }
 
 export interface EvalArticle {
@@ -73,7 +76,8 @@ export async function evaluateApprovedLinks(admin: Admin, projectId: string, art
   if (!batch) return empty('no_plan_batch', null)
   const allLinks = await getBatchLinks(admin, batch.id)
   const approved = allLinks.filter((l) => l.status === 'approved')
-  if (approved.length === 0) return { ...empty('no_approved_links', batch), approvedLinks: [] }
+  const plannedCount = allLinks.filter((l) => l.status === 'planned').length
+  if (approved.length === 0) return { ...empty('no_approved_links', batch), approvedLinks: [], plannedLinks: plannedCount }
 
   const cacheRow = await getCachedIndex(admin, projectId)
   const report = cacheRow ? reassembleReport(cacheRow) : null

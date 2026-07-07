@@ -256,7 +256,10 @@ export const dashboardEn = {
         target_caution_excluded: 'Caution target',
         over_cap: 'Beyond the auto-selected cap',
       },
-      autoApprove: 'Auto-approve the suggested links after saving',
+      autoApprove: 'Approve the links after saving',
+      // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't
+      // surprised that a saved-only plan doesn't auto-insert when the article is created.
+      planVsApproveNote: '"Save plan" saves a plan only. Only approved links are auto-inserted when an article is created. To auto-insert on creation, check "Approve the links after saving". Otherwise you can approve and insert them manually from the article page after it is created.',
       save: 'Save plan for selected topics',
       saving: 'Saving…',
       close: 'Close',
@@ -731,6 +734,12 @@ export const dashboardEn = {
         noPlan: 'No saved link plan for this topic',
         noApproved: 'No approved links to apply',
         noPlanHint: 'You can plan and approve links from the topics screen.',
+        // Phase 3B.3 — planned-but-unapproved links exist for this topic. Offer a
+        // one-click approve so the user isn't stuck at "no approved links".
+        plannedAvailable: 'There are {n} planned links saved but not yet approved. You can approve them, then preview and apply in the draft.',
+        approvePlanned: 'Approve and insert planned links',
+        approvingPlanned: 'Approving…',
+        approvePlannedError: 'Approving the planned links failed',
         previewTitle: 'Preview result',
         statusWouldInsert: 'Would insert',
         statusSkipped: 'Skipped',
@@ -762,6 +771,7 @@ export const dashboardEn = {
           readyToPreview: 'Ready to preview',
           noPlan: 'No saved plan',
           noApproved: 'No approved links',
+          plannedReady: '{n} planned — can approve',
           wouldInsert: '{n} ready to insert',
           nothingToInsert: 'Checked — nothing to insert',
           applied: '{n} inserted',

@@ -255,7 +255,10 @@ export const dashboardHe = {
         target_caution_excluded: 'יעד בזהירות',
         over_cap: 'מעל המכסה שנבחרה אוטומטית',
       },
-      autoApprove: 'אשר אוטומטית את הקישורים המוצעים לאחר שמירה',
+      autoApprove: 'אשר את הקישורים לאחר שמירה',
+      // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't
+      // surprised that a saved-only plan doesn't auto-insert when the article is created.
+      planVsApproveNote: '"שמור תכנון" שומר תכנון בלבד. רק קישורים מאושרים מוטמעים אוטומטית בעת יצירת מאמר. כדי שיוטמעו אוטומטית ביצירה, סמנו "אשר את הקישורים לאחר שמירה". אחרת אפשר לאשר ולהטמיע ידנית מדף המאמר לאחר היצירה.',
       save: 'שמור תכנון לנושאים שבחרת',
       saving: 'שומר…',
       close: 'סגור',
@@ -732,6 +735,12 @@ export const dashboardHe = {
         noPlan: 'אין תכנון קישורים שמור לנושא זה',
         noApproved: 'אין קישורים מאושרים להטמעה',
         noPlanHint: 'ניתן לתכנן ולאשר קישורים במסך ניהול הנושאים.',
+        // Phase 3B.3 — planned-but-unapproved links exist for this topic. Offer a
+        // one-click approve so the user isn't stuck at "no approved links".
+        plannedAvailable: 'יש {n} קישורים מתוכננים שנשמרו אך טרם אושרו. ניתן לאשר אותם ואז לבדוק ולהטמיע בטיוטה.',
+        approvePlanned: 'אשר והטמע קישורים מתוכננים',
+        approvingPlanned: 'מאשר…',
+        approvePlannedError: 'אישור הקישורים המתוכננים נכשל',
         previewTitle: 'תוצאת הבדיקה',
         statusWouldInsert: 'יוטמע',
         statusSkipped: 'ידולג',
@@ -764,6 +773,7 @@ export const dashboardHe = {
           readyToPreview: 'מוכן לבדיקה',
           noPlan: 'אין תכנון שמור',
           noApproved: 'אין קישורים מאושרים',
+          plannedReady: '{n} מתוכננים — ניתן לאשר',
           wouldInsert: '{n} מוכנים להטמעה',
           nothingToInsert: 'נבדק — אין מה להטמיע',
           applied: 'הוטמעו {n}',

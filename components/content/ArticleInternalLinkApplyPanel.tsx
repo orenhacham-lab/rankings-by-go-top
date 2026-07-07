@@ -41,6 +41,9 @@ interface PreviewResult {
   approvedLinks: number
   wouldInsert: number
   wouldSkip: number
+  // Phase 3B.3 — count of PLANNED (saved-but-unapproved) links in the topic's
+  // latest batch, surfaced only in the no_approved_links state.
+  plannedLinks: number
   planStale: boolean
   cacheStale: boolean
   cacheVersionStale: boolean
@@ -51,6 +54,7 @@ interface PreviewResult {
 const PREVIEW_URL = '/api/content/automation/internal-links/plan/insert/preview'
 const APPLY_URL = '/api/content/automation/internal-links/plan/insert/apply'
 const ROLLBACK_URL = '/api/content/automation/internal-links/plan/insert/rollback'
+const APPROVE_PLANNED_URL = '/api/content/automation/internal-links/plan/insert/approve-planned'
 
 export interface ApplyOutcome { applied: number; skipped: number; snapshotId: string | null }
 export interface PreviewSummary { hasPreview: boolean; approvedLinks: number; wouldInsert: number; wouldSkip: number }
@@ -102,6 +106,7 @@ export default function ArticleInternalLinkApplyPanel({
   const [previewedForHtml, setPreviewedForHtml] = useState<string>('')
   const [applying, setApplying] = useState(false)
   const [rollingBack, setRollingBack] = useState(false)
+  const [approvingPlanned, setApprovingPlanned] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const reasonLabel = useCallback((r?: string | null): string => {
@@ -133,6 +138,7 @@ export default function ArticleInternalLinkApplyPanel({
         approvedLinks,
         wouldInsert,
         wouldSkip,
+        plannedLinks: typeof data.plannedLinks === 'number' ? data.plannedLinks : 0,
         planStale: !!data.planStale,
         cacheStale: !!data.cacheStale,
         cacheVersionStale: !!data.cacheVersionStale,
@@ -148,6 +154,29 @@ export default function ArticleInternalLinkApplyPanel({
       setLoadingPreview(false)
     }
   }, [loadingPreview, projectId, generatedArticleId, contentHtml, t, onPreviewSummaryChange])
+
+  // Phase 3B.3 — when a topic has planned-but-unapproved links, flip them to
+  // approved (review-status only, no content write) then re-run the normal
+  // read-only preview so approved links surface as would_insert and the existing
+  // Apply flow becomes available. No silent auto-approve: this is an explicit
+  // button, and apply itself still requires its own confirmed click.
+  const approvePlanned = useCallback(async () => {
+    if (approvingPlanned || loadingPreview) return
+    setApprovingPlanned(true); setError(null)
+    try {
+      const res = await fetch(APPROVE_PLANNED_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, generatedArticleId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) { setError(t.approvePlannedError); return }
+      await runPreview()
+    } catch {
+      setError(t.approvePlannedError)
+    } finally {
+      setApprovingPlanned(false)
+    }
+  }, [approvingPlanned, loadingPreview, projectId, generatedArticleId, runPreview, t])
 
   const canApply =
     isDraft && !!previewToken && !!previewResult && !previewResult.reason &&
@@ -248,7 +277,7 @@ export default function ArticleInternalLinkApplyPanel({
   else if (applyOutcome) chip = { label: s.applied.replace('{n}', String(applyOutcome.applied)), tone: 'emerald' }
   else if (contentChanged) chip = { label: s.contentChanged, tone: 'amber' }
   else if (previewResult?.reason === 'no_plan_batch') chip = { label: s.noPlan, tone: 'neutral' }
-  else if (previewResult?.reason === 'no_approved_links') chip = { label: s.noApproved, tone: 'neutral' }
+  else if (previewResult?.reason === 'no_approved_links') chip = previewResult.plannedLinks > 0 ? { label: s.plannedReady.replace('{n}', String(previewResult.plannedLinks)), tone: 'amber' } : { label: s.noApproved, tone: 'neutral' }
   else if (previewResult && !previewResult.reason) {
     if (previewResult.planStale || previewResult.cacheStale || previewResult.cacheVersionStale) chip = { label: s.stale, tone: 'amber' }
     else if (previewResult.wouldInsert > 0) chip = { label: s.wouldInsert.replace('{n}', String(previewResult.wouldInsert)), tone: 'indigo' }
@@ -330,7 +359,20 @@ export default function ArticleInternalLinkApplyPanel({
                   </div>
                 )}
                 {previewResult && previewResult.reason === 'no_approved_links' && (
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t.noApproved}</p>
+                  previewResult.plannedLinks > 0 ? (
+                    <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
+                      <p className="text-sm text-amber-800 dark:text-amber-300">
+                        {t.plannedAvailable.replace('{n}', String(previewResult.plannedLinks))}
+                      </p>
+                      <div className="mt-2">
+                        <Button size="sm" onClick={approvePlanned} loading={approvingPlanned} disabled={approvingPlanned || loadingPreview}>
+                          {approvingPlanned ? t.approvingPlanned : t.approvePlanned}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t.noApproved}</p>
+                  )
                 )}
 
                 {previewResult && !previewResult.reason && (

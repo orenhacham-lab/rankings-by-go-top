@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   const base = { dryRun: true, projectId: project.id, generatedArticleId, contentChanged: false }
   if (evalRes.reason) {
-    return Response.json({ ...base, batchId: evalRes.batch?.id ?? null, approvedLinks: 0, wouldInsert: 0, wouldSkip: 0, reason: evalRes.reason, previewToken: null, items: [] })
+    return Response.json({ ...base, batchId: evalRes.batch?.id ?? null, approvedLinks: 0, wouldInsert: 0, wouldSkip: 0, plannedLinks: evalRes.plannedLinks ?? 0, reason: evalRes.reason, previewToken: null, items: [] })
   }
 
   const wouldInsert = evalRes.items.filter((i) => i.status === 'would_insert').length

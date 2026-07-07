@@ -343,6 +343,9 @@ export default function NewTopicsLinkPlanPanel({
               })}
             </div>
 
+            {/* Planned-vs-approved clarification (Phase 3B.3). */}
+            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">{t.planVsApproveNote}</p>
+
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <label className="inline-flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
                 <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving} className="accent-indigo-600" />
