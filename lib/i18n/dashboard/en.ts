@@ -70,6 +70,7 @@ export const dashboardEn = {
       allKnown: 'No new ideas were found beyond what is already saved, approved, or rejected.',
       krAllKnown: 'All keyword-research ideas have already been saved, approved, or rejected.',
       krThin: 'Keyword research returned too little data. Try adding a broader starting keyword.',
+      primaryKeywordExists: 'All generated ideas use primary keywords that already exist in the project or site.',
       creating: 'Saving…',
       createdToast: 'Added {n} approved topics',
       createdSkipped: 'Added {n} · {m} already existed',

@@ -12,7 +12,8 @@
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
-import { markIdeasApprovedForTopics } from '@/lib/content/recommendations/topic-idea-store'
+import { markIdeasApprovedForTopics, normalizeText } from '@/lib/content/recommendations/topic-idea-store'
+import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
 import type { ArticleTopicSource } from '@/lib/supabase/types'
 
 const ALLOWED_SOURCES: ArticleTopicSource[] = ['keyword', 'project_data', 'keyword_research_url']
@@ -69,6 +70,12 @@ export async function POST(request: Request) {
   const { data: articleRows } = await auth.admin.from('generated_articles').select('title, slug').eq('project_id', auth.project.id)
   for (const a of (articleRows ?? []) as { title: string; slug: string | null }[]) { corpus.add(a.title); corpus.add(a.slug) }
 
+  // Phase 3F.3.1b — exact primary-keyword guard against EXISTING CONTENT keywords
+  // (project keywords, topic/generated keywords, reliable site-scan focus
+  // keywords). Excludes persisted ideas so approving a pending idea isn't blocked
+  // by its own row. Exact-normalized only.
+  const guard = await buildKeywordGuard(auth.admin, auth.project.id)
+
   const nowIso = new Date().toISOString()
   const rows: Record<string, unknown>[] = []
   const seenInBatch = new Set<string>()
@@ -80,6 +87,7 @@ export async function POST(request: Request) {
     if (!title || !primaryKeyword) { skipped++; continue }
     const batchKey = primaryKeyword.toLowerCase()
     if (seenInBatch.has(batchKey)) { skipped++; continue }
+    if (guard.contentKeywords.has(normalizeText(primaryKeyword))) { skipped++; continue }
     if (corpus.isDuplicate(primaryKeyword) || corpus.isDuplicate(title)) { skipped++; continue }
     seenInBatch.add(batchKey)
 

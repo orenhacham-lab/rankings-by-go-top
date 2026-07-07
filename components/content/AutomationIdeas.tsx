@@ -289,18 +289,20 @@ export default function AutomationIdeas({
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
       )}
-      {/* "All newly generated ideas were already saved/approved/rejected" — shown
-          even when existing pending ideas remain visible below. */}
-      {meta && (meta.reason === 'all_known' || meta.reason === 'kr_all_known') && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{meta.reason === 'kr_all_known' ? t.krAllKnown : t.allKnown}</p>
+      {/* "All newly generated ideas were already saved/approved/rejected/exist" —
+          shown even when existing pending ideas remain visible below. */}
+      {meta && (meta.reason === 'all_known' || meta.reason === 'kr_all_known' || meta.reason === 'primary_keyword_exists') && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+          {meta.reason === 'primary_keyword_exists' ? t.primaryKeywordExists : meta.reason === 'kr_all_known' ? t.krAllKnown : t.allKnown}
+        </p>
       )}
       {/* Batch feedback: what was found vs. filtered, or a helpful empty reason. */}
-      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && suggestions.length > 0 && (
+      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && meta.reason !== 'primary_keyword_exists' && suggestions.length > 0 && (
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
           {t.foundSummary.replace('{found}', String(suggestions.length)).replace('{skipped}', String(meta.skippedDuplicates))}
         </p>
       )}
-      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && suggestions.length === 0 && !loading && (
+      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && meta.reason !== 'primary_keyword_exists' && suggestions.length === 0 && !loading && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
           {meta.reason === 'no_scan'
             ? t.noScan
