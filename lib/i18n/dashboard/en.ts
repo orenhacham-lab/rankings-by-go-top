@@ -335,6 +335,7 @@ export const dashboardEn = {
       newPostConfirm: 'This article was already exported to WordPress. Create another new post?',
       published: 'The article was published',
       draftSent: 'The article was sent to WordPress as a draft',
+      keywordAdded: 'The keyword was added to the project keywords',
       marked: 'The article was marked ready to publish',
       markBlocked: 'There are blockers to fix. Open the editor.',
       errImage: 'Publishing failed due to a featured-image problem. Regenerate the image or send as a draft.',

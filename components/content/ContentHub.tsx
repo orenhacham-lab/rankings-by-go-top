@@ -185,6 +185,9 @@ export default function ContentHub() {
           ...(wpStatus === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}),
         })
         toast.success(wpStatus === 'publish' ? t.rowWp.published : t.rowWp.draftSent)
+        // Phase 3E.1 — surface the keyword-added feedback in the list flow too
+        // (only when the publish actually added a new project keyword).
+        if (wpStatus === 'publish' && d.keywordAdded) toast.success(t.rowWp.keywordAdded)
         load() // sync authoritative fields (published_at, etc.)
         return
       }

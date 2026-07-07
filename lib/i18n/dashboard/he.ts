@@ -336,6 +336,7 @@ export const dashboardHe = {
       newPostConfirm: 'המאמר כבר נשלח ל-WordPress. ליצור פוסט חדש נוסף?',
       published: 'המאמר פורסם באתר',
       draftSent: 'המאמר נשלח ל-WordPress כטיוטה',
+      keywordAdded: 'המילה נוספה למילות המפתח של הפרויקט',
       marked: 'המאמר סומן כמוכן לפרסום',
       markBlocked: 'יש חוסמים שצריך לתקן. פתחו את העורך.',
       errImage: 'הפרסום נכשל בגלל בעיה בתמונה הראשית. נסו ליצור תמונה מחדש או שלחו כטיוטה.',
