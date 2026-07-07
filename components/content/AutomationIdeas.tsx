@@ -291,28 +291,30 @@ export default function AutomationIdeas({
       )}
       {/* "All newly generated ideas were already saved/approved/rejected" — shown
           even when existing pending ideas remain visible below. */}
-      {meta && meta.reason === 'all_known' && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{t.allKnown}</p>
+      {meta && (meta.reason === 'all_known' || meta.reason === 'kr_all_known') && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{meta.reason === 'kr_all_known' ? t.krAllKnown : t.allKnown}</p>
       )}
       {/* Batch feedback: what was found vs. filtered, or a helpful empty reason. */}
-      {meta && meta.reason !== 'all_known' && suggestions.length > 0 && (
+      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && suggestions.length > 0 && (
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
           {t.foundSummary.replace('{found}', String(suggestions.length)).replace('{skipped}', String(meta.skippedDuplicates))}
         </p>
       )}
-      {meta && meta.reason !== 'all_known' && suggestions.length === 0 && !loading && (
+      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && suggestions.length === 0 && !loading && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
           {meta.reason === 'no_scan'
             ? t.noScan
             : meta.reason === 'insufficient_data'
               ? t.insufficientScan
-              : meta.reason === 'model_error' || meta.reason === 'http_error'
-                ? t.temporaryError
-                : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
-                  ? t.researchFailed
-                  : meta.reason === 'all_duplicates'
-                    ? t.allDuplicates
-                    : t.tryOther}
+              : meta.reason === 'kr_thin' || meta.reason === 'no_keyword_data'
+                ? t.krThin
+                : meta.reason === 'model_error' || meta.reason === 'http_error'
+                  ? t.temporaryError
+                  : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
+                    ? t.researchFailed
+                    : meta.reason === 'all_duplicates'
+                      ? t.allDuplicates
+                      : t.tryOther}
         </p>
       )}
       {/* No saved ideas yet (fresh project / after clearing all) — calm prompt. */}

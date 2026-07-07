@@ -20,11 +20,15 @@ import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/
 import { clusterByTokens, tokens, slugKey } from './dedupe'
 import type { TopicSuggestion } from './types'
 
-const MAX_URL_SEEDS = 3
-const MAX_ADS_CALLS = 3
-const MAX_KEYWORDS = 80
-const MAX_CLUSTERS = 20
+// Phase 3F.3.1 — broadened (but still bounded) so the source doesn't exhaust
+// after ~2 runs: more URL seeds, an extra keyword-seed pass, a larger raw pool,
+// and more clusters → more distinct topics from a site's full breadth.
+const MAX_URL_SEEDS = 5
+const MAX_ADS_CALLS = 6
+const MAX_KEYWORDS = 150
+const MAX_CLUSTERS = 40
 const MIN_MONTHLY = 30
+const MAX_KEYWORD_SEEDS = 20
 
 const SUPPORT_TERMS = [
   'טלפון', 'משלוח', 'משלוחים', 'אחריות', 'קופון', 'קופונים', 'סניף', 'סניפים', 'ביטול',
@@ -40,6 +44,10 @@ export interface KeywordResearchInput {
   language: string
   businessName: string | null
   category: string | null
+  /** Phase 3F.3.1 — seed keywords (e.g. project tracked keywords) to widen the pool. */
+  seedKeywords?: string[]
+  /** Phase 3F.3.1 — normalized primary keywords already known; those clusters are skipped. */
+  avoid?: string[]
 }
 
 interface ClusterInput {
@@ -82,7 +90,31 @@ async function fetchSeed(
     country: input.country,
     language: input.language,
     minMonthlySearches: MIN_MONTHLY,
-    resultsLimit: 100,
+    resultsLimit: 250,
+  })
+  await setCachedKeywordResults(admin, input.userId, key, results)
+  return results
+}
+
+/** Fetch keyword ideas for a batch of seed KEYWORDS (cache-first). Never throws. */
+async function fetchKeywordSeed(
+  admin: ReturnType<typeof createAdminClient>,
+  input: KeywordResearchInput,
+  seedKeywords: string[],
+): Promise<KeywordIdeaResult[]> {
+  const seeds = seedKeywords.map((k) => k.trim()).filter(Boolean).slice(0, MAX_KEYWORD_SEEDS)
+  if (seeds.length === 0) return []
+  const cacheKeyValue = seeds.slice(0, 8).join('|').toLowerCase()
+  const key = { projectId: input.projectId, seedType: 'keyword' as const, seedValue: cacheKeyValue, country: input.country, language: input.language }
+  const cached = await getCachedKeywordResults(admin, key)
+  if (cached) return cached
+  const { results } = await generateKeywordIdeas({
+    researchType: 'keyword',
+    keywords: seeds,
+    country: input.country,
+    language: input.language,
+    minMonthlySearches: MIN_MONTHLY,
+    resultsLimit: 250,
   })
   await setCachedKeywordResults(admin, input.userId, key, results)
   return results
@@ -142,6 +174,10 @@ export interface KeywordResearchMeta {
   adsCalls: number
   keywordResearchFailed?: boolean
   failureReason?: string
+  // Phase 3F.3.1 diagnostics.
+  rawKeywords?: number
+  clusters?: number
+  reason?: 'keyword_research_failed' | 'thin_data' | 'all_known'
 }
 
 export async function recommendFromKeywordResearch(
@@ -156,25 +192,38 @@ export async function recommendFromKeywordResearch(
   const merged = new Map<string, KeywordIdeaResult>()
   let adsCalls = 0
   let failureReason: string | undefined
+  const absorb = (rows: KeywordIdeaResult[]) => {
+    for (const r of rows) {
+      const k = r.keyword.trim().toLowerCase()
+      if (!k) continue
+      const prev = merged.get(k)
+      if (!prev || (r.avgMonthlySearches ?? 0) > (prev.avgMonthlySearches ?? 0)) merged.set(k, r)
+    }
+  }
   for (const url of seeds) {
     if (adsCalls >= MAX_ADS_CALLS) break
     try {
       adsCalls++
-      const rows = await fetchSeed(admin, { ...input, country, language }, url)
-      for (const r of rows) {
-        const k = r.keyword.trim().toLowerCase()
-        if (!k) continue
-        const prev = merged.get(k)
-        if (!prev || (r.avgMonthlySearches ?? 0) > (prev.avgMonthlySearches ?? 0)) merged.set(k, r)
-      }
+      absorb(await fetchSeed(admin, { ...input, country, language }, url))
     } catch (e) {
       failureReason = e instanceof GoogleAdsError ? e.code : 'keyword_research_failed'
       break // stop hitting Google after the first failure
     }
   }
+  // Extra keyword-seed pass (project keywords / categories) to widen the pool
+  // beyond what the site URLs alone surface — one call, still cache-first.
+  const seedKeywords = (input.seedKeywords ?? []).filter(Boolean)
+  if (!failureReason && seedKeywords.length > 0 && adsCalls < MAX_ADS_CALLS) {
+    try {
+      adsCalls++
+      absorb(await fetchKeywordSeed(admin, { ...input, country, language }, seedKeywords))
+    } catch (e) {
+      failureReason = e instanceof GoogleAdsError ? e.code : failureReason
+    }
+  }
 
   if (merged.size === 0) {
-    return { suggestions: [], meta: { generated: 0, adsCalls, keywordResearchFailed: !!failureReason, failureReason } }
+    return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords: 0, clusters: 0, keywordResearchFailed: !!failureReason, failureReason, reason: failureReason ? 'keyword_research_failed' : 'thin_data' } }
   }
 
   // 2) Filter brand/support + sort by volume + cap.
@@ -188,6 +237,9 @@ export async function recommendFromKeywordResearch(
   const volumeByKw = new Map(filtered.map((r) => [r.keyword.trim().toLowerCase(), r.avgMonthlySearches ?? 0]))
   // Higher threshold = less merging = MORE distinct clusters = more article ideas.
   const clusters = clusterByTokens(filtered.map((r) => r.keyword), 0.6).slice(0, MAX_CLUSTERS)
+  // Skip clusters whose primary keyword is already known (exact normalized), so
+  // repeat "find more" runs surface FRESH clusters instead of the same batch.
+  const avoidSet = new Set((input.avoid ?? []).map((a) => a.trim().toLowerCase().replace(/\s+/g, ' ')).filter(Boolean))
   const clusterInputs: ClusterInput[] = clusters
     .map((members) => {
       const sorted = [...members].sort((a, b) => (volumeByKw.get(b.toLowerCase()) ?? 0) - (volumeByKw.get(a.toLowerCase()) ?? 0))
@@ -198,7 +250,12 @@ export async function recommendFromKeywordResearch(
         volume: volumeByKw.get(primaryKeyword.toLowerCase()) ?? 0,
       }
     })
-    .filter((c) => c.primaryKeyword)
+    .filter((c) => c.primaryKeyword && !avoidSet.has(c.primaryKeyword.trim().toLowerCase().replace(/\s+/g, ' ')))
+
+  // Every candidate cluster was already known → clean "all known", not an error.
+  if (clusterInputs.length === 0) {
+    return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords: filtered.length, clusters: clusters.length, keywordResearchFailed: !!failureReason, failureReason, reason: clusters.length > 0 ? 'all_known' : 'thin_data' } }
+  }
 
   // 4) Gemini clusters → topics (with a deterministic fallback title).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
@@ -228,5 +285,5 @@ export async function recommendFromKeywordResearch(
     }
   })
 
-  return { suggestions, meta: { generated: suggestions.length, adsCalls, keywordResearchFailed: !!failureReason, failureReason } }
+  return { suggestions, meta: { generated: suggestions.length, adsCalls, rawKeywords: filtered.length, clusters: clusters.length, keywordResearchFailed: !!failureReason, failureReason } }
 }

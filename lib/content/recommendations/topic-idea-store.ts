@@ -24,14 +24,18 @@ const TABLE = 'content_topic_ideas'
 const MISSING_TABLE = '42P01'
 
 /**
- * Conservative normalized fingerprint from primary_keyword (preferred) or title:
- * lowercase, collapse whitespace, strip edge punctuation. NO fuzzy/stemming —
- * only near-identical ideas collide, so long-tail variants stay distinct.
+ * Conservative normalized form: lowercase, collapse whitespace, strip edge
+ * punctuation. EXACT-normalized only — no fuzzy/stemming — so long-tail variants
+ * stay distinct ("הליכון ביתי" never blocks "תחזוקת הליכון ביתי").
  */
-export function topicIdeaFingerprint(primaryKeyword: string | null | undefined, title: string | null | undefined): string {
-  const base = primaryKeyword && primaryKeyword.trim() ? primaryKeyword : (title || '')
+export function normalizeText(s: string | null | undefined): string {
   const edge = /^[\s"'“”׳״.,:;!?()[\]{}\-–—/|]+|[\s"'“”׳״.,:;!?()[\]{}\-–—/|]+$/g
-  return base.toLowerCase().replace(/\s+/g, ' ').trim().replace(edge, '').trim()
+  return (s || '').toLowerCase().replace(/\s+/g, ' ').trim().replace(edge, '').trim()
+}
+
+/** Fingerprint (insert unique key) from primary_keyword (preferred) or title. */
+export function topicIdeaFingerprint(primaryKeyword: string | null | undefined, title: string | null | undefined): string {
+  return normalizeText(primaryKeyword && primaryKeyword.trim() ? primaryKeyword : (title || ''))
 }
 
 /** Map a persisted idea row to the UI/engine TopicSuggestion shape (id = row id). */
@@ -53,14 +57,20 @@ export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { 
 }
 
 /**
- * All fingerprints already known for a project (any status), so a re-generation
- * doesn't re-offer pending/approved/rejected ideas. Returns null when the table
- * is missing (caller falls back to session-only).
+ * All normalized strings already known for a project (any idea status): both the
+ * title AND the primary keyword of every stored idea. A re-generation is filtered
+ * if its normalized title OR keyword matches one of these — so an approved idea
+ * never comes back regardless of which field the model varies. Returns null when
+ * the table is missing (caller falls back to session-only).
  */
-export async function loadKnownFingerprints(admin: Admin, projectId: string): Promise<Set<string> | null> {
-  const { data, error } = await admin.from(TABLE).select('fingerprint').eq('project_id', projectId)
+export async function loadKnownStrings(admin: Admin, projectId: string): Promise<Set<string> | null> {
+  const { data, error } = await admin.from(TABLE).select('title, primary_keyword, fingerprint').eq('project_id', projectId)
   if (error) { if ((error as { code?: string }).code === MISSING_TABLE) return null; return new Set() }
-  return new Set(((data ?? []) as { fingerprint: string }[]).map((r) => (r.fingerprint || '').toLowerCase()).filter(Boolean))
+  const set = new Set<string>()
+  for (const r of (data ?? []) as { title: string; primary_keyword: string | null; fingerprint: string }[]) {
+    for (const v of [r.fingerprint, normalizeText(r.title), normalizeText(r.primary_keyword)]) if (v) set.add(v)
+  }
+  return set
 }
 
 /** Pending ideas for a project, newest first. Null = table missing. */
@@ -126,16 +136,58 @@ export async function rejectIdeas(admin: Admin, projectId: string, ideaIds: stri
   return ((data ?? []) as { id: string }[]).length
 }
 
-/** Mark ideas approved and link them to the created article_topics rows. Best-effort. */
-export async function markIdeasApproved(admin: Admin, projectId: string, pairs: { ideaId: string; topicId: string }[]): Promise<void> {
+export interface ApproveMatchTopic {
+  title: string
+  primaryKeyword: string
+  ideaId?: string
+}
+
+/**
+ * Mark the persisted ideas that were just approved into article_topics. Robust
+ * matching (Phase 3F.3.1): resolves each idea by explicit ideaId when present,
+ * otherwise by EXACT normalized primary_keyword or title against the project's
+ * PENDING ideas — so approval works even for old payloads without an ideaId.
+ * Only pending ideas are touched. Best-effort; never throws.
+ */
+export async function markIdeasApprovedForTopics(
+  admin: Admin,
+  projectId: string,
+  incoming: ApproveMatchTopic[],
+  createdRows: { id: string; topic: string; primary_keyword: string | null }[],
+): Promise<void> {
+  const { data, error } = await admin.from(TABLE).select('id, title, primary_keyword').eq('project_id', projectId).eq('status', 'pending')
+  if (error) return // table missing / error → nothing to mark
+  const pending = (data ?? []) as { id: string; title: string; primary_keyword: string | null }[]
+  const byTitle = new Map<string, string>()
+  const byKw = new Map<string, string>()
+  for (const p of pending) {
+    const t = normalizeText(p.title); if (t) byTitle.set(t, p.id)
+    const k = normalizeText(p.primary_keyword); if (k) byKw.set(k, p.id)
+  }
+  const topicByKw = new Map<string, string>()
+  const topicByTitle = new Map<string, string>()
+  for (const r of createdRows) {
+    const k = normalizeText(r.primary_keyword); if (k) topicByKw.set(k, r.id)
+    const t = normalizeText(r.topic); if (t) topicByTitle.set(t, r.id)
+  }
+  const pairs = new Map<string, string | null>() // ideaId → topicId (null when it matched an existing topic)
+  for (const it of incoming) {
+    const nt = normalizeText(it.title)
+    const nk = normalizeText(it.primaryKeyword)
+    const ideaId = (typeof it.ideaId === 'string' && it.ideaId) ? it.ideaId : (byKw.get(nk) ?? byTitle.get(nt))
+    if (!ideaId) continue
+    const topicId = topicByKw.get(nk) ?? topicByTitle.get(nt) ?? null
+    if (!pairs.has(ideaId) || (pairs.get(ideaId) === null && topicId)) pairs.set(ideaId, topicId)
+  }
   const nowIso = new Date().toISOString()
-  for (const p of pairs) {
+  for (const [ideaId, topicId] of pairs) {
     try {
       await admin
         .from(TABLE)
-        .update({ status: 'approved', approved_topic_id: p.topicId, approved_at: nowIso, updated_at: nowIso })
+        .update({ status: 'approved', approved_topic_id: topicId, approved_at: nowIso, updated_at: nowIso })
         .eq('project_id', projectId)
-        .eq('id', p.ideaId)
+        .eq('id', ideaId)
+        .eq('status', 'pending')
     } catch { /* best-effort */ }
   }
 }

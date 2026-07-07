@@ -318,10 +318,19 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       debug: process.env.NODE_ENV !== 'production' ? { ...res.meta.debug, afterDedupeCount: suggestions.length, noResultsReason: reason ?? null } : undefined,
     }
   } else {
-    // keyword_research_url — one Google Ads pass → clusters → topics, then dedupe.
+    // keyword_research_url — Google Ads over URL + keyword seeds → clusters →
+    // topics, then dedupe. Phase 3F.3.1: widen with project tracked keywords as
+    // extra seeds and skip already-covered clusters so "find more" keeps working.
     const seedUrls = [homepageFromDomain(project.target_domain), ...linkCandidates.map((c) => c.url)].filter((u): u is string => !!u)
+    const { data: kwSeedRows } = await admin
+      .from('tracking_targets').select('keyword, avg_monthly_searches')
+      .eq('project_id', input.projectId)
+      .order('avg_monthly_searches', { ascending: false, nullsFirst: false })
+      .limit(20)
+    const seedKeywords = ((kwSeedRows ?? []) as { keyword: string }[]).map((r) => r.keyword).filter(Boolean)
     const res = await recommendFromKeywordResearch(admin, {
       userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
+      seedKeywords, avoid: existingTitles,
     })
     const seenTitles = new Set<string>()
     let dupes = 0
@@ -341,7 +350,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       keywordResearchFailed: res.meta.keywordResearchFailed,
       failureReason: res.meta.failureReason,
       adsCalls: res.meta.adsCalls,
-      reason: suggestions.length === 0 ? (res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
+      reason: suggestions.length === 0 ? (res.meta.reason === 'keyword_research_failed' || res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.reason === 'thin_data' ? 'kr_thin' : res.meta.reason === 'all_known' ? 'kr_all_known' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
     }
   }
 

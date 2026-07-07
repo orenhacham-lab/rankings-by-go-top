@@ -12,7 +12,7 @@
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
-import { markIdeasApproved } from '@/lib/content/recommendations/topic-idea-store'
+import { markIdeasApprovedForTopics } from '@/lib/content/recommendations/topic-idea-store'
 import type { ArticleTopicSource } from '@/lib/supabase/types'
 
 const ALLOWED_SOURCES: ArticleTopicSource[] = ['keyword', 'project_data', 'keyword_research_url']
@@ -72,9 +72,6 @@ export async function POST(request: Request) {
   const nowIso = new Date().toISOString()
   const rows: Record<string, unknown>[] = []
   const seenInBatch = new Set<string>()
-  // Phase 3F.3 — map the created topic (by primary keyword, unique within a
-  // batch) back to its persisted idea so it can be marked approved after insert.
-  const ideaByKw = new Map<string, string>()
   let skipped = 0
 
   for (const it of incoming) {
@@ -85,7 +82,6 @@ export async function POST(request: Request) {
     if (seenInBatch.has(batchKey)) { skipped++; continue }
     if (corpus.isDuplicate(primaryKeyword) || corpus.isDuplicate(title)) { skipped++; continue }
     seenInBatch.add(batchKey)
-    if (typeof it.ideaId === 'string' && it.ideaId) ideaByKw.set(batchKey, it.ideaId)
 
     const source: ArticleTopicSource = ALLOWED_SOURCES.includes(it.source as ArticleTopicSource)
       ? (it.source as ArticleTopicSource)
@@ -136,14 +132,13 @@ export async function POST(request: Request) {
   const createdRows = (data ?? []) as { id: string; topic: string; primary_keyword: string | null }[]
   const ids = createdRows.map((r) => r.id)
 
-  // Phase 3F.3 — mark the corresponding persisted ideas approved (best-effort;
-  // never fails the creation, and no-ops when nothing was approved from ideas).
-  if (ideaByKw.size > 0) {
-    const pairs = createdRows
-      .map((r) => { const id = ideaByKw.get((r.primary_keyword || '').toLowerCase()); return id ? { ideaId: id, topicId: r.id } : null })
-      .filter((p): p is { ideaId: string; topicId: string } => !!p)
-    if (pairs.length) await markIdeasApproved(auth.admin, auth.project.id, pairs)
-  }
+  // Phase 3F.3.1 — mark the corresponding persisted ideas approved. Robust match
+  // by ideaId OR exact normalized title/keyword (pending-only) so approval works
+  // even without an ideaId; best-effort and no-ops when persistence is absent.
+  const approveMatch = incoming
+    .map((it) => ({ title: String(it.title ?? '').trim(), primaryKeyword: String(it.primaryKeyword ?? '').trim(), ideaId: typeof it.ideaId === 'string' ? it.ideaId : undefined }))
+    .filter((m) => m.title || m.primaryKeyword)
+  await markIdeasApprovedForTopics(auth.admin, auth.project.id, approveMatch, createdRows)
 
   return Response.json({ created: ids.length, skipped, ids, topics: createdRows })
 }

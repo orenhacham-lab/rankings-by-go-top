@@ -68,6 +68,8 @@ export const dashboardEn = {
       rejecting: 'Rejecting…',
       noSavedIdeas: 'No saved ideas yet. Generate new ideas to get started.',
       allKnown: 'No new ideas were found beyond what is already saved, approved, or rejected.',
+      krAllKnown: 'All keyword-research ideas have already been saved, approved, or rejected.',
+      krThin: 'Keyword research returned too little data. Try adding a broader starting keyword.',
       creating: 'Saving…',
       createdToast: 'Added {n} approved topics',
       createdSkipped: 'Added {n} · {m} already existed',

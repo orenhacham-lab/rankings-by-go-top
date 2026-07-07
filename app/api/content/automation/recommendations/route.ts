@@ -11,7 +11,7 @@
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
-import { loadKnownFingerprints, insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, topicIdeaFingerprint } from '@/lib/content/recommendations/topic-idea-store'
+import { loadKnownStrings, insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText } from '@/lib/content/recommendations/topic-idea-store'
 import { randomUUID } from 'crypto'
 
 const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan']
@@ -52,20 +52,28 @@ export async function POST(request: Request) {
     // pending set (so ideas survive refresh and "find more" appends). Best-effort:
     // if the ideas table is missing (migration not applied) fall back to the
     // previous session-only response with no regression.
-    const known = await loadKnownFingerprints(auth.admin, auth.project.id)
+    const known = await loadKnownStrings(auth.admin, auth.project.id)
     if (known === null) return Response.json(result)
 
-    // Also treat existing project keywords (tracking_targets) as "known" so a
-    // topic identical to a tracked keyword is not re-offered.
+    // Phase 3F.3.1 — comprehensive EXACT-normalized known set so an approved idea
+    // never reappears regardless of which field the model varies: existing topic
+    // titles + primary keywords, generated-article titles, and exact tracked
+    // keywords. Exact-normalized only — long-tail variants stay allowed.
     try {
+      const { data: topicRows } = await auth.admin.from('article_topics').select('topic, primary_keyword').eq('project_id', auth.project.id)
+      for (const t of (topicRows ?? []) as { topic: string; primary_keyword: string | null }[]) { for (const v of [normalizeText(t.topic), normalizeText(t.primary_keyword)]) if (v) known.add(v) }
+      const { data: artRows } = await auth.admin.from('generated_articles').select('title').eq('project_id', auth.project.id)
+      for (const a of (artRows ?? []) as { title: string | null }[]) { const v = normalizeText(a.title); if (v) known.add(v) }
       const { data: kwRows } = await auth.admin.from('tracking_targets').select('keyword').eq('project_id', auth.project.id)
-      for (const r of (kwRows ?? []) as { keyword: string }[]) { const fp = topicIdeaFingerprint(r.keyword, null); if (fp) known.add(fp) }
-    } catch { /* keyword table optional */ }
+      for (const r of (kwRows ?? []) as { keyword: string }[]) { const v = normalizeText(r.keyword); if (v) known.add(v) }
+    } catch { /* optional signals */ }
 
     const fresh = result.suggestions.filter((s) => {
-      const fp = topicIdeaFingerprint(s.primaryKeyword, s.title)
-      if (!fp || known.has(fp)) return false
-      known.add(fp)
+      const nt = normalizeText(s.title)
+      const nk = normalizeText(s.primaryKeyword)
+      if ((nt && known.has(nt)) || (nk && known.has(nk))) return false
+      if (nt) known.add(nt)
+      if (nk) known.add(nk)
       return true
     })
     await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
@@ -74,9 +82,12 @@ export async function POST(request: Request) {
     if (pending === null) return Response.json(result)
     const suggestions = pending.map(ideaToSuggestion)
     const filteredExisting = result.suggestions.length - fresh.length
+    // Precise "nothing new" reason. Keyword-research gets a source-specific
+    // message so exhaustion reads as "already saved/approved/rejected", not error.
+    const allKnownReason = source === 'keyword_research_url' ? 'kr_all_known' : 'all_known'
     const reason = suggestions.length === 0
-      ? (result.meta.reason ?? undefined)
-      : (fresh.length === 0 && result.suggestions.length > 0 ? 'all_known' : undefined)
+      ? (result.meta.reason ?? (result.suggestions.length > 0 ? allKnownReason : undefined))
+      : (fresh.length === 0 && result.suggestions.length > 0 ? allKnownReason : undefined)
     return Response.json({
       suggestions,
       meta: { ...result.meta, persisted: true, newlySaved: fresh.length, filteredExisting, pendingCount: suggestions.length, reason },
