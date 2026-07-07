@@ -21,6 +21,27 @@ const STALE_LOCK_MS = 45 * 60 * 1000 // 45 minutes
 const MAX_GENERATIONS_PER_RUN = Math.max(0, Number(process.env.AUTOMATION_MAX_GENERATIONS_PER_RUN) || 1)
 const DESIRED_READY_AHEAD = 1
 
+export interface PoolDiagnostic {
+  projectId: string
+  poolId: string
+  active: boolean
+  timezone: string
+  nextPublishAt: string | null
+  now: string
+  due: boolean
+  queuedCount: number
+  generatedCount: number
+  selectedTopicId: string | null
+  selectedTopicTitle: string | null
+  generateAttempted: boolean
+  generateResult: string | null
+  publishAttempted: boolean
+  publishResult: string | null
+  nextPublishAtAfter: string | null
+  note: string | null
+  error: string | null
+}
+
 export interface AutomationSummary {
   poolsChecked: number
   staleRecovered: number
@@ -29,7 +50,9 @@ export interface AutomationSummary {
   skipped: number
   failures: number
   durationMs: number
+  dryRun: boolean
   details: string[]
+  diagnostics: PoolDiagnostic[]
 }
 
 const nowIso = () => new Date().toISOString()
@@ -76,13 +99,39 @@ async function recoverStaleLocks(admin: Admin, projectId: string | undefined, cu
   }
 }
 
-export async function runAutomation(admin: Admin, opts: { projectId?: string } = {}): Promise<AutomationSummary> {
+async function countItems(admin: Admin, poolId: string, status: string): Promise<number> {
+  const { count } = await admin.from('article_pool_items').select('id', { count: 'exact', head: true }).eq('pool_id', poolId).eq('status', status)
+  return count ?? 0
+}
+
+/** Earliest item of a status in a pool (+ its topic title), or null. */
+async function earliestItem(admin: Admin, poolId: string, status: string): Promise<{ id: string; topicId: string | null; topicTitle: string | null } | null> {
+  const { data } = await admin
+    .from('article_pool_items')
+    .select('id, topic_id')
+    .eq('pool_id', poolId)
+    .eq('status', status)
+    .order('position', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const row = data as { id: string; topic_id: string | null } | null
+  if (!row) return null
+  let topicTitle: string | null = null
+  if (row.topic_id) {
+    const { data: t } = await admin.from('article_topics').select('topic').eq('id', row.topic_id).maybeSingle()
+    topicTitle = (t as { topic?: string } | null)?.topic ?? null
+  }
+  return { id: row.id, topicId: row.topic_id, topicTitle }
+}
+
+export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean } = {}): Promise<AutomationSummary> {
   const started = Date.now()
-  const summary: AutomationSummary = { poolsChecked: 0, staleRecovered: 0, generated: 0, published: 0, skipped: 0, failures: 0, durationMs: 0, details: [] }
+  const dryRun = opts.dryRun === true
+  const summary: AutomationSummary = { poolsChecked: 0, staleRecovered: 0, generated: 0, published: 0, skipped: 0, failures: 0, durationMs: 0, dryRun, details: [], diagnostics: [] }
   const nowMs = Date.now()
   const cutoffIso = new Date(nowMs - STALE_LOCK_MS).toISOString()
 
-  await recoverStaleLocks(admin, opts.projectId, cutoffIso, summary)
+  if (!dryRun) await recoverStaleLocks(admin, opts.projectId, cutoffIso, summary)
 
   let poolQ = admin.from('article_pools').select('id, project_id, cadence, interval_days, publish_time, timezone, next_publish_at, publish_days').eq('is_active', true)
   if (opts.projectId) poolQ = poolQ.eq('project_id', opts.projectId)
@@ -90,73 +139,102 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string } =
   const poolRows = (pools ?? []) as PoolRow[]
   summary.poolsChecked = poolRows.length
 
+  // Diagnostic: an active project with NO active pool is a common "nothing runs"
+  // cause. Surface it explicitly when scoped to one project.
+  if (opts.projectId && poolRows.length === 0) {
+    summary.diagnostics.push({
+      projectId: opts.projectId, poolId: '', active: false, timezone: DEFAULT_TIMEZONE, nextPublishAt: null, now: nowIso(),
+      due: false, queuedCount: 0, generatedCount: 0, selectedTopicId: null, selectedTopicTitle: null,
+      generateAttempted: false, generateResult: null, publishAttempted: false, publishResult: null,
+      nextPublishAtAfter: null, note: 'no_active_pool_for_project', error: null,
+    })
+  }
+
   let genBudget = MAX_GENERATIONS_PER_RUN
 
   for (const pool of poolRows) {
     const intervalDays = resolveIntervalDays(pool.cadence, pool.interval_days)
     const publishTime = pool.publish_time || DEFAULT_PUBLISH_TIME
     const tz = pool.timezone || DEFAULT_TIMEZONE
+    const due = !!pool.next_publish_at && Date.parse(pool.next_publish_at) <= nowMs
+
+    const diag: PoolDiagnostic = {
+      projectId: pool.project_id, poolId: pool.id, active: true, timezone: tz, nextPublishAt: pool.next_publish_at,
+      now: nowIso(), due, queuedCount: await countItems(admin, pool.id, 'queued'), generatedCount: await countItems(admin, pool.id, 'generated'),
+      selectedTopicId: null, selectedTopicTitle: null, generateAttempted: false, generateResult: null,
+      publishAttempted: false, publishResult: null, nextPublishAtAfter: pool.next_publish_at, note: null, error: null,
+    }
+
+    // ── DRY RUN: report what WOULD happen; mutate nothing. ──
+    if (dryRun) {
+      if (due && diag.generatedCount > 0) {
+        const g = await earliestItem(admin, pool.id, 'generated')
+        diag.selectedTopicId = g?.topicId ?? null; diag.selectedTopicTitle = g?.topicTitle ?? null
+        diag.note = 'would_publish_generated_item'
+      } else if (diag.queuedCount > 0) {
+        const q = await earliestItem(admin, pool.id, 'queued')
+        diag.selectedTopicId = q?.topicId ?? null; diag.selectedTopicTitle = q?.topicTitle ?? null
+        diag.note = due ? 'would_generate_then_publish' : 'would_generate_ahead'
+      } else {
+        diag.note = due ? 'due_but_no_queued_or_generated_items' : 'not_due_no_work'
+      }
+      summary.diagnostics.push(diag)
+      continue
+    }
+
+    // (D) Generate-ahead FIRST so a DUE pool with only queued items can generate
+    // AND publish in the SAME run (previously it took two cron runs → a missed day).
+    if (genBudget > 0) {
+      const need = due ? Math.max(DESIRED_READY_AHEAD, 1) : DESIRED_READY_AHEAD
+      if (diag.generatedCount < need && diag.queuedCount > 0) {
+        const q = await earliestItem(admin, pool.id, 'queued')
+        if (q) {
+          diag.selectedTopicId = q.topicId; diag.selectedTopicTitle = q.topicTitle; diag.generateAttempted = true
+          const res = await generatePoolItem(admin, q.id, { allowRetry: false })
+          diag.generateResult = res.status + (res.reason ? ` (${res.reason})` : '')
+          if (res.noop !== 'already_claimed') genBudget--
+          if (res.status === 'generated') { summary.generated++; diag.generatedCount++ }
+          else if (res.status === 'quality_check_failed' || res.status === 'failed') { summary.failures++; diag.error = res.reason ?? res.status }
+          summary.details.push(`pool ${pool.id}: generate ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
+        }
+      }
+    }
 
     // (E) Publish the earliest generated item if the pool is due — ≤1 per pool per run.
-    const due = !!pool.next_publish_at && Date.parse(pool.next_publish_at) <= nowMs
     if (due) {
-      const { data: gen } = await admin
-        .from('article_pool_items')
-        .select('id')
-        .eq('pool_id', pool.id)
-        .eq('status', 'generated')
-        .order('position', { ascending: true })
-        .limit(1)
-        .maybeSingle()
+      const gen = await earliestItem(admin, pool.id, 'generated')
       if (gen) {
-        const res = await publishPoolItem(admin, (gen as { id: string }).id)
+        diag.publishAttempted = true
+        const res = await publishPoolItem(admin, gen.id)
+        diag.publishResult = res.status + (res.reason ? ` (${res.reason})` : '')
         if (res.status === 'published') {
           summary.published++
-          // (F) Advance next slot only on a successful publish — weekday-aware
-          // when the pool has a weekday schedule, else by interval.
+          // (F) Advance next slot only on a successful publish.
           const days = Array.isArray(pool.publish_days) ? pool.publish_days : []
           const nextIso = days.length
             ? nextPublishAtWeekdays(publishTime, tz, days, nowMs)
             : advanceNextPublishAt(pool.next_publish_at!, tz, publishTime, intervalDays, nowMs)
           await admin.from('article_pools').update({ next_publish_at: nextIso, updated_at: nowIso() }).eq('id', pool.id)
+          diag.nextPublishAtAfter = nextIso
           summary.details.push(`pool ${pool.id}: published ${res.articleId ?? '?'} → next ${nextIso}`)
         } else {
           // (E/H) Do NOT advance; leave failed/quality_check_failed for manual retry.
-          summary.failures++
+          summary.failures++; diag.error = res.reason ?? res.status
           summary.details.push(`pool ${pool.id}: publish ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
         }
       } else {
-        // Due but nothing generated yet → wait (don't advance), generate below.
+        // Due but nothing generated (e.g. no queued items or generation failed).
         summary.skipped++
+        diag.note = diag.queuedCount === 0 ? 'due_but_no_queued_items' : 'due_but_generation_did_not_produce_item'
         summary.details.push(`pool ${pool.id}: due, no generated item ready`)
       }
     }
 
-    // (D) Generate-ahead: keep DESIRED_READY_AHEAD generated items, bounded globally.
-    if (genBudget > 0) {
-      const { count: readyAhead } = await admin
-        .from('article_pool_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('pool_id', pool.id)
-        .eq('status', 'generated')
-      if ((readyAhead ?? 0) < DESIRED_READY_AHEAD) {
-        const { data: queued } = await admin
-          .from('article_pool_items')
-          .select('id')
-          .eq('pool_id', pool.id)
-          .eq('status', 'queued')
-          .order('position', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-        if (queued) {
-          const res = await generatePoolItem(admin, (queued as { id: string }).id, { allowRetry: false })
-          if (res.noop !== 'already_claimed') genBudget-- // spent budget only if we actually worked
-          if (res.status === 'generated') summary.generated++
-          else if (res.status === 'quality_check_failed' || res.status === 'failed') summary.failures++
-          summary.details.push(`pool ${pool.id}: generate ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
-        }
-      }
-    }
+    console.log('[automation-runner] pool', {
+      projectId: diag.projectId, poolId: diag.poolId, due: diag.due, queued: diag.queuedCount, generated: diag.generatedCount,
+      generateResult: diag.generateResult, publishResult: diag.publishResult, note: diag.note, error: diag.error,
+    })
+    summary.diagnostics.push(diag)
   }
 
   summary.durationMs = Date.now() - started
