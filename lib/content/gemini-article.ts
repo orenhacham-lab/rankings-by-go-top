@@ -29,6 +29,12 @@ export interface ArticleBrief {
   targetAudience: string | null
   toneOfVoice: string | null
   desiredWordCount: number | null
+  // Phase 3D — resolved article depth + target word range (drives length &
+  // structure guidance). Optional for back-compat; falls back to desiredWordCount.
+  targetWordMin?: number | null
+  targetWordMax?: number | null
+  depthLabel?: string | null
+  depthKind?: 'support' | 'standard' | 'deep' | 'commercial' | null
   ctaPreference: string | null
   // Concrete CTA contact details (used only when ctaPreference !== 'none').
   ctaText: string | null
@@ -123,8 +129,12 @@ const FAILURE_HINT: Record<string, string> = {
 function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const lang = brief.language === 'he' ? 'Hebrew' : 'English'
   const tone = (brief.toneOfVoice && TONE_HINT[brief.toneOfVoice]) || 'professional and credible'
-  const words = brief.desiredWordCount || 1000
+  // Phase 3D — target range drives length; midpoint drives structural thresholds.
+  const wMin = brief.targetWordMin ?? (brief.desiredWordCount || 1000)
+  const wMax = brief.targetWordMax ?? Math.round((brief.desiredWordCount || 1000) * 1.2)
+  const words = Math.round((wMin + wMax) / 2)
   const th = thresholdsFor(words)
+  const depthKind = brief.depthKind ?? null
   const ctaEnabled = !(brief.ctaPreference === 'none' || !brief.ctaPreference)
   const ctaDetailLines: string[] = []
   if (ctaEnabled) {
@@ -163,7 +173,11 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     brief.briefNotes ? `- Treat [ARTICLE ANGLE] as the STRATEGIC angle of the whole article — make it less generic and focus the piece around it.` : '',
     brief.briefNotes ? `- Treat [MUST INCLUDE] items as important content requirements: don't mention them once and move on — turn them into sections, bullet points, examples, FAQ answers, or comparison-table rows, woven naturally and prominently.` : '',
     brief.briefNotes ? `- Treat [MUST AVOID] items as hard negative constraints: never make those claims or use those phrases.` : '',
-    `Tone: ${tone}. Total length: about ${words} words (between ${Math.round(words * 0.85)} and ${Math.round(words * 1.2)}).`,
+    `Tone: ${tone}. Total length: ${wMin}–${wMax} words${brief.depthLabel ? ` — ${brief.depthLabel}` : ''}.`,
+    `- LENGTH & DEPTH: reach ${wMin}–${wMax} words ONLY by adding genuinely useful content — concrete examples, comparisons, practical tips, decision criteria, common mistakes, a real comparison TABLE where relevant, and specific FAQs. Do NOT pad, repeat, or add filler to hit the count. A shorter, complete article is better than a padded one.`,
+    (depthKind === 'deep' || depthKind === 'commercial') ? `- This is ${brief.depthLabel}: be genuinely comprehensive — include clear decision criteria, practical examples, at least one comparison, "how to choose"/"what to check" guidance, and buyer/traveler guidance where relevant.` : '',
+    depthKind === 'commercial' ? `- Purchase-intent: cover price/value considerations, what to look for before buying, and a comparison of options — practical and specific, never generic sales copy.` : '',
+    depthKind === 'support' ? `- This is a concise supporting article: stay focused and tight; cover the essentials well without over-expanding.` : '',
     brandLine,
     ctaLine,
     ``,
@@ -652,8 +666,11 @@ export interface ValidatedArticle {
 }
 
 function auditFor(brief: ArticleBrief, structured: StructuredArticle, safeHtml: string, slug: string): AuditResult {
+  // Audit against the depth-resolved target (midpoint) so the length band matches.
+  const aMin = brief.targetWordMin ?? (brief.desiredWordCount || 1000)
+  const aMax = brief.targetWordMax ?? Math.round((brief.desiredWordCount || 1000) * 1.2)
   return runArticleAudit({
-    language: brief.language, desiredWordCount: brief.desiredWordCount || 1000,
+    language: brief.language, desiredWordCount: Math.round((aMin + aMax) / 2),
     primaryKeyword: brief.primaryKeyword, secondaryKeywords: brief.secondaryKeywords,
     ctaPreference: brief.ctaPreference,
     ctaDetails: { text: brief.ctaText || '', phone: brief.ctaPhone || '', whatsapp: brief.ctaWhatsApp || '', url: brief.ctaUrl || '' },

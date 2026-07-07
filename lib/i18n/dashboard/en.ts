@@ -455,6 +455,15 @@ export const dashboardEn = {
         deep: '1500 — in-depth',
         guide: '2000 — comprehensive guide',
       },
+      articleDepthLabel: 'Article depth / length',
+      articleDepthHint: 'On "Auto" the system picks the length by topic type (supporting / standard / deep / commercial). It expands only with useful content — no filler.',
+      articleDepths: {
+        auto: 'Auto',
+        support: 'Short / supporting',
+        standard: 'Standard',
+        deep: 'In-depth',
+        commercial: 'Commercial',
+      },
       ctaPreference: 'Call to action (CTA)',
       ctas: {
         gentle: 'Gentle CTA at the end',

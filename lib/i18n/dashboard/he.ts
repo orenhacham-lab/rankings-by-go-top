@@ -456,6 +456,15 @@ export const dashboardHe = {
         deep: '1500 — מעמיק',
         guide: '2000 — מדריך מקיף',
       },
+      articleDepthLabel: 'עומק/אורך המאמר',
+      articleDepthHint: 'ב"אוטומטי" המערכת בוחרת את האורך לפי סוג הנושא (תומך / רגיל / עומק / מסחרי). ההרחבה נעשית רק בתוכן שימושי — ללא מילוי.',
+      articleDepths: {
+        auto: 'אוטומטי',
+        support: 'קצר / תומך',
+        standard: 'רגיל',
+        deep: 'מאמר עומק',
+        commercial: 'מסחרי',
+      },
       ctaPreference: 'קריאה לפעולה (CTA)',
       ctas: {
         gentle: 'CTA עדין בסוף המאמר',

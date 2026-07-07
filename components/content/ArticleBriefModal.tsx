@@ -22,6 +22,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
 import type { GeminiTopicSuggestion } from '@/lib/content/gemini-topics'
 import { encodeBriefNotes, decodeBriefNotes, encodeBriefSections, decodeBriefSections, type PlannedInternalLink } from '@/lib/content/brief-notes'
+import { ARTICLE_DEPTHS, type ArticleDepth } from '@/lib/content/article-depth'
 import type { InternalLinkCandidate } from '@/lib/content/internal-link-candidates'
 import type { ArticleTopic, ArticleTopicAnchor } from '@/lib/supabase/types'
 
@@ -129,6 +130,7 @@ export default function ArticleBriefModal({
   const [includeBrandName, setIncludeBrandName] = useState(false)
   const [brandNameToInclude, setBrandNameToInclude] = useState('')
   const [includeManualToc, setIncludeManualToc] = useState(false)
+  const [articleDepth, setArticleDepth] = useState<ArticleDepth>('auto')
   const [ctaText, setCtaText] = useState('')
   const [ctaPhone, setCtaPhone] = useState('')
   const [ctaWhatsapp, setCtaWhatsapp] = useState('')
@@ -179,7 +181,7 @@ export default function ArticleBriefModal({
       setSearchIntent(oneOf(editing.search_intent, INTENT_KEYS, DEFAULT_INTENT))
       setSecondaryText((editing.secondary_keywords ?? []).join('\n'))
       setTargetAudience(editing.target_audience ?? '')
-      { const dec = decodeBriefNotes(editing.brief_notes); const sec = decodeBriefSections(dec.notes); setArticleAngle(sec.articleAngle); setMustInclude(sec.mustInclude); setMustAvoid(sec.mustAvoid); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude); setIncludeManualToc(dec.flags.includeManualToc); setCtaText(dec.flags.cta.text); setCtaPhone(dec.flags.cta.phone); setCtaWhatsapp(dec.flags.cta.whatsapp); setCtaUrl(dec.flags.cta.url) }
+      { const dec = decodeBriefNotes(editing.brief_notes); const sec = decodeBriefSections(dec.notes); setArticleAngle(sec.articleAngle); setMustInclude(sec.mustInclude); setMustAvoid(sec.mustAvoid); setIncludeBrandName(dec.flags.includeBrandName); setBrandNameToInclude(dec.flags.brandNameToInclude); setIncludeManualToc(dec.flags.includeManualToc); setArticleDepth(dec.flags.articleDepth ?? 'auto'); setCtaText(dec.flags.cta.text); setCtaPhone(dec.flags.cta.phone); setCtaWhatsapp(dec.flags.cta.whatsapp); setCtaUrl(dec.flags.cta.url) }
       setAnchors(Array.isArray(editing.anchors_json) ? editing.anchors_json.map((a) => ({ ...emptyAnchor(), ...a })) : [])
       { const planned = decodeBriefNotes(editing.brief_notes).flags.internalLinks; setInternalLinks(planned); const ch: Record<string, string> = {}, mn: Record<string, string> = {}; for (const l of planned) { if (l.source === 'manual') mn[l.targetId] = l.anchorText; else ch[l.targetId] = l.anchorText } setLinkChoice(ch); setLinkManual(mn) }
       setAdvancedOpen(true)
@@ -189,7 +191,7 @@ export default function ArticleBriefModal({
       setPrimaryKeyword(''); setSuggestions([]); setSelected(new Set()); setManualTopic(''); setSuggestError(null); setSource(null); setFallbackReason(null)
       setBriefLang(normalizeLang(projects.find((p) => p.id === defaultProjectId)?.language))
       setTone(DEFAULT_TONE); setWordCount(DEFAULT_WORD_COUNT); setCta(DEFAULT_CTA); setSearchIntent(DEFAULT_INTENT)
-      setSecondaryText(''); setTargetAudience(''); setArticleAngle(''); setMustInclude(''); setMustAvoid(''); setIncludeBrandName(false); setBrandNameToInclude(''); setIncludeManualToc(false); setCtaText(''); setCtaPhone(''); setCtaWhatsapp(''); setCtaUrl(''); setAnchors([])
+      setSecondaryText(''); setTargetAudience(''); setArticleAngle(''); setMustInclude(''); setMustAvoid(''); setIncludeBrandName(false); setBrandNameToInclude(''); setIncludeManualToc(false); setArticleDepth('auto'); setCtaText(''); setCtaPhone(''); setCtaWhatsapp(''); setCtaUrl(''); setAnchors([])
       setInternalLinks([]); setLinkChoice({}); setLinkManual({})
       setAdvancedOpen(false)
       setKeywordFit(null)
@@ -353,6 +355,7 @@ export default function ArticleBriefModal({
           ? { text: '', phone: '', whatsapp: '', url: '' }
           : { text: ctaText, phone: ctaPhone, whatsapp: ctaWhatsapp, url: ctaUrl },
         internalLinks,
+        articleDepth,
       }),
       anchors: anchors.filter((a) => a.anchor_text.trim() || a.target_url.trim()),
     }
@@ -601,15 +604,18 @@ export default function ArticleBriefModal({
               </div>
             )}
 
+            {/* Phase 3D — article depth / length by topic type. "אוטומטי" lets the
+                system pick the range from the topic; others force a depth. */}
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.desiredWordCount}</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.articleDepthLabel}</label>
               <div className="flex flex-wrap gap-2">
-                {LENGTHS.map((l) => (
-                  <button key={l.value} type="button" onClick={() => setWordCount(l.value)} className={`px-3 py-1.5 text-sm rounded-lg border transition ${wordCount === l.value ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
-                    {t.lengths[l.key]}
+                {ARTICLE_DEPTHS.map((d) => (
+                  <button key={d} type="button" onClick={() => setArticleDepth(d)} className={`px-3 py-1.5 text-sm rounded-lg border transition ${articleDepth === d ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
+                    {(t.articleDepths as Record<string, string>)[d]}
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t.articleDepthHint}</p>
             </div>
 
             <div className="flex flex-col gap-1">

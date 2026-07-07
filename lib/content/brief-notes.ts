@@ -7,6 +7,8 @@
  * time. Carries: includeBrandName + the exact brandNameToInclude to weave in.
  */
 
+import { type ArticleDepth, ARTICLE_DEPTHS } from '@/lib/content/article-depth'
+
 const MARKER_RE = /\n*\[\[brief:([^\]]*)\]\]\s*$/
 
 export interface CtaDetails {
@@ -43,6 +45,9 @@ export interface BriefFlags {
   cta: CtaDetails
   // Approved internal links to weave into the article (phrase-only at generation).
   internalLinks: PlannedInternalLink[]
+  // Phase 3D — manual article-depth override ('auto' = auto-classify). Stored in
+  // the marker (no column). Absent/'auto' ⇒ auto-classify at generation time.
+  articleDepth: ArticleDepth
 }
 
 export const EMPTY_CTA: CtaDetails = { text: '', phone: '', whatsapp: '', url: '' }
@@ -74,6 +79,7 @@ export function encodeBriefNotes(notes: string, flags: BriefFlags): string {
   // Approved internal links (phrase-only). base64 JSON so text can't break the marker.
   const links = (flags.internalLinks || []).filter((l) => l.anchorText.trim() && l.targetUrl.trim())
   if (links.length) parts.push(`links=${b64(JSON.stringify(links))}`)
+  if (flags.articleDepth && flags.articleDepth !== 'auto') parts.push(`depth=${flags.articleDepth}`)
   const marker = `[[brief:${parts.join(';')}]]`
   return clean ? `${clean}\n\n${marker}` : marker
 }
@@ -142,11 +148,13 @@ export function decodeBriefSections(notes: string | null | undefined): BriefSect
 export function decodeBriefNotes(raw: string | null | undefined): { notes: string; flags: BriefFlags } {
   const text = raw || ''
   const m = text.match(MARKER_RE)
-  const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '', includeManualToc: false, cta: { ...EMPTY_CTA }, internalLinks: [] }
+  const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '', includeManualToc: false, cta: { ...EMPTY_CTA }, internalLinks: [], articleDepth: 'auto' }
   if (m) {
     const body = m[1]
     if (/includeBrandName=1/.test(body)) flags.includeBrandName = true
     if (/toc=1/.test(body)) flags.includeManualToc = true
+    const depthM = body.match(/depth=([a-z]+)/)
+    if (depthM && (ARTICLE_DEPTHS as string[]).includes(depthM[1])) flags.articleDepth = depthM[1] as ArticleDepth
     const brand = body.match(/brand=([^;]*)/)
     if (brand) flags.brandNameToInclude = unb64(brand[1])
     const ctaM = body.match(/cta=([^;]*)/)

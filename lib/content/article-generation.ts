@@ -18,6 +18,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
+import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-depth'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
 import { autoApplyApprovedLinksToDraft, type AutoApplyResult } from '@/lib/content/internal-link-apply'
 import { isInternalLinkAutoInsertAfterManualGenerationEnabled } from '@/lib/content/api-auth'
@@ -93,6 +94,15 @@ export async function generateArticleForTopic(
 
   const businessName = (project as { business_name?: string } | null)?.business_name ?? null
 
+  // Phase 3D — resolve article depth + target word range. Manual override
+  // (brief_notes flag) wins; otherwise auto-classify from the topic. Drives length
+  // and structure guidance; back-compat when absent (auto-classify → standard).
+  const depth = resolveArticleDepth(
+    { title: String(t.topic || ''), primaryKeyword: (t.primary_keyword as string) ?? null, secondaryKeywords: Array.isArray(t.secondary_keywords) ? (t.secondary_keywords as string[]) : [], searchIntent: (t.search_intent as string) ?? null, briefNotes: decodedNotes.notes },
+    decodedNotes.flags.articleDepth,
+  )
+  console.log('[content-article-generation] depth', { topicId, depth: depth.depth, auto: depth.auto, words: `${depth.minWords}-${depth.maxWords}` })
+
   // Phase 2F.2: fold the topic's APPROVED saved-plan anchors into the phrase-only
   // internal-link guidance (max 3, stale plans skipped). Guidance ONLY — the model
   // is asked to include the phrase as plain text; nothing here inserts <a> tags or
@@ -123,6 +133,10 @@ export async function generateArticleForTopic(
     targetAudience: (t.target_audience as string) ?? null,
     toneOfVoice: (t.tone_of_voice as string) ?? null,
     desiredWordCount: (t.desired_word_count as number) ?? null,
+    targetWordMin: depth.minWords,
+    targetWordMax: depth.maxWords,
+    depthKind: depth.depth,
+    depthLabel: DEPTH_PROMPT_LABEL[depth.depth],
     ctaPreference: (t.cta_preference as string) ?? null,
     ctaText: decodedNotes.flags.cta.text || null,
     ctaPhone: decodedNotes.flags.cta.phone || null,
