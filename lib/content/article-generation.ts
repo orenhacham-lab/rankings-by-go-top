@@ -222,7 +222,11 @@ export async function generateArticleForTopic(
       autoInternalLinksAttempted: autoInternalLinks.attempted,
       autoInternalLinksApplied: autoInternalLinks.applied,
       autoInternalLinksSkipped: autoInternalLinks.skipped,
-      autoInternalLinksReasons: autoInternalLinks.reasons,
+      autoInternalLinksPasses: autoInternalLinks.passes,
+      autoInternalLinksAppliedByPass: autoInternalLinks.appliedByPass,
+      autoInternalLinksRemainingWouldInsertAfterFinalPass: autoInternalLinks.remainingWouldInsertAfterFinalPass,
+      autoInternalLinksFinalReasons: autoInternalLinks.finalReasons,
+      autoInternalLinksInsertedAnchors: autoInternalLinks.insertedAnchors,
       snapshotId: autoInternalLinks.snapshotId,
     })
   }

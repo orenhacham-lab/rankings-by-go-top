@@ -67,6 +67,21 @@ function wordsBefore(html: string, index: number): number {
   return plainText(html.slice(0, index)).split(/\s+/).filter(Boolean).length
 }
 
+/**
+ * Word offsets of EXISTING <a> links in the html — used to seed the spacing
+ * check so a new link is kept the min gap away from links ALREADY present (not
+ * just from other links inserted in the same pass). Without this, a fresh
+ * preview after an apply "forgets" the just-inserted links as neighbours and
+ * re-offers a too-close candidate as would_insert.
+ */
+export function existingLinkWordOffsets(html: string): number[] {
+  const offs: number[] = []
+  const re = /<a\b[^>]*>/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html)) !== null) offs.push(wordsBefore(html, m.index))
+  return offs
+}
+
 function sentencePreview(html: string, ranges: { start: number; end: number }[], index: number, anchor: string): string {
   const r = ranges.find((x) => index >= x.start && index < x.end)
   const text = plainText(r ? html.slice(r.start, r.end) : html).trim()

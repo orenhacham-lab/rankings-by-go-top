@@ -10,7 +10,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { getLatestBatchForTopic, getBatchLinks, evaluateStaleness } from '@/lib/content/internal-link-plan-store'
 import { selfOrDuplicateReason } from '@/lib/content/internal-link-planner-cache'
-import { findNaturalAnchorPlacement, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP, type OccurrenceEval } from '@/lib/content/internal-link-insertion'
+import { findNaturalAnchorPlacement, existingLinkWordOffsets, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP, type OccurrenceEval } from '@/lib/content/internal-link-insertion'
 import { isInternalUrl, isUrlAlreadyLinked, normalizeUrlKey, manualAnchorShapeValid } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { InternalLinkPlanBatchRow, InternalLinkPlanLinkRow } from '@/lib/supabase/types'
@@ -97,7 +97,12 @@ export async function evaluateApprovedLinks(admin: Admin, projectId: string, art
     targets,
   })
 
-  const usedWordOffsets: number[] = []
+  // Seed spacing with EXISTING links so a candidate is kept the min gap away from
+  // links already in the draft (not only from same-pass insertions). This makes
+  // preview self-consistent: after an apply, already-inserted links still count
+  // as neighbours, so a too-close candidate stays skipped instead of re-offering
+  // as would_insert.
+  const usedWordOffsets: number[] = existingLinkWordOffsets(html)
   const items: EvalItem[] = approved
     .slice()
     .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
