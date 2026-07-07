@@ -15,7 +15,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
-type Source = 'keyword' | 'project_data' | 'keyword_research_url'
+type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan'
 
 interface Suggestion {
   id: string
@@ -62,7 +62,7 @@ export default function AutomationIdeas({
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean } | null>(null)
 
-  const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : t.badgeResearch)
+  const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : s === 'site_scan' ? t.badgeSiteScan : t.badgeResearch)
 
   // Monotonic request id: only the latest generate() call is allowed to write
   // state, so a slow earlier response can never overwrite a newer one.
@@ -198,6 +198,7 @@ export default function AutomationIdeas({
   // Strongest SEO source first (site keyword research), then keyword, then project data.
   const sourceTabs: { key: Source; label: string }[] = [
     { key: 'keyword_research_url', label: t.sourceResearch },
+    { key: 'site_scan', label: t.sourceSiteScan },
     { key: 'keyword', label: t.sourceKeyword },
     { key: 'project_data', label: t.sourceProject },
   ]
@@ -235,7 +236,7 @@ export default function AutomationIdeas({
           />
         )}
         <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
-          {loading ? t.generating : t.generate}
+          {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : t.generate}
         </Button>
       </div>
 
@@ -250,13 +251,15 @@ export default function AutomationIdeas({
       )}
       {meta && suggestions.length === 0 && !loading && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
-          {meta.reason === 'model_error' || meta.reason === 'http_error'
-            ? t.temporaryError
-            : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
-              ? t.researchFailed
-              : meta.reason === 'all_duplicates'
-                ? t.allDuplicates
-                : t.tryOther}
+          {meta.reason === 'no_scan'
+            ? t.noScan
+            : meta.reason === 'model_error' || meta.reason === 'http_error'
+              ? t.temporaryError
+              : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
+                ? t.researchFailed
+                : meta.reason === 'all_duplicates'
+                  ? t.allDuplicates
+                  : t.tryOther}
         </p>
       )}
       {lastCreatedIds.length > 0 && (

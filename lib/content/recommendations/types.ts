@@ -8,7 +8,7 @@
 
 import type { ArticleTopicSource } from '@/lib/supabase/types'
 
-export type RecommendationSource = 'keyword' | 'project_data' | 'keyword_research_url'
+export type RecommendationSource = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan'
 
 export interface SuggestedInternalLink {
   url: string
@@ -57,5 +57,8 @@ export interface RecommendationResult {
 
 /** Map a UI recommendation source to the persisted article_topics.source tag. */
 export function toArticleTopicSource(source: RecommendationSource): ArticleTopicSource {
-  return source // values intentionally align with the widened CHECK
+  // 'site_scan' has no dedicated article_topics.source value (no schema change);
+  // it persists as 'project_data' — provenance is kept in suggestion_reason.
+  if (source === 'site_scan') return 'project_data'
+  return source // remaining values intentionally align with the widened CHECK
 }

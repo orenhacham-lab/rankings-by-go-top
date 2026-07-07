@@ -20,6 +20,7 @@ import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { recommendFromKeywordResearch } from './keyword-research'
+import { recommendFromSiteScan } from './site-scan'
 import type { RecommendationSource, RecommendationResult, TopicSuggestion, SuggestedInternalLink } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -286,6 +287,28 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     )
     suggestions = acc
     meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
+  } else if (input.source === 'site_scan') {
+    // From the CACHED site scan — content-gap ideas, then dedupe. Never rescans.
+    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel }, businessCtx)
+    const seenTitles = new Set<string>()
+    let dupes = 0
+    for (const s of res.suggestions) {
+      const key = s.title.trim().toLowerCase()
+      if (!key || seenTitles.has(key)) { dupes++; continue }
+      if (corpus.isDuplicate(s.title)) { dupes++; continue }
+      seenTitles.add(key)
+      suggestions.push(s)
+    }
+    meta = {
+      source: 'site_scan',
+      generated: res.meta.generated,
+      skippedDuplicates: dupes,
+      finalCount: suggestions.length,
+      attempts: 1,
+      reason: suggestions.length === 0
+        ? (res.meta.reason === 'no_scan' ? 'no_scan' : res.meta.reason === 'model_error' ? 'model_error' : res.meta.generated > 0 ? 'all_duplicates' : 'model_empty')
+        : undefined,
+    }
   } else {
     // keyword_research_url — one Google Ads pass → clusters → topics, then dedupe.
     const seedUrls = [homepageFromDomain(project.target_domain), ...linkCandidates.map((c) => c.url)].filter((u): u is string => !!u)

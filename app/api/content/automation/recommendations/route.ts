@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled } from '@/lib/content/ap
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 
-const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url']
+const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan']
 
 export async function POST(request: Request) {
   if (!isContentAutomationEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
