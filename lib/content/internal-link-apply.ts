@@ -14,7 +14,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { evaluateApprovedLinks, type EvalResult } from '@/lib/content/internal-link-insertion-eval'
-import { applyNaturalAnchor, sha256 } from '@/lib/content/internal-link-insertion'
+import { applyNaturalAnchor, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP } from '@/lib/content/internal-link-insertion'
 import { isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 
@@ -60,7 +60,7 @@ export async function applyEvaluatedLinks(
       results.push({ linkId: w.linkId, targetUrl: w.targetUrl, anchorText: w.anchorText, outcome: 'skipped', reason: 'already_linked' })
       continue
     }
-    const applied = applyNaturalAnchor(html, w.anchorText, w.targetUrl, usedWordOffsets)
+    const applied = applyNaturalAnchor(html, w.anchorText, w.targetUrl, usedWordOffsets, { minWordGap: INTERNAL_LINK_APPLY_MIN_WORD_GAP })
     if (!applied.ok || !applied.html) {
       results.push({ linkId: w.linkId, targetUrl: w.targetUrl, anchorText: w.anchorText, outcome: 'skipped', reason: applied.skipReason || 'no_safe_placement' })
       continue

@@ -20,7 +20,7 @@ import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
 import { autoApplyApprovedLinksToDraft, type AutoApplyResult } from '@/lib/content/internal-link-apply'
-import { isInternalLinkAutoApplyAfterGenerationEnabled } from '@/lib/content/api-auth'
+import { isInternalLinkAutoInsertAfterManualGenerationEnabled } from '@/lib/content/api-auth'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -208,13 +208,13 @@ export async function generateArticleForTopic(
 
   console.log('[content-article-generation] created', { articleId: inserted.id, projectId, score: gen.audit.score, warnings: gen.audit.warnings.length })
 
-  // Phase 2F.3 — OPTIONAL auto-apply of approved internal links into the fresh
-  // DRAFT, once. Requires BOTH the opted-in path (autoApplyInternalLinks, set
-  // only by the manual "generate now" route) AND the server flag. Cron/queue
-  // never opt in, so scheduled generation is unaffected. Draft-only; best-effort
-  // (never fails generation); never publishes / touches WordPress.
+  // Phase 2J — auto-insert approved internal links into the fresh DRAFT, once,
+  // right after insert. Runs when the caller opts in (autoApplyInternalLinks, set
+  // ONLY by the manual "generate now" route — cron/queue never opt in) AND the
+  // feature is not kill-switched. Default ON for manual generate. Draft-only;
+  // best-effort (never fails generation); never publishes / touches WordPress.
   let autoInternalLinks: AutoApplyResult | undefined
-  if (opts.autoApplyInternalLinks && isInternalLinkAutoApplyAfterGenerationEnabled()) {
+  if (opts.autoApplyInternalLinks && isInternalLinkAutoInsertAfterManualGenerationEnabled()) {
     autoInternalLinks = await autoApplyApprovedLinksToDraft(admin, { projectId, userId, generatedArticleId: inserted.id })
     console.log('[content-article-generation] auto internal-links', {
       articleId: inserted.id,

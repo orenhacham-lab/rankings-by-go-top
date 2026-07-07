@@ -38,13 +38,16 @@ export function isInternalLinkPlanningEnabled(): boolean {
 }
 
 /**
- * Phase 2F.3 — auto-apply approved internal links into a NEWLY GENERATED DRAFT,
- * once, right after generation. Default OFF: when absent/false, generation is
- * byte-for-byte unchanged. Requires the planning flag (same insertion engine +
- * safety rules as manual apply). Draft-only; never publishes / touches WordPress.
+ * Phase 2J — auto-insert approved internal links into a NEWLY GENERATED DRAFT,
+ * once, right after the MANUAL "generate now" flow. Requires the planning flag;
+ * default ON for manual generate (same insertion engine + safety rules as manual
+ * apply). Draft-only; never publishes / touches WordPress / cron / queue.
+ * Emergency kill-switch only: set DISABLE_INTERNAL_LINK_AUTO_INSERT_AFTER_MANUAL_GENERATION=true.
+ * NOTE: the generation core still gates this behind an explicit opt-in option so
+ * that scheduled/cron generation (which does not opt in) is never auto-inserted.
  */
-export function isInternalLinkAutoApplyAfterGenerationEnabled(): boolean {
-  return isInternalLinkPlanningEnabled() && process.env.ENABLE_INTERNAL_LINK_AUTO_APPLY_AFTER_GENERATION === 'true'
+export function isInternalLinkAutoInsertAfterManualGenerationEnabled(): boolean {
+  return isInternalLinkPlanningEnabled() && process.env.DISABLE_INTERNAL_LINK_AUTO_INSERT_AFTER_MANUAL_GENERATION !== 'true'
 }
 
 export type ContentAuthResult =

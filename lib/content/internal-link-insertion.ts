@@ -25,6 +25,16 @@ import { normalizeHref } from '@/lib/content/internal-links'
  */
 const INSERTION_MIN_WORDS_BEFORE_FIRST = 40
 
+/**
+ * Minimum word gap between two INSERTED internal links. The generation-time audit
+ * (anchors-check) uses ANCHOR_MIN_WORD_GAP (200) for anchor-quality scoring; that
+ * is too strict for approved-plan insertion and skips reasonable 2nd/3rd links.
+ * Insertion uses a smaller gap so 2–3 approved links in different sentences still
+ * apply, while still avoiding same-sentence / dense stacking. The 200 audit
+ * constant is unchanged.
+ */
+export const INTERNAL_LINK_APPLY_MIN_WORD_GAP = 80
+
 // Regions a link must NEVER be placed inside. Blanked (equal-length spaces) so
 // their inner text can't match while character offsets stay aligned.
 const FORBIDDEN_TAGS = ['nav', 'header', 'footer', 'aside', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'figure', 'figcaption', 'button', 'script', 'style', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
@@ -152,7 +162,8 @@ export interface PlacementResult {
  * links a normal paragraph well into the intro is a fine target. Only when NO
  * occurrence qualifies does it report a skip reason. Read-only.
  */
-export function findNaturalAnchorPlacement(html: string, anchor: string, usedWordOffsets: number[] = []): PlacementResult {
+export function findNaturalAnchorPlacement(html: string, anchor: string, usedWordOffsets: number[] = [], opts: { minWordGap?: number } = {}): PlacementResult {
+  const minWordGap = opts.minWordGap ?? ANCHOR_MIN_WORD_GAP
   const needle = (anchor || '').trim()
   if (!needle) return { found: false, skipReason: 'empty_anchor', occurrenceCount: 0, evaluatedOccurrences: [] }
 
@@ -202,7 +213,7 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
     // NO first-<h2> gate — a paragraph 100+ words in is a valid manual target.
     const early = wordOffset < INSERTION_MIN_WORDS_BEFORE_FIRST
     if (early) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_early', insideParagraph: true }); tooEarly = true; continue }
-    if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < ANCHOR_MIN_WORD_GAP)) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_close' }); tooClose = true; continue }
+    if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < minWordGap)) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_close' }); tooClose = true; continue }
 
     evaluated.push({ index: k, inProse: true, wordOffset, result: 'selected' })
     return { found: true, index: k, matchLength: needle.length, wordOffset, sentence: sentencePreview(html, ranges, k, needle), occurrenceCount, evaluatedOccurrences: evaluated, selectedOccurrenceIndex: occIdx }
@@ -235,8 +246,8 @@ export interface ApplyResult {
  * ok:false + skipReason when no safe occurrence exists. Caller must sanitize the
  * returned html. Pure (no I/O).
  */
-export function applyNaturalAnchor(html: string, anchor: string, url: string, usedWordOffsets: number[] = []): ApplyResult {
-  const p = findNaturalAnchorPlacement(html, anchor, usedWordOffsets)
+export function applyNaturalAnchor(html: string, anchor: string, url: string, usedWordOffsets: number[] = [], opts: { minWordGap?: number } = {}): ApplyResult {
+  const p = findNaturalAnchorPlacement(html, anchor, usedWordOffsets, opts)
   if (!p.found || p.index === undefined || p.matchLength === undefined) {
     return { ok: false, skipReason: p.skipReason }
   }

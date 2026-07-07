@@ -10,7 +10,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { getLatestBatchForTopic, getBatchLinks, evaluateStaleness } from '@/lib/content/internal-link-plan-store'
 import { selfOrDuplicateReason } from '@/lib/content/internal-link-planner-cache'
-import { findNaturalAnchorPlacement, sha256, type OccurrenceEval } from '@/lib/content/internal-link-insertion'
+import { findNaturalAnchorPlacement, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP, type OccurrenceEval } from '@/lib/content/internal-link-insertion'
 import { isInternalUrl, isUrlAlreadyLinked, normalizeUrlKey, manualAnchorShapeValid } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { InternalLinkPlanBatchRow, InternalLinkPlanLinkRow } from '@/lib/supabase/types'
@@ -136,7 +136,7 @@ export async function evaluateApprovedLinks(admin: Admin, projectId: string, art
 
       if (skipReason) return { linkId: l.id, targetUrl: url, anchorText: anchor, status: 'skipped', reason: skipReason, sentencePreview: null, checks }
 
-      const placement = findNaturalAnchorPlacement(html, anchor, usedWordOffsets)
+      const placement = findNaturalAnchorPlacement(html, anchor, usedWordOffsets, { minWordGap: INTERNAL_LINK_APPLY_MIN_WORD_GAP })
       const diag = {
         occurrenceCount: placement.occurrenceCount ?? 0,
         evaluatedOccurrences: placement.evaluatedOccurrences ?? [],
