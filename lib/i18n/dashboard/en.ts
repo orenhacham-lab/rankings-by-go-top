@@ -227,6 +227,7 @@ export const dashboardEn = {
       alsoFromRow: 'You can also open link planning from any topic row later.',
       loading: 'Checking internal links for the new topics…',
       noneFound: 'No suitable internal links were found for the new topics. You can close and continue.',
+      savedSuccess: 'Internal link planning saved successfully.',
       loadError: 'Failed to load suggestions',
       cacheMissing: 'Site index missing — refresh the index and try again.',
       cacheStale: 'Site index is stale — refresh before saving is recommended.',

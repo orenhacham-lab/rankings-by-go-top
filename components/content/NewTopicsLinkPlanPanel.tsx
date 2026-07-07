@@ -73,11 +73,14 @@ export default function NewTopicsLinkPlanPanel({
   const [warnNote, setWarnNote] = useState<string | null>(null)
   const [plans, setPlans] = useState<Record<string, DryPlan>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Checked RECOMMENDED links per topic (mkey set) — default all recommended.
+  const [linkSel, setLinkSel] = useState<Record<string, Set<string>>>({})
   // Manually-selected reviewable candidates, keyed by topicId → set of mkey().
   const [manualSel, setManualSel] = useState<Record<string, Set<string>>>({})
   const [autoApprove, setAutoApprove] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'approved' | 'zero' | 'failed'>>({})
+  const [savedOk, setSavedOk] = useState(false) // compact success state after save
 
   // Bring the panel into view once when it first appears (after topic creation).
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -102,13 +105,18 @@ export default function NewTopicsLinkPlanPanel({
         if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.loadError); return }
         if (Array.isArray(data.warnings) && (data.warnings.includes('cache_stale') || data.warnings.includes('cache_version_stale'))) setWarnNote(t.cacheStale)
         const map: Record<string, DryPlan> = {}
+        const initLinkSel: Record<string, Set<string>> = {}
         for (const p of Array.isArray(data.topics) ? data.topics : []) {
           const rejected: DryLink[] = Array.isArray(p.rejected) ? p.rejected : []
           const reviewable = rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
-          const plan: DryPlan = { topicId: p.topicId, selected: p.selected ?? [], rejected, reviewable, summary: p.summary ?? '' }
+          const selectedLinks: DryLink[] = Array.isArray(p.selected) ? p.selected : []
+          const plan: DryPlan = { topicId: p.topicId, selected: selectedLinks, rejected, reviewable, summary: p.summary ?? '' }
           map[p.topicId] = plan
+          // Recommended links checked by default; reviewable stay unchecked.
+          initLinkSel[p.topicId] = new Set(selectedLinks.map((l) => mkey(l)))
         }
         setPlans(map)
+        setLinkSel(initLinkSel)
         // Check ALL newly-created topics by default (not only those with
         // recommended links) so a zero-link/no-recommendation topic is still part
         // of the batch — it saves an auditable zero-link plan and its row badge
@@ -125,6 +133,13 @@ export default function NewTopicsLinkPlanPanel({
   const toggle = useCallback((id: string) => {
     setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }, [])
+  const toggleLink = useCallback((topicId: string, key: string) => {
+    setLinkSel((prev) => {
+      const set = new Set(prev[topicId] ?? [])
+      set.has(key) ? set.delete(key) : set.add(key)
+      return { ...prev, [topicId]: set }
+    })
+  }, [])
   const toggleManual = useCallback((topicId: string, key: string) => {
     setManualSel((prev) => {
       const set = new Set(prev[topicId] ?? [])
@@ -133,7 +148,7 @@ export default function NewTopicsLinkPlanPanel({
     })
   }, [])
 
-  // A topic is saved if its recommended box is checked OR it has ≥1 manual pick.
+  // A topic is saved when its topic checkbox is checked (or it has manual picks).
   const topicIdsToSave = useMemo(() => {
     const ids = new Set(selected)
     for (const [tid, set] of Object.entries(manualSel)) if (set.size > 0) ids.add(tid)
@@ -143,16 +158,21 @@ export default function NewTopicsLinkPlanPanel({
   const save = useCallback(async () => {
     if (saving || topicIdsToSave.length === 0) return
     setSaving(true); setError(null)
-    // Build server-revalidated manual candidates (targetUrl + anchorText only).
-    const manualCandidates: { topicId: string; targetUrl: string; anchorText: string }[] = []
-    for (const [tid, set] of Object.entries(manualSel)) {
+    // EXACT selection: only the checked recommended + checked manual links per
+    // checked topic. An empty list for a checked topic ⇒ zero-link plan.
+    const selectedLinks: { topicId: string; targetUrl: string; anchorText: string }[] = []
+    for (const tid of topicIdsToSave) {
+      const recs = plans[tid]?.selected ?? []
+      const lset = linkSel[tid] ?? new Set(recs.map((l) => mkey(l)))
+      for (const l of recs) if (lset.has(mkey(l)) && l.anchorText) selectedLinks.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
       const rev = plans[tid]?.reviewable ?? []
-      for (const l of rev) if (set.has(mkey(l)) && l.anchorText) manualCandidates.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
+      const mset = manualSel[tid] ?? new Set<string>()
+      for (const l of rev) if (mset.has(mkey(l)) && l.anchorText) selectedLinks.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
     }
     try {
       const res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: autoApprove, manualCandidates }),
+        body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: autoApprove, selectedLinks }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return }
@@ -166,12 +186,14 @@ export default function NewTopicsLinkPlanPanel({
       }
       setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
       onSaved(summaries)
+      // Compact success state; auto-dismiss the session panel shortly after.
+      if (results.some((r) => r.ok)) { setSavedOk(true); window.setTimeout(() => onClose(), 1800) }
     } catch {
       setError(t.saveError)
     } finally {
       setSaving(false)
     }
-  }, [saving, topicIdsToSave, manualSel, plans, projectId, autoApprove, t, onSaved])
+  }, [saving, topicIdsToSave, linkSel, manualSel, plans, projectId, autoApprove, t, onSaved, onClose])
 
   // Summary counts (session-only, from the dry-run + save results).
   const topicsWithLinks = Object.values(plans).filter((p) => p.selected.length > 0).length
@@ -207,7 +229,14 @@ export default function NewTopicsLinkPlanPanel({
         {warnNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{warnNote}</p>}
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
-        {loading ? (
+        {savedOk ? (
+          /* Compact success state — panel auto-dismisses shortly after. */
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
+            <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.savedSuccess}</span>
+            <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70">{t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</span>
+            <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
+          </div>
+        ) : loading ? (
           <div className="py-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />{t.loading}
           </div>
@@ -231,6 +260,7 @@ export default function NewTopicsLinkPlanPanel({
                 const reviewable = plan?.reviewable ?? []
                 const blocked = (plan?.rejected ?? []).filter((r) => r.reviewability !== 'reviewable')
                 const mset = manualSel[tp.id] ?? new Set<string>()
+                const lset = linkSel[tp.id] ?? new Set<string>(links.map((l) => mkey(l)))
                 return (
                   <div key={tp.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
                     <div className="flex flex-wrap items-center gap-2">
@@ -248,15 +278,21 @@ export default function NewTopicsLinkPlanPanel({
                       <>
                         <div className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{t.recommendedTitle}</div>
                         <div className="mt-1 space-y-1.5">
-                          {links.map((l, i) => (
-                            <div key={`${l.targetUrl}-${i}`} className="rounded-md bg-slate-50 dark:bg-slate-800/60 p-2 text-[11px]">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
-                                <span className="text-slate-400">{t.confidence} {l.confidence}</span>
-                              </div>
-                              <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
-                            </div>
-                          ))}
+                          {links.map((l, i) => {
+                            const k = mkey(l)
+                            return (
+                            <label key={`${l.targetUrl}-${i}`} className="flex flex-wrap items-start gap-2 rounded-md bg-slate-50 dark:bg-slate-800/60 p-2 text-[11px] cursor-pointer">
+                              <input type="checkbox" checked={lset.has(k)} onChange={() => toggleLink(tp.id, k)} disabled={saving} className="mt-0.5 accent-indigo-600" />
+                              <span className="flex-1 min-w-0">
+                                <span className="flex flex-wrap items-center gap-2">
+                                  <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
+                                  <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                                </span>
+                                <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
+                              </span>
+                            </label>
+                            )
+                          })}
                         </div>
                       </>
                     )}

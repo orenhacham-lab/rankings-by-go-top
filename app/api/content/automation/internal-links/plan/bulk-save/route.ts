@@ -23,7 +23,7 @@
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
-import { planFromCachedTargets, promoteManualCandidates, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
+import { planFromCachedTargets, promoteManualCandidates, selectClientLinks, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
 import { savePlanBatch, approveBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
@@ -36,7 +36,7 @@ interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCoun
 export async function POST(request: Request) {
   if (!isInternalLinkPlanningEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  let body: { projectId?: unknown; topicIds?: unknown; approve?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown }
+  let body: { projectId?: unknown; topicIds?: unknown; approve?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown; selectedLinks?: unknown }
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const approve = body.approve === true
@@ -55,6 +55,21 @@ export async function POST(request: Request) {
         const arr = manualByTopic.get(m.topicId) ?? []
         arr.push({ targetUrl: m.targetUrl, anchorText: m.anchorText })
         manualByTopic.set(m.topicId, arr)
+      }
+    }
+  }
+  // Phase 3B.2 — EXACT selection: when present, save ONLY these checked links per
+  // topic (recommended AND manual), re-validated server-side. Its presence
+  // switches those topics to exact mode; an empty per-topic list ⇒ zero-link plan.
+  const exactMode = Array.isArray(body.selectedLinks)
+  const selectedByTopic = new Map<string, { targetUrl: string; anchorText: string }[]>()
+  if (exactMode) {
+    for (const raw of (body.selectedLinks as unknown[]).slice(0, 400)) {
+      const m = raw as { topicId?: unknown; targetUrl?: unknown; anchorText?: unknown }
+      if (typeof m?.topicId === 'string' && typeof m.targetUrl === 'string' && typeof m.anchorText === 'string') {
+        const arr = selectedByTopic.get(m.topicId) ?? []
+        arr.push({ targetUrl: m.targetUrl, anchorText: m.anchorText })
+        selectedByTopic.set(m.topicId, arr)
       }
     }
   }
@@ -106,8 +121,17 @@ export async function POST(request: Request) {
       { id: topicRow.id, title: topicRow.topic, primaryKeyword: topicRow.primary_keyword, secondaryKeywords: Array.isArray(topicRow.secondary_keywords) ? topicRow.secondary_keywords : [] },
       targets, hosts, { allowCaution },
     )
-    // Merge server-validated manual reviewable overrides (if any) for this topic.
-    const { plan, promoted: manualApplied } = promoteManualCandidates(basePlan, manualByTopic.get(id) ?? [])
+    // Exact mode → save ONLY the client-checked links (recommended + manual),
+    // re-validated; else legacy: all recommended + promoted manual overrides.
+    let plan = basePlan
+    let manualApplied = 0
+    if (exactMode) {
+      plan = selectClientLinks(basePlan, selectedByTopic.get(id) ?? [])
+    } else {
+      const promoted = promoteManualCandidates(basePlan, manualByTopic.get(id) ?? [])
+      plan = promoted.plan
+      manualApplied = promoted.promoted
+    }
     const subject: PlanSubject = { subjectType: 'topic', topicId: id, articlePoolItemId: null, generatedArticleId: null }
     const batchId = await savePlanBatch(admin, {
       projectId: project.id, userId: user.id, subject,

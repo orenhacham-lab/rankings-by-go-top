@@ -445,3 +445,30 @@ export function promoteManualCandidates(
     rejectedManual,
   }
 }
+
+/**
+ * Phase 3B.2 — EXACT client selection: save ONLY the links the user checked.
+ * Each desired (targetUrl, anchorText) is kept ONLY if the server's own fresh
+ * plan classifies it as a recommended link OR an approvable reviewable candidate
+ * — client data is a lookup key, never trusted content, and blocked/hard-safety
+ * candidates can never be saved. An empty selection yields an auditable zero-link
+ * plan. Deduped by URL+anchor.
+ */
+export function selectClientLinks(
+  plan: CacheTopicPlan,
+  desired: { targetUrl: string; anchorText: string }[],
+): CacheTopicPlan {
+  const keyOf = (u: string, a: string | null | undefined) => `${normalizeUrlKey(u)}::${(a ?? '').trim().toLowerCase()}`
+  const desiredKeys = new Set((Array.isArray(desired) ? desired : []).map((d) => keyOf(d.targetUrl, d.anchorText)))
+  const pool = [
+    ...plan.selected,
+    ...plan.rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove),
+  ]
+  const seen = new Set<string>()
+  const selected: CachePlannedLink[] = []
+  for (const cand of pool) {
+    const k = keyOf(cand.targetUrl, cand.anchorText)
+    if (desiredKeys.has(k) && !seen.has(k)) { seen.add(k); selected.push({ ...cand, selected: true }) }
+  }
+  return { ...plan, selected, rejected: plan.rejected.filter((r) => !seen.has(keyOf(r.targetUrl, r.anchorText))) }
+}
