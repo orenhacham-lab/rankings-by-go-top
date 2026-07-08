@@ -41,6 +41,7 @@ export default function AutomationIdeas({
   onTopicsCreated,
   onPlansSaved,
   onApproved,
+  onReviewLinks,
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -55,11 +56,16 @@ export default function AutomationIdeas({
   // Phase 3F.3.3 — fires after approval so the hub can scroll to the queue,
   // highlight the new rows, and show the "queued for scheduled creation" notice.
   onApproved?: (info: { topicIds: string[]; plansSaved: boolean }) => void
+  // Phase 3F.3.3b — user asked to review/edit links before enqueue: the hub
+  // scrolls to + highlights the approved rows (and hints at "Open link planning").
+  onReviewLinks?: (topicIds: string[]) => void
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
   const [lastCreatedIds, setLastCreatedIds] = useState<string[]>([])
-  const [lastLinksSaved, setLastLinksSaved] = useState(false)
+  // How many of the just-created topics got a saved link plan (for the CTA
+  // link-status summary: none / some / all).
+  const [lastPlansCount, setLastPlansCount] = useState(0)
   const [scheduling, setScheduling] = useState(false)
   // Phase 3F.3.3a — the truthful "next step" CTA to scroll into view after approval.
   const ctaRef = useRef<HTMLDivElement | null>(null)
@@ -241,7 +247,7 @@ export default function AutomationIdeas({
         ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
         : []
       if (savedPlans.length) onPlansSaved?.(savedPlans)
-      setLastLinksSaved(savedPlans.length > 0)
+      setLastPlansCount(savedPlans.length)
       // Phase 3F.3.3a — highlight the new "ready" rows in the list, and scroll the
       // truthful next-step CTA ("add to publishing queue") into view here.
       if (createdTopics.length) onApproved?.({ topicIds: createdTopics.map((tp) => tp.id), plansSaved: savedPlans.length > 0 })
@@ -280,7 +286,9 @@ export default function AutomationIdeas({
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topicIds: lastCreatedIds }),
       })
-      setLastCreatedIds([])
+      // Only NOW are the topics truly in the automatic publishing queue.
+      setLastCreatedIds([]); setLastPlansCount(0)
+      setMessage({ text: t.queuedSuccess, ok: true })
       onScheduled?.()
     } finally {
       setScheduling(false)
@@ -401,11 +409,15 @@ export default function AutomationIdeas({
       )}
       {lastCreatedIds.length > 0 && (
         <div ref={ctaRef} className="mb-3 rounded-lg border-2 border-indigo-400 dark:border-indigo-500/60 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-3 scroll-mt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">↓ {t.nextStep}</div>
-          <p className="mt-0.5 text-sm font-medium text-indigo-900 dark:text-indigo-100">{t.approvedCta.replace('{n}', String(lastCreatedIds.length))}</p>
-          <p className="mt-0.5 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">{lastLinksSaved ? t.approvedReadyLinks : t.approvedReadyNoLinks}</p>
-          <div className="mt-2">
+          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{t.ctaTitle}</p>
+          <p className="mt-0.5 text-xs text-indigo-800/90 dark:text-indigo-200/90">{t.ctaBody}</p>
+          {/* Link-status summary: none / some / all of the approved topics. */}
+          <p className="mt-1 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
+            {lastPlansCount === 0 ? t.linkSummaryNone : lastPlansCount >= lastCreatedIds.length ? t.linkSummaryAll : t.linkSummaryMixed}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
+            <Button variant="outline" onClick={() => onReviewLinks?.(lastCreatedIds)} disabled={scheduling}>{t.reviewLinksBtn}</Button>
           </div>
         </div>
       )}

@@ -86,17 +86,31 @@ export default function ContentHub() {
   // planStatus so the panel can seed the topic-row badges for those IDs only.
   const [newTopics, setNewTopics] = useState<NewTopic[] | null>(null)
   const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
-  // Phase 3F.3.3a — after approving ideas, briefly highlight the new "ready"
-  // rows. The truthful next-step CTA ("add to publishing queue") lives in the
-  // ideas card itself, which scrolls itself into view — so we do NOT scroll away
-  // to the ready list here.
+  // Phase 3F.3.3a/b — after approving ideas, briefly highlight the new "ready"
+  // rows. The truthful next-step CTA lives in the ideas card (which scrolls
+  // itself into view) so approval does NOT scroll away. The explicit "review
+  // links first" action DOES scroll to the ready rows + shows a per-row hint.
+  const topicsSectionRef = useRef<HTMLDivElement>(null)
+  const scheduleSectionRef = useRef<HTMLDivElement>(null)
   const [highlightTopicIds, setHighlightTopicIds] = useState<string[]>([])
+  const [reviewLinksHint, setReviewLinksHint] = useState(false)
+  const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
+  const [automationRefresh, setAutomationRefresh] = useState(0)
   const handleTopicsQueued = useCallback((info: { topicIds: string[] }) => {
     setHighlightTopicIds(info.topicIds)
     window.setTimeout(() => setHighlightTopicIds([]), 4500)
   }, [])
-  const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
-  const [automationRefresh, setAutomationRefresh] = useState(0)
+  const handleReviewLinks = useCallback((topicIds: string[]) => {
+    setHighlightTopicIds(topicIds)
+    setReviewLinksHint(topicIds.length > 1)
+    window.setTimeout(() => topicsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+    window.setTimeout(() => setHighlightTopicIds([]), 6000)
+  }, [])
+  const handleScheduled = useCallback(() => {
+    setAutomationRefresh((k) => k + 1)
+    setReviewLinksHint(false)
+    window.setTimeout(() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }, [])
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
 
   // ── Batch article creation (client-side, sequential) ──
@@ -752,27 +766,38 @@ export default function ContentHub() {
                     projectId={projectId}
                     language={language}
                     onCreated={loadTopics}
-                    onScheduled={() => setAutomationRefresh((k) => k + 1)}
+                    onScheduled={handleScheduled}
                     onTopicsCreated={(created) => { if (created.length) setNewTopics(created) }}
                     onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: true, linkCount: p.linkCount, approvedCount: 0, stale: false }])) }))}
                     onApproved={handleTopicsQueued}
+                    onReviewLinks={handleReviewLinks}
                   />
-                  <AutomationSchedule
-                    projectId={projectId}
-                    language={language}
-                    refreshKey={automationRefresh}
-                    onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
-                  />
+                  <div ref={scheduleSectionRef} className="scroll-mt-4">
+                    <AutomationSchedule
+                      projectId={projectId}
+                      language={language}
+                      refreshKey={automationRefresh}
+                      onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
+                    />
+                  </div>
                 </div>
               )}
 
               {/* ── Section 3: pending / manual article topics ── */}
-              <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
+              <div ref={topicsSectionRef} className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 scroll-mt-4">
                 <div className="mb-3">
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t.queueExplain}</p>
                 </div>
+
+                {/* "Review links" helper when several topics were just approved. */}
+                {reviewLinksHint && (
+                  <div className="mb-3 rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-500/10 px-3 py-2 flex flex-wrap items-start gap-2">
+                    <span className="text-xs text-indigo-800 dark:text-indigo-200 flex-1 min-w-[12rem]">{t.reviewRowsHint}</span>
+                    <button type="button" onClick={() => setReviewLinksHint(false)} className="text-indigo-700/70 dark:text-indigo-300/70 hover:text-indigo-900 dark:hover:text-indigo-100 text-xs">✕</button>
+                  </div>
+                )}
                 {/* Workflow help — collapsed by default so it doesn't add standing
                     vertical weight. Wraps ONLY the help text. */}
                 <details className="mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 px-3 py-2">

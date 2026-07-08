@@ -44,6 +44,14 @@ export const dashboardEn = {
       approvedReadyLinks: 'The links you selected were saved as planned links for the approved topics.',
       approvedReadyNoLinks: 'You can add or edit internal links using the link-planning button.',
       nextStep: 'Next step: add these topics to the publishing queue',
+      // Phase 3F.3.3b — two-choice CTA + link summary + true queue success.
+      ctaTitle: 'The topics were approved and are ready for the next step.',
+      ctaBody: 'You can now add them to the publishing queue, or review internal links first.',
+      reviewLinksBtn: 'Review / edit links first',
+      linkSummaryAll: 'Planned internal links were saved for the approved topics.',
+      linkSummaryNone: 'No internal links were saved for these topics. Consider checking whether links should be added before adding them to the queue.',
+      linkSummaryMixed: 'Some topics have planned internal links. You can review or edit them before adding to the queue.',
+      queuedSuccess: 'The topics were added to the automatic publishing queue. The system will create and publish them according to the configured schedule.',
       linksFoundHint: 'We found internal links that may fit this topic. Keep only the links you want to save to the plan.',
       linksQualityHint: 'Links are suggested only when the system finds a good match from the site. A few relevant links are better than many weak ones.',
       sourceKeyword: 'By keyword',
@@ -239,6 +247,7 @@ export const dashboardEn = {
     // Phase 3F.3.3a — truthful ready-list explanation (topics here are approved
     // but NOT yet in the automatic queue until added).
     queueExplain: 'These are ready topics waiting for article creation. You can create an article from them, or add them to the automatic publishing queue from "Automatic ideas".',
+    reviewRowsHint: 'Click “Open link planning” next to each topic to add or edit links.',
     internalLinkIndex: {
       title: 'Internal-link index',
       statusReady: 'Index is ready',
