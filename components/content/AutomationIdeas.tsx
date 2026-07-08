@@ -302,13 +302,15 @@ export default function AutomationIdeas({
           known / keyword-research exhausted) — total pending stays visible above. */}
       {meta && suggestions.length > 0 && meta.newlyAdded === 0 && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
-          {meta.reason === 'primary_keyword_exists'
-            ? t.primaryKeywordExists
-            : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
-              ? t.krNoNew
-              : meta.reason === 'all_known' || meta.reason === 'no_new'
-                ? t.allKnown
-                : t.noNewThisRun.replace('{total}', String(suggestions.length))}
+          {meta.reason === 'kr_exhausted'
+            ? t.krExhausted
+            : meta.reason === 'primary_keyword_exists'
+              ? t.primaryKeywordExists
+              : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
+                ? t.krNoNew
+                : meta.reason === 'all_known' || meta.reason === 'no_new'
+                  ? t.allKnown
+                  : t.noNewThisRun.replace('{total}', String(suggestions.length))}
         </p>
       )}
       {/* Nothing to show at all — helpful empty reason. */}
@@ -318,10 +320,12 @@ export default function AutomationIdeas({
             ? t.noScan
             : meta.reason === 'insufficient_data'
               ? t.insufficientScan
-              : meta.reason === 'kr_thin' || meta.reason === 'no_keyword_data'
-                ? t.krThin
-                : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
-                  ? t.krNoNew
+              : meta.reason === 'kr_exhausted'
+                ? t.krExhausted
+                : meta.reason === 'kr_thin' || meta.reason === 'no_keyword_data'
+                  ? t.krThin
+                  : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
+                    ? t.krNoNew
                   : meta.reason === 'all_known' || meta.reason === 'no_new' || meta.reason === 'primary_keyword_exists'
                     ? t.allKnown
                     : meta.reason === 'model_error' || meta.reason === 'http_error'

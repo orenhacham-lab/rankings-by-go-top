@@ -75,6 +75,7 @@ export const dashboardEn = {
       runSummary: 'Added {new} new ideas · {total} saved ideas available',
       noNewThisRun: '{total} saved ideas are available. No new ideas were added in this run.',
       krNoNew: 'Keyword research did not find new ideas beyond what is already saved, approved, or rejected.',
+      krExhausted: 'Keyword research has exhausted the currently available clusters. To continue, try adding a broader seed keyword or using another idea source.',
       creating: 'Saving…',
       createdToast: 'Added {n} approved topics',
       createdSkipped: 'Added {n} · {m} already existed',

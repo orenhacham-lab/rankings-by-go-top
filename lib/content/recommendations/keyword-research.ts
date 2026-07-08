@@ -17,24 +17,59 @@ import { generateKeywordIdeas, type KeywordIdeaResult } from '@/lib/google-ads/k
 import { GoogleAdsError } from '@/lib/google-ads/client'
 import { isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
 import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/keyword-research-cache'
-import { clusterByTokens, tokens, slugKey } from './dedupe'
+import { tokens, slugKey } from './dedupe'
+import { normalizeText } from './topic-idea-store'
 import type { TopicSuggestion } from './types'
 
 // Phase 3F.3.1 — broadened (but still bounded) so the source doesn't exhaust
-// after ~2 runs: more URL seeds, an extra keyword-seed pass, a larger raw pool,
-// and more clusters → more distinct topics from a site's full breadth.
+// after ~2 runs: more URL seeds, an extra keyword-seed pass, a larger raw pool.
 const MAX_URL_SEEDS = 5
 const MAX_ADS_CALLS = 6
-const MAX_KEYWORDS = 150
-const MAX_CLUSTERS = 40
 const MIN_MONTHLY = 30
-const MAX_KEYWORD_SEEDS = 20
+const MAX_KEYWORD_SEEDS = 30
+// Phase 3F.3.1e — how many UNUSED candidate keywords become topics per run. The
+// avoid set advances the window each run, so successive "find more" clicks work
+// through the full inventory instead of re-emitting the same head cluster.
+const TOPICS_PER_RUN = 24
 
 const SUPPORT_TERMS = [
   'טלפון', 'משלוח', 'משלוחים', 'אחריות', 'קופון', 'קופונים', 'סניף', 'סניפים', 'ביטול',
   'החזר', 'החזרים', 'החזרה', 'שירות', 'לקוחות', 'יצירת קשר', 'כתובת', 'שעות', 'מבצע', 'מבצעים',
   'phone', 'shipping', 'delivery', 'warranty', 'coupon', 'branch', 'return', 'refund', 'contact',
 ]
+
+// Phase 3F.3.1e — used-goods / support / review noise. Skipped by default (not a
+// good article-topic pool); relevant commercial/informational terms are kept.
+const NOISE_TERMS = [
+  'יד 2', 'יד2', 'יד שנייה', 'יד שניה', 'למסירה', 'מודעות', 'ביקורת', 'ביקורות',
+  'קטלוג', 'טלפון', 'כתובת', 'שעות פתיחה', 'ביד2', 'yad2', 'used',
+]
+function isNoise(keyword: string): boolean {
+  const lower = keyword.toLowerCase()
+  return NOISE_TERMS.some((t) => lower.includes(t))
+}
+/** Skip only very short single-token head terms (e.g. 3-char generics). */
+function isTooGeneric(keyword: string): boolean {
+  const parts = keyword.trim().split(/\s+/)
+  return parts.length === 1 && parts[0]!.length < 4
+}
+/** Up to n other keywords sharing a significant token (>2 chars) — secondary context. */
+function relatedKeywords(primary: string, pool: KeywordIdeaResult[], n: number): string[] {
+  const pk = normalizeText(primary)
+  const pt = new Set(Array.from(tokens(primary)).filter((t) => t.length > 2))
+  if (pt.size === 0) return []
+  const out: string[] = []
+  for (const r of pool) {
+    const kw = r.keyword.trim()
+    if (normalizeText(kw) === pk) continue
+    const kt = tokens(kw)
+    let shared = false
+    for (const t of kt) if (pt.has(t)) { shared = true; break }
+    if (shared) out.push(kw)
+    if (out.length >= n) break
+  }
+  return out
+}
 
 export interface KeywordResearchInput {
   userId: string
@@ -174,10 +209,17 @@ export interface KeywordResearchMeta {
   adsCalls: number
   keywordResearchFailed?: boolean
   failureReason?: string
-  // Phase 3F.3.1 diagnostics.
+  // Phase 3F.3.1 / 3F.3.1e inventory diagnostics.
   rawKeywords?: number
+  afterBasicFilter?: number
+  afterNoiseFilter?: number
+  candidateCount?: number
+  batchSent?: number
+  unusedRemaining?: number
+  skippedKnownCount?: number
+  skippedKnownExamples?: string[]
   clusters?: number
-  reason?: 'keyword_research_failed' | 'thin_data' | 'all_known'
+  reason?: 'keyword_research_failed' | 'thin_data' | 'all_known' | 'exhausted'
 }
 
 export async function recommendFromKeywordResearch(
@@ -226,44 +268,62 @@ export async function recommendFromKeywordResearch(
     return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords: 0, clusters: 0, keywordResearchFailed: !!failureReason, failureReason, reason: failureReason ? 'keyword_research_failed' : 'thin_data' } }
   }
 
-  // 2) Filter brand/support + sort by volume + cap.
+  const rawKeywords = merged.size
+
+  // 2) Basic + noise filtering (brand/support/used-goods/competitor-support).
   const brandTokens = tokens(input.businessName || '')
-  const filtered = Array.from(merged.values())
-    .filter((r) => !isBrandOrSupport(r.keyword, brandTokens))
+  const afterBrand = Array.from(merged.values()).filter((r) => !isBrandOrSupport(r.keyword, brandTokens))
+  const afterBasicFilter = afterBrand.length
+  const cleaned = afterBrand
+    .filter((r) => !isNoise(r.keyword))
     .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
-    .slice(0, MAX_KEYWORDS)
+  const afterNoiseFilter = cleaned.length
 
-  // 3) Cluster and pick primary (highest volume) + secondary keywords.
-  const volumeByKw = new Map(filtered.map((r) => [r.keyword.trim().toLowerCase(), r.avgMonthlySearches ?? 0]))
-  // Higher threshold = less merging = MORE distinct clusters = more article ideas.
-  const clusters = clusterByTokens(filtered.map((r) => r.keyword), 0.6).slice(0, MAX_CLUSTERS)
-  // Skip clusters whose primary keyword is already known (exact normalized), so
-  // repeat "find more" runs surface FRESH clusters instead of the same batch.
-  const avoidSet = new Set((input.avoid ?? []).map((a) => a.trim().toLowerCase().replace(/\s+/g, ' ')).filter(Boolean))
-  const clusterInputs: ClusterInput[] = clusters
-    .map((members) => {
-      const sorted = [...members].sort((a, b) => (volumeByKw.get(b.toLowerCase()) ?? 0) - (volumeByKw.get(a.toLowerCase()) ?? 0))
-      const primaryKeyword = sorted[0]!
-      return {
-        primaryKeyword,
-        secondaryKeywords: sorted.slice(1, 5),
-        volume: volumeByKw.get(primaryKeyword.toLowerCase()) ?? 0,
-      }
-    })
-    .filter((c) => c.primaryKeyword && !avoidSet.has(c.primaryKeyword.trim().toLowerCase().replace(/\s+/g, ' ')))
+  // 3) KEYWORD INVENTORY (Phase 3F.3.1e): treat EACH distinct keyword as its own
+  // candidate primary — NOT collapsed into one head cluster — so long-tail
+  // variants ("הליכון ביתי מתקפל", "הליכון חשמלי", "תחזוקת הליכון ביתי") each
+  // become separate opportunities. Candidates already known (avoid) are skipped,
+  // so repeat "find more" runs advance through the inventory by volume.
+  const avoidSet = new Set((input.avoid ?? []).map((a) => normalizeText(a)).filter(Boolean))
+  const seenPrimary = new Set<string>()
+  const skippedKnownExamples: string[] = []
+  let skippedKnownCount = 0
+  const candidates: { keyword: string; volume: number }[] = []
+  for (const r of cleaned) {
+    const kw = r.keyword.trim()
+    const nk = normalizeText(kw)
+    if (!nk || seenPrimary.has(nk)) continue
+    seenPrimary.add(nk)
+    if (isTooGeneric(kw)) continue
+    if (avoidSet.has(nk)) { skippedKnownCount++; if (skippedKnownExamples.length < 20) skippedKnownExamples.push(kw); continue }
+    candidates.push({ keyword: kw, volume: r.avgMonthlySearches ?? 0 })
+  }
+  const candidateCount = candidates.length
 
-  // Every candidate cluster was already known → clean "all known", not an error.
-  if (clusterInputs.length === 0) {
-    return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords: filtered.length, clusters: clusters.length, keywordResearchFailed: !!failureReason, failureReason, reason: clusters.length > 0 ? 'all_known' : 'thin_data' } }
+  // Fetched a pool but every usable keyword is already known → EXHAUSTED clusters
+  // (distinct from "thin data" when the pool itself was tiny).
+  if (candidateCount === 0) {
+    const reason = afterNoiseFilter > 0 ? 'exhausted' : 'thin_data'
+    return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter, candidateCount: 0, batchSent: 0, unusedRemaining: 0, skippedKnownCount, skippedKnownExamples, keywordResearchFailed: !!failureReason, failureReason, reason } }
   }
 
-  // 4) Gemini clusters → topics (with a deterministic fallback title).
+  // 4) Take the next batch (highest-volume unused first). Attach light related
+  // keywords as secondary context WITHOUT removing them from the inventory.
+  const batch = candidates.slice(0, TOPICS_PER_RUN)
+  const clusterInputs: ClusterInput[] = batch.map((c) => ({
+    primaryKeyword: c.keyword,
+    secondaryKeywords: relatedKeywords(c.keyword, cleaned, 4),
+    volume: c.volume,
+  }))
+
+  // 5) Gemini candidate keywords → article topics (keep primaryKeyword EXACTLY;
+  // deterministic keyword-title fallback if the model is unavailable).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
   const geminiTopics = await clustersToTopics(clusterInputs, language, businessCtx)
-  const byPrimary = new Map(geminiTopics.map((t) => [(t.primaryKeyword || '').trim().toLowerCase(), t]))
+  const byPrimary = new Map(geminiTopics.map((t) => [normalizeText(t.primaryKeyword), t]))
 
   const suggestions: TopicSuggestion[] = clusterInputs.map((c) => {
-    const g = byPrimary.get(c.primaryKeyword.toLowerCase())
+    const g = byPrimary.get(normalizeText(c.primaryKeyword))
     const title = g?.title?.trim() || c.primaryKeyword
     const intent = g?.searchIntent?.trim() || 'informational'
     const wc = typeof g?.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000
@@ -285,5 +345,13 @@ export async function recommendFromKeywordResearch(
     }
   })
 
-  return { suggestions, meta: { generated: suggestions.length, adsCalls, rawKeywords: filtered.length, clusters: clusters.length, keywordResearchFailed: !!failureReason, failureReason } }
+  return {
+    suggestions,
+    meta: {
+      generated: suggestions.length, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter,
+      candidateCount, batchSent: batch.length, unusedRemaining: candidateCount - batch.length,
+      skippedKnownCount, skippedKnownExamples, clusters: candidateCount,
+      keywordResearchFailed: !!failureReason, failureReason,
+    },
+  }
 }

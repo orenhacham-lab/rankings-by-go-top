@@ -21,9 +21,40 @@ import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidat
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { recommendFromKeywordResearch } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
+import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { RecommendationSource, RecommendationResult, TopicSuggestion, SuggestedInternalLink } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
+
+/**
+ * Phase 3F.3.1e — derive seed CONCEPTS from the site's own taxonomy (category /
+ * tag / product target titles + their reliable focus keywords) to widen the
+ * keyword-research pool with the catalogue's breadth. Read-only cached scan; no
+ * rescan. Never hardcoded — purely project-derived.
+ */
+async function deriveScanSeedConcepts(admin: Admin, projectId: string): Promise<string[]> {
+  try {
+    const cacheRow = await getCachedIndex(admin, projectId)
+    if (!cacheRow) return []
+    const report = reassembleReport(cacheRow)
+    const targets = (report.targets ?? []) as ScannedTarget[]
+    const out: string[] = []
+    const seen = new Set<string>()
+    const push = (raw: string | null | undefined) => {
+      const v = (raw || '').trim()
+      const key = v.toLowerCase()
+      if (v && v.length >= 3 && v.length <= 40 && !seen.has(key)) { seen.add(key); out.push(v) }
+    }
+    for (const t of targets) {
+      if (t.targetType === 'category' || t.targetType === 'tag' || t.targetType === 'product') {
+        push(t.targetTitle)
+        if (t.keywordAvailable) push(t.primaryKeywordCandidate)
+      }
+    }
+    return out.slice(0, 20)
+  } catch { return [] }
+}
 
 const TARGET_NEW = 15
 const MAX_ATTEMPTS = 4
@@ -330,7 +361,12 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       .eq('project_id', input.projectId)
       .order('avg_monthly_searches', { ascending: false, nullsFirst: false })
       .limit(20)
-    const seedKeywords = ((kwSeedRows ?? []) as { keyword: string }[]).map((r) => r.keyword).filter(Boolean)
+    const trackingSeeds = ((kwSeedRows ?? []) as { keyword: string }[]).map((r) => r.keyword).filter(Boolean)
+    // Phase 3F.3.1e — DERIVE extra seed concepts from the site's own taxonomy
+    // (category/tag/product target titles + reliable focus keywords) so the raw
+    // keyword pool spans the whole catalogue, not just the homepage's terms.
+    const scanSeeds = await deriveScanSeedConcepts(admin, input.projectId)
+    const seedKeywords = Array.from(new Set([...trackingSeeds, ...scanSeeds].map((s) => s.trim()).filter(Boolean)))
     const res = await recommendFromKeywordResearch(admin, {
       userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
       seedKeywords, avoid: [...existingTitles, ...(input.avoidKeywords ?? [])],
@@ -353,8 +389,14 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       keywordResearchFailed: res.meta.keywordResearchFailed,
       failureReason: res.meta.failureReason,
       adsCalls: res.meta.adsCalls,
-      reason: suggestions.length === 0 ? (res.meta.reason === 'keyword_research_failed' || res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.reason === 'thin_data' ? 'kr_thin' : res.meta.reason === 'all_known' ? 'kr_all_known' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
-      debug: process.env.NODE_ENV !== 'production' ? { seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, rawKeywords: res.meta.rawKeywords, clusters: res.meta.clusters, adsCalls: res.meta.adsCalls, modelTopics: res.meta.generated, afterCorpusDedupe: suggestions.length } : undefined,
+      reason: suggestions.length === 0 ? (res.meta.reason === 'keyword_research_failed' || res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.reason === 'thin_data' ? 'kr_thin' : res.meta.reason === 'exhausted' ? 'kr_exhausted' : res.meta.reason === 'all_known' ? 'kr_all_known' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
+      debug: process.env.NODE_ENV !== 'production' ? {
+        seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, trackingSeedCount: trackingSeeds.length, scanSeedCount: scanSeeds.length,
+        rawKeywords: res.meta.rawKeywords, afterBasicFilter: res.meta.afterBasicFilter, afterNoiseFilter: res.meta.afterNoiseFilter,
+        candidateCount: res.meta.candidateCount, batchSent: res.meta.batchSent, unusedRemaining: res.meta.unusedRemaining,
+        skippedKnownCount: res.meta.skippedKnownCount, skippedKnownExamples: res.meta.skippedKnownExamples,
+        modelTopics: res.meta.generated, afterCorpusDedupe: suggestions.length,
+      } : undefined,
     }
   }
 
