@@ -51,7 +51,8 @@ export const dashboardEn = {
       // Phase 3F.3.6 — money target vs supporting links on the idea card + review helper.
       primaryCommercialLink: 'Primary commercial link',
       supportingLinks: 'Supporting links',
-      noMoneyTargetNote: 'No precise primary commercial target was found. You can still use supporting links or edit manually.',
+      noMoneyTargetNote: 'No precise primary commercial target was found. It is better not to add an automatic link than to add an unrelated one.',
+      noPreciseLink: 'No sufficiently precise internal link was found for this topic.',
       reviewEditHelper: 'You can edit links before adding to the queue. When finished, click “Add to publishing queue”.',
       approvedReady: 'The topics were approved and added to the list of topics ready for publishing. To place them in the automatic workflow queue, click “Add to publishing queue”.',
       approvedReadyLinks: 'The links you selected were saved as planned links for the approved topics.',
@@ -333,6 +334,10 @@ export const dashboardEn = {
       planVsApproveNote: '"Save plan" saves a plan only. Only approved links are auto-inserted when an article is created. To auto-insert on creation, check "Approve the links after saving". Otherwise you can approve and insert them manually from the article page after it is created.',
       save: 'Save plan for selected topics',
       saving: 'Saving…',
+      // Phase 3F.3.7 (Part G) — save the plans AND add topics to the publishing queue.
+      saveAndQueue: 'Save links and add to publishing queue',
+      savingQueue: 'Saving and adding to queue…',
+      queuedSuccess: 'The topics were added to the automatic publishing queue. The system will create and publish them according to the configured schedule.',
       close: 'Close',
       saveError: 'Failed to save plan',
       statusSuggested: 'Suggested',

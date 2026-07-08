@@ -42,9 +42,9 @@ export default function AutomationIdeas({
   language,
   onCreated,
   onScheduled,
+  onTopicsCreated,
   onPlansSaved,
   onApproved,
-  onReviewLinks,
   planSavedHint = false,
   scrollCtaSignal = 0,
 }: {
@@ -337,13 +337,12 @@ export default function AutomationIdeas({
     try {
       const res = await createTopics()
       if (!res) return
-      setMessage({ text: t.approvedReady, ok: true })
-      setLastCreatedIds(res.ids)
-      // Phase 3F.3.6 (Part F) — the FIRST click immediately performs the review
-      // flow: scroll to + highlight the approved rows so links can be edited there
-      // (per-row link planner). No duplicate "review/edit links" button is created,
-      // and nothing is enqueued until the user clicks the explicit add-to-queue action.
-      if (res.createdTopics.length) onReviewLinks?.(res.createdTopics.map((tp) => tp.id))
+      // Phase 3F.3.7 (Part F) — the FIRST click opens the ACTUAL review screen: the
+      // batch link-review panel listing the selected topics and their planned links
+      // (with save + "save and add to queue"). No scroll-then-another-button, no
+      // duplicate CTA, nothing enqueued until the user acts in that panel.
+      if (res.createdTopics.length) onTopicsCreated?.(res.createdTopics)
+      else setMessage({ text: t.approvedReady, ok: true })
     } catch {
       setMessage({ text: 'error', ok: false })
     } finally {
@@ -594,7 +593,7 @@ export default function AutomationIdeas({
                       <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
                         {s.linkPreviewReason === 'low_confidence_only' ? t.linkReasonLowConf
                           : s.linkPreviewReason === 'stale_index' ? t.linkReasonStale
-                            : (s.linkPreviewReason === 'valid_no_match' || s.linkPreviewReason === 'target_type_gap' || s.linkPreviewReason === 'already_linked_or_duplicate') ? t.linkReasonNoMatch
+                            : (s.linkPreviewReason === 'valid_no_match' || s.linkPreviewReason === 'target_type_gap' || s.linkPreviewReason === 'already_linked_or_duplicate') ? t.noPreciseLink
                               : t.linksNoneHint}
                       </div>
                     )}

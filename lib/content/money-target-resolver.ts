@@ -53,6 +53,9 @@ export interface MoneyTargetCandidateDebug {
   matchedTopicTerms: string[]
   matchedTargetTerms: string[]
   targetSourceFields: string[]
+  clusterCompatibility: string
+  topicCluster: string[]
+  targetCluster: string[]
   selected: boolean
   tier: number
 }
@@ -73,6 +76,13 @@ export function isCommercialLink(l: CachePlannedLink): boolean {
   return l.targetPriority === 'commercial_category_or_service_hub' || l.targetPriority === 'product_or_specific_offer'
 }
 const isProductLink = (l: CachePlannedLink): boolean => l.targetPriority === 'product_or_specific_offer'
+
+/** Phase 3F.3.7 — a candidate blocked by the strict cluster gate can NEVER be a
+ *  money target (cross-cluster / generic-only / unknown-no-exact). */
+const CLUSTER_BLOCK_REASONS = new Set(['blocked_cross_cluster', 'blocked_generic_only', 'unknown_no_exact'])
+export function isClusterBlocked(l: CachePlannedLink): boolean {
+  return (l.rejectedReasons ?? []).some((r) => CLUSTER_BLOCK_REASONS.has(r))
+}
 
 /**
  * Money-target TIER (lower = better). Only these semantic match types can be a
@@ -105,6 +115,12 @@ function toMatchType(l: CachePlannedLink): MoneyTargetMatchType {
 }
 
 function rejectReason(l: CachePlannedLink): MoneyTargetRejectReason {
+  // Cluster gate dominates: a cross-cluster / generic-only / unknown target is
+  // never a valid money target regardless of its raw score.
+  if (isClusterBlocked(l)) {
+    const r = (l.rejectedReasons ?? []).find((x) => CLUSTER_BLOCK_REASONS.has(x))
+    return r === 'blocked_cross_cluster' ? 'wrong_target_type' : 'generic_only_match'
+  }
   const tier = moneyTier(l.semanticMatchType ?? 'none')
   if (tier === 99) return (l.matchedTokens?.length ?? 0) === 0 ? 'generic_only_match' : 'weak_product_match'
   if (tier === 4) return 'broad_fallback_not_confident'
@@ -128,7 +144,7 @@ export function resolveMoneyTargetFromPlan(plan: CacheTopicPlan): MoneyTargetRes
   // the broad/parent fallback (tier 4) is accepted ONLY when the planner selected it
   // — we never invent a broad guess the planner itself rejected.
   const eligible = scored.filter(({ l, tier }) =>
-    tier <= 4 && (l.anchorText || '').trim() && (tier <= 3 ? (l.selected || l.confidence >= MONEY_TARGET_MIN_CONFIDENCE) : l.selected),
+    tier <= 4 && !isClusterBlocked(l) && (l.anchorText || '').trim() && (tier <= 3 ? (l.selected || l.confidence >= MONEY_TARGET_MIN_CONFIDENCE) : l.selected),
   )
   eligible.sort((a, b) => a.tier - b.tier || b.l.confidence - a.l.confidence)
   const best = eligible[0]?.l ?? null
@@ -139,7 +155,9 @@ export function resolveMoneyTargetFromPlan(plan: CacheTopicPlan): MoneyTargetRes
     targetType: isProductLink(l) ? 'product' : 'category',
     semanticMatchType: l.semanticMatchType ?? 'none', confidence: l.confidence, relevance: l.relevance,
     matchedTopicTerms: l.matchedTokens ?? [], matchedTargetTerms: l.matchedTargetTerms ?? [],
-    targetSourceFields: l.matchedSourceFields ?? [], selected: l.selected, tier,
+    targetSourceFields: l.matchedSourceFields ?? [],
+    clusterCompatibility: l.clusterCompatibility ?? 'unknown', topicCluster: l.topicCluster ?? [], targetCluster: l.targetCluster ?? [],
+    selected: l.selected, tier,
   }))
   const rejected = commercial
     .filter((l) => l !== best)

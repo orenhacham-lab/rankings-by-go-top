@@ -52,13 +52,16 @@ function reasonLabel(r?: string | null): string {
 }
 
 export default function NewTopicsLinkPlanPanel({
-  projectId, language, topics, onClose, onSaved,
+  projectId, language, topics, onClose, onSaved, onEnqueue,
 }: {
   projectId: string
   language: 'he' | 'en'
   topics: NewTopic[]
   onClose: () => void
   onSaved: (results: { topicId: string; summary: TopicPlanSummary }[]) => void
+  // Phase 3F.3.7 (Part G) — save the plans AND add the topics to the publishing
+  // queue in one action. Returns success. When absent, only plain save is shown.
+  onEnqueue?: (topicIds: string[]) => Promise<boolean>
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.newTopicsPlan, [language])
   const isHebrew = language === 'he'
@@ -79,8 +82,10 @@ export default function NewTopicsLinkPlanPanel({
   const [manualSel, setManualSel] = useState<Record<string, Set<string>>>({})
   const [autoApprove, setAutoApprove] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [queuing, setQueuing] = useState(false)
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'approved' | 'zero' | 'failed'>>({})
   const [savedOk, setSavedOk] = useState(false) // compact success state after save
+  const [queuedOk, setQueuedOk] = useState(false) // success state after save + enqueue
 
   // Bring the panel into view once when it first appears (after topic creation).
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -155,11 +160,10 @@ export default function NewTopicsLinkPlanPanel({
     return Array.from(ids)
   }, [selected, manualSel])
 
-  const save = useCallback(async () => {
-    if (saving || topicIdsToSave.length === 0) return
-    setSaving(true); setError(null)
-    // EXACT selection: only the checked recommended + checked manual links per
-    // checked topic. An empty list for a checked topic ⇒ zero-link plan.
+  // Persist the EXACT selection (checked recommended + checked manual per checked
+  // topic; empty ⇒ zero-link plan) and return the topic ids that saved OK, or null
+  // on request error. Shared by "Save" and "Save + add to queue".
+  const runSave = useCallback(async (): Promise<string[] | null> => {
     const selectedLinks: { topicId: string; targetUrl: string; anchorText: string }[] = []
     for (const tid of topicIdsToSave) {
       const recs = plans[tid]?.selected ?? []
@@ -169,31 +173,58 @@ export default function NewTopicsLinkPlanPanel({
       const mset = manualSel[tid] ?? new Set<string>()
       for (const l of rev) if (mset.has(mkey(l)) && l.anchorText) selectedLinks.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
     }
+    const res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: autoApprove, selectedLinks }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return null }
+    const results: BulkResult[] = Array.isArray(data.results) ? data.results : []
+    const nextStatus: Record<string, 'saved' | 'approved' | 'zero' | 'failed'> = {}
+    const summaries: { topicId: string; summary: TopicPlanSummary }[] = []
+    const okIds: string[] = []
+    for (const r of results) {
+      if (!r.ok) { nextStatus[r.topicId] = 'failed'; continue }
+      nextStatus[r.topicId] = r.linkCount === 0 ? 'zero' : r.approvedCount > 0 ? 'approved' : 'saved'
+      summaries.push({ topicId: r.topicId, summary: { exists: true, linkCount: r.linkCount, approvedCount: r.approvedCount, stale: false } })
+      okIds.push(r.topicId)
+    }
+    setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
+    onSaved(summaries)
+    return okIds
+  }, [topicIdsToSave, linkSel, manualSel, plans, projectId, autoApprove, t, onSaved])
+
+  const save = useCallback(async () => {
+    if (saving || queuing || topicIdsToSave.length === 0) return
+    setSaving(true); setError(null)
     try {
-      const res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: autoApprove, selectedLinks }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return }
-      const results: BulkResult[] = Array.isArray(data.results) ? data.results : []
-      const nextStatus: Record<string, 'saved' | 'approved' | 'zero' | 'failed'> = {}
-      const summaries: { topicId: string; summary: TopicPlanSummary }[] = []
-      for (const r of results) {
-        if (!r.ok) { nextStatus[r.topicId] = 'failed'; continue }
-        nextStatus[r.topicId] = r.linkCount === 0 ? 'zero' : r.approvedCount > 0 ? 'approved' : 'saved'
-        summaries.push({ topicId: r.topicId, summary: { exists: true, linkCount: r.linkCount, approvedCount: r.approvedCount, stale: false } })
-      }
-      setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
-      onSaved(summaries)
-      // Compact success state; auto-dismiss the session panel shortly after.
-      if (results.some((r) => r.ok)) { setSavedOk(true); window.setTimeout(() => onClose(), 1800) }
+      const okIds = await runSave()
+      if (okIds && okIds.length > 0) { setSavedOk(true); window.setTimeout(() => onClose(), 1800) }
     } catch {
       setError(t.saveError)
     } finally {
       setSaving(false)
     }
-  }, [saving, topicIdsToSave, linkSel, manualSel, plans, projectId, autoApprove, t, onSaved, onClose])
+  }, [saving, queuing, topicIdsToSave, runSave, onClose, t])
+
+  // Phase 3F.3.7 (Part G) — save the plans AND add the topics to the publishing
+  // queue in one action, then show final success and close.
+  const saveAndQueue = useCallback(async () => {
+    if (saving || queuing || topicIdsToSave.length === 0 || !onEnqueue) return
+    setQueuing(true); setError(null)
+    try {
+      const okIds = await runSave()
+      if (okIds === null) return
+      const idsToQueue = okIds.length > 0 ? okIds : topicIdsToSave
+      const queued = await onEnqueue(idsToQueue)
+      if (queued) { setQueuedOk(true); window.setTimeout(() => onClose(), 1800) }
+      else { setSavedOk(true) } // saved but enqueue failed — keep the panel with a plain success
+    } catch {
+      setError(t.saveError)
+    } finally {
+      setQueuing(false)
+    }
+  }, [saving, queuing, topicIdsToSave, onEnqueue, runSave, onClose, t])
 
   // Summary counts (session-only, from the dry-run + save results).
   const topicsWithLinks = Object.values(plans).filter((p) => p.selected.length > 0).length
@@ -229,7 +260,13 @@ export default function NewTopicsLinkPlanPanel({
         {warnNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{warnNote}</p>}
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
-        {savedOk ? (
+        {queuedOk ? (
+          /* Save + enqueue success — panel auto-dismisses shortly after. */
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
+            <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.queuedSuccess}</span>
+            <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
+          </div>
+        ) : savedOk ? (
           /* Compact success state — panel auto-dismisses shortly after. */
           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
             <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.savedSuccess}</span>
@@ -348,12 +385,20 @@ export default function NewTopicsLinkPlanPanel({
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <label className="inline-flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-                <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving} className="accent-indigo-600" />
+                <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving || queuing} className="accent-indigo-600" />
                 {t.autoApprove}
               </label>
-              <Button size="sm" onClick={save} loading={saving} disabled={saving || topicIdsToSave.length === 0} className="ms-auto">
-                {saving ? t.saving : t.save}
-              </Button>
+              {/* Plain save (secondary) + save-and-enqueue (primary, Part G). */}
+              <div className="ms-auto flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={save} loading={saving} disabled={saving || queuing || topicIdsToSave.length === 0}>
+                  {saving ? t.saving : t.save}
+                </Button>
+                {onEnqueue && (
+                  <Button size="sm" onClick={saveAndQueue} loading={queuing} disabled={saving || queuing || topicIdsToSave.length === 0}>
+                    {queuing ? t.savingQueue : t.saveAndQueue}
+                  </Button>
+                )}
+              </div>
             </div>
           </>
         )}

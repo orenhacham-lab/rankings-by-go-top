@@ -96,6 +96,13 @@ export interface CachePlannedLink {
   matchedTargetTerms?: string[]
   matchedSourceFields?: string[]
   commercialRank?: number | null
+  // Phase 3F.3.7 cluster-gate diagnostics (additive; response-only):
+  //  clusterCompatibility = same_cluster / parent_child / sibling_same_parent /
+  //  exact_unknown / blocked_cross_cluster / blocked_generic_only / unknown_no_exact;
+  //  topicCluster / targetCluster = the strong identity terms of each side.
+  clusterCompatibility?: string
+  topicCluster?: string[]
+  targetCluster?: string[]
   // Phase 2I candidate tiers (response-only diagnostics; not persisted):
   //  recommended = auto-selected; reviewable = rejected ONLY for soft scoring
   //  reasons and safe to manually approve; blocked = a hard-safety failure that
@@ -195,12 +202,16 @@ const GENERIC_MODIFIER_STEMS = new Set<string>(
     // Hebrew — use-case / place / audience / commercial / spec modifiers.
     'בית', 'ביתי', 'ביתית', 'ביתיים', 'חדר', 'כושר', 'אימון', 'אימונים', 'לאימון',
     'מקצועי', 'מקצועני', 'סט', 'זוג', 'קילו', 'קג', 'גודל', 'מידה', 'מחיר', 'עלות',
-    'קנייה', 'לקנות', 'איכותי', 'איכות', 'זול', 'משלוח', 'חשמלי', 'ידני', 'מתקפל',
+    'קנייה', 'לקנייה', 'לקנות', 'איכותי', 'איכות', 'זול', 'משלוח', 'חשמלי', 'ידני', 'מתקפל',
     'נייד', 'קומפקטי', 'למתחילים', 'מתקדמים', 'סקירה', 'השוואה', 'ביקורת', 'דגם',
     'דגמים', 'מבצע', 'הנחה', 'חדש', 'פופולרי', 'יעיל', 'קל', 'כבד',
+    // Phase 3F.3.7 — more generic intent/modifier words that must NOT connect targets.
+    'שימוש', 'להשתמש', 'סוגים', 'סוג', 'פתרון', 'פתרונות', 'מתאים', 'מתאימה', 'ציוד',
+    'אביזרים', 'אביזר', 'הטוב', 'הטובים', 'כללי', 'שאלות', 'שאלה', 'לפני',
     // English — the same generic modifiers when titles/slugs are transliterated.
-    'home', 'gym', 'training', 'workout', 'set', 'pair', 'kg', 'size', 'price',
-    'buy', 'cheap', 'electric', 'manual', 'folding', 'portable', 'compact',
+    'home', 'gym', 'fitness', 'training', 'workout', 'set', 'pair', 'kg', 'size', 'price',
+    'buy', 'cheap', 'electric', 'manual', 'folding', 'portable', 'compact', 'use', 'choose',
+    'equipment', 'solution', 'suitable', 'types', 'accessories', 'general', 'questions',
     'pro', 'beginner', 'review', 'model', 'sale', 'discount', 'new', 'best',
   ].map(stemOne),
 )
@@ -429,26 +440,64 @@ export function planFromCachedTargets(
     const matchedTargetTerms: string[] = []   // the candidate's own terms that matched
     const missingTokens: string[] = []
     const matchedSourceFields = new Set<string>()
+    // Phase 3F.3.7 — topic-side terms that matched via an IDENTITY field
+    // (title/keyword/slug), i.e. what the target actually IS — not an anchor word
+    // some OTHER page used to link to it. Cluster identity comes from these only.
+    const identityMatched: string[] = []
     let hadExactMatch = false
     let hadNearMatch = false
     let matchedOnlyViaSlug = true
     for (const c of candTokens) {
       if (topicTokens.has(c)) {
         alignedCand.add(c); matchedTokens.push(c); matchedTargetTerms.push(c); hadExactMatch = true
-        for (const f of fieldOf(c)) { matchedSourceFields.add(f); if (f !== 'slug') matchedOnlyViaSlug = false }
+        const fields = fieldOf(c)
+        for (const f of fields) { matchedSourceFields.add(f); if (f !== 'slug') matchedOnlyViaSlug = false }
+        if (fields.some((f) => f !== 'anchor')) identityMatched.push(c)
         continue
       }
       let near: string | null = null
       if (c.length >= 5) { for (const tt of topicTokens) { if (stemRelation(c, tt) === 'near') { near = tt; break } } }
       if (near) {
         alignedCand.add(near); matchedTokens.push(near); matchedTargetTerms.push(c); hadNearMatch = true
-        for (const f of fieldOf(c)) { matchedSourceFields.add(f); if (f !== 'slug') matchedOnlyViaSlug = false }
+        const fields = fieldOf(c)
+        for (const f of fields) { matchedSourceFields.add(f); if (f !== 'slug') matchedOnlyViaSlug = false }
+        if (fields.some((f) => f !== 'anchor')) identityMatched.push(near)
       } else {
         alignedCand.add(c); missingTokens.push(c)
       }
     }
     const jac = jaccard(topicTokens, alignedCand)
     const cont = containment(topicTokens, alignedCand)
+
+    // --- Phase 3F.3.7: STRICT SITE-DERIVED CLUSTER GATE ------------------------
+    // A target's CLUSTER identity is the set of strong (non-generic) nouns in its
+    // OWN title / clean keyword / slug. A link is allowed only when the topic and
+    // target share such an identity term (same product/service area, or a
+    // parent/child that shares the head noun), OR the topic phrase exactly equals
+    // the target. Generic-word overlap, or a match only via a peripheral anchor
+    // word, can NEVER connect two different clusters — this is a HARD block, so
+    // "משקולות → הליכון" and similar cross-cluster links are impossible regardless
+    // of score. Precision first: better no link than a wrong link.
+    const targetIdentity = new Set<string>([...titleTokens, ...keywordTokens, ...slugTokens])
+    const targetTitleNorm = normText(t.targetTitle)
+    const targetKwNorm = normText(t.primaryKeywordCandidate)
+    const exactPhrase = !!topicPhrase && (topicPhrase === targetTitleNorm || (!!targetKwNorm && topicPhrase === targetKwNorm))
+    let clusterCompatibility: string
+    if (exactPhrase) {
+      clusterCompatibility = 'same_cluster'
+    } else if (identityMatched.length >= 1) {
+      const smaller = Math.min(topicKeyTokens.size || topicTokens.size, targetIdentity.size)
+      clusterCompatibility = smaller > 0 && identityMatched.length >= smaller ? 'parent_child' : 'same_cluster'
+    } else if (targetIdentity.size === 0) {
+      clusterCompatibility = 'unknown_no_exact'
+    } else if (matchedTokens.length >= 1) {
+      clusterCompatibility = 'blocked_generic_only'
+    } else {
+      clusterCompatibility = 'blocked_cross_cluster'
+    }
+    if (clusterCompatibility.startsWith('blocked_') || clusterCompatibility === 'unknown_no_exact') {
+      rejectedReasons.push(clusterCompatibility)
+    }
 
     // Strong-entity single-token match: a specific city/landmark/entity token
     // shared between topic and candidate (any field OR URL slug) may carry
@@ -551,6 +600,10 @@ export function planFromCachedTargets(
       matchedTargetTerms,
       matchedSourceFields: Array.from(matchedSourceFields),
       commercialRank: null,
+      // Phase 3F.3.7 cluster-gate diagnostics.
+      clusterCompatibility,
+      topicCluster: Array.from(topicKeyTokens),
+      targetCluster: Array.from(targetIdentity),
       // Finalized after the dedup/cap pass below (it can add more reasons).
       reviewability: 'recommended',
       canManualApprove: false,

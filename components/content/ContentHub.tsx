@@ -118,10 +118,11 @@ export default function ContentHub() {
   }, [])
   const handleDrawerPlanSaved = useCallback(() => { setLinkPlanSavedHint(true) }, [])
   const handleReturnToQueue = useCallback(() => { setLinkPlanSavedHint(true); setCtaScrollSignal((n) => n + 1) }, [])
-  // Phase 3F.3.6 (Part G) — ensure the project's pool exists and add one topic to
-  // its publishing queue (drawer "save links and add to queue"). Returns success.
-  const handleSaveAndQueue = useCallback(async (topicId: string): Promise<boolean> => {
-    if (!projectId) return false
+  // Phase 3F.3.6/3F.3.7 (Part G) — ensure the project's pool exists (never flips an
+  // active pool to paused) and add the given topics to its publishing queue.
+  // Returns success. Used by the drawer and the batch link-review panel.
+  const ensurePoolAndEnqueue = useCallback(async (topicIds: string[]): Promise<boolean> => {
+    if (!projectId || topicIds.length === 0) return false
     try {
       let poolId: string | null = null
       try {
@@ -139,7 +140,7 @@ export default function ContentHub() {
       if (!poolId) return false
       const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicIds: [topicId] }),
+        body: JSON.stringify({ topicIds }),
       })
       if (!ir.ok) return false
       handleScheduled()
@@ -148,6 +149,7 @@ export default function ContentHub() {
       return false
     }
   }, [projectId, handleScheduled])
+  const handleSaveAndQueue = useCallback((topicId: string) => ensurePoolAndEnqueue([topicId]), [ensurePoolAndEnqueue])
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
 
   // ── Batch article creation (client-side, sequential) ──
@@ -874,6 +876,7 @@ export default function ContentHub() {
                     language={language}
                     topics={newTopics}
                     onClose={() => setNewTopics(null)}
+                    onEnqueue={ensurePoolAndEnqueue}
                     onSaved={(summaries) => setPlanStatus((prev) => {
                       const next = { ...prev }
                       for (const s of summaries) next[s.topicId] = s.summary

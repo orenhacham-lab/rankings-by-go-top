@@ -49,7 +49,8 @@ export const dashboardHe = {
       // Phase 3F.3.6 — money target vs supporting links on the idea card + review helper.
       primaryCommercialLink: 'קישור מסחרי ראשי',
       supportingLinks: 'קישורים תומכים',
-      noMoneyTargetNote: 'לא נמצא יעד מסחרי ראשי מספיק מדויק. אפשר עדיין להשתמש בקישורים תומכים או לערוך ידנית.',
+      noMoneyTargetNote: 'לא נמצא יעד מסחרי ראשי מספיק מדויק. עדיף לא להוסיף קישור אוטומטי מאשר להוסיף קישור לא קשור.',
+      noPreciseLink: 'לא נמצא קישור פנימי מספיק מדויק לנושא הזה.',
       reviewEditHelper: 'אפשר לערוך קישורים לפני ההוספה לתור. בסיום לחץ ״הוסף לתור הפרסום״.',
       approvedReady: 'הנושאים אושרו ונוספו לרשימת הנושאים המוכנים לפרסום. כדי להכניס אותם לתור העבודה האוטומטי, לחץ על ״הוסף לתור הפרסום״.',
       approvedReadyLinks: 'הקישורים שסימנת נשמרו כתכנון קישורים לנושאים שאושרו.',
@@ -332,6 +333,10 @@ export const dashboardHe = {
       planVsApproveNote: '"שמור תכנון" שומר תכנון בלבד. רק קישורים מאושרים מוטמעים אוטומטית בעת יצירת מאמר. כדי שיוטמעו אוטומטית ביצירה, סמנו "אשר את הקישורים לאחר שמירה". אחרת אפשר לאשר ולהטמיע ידנית מדף המאמר לאחר היצירה.',
       save: 'שמור תכנון לנושאים שבחרת',
       saving: 'שומר…',
+      // Phase 3F.3.7 (Part G) — save the plans AND add topics to the publishing queue.
+      saveAndQueue: 'שמור קישורים והוסף לתור הפרסום',
+      savingQueue: 'שומר ומוסיף לתור…',
+      queuedSuccess: 'הנושאים נוספו לתור הפרסום האוטומטי. המערכת תיצור ותפרסם אותם לפי התזמון שהוגדר.',
       close: 'סגור',
       saveError: 'שמירת התכנון נכשלה',
       statusSuggested: 'הצעה',
