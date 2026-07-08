@@ -319,6 +319,10 @@ export const dashboardHe = {
       recommendedTitle: 'קישורים מומלצים',
       reviewableTitle: 'אפשרויות נוספות לבדיקה ידנית',
       reviewableNote: 'המערכת לא בחרה אותן אוטומטית, אבל אפשר לאשר ידנית אם הן מתאימות להקשר.',
+      // Phase 3F.3.7a — note above the manual/additional options.
+      manualOptionsNote: 'אפשרויות ידניות מוצגות לבחירה חופשית. המערכת מסננת את ההמלצות האוטומטיות בקפדנות, אבל כאן אפשר לבחור קישור נוסף אם לדעתך הוא מתאים.',
+      showMore: 'הצג עוד',
+      showLess: 'הצג פחות',
       blockedTitle: 'חסומים — לא ניתן לאישור',
       manualBadge: 'אישור ידני',
       reviewReasons: {
@@ -326,6 +330,9 @@ export const dashboardHe = {
         low_confidence: 'התאמה חלשה',
         target_caution_excluded: 'יעד בזהירות',
         over_cap: 'מעל המכסה שנבחרה אוטומטית',
+        blocked_cross_cluster: 'אשכול מוצר/שירות שונה',
+        blocked_generic_only: 'התאמה על מילים כלליות בלבד',
+        unknown_no_exact: 'ללא אשכול מזוהה — לא התאמה מדויקת',
       },
       autoApprove: 'אשר את הקישורים לאחר שמירה',
       // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't

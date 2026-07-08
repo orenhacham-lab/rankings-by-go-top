@@ -35,6 +35,9 @@ const REASON_HE: Record<string, string> = {
   over_cap: 'מעל המכסה',
   content_skipped_no_anchors: 'תוכן דולג — אין עוגנים',
   off_domain_or_empty_url: 'כתובת חיצונית/ריקה',
+  blocked_cross_cluster: 'אשכול מוצר/שירות שונה',
+  blocked_generic_only: 'התאמה על מילים כלליות בלבד',
+  unknown_no_exact: 'ללא אשכול מזוהה — לא התאמה מדויקת',
 }
 function reasonLabel(r?: string | null): string {
   if (!r) return ''

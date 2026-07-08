@@ -118,8 +118,17 @@ export type CandidateTier = 'recommended' | 'reviewable' | 'blocked'
  * Soft rejection reasons a human may override. Anything NOT in this set is a
  * HARD-safety failure (ineligible / external / self-dup / no-anchor / duplicate)
  * and can never be manually approved.
+ *
+ * Phase 3F.3.7a — the strict CLUSTER-GATE reasons are SOFT: they keep AUTOMATIC
+ * recommendations strict (any reason still prevents auto-selection, and the money
+ * target still excludes them), but a human reviewer may deliberately pick such a
+ * link in the manual/additional-options layer. Hard-safety failures (external,
+ * self, duplicate, no-anchor, ineligible) remain non-approvable.
  */
-const SOFT_REJECTION_BASES = new Set(['low_relevance', 'low_confidence', 'target_caution_excluded', 'over_cap'])
+const SOFT_REJECTION_BASES = new Set([
+  'low_relevance', 'low_confidence', 'target_caution_excluded', 'over_cap',
+  'blocked_cross_cluster', 'blocked_generic_only', 'unknown_no_exact',
+])
 function isSoftRejection(reason: string): boolean {
   return SOFT_REJECTION_BASES.has(reason.split('(')[0]!)
 }

@@ -320,6 +320,10 @@ export const dashboardEn = {
       recommendedTitle: 'Recommended links',
       reviewableTitle: 'More options for manual review',
       reviewableNote: 'The system did not auto-select these, but you can approve them manually if they fit the context.',
+      // Phase 3F.3.7a — note above the manual/additional options.
+      manualOptionsNote: 'Manual options are shown for user review. Automatic suggestions are filtered strictly, but here you can choose an additional link if you believe it fits.',
+      showMore: 'Show more',
+      showLess: 'Show less',
       blockedTitle: 'Blocked — cannot be approved',
       manualBadge: 'Manual approval',
       reviewReasons: {
@@ -327,6 +331,9 @@ export const dashboardEn = {
         low_confidence: 'Weak match',
         target_caution_excluded: 'Caution target',
         over_cap: 'Beyond the auto-selected cap',
+        blocked_cross_cluster: 'Different product/service cluster',
+        blocked_generic_only: 'Matched on generic words only',
+        unknown_no_exact: 'No identified cluster — not an exact match',
       },
       autoApprove: 'Approve the links after saving',
       // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't

@@ -80,6 +80,8 @@ export default function NewTopicsLinkPlanPanel({
   const [linkSel, setLinkSel] = useState<Record<string, Set<string>>>({})
   // Manually-selected reviewable candidates, keyed by topicId → set of mkey().
   const [manualSel, setManualSel] = useState<Record<string, Set<string>>>({})
+  // Phase 3F.3.7a — per-topic "show all manual options" toggle (first batch shown).
+  const [revExpanded, setRevExpanded] = useState<Set<string>>(new Set())
   const [autoApprove, setAutoApprove] = useState(false)
   const [saving, setSaving] = useState(false)
   const [queuing, setQueuing] = useState(false)
@@ -334,13 +336,21 @@ export default function NewTopicsLinkPlanPanel({
                       </>
                     )}
 
-                    {/* Reviewable — collapsed manual-override options */}
-                    {reviewable.length > 0 && (
-                      <details className="mt-2" open={links.length === 0}>
-                        <summary className="cursor-pointer select-none text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</summary>
-                        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableNote}</p>
+                    {/* Manual / additional options — Phase 3F.3.7a: EXPANDED by
+                        default (no click-to-reveal). Automatic recommendations stay
+                        strict, but the user may deliberately pick an additional link
+                        here even if the strict cluster gate would not auto-select it.
+                        A reasonable first batch is shown with an optional "show more". */}
+                    {reviewable.length > 0 && (() => {
+                      const showAll = revExpanded.has(tp.id)
+                      const CAP = 6
+                      const shown = showAll ? reviewable : reviewable.slice(0, CAP)
+                      return (
+                      <div className="mt-2">
+                        <div className="text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</div>
+                        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.manualOptionsNote}</p>
                         <div className="mt-1.5 space-y-1.5">
-                          {reviewable.map((l, i) => {
+                          {shown.map((l, i) => {
                             const k = mkey(l)
                             return (
                               <label key={`${l.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-md border border-indigo-100 dark:border-indigo-500/20 p-2 text-[11px] cursor-pointer">
@@ -358,8 +368,15 @@ export default function NewTopicsLinkPlanPanel({
                             )
                           })}
                         </div>
-                      </details>
-                    )}
+                        {reviewable.length > CAP && (
+                          <button type="button" onClick={() => setRevExpanded((prev) => { const n = new Set(prev); n.has(tp.id) ? n.delete(tp.id) : n.add(tp.id); return n })}
+                            className="mt-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                            {showAll ? t.showLess : `${t.showMore} (${reviewable.length - CAP})`}
+                          </button>
+                        )}
+                      </div>
+                      )
+                    })()}
 
                     {/* Blocked — advanced diagnostics, not selectable */}
                     {blocked.length > 0 && (
