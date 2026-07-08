@@ -44,6 +44,9 @@ export interface GenerateInput {
   source: RecommendationSource
   /** Required for the 'keyword' source. */
   keyword?: string
+  /** Phase 3F.3.1c — normalized keywords to skip (keyword-research clusters), so
+   *  "find more" surfaces fresh clusters instead of re-emitting known ones. */
+  avoidKeywords?: string[]
 }
 
 /** Raw idea shape returned by the Gemini prompts below. */
@@ -330,7 +333,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const seedKeywords = ((kwSeedRows ?? []) as { keyword: string }[]).map((r) => r.keyword).filter(Boolean)
     const res = await recommendFromKeywordResearch(admin, {
       userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
-      seedKeywords, avoid: existingTitles,
+      seedKeywords, avoid: [...existingTitles, ...(input.avoidKeywords ?? [])],
     })
     const seenTitles = new Set<string>()
     let dupes = 0
@@ -351,6 +354,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       failureReason: res.meta.failureReason,
       adsCalls: res.meta.adsCalls,
       reason: suggestions.length === 0 ? (res.meta.reason === 'keyword_research_failed' || res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.reason === 'thin_data' ? 'kr_thin' : res.meta.reason === 'all_known' ? 'kr_all_known' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
+      debug: process.env.NODE_ENV !== 'production' ? { seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, rawKeywords: res.meta.rawKeywords, clusters: res.meta.clusters, adsCalls: res.meta.adsCalls, modelTopics: res.meta.generated, afterCorpusDedupe: suggestions.length } : undefined,
     }
   }
 

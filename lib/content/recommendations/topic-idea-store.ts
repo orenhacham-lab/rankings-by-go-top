@@ -121,6 +121,27 @@ export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Pro
   return rows.length
 }
 
+/**
+ * Mark pending ideas as 'duplicate' (Phase 3F.3.1c) — used when a previously
+ * persisted pending idea now conflicts with an existing exact primary keyword or
+ * title. Keeps history (not deleted); it just leaves the active pending list and
+ * won't be re-loaded. Only pending rows are touched. Best-effort; never throws.
+ */
+export async function markIdeasDuplicate(admin: Admin, projectId: string, ideaIds: string[]): Promise<number> {
+  if (ideaIds.length === 0) return 0
+  const nowIso = new Date().toISOString()
+  try {
+    const { data } = await admin
+      .from(TABLE)
+      .update({ status: 'duplicate', updated_at: nowIso })
+      .eq('project_id', projectId)
+      .eq('status', 'pending')
+      .in('id', ideaIds)
+      .select('id')
+    return ((data ?? []) as { id: string }[]).length
+  } catch { return 0 }
+}
+
 /** Durably reject pending ideas by id. Returns count rejected (0 on missing table). */
 export async function rejectIdeas(admin: Admin, projectId: string, ideaIds: string[]): Promise<number> {
   if (ideaIds.length === 0) return 0
