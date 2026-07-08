@@ -87,6 +87,15 @@ export interface CachePlannedLink {
   normalizedTopicTokens: string[]
   normalizedCandidateTokens: string[]
   relevanceMethod: RelevanceMethod
+  // Phase 3F.3.5 semantic diagnostics (additive; response-only, not persisted):
+  //  semanticMatchType = how the topic matched this indexed target; matchedTargetTerms
+  //  = the target's own terms that matched; matchedSourceFields = which index fields
+  //  produced the match (title/keyword/slug/anchor); commercialRank = 1-based order
+  //  among category/product candidates by confidence.
+  semanticMatchType?: SemanticMatchType
+  matchedTargetTerms?: string[]
+  matchedSourceFields?: string[]
+  commercialRank?: number | null
   // Phase 2I candidate tiers (response-only diagnostics; not persisted):
   //  recommended = auto-selected; reviewable = rejected ONLY for soft scoring
   //  reasons and safe to manually approve; blocked = a hard-safety failure that
@@ -169,6 +178,33 @@ function stemHebrew(w: string): string {
   return w
 }
 
+const stemOne = (w0: string): string => {
+  const isHebrew = /[֐-׿]/.test(w0)
+  return isHebrew ? foldFinals(stemHebrew(stripHebrewPrefixes(w0))) : w0.toLowerCase()
+}
+
+// --- Phase 3F.3.5: generic ecommerce MODIFIER stopwords (site-agnostic) --------
+// Words that describe HOW/WHERE/FOR-WHOM a product is used or sold — home/gym/
+// training/set/kg/size/price/electric/folding/review… — as opposed to the PRODUCT
+// NOUN itself (kettlebell, treadmill, rubber). They're generic across ANY store,
+// so treating them as relevance stopwords stops "shared 'gym'/'set 50 kg'" from
+// linking unrelated products, WITHOUT naming any site's products. Removed from the
+// relevance token sets (topic AND target) so only real product/subject nouns match.
+const GENERIC_MODIFIER_STEMS = new Set<string>(
+  [
+    // Hebrew — use-case / place / audience / commercial / spec modifiers.
+    'בית', 'ביתי', 'ביתית', 'ביתיים', 'חדר', 'כושר', 'אימון', 'אימונים', 'לאימון',
+    'מקצועי', 'מקצועני', 'סט', 'זוג', 'קילו', 'קג', 'גודל', 'מידה', 'מחיר', 'עלות',
+    'קנייה', 'לקנות', 'איכותי', 'איכות', 'זול', 'משלוח', 'חשמלי', 'ידני', 'מתקפל',
+    'נייד', 'קומפקטי', 'למתחילים', 'מתקדמים', 'סקירה', 'השוואה', 'ביקורת', 'דגם',
+    'דגמים', 'מבצע', 'הנחה', 'חדש', 'פופולרי', 'יעיל', 'קל', 'כבד',
+    // English — the same generic modifiers when titles/slugs are transliterated.
+    'home', 'gym', 'training', 'workout', 'set', 'pair', 'kg', 'size', 'price',
+    'buy', 'cheap', 'electric', 'manual', 'folding', 'portable', 'compact',
+    'pro', 'beginner', 'review', 'model', 'sale', 'discount', 'new', 'best',
+  ].map(stemOne),
+)
+
 /**
  * Planner-local normalized token set for relevance/containment ONLY. Handles the
  * Hebrew morphology plain token Jaccard misses: 1-letter prefixes (ב/ל/מ/ה/ו/ש/כ),
@@ -187,7 +223,10 @@ function normTokens(s: string): Set<string> {
     const isHebrew = /[֐-׿]/.test(w0)
     // Stem/strip on the original-final form (so ים/ן are detectable), THEN fold finals.
     const w = isHebrew ? foldFinals(stemHebrew(stripHebrewPrefixes(w0))) : w0
-    if (w.length > 1 && !REL_STOPWORDS.has(w)) out.add(w)
+    // Drop generic ecommerce modifiers (home/gym/set/kg/…) and pure spec numbers
+    // (a shared "50" must not link a 50kg-weights topic to a 50kg-kettlebell
+    // product) so only PRODUCT/subject nouns carry relevance.
+    if (w.length > 1 && !/^\d+$/.test(w) && !REL_STOPWORDS.has(w) && !GENERIC_MODIFIER_STEMS.has(w)) out.add(w)
   }
   return out
 }
@@ -211,6 +250,16 @@ const SELF_CONTAINMENT_MAX = 0.8
  * Returns a rejection reason, or null.
  */
 export function selfOrDuplicateReason(topic: TopicForPlanning, t: ScannedTarget): string | null {
+  // Phase 3F.3.5 — a COMMERCIAL target (product category / product) is never the
+  // topic's own article: linking the new article to the matching category/product
+  // is the whole point (money target). The self/duplicate guard exists to avoid
+  // linking a topic to an existing ARTICLE about the same subject, so it must not
+  // fire for category/product destinations even when the names coincide. An
+  // existing generated article that happens to be classed commercial is still
+  // caught below via matchedGeneratedArticleId.
+  const isCommercial = t.targetType === 'category' || t.targetType === 'product'
+  if (isCommercial && !t.matchedGeneratedArticleId) return null
+
   const topicTitle = normText(topic.title)
   const targetTitle = normText(t.targetTitle)
   if (topicTitle && targetTitle && topicTitle === targetTitle) return 'self_target'
@@ -270,42 +319,57 @@ function urlSlugTokens(url: string): Set<string> {
   }
 }
 
-// --- Phase 3F.3.4b: conservative curated ecommerce alias groups ---------------
-// Each group lists SPELLING/TRANSLITERATION VARIANTS of the SAME commercial term
-// that Hebrew plural/prefix stemming can't unify (e.g. קטלבלס vs קטלבל — same
-// word, different transliteration; ends in ס so no plural rule applies). Used
-// ONLY to expand the TOPIC-side token set as an additive relevance signal — never
-// a floor override, never fuzzy, never cross-concept (משקולות/weights is a DIFFERENT
-// product than a kettlebell and is deliberately NOT grouped here). Keep tiny and
-// clearly-equivalent; the aggressive stemmer already covers plural/prefix variants.
-const ECOM_ALIAS_GROUPS: string[][] = [
-  ['קטלבל', 'קטלבלס', 'קטלבלים', 'kettlebell'],
-  ['הליכון', 'הליכונים', 'treadmill'],
-  ['פילאטיס', 'pilates'],
-]
-/** canonical stem → the set of equivalent stems in its alias group (computed once). */
-const ECOM_ALIAS_INDEX: Map<string, Set<string>> = (() => {
-  const index = new Map<string, Set<string>>()
-  for (const group of ECOM_ALIAS_GROUPS) {
-    const stems = new Set<string>()
-    for (const term of group) for (const s of normTokens(term)) stems.add(s)
-    for (const s of stems) {
-      const cur = index.get(s) ?? new Set<string>()
-      for (const other of stems) cur.add(other)
-      index.set(s, cur)
+// --- Phase 3F.3.5: generic near-stem matching (index-derived, NO hardcoded terms)
+// A bounded, GENERIC morphology/transliteration slack so a topic term and an
+// indexed target term that denote the SAME concept but differ by a letter (e.g.
+// קטלבלס vs קטלבל — same word, transliteration variant Hebrew plural stemming
+// can't unify) still align. This is NOT a synonym/alias list: it derives the
+// relationship purely from the two strings' own shape (length + edit distance),
+// so it works for ANY site's index without naming its products. Deliberately
+// conservative — only long stems, only a single-edit difference.
+
+/** Bounded Levenshtein: true iff edit distance between a and b is ≤ max. Early-exits. */
+function withinEditDistance(a: string, b: string, max: number): boolean {
+  const la = a.length, lb = b.length
+  if (Math.abs(la - lb) > max) return false
+  if (a === b) return true
+  // Two-row DP capped at (max) — cheap for the short stems we compare.
+  let prev = new Array(lb + 1)
+  for (let j = 0; j <= lb; j++) prev[j] = j
+  for (let i = 1; i <= la; i++) {
+    const cur = new Array(lb + 1)
+    cur[0] = i
+    let rowMin = cur[0]
+    for (let j = 1; j <= lb; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+      if (cur[j] < rowMin) rowMin = cur[j]
     }
+    if (rowMin > max) return false // whole row already exceeds budget
+    prev = cur
   }
-  return index
-})()
-/** Expand a normalized token set with curated ecommerce alias variants (additive). */
-function withAliases(tokenSet: Set<string>): Set<string> {
-  let expanded: Set<string> | null = null
-  for (const tk of tokenSet) {
-    const grp = ECOM_ALIAS_INDEX.get(tk)
-    if (grp) { if (!expanded) expanded = new Set(tokenSet); for (const a of grp) expanded.add(a) }
-  }
-  return expanded ?? tokenSet
+  return prev[lb] <= max
 }
+
+/**
+ * Two normalized stems denote the same concept — exact, or a GENERIC bounded
+ * near-match for sufficiently-long stems (single-edit difference). No hardcoded
+ * synonyms; purely a function of the strings' own shape. Returns the match kind.
+ */
+function stemRelation(a: string, b: string): 'exact' | 'near' | null {
+  if (a === b) return 'exact'
+  if (a.length >= 5 && b.length >= 5 && Math.abs(a.length - b.length) <= 1 && withinEditDistance(a, b, 1)) return 'near'
+  return null
+}
+
+/**
+ * Semantic match type between a topic and a candidate target — surfaced in dev
+ * diagnostics so we can SEE whether the planner is truly reading the site index.
+ */
+export type SemanticMatchType =
+  | 'exact_phrase' | 'stem_phrase' | 'taxonomy_relation' | 'slug_match'
+  | 'parent_category' | 'product_match' | 'broad_category_fallback'
+  | 'article_fallback' | 'weak_match' | 'none'
 
 /**
  * Plan internal links for ONE topic against the project's CACHED targets. Pure.
@@ -317,8 +381,9 @@ export function planFromCachedTargets(
   opts: { allowCaution?: boolean } = {},
 ): CacheTopicPlan {
   const allowCaution = opts.allowCaution === true
-  const topicTokens = withAliases(normTokens([topic.primaryKeyword ?? '', topic.title, ...(topic.secondaryKeywords ?? [])].join(' ')))
-  const topicKeyTokens = withAliases(normTokens(topic.primaryKeyword || topic.title))
+  const topicTokens = normTokens([topic.primaryKeyword ?? '', topic.title, ...(topic.secondaryKeywords ?? [])].join(' '))
+  const topicKeyTokens = normTokens(topic.primaryKeyword || topic.title)
+  const topicPhrase = normText(topic.primaryKeyword || topic.title)
 
   const scored: CachePlannedLink[] = []
 
@@ -339,26 +404,57 @@ export function planFromCachedTargets(
     const selfReason = selfOrDuplicateReason(topic, t)
     if (selfReason) rejectedReasons.push(selfReason)
 
-    // 3) Blended relevance topic ↔ target (normalized tokens). Jaccard alone
-    // penalizes long descriptive topic titles, so a candidate whose meaningful
-    // tokens are largely a SUBSET of the topic's concepts is also credited via
-    // containment — but ONLY when ≥2 meaningful tokens overlap, so a shared
-    // single entity/place token (e.g. only "יפן") can never carry it through.
-    const candTokens = normTokens([t.targetTitle, t.primaryKeywordCandidate ?? '', ...(t.usableAnchors ?? []).map((a) => a.text)].join(' '))
-    const matchedTokens: string[] = []
-    for (const x of candTokens) if (topicTokens.has(x)) matchedTokens.push(x)
+    // 3) Blended relevance topic ↔ target — computed from the target's OWN indexed
+    // fields (title, clean keyword, usable anchors, URL slug), so the relationship
+    // comes from the site index, not a hardcoded map. Each candidate token is
+    // ALIGNED to the topic via exact OR generic near-stem match (see stemRelation);
+    // aligned tokens then feed jaccard/containment. Per-field sets let us report
+    // WHICH source field(s) produced the match (Part B diagnostics).
+    const titleTokens = normTokens(t.targetTitle)
+    const keywordTokens = normTokens(t.primaryKeywordCandidate ?? '')
+    const anchorTokens = normTokens((t.usableAnchors ?? []).map((a) => a.text).join(' '))
+    const slugTokens = urlSlugTokens(url)
+    const candTokens = new Set<string>([...titleTokens, ...keywordTokens, ...anchorTokens, ...slugTokens])
+    const fieldOf = (tok: string): string[] => {
+      const f: string[] = []
+      if (titleTokens.has(tok)) f.push('title')
+      if (keywordTokens.has(tok)) f.push('keyword')
+      if (slugTokens.has(tok)) f.push('slug')
+      if (anchorTokens.has(tok)) f.push('anchor')
+      return f
+    }
+    // Align each candidate token onto the topic's vocabulary (exact or near-stem).
+    const alignedCand = new Set<string>()
+    const matchedTokens: string[] = []        // topic-side terms that matched
+    const matchedTargetTerms: string[] = []   // the candidate's own terms that matched
     const missingTokens: string[] = []
-    for (const x of candTokens) if (!topicTokens.has(x)) missingTokens.push(x)
-    const jac = jaccard(topicTokens, candTokens)
-    const cont = containment(topicTokens, candTokens)
+    const matchedSourceFields = new Set<string>()
+    let hadExactMatch = false
+    let hadNearMatch = false
+    let matchedOnlyViaSlug = true
+    for (const c of candTokens) {
+      if (topicTokens.has(c)) {
+        alignedCand.add(c); matchedTokens.push(c); matchedTargetTerms.push(c); hadExactMatch = true
+        for (const f of fieldOf(c)) { matchedSourceFields.add(f); if (f !== 'slug') matchedOnlyViaSlug = false }
+        continue
+      }
+      let near: string | null = null
+      if (c.length >= 5) { for (const tt of topicTokens) { if (stemRelation(c, tt) === 'near') { near = tt; break } } }
+      if (near) {
+        alignedCand.add(near); matchedTokens.push(near); matchedTargetTerms.push(c); hadNearMatch = true
+        for (const f of fieldOf(c)) { matchedSourceFields.add(f); if (f !== 'slug') matchedOnlyViaSlug = false }
+      } else {
+        alignedCand.add(c); missingTokens.push(c)
+      }
+    }
+    const jac = jaccard(topicTokens, alignedCand)
+    const cont = containment(topicTokens, alignedCand)
 
     // Strong-entity single-token match: a specific city/landmark/entity token
-    // shared between topic and candidate (title/keyword/anchor OR URL slug) may
-    // carry relevance even without a 2nd shared token — but a generic place word
-    // (e.g. "יפן") never does (excluded by GENERIC_ENTITY_TOKENS + ≥4-char rule).
-    const candEntityTokens = new Set([...candTokens, ...urlSlugTokens(url)])
+    // shared between topic and candidate (any field OR URL slug) may carry
+    // relevance even without a 2nd shared token — a generic place word never does.
     const entityMatchedTokens: string[] = []
-    for (const x of topicTokens) if (isStrongEntityToken(x) && candEntityTokens.has(x)) entityMatchedTokens.push(x)
+    for (const x of topicTokens) if (isStrongEntityToken(x) && alignedCand.has(x)) entityMatchedTokens.push(x)
 
     const useContainment = matchedTokens.length >= 2 && cont > jac
     let relevance = round2(useContainment ? cont : jac)
@@ -373,9 +469,14 @@ export function planFromCachedTargets(
     const relMin = ecomBoost ? CACHE_PLANNER_RELEVANCE_MIN_ECOM : CACHE_PLANNER_RELEVANCE_MIN
     if (relevance < relMin) rejectedReasons.push(`low_relevance(${relevance} < ${relMin})`)
 
-    // 4) Near-self guard (normalized, so morphological near-duplicates are still caught).
-    const selfSim = round2(jaccard(topicKeyTokens, normTokens(`${t.targetTitle} ${t.primaryKeywordCandidate ?? ''}`)))
-    if (selfSim > CACHE_PLANNER_SELF_SIMILARITY_MAX) rejectedReasons.push(`too_similar_self_link(${selfSim})`)
+    // 4) Near-self guard (normalized, so morphological near-duplicates are still
+    // caught) — but NOT for commercial targets: an article whose title matches a
+    // product category / product should link to that money page, not be blocked
+    // for "looking like itself" (same rationale as selfOrDuplicateReason).
+    if (t.targetType !== 'category' && t.targetType !== 'product') {
+      const selfSim = round2(jaccard(topicKeyTokens, normTokens(`${t.targetTitle} ${t.primaryKeywordCandidate ?? ''}`)))
+      if (selfSim > CACHE_PLANNER_SELF_SIMILARITY_MAX) rejectedReasons.push(`too_similar_self_link(${selfSim})`)
+    }
 
     // 5) Anchor (vetted usable anchor, or a clean available keyword).
     const anchor = chooseAnchor(t)
@@ -398,9 +499,31 @@ export function planFromCachedTargets(
       : ecomBoost ? CACHE_PLANNER_MIN_CONFIDENCE_ECOM : CACHE_PLANNER_MIN_CONFIDENCE
     if (rejectedReasons.length === 0 && confidence < minConf) rejectedReasons.push(`low_confidence(${confidence} < ${minConf})`)
 
+    // Semantic match TYPE (Part B) — a human-readable classification of HOW the
+    // topic matched this indexed target, purely from index fields + the alignment.
+    let semanticMatchType: SemanticMatchType = 'none'
+    if (matchedTokens.length > 0) {
+      const targetTitleNorm = normText(t.targetTitle)
+      const targetKwNorm = normText(t.primaryKeywordCandidate)
+      const exactPhrase = !!topicPhrase && (topicPhrase === targetTitleNorm || (!!targetKwNorm && topicPhrase === targetKwNorm))
+      if (exactPhrase) semanticMatchType = 'exact_phrase'
+      else if (matchedOnlyViaSlug) semanticMatchType = 'slug_match'
+      else if (isCommercialTarget && keyMatched.length > 0) {
+        semanticMatchType = t.targetType === 'product'
+          ? 'product_match'
+          : relevance >= 0.4 ? 'taxonomy_relation' : 'parent_category'
+      } else if (isCommercialTarget) {
+        semanticMatchType = 'broad_category_fallback'
+      } else {
+        semanticMatchType = (hadExactMatch || hadNearMatch) && relevance >= 0.4 ? 'stem_phrase' : 'article_fallback'
+      }
+      // Matched, but under the (non-ecom) floor → genuinely weak.
+      if (semanticMatchType !== 'exact_phrase' && relevance < relMin && !ecomBoost) semanticMatchType = 'weak_match'
+    }
+
     const selected = rejectedReasons.length === 0
     const reason = selected
-      ? `relevance ${relevance} (${relevanceMethod}) + priority ${priorityBonus >= 0 ? '+' : ''}${priorityBonus} (${t.targetPriority})${commercialBoost ? ` + commercial ${commercialBoost} [${t.targetType}, key: ${keyMatched.join(', ')}]` : ''}; anchor "${anchor!.text}" from ${anchor!.source} (confidence ${confidence})`
+      ? `relevance ${relevance} (${relevanceMethod}, ${semanticMatchType}${hadNearMatch ? ', near-stem' : ''}) + priority ${priorityBonus >= 0 ? '+' : ''}${priorityBonus} (${t.targetPriority})${commercialBoost ? ` + commercial ${commercialBoost} [${t.targetType}, key: ${keyMatched.join(', ')}]` : ''}; anchor "${anchor!.text}" from ${anchor!.source} (confidence ${confidence})`
       : ''
 
     scored.push({
@@ -423,11 +546,27 @@ export function planFromCachedTargets(
       normalizedTopicTokens: Array.from(topicTokens),
       normalizedCandidateTokens: Array.from(candTokens),
       relevanceMethod,
+      // Phase 3F.3.5 semantic diagnostics (additive; response-only).
+      semanticMatchType,
+      matchedTargetTerms,
+      matchedSourceFields: Array.from(matchedSourceFields),
+      commercialRank: null,
       // Finalized after the dedup/cap pass below (it can add more reasons).
       reviewability: 'recommended',
       canManualApprove: false,
       blockReason: null,
     })
+  }
+
+  // Commercial-target RANK (Part B/C) — 1-based order of category/product
+  // candidates by confidence, so diagnostics + idea cards can show the best
+  // commercial destination first. Uses targetPriority as the commercial signal
+  // (the planned link doesn't carry targetType). Computed over all candidates.
+  let cr = 0
+  for (const s of [...scored].sort((a, b) => b.confidence - a.confidence)) {
+    if (s.targetPriority === 'commercial_category_or_service_hub' || s.targetPriority === 'product_or_specific_offer') {
+      cr += 1; s.commercialRank = cr
+    }
   }
 
   // Sort selectable by confidence, then de-dup by URL + anchor, then cap.

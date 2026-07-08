@@ -75,6 +75,9 @@ export default function AutomationIdeas({
   // link-status summary: none / some / all).
   const [lastPlansCount, setLastPlansCount] = useState(0)
   const [scheduling, setScheduling] = useState(false)
+  // Which approve action is running (for per-button spinners): the one-click
+  // queue action or the advanced review action. Phase 3F.3.5.
+  const [busyAction, setBusyAction] = useState<'queue' | 'review' | null>(null)
   // Phase 3F.3.3a — the truthful "next step" CTA to scroll into view after approval.
   const ctaRef = useRef<HTMLDivElement | null>(null)
 
@@ -217,70 +220,59 @@ export default function AutomationIdeas({
     void rejectIds(suggestions.filter((s) => selected.has(s.id)).map((s) => s.id))
   }
 
-  async function approveSelected() {
-    if (creating) return
+  // Create/approve the selected ideas AND save their checked idea-stage links
+  // (server re-validates; unchecked omitted). Returns parsed results, or null on
+  // error (message already set). Does NOT itself enqueue or open the planner — the
+  // caller decides the next step (one-click queue vs. advanced review).
+  type CreateResult = {
+    ids: string[]
+    createdTopics: { id: string; topic: string; primary_keyword: string | null }[]
+    plannedIds: Set<string>
+    savedPlans: { topicId: string; linkCount: number }[]
+    expectedPlans: number
+  }
+  async function createTopics(): Promise<CreateResult | null> {
     const chosen = suggestions.filter((s) => selected.has(s.id))
-    if (chosen.length === 0) return
-    // Phase 3F.3.2 — attach each idea's CHECKED suggested links so they become the
-    // new topic's planned link set (server re-validates; unchecked are omitted).
+    if (chosen.length === 0) return null
+    // How many of the chosen ideas had at least one link checked (Part I: used to
+    // detect a partial link-save so we can warn while still enqueuing).
+    const expectedPlans = chosen.filter((s) => selectedLinksFor(s).length > 0).length
     const chosenPayload = chosen.map((s) => ({ ...s, selectedLinks: selectedLinksFor(s) }))
-    setCreating(true); setMessage(null)
-    try {
-      const res = await fetch('/api/content/automation/topics/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, status: 'approved', topics: chosenPayload }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setMessage({ text: data?.error === 'automation_migration_required' ? 'automation_migration_required' : (data?.error || 'error'), ok: false })
-        return
-      }
-      const created = data.created ?? 0
-      // Truthful: topics are APPROVED and now in the ready list — NOT yet in the
-      // automatic publishing queue (that's the explicit next-step CTA below).
-      setMessage({ text: t.approvedReady, ok: true })
-      // Remove the created ones from the list and refresh the topics table.
-      setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
-      setSelected(new Set())
-      setLastCreatedIds(Array.isArray(data.ids) ? data.ids : [])
-      const createdTopics = Array.isArray(data.topics)
-        ? (data.topics as { id?: unknown; topic?: unknown; primary_keyword?: unknown }[])
-            .filter((r): r is { id: string; topic: string; primary_keyword: string | null } => typeof r?.id === 'string')
-            .map((r) => ({ id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }))
-        : []
-      // Phase 3F.3.2 — topics whose idea-stage selected links were already saved as
-      // a plan skip the planning panel (avoids re-selection / clobbering it); the
-      // rest still open the panel as before.
-      const plannedIds = new Set(Array.isArray(data.plannedTopicIds) ? (data.plannedTopicIds as unknown[]).filter((x): x is string => typeof x === 'string') : [])
-      const needPlanning = createdTopics.filter((tp) => !plannedIds.has(tp.id))
-      if (needPlanning.length) onTopicsCreated?.(needPlanning)
-      // Seed the topic-row plan badge so saved idea-stage links show immediately
-      // (not 0) even though the planning panel was skipped for those topics.
-      const savedPlans = Array.isArray(data.savedPlans)
-        ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
-        : []
-      if (savedPlans.length) onPlansSaved?.(savedPlans)
-      setLastPlansCount(savedPlans.length)
-      // Phase 3F.3.3a — highlight the new "ready" rows in the list, and scroll the
-      // truthful next-step CTA ("add to publishing queue") into view here.
-      if (createdTopics.length) onApproved?.({ topicIds: createdTopics.map((tp) => tp.id), plansSaved: savedPlans.length > 0 })
-      window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
-      onCreated()
-    } catch {
-      setMessage({ text: 'error', ok: false })
-    } finally {
-      setCreating(false)
+    const res = await fetch('/api/content/automation/topics/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, status: 'approved', topics: chosenPayload }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setMessage({ text: data?.error === 'automation_migration_required' ? 'automation_migration_required' : (data?.error || 'error'), ok: false })
+      return null
     }
+    // Remove the created ones from the list and refresh the topics table.
+    setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
+    setSelected(new Set())
+    const ids: string[] = Array.isArray(data.ids) ? data.ids : []
+    const createdTopics = Array.isArray(data.topics)
+      ? (data.topics as { id?: unknown; topic?: unknown; primary_keyword?: unknown }[])
+          .filter((r): r is { id: string; topic: string; primary_keyword: string | null } => typeof r?.id === 'string')
+          .map((r) => ({ id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }))
+      : []
+    const plannedIds = new Set<string>(Array.isArray(data.plannedTopicIds) ? (data.plannedTopicIds as unknown[]).filter((x): x is string => typeof x === 'string') : [])
+    const savedPlans = Array.isArray(data.savedPlans)
+      ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
+      : []
+    // Seed the topic-row plan badge so saved idea-stage links show immediately.
+    if (savedPlans.length) onPlansSaved?.(savedPlans)
+    setLastPlansCount(savedPlans.length)
+    onCreated()
+    return { ids, createdTopics, plannedIds, savedPlans, expectedPlans }
   }
 
-  async function addCreatedToSchedule() {
-    if (scheduling || lastCreatedIds.length === 0) return
-    setScheduling(true); setMessage(null)
+  // Ensure the project's pool exists (never flips an active pool to paused) and
+  // add the given approved topics to its publishing queue. Returns success.
+  async function enqueueTopics(ids: string[]): Promise<boolean> {
+    if (ids.length === 0) return false
     try {
-      // Ensure the project's pool exists WITHOUT mutating an existing one: GET
-      // first, and only create a new (paused) pool when none exists. This never
-      // flips an already-active pool to paused.
       let poolId: string | null = null
       try {
         const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
@@ -291,19 +283,85 @@ export default function AutomationIdeas({
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
         })
-        if (!pr.ok) { setMessage({ text: 'error', ok: false }); return }
+        if (!pr.ok) return false
         const pd = await pr.json()
         poolId = pd.pool?.id ?? null
       }
-      if (!poolId) { setMessage({ text: 'error', ok: false }); return }
-      await fetch(`/api/content/automation/pools/${poolId}/items`, {
+      if (!poolId) return false
+      const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicIds: lastCreatedIds }),
+        body: JSON.stringify({ topicIds: ids }),
       })
-      // Only NOW are the topics truly in the automatic publishing queue.
+      return ir.ok
+    } catch {
+      return false
+    }
+  }
+
+  // PRIMARY (Phase 3F.3.5) — approve + save checked links + add to the publishing
+  // queue in ONE action. No intermediate CTA / planner unless enqueue fails.
+  async function approveAndQueue() {
+    if (creating) return
+    setCreating(true); setBusyAction('queue'); setMessage(null)
+    try {
+      const res = await createTopics()
+      if (!res) return
+      const queued = await enqueueTopics(res.ids)
+      if (!queued) {
+        // Enqueue failed → surface the manual CTA so the user can retry (Part G).
+        setLastCreatedIds(res.ids)
+        if (res.createdTopics.length) onApproved?.({ topicIds: res.createdTopics.map((tp) => tp.id), plansSaved: res.savedPlans.length > 0 })
+        window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+        setMessage({ text: t.queueFailedRetry, ok: false })
+        return
+      }
+      // Queued. If the user had checked links but some didn't persist, warn while
+      // keeping the topics queued (Part I). Otherwise the clean success message.
+      const partial = res.expectedPlans > 0 && res.savedPlans.length < res.expectedPlans
       setLastCreatedIds([]); setLastPlansCount(0)
-      setMessage({ text: t.queuedSuccess, ok: true })
+      setMessage({ text: partial ? t.linkSavePartialWarn : t.queuedFinalSuccess, ok: !partial })
       onScheduled?.()
+    } catch {
+      setMessage({ text: 'error', ok: false })
+    } finally {
+      setCreating(false); setBusyAction(null)
+    }
+  }
+
+  // SECONDARY / advanced (Part E) — approve + save links, then open the planner /
+  // manual CTA so the user can review & edit links BEFORE adding to the queue.
+  async function approveAndReview() {
+    if (creating) return
+    setCreating(true); setBusyAction('review'); setMessage(null)
+    try {
+      const res = await createTopics()
+      if (!res) return
+      setMessage({ text: t.approvedReady, ok: true })
+      setLastCreatedIds(res.ids)
+      const needPlanning = res.createdTopics.filter((tp) => !res.plannedIds.has(tp.id))
+      if (needPlanning.length) onTopicsCreated?.(needPlanning)
+      if (res.createdTopics.length) onApproved?.({ topicIds: res.createdTopics.map((tp) => tp.id), plansSaved: res.savedPlans.length > 0 })
+      window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+    } catch {
+      setMessage({ text: 'error', ok: false })
+    } finally {
+      setCreating(false); setBusyAction(null)
+    }
+  }
+
+  // Add the already-created (review-path or enqueue-failed) topics to the queue.
+  async function addCreatedToSchedule() {
+    if (scheduling || lastCreatedIds.length === 0) return
+    setScheduling(true); setMessage(null)
+    try {
+      const ok = await enqueueTopics(lastCreatedIds)
+      if (ok) {
+        setLastCreatedIds([]); setLastPlansCount(0)
+        setMessage({ text: t.queuedSuccess, ok: true })
+        onScheduled?.()
+      } else {
+        setMessage({ text: 'error', ok: false })
+      }
     } finally {
       setScheduling(false)
     }
@@ -443,16 +501,26 @@ export default function AutomationIdeas({
         null
       ) : (
         <>
+          {/* Part F — one clear instruction: pick topics, optionally check links,
+              then one primary button adds them straight to the publishing queue. */}
+          <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">{t.approveQueueHelper}</p>
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <Button size="sm" variant="ghost" onClick={selectAll}>{t.selectAll}</Button>
-            <Button size="sm" variant="ghost" onClick={clearSel}>{t.clear}</Button>
+            <Button size="sm" variant="ghost" onClick={selectAll} disabled={creating}>{t.selectAll}</Button>
+            <Button size="sm" variant="ghost" onClick={clearSel} disabled={creating}>{t.clear}</Button>
             <div className="flex-1" />
-            <Button size="sm" variant="outline" onClick={rejectSelected} disabled={selected.size === 0}>{t.rejectSelected}</Button>
-            <Button size="sm" onClick={approveSelected} loading={creating} disabled={creating || selected.size === 0}>
-              {creating ? t.creating : `${t.approveNext}${selected.size > 0 ? ` (${selected.size})` : ''}`}
+            <Button size="sm" variant="outline" onClick={rejectSelected} disabled={selected.size === 0 || creating}>{t.rejectSelected}</Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            {/* PRIMARY — approve + save links + enqueue in one click. */}
+            <Button onClick={approveAndQueue} loading={creating && busyAction === 'queue'} disabled={creating || selected.size === 0}>
+              {creating && busyAction === 'queue' ? t.creating : `${t.approveAndQueue}${selected.size > 0 ? ` (${selected.size})` : ''}`}
+            </Button>
+            {/* SECONDARY — advanced review/edit before adding. */}
+            <Button variant="outline" onClick={approveAndReview} loading={creating && busyAction === 'review'} disabled={creating || selected.size === 0}>
+              {creating && busyAction === 'review' ? t.creating : t.reviewEditBeforeBtn}
             </Button>
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.approveNextHint}</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.linksOptionalNote}</p>
 
           <div className="space-y-2">
             {(ideasExpanded ? suggestions : suggestions.slice(0, 3)).map((s) => (
