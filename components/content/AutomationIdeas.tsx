@@ -481,7 +481,7 @@ export default function AutomationIdeas({
                           ))}
                         </div>
                         <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
-                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksQualityHint}</p>
+                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksMoreOptions}</p>
                       </div>
                     )}
                     {s.suggestedInternalLinks.length === 0 && (

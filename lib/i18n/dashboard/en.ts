@@ -54,6 +54,7 @@ export const dashboardEn = {
       queuedSuccess: 'The topics were added to the automatic publishing queue. The system will create and publish them according to the configured schedule.',
       linksFoundHint: 'We found internal links that may fit this topic. Keep only the links you want to save to the plan.',
       linksQualityHint: 'Links are suggested only when the system finds a good match from the site. A few relevant links are better than many weak ones.',
+      linksMoreOptions: 'More options will be available in link planning after approving the topic.',
       sourceKeyword: 'By keyword',
       sourceProject: 'By project data',
       sourceResearch: 'By site keyword research',

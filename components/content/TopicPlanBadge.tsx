@@ -43,7 +43,7 @@ export default function TopicPlanBadge({ summary, onClick, t, highlight = false 
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-semibold shadow-sm hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors ${tone} ${emphasis}`}
+      className={`inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-3 py-1.5 h-7 text-xs font-semibold shadow-sm hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors ${tone} ${emphasis}`}
       title={t.badgeTooltip}
     >
       🔗 {label}

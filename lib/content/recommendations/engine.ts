@@ -22,6 +22,8 @@ import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { recommendFromKeywordResearch } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { planFromCachedTargets } from '@/lib/content/internal-link-planner-cache'
+import { isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { RecommendationSource, RecommendationResult, TopicSuggestion, SuggestedInternalLink } from './types'
 
@@ -115,6 +117,25 @@ function attachInternalLinks(
     .filter((c) => c.anchor && c.score > 0)
     .sort((a, b) => b.score - a.score)
   return scored.slice(0, 2).map((c) => ({ url: c.url, anchor: c.anchor }))
+}
+
+/**
+ * Phase 3F.3.3d — idea-stage link preview using the SAME planner the post-approval
+ * drawer uses (planFromCachedTargets over the cached scan), so the card no longer
+ * shows "no links" while the planner later finds several. Returns the top
+ * `max` recommended links. Read-only; no planner-scoring change.
+ */
+function plannerPreviewLinks(s: TopicSuggestion, targets: ScannedTarget[], hosts: string[], max: number): SuggestedInternalLink[] {
+  try {
+    const plan = planFromCachedTargets(
+      { id: `preview:${slugKey(s.title)}`, title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords ?? [] },
+      targets, hosts, {},
+    )
+    return plan.selected
+      .filter((l) => (l.anchorText || '').trim())
+      .slice(0, max)
+      .map((l) => ({ url: l.targetUrl, anchor: (l.anchorText || '').trim() }))
+  } catch { return [] }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -400,10 +421,24 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     }
   }
 
-  // 5) Enrich internal links + cap + sort.
+  // 5) Enrich internal links + cap + sort. Prefer the SAME planner used by the
+  // post-approval drawer (consistent suggestions); fall back to the lightweight
+  // keyword-overlap heuristic only when the planner finds nothing / is off.
+  let planTargets: ScannedTarget[] = []
+  let planHosts: string[] = []
+  if (isInternalLinkPlanningEnabled()) {
+    try {
+      const cacheRow = await getCachedIndex(admin, input.projectId)
+      if (cacheRow) { const rep = reassembleReport(cacheRow); planTargets = (rep.targets ?? []) as ScannedTarget[]; planHosts = rep.hosts ?? [] }
+    } catch { /* no scan cache → heuristic fallback */ }
+  }
   const enriched = suggestions
     .slice(0, MAX_SUGGESTIONS)
-    .map((s) => ({ ...s, suggestedInternalLinks: s.suggestedInternalLinks.length ? s.suggestedInternalLinks : attachInternalLinks(s.primaryKeyword, linkCandidates) }))
+    .map((s) => {
+      if (s.suggestedInternalLinks.length) return s
+      const preview = planTargets.length ? plannerPreviewLinks(s, planTargets, planHosts, 3) : []
+      return { ...s, suggestedInternalLinks: preview.length ? preview : attachInternalLinks(s.primaryKeyword, linkCandidates) }
+    })
   enriched.sort((a, b) => b.suggestionScore - a.suggestionScore)
 
   return { suggestions: enriched, meta }
