@@ -28,6 +28,16 @@ export const dashboardHe = {
     autoIdeas: {
       title: 'רעיונות אוטומטיים למאמרים',
       intro: 'מצאנו רעיונות למאמרים לפי נתוני האתר ומחקר ביטויים. אפשר לאשר נושאים עכשיו, ובשלב הבא להוסיף אותם לתזמון פרסום אוטומטי.',
+      // Phase 3F.3.3 — onboarding step block + clearer link/queue copy.
+      onboardTitle: 'מה עושים כאן?',
+      onboardStep1: 'מוצאים רעיונות למאמרים',
+      onboardStep2: 'בוחרים את הנושאים שרוצים',
+      onboardStep3: 'מאשרים קישורים פנימיים מומלצים, אם קיימים',
+      onboardStep4: 'מוסיפים לתור — המערכת תיצור ותפרסם לפי התזמון',
+      addToQueue: 'הוסף נושאים נבחרים לתור',
+      addToQueueHint: 'לאחר ההוספה, הנושא יופיע למטה בתור המאמרים.',
+      linksFoundHint: 'מצאנו קישורים פנימיים שיכולים להתאים לנושא הזה. אפשר להשאיר רק את הקישורים שרוצים לשמור לתכנון.',
+      linksQualityHint: 'המערכת מציעה קישורים רק כשהיא מוצאת התאמה טובה מתוך האתר. עדיף מעט קישורים רלוונטיים מאשר הרבה קישורים חלשים.',
       sourceKeyword: 'לפי מילת מפתח',
       sourceProject: 'לפי נתוני הפרויקט',
       sourceResearch: 'לפי מחקר ביטויים מהאתר',
@@ -53,7 +63,7 @@ export const dashboardHe = {
       reasonLabel: 'למה הוצע',
       internalLinksLabel: 'קישורים פנימיים מוצעים',
       linksSelectHint: 'הקישורים שתסמן כאן יישמרו כתכנון קישורים לאחר אישור הנושא.',
-      linksNoneHint: 'לא נמצאו קישורים פנימיים מוצעים לרעיון הזה. אפשר להוסיף קישורים ידנית אחרי אישור הנושא.',
+      linksNoneHint: 'לא נמצאו קישורים פנימיים מתאימים מספיק לנושא הזה. אפשר להוסיף קישורים ידנית אחרי אישור הנושא.',
       badgeKeyword: 'מילת מפתח',
       badgeProject: 'נתוני הפרויקט',
       badgeResearch: 'מחקר ביטויים',
@@ -218,6 +228,11 @@ export const dashboardHe = {
     articlesEmptyTitle: 'עדיין לא נוצרו מאמרים לפרויקט הזה',
     topicsHeading: 'נושאים שממתינים ליצירת מאמר',
     topicsSubtitle: 'בריפים ורעיונות שעדיין לא נוצר מהם מאמר. לאחר יצירת מאמר, המשך העבודה מתבצע בטבלת המאמרים למעלה.',
+    // Phase 3F.3.3 — queue clarity + post-approval notice.
+    queueExplain: 'אלה הנושאים שממתינים ליצירת מאמר. המערכת תעבוד עליהם לפי התזמון שהוגדר לפרויקט.',
+    queueAddedTitle: 'הנושאים נוספו לתור יצירת המאמרים. המערכת תיצור ותפרסם אותם לפי התזמון שהוגדר.',
+    queueLinksSaved: 'נשמרו קישורים פנימיים מתוכננים לנושאים שסימנת.',
+    queueNoLinks: 'אפשר להוסיף קישורים פנימיים ידנית דרך כפתור תכנון קישורים.',
     internalLinkIndex: {
       title: 'אינדקס קישורים פנימיים',
       statusReady: 'האינדקס מוכן',
@@ -303,8 +318,9 @@ export const dashboardHe = {
     topicPlan: {
       badgeAction: 'תכנון קישורים',
       badgeNoPlan: 'אין תכנון',
-      badgeZero: 'נבדק — אין קישורים מתאימים',
+      badgeZero: 'ללא קישורים מתוכננים',
       badgePlanned: '{n} קישורים מתוכננים',
+      badgePlannedOne: 'קישור מתוכנן אחד',
       badgeApproved: '{n} מאושרים',
       badgeStaleSuffix: '· מיושן',
       drawerTitle: 'תכנון קישורים פנימיים',

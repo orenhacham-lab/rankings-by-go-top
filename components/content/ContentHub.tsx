@@ -86,6 +86,17 @@ export default function ContentHub() {
   // planStatus so the panel can seed the topic-row badges for those IDs only.
   const [newTopics, setNewTopics] = useState<NewTopic[] | null>(null)
   const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
+  // Phase 3F.3.3 — after approving ideas, scroll to the queue, highlight the new
+  // rows, and show a "queued for scheduled creation" notice.
+  const topicsSectionRef = useRef<HTMLDivElement>(null)
+  const [highlightTopicIds, setHighlightTopicIds] = useState<string[]>([])
+  const [queueNotice, setQueueNotice] = useState<{ linksSaved: boolean } | null>(null)
+  const handleTopicsQueued = useCallback((info: { topicIds: string[]; plansSaved: boolean }) => {
+    setHighlightTopicIds(info.topicIds)
+    setQueueNotice({ linksSaved: info.plansSaved })
+    window.setTimeout(() => topicsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+    window.setTimeout(() => setHighlightTopicIds([]), 4500)
+  }, [])
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
   const [automationRefresh, setAutomationRefresh] = useState(0)
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
@@ -746,6 +757,7 @@ export default function ContentHub() {
                     onScheduled={() => setAutomationRefresh((k) => k + 1)}
                     onTopicsCreated={(created) => { if (created.length) setNewTopics(created) }}
                     onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: true, linkCount: p.linkCount, approvedCount: 0, stale: false }])) }))}
+                    onApproved={handleTopicsQueued}
                   />
                   <AutomationSchedule
                     projectId={projectId}
@@ -757,11 +769,25 @@ export default function ContentHub() {
               )}
 
               {/* ── Section 3: pending / manual article topics ── */}
-              <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
+              <div ref={topicsSectionRef} className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 scroll-mt-4">
                 <div className="mb-3">
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{t.topicsHeading}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.topicsSubtitle}</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t.queueExplain}</p>
                 </div>
+
+                {/* Post-approval "added to queue" notice (Phase 3F.3.3). */}
+                {queueNotice && (
+                  <div className="mb-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5 flex flex-wrap items-start gap-2">
+                    <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200 flex-1 min-w-[12rem]">
+                      {t.queueAddedTitle}
+                      <span className="block text-[11px] font-normal text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                        {queueNotice.linksSaved ? t.queueLinksSaved : t.queueNoLinks}
+                      </span>
+                    </span>
+                    <button type="button" onClick={() => setQueueNotice(null)} className="text-emerald-700/70 dark:text-emerald-300/70 hover:text-emerald-900 dark:hover:text-emerald-100 text-xs">✕</button>
+                  </div>
+                )}
                 {/* Workflow help — collapsed by default so it doesn't add standing
                     vertical weight. Wraps ONLY the help text. */}
                 <details className="mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 px-3 py-2">
@@ -828,6 +854,7 @@ export default function ContentHub() {
                       onRetry={retryTopic}
                       planStatus={planStatus}
                       onPlanStatusChange={(id, summary) => setPlanStatus((prev) => ({ ...prev, [id]: summary }))}
+                      highlightIds={highlightTopicIds}
                     />
                   </>
                 )}

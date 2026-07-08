@@ -20,6 +20,7 @@ interface Strings {
   badgeNoPlan: string
   badgeZero: string
   badgePlanned: string
+  badgePlannedOne: string
   badgeApproved: string
   badgeStaleSuffix: string
 }
@@ -31,7 +32,7 @@ export default function TopicPlanBadge({ summary, onClick, t }: { summary?: Topi
     if (!summary.exists) { label = t.badgeNoPlan }
     else if (summary.linkCount === 0) { label = t.badgeZero; tone = 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400' }
     else if (summary.approvedCount > 0) { label = t.badgeApproved.replace('{n}', String(summary.approvedCount)); tone = 'border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300' }
-    else { label = t.badgePlanned.replace('{n}', String(summary.linkCount)); tone = 'border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300' }
+    else { label = (summary.linkCount === 1 ? t.badgePlannedOne : t.badgePlanned).replace('{n}', String(summary.linkCount)); tone = 'border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300' }
     if (summary.stale) { label = `${label} ${t.badgeStaleSuffix}`; tone = 'border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400' }
   }
   return (

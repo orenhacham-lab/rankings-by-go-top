@@ -36,6 +36,7 @@ export default function TopicsList({
   onRetry,
   planStatus: planStatusExternal,
   onPlanStatusChange,
+  highlightIds = [],
 }: {
   topics: ArticleTopic[]
   projectId?: string
@@ -53,6 +54,8 @@ export default function TopicsList({
   // can seed row badges). Falls back to internal state when not provided.
   planStatus?: Record<string, TopicPlanSummary>
   onPlanStatusChange?: (id: string, summary: TopicPlanSummary) => void
+  // Phase 3F.3.3 — topic ids to highlight briefly (just added to the queue).
+  highlightIds?: string[]
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
@@ -222,8 +225,9 @@ export default function TopicsList({
               const hasArticle = tState === 'has_article'
               const bs = batchState[topic.id]
               const selectable = !hasArticle
+              const highlighted = highlightIds.includes(topic.id)
               return (
-                <TableRow key={topic.id}>
+                <TableRow key={topic.id} className={highlighted ? 'bg-emerald-50 dark:bg-emerald-900/20 transition-colors duration-1000' : undefined}>
                   {/* Batch selection — only for topics without an article. */}
                   <Td>
                     {selectable && (

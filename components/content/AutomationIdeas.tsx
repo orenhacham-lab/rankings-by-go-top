@@ -40,6 +40,7 @@ export default function AutomationIdeas({
   onScheduled,
   onTopicsCreated,
   onPlansSaved,
+  onApproved,
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -51,6 +52,9 @@ export default function AutomationIdeas({
   // Phase 3F.3.2a — fires with per-topic saved planned-link counts (from idea-stage
   // selection) so the hub can seed the topic-row plan badge immediately.
   onPlansSaved?: (plans: { topicId: string; linkCount: number }[]) => void
+  // Phase 3F.3.3 — fires after approval so the hub can scroll to the queue,
+  // highlight the new rows, and show the "queued for scheduled creation" notice.
+  onApproved?: (info: { topicIds: string[]; plansSaved: boolean }) => void
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
@@ -233,6 +237,8 @@ export default function AutomationIdeas({
         ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
         : []
       if (savedPlans.length) onPlansSaved?.(savedPlans)
+      // Phase 3F.3.3 — trigger scroll/highlight/queue-notice for the new rows.
+      if (createdTopics.length) onApproved?.({ topicIds: createdTopics.map((tp) => tp.id), plansSaved: savedPlans.length > 0 })
       onCreated()
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -286,6 +292,17 @@ export default function AutomationIdeas({
     <Card className="hover:translate-y-0">
       <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-3">{t.intro}</p>
+
+      {/* Compact onboarding / chronology block (Phase 3F.3.3). */}
+      <div className="mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
+        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{t.onboardTitle}</div>
+        <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+          <li>1. {t.onboardStep1}</li>
+          <li>2. {t.onboardStep2}</li>
+          <li>3. {t.onboardStep3}</li>
+          <li>4. {t.onboardStep4}</li>
+        </ol>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {sourceTabs.map((s) => (
@@ -391,9 +408,10 @@ export default function AutomationIdeas({
             <div className="flex-1" />
             <Button size="sm" variant="outline" onClick={rejectSelected} disabled={selected.size === 0}>{t.rejectSelected}</Button>
             <Button size="sm" onClick={approveSelected} loading={creating} disabled={creating || selected.size === 0}>
-              {creating ? t.creating : `${t.approveSelected} (${selected.size})`}
+              {creating ? t.creating : `${t.addToQueue}${selected.size > 0 ? ` (${selected.size})` : ''}`}
             </Button>
           </div>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.addToQueueHint}</p>
 
           <div className="space-y-2">
             {(ideasExpanded ? suggestions : suggestions.slice(0, 3)).map((s) => (
@@ -428,8 +446,9 @@ export default function AutomationIdeas({
                     )}
                     {s.suggestedInternalLinks.length > 0 && (
                       <div className="mt-1" dir={isHebrew ? 'rtl' : 'ltr'}>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{t.internalLinksLabel}:</div>
-                        <div className="mt-0.5 space-y-0.5">
+                        <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.internalLinksLabel}</div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">{t.linksFoundHint}</p>
+                        <div className="mt-1 space-y-0.5">
                           {s.suggestedInternalLinks.map((l, i) => (
                             <label key={`${l.url}-${i}`} className="flex items-start gap-1.5 text-[11px] cursor-pointer">
                               <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 h-3.5 w-3.5 accent-indigo-600" />
@@ -438,6 +457,7 @@ export default function AutomationIdeas({
                           ))}
                         </div>
                         <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
+                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksQualityHint}</p>
                       </div>
                     )}
                     {s.suggestedInternalLinks.length === 0 && (
