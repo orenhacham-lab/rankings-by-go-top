@@ -26,21 +26,24 @@ interface Strings {
   badgeTooltip: string
 }
 
-export default function TopicPlanBadge({ summary, onClick, t }: { summary?: TopicPlanSummary; onClick: () => void; t: Strings }) {
+export default function TopicPlanBadge({ summary, onClick, t, highlight = false }: { summary?: TopicPlanSummary; onClick: () => void; t: Strings; highlight?: boolean }) {
   let label = t.badgeAction
-  let tone = 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+  // Actionable by default (indigo), so it reads as a button, not muted metadata.
+  let tone = 'border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300 bg-white dark:bg-transparent'
   if (summary) {
     if (!summary.exists) { label = t.badgeNoPlan }
-    else if (summary.linkCount === 0) { label = t.badgeZero; tone = 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400' }
-    else if (summary.approvedCount > 0) { label = t.badgeApproved.replace('{n}', String(summary.approvedCount)); tone = 'border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300' }
-    else { label = (summary.linkCount === 1 ? t.badgePlannedOne : t.badgePlanned).replace('{n}', String(summary.linkCount)); tone = 'border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300' }
-    if (summary.stale) { label = `${label} ${t.badgeStaleSuffix}`; tone = 'border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400' }
+    else if (summary.linkCount === 0) { label = t.badgeZero }
+    else if (summary.approvedCount > 0) { label = t.badgeApproved.replace('{n}', String(summary.approvedCount)); tone = 'border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-white dark:bg-transparent' }
+    else { label = (summary.linkCount === 1 ? t.badgePlannedOne : t.badgePlanned).replace('{n}', String(summary.linkCount)) }
+    if (summary.stale) { label = `${label} ${t.badgeStaleSuffix}`; tone = 'border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400 bg-white dark:bg-transparent' }
   }
+  // After "review/edit links first", make the action pop for a few seconds.
+  const emphasis = highlight ? 'ring-2 ring-indigo-400 dark:ring-indigo-500/60 bg-indigo-50 dark:bg-indigo-500/10 animate-pulse' : ''
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${tone}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-semibold shadow-sm hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors ${tone} ${emphasis}`}
       title={t.badgeTooltip}
     >
       🔗 {label}

@@ -247,7 +247,7 @@ export const dashboardEn = {
     // Phase 3F.3.3a — truthful ready-list explanation (topics here are approved
     // but NOT yet in the automatic queue until added).
     queueExplain: 'These are ready topics waiting for article creation. You can create an article from them, or add them to the automatic publishing queue from "Automatic ideas".',
-    reviewRowsHint: 'Click “Open link planning” next to each topic to add or edit links.',
+    reviewRowsHint: 'Now review the links for the topics you selected. Click “Review links” or “Add links” in the topic row.',
     internalLinkIndex: {
       title: 'Internal-link index',
       statusReady: 'Index is ready',
@@ -329,14 +329,14 @@ export const dashboardEn = {
       sumLinksApproved: 'Links approved',
     },
     topicPlan: {
-      badgeAction: 'Add internal links',
-      badgeNoPlan: 'Add internal links',
-      badgeZero: 'Add internal links',
-      badgePlanned: 'Open link planning ({n})',
-      badgePlannedOne: 'Open link planning (1)',
+      badgeAction: 'Add links',
+      badgeNoPlan: 'Add links',
+      badgeZero: 'Add links',
+      badgePlanned: 'Review links ({n})',
+      badgePlannedOne: 'Review links (1)',
       badgeApproved: '{n} approved',
       badgeStaleSuffix: '· stale',
-      badgeTooltip: 'Click to add, remove, or edit internal links before the article is created.',
+      badgeTooltip: 'Open to review, add, or remove links before the article is created.',
       drawerTitle: 'Internal-link planning',
       primaryKeyword: 'Keyword',
       runPlan: 'Run plan (dry-run)',

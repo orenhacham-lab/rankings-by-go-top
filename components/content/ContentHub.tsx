@@ -102,7 +102,7 @@ export default function ContentHub() {
   }, [])
   const handleReviewLinks = useCallback((topicIds: string[]) => {
     setHighlightTopicIds(topicIds)
-    setReviewLinksHint(topicIds.length > 1)
+    setReviewLinksHint(true)
     window.setTimeout(() => topicsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
     window.setTimeout(() => setHighlightTopicIds([]), 6000)
   }, [])

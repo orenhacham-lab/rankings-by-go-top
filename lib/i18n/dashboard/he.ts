@@ -245,7 +245,7 @@ export const dashboardHe = {
     // Phase 3F.3.3a — truthful ready-list explanation (topics here are approved
     // but NOT yet in the automatic queue until added).
     queueExplain: 'אלה נושאים מוכנים שממתינים ליצירת מאמר. אפשר ליצור מהם מאמר, או להוסיף אותם לתור הפרסום האוטומטי דרך "רעיונות אוטומטיים".',
-    reviewRowsHint: 'לחץ על ״פתח תכנון קישורים״ ליד כל נושא כדי להוסיף או לערוך קישורים.',
+    reviewRowsHint: 'עכשיו בדוק את הקישורים של הנושאים שסימנת. לחץ על ״בדוק קישורים״ או ״הוסף קישורים״ בשורת הנושא.',
     internalLinkIndex: {
       title: 'אינדקס קישורים פנימיים',
       statusReady: 'האינדקס מוכן',
@@ -329,12 +329,12 @@ export const dashboardHe = {
       sumLinksApproved: 'קישורים שאושרו',
     },
     topicPlan: {
-      badgeAction: 'הוסף קישורים פנימיים',
-      badgeNoPlan: 'הוסף קישורים פנימיים',
-      badgeZero: 'הוסף קישורים פנימיים',
-      badgePlanned: 'פתח תכנון קישורים ({n})',
-      badgePlannedOne: 'פתח תכנון קישורים (1)',
-      badgeTooltip: 'לחץ כדי להוסיף, להסיר או לערוך קישורים פנימיים לפני יצירת המאמר.',
+      badgeAction: 'הוסף קישורים',
+      badgeNoPlan: 'הוסף קישורים',
+      badgeZero: 'הוסף קישורים',
+      badgePlanned: 'בדוק קישורים ({n})',
+      badgePlannedOne: 'בדוק קישורים (1)',
+      badgeTooltip: 'פתח כדי לבדוק, להוסיף או להסיר קישורים לפני יצירת המאמר.',
       badgeApproved: '{n} מאושרים',
       badgeStaleSuffix: '· מיושן',
       drawerTitle: 'תכנון קישורים פנימיים',

@@ -275,7 +275,7 @@ export default function TopicsList({
                       {/* Internal-link planning entry point (flag-gated). Opens the
                           drawer; status is loaded there, never per row. */}
                       {planningOn && (
-                        <TopicPlanBadge summary={planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} />
+                        <TopicPlanBadge summary={planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} highlight={highlighted} />
                       )}
                       {/* Visible feedback while (re)generating — the primary button
                           may be "Edit article" during a regenerate. */}
