@@ -56,6 +56,10 @@ export const dashboardEn = {
       linksFoundHint: 'We found internal links that may fit this topic. Keep only the links you want to save to the plan.',
       linksQualityHint: 'Links are suggested only when the system finds a good match from the site. A few relevant links are better than many weak ones.',
       linksMoreOptions: 'More options will be available in link planning after approving the topic.',
+      // Phase 3F.3.4a — specific no-links reasons.
+      linkReasonNoMatch: 'No suitable link targets were found in the site index for this topic.',
+      linkReasonLowConf: 'A few options were found, but they were not relevant enough to save automatically.',
+      linkReasonStale: 'The index needs a refresh to check new categories, products, and pages.',
       sourceKeyword: 'By keyword',
       sourceProject: 'By project data',
       sourceResearch: 'By site keyword research',

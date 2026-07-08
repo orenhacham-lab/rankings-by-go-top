@@ -8,9 +8,12 @@
  * Query: ?projectId=…
  */
 
-import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
+import { authContentProject, isContentAutomationEnabled, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { loadPendingIdeas, ideaToSuggestion, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending } from '@/lib/content/recommendations/keyword-guard'
+import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
+import { previewPlannerLinks } from '@/lib/content/internal-link-idea-plan'
+import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +35,31 @@ export async function GET(request: Request) {
   const { visible, conflictIds } = partitionPending(pending, guard)
   if (conflictIds.length > 0) await markIdeasDuplicate(auth.admin, auth.project.id, conflictIds)
 
+  let suggestions = visible.map(ideaToSuggestion)
+
+  // Phase 3F.3.4a — response-only re-enrichment: give existing pending ideas that
+  // have NO saved links the CURRENT planner preview (so new category/product
+  // targets appear after an index refresh). Never overwrites saved links; never
+  // persists; never forces links (attaches a precise no-link reason instead).
+  if (isInternalLinkPlanningEnabled()) {
+    try {
+      const cacheRow = await getCachedIndex(auth.admin, auth.project.id)
+      if (cacheRow) {
+        const rep = reassembleReport(cacheRow)
+        const targets = (rep.targets ?? []) as ScannedTarget[]
+        const hosts = rep.hosts ?? []
+        const stale = isStale(cacheRow) || isVersionStale(cacheRow)
+        const devDebug = process.env.NODE_ENV !== 'production'
+        suggestions = suggestions.map((s) => {
+          if (s.suggestedInternalLinks?.length) return s
+          const preview = targets.length ? previewPlannerLinks({ id: 'preview', title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords }, targets, hosts, 3, devDebug) : { links: [] as { url: string; anchor: string }[], reason: 'stale_index' as const }
+          if (preview.links.length) return { ...s, suggestedInternalLinks: preview.links }
+          return { ...s, linkPreviewReason: stale ? 'stale_index' : (preview.reason ?? 'valid_no_match') }
+        })
+      }
+    } catch { /* enrichment is best-effort */ }
+  }
+
   const debug = process.env.NODE_ENV !== 'production' ? { ...guard.counts, scanKeywordSamples: guard.scanSamples, revalidatedHidden: conflictIds.length } : undefined
-  return Response.json({ suggestions: visible.map(ideaToSuggestion), meta: { persisted: true, pendingCount: visible.length, revalidatedHidden: conflictIds.length, debug } })
+  return Response.json({ suggestions, meta: { persisted: true, pendingCount: visible.length, revalidatedHidden: conflictIds.length, debug } })
 }

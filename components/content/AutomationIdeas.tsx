@@ -31,6 +31,8 @@ interface Suggestion {
   source: Source
   suggestionReason: string
   suggestionScore: number
+  /** Phase 3F.3.4a — why there are no suggested links (for a helpful message). */
+  linkPreviewReason?: string
 }
 
 export default function AutomationIdeas({
@@ -500,7 +502,12 @@ export default function AutomationIdeas({
                       </div>
                     )}
                     {s.suggestedInternalLinks.length === 0 && (
-                      <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksNoneHint}</div>
+                      <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                        {s.linkPreviewReason === 'low_confidence_only' ? t.linkReasonLowConf
+                          : s.linkPreviewReason === 'stale_index' ? t.linkReasonStale
+                            : (s.linkPreviewReason === 'valid_no_match' || s.linkPreviewReason === 'target_type_gap' || s.linkPreviewReason === 'already_linked_or_duplicate') ? t.linkReasonNoMatch
+                              : t.linksNoneHint}
+                      </div>
                     )}
                   </div>
                 </label>

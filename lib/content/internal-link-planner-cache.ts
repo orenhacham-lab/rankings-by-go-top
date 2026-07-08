@@ -32,6 +32,12 @@ export const CACHE_PLANNER_VERSION = '2b.3'
 
 // --- Tunable thresholds (explicit for review) --------------------------------
 export const CACHE_PLANNER_RELEVANCE_MIN = 0.3
+// Phase 3F.3.4a — slightly lower floors for HIGH-VALUE ecommerce hubs
+// (category / product-category / product) but ONLY when there is a REAL token/stem
+// overlap with the topic. This recovers "הליכון מתקפל → הליכונים" without ever
+// letting an unrelated target through (a matched token is still required).
+export const CACHE_PLANNER_RELEVANCE_MIN_ECOM = 0.22
+export const CACHE_PLANNER_MIN_CONFIDENCE_ECOM = 0.38
 export const CACHE_PLANNER_SELF_SIMILARITY_MAX = 0.85
 export const CACHE_PLANNER_MIN_CONFIDENCE = 0.45
 /** Caution targets (homepage/unknown) must clear a higher bar. */
@@ -323,7 +329,10 @@ export function planFromCachedTargets(
       relevance = round2(Math.max(relevance, cont, ENTITY_MATCH_RELEVANCE))
       relevanceMethod = 'entity_single_token'
     }
-    if (relevance < CACHE_PLANNER_RELEVANCE_MIN) rejectedReasons.push(`low_relevance(${relevance} < ${CACHE_PLANNER_RELEVANCE_MIN})`)
+    // High-value ecommerce hub with a REAL token/stem match → slightly lower floor.
+    const ecomBoost = (t.targetType === 'category' || t.targetType === 'product') && matchedTokens.length >= 1
+    const relMin = ecomBoost ? CACHE_PLANNER_RELEVANCE_MIN_ECOM : CACHE_PLANNER_RELEVANCE_MIN
+    if (relevance < relMin) rejectedReasons.push(`low_relevance(${relevance} < ${relMin})`)
 
     // 4) Near-self guard (normalized, so morphological near-duplicates are still caught).
     const selfSim = round2(jaccard(topicKeyTokens, normTokens(`${t.targetTitle} ${t.primaryKeywordCandidate ?? ''}`)))
@@ -338,7 +347,9 @@ export function planFromCachedTargets(
     const kwBonus = t.keywordAvailable ? 0.1 : 0
     const anchorBonus = anchor?.source === 'usable_anchor' ? 0.1 : 0
     const confidence = round2(clamp01(relevance + priorityBonus + kwBonus + anchorBonus))
-    const minConf = t.eligibility === 'caution' ? CACHE_PLANNER_CAUTION_MIN_CONFIDENCE : CACHE_PLANNER_MIN_CONFIDENCE
+    const minConf = t.eligibility === 'caution'
+      ? CACHE_PLANNER_CAUTION_MIN_CONFIDENCE
+      : ecomBoost ? CACHE_PLANNER_MIN_CONFIDENCE_ECOM : CACHE_PLANNER_MIN_CONFIDENCE
     if (rejectedReasons.length === 0 && confidence < minConf) rejectedReasons.push(`low_confidence(${confidence} < ${minConf})`)
 
     const selected = rejectedReasons.length === 0

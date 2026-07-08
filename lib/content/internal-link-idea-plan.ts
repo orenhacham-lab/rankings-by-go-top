@@ -10,7 +10,7 @@
  */
 
 import { normalizeUrlKey, isInternalUrl, manualAnchorShapeValid } from '@/lib/content/internal-links'
-import { selfOrDuplicateReason, type CachePlannedLink, type CacheTopicPlan } from '@/lib/content/internal-link-planner-cache'
+import { selfOrDuplicateReason, planFromCachedTargets, type CachePlannedLink, type CacheTopicPlan } from '@/lib/content/internal-link-planner-cache'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
 export interface SelectedIdeaLink { url: string; anchor: string }
@@ -105,4 +105,63 @@ export function buildIdeaSelectedPlanLinks(
 /** Assemble a CacheTopicPlan from validated selection (for savePlanBatch). */
 export function ideaSelectedPlan(topic: TopicForPlan, links: CachePlannedLink[]): CacheTopicPlan {
   return { topicId: topic.id, topicTitle: topic.title, primaryKeyword: topic.primaryKeyword, selected: links, rejected: [], summary: 'topic_idea_selection' }
+}
+
+export type NoLinkReason =
+  | 'valid_no_match'
+  | 'low_confidence_only'
+  | 'target_type_gap'
+  | 'already_linked_or_duplicate'
+  | 'planner_error'
+  | 'stale_index'
+
+/** Classify WHY a plan produced no selected links (Phase 3F.3.4a). */
+export function classifyNoLinkReason(plan: CacheTopicPlan, commerceTargetCount: number): NoLinkReason {
+  const rejected = plan.rejected
+  if (rejected.length === 0) return 'valid_no_match'
+  const isSelfDup = (r: CachePlannedLink) => r.rejectedReasons.some((x) => x.startsWith('self') || x.includes('duplicate') || x.startsWith('too_similar_self'))
+  const isLow = (r: CachePlannedLink) => r.rejectedReasons.some((x) => x.startsWith('low_relevance') || x.startsWith('low_confidence'))
+  if (rejected.every(isSelfDup)) return 'already_linked_or_duplicate'
+  if (rejected.some(isLow)) return commerceTargetCount === 0 ? 'target_type_gap' : 'low_confidence_only'
+  return 'valid_no_match'
+}
+
+export interface LinkPreview {
+  links: { url: string; anchor: string }[]
+  reason?: NoLinkReason
+  /** Dev diagnostics: top rejected candidates + score explanations. */
+  debug?: Record<string, unknown>
+}
+
+/**
+ * Preview internal links for a topic with the SAME planner used by the drawer,
+ * returning the top `max` links OR a precise no-link reason + dev diagnostics.
+ * Pure (targets/hosts provided by the caller). Never throws.
+ */
+export function previewPlannerLinks(topic: TopicForPlan, targets: ScannedTarget[], hosts: string[], max: number, devDebug = false): LinkPreview {
+  try {
+    const plan = planFromCachedTargets(
+      { id: topic.id || 'preview', title: topic.title, primaryKeyword: topic.primaryKeyword, secondaryKeywords: topic.secondaryKeywords ?? [] },
+      targets, hosts, {},
+    )
+    const links = plan.selected
+      .filter((l) => (l.anchorText || '').trim())
+      .slice(0, max)
+      .map((l) => ({ url: l.targetUrl, anchor: (l.anchorText || '').trim() }))
+    const byType: Record<string, number> = { category: 0, product: 0, post: 0, page: 0, tag: 0, unknown: 0 }
+    for (const t of targets) byType[t.targetType] = (byType[t.targetType] ?? 0) + 1
+    const commerce = byType.category + byType.product
+    const debug = devDebug ? {
+      title: topic.title, primaryKeyword: topic.primaryKeyword,
+      eligibleTargets: targets.filter((t) => t.eligibility === 'yes').length, targetTypes: byType,
+      topCandidates: [...plan.selected, ...plan.rejected]
+        .sort((a, b) => b.confidence - a.confidence).slice(0, 10)
+        .map((c) => ({ title: c.targetTitle, url: c.targetUrl, priority: c.targetPriority, score: c.confidence, relevance: c.relevance, selected: c.selected, rejected: c.rejectedReasons })),
+      finalCount: links.length,
+    } : undefined
+    if (links.length) return { links, debug }
+    return { links: [], reason: classifyNoLinkReason(plan, commerce), debug }
+  } catch {
+    return { links: [], reason: 'planner_error' }
+  }
 }

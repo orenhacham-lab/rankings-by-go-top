@@ -21,8 +21,8 @@ import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidat
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { recommendFromKeywordResearch } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
-import { planFromCachedTargets } from '@/lib/content/internal-link-planner-cache'
+import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
+import { previewPlannerLinks } from '@/lib/content/internal-link-idea-plan'
 import { isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { RecommendationSource, RecommendationResult, TopicSuggestion, SuggestedInternalLink } from './types'
@@ -119,24 +119,6 @@ function attachInternalLinks(
   return scored.slice(0, 2).map((c) => ({ url: c.url, anchor: c.anchor }))
 }
 
-/**
- * Phase 3F.3.3d — idea-stage link preview using the SAME planner the post-approval
- * drawer uses (planFromCachedTargets over the cached scan), so the card no longer
- * shows "no links" while the planner later finds several. Returns the top
- * `max` recommended links. Read-only; no planner-scoring change.
- */
-function plannerPreviewLinks(s: TopicSuggestion, targets: ScannedTarget[], hosts: string[], max: number): SuggestedInternalLink[] {
-  try {
-    const plan = planFromCachedTargets(
-      { id: `preview:${slugKey(s.title)}`, title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords ?? [] },
-      targets, hosts, {},
-    )
-    return plan.selected
-      .filter((l) => (l.anchorText || '').trim())
-      .slice(0, max)
-      .map((l) => ({ url: l.targetUrl, anchor: (l.anchorText || '').trim() }))
-  } catch { return [] }
-}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -426,18 +408,25 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   // keyword-overlap heuristic only when the planner finds nothing / is off.
   let planTargets: ScannedTarget[] = []
   let planHosts: string[] = []
+  let indexStale = false
   if (isInternalLinkPlanningEnabled()) {
     try {
       const cacheRow = await getCachedIndex(admin, input.projectId)
-      if (cacheRow) { const rep = reassembleReport(cacheRow); planTargets = (rep.targets ?? []) as ScannedTarget[]; planHosts = rep.hosts ?? [] }
+      if (cacheRow) { const rep = reassembleReport(cacheRow); planTargets = (rep.targets ?? []) as ScannedTarget[]; planHosts = rep.hosts ?? []; indexStale = isStale(cacheRow) || isVersionStale(cacheRow) }
     } catch { /* no scan cache → heuristic fallback */ }
   }
+  const devDebug = process.env.NODE_ENV !== 'production'
   const enriched = suggestions
     .slice(0, MAX_SUGGESTIONS)
     .map((s) => {
       if (s.suggestedInternalLinks.length) return s
-      const preview = planTargets.length ? plannerPreviewLinks(s, planTargets, planHosts, 3) : []
-      return { ...s, suggestedInternalLinks: preview.length ? preview : attachInternalLinks(s.primaryKeyword, linkCandidates) }
+      // Same planner as the drawer → consistent links + a precise no-link reason.
+      const preview = planTargets.length ? previewPlannerLinks({ id: 'preview', title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords }, planTargets, planHosts, 3, devDebug) : { links: [] as { url: string; anchor: string }[], reason: planTargets.length ? undefined : 'stale_index' as const }
+      if (preview.links.length) return { ...s, suggestedInternalLinks: preview.links }
+      // Heuristic fallback (keyword-overlap) before declaring "no links".
+      const fallback = attachInternalLinks(s.primaryKeyword, linkCandidates)
+      if (fallback.length) return { ...s, suggestedInternalLinks: fallback }
+      return { ...s, suggestedInternalLinks: [], linkPreviewReason: indexStale ? 'stale_index' : (preview.reason ?? (planTargets.length ? 'valid_no_match' : 'stale_index')) }
     })
   enriched.sort((a, b) => b.suggestionScore - a.suggestionScore)
 

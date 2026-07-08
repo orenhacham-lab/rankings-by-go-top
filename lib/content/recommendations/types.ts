@@ -30,6 +30,9 @@ export interface TopicSuggestion {
   suggestionReason: string
   /** 0..1 relevance/confidence. */
   suggestionScore: number
+  /** Phase 3F.3.4a — when there are no suggested links, WHY (valid_no_match /
+   *  low_confidence_only / target_type_gap / stale_index / …). Response-only. */
+  linkPreviewReason?: string
 }
 
 export interface RecommendationMeta {
