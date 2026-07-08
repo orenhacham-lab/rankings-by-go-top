@@ -118,6 +118,36 @@ export default function ContentHub() {
   }, [])
   const handleDrawerPlanSaved = useCallback(() => { setLinkPlanSavedHint(true) }, [])
   const handleReturnToQueue = useCallback(() => { setLinkPlanSavedHint(true); setCtaScrollSignal((n) => n + 1) }, [])
+  // Phase 3F.3.6 (Part G) — ensure the project's pool exists and add one topic to
+  // its publishing queue (drawer "save links and add to queue"). Returns success.
+  const handleSaveAndQueue = useCallback(async (topicId: string): Promise<boolean> => {
+    if (!projectId) return false
+    try {
+      let poolId: string | null = null
+      try {
+        const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
+        if (gr.ok) { const gd = await gr.json(); poolId = gd.pool?.id ?? null }
+      } catch { /* fall through to create */ }
+      if (!poolId) {
+        const pr = await fetch('/api/content/automation/pools', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
+        })
+        if (!pr.ok) return false
+        const pd = await pr.json(); poolId = pd.pool?.id ?? null
+      }
+      if (!poolId) return false
+      const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicIds: [topicId] }),
+      })
+      if (!ir.ok) return false
+      handleScheduled()
+      return true
+    } catch {
+      return false
+    }
+  }, [projectId, handleScheduled])
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
 
   // ── Batch article creation (client-side, sequential) ──
@@ -876,6 +906,7 @@ export default function ContentHub() {
                       highlightIds={highlightTopicIds}
                       onReturnToQueue={handleReturnToQueue}
                       onPlanSaved={handleDrawerPlanSaved}
+                      onSaveAndQueue={handleSaveAndQueue}
                     />
                   </>
                 )}

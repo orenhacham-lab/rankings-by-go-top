@@ -22,7 +22,7 @@ import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { recommendFromKeywordResearch } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
-import { previewPlannerLinks } from '@/lib/content/internal-link-idea-plan'
+import { previewStructuredLinks } from '@/lib/content/internal-link-idea-plan'
 import { isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { RecommendationSource, RecommendationResult, TopicSuggestion, SuggestedInternalLink } from './types'
@@ -420,13 +420,20 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     .slice(0, MAX_SUGGESTIONS)
     .map((s) => {
       if (s.suggestedInternalLinks.length) return s
-      // Same planner as the drawer → consistent links + a precise no-link reason.
-      const preview = planTargets.length ? previewPlannerLinks({ id: 'preview', title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords }, planTargets, planHosts, 3, devDebug) : { links: [] as { url: string; anchor: string }[], reason: planTargets.length ? undefined : 'stale_index' as const }
-      if (preview.links.length) return { ...s, suggestedInternalLinks: preview.links }
+      // Phase 3F.3.6 — resolve the MONEY TARGET first (best commercial destination),
+      // then supporting links, using the same planner the drawer uses. The card
+      // shows the money target first under "Primary commercial link".
+      const structured = planTargets.length
+        ? previewStructuredLinks({ id: 'preview', title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords }, planTargets, planHosts, 4, devDebug)
+        : { moneyTarget: null, supportingLinks: [] as { url: string; anchor: string; title: string }[], moneyTargetMatchType: 'no_match', reason: 'stale_index' as const }
+      const ordered = [...(structured.moneyTarget ? [structured.moneyTarget] : []), ...structured.supportingLinks].map(({ url, anchor }) => ({ url, anchor }))
+      if (ordered.length) {
+        return { ...s, suggestedInternalLinks: ordered, moneyTargetUrl: structured.moneyTarget?.url ?? null, moneyTargetMatchType: structured.moneyTargetMatchType }
+      }
       // Heuristic fallback (keyword-overlap) before declaring "no links".
       const fallback = attachInternalLinks(s.primaryKeyword, linkCandidates)
-      if (fallback.length) return { ...s, suggestedInternalLinks: fallback }
-      return { ...s, suggestedInternalLinks: [], linkPreviewReason: indexStale ? 'stale_index' : (preview.reason ?? (planTargets.length ? 'valid_no_match' : 'stale_index')) }
+      if (fallback.length) return { ...s, suggestedInternalLinks: fallback, moneyTargetUrl: null }
+      return { ...s, suggestedInternalLinks: [], moneyTargetUrl: null, linkPreviewReason: indexStale ? 'stale_index' : (structured.reason ?? (planTargets.length ? 'valid_no_match' : 'stale_index')) }
     })
   enriched.sort((a, b) => b.suggestionScore - a.suggestionScore)
 

@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled, isInternalLinkPlanningE
 import { loadPendingIdeas, ideaToSuggestion, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending } from '@/lib/content/recommendations/keyword-guard'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
-import { previewPlannerLinks } from '@/lib/content/internal-link-idea-plan'
+import { previewStructuredLinks } from '@/lib/content/internal-link-idea-plan'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
 export const dynamic = 'force-dynamic'
@@ -52,9 +52,13 @@ export async function GET(request: Request) {
         const devDebug = process.env.NODE_ENV !== 'production'
         suggestions = suggestions.map((s) => {
           if (s.suggestedInternalLinks?.length) return s
-          const preview = targets.length ? previewPlannerLinks({ id: 'preview', title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords }, targets, hosts, 3, devDebug) : { links: [] as { url: string; anchor: string }[], reason: 'stale_index' as const }
-          if (preview.links.length) return { ...s, suggestedInternalLinks: preview.links }
-          return { ...s, linkPreviewReason: stale ? 'stale_index' : (preview.reason ?? 'valid_no_match') }
+          // Phase 3F.3.6 — money target first, then supporting links.
+          const structured = targets.length
+            ? previewStructuredLinks({ id: 'preview', title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords }, targets, hosts, 4, devDebug)
+            : { moneyTarget: null, supportingLinks: [] as { url: string; anchor: string; title: string }[], moneyTargetMatchType: 'no_match', reason: 'stale_index' as const }
+          const ordered = [...(structured.moneyTarget ? [structured.moneyTarget] : []), ...structured.supportingLinks].map(({ url, anchor }) => ({ url, anchor }))
+          if (ordered.length) return { ...s, suggestedInternalLinks: ordered, moneyTargetUrl: structured.moneyTarget?.url ?? null, moneyTargetMatchType: structured.moneyTargetMatchType }
+          return { ...s, moneyTargetUrl: null, linkPreviewReason: stale ? 'stale_index' : (structured.reason ?? 'valid_no_match') }
         })
       }
     } catch { /* enrichment is best-effort */ }

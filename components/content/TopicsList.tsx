@@ -39,6 +39,7 @@ export default function TopicsList({
   highlightIds = [],
   onReturnToQueue,
   onPlanSaved,
+  onSaveAndQueue,
 }: {
   topics: ArticleTopic[]
   projectId?: string
@@ -61,6 +62,8 @@ export default function TopicsList({
   // Phase 3F.3.3e — drawer completion callbacks (guide back to the queue CTA).
   onReturnToQueue?: () => void
   onPlanSaved?: () => void
+  // Phase 3F.3.6 (Part G) — save the plan AND enqueue the topic from the drawer.
+  onSaveAndQueue?: (topicId: string) => Promise<boolean>
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
@@ -382,6 +385,7 @@ export default function TopicsList({
           onStatusChange={handlePlanStatus}
           onReturnToQueue={onReturnToQueue}
           onPlanSaved={onPlanSaved}
+          onSaveAndQueue={onSaveAndQueue}
         />
       )}
     </div>

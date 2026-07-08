@@ -33,6 +33,11 @@ export interface TopicSuggestion {
   /** Phase 3F.3.4a — when there are no suggested links, WHY (valid_no_match /
    *  low_confidence_only / target_type_gap / stale_index / …). Response-only. */
   linkPreviewReason?: string
+  /** Phase 3F.3.6 — URL of the best commercial destination among suggestedInternalLinks
+   *  (null when none). The idea card shows it FIRST under "Primary commercial link". */
+  moneyTargetUrl?: string | null
+  /** Phase 3F.3.6 — money-target match classification (dev/diagnostic + card badge). */
+  moneyTargetMatchType?: string
 }
 
 export interface RecommendationMeta {

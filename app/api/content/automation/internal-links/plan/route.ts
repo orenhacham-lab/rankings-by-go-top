@@ -30,6 +30,7 @@ import {
   CACHE_PLANNER_MAX_LINKS,
   type CacheTopicPlan,
 } from '@/lib/content/internal-link-planner-cache'
+import { resolveMoneyTargetFromPlan } from '@/lib/content/money-target-resolver'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
 export const dynamic = 'force-dynamic'
@@ -74,7 +75,13 @@ export async function GET(request: Request) {
   const hosts = report.hosts ?? []
 
   const { topics, resolvedScope } = await resolveTopicsForPlanning(admin, project.id, { scope, topicIds, limit })
-  const plans: CacheTopicPlan[] = topics.map((t) => planFromCachedTargets(t, targets, hosts, { allowCaution }))
+  // Phase 3F.3.6 — resolve each topic's MONEY TARGET (best commercial destination)
+  // so the drawer can show it first, above supporting links.
+  const plans = topics.map((t) => {
+    const plan = planFromCachedTargets(t, targets, hosts, { allowCaution })
+    const money = resolveMoneyTargetFromPlan(plan)
+    return { ...plan, moneyTargetUrl: money.moneyTarget?.targetUrl ?? null, moneyTargetMatchType: money.matchType }
+  })
 
   const eligibleTargetCount = targets.filter((t) => t.eligibility === 'yes').length
   const ineligibleTargetsSkipped = targets.filter((t) => t.eligibility === 'no').length

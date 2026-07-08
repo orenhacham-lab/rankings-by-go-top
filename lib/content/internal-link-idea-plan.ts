@@ -11,6 +11,7 @@
 
 import { normalizeUrlKey, isInternalUrl, manualAnchorShapeValid } from '@/lib/content/internal-links'
 import { selfOrDuplicateReason, planFromCachedTargets, type CachePlannedLink, type CacheTopicPlan } from '@/lib/content/internal-link-planner-cache'
+import { resolveMoneyTargetFromPlan, type MoneyTargetMatchType } from '@/lib/content/money-target-resolver'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
 export interface SelectedIdeaLink { url: string; anchor: string }
@@ -133,55 +134,85 @@ export interface LinkPreview {
   debug?: Record<string, unknown>
 }
 
+/** A single previewed link (money target or supporting), with its target title. */
+export interface PreviewLink { url: string; anchor: string; title: string }
+
+export interface StructuredLinkPreview {
+  /** Best commercial destination for the topic, or null when none is confident. */
+  moneyTarget: PreviewLink | null
+  /** Supporting internal links (articles/pages/secondary commercial), money target excluded. */
+  supportingLinks: PreviewLink[]
+  /** Money-target match classification (for the card + diagnostics). */
+  moneyTargetMatchType: MoneyTargetMatchType
+  moneyTargetConfidence: number
+  reason?: NoLinkReason
+  debug?: Record<string, unknown>
+}
+
 /**
- * Preview internal links for a topic with the SAME planner used by the drawer,
- * returning the top `max` links OR a precise no-link reason + dev diagnostics.
- * Pure (targets/hosts provided by the caller). Never throws.
+ * Phase 3F.3.6 — resolve the MONEY TARGET first (best commercial destination),
+ * then the supporting links, as a structured result. Same planner the drawer
+ * uses, run ONCE. Pure; never throws. `max` caps the TOTAL links shown
+ * (money target + supporting).
  */
-export function previewPlannerLinks(topic: TopicForPlan, targets: ScannedTarget[], hosts: string[], max: number, devDebug = false): LinkPreview {
+export function previewStructuredLinks(topic: TopicForPlan, targets: ScannedTarget[], hosts: string[], max: number, devDebug = false): StructuredLinkPreview {
   try {
     const plan = planFromCachedTargets(
       { id: topic.id || 'preview', title: topic.title, primaryKeyword: topic.primaryKeyword, secondaryKeywords: topic.secondaryKeywords ?? [] },
       targets, hosts, {},
     )
-    const links = plan.selected
-      .filter((l) => (l.anchorText || '').trim())
-      .slice(0, max)
-      .map((l) => ({ url: l.targetUrl, anchor: (l.anchorText || '').trim() }))
+    const money = resolveMoneyTargetFromPlan(plan)
+    const moneyKey = money.moneyTarget ? normalizeUrlKey(money.moneyTarget.targetUrl) : null
+    const moneyTarget: PreviewLink | null = money.moneyTarget && (money.moneyTarget.anchorText || '').trim()
+      ? { url: money.moneyTarget.targetUrl, anchor: (money.moneyTarget.anchorText || '').trim(), title: money.moneyTarget.targetTitle }
+      : null
+
+    const cap = Math.max(1, max)
+    const supportingCap = Math.max(0, moneyTarget ? cap - 1 : cap)
+    const supportingLinks: PreviewLink[] = plan.selected
+      .filter((l) => (l.anchorText || '').trim() && (!moneyKey || normalizeUrlKey(l.targetUrl) !== moneyKey))
+      .slice(0, supportingCap)
+      .map((l) => ({ url: l.targetUrl, anchor: (l.anchorText || '').trim(), title: l.targetTitle }))
+
     const byType: Record<string, number> = { category: 0, product: 0, post: 0, page: 0, tag: 0, unknown: 0 }
     for (const t of targets) byType[t.targetType] = (byType[t.targetType] ?? 0) + 1
     const commerce = byType.category + byType.product
-    // Phase 3F.3.5 — map planning priority → a coarse target type for diagnostics
-    // (the planned link doesn't carry targetType; priority is the reliable signal).
-    const typeFromPriority = (priority: string): string =>
-      priority === 'commercial_category_or_service_hub' ? 'category'
-        : priority === 'product_or_specific_offer' ? 'product'
-          : priority === 'content_hub' || priority === 'strategic_content_page' ? 'page' : 'article'
+    const anyLinks = !!moneyTarget || supportingLinks.length > 0
+
     const debug = devDebug ? {
       title: topic.title, primaryKeyword: topic.primaryKeyword,
       eligibleTargets: targets.filter((t) => t.eligibility === 'yes').length, targetTypes: byType,
-      // Top candidates with FULL semantic diagnostics (Part B): each entry shows
-      // how the topic matched this indexed target and why it ranked where it did.
-      topCandidates: [...plan.selected, ...plan.rejected]
-        .sort((a, b) => b.confidence - a.confidence).slice(0, 10)
-        .map((c) => ({
-          targetTitle: c.targetTitle, url: c.targetUrl,
-          targetType: typeFromPriority(c.targetPriority), priority: c.targetPriority,
-          isCommercialTarget: c.targetPriority === 'commercial_category_or_service_hub' || c.targetPriority === 'product_or_specific_offer',
-          commercialRank: c.commercialRank ?? null,
-          semanticMatchType: c.semanticMatchType ?? 'none',
-          matchedTopicTerms: c.matchedTokens,
-          matchedTargetTerms: c.matchedTargetTerms ?? [],
-          targetSourceFields: c.matchedSourceFields ?? [],
-          finalScore: c.confidence, relevance: c.relevance,
-          selected: c.selected, rejected: c.rejectedReasons,
-          rationale: c.reason || (c.rejectedReasons.length ? `rejected: ${c.rejectedReasons.join(', ')}` : ''),
-        })),
-      finalCount: links.length,
+      // Money-target diagnostics (Part D).
+      selectedMoneyTarget: moneyTarget ? { url: moneyTarget.url, title: moneyTarget.title, matchType: money.matchType, confidence: money.confidence } : null,
+      moneyTargetMatchType: money.matchType,
+      moneyTargetConfidence: money.confidence,
+      moneyTargetCandidates: money.candidates,
+      rejectedMoneyTargets: money.rejected,
+      supportingLinksSelected: supportingLinks.map((l) => ({ url: l.url, title: l.title })),
     } : undefined
-    if (links.length) return { links, debug }
-    return { links: [], reason: classifyNoLinkReason(plan, commerce), debug }
+
+    return {
+      moneyTarget,
+      supportingLinks,
+      moneyTargetMatchType: money.matchType,
+      moneyTargetConfidence: money.confidence,
+      reason: anyLinks ? undefined : classifyNoLinkReason(plan, commerce),
+      debug,
+    }
   } catch {
-    return { links: [], reason: 'planner_error' }
+    return { moneyTarget: null, supportingLinks: [], moneyTargetMatchType: 'no_match', moneyTargetConfidence: 0, reason: 'planner_error' }
   }
+}
+
+/**
+ * Flat preview (money target first, then supporting) — kept for callers that only
+ * need an ordered link list. Delegates to previewStructuredLinks so ordering and
+ * diagnostics stay consistent. Pure; never throws.
+ */
+export function previewPlannerLinks(topic: TopicForPlan, targets: ScannedTarget[], hosts: string[], max: number, devDebug = false): LinkPreview {
+  const s = previewStructuredLinks(topic, targets, hosts, max, devDebug)
+  const links = [...(s.moneyTarget ? [s.moneyTarget] : []), ...s.supportingLinks]
+    .slice(0, max)
+    .map(({ url, anchor }) => ({ url, anchor }))
+  return { links, reason: s.reason, debug: s.debug }
 }

@@ -33,6 +33,8 @@ interface Suggestion {
   suggestionScore: number
   /** Phase 3F.3.4a — why there are no suggested links (for a helpful message). */
   linkPreviewReason?: string
+  /** Phase 3F.3.6 — URL of the best commercial destination (shown first, labelled). */
+  moneyTargetUrl?: string | null
 }
 
 export default function AutomationIdeas({
@@ -40,7 +42,6 @@ export default function AutomationIdeas({
   language,
   onCreated,
   onScheduled,
-  onTopicsCreated,
   onPlansSaved,
   onApproved,
   onReviewLinks,
@@ -338,10 +339,11 @@ export default function AutomationIdeas({
       if (!res) return
       setMessage({ text: t.approvedReady, ok: true })
       setLastCreatedIds(res.ids)
-      const needPlanning = res.createdTopics.filter((tp) => !res.plannedIds.has(tp.id))
-      if (needPlanning.length) onTopicsCreated?.(needPlanning)
-      if (res.createdTopics.length) onApproved?.({ topicIds: res.createdTopics.map((tp) => tp.id), plansSaved: res.savedPlans.length > 0 })
-      window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+      // Phase 3F.3.6 (Part F) — the FIRST click immediately performs the review
+      // flow: scroll to + highlight the approved rows so links can be edited there
+      // (per-row link planner). No duplicate "review/edit links" button is created,
+      // and nothing is enqueued until the user clicks the explicit add-to-queue action.
+      if (res.createdTopics.length) onReviewLinks?.(res.createdTopics.map((tp) => tp.id))
     } catch {
       setMessage({ text: 'error', ok: false })
     } finally {
@@ -490,9 +492,12 @@ export default function AutomationIdeas({
           {planSavedHint && (
             <p className="mt-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">{t.planSavedNote}</p>
           )}
+          {/* Phase 3F.3.6 (Part F/H) — the ONLY action here is add-to-queue. The
+              review flow already ran on the first click; a duplicate "review/edit
+              links" button is intentionally NOT rendered. */}
+          <p className="mt-1 text-[11px] text-indigo-800/80 dark:text-indigo-200/80">{t.reviewEditHelper}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
-            <Button variant="outline" onClick={() => onReviewLinks?.(lastCreatedIds)} disabled={scheduling}>{t.reviewLinksBtn}</Button>
           </div>
         </div>
       )}
@@ -553,22 +558,38 @@ export default function AutomationIdeas({
                     {s.suggestionReason && (
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.reasonLabel}: {s.suggestionReason}</div>
                     )}
-                    {s.suggestedInternalLinks.length > 0 && (
-                      <div className="mt-1" dir={isHebrew ? 'rtl' : 'ltr'}>
-                        <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.internalLinksLabel}</div>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400">{t.linksFoundHint}</p>
-                        <div className="mt-1 space-y-0.5">
-                          {s.suggestedInternalLinks.map((l, i) => (
-                            <label key={`${l.url}-${i}`} className="flex items-start gap-1.5 text-[11px] cursor-pointer">
-                              <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 h-3.5 w-3.5 accent-indigo-600" />
-                              <span className="text-slate-600 dark:text-slate-300 break-words">{l.anchor || l.url}</span>
-                            </label>
-                          ))}
+                    {s.suggestedInternalLinks.length > 0 && (() => {
+                      // Phase 3F.3.6 — split into the PRIMARY commercial link (money
+                      // target) and SUPPORTING links, each with its own heading.
+                      const money = s.moneyTargetUrl ? s.suggestedInternalLinks.find((l) => l.url === s.moneyTargetUrl) : null
+                      const supporting = s.suggestedInternalLinks.filter((l) => !money || l.url !== money.url)
+                      const linkRow = (l: { url: string; anchor: string }) => (
+                        <label key={l.url} className="flex items-start gap-1.5 text-[11px] cursor-pointer">
+                          <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 h-3.5 w-3.5 accent-indigo-600" />
+                          <span className="text-slate-600 dark:text-slate-300 break-words">{l.anchor || l.url}</span>
+                        </label>
+                      )
+                      return (
+                        <div className="mt-1" dir={isHebrew ? 'rtl' : 'ltr'}>
+                          <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.internalLinksLabel}</div>
+                          {money ? (
+                            <div className="mt-1">
+                              <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div>
+                              <div className="mt-0.5">{linkRow(money)}</div>
+                            </div>
+                          ) : (
+                            <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>
+                          )}
+                          {supporting.length > 0 && (
+                            <div className="mt-1.5">
+                              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{t.supportingLinks}</div>
+                              <div className="mt-0.5 space-y-0.5">{supporting.map(linkRow)}</div>
+                            </div>
+                          )}
+                          <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
                         </div>
-                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
-                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksMoreOptions}</p>
-                      </div>
-                    )}
+                      )
+                    })()}
                     {s.suggestedInternalLinks.length === 0 && (
                       <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
                         {s.linkPreviewReason === 'low_confidence_only' ? t.linkReasonLowConf

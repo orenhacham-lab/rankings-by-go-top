@@ -63,7 +63,7 @@ const dmkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targ
 export interface DrawerTopic { id: string; topic: string; primary_keyword: string | null }
 
 export default function TopicPlanDrawer({
-  open, onClose, projectId, topic, language, onStatusChange, onReturnToQueue, onPlanSaved,
+  open, onClose, projectId, topic, language, onStatusChange, onReturnToQueue, onPlanSaved, onSaveAndQueue,
 }: {
   open: boolean
   onClose: () => void
@@ -74,18 +74,22 @@ export default function TopicPlanDrawer({
   // Phase 3F.3.3e — completion actions that guide the user back to the queue.
   onReturnToQueue?: () => void
   onPlanSaved?: () => void
+  // Phase 3F.3.6 (Part G) — streamlined "save links and add to queue". When
+  // provided, the drawer offers a one-click save+enqueue; returns queue success.
+  onSaveAndQueue?: (topicId: string) => Promise<boolean>
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.topicPlan, [language])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<{ exists: boolean; batch: SavedBatch | null; links: SavedLink[]; stale: boolean; staleReasons: string[] } | null>(null)
-  const [dry, setDry] = useState<{ selected: DryItem[]; rejected: DryItem[]; summary: string; cacheState: string; warnings: string[] } | null>(null)
+  const [dry, setDry] = useState<{ selected: DryItem[]; rejected: DryItem[]; summary: string; cacheState: string; warnings: string[]; moneyTargetUrl: string | null } | null>(null)
   // Manually-selected reviewable candidates for the current dry-run (mkey set).
   const [manualSel, setManualSel] = useState<Set<string>>(new Set())
   // Phase 3F.3.4b — recommended links CHECKED for the plan (default all checked).
   const [recSel, setRecSel] = useState<Set<string>>(new Set())
   const [running, setRunning] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingQueue, setSavingQueue] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [busyLink, setBusyLink] = useState<string | null>(null)
   // Guards against the /plan/saved refetch loop: reqIdRef ignores stale
@@ -155,7 +159,7 @@ export default function TopicPlanDrawer({
     try {
       const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`)
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setDry({ selected: [], rejected: [], summary: '', cacheState: data.cacheState || 'missing', warnings: data.warnings || [data.warning].filter(Boolean) }); return }
+      if (!res.ok) { setDry({ selected: [], rejected: [], summary: '', cacheState: data.cacheState || 'missing', warnings: data.warnings || [data.warning].filter(Boolean), moneyTargetUrl: null }); return }
       const plan = Array.isArray(data.topics) ? data.topics[0] : null
       const selected: DryItem[] = plan?.selected ?? []
       setManualSel(new Set())
@@ -166,6 +170,7 @@ export default function TopicPlanDrawer({
         summary: plan?.summary ?? '',
         cacheState: data.cacheState || 'ok',
         warnings: data.warnings ?? [],
+        moneyTargetUrl: typeof plan?.moneyTargetUrl === 'string' ? plan.moneyTargetUrl : null,
       })
     } finally {
       setRunning(false)
@@ -174,39 +179,63 @@ export default function TopicPlanDrawer({
   // Keep the auto-preview effect pointing at the latest runPlan (Phase 3F.3.4b).
   runPlanRef.current = runPlan
 
+  // Persist the EXACT checked selection (recommended + manual) via the exact-mode
+  // bulk-save; falls back to /plan/save when no dry-run is loaded. Returns success.
+  const persistSelection = useCallback(async (): Promise<boolean> => {
+    if (!topic) return false
+    let res: Response
+    if (dry) {
+      const recommended = dry.selected
+        .filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
+        .map((d) => ({ topicId: topic.id, targetUrl: d.targetUrl, anchorText: d.anchorText as string }))
+      const manual = dry.rejected
+        .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
+        .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
+      res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve: false }),
+      })
+    } else {
+      res = await fetch('/api/content/automation/internal-links/plan/save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, topicId: topic.id }),
+      })
+    }
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return false }
+    return true
+  }, [projectId, topic, dry, manualSel, recSel, t.saveError])
+
   const savePlan = useCallback(async () => {
     if (!topic || saving) return
     setSaving(true); setError(null)
     try {
-      // Phase 3F.3.4b — persist the EXACT checked selection (recommended + manual)
-      // via the exact-mode bulk-save. When no dry-run is loaded, fall back to the
-      // legacy /plan/save (re-runs the planner and saves all recommended links).
-      let res: Response
-      if (dry) {
-        const recommended = dry.selected
-          .filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
-          .map((d) => ({ topicId: topic.id, targetUrl: d.targetUrl, anchorText: d.anchorText as string }))
-        const manual = dry.rejected
-          .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
-          .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
-        res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve: false }),
-        })
-      } else {
-        res = await fetch('/api/content/automation/internal-links/plan/save', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, topicId: topic.id }),
-        })
-      }
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError) }
-      else { setJustSaved(true); onPlanSaved?.() } // success → show completion state + notify hub
+      const ok = await persistSelection()
+      if (ok) { setJustSaved(true); onPlanSaved?.() } // success → show completion state + notify hub
       setDry(null); setManualSel(new Set()); setRecSel(new Set())
       await loadSaved()
     } finally {
       setSaving(false)
     }
-  }, [projectId, topic, saving, dry, manualSel, recSel, loadSaved, t.saveError, onPlanSaved])
+  }, [topic, saving, persistSelection, loadSaved, onPlanSaved])
+
+  // Phase 3F.3.6 (Part G) — streamlined: save the current plan AND add the topic to
+  // the publishing queue in one action, then close. Only shown when the parent
+  // provides an enqueue handler.
+  const saveAndQueue = useCallback(async () => {
+    if (!topic || saving || savingQueue || !onSaveAndQueue) return
+    setSavingQueue(true); setError(null)
+    try {
+      const ok = await persistSelection()
+      if (!ok) return
+      onPlanSaved?.()
+      const queued = await onSaveAndQueue(topic.id)
+      setManualSel(new Set()); setRecSel(new Set())
+      if (queued) { onClose() }
+      else { setJustSaved(true); await loadSaved() } // saved but not queued → show completion + manual queue
+    } finally {
+      setSavingQueue(false)
+    }
+  }, [topic, saving, savingQueue, onSaveAndQueue, persistSelection, onPlanSaved, onClose, loadSaved])
 
   const setLinkStatus = useCallback(async (linkId: string, status: 'approved' | 'rejected') => {
     if (busyLink) return
@@ -346,8 +375,12 @@ export default function TopicPlanDrawer({
 
         {/* Actions — all manual */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={runPlan} loading={running} disabled={running}>{running ? t.running : t.runPlan}</Button>
-          <Button size="sm" onClick={savePlan} loading={saving} disabled={saving}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
+          <Button size="sm" variant="outline" onClick={runPlan} loading={running} disabled={running || savingQueue}>{running ? t.running : t.runPlan}</Button>
+          <Button size="sm" onClick={savePlan} loading={saving} disabled={saving || savingQueue}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
+          {/* Phase 3F.3.6 (Part G) — streamlined save + enqueue in one click. */}
+          {onSaveAndQueue && (
+            <Button size="sm" onClick={saveAndQueue} loading={savingQueue} disabled={saving || savingQueue}>{savingQueue ? t.savingQueue : t.saveAndQueue}</Button>
+          )}
           {hasUnsavedChanges && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">{t.unsavedChanges}</span>}
         </div>
 
@@ -379,7 +412,28 @@ export default function TopicPlanDrawer({
                 ) : (
                   <>
                     <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">{t.recommendedCheckNote}</p>
-                    <div className="space-y-1.5">{dry.selected.map((d) => recommendedRow(d))}</div>
+                    {(() => {
+                      // Phase 3F.3.6 — primary commercial link first, supporting below.
+                      const money = dry.moneyTargetUrl ? dry.selected.find((d) => d.targetUrl === dry.moneyTargetUrl) : null
+                      const supporting = dry.selected.filter((d) => !money || d.targetUrl !== money.targetUrl)
+                      return (
+                        <>
+                          {money && (
+                            <div className="mb-2">
+                              <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 mb-0.5">{t.primaryCommercialLink}</div>
+                              {recommendedRow(money)}
+                            </div>
+                          )}
+                          {!money && <p className="mb-1 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
+                          {supporting.length > 0 && (
+                            <>
+                              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">{t.supportingLinks}</div>
+                              <div className="space-y-1.5">{supporting.map((d) => recommendedRow(d))}</div>
+                            </>
+                          )}
+                        </>
+                      )
+                    })()}
                   </>
                 )}
 
