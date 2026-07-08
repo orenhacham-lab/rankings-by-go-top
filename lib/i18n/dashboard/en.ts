@@ -371,6 +371,11 @@ export const dashboardEn = {
       blockedTitle: 'Blocked — cannot be approved',
       manualBadge: 'Manual approval',
       techDetails: 'Technical details',
+      // Phase 3F.3.4 — target-type labels (subtle metadata).
+      typeCategory: 'Product category',
+      typeProduct: 'Product',
+      typeArticle: 'Article',
+      typePage: 'Page',
       savedStatus: 'Saved status',
       confidence: 'conf',
       approve: 'Approve',

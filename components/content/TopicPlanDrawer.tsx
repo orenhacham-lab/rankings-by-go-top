@@ -227,12 +227,17 @@ export default function TopicPlanDrawer({
     </div>
   )
 
+  const typeLabel = (priority: string): string =>
+    priority === 'commercial_category_or_service_hub' ? t.typeCategory
+      : priority === 'product_or_specific_offer' ? t.typeProduct
+        : priority === 'post_or_article' ? t.typeArticle
+          : t.typePage
   const dryItemRow = (d: DryItem, rejected: boolean) => (
     <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2 text-[11px]">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-slate-800 dark:text-slate-100 font-medium">{d.anchorText || '—'}</span>
+        <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
         <span className="text-slate-400">{t.confidence} {d.confidence}</span>
-        <span className="text-slate-400">{d.targetPriority}</span>
       </div>
       <div className="mt-0.5 text-slate-500 dark:text-slate-400">
         <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:underline">{d.targetTitle || d.targetUrl}</a>

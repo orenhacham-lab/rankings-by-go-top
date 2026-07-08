@@ -456,6 +456,23 @@ export async function getCategories(creds: WordPressCredentials): Promise<WordPr
   }))
 }
 
+/**
+ * Read-only: fetch taxonomy TERMS (name + public URL + product count) for a REST
+ * base — e.g. 'product_cat' (WooCommerce product categories) or 'categories'.
+ * Ordered by product count desc so the most important hubs come first. Returns
+ * [] gracefully when the taxonomy isn't exposed via REST (404) or on any error.
+ */
+export async function getTaxonomyTerms(creds: WordPressCredentials, base: string): Promise<{ name: string; link: string; count: number }[]> {
+  try {
+    const rows = await wpGet<any[]>(creds, `/${base}?per_page=100&orderby=count&order=desc`)
+    return (Array.isArray(rows) ? rows : [])
+      .map((r) => ({ name: String(r?.name ?? '').trim(), link: String(r?.link ?? '').trim(), count: typeof r?.count === 'number' ? r.count : 0 }))
+      .filter((r) => r.name && r.link)
+  } catch {
+    return []
+  }
+}
+
 export async function getTags(creds: WordPressCredentials): Promise<WordPressTag[]> {
   const rows = await wpGet<any[]>(creds, '/tags?per_page=100&orderby=name&order=asc')
   return (Array.isArray(rows) ? rows : []).map((t) => ({

@@ -372,6 +372,11 @@ export const dashboardHe = {
       blockedTitle: 'חסומים — לא ניתן לאישור',
       manualBadge: 'אישור ידני',
       techDetails: 'פרטים טכניים',
+      // Phase 3F.3.4 — target-type labels (subtle metadata).
+      typeCategory: 'קטגוריית מוצר',
+      typeProduct: 'מוצר',
+      typeArticle: 'מאמר',
+      typePage: 'עמוד',
       savedStatus: 'סטטוס שמור',
       confidence: 'ביטחון',
       approve: 'אשר',

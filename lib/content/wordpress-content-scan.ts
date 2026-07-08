@@ -13,7 +13,7 @@
  */
 
 import type { WordPressCredentials, WordPressContentItem } from '@/lib/wordpress/types'
-import { getPosts, getPages, getItemContentHtml, getCategories, getTags, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
+import { getPosts, getPages, getItemContentHtml, getCategories, getTags, getTaxonomyTerms, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
 import {
   extractLinkAnchorsFromHtml,
   isInternalUrl,
@@ -663,6 +663,67 @@ function guessType(
   return 'unknown'
 }
 
+const MAX_TAXONOMY_TARGETS = 60
+const taxKey = (u: string) => u.replace(/[?#].*$/, '').replace(/\/+$/, '').toLowerCase()
+
+/**
+ * Phase 3F.3.4 — build internal-link TARGETS directly from the WooCommerce
+ * product-category and blog-category taxonomies, so category/hub pages are
+ * available to the planner even when they are not linked from editorial content
+ * (the most important targets on ecommerce sites). Read-only; best-effort;
+ * excludes anything the existing classifier marks ineligible (cart/checkout/
+ * search/filters/noise). The category NAME is the (usable) anchor + keyword.
+ */
+async function buildTaxonomyTargets(creds: WordPressCredentials, existing: Set<string>, note: (m: string) => void): Promise<ScannedTarget[]> {
+  const out: ScannedTarget[] = []
+  const seen = new Set(existing)
+  const bases: { base: string; wpType: string }[] = [
+    { base: 'product_cat', wpType: 'product_cat' },
+    { base: 'categories', wpType: 'category' },
+  ]
+  for (const { base, wpType } of bases) {
+    let terms: { name: string; link: string; count: number }[] = []
+    try { terms = await getTaxonomyTerms(creds, base) } catch { terms = [] }
+    for (const term of terms) {
+      if (out.length >= MAX_TAXONOMY_TARGETS) break
+      const key = taxKey(term.link)
+      if (!key || seen.has(key)) continue
+      const cls = classifyTarget(term.link, term.name, wpType)
+      if (cls.eligibility === 'no') continue
+      seen.add(key)
+      const anchor: ScannedAnchor = { text: term.name, count: term.count || 0, usability: 'yes', reason: 'taxonomy_term_name' }
+      out.push({
+        targetUrl: term.link,
+        targetType: cls.targetType,
+        targetTitle: term.name,
+        inboundLinkCount: 0,
+        eligibility: cls.eligibility,
+        eligibilityReason: cls.reason,
+        targetRole: cls.targetRole,
+        targetPriority: cls.targetPriority,
+        keywordSource: 'title',
+        primaryKeywordCandidate: term.name,
+        // Not a reliable focus keyword (a taxonomy name), so it does NOT feed the
+        // exact-keyword guard — but it IS a usable ANCHOR (below).
+        keywordAvailable: false,
+        usableAnchorsCount: 1,
+        cautionAnchorsCount: 0,
+        rejectedAnchorsCount: 0,
+        onlyGenericAnchors: false,
+        usableAnchors: [anchor],
+        cautionAnchors: [],
+        rejectedAnchors: [],
+        exampleSources: [],
+        matchedGeneratedArticleId: null,
+        matchedGeneratedArticleTitle: null,
+        contentSkipped: false,
+      })
+    }
+  }
+  if (out.length > 0) note(`Added ${out.length} category/product-category target(s) from the site taxonomy.`)
+  return out
+}
+
 export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanOptions = {}): Promise<SiteScanReport> {
   const startedAt = Date.now()
   const notes: string[] = []
@@ -931,6 +992,12 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     // Linked targets first; among equal inbound, content-readable before skipped.
     .sort((a, b) => b.inboundLinkCount - a.inboundLinkCount || Number(a.contentSkipped) - Number(b.contentSkipped))
 
+  // Phase 3F.3.4 — augment with taxonomy (category / product-category) targets,
+  // reserving cap slots so these high-value hubs are never dropped by TOP_TARGETS.
+  const taxTargets = await buildTaxonomyTargets(creds, new Set(targetList.map((t) => taxKey(t.targetUrl))), (m) => notes.push(m))
+  const contentCap = Math.max(0, TOP_TARGETS - taxTargets.length)
+  const finalTargets = [...targetList.slice(0, contentCap), ...taxTargets]
+
   return {
     siteUrl: creds.siteUrl,
     hosts,
@@ -950,18 +1017,18 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     internalLinksExtracted,
     externalOrRejected,
     rejectedReasons,
-    uniqueTargets: targetList.length,
-    targetsWithUsableAnchors: targetList.filter((t) => t.usableAnchorsCount > 0).length,
-    targetsGenericOnly: targetList.filter((t) => t.onlyGenericAnchors).length,
-    targetsEligible: targetList.filter((t) => t.eligibility === 'yes').length,
-    targetsEligibilityCaution: targetList.filter((t) => t.eligibility === 'caution').length,
-    targetsIneligible: targetList.filter((t) => t.eligibility === 'no').length,
+    uniqueTargets: finalTargets.length,
+    targetsWithUsableAnchors: finalTargets.filter((t) => t.usableAnchorsCount > 0).length,
+    targetsGenericOnly: finalTargets.filter((t) => t.onlyGenericAnchors).length,
+    targetsEligible: finalTargets.filter((t) => t.eligibility === 'yes').length,
+    targetsEligibilityCaution: finalTargets.filter((t) => t.eligibility === 'caution').length,
+    targetsIneligible: finalTargets.filter((t) => t.eligibility === 'no').length,
     ecommerceActionLinksRejected: rejectedReasons.ecommerce_action,
     wordpressApiUrlsRejected: rejectedReasons.wordpress_api,
-    utilityTargetsIneligible: targetList.filter((t) => t.targetRole === 'utility_system').length,
+    utilityTargetsIneligible: finalTargets.filter((t) => t.targetRole === 'utility_system').length,
     productCardNoiseAnchorsRejected: targetList.reduce((n, t) => n + t.rejectedAnchors.filter((a) => a.reason === 'product_card_noise' || a.reason === 'too_long_product_card').length, 0),
     seoFocusKeywordsFound,
-    targets: targetList.slice(0, TOP_TARGETS),
+    targets: finalTargets,
     sampleLinks,
     notes,
     errors,

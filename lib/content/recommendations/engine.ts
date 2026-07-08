@@ -441,5 +441,13 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     })
   enriched.sort((a, b) => b.suggestionScore - a.suggestionScore)
 
+  // Phase 3F.3.4 — link-target diagnostics (dev only): how many category / product
+  // targets the planner had to work with (QA can see if ecommerce hubs exist).
+  if (process.env.NODE_ENV !== 'production' && meta.debug) {
+    const byType: Record<string, number> = { category: 0, product: 0, post: 0, page: 0, tag: 0, unknown: 0 }
+    for (const t of planTargets) byType[t.targetType] = (byType[t.targetType] ?? 0) + 1
+    meta.debug = { ...meta.debug, linkTargetTypes: byType, eligibleLinkTargets: planTargets.filter((t) => t.eligibility === 'yes').length, productCategoryTargetCount: byType.category, productTargetCount: byType.product }
+  }
+
   return { suggestions: enriched, meta }
 }
