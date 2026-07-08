@@ -30,14 +30,20 @@ export const dashboardEn = {
     autoIdeas: {
       title: 'Automatic article ideas',
       intro: 'We found article ideas from your site data and keyword research. Approve topics now, and next you can add them to an automatic publishing schedule.',
-      // Phase 3F.3.3 — onboarding step block + clearer link/queue copy.
+      // Phase 3F.3.3a — visible onboarding block + truthful two-step copy.
       onboardTitle: 'What happens here?',
+      onboardBody: 'This is where you choose article ideas. After approval, topics move to the ready list, and from there you can add them to the automatic publishing queue.',
       onboardStep1: 'Find article ideas',
       onboardStep2: 'Choose the topics you want',
       onboardStep3: 'Review suggested internal links, if available',
-      onboardStep4: 'Add to the queue — the system will create and publish on schedule',
-      addToQueue: 'Add selected topics to queue',
-      addToQueueHint: 'After approval, the topic will appear below in the article queue.',
+      onboardStep4: 'Approve the topics',
+      onboardStep5: 'Add them to the automatic publishing queue',
+      approveNext: 'Approve topics for the next step',
+      approveNextHint: 'After approval, you can add the topics to the automatic publishing queue.',
+      approvedReady: 'The topics were approved and added to the list of topics ready for publishing. To place them in the automatic workflow queue, click “Add to publishing queue”.',
+      approvedReadyLinks: 'The links you selected were saved as planned links for the approved topics.',
+      approvedReadyNoLinks: 'You can add or edit internal links using the link-planning button.',
+      nextStep: 'Next step: add these topics to the publishing queue',
       linksFoundHint: 'We found internal links that may fit this topic. Keep only the links you want to save to the plan.',
       linksQualityHint: 'Links are suggested only when the system finds a good match from the site. A few relevant links are better than many weak ones.',
       sourceKeyword: 'By keyword',
@@ -93,7 +99,7 @@ export const dashboardEn = {
       createdSkipped: 'Added {n} · {m} already existed',
       nextStepHint: 'Next, you’ll be able to add approved topics to an automatic publishing schedule.',
       addToSchedule: 'Add to publishing queue',
-      approvedCta: '{n} topics approved — add to the publishing queue',
+      approvedCta: '{n} topics approved and ready for publishing.',
     },
     autoSchedule: {
       title: 'Automatic publishing schedule',
@@ -230,11 +236,9 @@ export const dashboardEn = {
     articlesEmptyTitle: 'No articles have been created for this project yet',
     topicsHeading: 'Topics waiting for an article',
     topicsSubtitle: 'Briefs and ideas that have not become an article yet. Once an article is generated, manage it in the articles table above.',
-    // Phase 3F.3.3 — queue clarity + post-approval notice.
-    queueExplain: 'These topics are waiting for article creation. The system will process them according to the project schedule.',
-    queueAddedTitle: 'The topics were added to the article queue. The system will create and publish them according to the configured schedule.',
-    queueLinksSaved: 'Selected internal links were saved as planned links for the approved topics.',
-    queueNoLinks: 'You can add internal links manually using the link planning button.',
+    // Phase 3F.3.3a — truthful ready-list explanation (topics here are approved
+    // but NOT yet in the automatic queue until added).
+    queueExplain: 'These are ready topics waiting for article creation. You can create an article from them, or add them to the automatic publishing queue from "Automatic ideas".',
     internalLinkIndex: {
       title: 'Internal-link index',
       statusReady: 'Index is ready',
@@ -316,13 +320,14 @@ export const dashboardEn = {
       sumLinksApproved: 'Links approved',
     },
     topicPlan: {
-      badgeAction: 'Plan links',
-      badgeNoPlan: 'No plan',
-      badgeZero: 'No planned links',
-      badgePlanned: '{n} planned links',
-      badgePlannedOne: '1 planned link',
+      badgeAction: 'Add internal links',
+      badgeNoPlan: 'Add internal links',
+      badgeZero: 'Add internal links',
+      badgePlanned: 'Open link planning ({n})',
+      badgePlannedOne: 'Open link planning (1)',
       badgeApproved: '{n} approved',
       badgeStaleSuffix: '· stale',
+      badgeTooltip: 'Click to add, remove, or edit internal links before the article is created.',
       drawerTitle: 'Internal-link planning',
       primaryKeyword: 'Keyword',
       runPlan: 'Run plan (dry-run)',

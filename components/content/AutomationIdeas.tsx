@@ -59,7 +59,10 @@ export default function AutomationIdeas({
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
   const [lastCreatedIds, setLastCreatedIds] = useState<string[]>([])
+  const [lastLinksSaved, setLastLinksSaved] = useState(false)
   const [scheduling, setScheduling] = useState(false)
+  // Phase 3F.3.3a — the truthful "next step" CTA to scroll into view after approval.
+  const ctaRef = useRef<HTMLDivElement | null>(null)
 
   // Default to the most SEO-grounded source (real Google Ads keyword data).
   const [source, setSource] = useState<Source>('keyword_research_url')
@@ -214,8 +217,9 @@ export default function AutomationIdeas({
         return
       }
       const created = data.created ?? 0
-      const skipped = data.skipped ?? 0
-      setMessage({ text: skipped > 0 ? t.createdSkipped.replace('{n}', String(created)).replace('{m}', String(skipped)) : t.createdToast.replace('{n}', String(created)), ok: true })
+      // Truthful: topics are APPROVED and now in the ready list — NOT yet in the
+      // automatic publishing queue (that's the explicit next-step CTA below).
+      setMessage({ text: t.approvedReady, ok: true })
       // Remove the created ones from the list and refresh the topics table.
       setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
       setSelected(new Set())
@@ -237,8 +241,11 @@ export default function AutomationIdeas({
         ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
         : []
       if (savedPlans.length) onPlansSaved?.(savedPlans)
-      // Phase 3F.3.3 — trigger scroll/highlight/queue-notice for the new rows.
+      setLastLinksSaved(savedPlans.length > 0)
+      // Phase 3F.3.3a — highlight the new "ready" rows in the list, and scroll the
+      // truthful next-step CTA ("add to publishing queue") into view here.
       if (createdTopics.length) onApproved?.({ topicIds: createdTopics.map((tp) => tp.id), plansSaved: savedPlans.length > 0 })
+      window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
       onCreated()
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -293,14 +300,17 @@ export default function AutomationIdeas({
       <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-3">{t.intro}</p>
 
-      {/* Compact onboarding / chronology block (Phase 3F.3.3). */}
-      <div className="mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
-        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{t.onboardTitle}</div>
-        <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-          <li>1. {t.onboardStep1}</li>
-          <li>2. {t.onboardStep2}</li>
-          <li>3. {t.onboardStep3}</li>
-          <li>4. {t.onboardStep4}</li>
+      {/* Onboarding / chronology block (Phase 3F.3.3a) — more visible, explains
+          the two-step flow (approve → add to publishing queue). */}
+      <div className="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-500/10 px-4 py-3">
+        <div className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">{t.onboardTitle}</div>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{t.onboardBody}</p>
+        <ol className="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">1.</span> {t.onboardStep1}</li>
+          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">2.</span> {t.onboardStep2}</li>
+          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">3.</span> {t.onboardStep3}</li>
+          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">4.</span> {t.onboardStep4}</li>
+          <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">5.</span> {t.onboardStep5}</li>
         </ol>
       </div>
 
@@ -390,11 +400,13 @@ export default function AutomationIdeas({
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.noSavedIdeas}</p>
       )}
       {lastCreatedIds.length > 0 && (
-        <div className="mb-3 rounded-lg border border-indigo-300 dark:border-indigo-500/40 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-2.5 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-indigo-800 dark:text-indigo-200 flex-1">
-            {t.approvedCta.replace('{n}', String(lastCreatedIds.length))}
-          </span>
-          <Button onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
+        <div ref={ctaRef} className="mb-3 rounded-lg border-2 border-indigo-400 dark:border-indigo-500/60 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-3 scroll-mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">↓ {t.nextStep}</div>
+          <p className="mt-0.5 text-sm font-medium text-indigo-900 dark:text-indigo-100">{t.approvedCta.replace('{n}', String(lastCreatedIds.length))}</p>
+          <p className="mt-0.5 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">{lastLinksSaved ? t.approvedReadyLinks : t.approvedReadyNoLinks}</p>
+          <div className="mt-2">
+            <Button onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
+          </div>
         </div>
       )}
 
@@ -408,10 +420,10 @@ export default function AutomationIdeas({
             <div className="flex-1" />
             <Button size="sm" variant="outline" onClick={rejectSelected} disabled={selected.size === 0}>{t.rejectSelected}</Button>
             <Button size="sm" onClick={approveSelected} loading={creating} disabled={creating || selected.size === 0}>
-              {creating ? t.creating : `${t.addToQueue}${selected.size > 0 ? ` (${selected.size})` : ''}`}
+              {creating ? t.creating : `${t.approveNext}${selected.size > 0 ? ` (${selected.size})` : ''}`}
             </Button>
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.addToQueueHint}</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.approveNextHint}</p>
 
           <div className="space-y-2">
             {(ideasExpanded ? suggestions : suggestions.slice(0, 3)).map((s) => (

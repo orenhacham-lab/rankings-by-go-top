@@ -23,6 +23,7 @@ interface Strings {
   badgePlannedOne: string
   badgeApproved: string
   badgeStaleSuffix: string
+  badgeTooltip: string
 }
 
 export default function TopicPlanBadge({ summary, onClick, t }: { summary?: TopicPlanSummary; onClick: () => void; t: Strings }) {
@@ -40,7 +41,7 @@ export default function TopicPlanBadge({ summary, onClick, t }: { summary?: Topi
       type="button"
       onClick={onClick}
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${tone}`}
-      title={t.badgeAction}
+      title={t.badgeTooltip}
     >
       🔗 {label}
     </button>
