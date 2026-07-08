@@ -62,7 +62,7 @@ export default function AutomationIdeas({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [ideasExpanded, setIdeasExpanded] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -112,7 +112,7 @@ export default function AutomationIdeas({
         if (data?.error === 'keyword_required') {
           setMessage({ text: t.keywordPlaceholder, ok: false })
         } else {
-          setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error' })
+          setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error', newlyAdded: 0 })
         }
         return
       }
@@ -126,10 +126,12 @@ export default function AutomationIdeas({
         finalCount: data.meta?.finalCount ?? list.length,
         reason: data.meta?.reason,
         keywordResearchFailed: data.meta?.keywordResearchFailed,
+        // This run's NEW additions (not the total pending). Falls back to legacy field.
+        newlyAdded: typeof data.meta?.newlyAddedCount === 'number' ? data.meta.newlyAddedCount : (data.meta?.newlySaved ?? 0),
       })
     } catch {
       if (reqId !== reqRef.current) return
-      setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error' })
+      setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error', newlyAdded: 0 })
     } finally {
       if (reqId === reqRef.current) setLoading(false)
     }
@@ -289,20 +291,28 @@ export default function AutomationIdeas({
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
       )}
-      {/* "All newly generated ideas were already saved/approved/rejected/exist" —
-          shown even when existing pending ideas remain visible below. */}
-      {meta && (meta.reason === 'all_known' || meta.reason === 'kr_all_known' || meta.reason === 'primary_keyword_exists') && (
+      {/* Accurate per-run summary: NEW additions this run vs TOTAL saved shown —
+          never labels the total as "new". */}
+      {meta && suggestions.length > 0 && (
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+          {t.runSummary.replace('{new}', String(meta.newlyAdded)).replace('{total}', String(suggestions.length))}
+        </p>
+      )}
+      {/* When this run added nothing new, explain WHY (existing keywords / all
+          known / keyword-research exhausted) — total pending stays visible above. */}
+      {meta && suggestions.length > 0 && meta.newlyAdded === 0 && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
-          {meta.reason === 'primary_keyword_exists' ? t.primaryKeywordExists : meta.reason === 'kr_all_known' ? t.krAllKnown : t.allKnown}
+          {meta.reason === 'primary_keyword_exists'
+            ? t.primaryKeywordExists
+            : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
+              ? t.krNoNew
+              : meta.reason === 'all_known' || meta.reason === 'no_new'
+                ? t.allKnown
+                : t.noNewThisRun.replace('{total}', String(suggestions.length))}
         </p>
       )}
-      {/* Batch feedback: what was found vs. filtered, or a helpful empty reason. */}
-      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && meta.reason !== 'primary_keyword_exists' && suggestions.length > 0 && (
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
-          {t.foundSummary.replace('{found}', String(suggestions.length)).replace('{skipped}', String(meta.skippedDuplicates))}
-        </p>
-      )}
-      {meta && meta.reason !== 'all_known' && meta.reason !== 'kr_all_known' && meta.reason !== 'primary_keyword_exists' && suggestions.length === 0 && !loading && (
+      {/* Nothing to show at all — helpful empty reason. */}
+      {meta && suggestions.length === 0 && !loading && (
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
           {meta.reason === 'no_scan'
             ? t.noScan
@@ -310,13 +320,17 @@ export default function AutomationIdeas({
               ? t.insufficientScan
               : meta.reason === 'kr_thin' || meta.reason === 'no_keyword_data'
                 ? t.krThin
-                : meta.reason === 'model_error' || meta.reason === 'http_error'
-                  ? t.temporaryError
-                  : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
-                    ? t.researchFailed
-                    : meta.reason === 'all_duplicates'
-                      ? t.allDuplicates
-                      : t.tryOther}
+                : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
+                  ? t.krNoNew
+                  : meta.reason === 'all_known' || meta.reason === 'no_new' || meta.reason === 'primary_keyword_exists'
+                    ? t.allKnown
+                    : meta.reason === 'model_error' || meta.reason === 'http_error'
+                      ? t.temporaryError
+                      : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
+                        ? t.researchFailed
+                        : meta.reason === 'all_duplicates'
+                          ? t.allDuplicates
+                          : t.tryOther}
         </p>
       )}
       {/* No saved ideas yet (fresh project / after clearing all) — calm prompt. */}

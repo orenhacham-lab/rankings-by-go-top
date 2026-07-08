@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     // No ideas table yet (migration not applied): still return the GUARD-FILTERED
     // list session-only, so the keyword guard works even before persistence.
     if (pending === null) {
-      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, newlySaved: fresh.length, filteredExisting, debug: buildDebug({ persisted: false }) } })
+      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting, debug: buildDebug({ persisted: false }) } })
     }
 
     // Phase 3F.3.1c — revalidate ALREADY-PERSISTED pending ideas against the
@@ -94,15 +94,36 @@ export async function POST(request: Request) {
     if (conflictIds.length > 0) await markIdeasDuplicate(auth.admin, auth.project.id, conflictIds)
     const suggestions = visible.map(ideaToSuggestion)
 
-    // Precise "nothing new" reason.
+    // Precise "nothing new this run" reason (accurate whether the model produced
+    // known ideas that were filtered, or produced nothing because avoid-skip
+    // already covered every cluster).
     const allKnownReason = source === 'keyword_research_url' ? 'kr_all_known' : 'all_known'
-    const emptyBecause = filteredPrimaryKeywordExists > 0 && filteredTitleExists === 0 ? 'primary_keyword_exists' : allKnownReason
-    const reason = suggestions.length === 0
-      ? (result.meta.reason ?? (result.suggestions.length > 0 ? emptyBecause : undefined))
-      : (fresh.length === 0 && result.suggestions.length > 0 ? emptyBecause : undefined)
+    const emptyBecause = filteredExisting > 0 && filteredPrimaryKeywordExists > 0 && filteredTitleExists === 0 ? 'primary_keyword_exists' : allKnownReason
+    let reason: string | undefined
+    if (suggestions.length === 0) {
+      reason = result.meta.reason ?? (result.suggestions.length > 0 ? emptyBecause : undefined)
+    } else if (fresh.length === 0) {
+      // Total pending > 0 but this run added nothing new — surface WHY.
+      reason = result.meta.reason ?? (result.suggestions.length > 0 ? emptyBecause : (source === 'keyword_research_url' ? 'kr_no_new' : 'no_new'))
+    }
     return Response.json({
       suggestions,
-      meta: { ...result.meta, persisted: true, newlySaved: fresh.length, filteredExisting, revalidatedHidden: conflictIds.length, pendingCount: suggestions.length, reason, debug: buildDebug({ revalidatedHidden: conflictIds.length }) },
+      meta: {
+        ...result.meta,
+        persisted: true,
+        source,
+        newlyAddedCount: fresh.length,
+        totalPendingCount: suggestions.length,
+        filteredCount: filteredExisting,
+        hiddenDuplicateCount: conflictIds.length,
+        // Back-compat aliases.
+        newlySaved: fresh.length,
+        filteredExisting,
+        revalidatedHidden: conflictIds.length,
+        pendingCount: suggestions.length,
+        reason,
+        debug: buildDebug({ revalidatedHidden: conflictIds.length }),
+      },
     })
   } catch (e) {
     if ((e as { code?: string })?.code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })

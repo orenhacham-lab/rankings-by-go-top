@@ -69,6 +69,10 @@ export const dashboardHe = {
       krAllKnown: 'כל הרעיונות ממחקר הביטויים כבר נשמרו, אושרו או נדחו.',
       krThin: 'מחקר הביטויים החזיר מעט מדי נתונים. נסה להוסיף מילת מפתח התחלתית רחבה יותר.',
       primaryKeywordExists: 'כל הרעיונות שנמצאו משתמשים במילות מפתח שכבר קיימות בפרויקט או באתר.',
+      // Phase 3F.3.1d — accurate per-run counts (new this run vs total saved).
+      runSummary: 'נוספו {new} רעיונות חדשים · {total} רעיונות שמורים להצגה',
+      noNewThisRun: 'יש {total} רעיונות שמורים. לא נמצאו רעיונות חדשים בהרצה הזו.',
+      krNoNew: 'מחקר הביטויים לא מצא רעיונות חדשים מעבר למה שכבר שמור, אושר או נדחה.',
       creating: 'שומר…',
       createdToast: 'נוספו {n} נושאים מאושרים',
       createdSkipped: 'נוספו {n} · {m} כבר היו קיימים',

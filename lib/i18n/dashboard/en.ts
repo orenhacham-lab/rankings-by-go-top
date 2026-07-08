@@ -71,6 +71,10 @@ export const dashboardEn = {
       krAllKnown: 'All keyword-research ideas have already been saved, approved, or rejected.',
       krThin: 'Keyword research returned too little data. Try adding a broader starting keyword.',
       primaryKeywordExists: 'All generated ideas use primary keywords that already exist in the project or site.',
+      // Phase 3F.3.1d — accurate per-run counts (new this run vs total saved).
+      runSummary: 'Added {new} new ideas · {total} saved ideas available',
+      noNewThisRun: '{total} saved ideas are available. No new ideas were added in this run.',
+      krNoNew: 'Keyword research did not find new ideas beyond what is already saved, approved, or rejected.',
       creating: 'Saving…',
       createdToast: 'Added {n} approved topics',
       createdSkipped: 'Added {n} · {m} already existed',
