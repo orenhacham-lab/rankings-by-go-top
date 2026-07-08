@@ -42,6 +42,8 @@ export default function AutomationIdeas({
   onPlansSaved,
   onApproved,
   onReviewLinks,
+  planSavedHint = false,
+  scrollCtaSignal = 0,
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -59,6 +61,10 @@ export default function AutomationIdeas({
   // Phase 3F.3.3b — user asked to review/edit links before enqueue: the hub
   // scrolls to + highlights the approved rows (and hints at "Open link planning").
   onReviewLinks?: (topicIds: string[]) => void
+  // Phase 3F.3.3e — a link plan was saved in the drawer: show a "now add to
+  // queue" note in the CTA; a bumped scrollCtaSignal re-scrolls the CTA in view.
+  planSavedHint?: boolean
+  scrollCtaSignal?: number
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
@@ -115,6 +121,12 @@ export default function AutomationIdeas({
     })()
     return () => { cancelled = true }
   }, [projectId])
+
+  // Phase 3F.3.3e — "return to add to publishing queue" from the drawer bumps
+  // this signal; bring the CTA back into view.
+  useEffect(() => {
+    if (scrollCtaSignal > 0) window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
+  }, [scrollCtaSignal])
 
   const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : s === 'site_scan' ? t.badgeSiteScan : t.badgeResearch)
 
@@ -415,6 +427,9 @@ export default function AutomationIdeas({
           <p className="mt-1 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
             {lastPlansCount === 0 ? t.linkSummaryNone : lastPlansCount >= lastCreatedIds.length ? t.linkSummaryAll : t.linkSummaryMixed}
           </p>
+          {planSavedHint && (
+            <p className="mt-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">{t.planSavedNote}</p>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button onClick={addCreatedToSchedule} loading={scheduling} disabled={scheduling}>{t.addToSchedule}</Button>
             <Button variant="outline" onClick={() => onReviewLinks?.(lastCreatedIds)} disabled={scheduling}>{t.reviewLinksBtn}</Button>

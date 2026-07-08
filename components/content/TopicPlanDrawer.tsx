@@ -63,7 +63,7 @@ const dmkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targ
 export interface DrawerTopic { id: string; topic: string; primary_keyword: string | null }
 
 export default function TopicPlanDrawer({
-  open, onClose, projectId, topic, language, onStatusChange,
+  open, onClose, projectId, topic, language, onStatusChange, onReturnToQueue, onPlanSaved,
 }: {
   open: boolean
   onClose: () => void
@@ -71,6 +71,9 @@ export default function TopicPlanDrawer({
   topic: DrawerTopic | null
   language: 'he' | 'en'
   onStatusChange?: (topicId: string, summary: TopicPlanSummary) => void
+  // Phase 3F.3.3e — completion actions that guide the user back to the queue.
+  onReturnToQueue?: () => void
+  onPlanSaved?: () => void
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.topicPlan, [language])
   const [loading, setLoading] = useState(false)
@@ -81,6 +84,7 @@ export default function TopicPlanDrawer({
   const [manualSel, setManualSel] = useState<Set<string>>(new Set())
   const [running, setRunning] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const [busyLink, setBusyLink] = useState<string | null>(null)
   // Guards against the /plan/saved refetch loop: reqIdRef ignores stale
   // responses; abortRef cancels an in-flight load when topic/open changes.
@@ -133,14 +137,14 @@ export default function TopicPlanDrawer({
   // retrigger it. Cleanup aborts any in-flight request on topic/open change.
   useEffect(() => {
     if (!open || !topic) return
-    setDry(null)
+    setDry(null); setJustSaved(false)
     loadSavedRef.current()
     return () => { abortRef.current?.abort() }
   }, [open, projectId, topic?.id])
 
   const runPlan = useCallback(async () => {
     if (!topic || running) return
-    setRunning(true); setError(null)
+    setRunning(true); setError(null); setJustSaved(false)
     try {
       const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`)
       const data = await res.json().catch(() => ({}))
@@ -172,12 +176,13 @@ export default function TopicPlanDrawer({
         body: JSON.stringify({ projectId, topicId: topic.id, manualCandidates }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError) }
+      else { setJustSaved(true); onPlanSaved?.() } // success → show completion state + notify hub
       setDry(null); setManualSel(new Set())
       await loadSaved()
     } finally {
       setSaving(false)
     }
-  }, [projectId, topic, saving, dry, manualSel, loadSaved, t.saveError])
+  }, [projectId, topic, saving, dry, manualSel, loadSaved, t.saveError, onPlanSaved])
 
   const setLinkStatus = useCallback(async (linkId: string, status: 'approved' | 'rejected') => {
     if (busyLink) return
@@ -242,6 +247,29 @@ export default function TopicPlanDrawer({
         <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{topic.topic}</p>
         {topic.primary_keyword && <p className="text-xs text-slate-500 dark:text-slate-400">{t.primaryKeyword}: {topic.primary_keyword}</p>}
 
+        {/* Purpose + step hint (Phase 3F.3.3e). */}
+        <div className="mt-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
+          <p className="text-xs text-slate-600 dark:text-slate-300">{t.drawerIntro1}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.drawerIntro2}</p>
+          <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <li>1. {t.step1}</li>
+            <li>2. {t.step2}</li>
+            <li>3. {t.step3}</li>
+            <li>4. {t.step4}</li>
+          </ol>
+        </div>
+
+        {/* Completion state after a successful save. */}
+        {justSaved && (
+          <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5">
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">{t.savedOk}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={() => { onReturnToQueue?.(); onClose() }}>{t.returnToQueue}</Button>
+              <Button size="sm" variant="outline" onClick={() => setJustSaved(false)}>{t.keepEditing}</Button>
+            </div>
+          </div>
+        )}
+
         {/* Warnings */}
         {saved?.stale && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.staleWarn}{saved.staleReasons.length ? ` (${saved.staleReasons.join(', ')})` : ''}</p>}
         {dry?.cacheState === 'missing' && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.cacheMissing}</p>}
@@ -281,15 +309,18 @@ export default function TopicPlanDrawer({
                 {dry.selected.length === 0 ? (
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
                 ) : (
-                  <div className="space-y-1.5">{dry.selected.map((d) => dryItemRow(d, false))}</div>
+                  <>
+                    <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">{t.recommendedAutoNote}</p>
+                    <div className="space-y-1.5">{dry.selected.map((d) => dryItemRow(d, false))}</div>
+                  </>
                 )}
-                {dry.selected.length > 0 && <p className="mt-1 text-[11px] text-slate-400">{t.saveHint}</p>}
 
                 {/* Reviewable — manual-override candidates */}
                 {reviewable.length > 0 && (
                   <details className="mt-3" open={dry.selected.length === 0}>
                     <summary className="cursor-pointer select-none text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</summary>
                     <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableNote}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t.reviewableSelectNote}</p>
                     <div className="mt-1.5 space-y-1.5">
                       {reviewable.map((d, i) => {
                         const k = dmkey(d)

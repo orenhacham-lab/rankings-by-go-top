@@ -37,6 +37,8 @@ export default function TopicsList({
   planStatus: planStatusExternal,
   onPlanStatusChange,
   highlightIds = [],
+  onReturnToQueue,
+  onPlanSaved,
 }: {
   topics: ArticleTopic[]
   projectId?: string
@@ -56,6 +58,9 @@ export default function TopicsList({
   onPlanStatusChange?: (id: string, summary: TopicPlanSummary) => void
   // Phase 3F.3.3 — topic ids to highlight briefly (just added to the queue).
   highlightIds?: string[]
+  // Phase 3F.3.3e — drawer completion callbacks (guide back to the queue CTA).
+  onReturnToQueue?: () => void
+  onPlanSaved?: () => void
 }) {
   const { language } = useDashboardLanguage()
   const c = getDashboardDictionary(language).contentHub
@@ -372,6 +377,8 @@ export default function TopicsList({
           topic={planTopic}
           language={language}
           onStatusChange={handlePlanStatus}
+          onReturnToQueue={onReturnToQueue}
+          onPlanSaved={onPlanSaved}
         />
       )}
     </div>

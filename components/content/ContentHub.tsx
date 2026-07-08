@@ -94,6 +94,10 @@ export default function ContentHub() {
   const scheduleSectionRef = useRef<HTMLDivElement>(null)
   const [highlightTopicIds, setHighlightTopicIds] = useState<string[]>([])
   const [reviewLinksHint, setReviewLinksHint] = useState(false)
+  // Phase 3F.3.3e — a link plan was saved in the drawer; guide the user back to
+  // the "add to publishing queue" CTA (a bumped signal re-scrolls it into view).
+  const [linkPlanSavedHint, setLinkPlanSavedHint] = useState(false)
+  const [ctaScrollSignal, setCtaScrollSignal] = useState(0)
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
   const [automationRefresh, setAutomationRefresh] = useState(0)
   const handleTopicsQueued = useCallback((info: { topicIds: string[] }) => {
@@ -109,8 +113,11 @@ export default function ContentHub() {
   const handleScheduled = useCallback(() => {
     setAutomationRefresh((k) => k + 1)
     setReviewLinksHint(false)
+    setLinkPlanSavedHint(false)
     window.setTimeout(() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }, [])
+  const handleDrawerPlanSaved = useCallback(() => { setLinkPlanSavedHint(true) }, [])
+  const handleReturnToQueue = useCallback(() => { setLinkPlanSavedHint(true); setCtaScrollSignal((n) => n + 1) }, [])
   const [articlesExpanded, setArticlesExpanded] = useState(false) // show first 3 by default
 
   // ── Batch article creation (client-side, sequential) ──
@@ -771,6 +778,8 @@ export default function ContentHub() {
                     onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: true, linkCount: p.linkCount, approvedCount: 0, stale: false }])) }))}
                     onApproved={handleTopicsQueued}
                     onReviewLinks={handleReviewLinks}
+                    planSavedHint={linkPlanSavedHint}
+                    scrollCtaSignal={ctaScrollSignal}
                   />
                   <div ref={scheduleSectionRef} className="scroll-mt-4">
                     <AutomationSchedule
@@ -865,6 +874,8 @@ export default function ContentHub() {
                       planStatus={planStatus}
                       onPlanStatusChange={(id, summary) => setPlanStatus((prev) => ({ ...prev, [id]: summary }))}
                       highlightIds={highlightTopicIds}
+                      onReturnToQueue={handleReturnToQueue}
+                      onPlanSaved={handleDrawerPlanSaved}
                     />
                   </>
                 )}
