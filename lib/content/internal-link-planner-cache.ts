@@ -38,6 +38,8 @@ export const CACHE_PLANNER_RELEVANCE_MIN = 0.3
 // letting an unrelated target through (a matched token is still required).
 export const CACHE_PLANNER_RELEVANCE_MIN_ECOM = 0.22
 export const CACHE_PLANNER_MIN_CONFIDENCE_ECOM = 0.38
+/** Rank-only boost so a strongly-matching category/product outranks related articles. */
+export const COMMERCIAL_TARGET_BOOST = 0.2
 export const CACHE_PLANNER_SELF_SIMILARITY_MAX = 0.85
 export const CACHE_PLANNER_MIN_CONFIDENCE = 0.45
 /** Caution targets (homepage/unknown) must clear a higher bar. */
@@ -268,6 +270,43 @@ function urlSlugTokens(url: string): Set<string> {
   }
 }
 
+// --- Phase 3F.3.4b: conservative curated ecommerce alias groups ---------------
+// Each group lists SPELLING/TRANSLITERATION VARIANTS of the SAME commercial term
+// that Hebrew plural/prefix stemming can't unify (e.g. קטלבלס vs קטלבל — same
+// word, different transliteration; ends in ס so no plural rule applies). Used
+// ONLY to expand the TOPIC-side token set as an additive relevance signal — never
+// a floor override, never fuzzy, never cross-concept (משקולות/weights is a DIFFERENT
+// product than a kettlebell and is deliberately NOT grouped here). Keep tiny and
+// clearly-equivalent; the aggressive stemmer already covers plural/prefix variants.
+const ECOM_ALIAS_GROUPS: string[][] = [
+  ['קטלבל', 'קטלבלס', 'קטלבלים', 'kettlebell'],
+  ['הליכון', 'הליכונים', 'treadmill'],
+  ['פילאטיס', 'pilates'],
+]
+/** canonical stem → the set of equivalent stems in its alias group (computed once). */
+const ECOM_ALIAS_INDEX: Map<string, Set<string>> = (() => {
+  const index = new Map<string, Set<string>>()
+  for (const group of ECOM_ALIAS_GROUPS) {
+    const stems = new Set<string>()
+    for (const term of group) for (const s of normTokens(term)) stems.add(s)
+    for (const s of stems) {
+      const cur = index.get(s) ?? new Set<string>()
+      for (const other of stems) cur.add(other)
+      index.set(s, cur)
+    }
+  }
+  return index
+})()
+/** Expand a normalized token set with curated ecommerce alias variants (additive). */
+function withAliases(tokenSet: Set<string>): Set<string> {
+  let expanded: Set<string> | null = null
+  for (const tk of tokenSet) {
+    const grp = ECOM_ALIAS_INDEX.get(tk)
+    if (grp) { if (!expanded) expanded = new Set(tokenSet); for (const a of grp) expanded.add(a) }
+  }
+  return expanded ?? tokenSet
+}
+
 /**
  * Plan internal links for ONE topic against the project's CACHED targets. Pure.
  */
@@ -278,8 +317,8 @@ export function planFromCachedTargets(
   opts: { allowCaution?: boolean } = {},
 ): CacheTopicPlan {
   const allowCaution = opts.allowCaution === true
-  const topicTokens = normTokens([topic.primaryKeyword ?? '', topic.title, ...(topic.secondaryKeywords ?? [])].join(' '))
-  const topicKeyTokens = normTokens(topic.primaryKeyword || topic.title)
+  const topicTokens = withAliases(normTokens([topic.primaryKeyword ?? '', topic.title, ...(topic.secondaryKeywords ?? [])].join(' ')))
+  const topicKeyTokens = withAliases(normTokens(topic.primaryKeyword || topic.title))
 
   const scored: CachePlannedLink[] = []
 
@@ -346,7 +385,14 @@ export function planFromCachedTargets(
     const priorityBonus = PRIORITY_BONUS[t.targetPriority] ?? 0
     const kwBonus = t.keywordAvailable ? 0.1 : 0
     const anchorBonus = anchor?.source === 'usable_anchor' ? 0.1 : 0
-    const confidence = round2(clamp01(relevance + priorityBonus + kwBonus + anchorBonus))
+    // Phase 3F.3.4b — MONEY-TARGET boost: a category/product target that matches
+    // the topic's PRIMARY-KEYWORD tokens (not just a peripheral title word) is the
+    // best commercial destination, so lift it above merely-related articles. Only
+    // when there is a real key-token match — never forces unrelated commerce.
+    const isCommercialTarget = t.targetType === 'category' || t.targetType === 'product'
+    const keyMatched = matchedTokens.filter((x) => topicKeyTokens.has(x))
+    const commercialBoost = (isCommercialTarget && keyMatched.length >= 1) ? COMMERCIAL_TARGET_BOOST : 0
+    const confidence = round2(clamp01(relevance + priorityBonus + kwBonus + anchorBonus + commercialBoost))
     const minConf = t.eligibility === 'caution'
       ? CACHE_PLANNER_CAUTION_MIN_CONFIDENCE
       : ecomBoost ? CACHE_PLANNER_MIN_CONFIDENCE_ECOM : CACHE_PLANNER_MIN_CONFIDENCE
@@ -354,7 +400,7 @@ export function planFromCachedTargets(
 
     const selected = rejectedReasons.length === 0
     const reason = selected
-      ? `relevance ${relevance} (${relevanceMethod}) + priority ${priorityBonus >= 0 ? '+' : ''}${priorityBonus} (${t.targetPriority}); anchor "${anchor!.text}" from ${anchor!.source} (confidence ${confidence})`
+      ? `relevance ${relevance} (${relevanceMethod}) + priority ${priorityBonus >= 0 ? '+' : ''}${priorityBonus} (${t.targetPriority})${commercialBoost ? ` + commercial ${commercialBoost} [${t.targetType}, key: ${keyMatched.join(', ')}]` : ''}; anchor "${anchor!.text}" from ${anchor!.source} (confidence ${confidence})`
       : ''
 
     scored.push({

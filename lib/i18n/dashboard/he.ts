@@ -354,6 +354,10 @@ export const dashboardHe = {
       step4: 'חזור להוספה לתור הפרסום',
       recommendedAutoNote: 'אלה הקישורים שהמערכת ממליצה עליהם. הם יישמרו לתכנון בלחיצה על ״שמור את תכנון הקישורים״.',
       reviewableSelectNote: 'סמן קישורים נוספים; הם יתווספו לתכנון בלחיצה על ״שמור״.',
+      // Phase 3F.3.4b — recommended links are checked by default and saved on Save.
+      recommendedCheckNote: 'הקישורים המומלצים מסומנים לתכנון. בטל סימון כדי להסיר, ולחץ ״שמור את תכנון הקישורים״.',
+      alreadyInPlan: 'כבר בתכנון',
+      unsavedChanges: 'יש שינויים שלא נשמרו — לחץ ״שמור את תכנון הקישורים״.',
       savedOk: 'התכנון נשמר',
       savedBody: 'הקישורים נשמרו כתכנון למאמר. עכשיו אפשר לחזור ולהוסיף את הנושא לתור הפרסום.',
       returnToQueue: 'חזור להוספה לתור הפרסום',

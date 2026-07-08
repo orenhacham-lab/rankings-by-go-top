@@ -151,12 +151,19 @@ export function previewPlannerLinks(topic: TopicForPlan, targets: ScannedTarget[
     const byType: Record<string, number> = { category: 0, product: 0, post: 0, page: 0, tag: 0, unknown: 0 }
     for (const t of targets) byType[t.targetType] = (byType[t.targetType] ?? 0) + 1
     const commerce = byType.category + byType.product
+    const commercialType = (priority: string): string => priority === 'commercial_category_or_service_hub' ? 'category' : priority === 'product_or_specific_offer' ? 'product' : 'article_fallback'
     const debug = devDebug ? {
       title: topic.title, primaryKeyword: topic.primaryKeyword,
       eligibleTargets: targets.filter((t) => t.eligibility === 'yes').length, targetTypes: byType,
       topCandidates: [...plan.selected, ...plan.rejected]
         .sort((a, b) => b.confidence - a.confidence).slice(0, 10)
-        .map((c) => ({ title: c.targetTitle, url: c.targetUrl, priority: c.targetPriority, score: c.confidence, relevance: c.relevance, selected: c.selected, rejected: c.rejectedReasons })),
+        .map((c) => ({
+          title: c.targetTitle, url: c.targetUrl, priority: c.targetPriority, score: c.confidence, relevance: c.relevance,
+          isCommercialTarget: c.targetPriority === 'commercial_category_or_service_hub' || c.targetPriority === 'product_or_specific_offer',
+          commercialMatchType: c.reason.includes('commercial') ? (c.targetPriority === 'product_or_specific_offer' ? 'exact_product' : 'exact_category') : commercialType(c.targetPriority),
+          commercialBoostApplied: c.reason.includes('commercial'),
+          matchedTerms: c.matchedTokens, selected: c.selected, rejected: c.rejectedReasons,
+        })),
       finalCount: links.length,
     } : undefined
     if (links.length) return { links, debug }

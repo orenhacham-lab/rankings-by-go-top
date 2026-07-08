@@ -82,6 +82,8 @@ export default function TopicPlanDrawer({
   const [dry, setDry] = useState<{ selected: DryItem[]; rejected: DryItem[]; summary: string; cacheState: string; warnings: string[] } | null>(null)
   // Manually-selected reviewable candidates for the current dry-run (mkey set).
   const [manualSel, setManualSel] = useState<Set<string>>(new Set())
+  // Phase 3F.3.4b — recommended links CHECKED for the plan (default all checked).
+  const [recSel, setRecSel] = useState<Set<string>>(new Set())
   const [running, setRunning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
@@ -131,6 +133,8 @@ export default function TopicPlanDrawer({
   // source of the /plan/saved refetch loop.
   const loadSavedRef = useRef(loadSaved)
   loadSavedRef.current = loadSaved
+  // Stable pointer to the latest runPlan for the auto-preview effect (Phase 3F.3.4b).
+  const runPlanRef = useRef<() => void>(() => {})
 
   // Load the saved plan exactly once per (open, project, topic). Depends only on
   // primitives — parent re-renders / callback-identity churn can no longer
@@ -139,6 +143,9 @@ export default function TopicPlanDrawer({
     if (!open || !topic) return
     setDry(null); setJustSaved(false)
     loadSavedRef.current()
+    // Phase 3F.3.4b — auto-preview recommended links so they are always visible
+    // and directly checkable (no need to click "find recommended" first).
+    runPlanRef.current()
     return () => { abortRef.current?.abort() }
   }, [open, projectId, topic?.id])
 
@@ -150,9 +157,11 @@ export default function TopicPlanDrawer({
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setDry({ selected: [], rejected: [], summary: '', cacheState: data.cacheState || 'missing', warnings: data.warnings || [data.warning].filter(Boolean) }); return }
       const plan = Array.isArray(data.topics) ? data.topics[0] : null
+      const selected: DryItem[] = plan?.selected ?? []
       setManualSel(new Set())
+      setRecSel(new Set(selected.map((d) => dmkey(d)))) // recommended default-checked
       setDry({
-        selected: plan?.selected ?? [],
+        selected,
         rejected: plan?.rejected ?? [],
         summary: plan?.summary ?? '',
         cacheState: data.cacheState || 'ok',
@@ -162,27 +171,42 @@ export default function TopicPlanDrawer({
       setRunning(false)
     }
   }, [projectId, topic, running])
+  // Keep the auto-preview effect pointing at the latest runPlan (Phase 3F.3.4b).
+  runPlanRef.current = runPlan
 
   const savePlan = useCallback(async () => {
     if (!topic || saving) return
     setSaving(true); setError(null)
-    // Include server-revalidated manual reviewable overrides picked in this dry-run.
-    const manualCandidates = (dry?.rejected ?? [])
-      .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && r.anchorText)
-      .map((r) => ({ targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
     try {
-      const res = await fetch('/api/content/automation/internal-links/plan/save', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicId: topic.id, manualCandidates }),
-      })
+      // Phase 3F.3.4b — persist the EXACT checked selection (recommended + manual)
+      // via the exact-mode bulk-save. When no dry-run is loaded, fall back to the
+      // legacy /plan/save (re-runs the planner and saves all recommended links).
+      let res: Response
+      if (dry) {
+        const recommended = dry.selected
+          .filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
+          .map((d) => ({ topicId: topic.id, targetUrl: d.targetUrl, anchorText: d.anchorText as string }))
+        const manual = dry.rejected
+          .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
+          .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
+        res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve: false }),
+        })
+      } else {
+        res = await fetch('/api/content/automation/internal-links/plan/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, topicId: topic.id }),
+        })
+      }
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError) }
       else { setJustSaved(true); onPlanSaved?.() } // success → show completion state + notify hub
-      setDry(null); setManualSel(new Set())
+      setDry(null); setManualSel(new Set()); setRecSel(new Set())
       await loadSaved()
     } finally {
       setSaving(false)
     }
-  }, [projectId, topic, saving, dry, manualSel, loadSaved, t.saveError, onPlanSaved])
+  }, [projectId, topic, saving, dry, manualSel, recSel, loadSaved, t.saveError, onPlanSaved])
 
   const setLinkStatus = useCallback(async (linkId: string, status: 'approved' | 'rejected') => {
     if (busyLink) return
@@ -232,6 +256,39 @@ export default function TopicPlanDrawer({
       : priority === 'product_or_specific_offer' ? t.typeProduct
         : priority === 'post_or_article' ? t.typeArticle
           : t.typePage
+  // Keys already persisted in the saved plan → "already in plan" state on rows.
+  const savedKeys = new Set((saved?.links ?? []).map((l) => dmkey({ targetUrl: l.target_url, anchorText: l.anchor_text })))
+  // How many recommended + manual links are checked, and whether the checked set
+  // differs from what's already saved (→ the save button becomes primary/active).
+  const checkedRecommended = (dry?.selected ?? []).filter((d) => recSel.has(dmkey(d)) && (d.anchorText || '').trim())
+  const checkedManual = (dry?.rejected ?? []).filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
+  const checkedCount = checkedRecommended.length + checkedManual.length
+  const checkedKeys = new Set([...checkedRecommended, ...checkedManual].map((d) => dmkey(d)))
+  const hasUnsavedChanges = !!dry && !justSaved && (
+    checkedKeys.size !== savedKeys.size || [...checkedKeys].some((k) => !savedKeys.has(k))
+  )
+
+  // Recommended link row with a checkbox (default checked). Unchecking removes it
+  // from the plan that will be saved; already-persisted links are flagged.
+  const recommendedRow = (d: DryItem) => {
+    const k = dmkey(d)
+    const inPlan = savedKeys.has(k)
+    return (
+      <label key={`${d.targetUrl}-rec-${d.anchorText}`} className="flex flex-wrap items-start gap-2 rounded-lg border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-900/10 p-2 text-[11px] cursor-pointer">
+        <input type="checkbox" checked={recSel.has(k)} onChange={() => setRecSel((prev) => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })} className="mt-0.5 accent-emerald-600" />
+        <span className="flex-1 min-w-0">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{d.anchorText || '—'}</span>
+            <Badge variant="neutral">{typeLabel(d.targetPriority)}</Badge>
+            {inPlan ? <Badge variant="success">{t.alreadyInPlan}</Badge> : null}
+            <span className="text-slate-400">{t.confidence} {d.confidence}</span>
+          </span>
+          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{d.targetTitle || d.targetUrl}</a>
+        </span>
+      </label>
+    )
+  }
+
   const dryItemRow = (d: DryItem, rejected: boolean) => (
     <div key={`${d.targetUrl}-${d.anchorText}`} className="rounded-lg border border-slate-100 dark:border-slate-800 p-2 text-[11px]">
       <div className="flex flex-wrap items-center gap-2">
@@ -290,7 +347,8 @@ export default function TopicPlanDrawer({
         {/* Actions — all manual */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={runPlan} loading={running} disabled={running}>{running ? t.running : t.runPlan}</Button>
-          <Button size="sm" onClick={savePlan} loading={saving} disabled={saving}>{saving ? t.saving : (saved?.exists ? t.regenerate : t.savePlan)}</Button>
+          <Button size="sm" onClick={savePlan} loading={saving} disabled={saving}>{saving ? t.saving : (dry ? `${t.savePlan}${checkedCount ? ` (${checkedCount})` : ''}` : t.savePlan)}</Button>
+          {hasUnsavedChanges && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">{t.unsavedChanges}</span>}
         </div>
 
         {loading ? (
@@ -320,8 +378,8 @@ export default function TopicPlanDrawer({
                   <p className="text-xs text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
                 ) : (
                   <>
-                    <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">{t.recommendedAutoNote}</p>
-                    <div className="space-y-1.5">{dry.selected.map((d) => dryItemRow(d, false))}</div>
+                    <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">{t.recommendedCheckNote}</p>
+                    <div className="space-y-1.5">{dry.selected.map((d) => recommendedRow(d))}</div>
                   </>
                 )}
 

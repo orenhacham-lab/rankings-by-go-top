@@ -354,6 +354,10 @@ export const dashboardEn = {
       step4: 'Return to adding the topic to the publishing queue',
       recommendedAutoNote: 'These are recommended links. They are saved to the plan when you click “Save link plan”.',
       reviewableSelectNote: 'Select more links; they are added to the plan when you click “Save”.',
+      // Phase 3F.3.4b — recommended links are checked by default and saved on Save.
+      recommendedCheckNote: 'Recommended links are checked and will be added to the plan. Uncheck to remove, then click “Save link plan”.',
+      alreadyInPlan: 'Already in plan',
+      unsavedChanges: 'Unsaved changes — click “Save link plan”.',
       savedOk: 'Link plan saved',
       savedBody: 'The links were saved as a plan for the article. You can now return and add the topic to the publishing queue.',
       returnToQueue: 'Return to add to publishing queue',
