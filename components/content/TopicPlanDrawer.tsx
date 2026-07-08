@@ -247,26 +247,31 @@ export default function TopicPlanDrawer({
         <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{topic.topic}</p>
         {topic.primary_keyword && <p className="text-xs text-slate-500 dark:text-slate-400">{t.primaryKeyword}: {topic.primary_keyword}</p>}
 
-        {/* Purpose + step hint (Phase 3F.3.3e). */}
-        <div className="mt-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
-          <p className="text-xs text-slate-600 dark:text-slate-300">{t.drawerIntro1}</p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.drawerIntro2}</p>
-          <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-            <li>1. {t.step1}</li>
-            <li>2. {t.step2}</li>
-            <li>3. {t.step3}</li>
-            <li>4. {t.step4}</li>
-          </ol>
-        </div>
-
-        {/* Completion state after a successful save. */}
+        {/* Persistent completion state after a successful save (Phase 3F.3.3f) —
+            placed at the top so it is always visible, and stays until the user
+            returns / keeps editing / closes / starts a new search. */}
         {justSaved && (
-          <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5">
-            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">{t.savedOk}</p>
+          <div className="mt-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-3">
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">✓ {t.savedOk}</p>
+            <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.savedBody}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={() => { onReturnToQueue?.(); onClose() }}>{t.returnToQueue}</Button>
               <Button size="sm" variant="outline" onClick={() => setJustSaved(false)}>{t.keepEditing}</Button>
             </div>
+          </div>
+        )}
+
+        {/* Purpose + step hint (hidden once saved, to keep the completion clear). */}
+        {!justSaved && (
+          <div className="mt-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
+            <p className="text-xs text-slate-600 dark:text-slate-300">{t.drawerIntro1}</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.drawerIntro2}</p>
+            <ol className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <li>1. {t.step1}</li>
+              <li>2. {t.step2}</li>
+              <li>3. {t.step3}</li>
+              <li>4. {t.step4}</li>
+            </ol>
           </div>
         )}
 

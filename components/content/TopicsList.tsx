@@ -293,11 +293,14 @@ export default function TopicsList({
                       {/* Primary action: create OR edit the article. */}
                       {articleByTopic[topic.id] ? (
                         <Link href={`/content/articles/${articleByTopic[topic.id].id}`}>
-                          <Button size="sm" variant="outline">{c.openArticle}</Button>
+                          <Button size="sm" variant="outline" className="h-7 whitespace-nowrap shadow-sm hover:translate-y-0">{c.openArticle}</Button>
                         </Link>
                       ) : (
+                        // Flatten the primary button's lift/shadow so it aligns with the
+                        // outline link-planning + open buttons as equal row actions.
                         <Button
                           size="sm"
+                          className="h-7 whitespace-nowrap shadow-sm hover:translate-y-0 hover:shadow-md"
                           onClick={() => createArticle(topic.id)}
                           loading={creatingId === topic.id}
                           disabled={busy || creatingId === topic.id || batchRunning}
