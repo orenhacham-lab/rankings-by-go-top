@@ -54,6 +54,7 @@ export const dashboardEn = {
       intentLabel: 'Search intent',
       reasonLabel: 'Why suggested',
       internalLinksLabel: 'Suggested internal links',
+      linksSelectHint: 'Links selected here will be saved as the link plan after the idea is approved.',
       badgeKeyword: 'Keyword',
       badgeProject: 'Project data',
       badgeResearch: 'Keyword research',

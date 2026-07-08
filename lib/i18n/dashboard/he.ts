@@ -52,6 +52,7 @@ export const dashboardHe = {
       intentLabel: 'כוונת חיפוש',
       reasonLabel: 'למה הוצע',
       internalLinksLabel: 'קישורים פנימיים מוצעים',
+      linksSelectHint: 'הקישורים שתסמן כאן יישמרו כתכנון קישורים לאחר אישור הנושא.',
       badgeKeyword: 'מילת מפתח',
       badgeProject: 'נתוני הפרויקט',
       badgeResearch: 'מחקר ביטויים',

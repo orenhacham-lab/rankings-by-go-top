@@ -66,6 +66,19 @@ export default function AutomationIdeas({
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
+  // Phase 3F.3.2 — per-idea suggested-link selection (keyed by suggestion id →
+  // set of selected link URLs). Undefined for an idea means "all checked".
+  const [linkSel, setLinkSel] = useState<Record<string, Set<string>>>({})
+  const isLinkChecked = (s: Suggestion, url: string) => { const set = linkSel[s.id]; return set ? set.has(url) : true }
+  const toggleLink = (s: Suggestion, url: string) => {
+    setLinkSel((prev) => {
+      const current = prev[s.id] ?? new Set(s.suggestedInternalLinks.map((l) => l.url))
+      const next = new Set(current)
+      next.has(url) ? next.delete(url) : next.add(url)
+      return { ...prev, [s.id]: next }
+    })
+  }
+  const selectedLinksFor = (s: Suggestion) => s.suggestedInternalLinks.filter((l) => isLinkChecked(s, l.url))
 
   // Load the project's previously-saved PENDING ideas so they appear without the
   // user clicking generate again (survives page refresh). Best-effort/read-only.
@@ -177,12 +190,15 @@ export default function AutomationIdeas({
     if (creating) return
     const chosen = suggestions.filter((s) => selected.has(s.id))
     if (chosen.length === 0) return
+    // Phase 3F.3.2 — attach each idea's CHECKED suggested links so they become the
+    // new topic's planned link set (server re-validates; unchecked are omitted).
+    const chosenPayload = chosen.map((s) => ({ ...s, selectedLinks: selectedLinksFor(s) }))
     setCreating(true); setMessage(null)
     try {
       const res = await fetch('/api/content/automation/topics/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, status: 'approved', topics: chosen }),
+        body: JSON.stringify({ projectId, status: 'approved', topics: chosenPayload }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -201,7 +217,12 @@ export default function AutomationIdeas({
             .filter((r): r is { id: string; topic: string; primary_keyword: string | null } => typeof r?.id === 'string')
             .map((r) => ({ id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }))
         : []
-      if (createdTopics.length) onTopicsCreated?.(createdTopics)
+      // Phase 3F.3.2 — topics whose idea-stage selected links were already saved as
+      // a plan skip the planning panel (avoids re-selection / clobbering it); the
+      // rest still open the panel as before.
+      const plannedIds = new Set(Array.isArray(data.plannedTopicIds) ? (data.plannedTopicIds as unknown[]).filter((x): x is string => typeof x === 'string') : [])
+      const needPlanning = createdTopics.filter((tp) => !plannedIds.has(tp.id))
+      if (needPlanning.length) onTopicsCreated?.(needPlanning)
       onCreated()
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -396,8 +417,17 @@ export default function AutomationIdeas({
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.reasonLabel}: {s.suggestionReason}</div>
                     )}
                     {s.suggestedInternalLinks.length > 0 && (
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5" dir={isHebrew ? 'rtl' : 'ltr'}>
-                        {t.internalLinksLabel}: {s.suggestedInternalLinks.map((l) => l.anchor).join(' · ')}
+                      <div className="mt-1" dir={isHebrew ? 'rtl' : 'ltr'}>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{t.internalLinksLabel}:</div>
+                        <div className="mt-0.5 space-y-0.5">
+                          {s.suggestedInternalLinks.map((l, i) => (
+                            <label key={`${l.url}-${i}`} className="flex items-start gap-1.5 text-[11px] cursor-pointer">
+                              <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 h-3.5 w-3.5 accent-indigo-600" />
+                              <span className="text-slate-600 dark:text-slate-300 break-words">{l.anchor || l.url}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
                       </div>
                     )}
                   </div>

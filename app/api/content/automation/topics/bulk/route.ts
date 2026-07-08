@@ -9,11 +9,16 @@
  * Gated by ENABLE_CONTENT_AUTOMATION + project ownership.
  */
 
-import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
+import { authContentProject, isContentAutomationEnabled, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
 import { markIdeasApprovedForTopics, normalizeText } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
+import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
+import { savePlanBatch, type PlanSubject } from '@/lib/content/internal-link-plan-store'
+import { CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
+import { buildIdeaSelectedPlanLinks, ideaSelectedPlan } from '@/lib/content/internal-link-idea-plan'
+import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { ArticleTopicSource } from '@/lib/supabase/types'
 
 const ALLOWED_SOURCES: ArticleTopicSource[] = ['keyword', 'project_data', 'keyword_research_url']
@@ -32,6 +37,8 @@ interface IncomingTopic {
   suggestionScore?: unknown
   /** Phase 3F.3 — persisted idea id, so an approved idea can be marked approved. */
   ideaId?: unknown
+  /** Phase 3F.3.2 — user-selected suggested internal links to save as a plan. */
+  selectedLinks?: unknown
 }
 
 export async function POST(request: Request) {
@@ -148,5 +155,58 @@ export async function POST(request: Request) {
     .filter((m) => m.title || m.primaryKeyword)
   await markIdeasApprovedForTopics(auth.admin, auth.project.id, approveMatch, createdRows)
 
-  return Response.json({ created: ids.length, skipped, ids, topics: createdRows })
+  // Phase 3F.3.2 — carry the idea-stage user-SELECTED suggested internal links
+  // into the new topic's link PLAN (planned, never inserted). Behind the
+  // internal-link flag; best-effort — never affects topic creation. Server
+  // re-validates every link against the cached scan; invalid/stale links are
+  // skipped; zero valid links → no plan created. No planner-scoring change.
+  let linkPlansSaved = 0
+  const plannedTopicIds: string[] = []
+  if (isInternalLinkPlanningEnabled()) {
+    // Map created topic (by exact primary keyword, unique in batch) → its payload.
+    const payloadByKw = new Map<string, { secondary: string[]; selectedLinks: { url: string; anchor: string }[] }>()
+    for (const it of incoming) {
+      const pk = String(it.primaryKeyword ?? '').trim()
+      if (!pk) continue
+      const links = Array.isArray(it.selectedLinks)
+        ? (it.selectedLinks as unknown[]).slice(0, 20)
+            .map((l) => (l && typeof l === 'object' ? l as Record<string, unknown> : {}))
+            .filter((l) => typeof l.url === 'string' && (l.url as string).trim())
+            .map((l) => ({ url: (l.url as string).trim(), anchor: typeof l.anchor === 'string' ? l.anchor : '' }))
+        : []
+      if (links.length === 0) continue
+      const secondary = Array.isArray(it.secondaryKeywords) ? (it.secondaryKeywords as unknown[]).map((s) => String(s).trim()).filter(Boolean) : []
+      payloadByKw.set(pk.toLowerCase(), { secondary, selectedLinks: links })
+    }
+
+    if (payloadByKw.size > 0) {
+      try {
+        const row = await getCachedIndex(auth.admin, auth.project.id)
+        if (row && !isStale(row) && !isVersionStale(row)) {
+          const report = reassembleReport(row)
+          const targets = (report.targets ?? []) as ScannedTarget[]
+          const hosts = report.hosts ?? []
+          for (const r of createdRows) {
+            const payload = payloadByKw.get((r.primary_keyword || '').toLowerCase())
+            if (!payload) continue
+            const topicForPlan = { id: r.id, title: r.topic, primaryKeyword: r.primary_keyword, secondaryKeywords: payload.secondary }
+            const links = buildIdeaSelectedPlanLinks(topicForPlan, payload.selectedLinks, targets, hosts)
+            if (links.length === 0) continue // no valid links → don't create an empty plan
+            const subject: PlanSubject = { subjectType: 'topic', topicId: r.id, articlePoolItemId: null, generatedArticleId: null }
+            const batchId = await savePlanBatch(auth.admin, {
+              projectId: auth.project.id, userId: auth.user.id, subject,
+              topicTitle: r.topic, primaryKeyword: r.primary_keyword, plan: ideaSelectedPlan(topicForPlan, links),
+              plannerVersion: CACHE_PLANNER_VERSION, cacheScannerVersion: row.scanner_version,
+              cacheScanCompletedAt: row.scan_completed_at, cacheState: 'ok', allowCaution: false, strict: false, staleAtCreation: false, warnings: [],
+            })
+            if (batchId) { linkPlansSaved++; plannedTopicIds.push(r.id) }
+          }
+        }
+      } catch (e) {
+        console.warn('[automation-topics-bulk] idea-link plan save failed', { message: e instanceof Error ? e.message : String(e) })
+      }
+    }
+  }
+
+  return Response.json({ created: ids.length, skipped, ids, topics: createdRows, linkPlansSaved, plannedTopicIds })
 }
