@@ -39,6 +39,7 @@ export default function AutomationIdeas({
   onCreated,
   onScheduled,
   onTopicsCreated,
+  onPlansSaved,
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -47,6 +48,9 @@ export default function AutomationIdeas({
   // Phase 2F.1 — fires with the newly-created topics so the hub can offer the
   // internal-link planning step for exactly those new topic IDs.
   onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[]) => void
+  // Phase 3F.3.2a — fires with per-topic saved planned-link counts (from idea-stage
+  // selection) so the hub can seed the topic-row plan badge immediately.
+  onPlansSaved?: (plans: { topicId: string; linkCount: number }[]) => void
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
@@ -223,6 +227,12 @@ export default function AutomationIdeas({
       const plannedIds = new Set(Array.isArray(data.plannedTopicIds) ? (data.plannedTopicIds as unknown[]).filter((x): x is string => typeof x === 'string') : [])
       const needPlanning = createdTopics.filter((tp) => !plannedIds.has(tp.id))
       if (needPlanning.length) onTopicsCreated?.(needPlanning)
+      // Seed the topic-row plan badge so saved idea-stage links show immediately
+      // (not 0) even though the planning panel was skipped for those topics.
+      const savedPlans = Array.isArray(data.savedPlans)
+        ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
+        : []
+      if (savedPlans.length) onPlansSaved?.(savedPlans)
       onCreated()
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -429,6 +439,9 @@ export default function AutomationIdeas({
                         </div>
                         <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
                       </div>
+                    )}
+                    {s.suggestedInternalLinks.length === 0 && (
+                      <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksNoneHint}</div>
                     )}
                   </div>
                 </label>

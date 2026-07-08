@@ -53,6 +53,7 @@ export const dashboardHe = {
       reasonLabel: 'למה הוצע',
       internalLinksLabel: 'קישורים פנימיים מוצעים',
       linksSelectHint: 'הקישורים שתסמן כאן יישמרו כתכנון קישורים לאחר אישור הנושא.',
+      linksNoneHint: 'לא נמצאו קישורים פנימיים מוצעים לרעיון הזה. אפשר להוסיף קישורים ידנית אחרי אישור הנושא.',
       badgeKeyword: 'מילת מפתח',
       badgeProject: 'נתוני הפרויקט',
       badgeResearch: 'מחקר ביטויים',

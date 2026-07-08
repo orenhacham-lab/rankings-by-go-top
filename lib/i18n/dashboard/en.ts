@@ -55,6 +55,7 @@ export const dashboardEn = {
       reasonLabel: 'Why suggested',
       internalLinksLabel: 'Suggested internal links',
       linksSelectHint: 'Links selected here will be saved as the link plan after the idea is approved.',
+      linksNoneHint: 'No suggested internal links were found for this idea. You can add links manually after approving the topic.',
       badgeKeyword: 'Keyword',
       badgeProject: 'Project data',
       badgeResearch: 'Keyword research',

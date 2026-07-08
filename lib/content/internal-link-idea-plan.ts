@@ -37,34 +37,41 @@ function resolveAnchor(target: ScannedTarget, chosen: string): { text: string; s
   return null
 }
 
+export interface IdeaPlanBuildResult {
+  links: CachePlannedLink[]
+  skipped: { url: string; reason: string }[]
+}
+
 /**
- * Build validated PLANNED links from the idea-stage selection. Returns the
- * CachePlannedLink[] (may be empty when nothing is valid). Pure.
+ * Build validated PLANNED links from the idea-stage selection. Returns the valid
+ * links AND per-link skip reasons (diagnostics). Pure.
  */
 export function buildIdeaSelectedPlanLinks(
   topic: TopicForPlan,
   selected: SelectedIdeaLink[],
   targets: ScannedTarget[],
   hosts: string[],
-): CachePlannedLink[] {
+): IdeaPlanBuildResult {
   const targetByKey = new Map<string, ScannedTarget>()
   for (const t of targets) targetByKey.set(normalizeUrlKey(t.targetUrl), t)
   const topicForPlanning = { id: topic.id, title: topic.title, primaryKeyword: topic.primaryKeyword, secondaryKeywords: topic.secondaryKeywords }
 
   const out: CachePlannedLink[] = []
+  const skipped: { url: string; reason: string }[] = []
   const seen = new Set<string>()
   for (const sel of Array.isArray(selected) ? selected : []) {
     const url = (sel?.url || '').trim()
-    if (!url) continue
+    if (!url) { skipped.push({ url: '', reason: 'empty_url' }); continue }
     const key = normalizeUrlKey(url)
-    if (seen.has(key)) continue // no duplicate targets
+    if (seen.has(key)) { skipped.push({ url, reason: 'duplicate_target' }); continue }
     const target = targetByKey.get(key)
-    if (!target) continue // must exist in the current scan
-    if (!isInternalUrl(url, hosts)) continue // must be internal
-    if (target.eligibility !== 'yes') continue // not blocked/ineligible
-    if (selfOrDuplicateReason(topicForPlanning, target)) continue // not self/duplicate
+    if (!target) { skipped.push({ url, reason: 'target_not_in_scan' }); continue }
+    if (!isInternalUrl(url, hosts)) { skipped.push({ url, reason: 'not_internal' }); continue }
+    if (target.eligibility !== 'yes') { skipped.push({ url, reason: `target_ineligible(${target.eligibility})` }); continue }
+    const selfDup = selfOrDuplicateReason(topicForPlanning, target)
+    if (selfDup) { skipped.push({ url, reason: `self_or_duplicate(${selfDup})` }); continue }
     const anchor = resolveAnchor(target, sel.anchor || '')
-    if (!anchor) continue // no safe anchor
+    if (!anchor) { skipped.push({ url, reason: 'no_safe_anchor' }); continue }
 
     seen.add(key)
     out.push({
@@ -92,7 +99,7 @@ export function buildIdeaSelectedPlanLinks(
       blockReason: null,
     })
   }
-  return out
+  return { links: out, skipped }
 }
 
 /** Assemble a CacheTopicPlan from validated selection (for savePlanBatch). */

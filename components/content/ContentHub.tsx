@@ -745,6 +745,7 @@ export default function ContentHub() {
                     onCreated={loadTopics}
                     onScheduled={() => setAutomationRefresh((k) => k + 1)}
                     onTopicsCreated={(created) => { if (created.length) setNewTopics(created) }}
+                    onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: true, linkCount: p.linkCount, approvedCount: 0, stale: false }])) }))}
                   />
                   <AutomationSchedule
                     projectId={projectId}

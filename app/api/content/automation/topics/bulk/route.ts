@@ -162,6 +162,11 @@ export async function POST(request: Request) {
   // skipped; zero valid links → no plan created. No planner-scoring change.
   let linkPlansSaved = 0
   const plannedTopicIds: string[] = []
+  // Per-topic saved counts (so the caller can seed the topic-row plan badge) +
+  // dev diagnostics explaining any skips.
+  const savedPlans: { topicId: string; linkCount: number }[] = []
+  const linkPlanDebug: Record<string, unknown>[] = []
+  let cacheReason: string | null = null
   if (isInternalLinkPlanningEnabled()) {
     // Map created topic (by exact primary keyword, unique in batch) → its payload.
     const payloadByKw = new Map<string, { secondary: string[]; selectedLinks: { url: string; anchor: string }[] }>()
@@ -182,7 +187,9 @@ export async function POST(request: Request) {
     if (payloadByKw.size > 0) {
       try {
         const row = await getCachedIndex(auth.admin, auth.project.id)
-        if (row && !isStale(row) && !isVersionStale(row)) {
+        if (!row) cacheReason = 'no_scan_cache'
+        else if (isStale(row) || isVersionStale(row)) cacheReason = 'cache_stale'
+        else {
           const report = reassembleReport(row)
           const targets = (report.targets ?? []) as ScannedTarget[]
           const hosts = report.hosts ?? []
@@ -190,23 +197,33 @@ export async function POST(request: Request) {
             const payload = payloadByKw.get((r.primary_keyword || '').toLowerCase())
             if (!payload) continue
             const topicForPlan = { id: r.id, title: r.topic, primaryKeyword: r.primary_keyword, secondaryKeywords: payload.secondary }
-            const links = buildIdeaSelectedPlanLinks(topicForPlan, payload.selectedLinks, targets, hosts)
-            if (links.length === 0) continue // no valid links → don't create an empty plan
-            const subject: PlanSubject = { subjectType: 'topic', topicId: r.id, articlePoolItemId: null, generatedArticleId: null }
-            const batchId = await savePlanBatch(auth.admin, {
-              projectId: auth.project.id, userId: auth.user.id, subject,
-              topicTitle: r.topic, primaryKeyword: r.primary_keyword, plan: ideaSelectedPlan(topicForPlan, links),
-              plannerVersion: CACHE_PLANNER_VERSION, cacheScannerVersion: row.scanner_version,
-              cacheScanCompletedAt: row.scan_completed_at, cacheState: 'ok', allowCaution: false, strict: false, staleAtCreation: false, warnings: [],
+            const { links, skipped: skippedLinks } = buildIdeaSelectedPlanLinks(topicForPlan, payload.selectedLinks, targets, hosts)
+            let batchId: string | null = null
+            if (links.length > 0) {
+              const subject: PlanSubject = { subjectType: 'topic', topicId: r.id, articlePoolItemId: null, generatedArticleId: null }
+              batchId = await savePlanBatch(auth.admin, {
+                projectId: auth.project.id, userId: auth.user.id, subject,
+                topicTitle: r.topic, primaryKeyword: r.primary_keyword, plan: ideaSelectedPlan(topicForPlan, links),
+                plannerVersion: CACHE_PLANNER_VERSION, cacheScannerVersion: row.scanner_version,
+                cacheScanCompletedAt: row.scan_completed_at, cacheState: 'ok', allowCaution: false, strict: false, staleAtCreation: false, warnings: [],
+              })
+              if (batchId) { linkPlansSaved++; plannedTopicIds.push(r.id); savedPlans.push({ topicId: r.id, linkCount: links.length }) }
+            }
+            linkPlanDebug.push({
+              topicId: r.id, topicTitle: r.topic, primaryKeyword: r.primary_keyword,
+              selectedLinksReceivedCount: payload.selectedLinks.length,
+              validIdeaLinksCount: links.length, skippedIdeaLinksCount: skippedLinks.length,
+              skippedReasons: skippedLinks, planSaved: !!batchId, plannedLinksSavedCount: batchId ? links.length : 0, plannedBatchId: batchId,
             })
-            if (batchId) { linkPlansSaved++; plannedTopicIds.push(r.id) }
           }
         }
       } catch (e) {
+        cacheReason = 'exception'
         console.warn('[automation-topics-bulk] idea-link plan save failed', { message: e instanceof Error ? e.message : String(e) })
       }
     }
   }
 
-  return Response.json({ created: ids.length, skipped, ids, topics: createdRows, linkPlansSaved, plannedTopicIds })
+  const debug = process.env.NODE_ENV !== 'production' ? { cacheReason, linkPlans: linkPlanDebug, plannedTopicIds } : undefined
+  return Response.json({ created: ids.length, skipped, ids, topics: createdRows, linkPlansSaved, plannedTopicIds, savedPlans, cacheReason, debug })
 }
