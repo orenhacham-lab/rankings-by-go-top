@@ -17,9 +17,47 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { slugFromUrl } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { ContentTopicIdeaRow } from '@/lib/supabase/types'
 import { normalizeText } from './topic-idea-store'
+
+// ── Phase 3G.7 — phrase-level coverage of EXISTING SITE CONTENT ────────────────
+// The exact title/keyword guard misses the common real-world case: an existing
+// site article "מנורות לילה לשבת – תאורה מותאמת לשקט, נוחות והלכה" (no focus
+// keyword in the index) vs a new idea "מנורות לילה לשבת: תאורה מעוצבת
+// ופונקציונלית". Both share the same MAIN PHRASE ("מנורות לילה לשבת") — the
+// topic is already covered. contentPhrases holds normalized main phrases of
+// existing content (title-prefix before separators, full short titles, Hebrew
+// slugs, keywords); an idea whose primary keyword OR title-prefix equals such a
+// phrase is a duplicate. Matching is EXACT full-phrase equality (≥2 words) after
+// punctuation/finals normalization — no token overlap, no substring — so a
+// genuinely different long-tail ("מנורות לילה לשבת לחדרי ילדים") stays allowed.
+
+const HE_FINALS_MAP: Record<string, string> = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' }
+/** Aggressive phrase normalization: lowercase, strip ALL punctuation/separators,
+ *  fold Hebrew final letters, collapse whitespace. For phrase-set comparison only. */
+export function normalizePhrase(s: string | null | undefined): string {
+  const t = (s || '')
+    .toLowerCase()
+    .replace(/["'“”‘’׳״`]+/g, '')
+    .replace(/[?!.,:;|()[\]{}<>«»/\\_\-–—…]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return Array.from(t, (c) => HE_FINALS_MAP[c] ?? c).join('')
+}
+
+/** Title/keyphrase segment separators (same family the anchor derivation uses). */
+const PHRASE_SEGMENT_SPLIT = /\s+[–—-]\s+|\s*\|\s*|:\s+/
+
+/** The title's MAIN phrase: the first segment before separators, normalized.
+ *  Returns '' when it has fewer than 2 words (single words are too generic to
+ *  treat as topic coverage). */
+export function titleMainPhrase(title: string | null | undefined): string {
+  const first = ((title || '').split(PHRASE_SEGMENT_SPLIT)[0] ?? '').trim()
+  const norm = normalizePhrase(first)
+  return norm && norm.split(' ').length >= 2 ? norm : ''
+}
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -32,6 +70,10 @@ export interface KeywordGuard {
   contentKeywords: Set<string>
   /** Titles from existing CONTENT only (topics + generated articles; no ideas). */
   contentTitles: Set<string>
+  /** Phase 3G.7 — normalized MAIN PHRASES of existing content (title-prefixes,
+   *  short titles, Hebrew slugs, keywords) incl. scanned site posts/pages, so a
+   *  re-angled duplicate of an existing article is caught. Content-only. */
+  contentPhrases: Set<string>
   /** Per-source sets for diagnostics/classification (server-side only). */
   sources: {
     tracking: Set<string>
@@ -54,19 +96,34 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
   const keywords = new Set<string>()
   const contentKeywords = new Set<string>()
   const contentTitles = new Set<string>()
+  const contentPhrases = new Set<string>()
   const sources = { tracking: new Set<string>(), topics: new Set<string>(), ideas: new Set<string>(), scan: new Set<string>() }
   const scanSamples: string[] = []
   const counts = { existingProjectKeywordCount: 0, existingTopicKeywordCount: 0, existingIdeaKeywordCount: 0, existingScanKeywordCount: 0 }
+
+  // Phase 3G.7 — content phrase harvesting: title main-phrase + full-title phrase
+  // (multi-word only) for existing CONTENT titles; keywords also enter as phrases
+  // so the comparison is punctuation/finals-insensitive.
+  const addContentPhraseFromTitle = (raw: string | null | undefined) => {
+    const main = titleMainPhrase(raw)
+    if (main) contentPhrases.add(main)
+    const full = normalizePhrase(raw)
+    if (full && full.split(' ').length >= 2) contentPhrases.add(full)
+  }
+  const addContentPhrase = (raw: string | null | undefined) => {
+    const v = normalizePhrase(raw)
+    if (v && v.split(' ').length >= 2) contentPhrases.add(v)
+  }
 
   const addKeyword = (raw: string | null | undefined, opts: { content: boolean; sourceSet?: Set<string>; bump?: () => void }) => {
     const v = normalizeText(raw)
     if (!v) return
     keywords.add(v)
-    if (opts.content) contentKeywords.add(v)
+    if (opts.content) { contentKeywords.add(v); addContentPhrase(raw) }
     opts.sourceSet?.add(v)
     opts.bump?.()
   }
-  const addTitle = (raw: string | null | undefined, content: boolean) => { const v = normalizeText(raw); if (v) { titles.add(v); if (content) contentTitles.add(v) } }
+  const addTitle = (raw: string | null | undefined, content: boolean) => { const v = normalizeText(raw); if (v) { titles.add(v); if (content) { contentTitles.add(v); addContentPhraseFromTitle(raw) } } }
 
   // Article topics — title + primary keyword. Covers generated articles too,
   // since every generated_articles.topic_id references a project topic here.
@@ -116,11 +173,19 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
           addKeyword(tg.primaryKeywordCandidate, { content: true, sourceSet: sources.scan, bump: () => counts.existingScanKeywordCount++ })
           if (sources.scan.size > before && scanSamples.length < 10) scanSamples.push(tg.primaryKeywordCandidate.trim())
         }
+        // Phase 3G.7 — existing site ARTICLES/PAGES already cover their title's
+        // main phrase, keyword or not. Posts/pages only: a category or product
+        // page existing must NOT block writing a supporting article about it.
+        if (tg.targetType === 'post' || tg.targetType === 'page') {
+          addContentPhraseFromTitle(tg.targetTitle)
+          const slugPhrase = slugFromUrl(tg.targetUrl)
+          if (/[֐-׿]/.test(slugPhrase)) addContentPhrase(slugPhrase)
+        }
       }
     }
   } catch { /* scan cache optional */ }
 
-  return { titles, keywords, contentKeywords, contentTitles, sources, scanSamples, counts }
+  return { titles, keywords, contentKeywords, contentTitles, contentPhrases, sources, scanSamples, counts }
 }
 
 /**
@@ -132,18 +197,35 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
  * itself; and since fingerprint = normalize(primary_keyword), two ideas can't
  * share a keyword, so pending-vs-pending self-conflict is impossible.
  */
+/**
+ * Phase 3G.7 — is a suggested topic ALREADY COVERED by existing site content?
+ * True when its normalized primary keyword, or its title's main phrase, exactly
+ * equals a known content phrase (existing article title-prefix / short title /
+ * Hebrew slug / content keyword). Full-phrase equality only — long-tail
+ * variations with additional words remain allowed.
+ */
+export function coveredByExistingContent(guard: KeywordGuard, title: string | null | undefined, primaryKeyword: string | null | undefined): boolean {
+  const kw = normalizePhrase(primaryKeyword)
+  if (kw && kw.split(' ').length >= 2 && guard.contentPhrases.has(kw)) return true
+  const main = titleMainPhrase(title)
+  return !!main && guard.contentPhrases.has(main)
+}
+
 export function partitionPending(
   rows: ContentTopicIdeaRow[],
   guard: KeywordGuard,
-): { visible: ContentTopicIdeaRow[]; conflictIds: string[]; conflicts: { id: string; reason: 'primary_keyword_exists' | 'title_exists' }[] } {
+): { visible: ContentTopicIdeaRow[]; conflictIds: string[]; conflicts: { id: string; reason: 'primary_keyword_exists' | 'title_exists' | 'covered_by_existing_content' }[] } {
   const visible: ContentTopicIdeaRow[] = []
   const conflictIds: string[] = []
-  const conflicts: { id: string; reason: 'primary_keyword_exists' | 'title_exists' }[] = []
+  const conflicts: { id: string; reason: 'primary_keyword_exists' | 'title_exists' | 'covered_by_existing_content' }[] = []
   for (const r of rows) {
     const nk = normalizeText(r.primary_keyword)
     const nt = normalizeText(r.title)
     if (nk && guard.contentKeywords.has(nk)) { conflictIds.push(r.id); conflicts.push({ id: r.id, reason: 'primary_keyword_exists' }); continue }
     if (nt && guard.contentTitles.has(nt)) { conflictIds.push(r.id); conflicts.push({ id: r.id, reason: 'title_exists' }); continue }
+    // Phase 3G.7 — re-angled duplicates of existing site articles (same main
+    // phrase, different suffix) are hidden + marked duplicate on load.
+    if (coveredByExistingContent(guard, r.title, r.primary_keyword)) { conflictIds.push(r.id); conflicts.push({ id: r.id, reason: 'covered_by_existing_content' }); continue }
     visible.push(r)
   }
   return { visible, conflictIds, conflicts }

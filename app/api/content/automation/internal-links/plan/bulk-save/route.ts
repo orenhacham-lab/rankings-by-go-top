@@ -31,7 +31,7 @@ export const dynamic = 'force-dynamic'
 
 interface TopicRow { id: string; topic: string; primary_keyword: string | null; secondary_keywords: string[] | null }
 
-interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCount: number; approvedCount: number; manualApplied?: number; staleAtCreation?: boolean; reason?: string; droppedLinks?: DroppedSelection[] }
+interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCount: number; approvedCount: number; unapprovedCount?: number; approvalWarning?: boolean; manualApplied?: number; staleAtCreation?: boolean; reason?: string; droppedLinks?: DroppedSelection[] }
 
 export async function POST(request: Request) {
   if (!isInternalLinkPlanningEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -146,13 +146,19 @@ export async function POST(request: Request) {
     })
     if (!batchId) { results.push({ topicId: id, ok: false, linkCount: plan.selected.length, approvedCount: 0, reason: 'save_failed', droppedLinks }); continue }
 
+    // Phase 3G.7 — approval-count VERIFICATION: when approval was requested, the
+    // response reports exactly how many rows were approved; a shortfall is flagged
+    // (approvalWarning) and logged — never silently accepted.
     let approvedCount = 0
     if (approve && plan.selected.length > 0) approvedCount = await approveBatchLinks(admin, project.id, batchId)
+    const unapprovedCount = approve ? plan.selected.length - approvedCount : 0
+    const approvalWarning = approve && unapprovedCount > 0
+    if (approvalWarning) console.warn('[ilp-bulk-save] approval incomplete', { topicId: id, batchId, saved: plan.selected.length, approved: approvedCount })
 
     topicsSaved++
     linksSaved += plan.selected.length
     linksApproved += approvedCount
-    results.push({ topicId: id, ok: true, batchId, linkCount: plan.selected.length, approvedCount, manualApplied, staleAtCreation, droppedLinks })
+    results.push({ topicId: id, ok: true, batchId, linkCount: plan.selected.length, approvedCount, unapprovedCount, approvalWarning, manualApplied, staleAtCreation, droppedLinks })
   }
 
   return Response.json({

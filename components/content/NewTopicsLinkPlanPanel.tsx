@@ -30,7 +30,7 @@ interface DryPlan { topicId: string; selected: DryLink[]; rejected: DryLink[]; r
 const mkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targetUrl}||${(l.anchorText ?? '').toLowerCase()}`
 
 interface DroppedLink { targetUrl: string; anchorText: string; reason: string }
-interface BulkResult { topicId: string; ok: boolean; linkCount: number; approvedCount: number; reason?: string; droppedLinks?: DroppedLink[] }
+interface BulkResult { topicId: string; ok: boolean; linkCount: number; approvedCount: number; approvalWarning?: boolean; reason?: string; droppedLinks?: DroppedLink[] }
 
 const REASON_HE: Record<string, string> = {
   low_relevance: 'רלוונטיות נמוכה',
@@ -96,6 +96,9 @@ export default function NewTopicsLinkPlanPanel({
   // Phase 3G.5 — checked links the server could NOT save (per topic), surfaced
   // with their reasons instead of being dropped silently.
   const [droppedByTopic, setDroppedByTopic] = useState<Record<string, DroppedLink[]>>({})
+  // Phase 3G.7 — approval-count verification: true when an approve-intent save
+  // reported fewer approved rows than saved rows (never silently accepted).
+  const [approvalShort, setApprovalShort] = useState(false)
   const [savedOk, setSavedOk] = useState(false) // compact success state after save
   const [queuedOk, setQueuedOk] = useState(false) // success state after save + enqueue
 
@@ -211,8 +214,10 @@ export default function NewTopicsLinkPlanPanel({
     const nextDropped: Record<string, DroppedLink[]> = {}
     const summaries: { topicId: string; summary: TopicPlanSummary }[] = []
     const okIds: string[] = []
+    let anyApprovalShort = false
     for (const r of results) {
       if (Array.isArray(r.droppedLinks) && r.droppedLinks.length > 0) nextDropped[r.topicId] = r.droppedLinks
+      if (r.ok && r.approvalWarning) anyApprovalShort = true
       if (!r.ok) { nextStatus[r.topicId] = 'failed'; continue }
       nextStatus[r.topicId] = r.linkCount === 0 ? 'zero' : r.approvedCount > 0 ? 'approved' : 'saved'
       summaries.push({ topicId: r.topicId, summary: { exists: true, linkCount: r.linkCount, approvedCount: r.approvedCount, stale: false } })
@@ -220,8 +225,10 @@ export default function NewTopicsLinkPlanPanel({
     }
     setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
     setDroppedByTopic((prev) => ({ ...prev, ...nextDropped }))
+    setApprovalShort(anyApprovalShort)
     onSaved(summaries)
-    return { okIds, droppedCount: Object.values(nextDropped).reduce((n, a) => n + a.length, 0) }
+    // An approval shortfall behaves like a dropped link: warn + keep panel open.
+    return { okIds, droppedCount: Object.values(nextDropped).reduce((n, a) => n + a.length, 0) + (anyApprovalShort ? 1 : 0) }
   }, [topicIdsToSave, linkSel, manualSel, plans, projectId, autoApprove, t, onSaved])
 
   const save = useCallback(async () => {
@@ -276,9 +283,10 @@ export default function NewTopicsLinkPlanPanel({
   // auto-close so the user actually sees it.
   const droppedEntries = Object.entries(droppedByTopic)
   const droppedTotal = droppedEntries.reduce((n, [, a]) => n + a.length, 0)
-  const droppedNote = droppedTotal > 0 ? (
+  const droppedNote = droppedTotal > 0 || approvalShort ? (
     <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
-      <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.droppedWarning} ({droppedTotal})</p>
+      {approvalShort && <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.approvalIncomplete}</p>}
+      {droppedTotal > 0 && <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.droppedWarning} ({droppedTotal})</p>}
       <ul className="mt-1 space-y-0.5">
         {droppedEntries.flatMap(([tid, arr]) => arr.map((d, i) => (
           <li key={`${tid}-dl-${i}`} className="text-[10px] text-amber-700 dark:text-amber-400">
@@ -440,6 +448,12 @@ export default function NewTopicsLinkPlanPanel({
                       </div>
                       )
                     })()}
+
+                    {/* Phase 3G.7 — honest empty state: no manual alternatives passed
+                        the quality filter (instead of looking broken/empty). */}
+                    {reviewable.length === 0 && links.length > 0 && (
+                      <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t.noManualOptions}</p>
+                    )}
 
                     {/* Blocked — advanced diagnostics, not selectable */}
                     {blocked.length > 0 && (

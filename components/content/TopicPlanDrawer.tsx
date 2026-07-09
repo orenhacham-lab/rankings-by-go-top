@@ -184,8 +184,16 @@ export default function TopicPlanDrawer({
 
   // Persist the EXACT checked selection (recommended + manual) via the exact-mode
   // bulk-save; falls back to /plan/save when no dry-run is loaded. Returns success.
-  const persistSelection = useCallback(async (): Promise<boolean> => {
-    if (!topic) return false
+  //
+  // Phase 3G.7 — `approve` distinguishes ENQUEUE-INTENT saves from plain saves:
+  // "save + add to queue" MUST approve the checked links (generation only
+  // auto-inserts approved links; a planned-only save produced the "נשמרו אך טרם
+  // אושרו" articles). Plain "save plan" keeps approve=false. The server's
+  // approval count is VERIFIED — a shortfall or dropped links surface a warning
+  // instead of silently continuing.
+  const persistSelection = useCallback(async (approve: boolean): Promise<{ ok: boolean; warning: string | null }> => {
+    if (!topic) return { ok: false, warning: null }
+    let warning: string | null = null
     let res: Response
     if (dry) {
       const recommended = dry.selected
@@ -194,25 +202,42 @@ export default function TopicPlanDrawer({
       const manual = dry.rejected
         .filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && manualSel.has(dmkey(r)) && (r.anchorText || '').trim())
         .map((r) => ({ topicId: topic.id, targetUrl: r.targetUrl, anchorText: r.anchorText as string }))
+      const checkedCount = recommended.length + manual.length
       res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve: false }),
+        body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve }),
       })
-    } else {
-      res = await fetch('/api/content/automation/internal-links/plan/save', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicId: topic.id }),
-      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return { ok: false, warning: null } }
+      if (approve) {
+        const d = await res.json().catch(() => ({}))
+        const r0 = Array.isArray(d.results) ? d.results[0] : null
+        const approvedCount = typeof r0?.approvedCount === 'number' ? r0.approvedCount : 0
+        const droppedCount = Array.isArray(r0?.droppedLinks) ? r0.droppedLinks.length : 0
+        if (checkedCount > 0 && approvedCount < checkedCount) {
+          warning = `${t.approvalIncomplete} (${approvedCount}/${checkedCount}${droppedCount ? ` · ${t.droppedShort}: ${droppedCount}` : ''})`
+        }
+      }
+      return { ok: true, warning }
     }
-    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return false }
-    return true
-  }, [projectId, topic, dry, manualSel, recSel, t.saveError])
+    res = await fetch('/api/content/automation/internal-links/plan/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, topicId: topic.id, approve }),
+    })
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return { ok: false, warning: null } }
+    if (approve) {
+      const d = await res.json().catch(() => ({}))
+      if (typeof d.linkCount === 'number' && typeof d.approvedCount === 'number' && d.approvedCount < d.linkCount) {
+        warning = `${t.approvalIncomplete} (${d.approvedCount}/${d.linkCount})`
+      }
+    }
+    return { ok: true, warning }
+  }, [projectId, topic, dry, manualSel, recSel, t])
 
   const savePlan = useCallback(async () => {
     if (!topic || saving) return
     setSaving(true); setError(null)
     try {
-      const ok = await persistSelection()
+      const { ok } = await persistSelection(false) // plain save → planned only (by design)
       if (ok) { setJustSaved(true); onPlanSaved?.() } // success → show completion state + notify hub
       setDry(null); setManualSel(new Set()); setRecSel(new Set())
       await loadSaved()
@@ -228,13 +253,21 @@ export default function TopicPlanDrawer({
     if (!topic || saving || savingQueue || !onSaveAndQueue) return
     setSavingQueue(true); setError(null)
     try {
-      const ok = await persistSelection()
+      // Phase 3G.7 — enqueue intent ⇒ APPROVE the checked links, so generation
+      // auto-inserts them (planned-only links are never inserted).
+      const { ok, warning } = await persistSelection(true)
       if (!ok) return
       onPlanSaved?.()
       const queued = await onSaveAndQueue(topic.id)
       setManualSel(new Set()); setRecSel(new Set())
-      if (queued) { onClose() }
-      else { setJustSaved(true); await loadSaved() } // saved but not queued → show completion + manual queue
+      // An approval warning keeps the drawer OPEN so the user actually sees it
+      // (set AFTER loadSaved, which clears the error state).
+      if (queued && !warning) { onClose() }
+      else {
+        setJustSaved(true)
+        await loadSaved()
+        if (warning) setError(warning)
+      }
     } finally {
       setSavingQueue(false)
     }
@@ -468,6 +501,12 @@ export default function TopicPlanDrawer({
                       })}
                     </div>
                   </details>
+                )}
+
+                {/* Phase 3G.7 — honest empty state: no manual alternatives passed
+                    the quality filter (instead of looking broken/empty). */}
+                {reviewable.length === 0 && dry.selected.length > 0 && (
+                  <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t.noManualOptions}</p>
                 )}
 
                 {/* Blocked — advanced diagnostics, not selectable */}

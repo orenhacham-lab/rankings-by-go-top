@@ -11,13 +11,13 @@
  * generation, publishing, cron, queue, or approval. 'approved' is review-only.
  *
  * Gated by ENABLE_INTERNAL_LINK_PLANNING + project ownership.
- * Body: { projectId, topicId? , articlePoolItemId?, generatedArticleId?, allowCaution?, force? }
+ * Body: { projectId, topicId? , articlePoolItemId?, generatedArticleId?, allowCaution?, force?, approve? }
  */
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { planFromCachedTargets, promoteManualCandidates, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
-import { savePlanBatch, getBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
+import { savePlanBatch, getBatchLinks, approveBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { InternalLinkPlanSubjectType } from '@/lib/supabase/types'
 
@@ -33,11 +33,14 @@ interface TopicRow {
 export async function POST(request: Request) {
   if (!isInternalLinkPlanningEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  let body: { projectId?: unknown; topicId?: unknown; articlePoolItemId?: unknown; generatedArticleId?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown }
+  let body: { projectId?: unknown; topicId?: unknown; articlePoolItemId?: unknown; generatedArticleId?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown; approve?: unknown }
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const allowCaution = body.allowCaution === true
   const force = body.force === true
+  // Phase 3G.7 — enqueue-intent saves must APPROVE the saved links (generation
+  // only auto-inserts approved links). Plain saves keep the default (planned).
+  const approve = body.approve === true
   // Phase 2I — optional manually-selected reviewable candidates (server re-validated).
   const manualCandidates: { targetUrl: string; anchorText: string }[] = Array.isArray(body.manualCandidates)
     ? body.manualCandidates
@@ -126,6 +129,17 @@ export async function POST(request: Request) {
   })
   if (!batchId) return Response.json({ error: 'save_failed' }, { status: 500 })
 
+  // Phase 3G.7 — approval-count VERIFICATION: report exactly how many rows were
+  // approved; an incomplete approval is surfaced as a warning, never silent.
+  let approvedCount = 0
+  if (approve && plan.selected.length > 0) {
+    approvedCount = await approveBatchLinks(admin, project.id, batchId)
+    if (approvedCount < plan.selected.length) {
+      warnings.push('approval_incomplete')
+      console.warn('[ilp-save] approval incomplete', { batchId, saved: plan.selected.length, approved: approvedCount })
+    }
+  }
+
   const links = await getBatchLinks(admin, batchId)
   return Response.json({
     ok: true,
@@ -136,6 +150,8 @@ export async function POST(request: Request) {
     staleAtCreation,
     warnings,
     linkCount: plan.selected.length,
+    approvedCount,
+    unapprovedCount: plan.selected.length - approvedCount,
     rejectedCount: plan.rejected.length,
     manualApplied,
     summary: plan.summary,

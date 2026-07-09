@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled } from '@/lib/content/ap
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
-import { buildKeywordGuard, partitionPending, keywordSourcesOf } from '@/lib/content/recommendations/keyword-guard'
+import { buildKeywordGuard, partitionPending, keywordSourcesOf, coveredByExistingContent, normalizePhrase, titleMainPhrase } from '@/lib/content/recommendations/keyword-guard'
 import { randomUUID } from 'crypto'
 
 const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan']
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     // already exists. No fuzzy / contains / token-overlap — long-tail stays allowed.
     let filteredPrimaryKeywordExists = 0
     let filteredTitleExists = 0
+    let filteredCoveredByContent = 0
     const filteredExamples: { title: string; primaryKeyword: string; reason: string; sources: string[] }[] = []
     const fresh = result.suggestions.filter((s) => {
       const nt = normalizeText(s.title)
@@ -68,8 +69,15 @@ export async function POST(request: Request) {
       const pushEx = (reason: string) => { if (filteredExamples.length < 10) filteredExamples.push({ title: s.title, primaryKeyword: s.primaryKeyword, reason, sources: keywordSourcesOf(guard, s.primaryKeyword) }) }
       if (nk && guard.keywords.has(nk)) { filteredPrimaryKeywordExists++; pushEx('primary_keyword_exists'); return false }
       if (nt && guard.titles.has(nt)) { filteredTitleExists++; pushEx('title_exists'); return false }
+      // Phase 3G.7 — re-angled duplicate of an EXISTING SITE ARTICLE (same main
+      // phrase, different suffix — e.g. "מנורות לילה לשבת: …" vs the site's
+      // "מנורות לילה לשבת – …"): already covered, never suggested again.
+      if (coveredByExistingContent(guard, s.title, s.primaryKeyword)) { filteredCoveredByContent++; pushEx('covered_by_existing_content'); return false }
       if (nk) guard.keywords.add(nk) // avoid intra-batch primary-keyword dupes
       if (nt) guard.titles.add(nt)
+      // Intra-batch phrase dedupe: two same-main-phrase ideas can't both pass.
+      const kp = normalizePhrase(s.primaryKeyword); if (kp && kp.split(' ').length >= 2) guard.contentPhrases.add(kp)
+      const mp = titleMainPhrase(s.title); if (mp) guard.contentPhrases.add(mp)
       return true
     })
 
@@ -77,7 +85,7 @@ export async function POST(request: Request) {
 
     const filteredExisting = result.suggestions.length - fresh.length
     const buildDebug = (extra: Record<string, unknown>) => process.env.NODE_ENV !== 'production'
-      ? { ...guard.counts, scanKeywordSamples: guard.scanSamples, modelSuggestions: result.suggestions.length, filteredPrimaryKeywordExistsCount: filteredPrimaryKeywordExists, filteredTitleExistsCount: filteredTitleExists, filteredExamples, kr: (result.meta as { debug?: unknown }).debug, ...extra }
+      ? { ...guard.counts, scanKeywordSamples: guard.scanSamples, modelSuggestions: result.suggestions.length, filteredPrimaryKeywordExistsCount: filteredPrimaryKeywordExists, filteredTitleExistsCount: filteredTitleExists, filteredCoveredByContentCount: filteredCoveredByContent, filteredExamples, kr: (result.meta as { debug?: unknown }).debug, ...extra }
       : undefined
 
     const pending = await loadPendingIdeas(auth.admin, auth.project.id)

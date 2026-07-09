@@ -345,6 +345,9 @@ export const dashboardEn = {
         blocked_generic_only: 'Matched on generic words only',
         unknown_no_exact: 'No identified cluster — not an exact match',
       },
+      // Phase 3G.7 — approval verification + manual-tier empty state.
+      approvalIncomplete: 'Some links were saved but not approved — review the topic\'s link plan before the article is generated.',
+      noManualOptions: 'No additional manual options passed the quality filter.',
       // Phase 3G.5 — a checked link that could not be saved is reported, never silent.
       droppedWarning: 'Checked links that were not saved',
       droppedReasons: {
@@ -380,6 +383,10 @@ export const dashboardEn = {
       sumLinksApproved: 'Links approved',
     },
     topicPlan: {
+      // Phase 3G.7 — approval-count verification + manual-tier empty state.
+      approvalIncomplete: 'Some links were saved but not approved — review the plan before the article is generated',
+      droppedShort: 'not saved',
+      noManualOptions: 'No additional manual options passed the quality filter.',
       badgeAction: 'Add links',
       badgeNoPlan: 'Add links',
       badgeZero: 'Add links',

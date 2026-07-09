@@ -414,13 +414,34 @@ function withinEditDistance(a: string, b: string, max: number): boolean {
 }
 
 /**
+ * Phase 3G.7 — Hebrew matres-lectionis variant: the SAME word written plene vs
+ * defective (with/without an internal ו), which the plural stemmer cannot unify:
+ * בושם → stem "בושמ" vs בשמים → stem "בשמ"; מנורה → "מנור" vs מנרות → "מנר".
+ * True when deleting exactly ONE internal ו from the longer stem yields the
+ * shorter one (shorter ≥3 chars, Hebrew only). Deliberately ו-only (not י) — a
+ * generic orthography rule, not a synonym list; י-deletion collides too easily
+ * (ספיר/ספר, מיטה/מטה).
+ */
+function matresVariant(a: string, b: string): boolean {
+  const [longer, shorter] = a.length > b.length ? [a, b] : [b, a]
+  if (longer.length - shorter.length !== 1 || shorter.length < 3) return false
+  if (!/[֐-׿]/.test(longer)) return false
+  for (let i = 1; i < longer.length - 1; i++) {
+    if (longer[i] === 'ו' && longer.slice(0, i) + longer.slice(i + 1) === shorter) return true
+  }
+  return false
+}
+
+/**
  * Two normalized stems denote the same concept — exact, or a GENERIC bounded
- * near-match for sufficiently-long stems (single-edit difference). No hardcoded
- * synonyms; purely a function of the strings' own shape. Returns the match kind.
+ * near-match for sufficiently-long stems (single-edit difference), or a Hebrew
+ * plene/defective spelling variant (see matresVariant). No hardcoded synonyms;
+ * purely a function of the strings' own shape. Returns the match kind.
  */
 function stemRelation(a: string, b: string): 'exact' | 'near' | null {
   if (a === b) return 'exact'
   if (a.length >= 5 && b.length >= 5 && Math.abs(a.length - b.length) <= 1 && withinEditDistance(a, b, 1)) return 'near'
+  if (matresVariant(a, b)) return 'near'
   return null
 }
 
@@ -506,8 +527,10 @@ export function planFromCachedTargets(
         if (fields.some((f) => f !== 'anchor')) identityMatched.push(c)
         continue
       }
+      // Near-stem alignment: edit-distance near needs ≥5 chars (gated inside
+      // stemRelation); the Hebrew plene/defective variant works from 3 chars.
       let near: string | null = null
-      if (c.length >= 5) { for (const tt of topicTokens) { if (stemRelation(c, tt) === 'near') { near = tt; break } } }
+      if (c.length >= 3) { for (const tt of topicTokens) { if (stemRelation(c, tt) === 'near') { near = tt; break } } }
       if (near) {
         alignedCand.add(near); matchedTokens.push(near); matchedTargetTerms.push(c); hadNearMatch = true
         const fields = fieldOf(c)

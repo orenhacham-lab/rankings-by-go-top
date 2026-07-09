@@ -344,6 +344,9 @@ export const dashboardHe = {
         blocked_generic_only: 'התאמה על מילים כלליות בלבד',
         unknown_no_exact: 'ללא אשכול מזוהה — לא התאמה מדויקת',
       },
+      // Phase 3G.7 — approval verification + manual-tier empty state.
+      approvalIncomplete: 'חלק מהקישורים נשמרו אך לא אושרו — בדוק את תכנון הקישורים של הנושא לפני יצירת המאמר.',
+      noManualOptions: 'לא נמצאו אפשרויות ידניות נוספות שעומדות בסינון האיכות.',
       // Phase 3G.5 — a checked link that could not be saved is reported, never silent.
       droppedWarning: 'קישורים שסומנו ולא נשמרו',
       droppedReasons: {
@@ -380,6 +383,10 @@ export const dashboardHe = {
       sumLinksApproved: 'קישורים שאושרו',
     },
     topicPlan: {
+      // Phase 3G.7 — approval-count verification + manual-tier empty state.
+      approvalIncomplete: 'חלק מהקישורים נשמרו אך לא אושרו — בדוק את התכנון לפני יצירת המאמר',
+      droppedShort: 'לא נשמרו',
+      noManualOptions: 'לא נמצאו אפשרויות ידניות נוספות שעומדות בסינון האיכות.',
       badgeAction: 'הוסף קישורים',
       badgeNoPlan: 'הוסף קישורים',
       badgeZero: 'הוסף קישורים',

@@ -12,8 +12,8 @@
 import { authContentProject, isContentAutomationEnabled, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { ExistingCorpus, tokens, jaccard } from '@/lib/content/recommendations/dedupe'
-import { markIdeasApprovedForTopics, normalizeText } from '@/lib/content/recommendations/topic-idea-store'
-import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
+import { markIdeasApprovedForTopics, markIdeasDuplicate, normalizeText } from '@/lib/content/recommendations/topic-idea-store'
+import { buildKeywordGuard, coveredByExistingContent } from '@/lib/content/recommendations/keyword-guard'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { savePlanBatch, approveBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import { CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
@@ -139,6 +139,17 @@ export async function POST(request: Request) {
         continue
       }
       // else: no resolvable topic → create one (below).
+    }
+    // Phase 3G.7 — FINAL approval guard vs existing SITE CONTENT: an idea that
+    // re-angles an existing site article (same main phrase — e.g. "מנורות לילה
+    // לשבת: …" vs the site's "מנורות לילה לשבת – …") must not become a new
+    // topic. There is no topic row to resolve to, so it is refused with a clear
+    // reason and its pending idea row is marked duplicate (not a 3F.3.7f
+    // dead-end: the idea disappears from the list instead of error-looping).
+    if (coveredByExistingContent(guard, title, primaryKeyword)) {
+      skipped++
+      resolutions.push({ ideaId, title, primaryKeyword, outcome: 'unresolved', reason: 'covered_by_existing_content' })
+      continue
     }
     seenInBatch.add(batchKey)
     resolutions.push({ ideaId, title, primaryKeyword, outcome: 'create', batchKey })
@@ -299,6 +310,13 @@ export async function POST(request: Request) {
     .filter((rt): rt is typeof rt & { topicId: string } => typeof rt.topicId === 'string')
     .map((rt) => ({ id: rt.topicId, topic: rt.title, primary_keyword: rt.primaryKeyword }))
   if (resolvedRows.length > 0) await markIdeasApprovedForTopics(auth.admin, auth.project.id, approveMatch, resolvedRows)
+
+  // Phase 3G.7 — ideas refused because they re-angle existing site content are
+  // marked 'duplicate' so they leave the pending list instead of reappearing.
+  const coveredIdeaIds = resolutions
+    .filter((r) => r.outcome === 'unresolved' && r.reason === 'covered_by_existing_content' && typeof r.ideaId === 'string')
+    .map((r) => r.ideaId as string)
+  if (coveredIdeaIds.length > 0) { try { await markIdeasDuplicate(auth.admin, auth.project.id, coveredIdeaIds) } catch { /* best-effort */ } }
 
   const debug = process.env.NODE_ENV !== 'production' ? { cacheReason, linkPlans: linkPlanDebug, plannedTopicIds } : undefined
   return Response.json({ created: ids.length, skipped, ids, topics: createdRows, resolvedTopics, linkPlansSaved, plannedTopicIds, savedPlans, cacheReason, debug })
