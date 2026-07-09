@@ -124,15 +124,21 @@ export async function POST(request: Request) {
     if (!title || !primaryKeyword) { skipped++; resolutions.push({ ideaId, title, primaryKeyword, outcome: 'unresolved', reason: 'missing_title_or_keyword' }); continue }
     const batchKey = primaryKeyword.toLowerCase()
     if (seenInBatch.has(batchKey)) { skipped++; resolutions.push({ ideaId, title, primaryKeyword, outcome: 'batchdup', batchKey }); continue }
+    // Phase 3F.3.7f — a similar/guard flag ONLY blocks creation when it resolves to
+    // an ACTUAL existing article_topic (→ 'existing'). If it was flagged because of
+    // a generated_article / secondary keyword / project keyword that has NO topic
+    // row to point to, we must NOT dead-end (the old 'similar_existing_no_topic'
+    // bug) — fall through and CREATE a new topic so the idea is always actionable.
     const byGuard = guard.contentKeywords.has(normalizeText(primaryKeyword))
     const byCorpus = corpus.isDuplicate(primaryKeyword) || corpus.isDuplicate(title)
     if (byGuard || byCorpus) {
-      skipped++
-      const existingTopicId = resolveExistingTopicId(title, primaryKeyword) ?? undefined
-      resolutions.push(existingTopicId
-        ? { ideaId, title, primaryKeyword, outcome: 'existing', existingTopicId }
-        : { ideaId, title, primaryKeyword, outcome: 'unresolved', reason: byGuard ? 'matched_existing_content_no_topic' : 'similar_existing_no_topic' })
-      continue
+      const existingTopicId = resolveExistingTopicId(title, primaryKeyword)
+      if (existingTopicId) {
+        skipped++
+        resolutions.push({ ideaId, title, primaryKeyword, outcome: 'existing', existingTopicId })
+        continue
+      }
+      // else: no resolvable topic → create one (below).
     }
     seenInBatch.add(batchKey)
     resolutions.push({ ideaId, title, primaryKeyword, outcome: 'create', batchKey })
