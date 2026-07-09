@@ -103,6 +103,9 @@ export default function ContentHub() {
   const [ctaScrollSignal, setCtaScrollSignal] = useState(0)
   const [rowBusy, setRowBusy] = useState<{ id: string; action: 'publish' | 'draft' | 'ready' } | null>(null)
   const [automationRefresh, setAutomationRefresh] = useState(0)
+  // Phase 3F.3.7i — bumped when an enqueue succeeds from the drawer/review panel, so
+  // the Automatic Ideas section shows + scrolls its success box into view.
+  const [ideasSuccessSignal, setIdeasSuccessSignal] = useState<{ n: number; count: number } | null>(null)
   const handleTopicsQueued = useCallback((info: { topicIds: string[] }) => {
     setHighlightTopicIds(info.topicIds)
     window.setTimeout(() => setHighlightTopicIds([]), 4500)
@@ -114,10 +117,12 @@ export default function ContentHub() {
     window.setTimeout(() => setHighlightTopicIds([]), 6000)
   }, [])
   const handleScheduled = useCallback(() => {
+    // Phase 3F.3.7i — refresh the queue in the background but DO NOT scroll to the
+    // schedule section; the viewport must stay on / return to the Automatic Ideas
+    // section (its success box scrolls itself into view).
     setAutomationRefresh((k) => k + 1)
     setReviewLinksHint(false)
     setLinkPlanSavedHint(false)
-    window.setTimeout(() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }, [])
   const handleDrawerPlanSaved = useCallback(() => { setLinkPlanSavedHint(true) }, [])
   const handleReturnToQueue = useCallback(() => { setLinkPlanSavedHint(true); setCtaScrollSignal((n) => n + 1) }, [])
@@ -152,6 +157,8 @@ export default function ContentHub() {
       const alreadyQueued = Array.isArray(d.alreadyQueued) ? d.alreadyQueued.length : 0
       if (added <= 0 && alreadyQueued <= 0) return false
       handleScheduled()
+      // Surface the success in the Automatic Ideas section (drawer/panel path).
+      setIdeasSuccessSignal((prev) => ({ n: (prev?.n ?? 0) + 1, count: topicIds.length }))
       return true
     } catch {
       return false
@@ -820,6 +827,7 @@ export default function ContentHub() {
                     onReviewLinks={handleReviewLinks}
                     planSavedHint={linkPlanSavedHint}
                     scrollCtaSignal={ctaScrollSignal}
+                    queueSuccessSignal={ideasSuccessSignal}
                   />
                   <div ref={scheduleSectionRef} className="scroll-mt-4">
                     <AutomationSchedule

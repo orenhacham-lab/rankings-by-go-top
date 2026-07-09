@@ -47,6 +47,7 @@ export default function AutomationIdeas({
   onApproved,
   planSavedHint = false,
   scrollCtaSignal = 0,
+  queueSuccessSignal = null,
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -68,6 +69,9 @@ export default function AutomationIdeas({
   // queue" note in the CTA; a bumped scrollCtaSignal re-scrolls the CTA in view.
   planSavedHint?: boolean
   scrollCtaSignal?: number
+  // Phase 3F.3.7i — bumped by the hub when an enqueue succeeds from the drawer/
+  // review panel, so this section shows + scrolls its success box into view.
+  queueSuccessSignal?: { n: number; count: number } | null
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
@@ -83,6 +87,8 @@ export default function AutomationIdeas({
   const [queueSuccess, setQueueSuccess] = useState<{ count: number; links: boolean } | null>(null)
   // Phase 3F.3.3a — the truthful "next step" CTA to scroll into view after approval.
   const ctaRef = useRef<HTMLDivElement | null>(null)
+  // Phase 3F.3.7i — the enqueue success box scrolls itself into view here.
+  const successRef = useRef<HTMLDivElement | null>(null)
 
   // Default to the most SEO-grounded source (real Google Ads keyword data).
   const [source, setSource] = useState<Source>('keyword_research_url')
@@ -136,10 +142,18 @@ export default function AutomationIdeas({
     if (scrollCtaSignal > 0) window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
   }, [scrollCtaSignal])
 
-  // Phase 3F.3.7h — keep the enqueue success confirmation visible for ~3s, then
-  // auto-hide. (Still dismissible earlier via the ✕.) UX timing only.
+  // Phase 3F.3.7i — an enqueue from the drawer/review panel bumps this signal;
+  // show the success box here so the confirmation lands on the Ideas section.
+  useEffect(() => {
+    if (queueSuccessSignal && queueSuccessSignal.n > 0) setQueueSuccess({ count: queueSuccessSignal.count, links: true })
+  }, [queueSuccessSignal])
+
+  // Phase 3F.3.7h/i — when the enqueue success box appears, scroll IT into view
+  // (so the viewport lands on the Automatic Ideas section, not the schedule), keep
+  // it visible ~3s, then auto-hide. Still dismissible earlier via the ✕.
   useEffect(() => {
     if (!queueSuccess) return
+    window.setTimeout(() => successRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
     const id = window.setTimeout(() => setQueueSuccess(null), 3000)
     return () => window.clearTimeout(id)
   }, [queueSuccess])
@@ -474,7 +488,7 @@ export default function AutomationIdeas({
 
       {/* Phase 3F.3.7g — prominent, dismissible success confirmation after enqueue. */}
       {queueSuccess && (
-        <div className="mb-4 rounded-xl border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
+        <div ref={successRef} className="mb-4 rounded-xl border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3 scroll-mt-4">
           <div className="flex items-start gap-2">
             <span className="text-lg leading-none text-emerald-600 dark:text-emerald-400">✓</span>
             <div className="flex-1 min-w-0">
