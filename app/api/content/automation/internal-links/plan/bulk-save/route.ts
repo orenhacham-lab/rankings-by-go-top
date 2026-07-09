@@ -23,7 +23,7 @@
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
-import { planFromCachedTargets, promoteManualCandidates, selectClientLinks, CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
+import { planFromCachedTargets, promoteManualCandidates, selectClientLinks, CACHE_PLANNER_VERSION, type DroppedSelection } from '@/lib/content/internal-link-planner-cache'
 import { savePlanBatch, approveBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
@@ -31,7 +31,7 @@ export const dynamic = 'force-dynamic'
 
 interface TopicRow { id: string; topic: string; primary_keyword: string | null; secondary_keywords: string[] | null }
 
-interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCount: number; approvedCount: number; manualApplied?: number; staleAtCreation?: boolean; reason?: string }
+interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCount: number; approvedCount: number; manualApplied?: number; staleAtCreation?: boolean; reason?: string; droppedLinks?: DroppedSelection[] }
 
 export async function POST(request: Request) {
   if (!isInternalLinkPlanningEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -125,8 +125,13 @@ export async function POST(request: Request) {
     // re-validated; else legacy: all recommended + promoted manual overrides.
     let plan = basePlan
     let manualApplied = 0
+    // Phase 3G.5 — user-checked links that could NOT be saved, with reasons.
+    // Returned per topic so the review panel can warn instead of dropping silently.
+    let droppedLinks: DroppedSelection[] = []
     if (exactMode) {
-      plan = selectClientLinks(basePlan, selectedByTopic.get(id) ?? [])
+      const sel = selectClientLinks(basePlan, selectedByTopic.get(id) ?? [])
+      plan = sel.plan
+      droppedLinks = sel.dropped
     } else {
       const promoted = promoteManualCandidates(basePlan, manualByTopic.get(id) ?? [])
       plan = promoted.plan
@@ -139,7 +144,7 @@ export async function POST(request: Request) {
       plannerVersion: CACHE_PLANNER_VERSION, cacheScannerVersion: row.scanner_version,
       cacheScanCompletedAt: row.scan_completed_at, cacheState, allowCaution, strict: false, staleAtCreation, warnings,
     })
-    if (!batchId) { results.push({ topicId: id, ok: false, linkCount: plan.selected.length, approvedCount: 0, reason: 'save_failed' }); continue }
+    if (!batchId) { results.push({ topicId: id, ok: false, linkCount: plan.selected.length, approvedCount: 0, reason: 'save_failed', droppedLinks }); continue }
 
     let approvedCount = 0
     if (approve && plan.selected.length > 0) approvedCount = await approveBatchLinks(admin, project.id, batchId)
@@ -147,7 +152,7 @@ export async function POST(request: Request) {
     topicsSaved++
     linksSaved += plan.selected.length
     linksApproved += approvedCount
-    results.push({ topicId: id, ok: true, batchId, linkCount: plan.selected.length, approvedCount, manualApplied, staleAtCreation })
+    results.push({ topicId: id, ok: true, batchId, linkCount: plan.selected.length, approvedCount, manualApplied, staleAtCreation, droppedLinks })
   }
 
   return Response.json({

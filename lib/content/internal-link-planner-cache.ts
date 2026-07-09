@@ -110,31 +110,59 @@ export interface CachePlannedLink {
   reviewability: CandidateTier
   canManualApprove: boolean
   blockReason: string | null
+  // Phase 3G.5 — true when blocked by a TRUE hard-safety/target failure (worth
+  // showing in the review UI's blocked list); false/absent when the candidate is
+  // merely irrelevant (cluster gate) — hidden noise, not a "blocked candidate".
+  displayBlocked?: boolean
 }
 
 export type CandidateTier = 'recommended' | 'reviewable' | 'blocked'
 
 /**
- * Soft rejection reasons a human may override. Anything NOT in this set is a
- * HARD-safety failure (ineligible / external / self-dup / no-anchor / duplicate)
- * and can never be manually approved.
+ * Soft rejection reasons a human may override. Anything NOT in this set can
+ * never be manually approved.
  *
- * Phase 3F.3.7a — the strict CLUSTER-GATE reasons are SOFT: they keep AUTOMATIC
- * recommendations strict (any reason still prevents auto-selection, and the money
- * target still excludes them), but a human reviewer may deliberately pick such a
- * link in the manual/additional-options layer. Hard-safety failures (external,
- * self, duplicate, no-anchor, ineligible) remain non-approvable.
+ * Phase 3G.5 — the manual/selectable tier contains ONLY candidates that share a
+ * real cluster-identity match with the topic, point at an ELIGIBLE target, and
+ * merely scored under the automatic floors (or fell over the cap). Reverted from
+ * 3F.3.7a: the strict CLUSTER-GATE reasons (generic-only / cross-cluster /
+ * unknown) are HARD again — a candidate whose only basis is generic-word overlap
+ * must never surface as a valid selectable suggestion. `target_caution_excluded`
+ * (homepage/unknown pages) is also HARD: insertion requires eligibility 'yes',
+ * so approving a caution target could only ever produce a dead
+ * approved-but-never-insertable link.
  */
 const SOFT_REJECTION_BASES = new Set([
-  'low_relevance', 'low_confidence', 'target_caution_excluded', 'over_cap',
+  'low_relevance', 'low_confidence', 'over_cap',
+])
+/**
+ * Strict cluster-gate verdicts (Phase 3F.3.7): the candidate is merely
+ * IRRELEVANT to the topic (generic-only overlap / different cluster / unknown
+ * identity) — not "unsafe". Never manually approvable, and also not interesting
+ * to display in the blocked list (they are noise, not blocked candidates).
+ */
+const CLUSTER_GATE_BASES = new Set([
   'blocked_cross_cluster', 'blocked_generic_only', 'unknown_no_exact',
 ])
 function isSoftRejection(reason: string): boolean {
   return SOFT_REJECTION_BASES.has(reason.split('(')[0]!)
 }
+function isClusterGateRejection(reason: string): boolean {
+  return CLUSTER_GATE_BASES.has(reason.split('(')[0]!)
+}
 /** True when EVERY rejection reason is soft (⇒ safe to manually approve). */
 export function isReviewableRejection(rejectedReasons: string[]): boolean {
   return rejectedReasons.length > 0 && rejectedReasons.every(isSoftRejection)
+}
+/**
+ * True when the candidate failed a TRUE hard-safety/target check (no anchor,
+ * self/duplicate, ineligible or caution target, external URL, duplicate
+ * url/anchor) — as opposed to being merely irrelevant (cluster gate) or merely
+ * under-scored (soft). Review UIs show ONLY these in the "blocked" section so
+ * the list stays accurate instead of dumping every unrelated page on the site.
+ */
+export function isDisplayBlockedRejection(rejectedReasons: string[]): boolean {
+  return rejectedReasons.some((r) => !isSoftRejection(r) && !isClusterGateRejection(r))
 }
 
 export interface CacheTopicPlan {
@@ -651,11 +679,12 @@ export function planFromCachedTargets(
   // duplicate_anchor / over_cap). recommended = auto-selected; reviewable = soft
   // reasons only (safe manual override); blocked = any hard-safety reason.
   for (const s of scored) {
-    if (finalSelected.includes(s)) { s.reviewability = 'recommended'; s.canManualApprove = false; s.blockReason = null; continue }
+    if (finalSelected.includes(s)) { s.reviewability = 'recommended'; s.canManualApprove = false; s.blockReason = null; s.displayBlocked = false; continue }
     const soft = isReviewableRejection(s.rejectedReasons)
     s.reviewability = soft ? 'reviewable' : 'blocked'
     s.canManualApprove = soft
     s.blockReason = soft ? null : (s.rejectedReasons.find((r) => !isSoftRejection(r)) ?? 'blocked')
+    s.displayBlocked = soft ? false : isDisplayBlockedRejection(s.rejectedReasons)
   }
 
   const rejected = scored.filter((s) => !finalSelected.includes(s)).sort((a, b) => b.confidence - a.confidence)
@@ -704,29 +733,82 @@ export function promoteManualCandidates(
   }
 }
 
+/** Why a user-checked link could not be saved (Phase 3G.5 — never silent). */
+export type DroppedSelectionReason = 'blocked' | 'not_in_plan' | 'invalid_anchor' | 'duplicate_target'
+export interface DroppedSelection { targetUrl: string; anchorText: string; reason: DroppedSelectionReason }
+export interface SelectClientLinksResult { plan: CacheTopicPlan; dropped: DroppedSelection[] }
+
 /**
  * Phase 3B.2 — EXACT client selection: save ONLY the links the user checked.
  * Each desired (targetUrl, anchorText) is kept ONLY if the server's own fresh
  * plan classifies it as a recommended link OR an approvable reviewable candidate
  * — client data is a lookup key, never trusted content, and blocked/hard-safety
  * candidates can never be saved. An empty selection yields an auditable zero-link
- * plan. Deduped by URL+anchor.
+ * plan. Deduped by target URL.
+ *
+ * Phase 3G.5 — exact END-TO-END persistence of the user's choice:
+ *  - A desired link whose URL is in the approvable pool but whose anchor text
+ *    differs from the fresh plan's chosen anchor (e.g. an idea-stage anchor) is
+ *    KEPT with the USER'S anchor — validated by the same shape rule the
+ *    insertion evaluator applies — instead of being silently dropped.
+ *  - Every desired link that could NOT be saved is reported in `dropped` with a
+ *    reason, so callers can surface it. No silent remapping, ever.
  */
 export function selectClientLinks(
   plan: CacheTopicPlan,
   desired: { targetUrl: string; anchorText: string }[],
-): CacheTopicPlan {
+): SelectClientLinksResult {
   const keyOf = (u: string, a: string | null | undefined) => `${normalizeUrlKey(u)}::${(a ?? '').trim().toLowerCase()}`
-  const desiredKeys = new Set((Array.isArray(desired) ? desired : []).map((d) => keyOf(d.targetUrl, d.anchorText)))
   const pool = [
     ...plan.selected,
     ...plan.rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove),
   ]
-  const seen = new Set<string>()
-  const selected: CachePlannedLink[] = []
+  const poolByKey = new Map<string, CachePlannedLink>()
+  const poolByUrl = new Map<string, CachePlannedLink>()
   for (const cand of pool) {
     const k = keyOf(cand.targetUrl, cand.anchorText)
-    if (desiredKeys.has(k) && !seen.has(k)) { seen.add(k); selected.push({ ...cand, selected: true }) }
+    if (!poolByKey.has(k)) poolByKey.set(k, cand)
+    const u = normalizeUrlKey(cand.targetUrl)
+    if (!poolByUrl.has(u)) poolByUrl.set(u, cand)
   }
-  return { ...plan, selected, rejected: plan.rejected.filter((r) => !seen.has(keyOf(r.targetUrl, r.anchorText))) }
+
+  const seenUrl = new Set<string>()
+  const selected: CachePlannedLink[] = []
+  const dropped: DroppedSelection[] = []
+  const promote = (cand: CachePlannedLink, anchorText: string): CachePlannedLink => ({
+    ...cand,
+    anchorText,
+    selected: true,
+    reason: cand.selected ? cand.reason : `manual_override (${cand.rejectedReasons.join(', ')})`,
+  })
+
+  for (const d of Array.isArray(desired) ? desired : []) {
+    if (!d || typeof d.targetUrl !== 'string' || !d.targetUrl.trim()) continue
+    const anchor = (d.anchorText ?? '').trim()
+    const urlKey = normalizeUrlKey(d.targetUrl)
+    if (seenUrl.has(urlKey)) { dropped.push({ targetUrl: d.targetUrl, anchorText: anchor, reason: 'duplicate_target' }); continue }
+
+    // 1) Exact (url + anchor) match against the approvable pool.
+    const exact = poolByKey.get(keyOf(d.targetUrl, anchor))
+    if (exact) { seenUrl.add(urlKey); selected.push(promote(exact, exact.anchorText ?? anchor)); continue }
+
+    // 2) Same approvable target, different chosen anchor (e.g. the idea-stage
+    // anchor): keep the USER'S anchor when it passes the same shape rule the
+    // insertion evaluator uses — the exact selection persists end-to-end.
+    const byUrl = poolByUrl.get(urlKey)
+    if (byUrl) {
+      if (anchor && manualAnchorShapeValid(anchor)) { seenUrl.add(urlKey); selected.push(promote(byUrl, anchor)) }
+      else dropped.push({ targetUrl: d.targetUrl, anchorText: anchor, reason: 'invalid_anchor' })
+      continue
+    }
+
+    // 3) Not approvable: a hard-blocked/irrelevant candidate, or not in the plan.
+    const knownRejected = plan.rejected.some((r) => normalizeUrlKey(r.targetUrl) === urlKey)
+    dropped.push({ targetUrl: d.targetUrl, anchorText: anchor, reason: knownRejected ? 'blocked' : 'not_in_plan' })
+  }
+
+  return {
+    plan: { ...plan, selected, rejected: plan.rejected.filter((r) => !seenUrl.has(normalizeUrlKey(r.targetUrl))) },
+    dropped,
+  }
 }

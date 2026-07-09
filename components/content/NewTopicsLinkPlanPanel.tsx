@@ -24,12 +24,13 @@ import { Link2, X } from 'lucide-react'
 
 export interface NewTopic { id: string; topic: string; primary_keyword: string | null }
 
-interface DryLink { targetUrl: string; targetTitle: string; anchorText: string | null; confidence: number; relevance: number; reason: string; rejectedReasons: string[]; reviewability?: string; canManualApprove?: boolean }
+interface DryLink { targetUrl: string; targetTitle: string; anchorText: string | null; confidence: number; relevance: number; reason: string; rejectedReasons: string[]; reviewability?: string; canManualApprove?: boolean; displayBlocked?: boolean }
 interface DryPlan { topicId: string; selected: DryLink[]; rejected: DryLink[]; reviewable: DryLink[]; summary: string }
 
 const mkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targetUrl}||${(l.anchorText ?? '').toLowerCase()}`
 
-interface BulkResult { topicId: string; ok: boolean; linkCount: number; approvedCount: number; reason?: string }
+interface DroppedLink { targetUrl: string; anchorText: string; reason: string }
+interface BulkResult { topicId: string; ok: boolean; linkCount: number; approvedCount: number; reason?: string; droppedLinks?: DroppedLink[] }
 
 const REASON_HE: Record<string, string> = {
   low_relevance: 'רלוונטיות נמוכה',
@@ -92,6 +93,9 @@ export default function NewTopicsLinkPlanPanel({
   const [saving, setSaving] = useState(false)
   const [queuing, setQueuing] = useState(false)
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'approved' | 'zero' | 'failed'>>({})
+  // Phase 3G.5 — checked links the server could NOT save (per topic), surfaced
+  // with their reasons instead of being dropped silently.
+  const [droppedByTopic, setDroppedByTopic] = useState<Record<string, DroppedLink[]>>({})
   const [savedOk, setSavedOk] = useState(false) // compact success state after save
   const [queuedOk, setQueuedOk] = useState(false) // success state after save + enqueue
 
@@ -180,9 +184,11 @@ export default function NewTopicsLinkPlanPanel({
   }, [selected, manualSel])
 
   // Persist the EXACT selection (checked recommended + checked manual per checked
-  // topic; empty ⇒ zero-link plan) and return the topic ids that saved OK, or null
-  // on request error. Shared by "Save" and "Save + add to queue".
-  const runSave = useCallback(async (forceApprove = false): Promise<string[] | null> => {
+  // topic; empty ⇒ zero-link plan) and return the topic ids that saved OK (plus
+  // how many checked links the server refused, so callers can keep the panel
+  // open and show the warning), or null on request error. Shared by "Save" and
+  // "Save + add to queue".
+  const runSave = useCallback(async (forceApprove = false): Promise<{ okIds: string[]; droppedCount: number } | null> => {
     const selectedLinks: { topicId: string; targetUrl: string; anchorText: string }[] = []
     for (const tid of topicIdsToSave) {
       const recs = plans[tid]?.selected ?? []
@@ -202,25 +208,30 @@ export default function NewTopicsLinkPlanPanel({
     if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return null }
     const results: BulkResult[] = Array.isArray(data.results) ? data.results : []
     const nextStatus: Record<string, 'saved' | 'approved' | 'zero' | 'failed'> = {}
+    const nextDropped: Record<string, DroppedLink[]> = {}
     const summaries: { topicId: string; summary: TopicPlanSummary }[] = []
     const okIds: string[] = []
     for (const r of results) {
+      if (Array.isArray(r.droppedLinks) && r.droppedLinks.length > 0) nextDropped[r.topicId] = r.droppedLinks
       if (!r.ok) { nextStatus[r.topicId] = 'failed'; continue }
       nextStatus[r.topicId] = r.linkCount === 0 ? 'zero' : r.approvedCount > 0 ? 'approved' : 'saved'
       summaries.push({ topicId: r.topicId, summary: { exists: true, linkCount: r.linkCount, approvedCount: r.approvedCount, stale: false } })
       okIds.push(r.topicId)
     }
     setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
+    setDroppedByTopic((prev) => ({ ...prev, ...nextDropped }))
     onSaved(summaries)
-    return okIds
+    return { okIds, droppedCount: Object.values(nextDropped).reduce((n, a) => n + a.length, 0) }
   }, [topicIdsToSave, linkSel, manualSel, plans, projectId, autoApprove, t, onSaved])
 
   const save = useCallback(async () => {
     if (saving || queuing || topicIdsToSave.length === 0) return
     setSaving(true); setError(null)
     try {
-      const okIds = await runSave()
-      if (okIds && okIds.length > 0) { setSavedOk(true); window.setTimeout(() => onClose(), 1800) }
+      const r = await runSave()
+      // Auto-close only when EVERY checked link was saved — a dropped link keeps
+      // the panel open so the user actually sees the warning.
+      if (r && r.okIds.length > 0) { setSavedOk(true); if (r.droppedCount === 0) window.setTimeout(() => onClose(), 1800) }
     } catch {
       setError(t.saveError)
     } finally {
@@ -235,13 +246,14 @@ export default function NewTopicsLinkPlanPanel({
     setQueuing(true); setError(null)
     try {
       // Phase 3G — approve the checked links so generation inserts them automatically.
-      const okIds = await runSave(true)
-      if (okIds === null) return
-      const idsToQueue = okIds.length > 0 ? okIds : topicIdsToSave
+      const r = await runSave(true)
+      if (r === null) return
+      const idsToQueue = r.okIds.length > 0 ? r.okIds : topicIdsToSave
       const queued = await onEnqueue(idsToQueue)
       // Links were saved regardless. If the enqueue itself failed, KEEP the panel
-      // open and show the exact failure — never claim a false success.
-      if (queued) { setQueuedOk(true); window.setTimeout(() => onClose(), 1800) }
+      // open and show the exact failure — never claim a false success. A dropped
+      // link also keeps the panel open so the warning is actually seen.
+      if (queued) { setQueuedOk(true); if (r.droppedCount === 0) window.setTimeout(() => onClose(), 1800) }
       else { setError(t.enqueueFailed) }
     } catch {
       setError(t.saveError)
@@ -258,6 +270,25 @@ export default function NewTopicsLinkPlanPanel({
   const linksApproved = Object.entries(saveStatus).filter(([, s]) => s === 'approved').length
   // Calm empty state: no recommended AND no reviewable across all new topics.
   const nothingFound = Object.keys(plans).length > 0 && linksSuggested === 0 && reviewableTotal === 0
+
+  // Phase 3G.5 — checked links the server refused, with per-link reasons. Shown
+  // in the success banners AND the list view; a non-empty list suppresses the
+  // auto-close so the user actually sees it.
+  const droppedEntries = Object.entries(droppedByTopic)
+  const droppedTotal = droppedEntries.reduce((n, [, a]) => n + a.length, 0)
+  const droppedNote = droppedTotal > 0 ? (
+    <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+      <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.droppedWarning} ({droppedTotal})</p>
+      <ul className="mt-1 space-y-0.5">
+        {droppedEntries.flatMap(([tid, arr]) => arr.map((d, i) => (
+          <li key={`${tid}-dl-${i}`} className="text-[10px] text-amber-700 dark:text-amber-400">
+            <span className="font-medium break-words">{d.anchorText || d.targetUrl}</span>
+            {' · '}{(t.droppedReasons as Record<string, string>)[d.reason] ?? d.reason}
+          </li>
+        )))}
+      </ul>
+    </div>
+  ) : null
 
   const statusBadge = (id: string) => {
     const s = saveStatus[id]
@@ -285,18 +316,24 @@ export default function NewTopicsLinkPlanPanel({
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
         {queuedOk ? (
-          /* Save + enqueue success — panel auto-dismisses shortly after. */
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
-            <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.queuedSuccess}</span>
-            <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
-          </div>
+          /* Save + enqueue success — panel auto-dismisses shortly after (unless links were dropped). */
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
+              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.queuedSuccess}</span>
+              <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
+            </div>
+            {droppedNote}
+          </>
         ) : savedOk ? (
-          /* Compact success state — panel auto-dismisses shortly after. */
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
-            <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.savedSuccess}</span>
-            <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70">{t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</span>
-            <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
-          </div>
+          /* Compact success state — panel auto-dismisses shortly after (unless links were dropped). */
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
+              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.savedSuccess}</span>
+              <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70">{t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</span>
+              <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
+            </div>
+            {droppedNote}
+          </>
         ) : loading ? (
           <div className="py-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />{t.loading}
@@ -308,6 +345,7 @@ export default function NewTopicsLinkPlanPanel({
               {t.sumTopicsChecked}: {topicIdsToSave.length} · {t.sumTopicsWithLinks}: {topicsWithLinks} · {t.sumLinksSuggested}: {linksSuggested} · {t.sumReviewable}: {reviewableTotal}
               {plansSaved > 0 && <> · {t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</>}
             </p>
+            {droppedNote}
 
             {/* Calm empty state — not an error. */}
             {nothingFound && (
@@ -319,7 +357,10 @@ export default function NewTopicsLinkPlanPanel({
                 const plan = plans[tp.id]
                 const links = plan?.selected ?? []
                 const reviewable = plan?.reviewable ?? []
-                const blocked = (plan?.rejected ?? []).filter((r) => r.reviewability !== 'reviewable')
+                // Phase 3G.5 — the blocked list shows ONLY true hard-safety/target
+                // failures (displayBlocked). Merely-irrelevant candidates (cluster
+                // gate) are noise, not "blocked candidates", and are hidden.
+                const blocked = (plan?.rejected ?? []).filter((r) => r.reviewability !== 'reviewable' && r.displayBlocked !== false)
                 const mset = manualSel[tp.id] ?? new Set<string>()
                 const lset = linkSel[tp.id] ?? new Set<string>(links.map((l) => mkey(l)))
                 return (

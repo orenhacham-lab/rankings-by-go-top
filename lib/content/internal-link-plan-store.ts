@@ -235,7 +235,16 @@ export function evaluateStaleness(
   const keywordChanged = curKw !== snapKw
   if (titleChanged || keywordChanged) reasons.push('topic_changed')
 
-  // Target URL disappeared from / became ineligible in the current cache.
+  // Phase 3G.5 — `stale` is PLAN-LEVEL only (cache rescanned / scanner version /
+  // topic changed). Everything above this line contributes to it.
+  const planLevelReasons = reasons.length
+
+  // Target URL disappeared from / became ineligible in the current cache —
+  // reported per-plan for DIAGNOSTICS, but it no longer flips `stale`: one bad
+  // target must not poison the whole plan (blocking generation guidance and the
+  // auto-apply of every OTHER, still-valid approved link). The insertion
+  // evaluator and generation guidance handle these PER LINK (target_in_cache /
+  // target_eligible), which is both precise and explainable.
   const byKey = new Map<string, ScannedTarget>()
   for (const t of current.targets) byKey.set(normalizeUrlKey(t.targetUrl), t)
   let missing = 0
@@ -249,5 +258,5 @@ export function evaluateStaleness(
   if (missing) reasons.push(`target_missing(${missing})`)
   if (ineligible) reasons.push(`target_now_ineligible(${ineligible})`)
 
-  return { stale: reasons.length > 0, reasons }
+  return { stale: planLevelReasons > 0, reasons }
 }

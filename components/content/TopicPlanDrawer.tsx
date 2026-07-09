@@ -60,7 +60,7 @@ interface SavedLink {
   status: string
 }
 interface SavedBatch { id: string; status: string; linkCount: number; cacheState?: string | null }
-interface DryItem { targetUrl: string; targetTitle: string; targetRole: string; targetPriority: string; eligibility: string; anchorText: string | null; anchorSource: string | null; relevance: number; priorityBonus: number; confidence: number; reason: string; rejectedReasons: string[]; reviewability?: string; canManualApprove?: boolean }
+interface DryItem { targetUrl: string; targetTitle: string; targetRole: string; targetPriority: string; eligibility: string; anchorText: string | null; anchorSource: string | null; relevance: number; priorityBonus: number; confidence: number; reason: string; rejectedReasons: string[]; reviewability?: string; canManualApprove?: boolean; displayBlocked?: boolean }
 const dmkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targetUrl}||${(l.anchorText ?? '').toLowerCase()}`
 
 export interface DrawerTopic { id: string; topic: string; primary_keyword: string | null }
@@ -406,7 +406,9 @@ export default function TopicPlanDrawer({
             {/* Dry-run result (preview before save) */}
             {dry && (() => {
               const reviewable = dry.rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
-              const blocked = dry.rejected.filter((r) => r.reviewability !== 'reviewable')
+              // Phase 3G.5 — the blocked list shows ONLY true hard-safety/target
+              // failures (displayBlocked); merely-irrelevant candidates are hidden noise.
+              const blocked = dry.rejected.filter((r) => r.reviewability !== 'reviewable' && r.displayBlocked !== false)
               return (
               <div className="mt-4">
                 <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.recommendedTitle}</div>

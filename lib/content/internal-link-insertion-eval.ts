@@ -137,7 +137,10 @@ export async function evaluateApprovedLinks(admin: Admin, projectId: string, art
       else if (!checks.cache_not_stale) skipReason = 'cache_stale'
       else if (!checks.cache_version_ok) skipReason = 'cache_version_stale'
       else if (!checks.target_in_cache) skipReason = 'target_missing_from_cache'
-      else if (!checks.target_eligible) skipReason = 'target_now_ineligible'
+      // Phase 3G.5 — precise cause: a 'caution' target (homepage/unknown page)
+      // was never insertable, which is different from a target that CHANGED to
+      // ineligible ('no') after the plan was approved.
+      else if (!checks.target_eligible) skipReason = target?.eligibility === 'caution' ? 'target_caution_not_insertable' : 'target_now_ineligible'
       else if (!checks.not_self_or_duplicate) skipReason = `self_or_duplicate_target(${selfReason})`
       else if (!checks.anchor_clean) skipReason = 'anchor_no_longer_clean'
       else if (!checks.url_internal) skipReason = 'target_not_internal'

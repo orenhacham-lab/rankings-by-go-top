@@ -14,6 +14,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import { getLatestBatchForTopic, getBatchLinks, evaluateStaleness } from '@/lib/content/internal-link-plan-store'
+import { normalizeUrlKey } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -65,6 +66,13 @@ export async function loadApprovedPlanAnchors(
       return { ...EMPTY(true), diagnostics: { approvedPlanLinksLoaded: approved.length, approvedAnchorsPassedToPrompt: 0, anchorsRequestedInPrompt: 0, planStale: true } }
     }
 
+    // Phase 3G.5 — PER-LINK target health (plan-level staleness no longer covers
+    // it): skip an approved link whose target is missing from the current cache
+    // or not eligible ('yes'), so a phrase whose link can never be inserted is
+    // not woven into the article — while every healthy anchor still flows.
+    const targetByKey = new Map<string, ScannedTarget>()
+    for (const t of targets) targetByKey.set(normalizeUrlKey(t.targetUrl), t)
+
     // Approved links are already confidence-sorted (getBatchLinks). Dedupe by
     // lowercased phrase, keep original order, cap.
     const seen = new Set<string>()
@@ -73,6 +81,8 @@ export async function loadApprovedPlanAnchors(
       const text = (l.anchor_text || '').trim()
       const key = text.toLowerCase()
       if (!text || seen.has(key)) continue
+      const target = targetByKey.get(normalizeUrlKey(l.target_url))
+      if (!target || target.eligibility !== 'yes') continue
       seen.add(key)
       anchors.push(text)
       if (anchors.length >= max) break

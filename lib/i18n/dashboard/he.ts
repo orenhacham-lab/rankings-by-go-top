@@ -344,6 +344,14 @@ export const dashboardHe = {
         blocked_generic_only: 'התאמה על מילים כלליות בלבד',
         unknown_no_exact: 'ללא אשכול מזוהה — לא התאמה מדויקת',
       },
+      // Phase 3G.5 — a checked link that could not be saved is reported, never silent.
+      droppedWarning: 'קישורים שסומנו ולא נשמרו',
+      droppedReasons: {
+        blocked: 'המועמד חסום ולא ניתן לאישור',
+        not_in_plan: 'היעד לא נמצא באינדקס העדכני',
+        invalid_anchor: 'טקסט העוגן אינו תקין',
+        duplicate_target: 'יעד כפול',
+      },
       autoApprove: 'אשר את הקישורים לאחר שמירה (רלוונטי ל״שמור תכנון״ בלבד)',
       approveAutoNote: '״שמור קישורים והוסף לתור הפרסום״ מאשר תמיד את הקישורים המסומנים — אין צורך בסימון הזה.',
       // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't
@@ -946,6 +954,7 @@ export const dashboardHe = {
           target_missing: 'יעד הקישור לא נמצא באינדקס',
           target_missing_from_cache: 'יעד הקישור לא נמצא באינדקס',
           target_now_ineligible: 'יעד הקישור כבר לא מתאים',
+          target_caution_not_insertable: 'יעד ברמת זהירות (למשל עמוד בית) — לא מוטמע אוטומטית',
           anchor_no_longer_clean: 'העוגן כבר לא עומד בכללי האיכות',
           target_not_internal: 'היעד אינו קישור פנימי תקין',
           self_or_duplicate_target: 'יעד עצמי או כפול',

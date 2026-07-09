@@ -345,6 +345,14 @@ export const dashboardEn = {
         blocked_generic_only: 'Matched on generic words only',
         unknown_no_exact: 'No identified cluster — not an exact match',
       },
+      // Phase 3G.5 — a checked link that could not be saved is reported, never silent.
+      droppedWarning: 'Checked links that were not saved',
+      droppedReasons: {
+        blocked: 'Candidate is blocked and cannot be approved',
+        not_in_plan: 'Target not found in the current index',
+        invalid_anchor: 'Anchor text is not valid',
+        duplicate_target: 'Duplicate target',
+      },
       autoApprove: 'Approve the links after saving (applies to “Save plan” only)',
       approveAutoNote: '“Save links and add to publishing queue” always approves the checked links — this checkbox isn’t needed for it.',
       // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't
@@ -944,6 +952,7 @@ export const dashboardEn = {
           target_missing: 'Link target not found in the index',
           target_missing_from_cache: 'Link target not found in the index',
           target_now_ineligible: 'Link target is no longer eligible',
+          target_caution_not_insertable: 'Caution-level target (e.g. homepage) — not auto-inserted',
           anchor_no_longer_clean: 'Anchor no longer meets quality rules',
           target_not_internal: 'Target is not a valid internal link',
           self_or_duplicate_target: 'Self or duplicate target',
