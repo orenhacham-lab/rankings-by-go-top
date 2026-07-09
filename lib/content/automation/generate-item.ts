@@ -65,7 +65,7 @@ async function gateAndFinalize(admin: Admin, itemId: string, article: { id: stri
 export async function generatePoolItem(
   admin: Admin,
   itemId: string,
-  opts: { allowRetry?: boolean } = {},
+  opts: { allowRetry?: boolean; autoApplyInternalLinks?: boolean } = {},
 ): Promise<GenerateItemResult> {
   try {
     const { data: itemData } = await admin
@@ -131,8 +131,11 @@ export async function generatePoolItem(
       return { itemId, status: 'failed', articleId: null, reason: 'project_owner_missing' }
     }
 
-    // Generate via the shared core (same path as manual generation).
-    const gen = await generateArticleForTopic(admin, { topicId: item.topic_id, userId: ownerId })
+    // Generate via the shared core (same path as manual generation). Phase 3G.1 —
+    // when the caller opts in (the MANUAL "generate" button on a queued item), the
+    // topic's APPROVED internal links are auto-inserted into the draft, exactly like
+    // the per-topic manual generate. Cron/scheduled runs do NOT opt in (unchanged).
+    const gen = await generateArticleForTopic(admin, { topicId: item.topic_id, userId: ownerId, autoApplyInternalLinks: opts.autoApplyInternalLinks === true })
     if (!gen.ok) {
       let status = 'failed'
       let reason: string = gen.kind

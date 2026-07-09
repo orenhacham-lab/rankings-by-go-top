@@ -21,7 +21,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ it
   const owned = await authItem(itemId)
   if ('error' in owned) return Response.json({ error: owned.error }, { status: owned.status })
 
-  // Manual trigger allows retrying failed/quality_check_failed items.
-  const result = await generatePoolItem(owned.auth.admin, itemId, { allowRetry: true })
+  // Manual trigger allows retrying failed/quality_check_failed items, and (Phase
+  // 3G.1) auto-inserts the topic's APPROVED internal links into the draft — the
+  // same behavior as the per-topic manual generate. (Cron never opts in.)
+  const result = await generatePoolItem(owned.auth.admin, itemId, { allowRetry: true, autoApplyInternalLinks: true })
   return Response.json(result)
 }
