@@ -49,6 +49,7 @@ export const dashboardEn = {
       linkSavePartialWarn: 'The topics were added to the queue, but some links were not saved. You can edit links from the table.',
       queueFailedRetry: 'The topics were approved but adding them to the queue failed. Click “Add to publishing queue” to try again.',
       reviewOpenFailed: 'We could not open link review for the selected topics.',
+      topicResolveFailed: 'We could not resolve a topic for the selected ideas. The ideas remain in the list.',
       // Phase 3F.3.6 — money target vs supporting links on the idea card + review helper.
       primaryCommercialLink: 'Primary commercial link',
       supportingLinks: 'Supporting links',

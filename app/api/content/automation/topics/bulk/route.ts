@@ -11,7 +11,7 @@
 
 import { authContentProject, isContentAutomationEnabled, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
-import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
+import { ExistingCorpus, tokens, jaccard } from '@/lib/content/recommendations/dedupe'
 import { markIdeasApprovedForTopics, normalizeText } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
@@ -66,13 +66,37 @@ export async function POST(request: Request) {
   const language = (proj as { language?: string } | null)?.language ?? null
 
   const corpus = new ExistingCorpus()
+  // Phase 3F.3.7e — load existing topics WITH ids so the route can AUTHORITATIVELY
+  // resolve an idea the dedupe skips back to its existing article_topic (the client
+  // cannot do this reliably — dedupe is fuzzy jaccard, not an exact keyword match).
   const { data: topicRows } = await auth.admin
     .from('article_topics')
-    .select('topic, primary_keyword, secondary_keywords')
+    .select('id, topic, primary_keyword, secondary_keywords')
     .eq('project_id', auth.project.id)
-  for (const t of (topicRows ?? []) as { topic: string; primary_keyword: string | null; secondary_keywords: string[] | null }[]) {
+  const topicsWithId = (topicRows ?? []) as { id: string; topic: string; primary_keyword: string | null; secondary_keywords: string[] | null }[]
+  const exactToId = new Map<string, string>()
+  const topicTok: { id: string; set: Set<string> }[] = []
+  for (const t of topicsWithId) {
     corpus.add(t.topic); corpus.add(t.primary_keyword)
     for (const s of t.secondary_keywords ?? []) corpus.add(s)
+    const ti = (t.topic || '').trim().toLowerCase()
+    const pk = (t.primary_keyword || '').trim().toLowerCase()
+    if (ti && !exactToId.has(ti)) exactToId.set(ti, t.id)
+    if (pk && !exactToId.has(pk)) exactToId.set(pk, t.id)
+    if (t.topic) topicTok.push({ id: t.id, set: tokens(t.topic) })
+    if (t.primary_keyword) topicTok.push({ id: t.id, set: tokens(t.primary_keyword) })
+  }
+  // Resolve a skipped idea → an existing topic id: exact title/keyword first, then
+  // the SAME fuzzy signal dedupe used (highest token jaccard ≥ 0.82).
+  const resolveExistingTopicId = (title: string, pk: string): string | null => {
+    const ti = title.trim().toLowerCase(), pkl = pk.trim().toLowerCase()
+    const exact = exactToId.get(pkl) ?? exactToId.get(ti)
+    if (exact) return exact
+    const cand = tokens(title || pk)
+    if (cand.size === 0) return null
+    let best: { id: string; score: number } | null = null
+    for (const p of topicTok) { const s = jaccard(cand, p.set); if (s >= 0.82 && (!best || s > best.score)) best = { id: p.id, score: s } }
+    return best?.id ?? null
   }
   const { data: articleRows } = await auth.admin.from('generated_articles').select('title, slug').eq('project_id', auth.project.id)
   for (const a of (articleRows ?? []) as { title: string; slug: string | null }[]) { corpus.add(a.title); corpus.add(a.slug) }
@@ -88,15 +112,30 @@ export async function POST(request: Request) {
   const seenInBatch = new Set<string>()
   let skipped = 0
 
+  // Phase 3F.3.7e — one resolution entry per incoming idea (same order), so the
+  // client can act on EVERY selected idea (created OR existing) by index.
+  type Resolution = { ideaId: string | null; title: string; primaryKeyword: string; outcome: 'create' | 'existing' | 'batchdup' | 'unresolved'; batchKey?: string; existingTopicId?: string; reason?: string }
+  const resolutions: Resolution[] = []
+
   for (const it of incoming) {
     const title = String(it.title ?? '').trim()
     const primaryKeyword = String(it.primaryKeyword ?? '').trim()
-    if (!title || !primaryKeyword) { skipped++; continue }
+    const ideaId = typeof it.ideaId === 'string' ? it.ideaId : null
+    if (!title || !primaryKeyword) { skipped++; resolutions.push({ ideaId, title, primaryKeyword, outcome: 'unresolved', reason: 'missing_title_or_keyword' }); continue }
     const batchKey = primaryKeyword.toLowerCase()
-    if (seenInBatch.has(batchKey)) { skipped++; continue }
-    if (guard.contentKeywords.has(normalizeText(primaryKeyword))) { skipped++; continue }
-    if (corpus.isDuplicate(primaryKeyword) || corpus.isDuplicate(title)) { skipped++; continue }
+    if (seenInBatch.has(batchKey)) { skipped++; resolutions.push({ ideaId, title, primaryKeyword, outcome: 'batchdup', batchKey }); continue }
+    const byGuard = guard.contentKeywords.has(normalizeText(primaryKeyword))
+    const byCorpus = corpus.isDuplicate(primaryKeyword) || corpus.isDuplicate(title)
+    if (byGuard || byCorpus) {
+      skipped++
+      const existingTopicId = resolveExistingTopicId(title, primaryKeyword) ?? undefined
+      resolutions.push(existingTopicId
+        ? { ideaId, title, primaryKeyword, outcome: 'existing', existingTopicId }
+        : { ideaId, title, primaryKeyword, outcome: 'unresolved', reason: byGuard ? 'matched_existing_content_no_topic' : 'similar_existing_no_topic' })
+      continue
+    }
     seenInBatch.add(batchKey)
+    resolutions.push({ ideaId, title, primaryKeyword, outcome: 'create', batchKey })
 
     const source: ArticleTopicSource = ALLOWED_SOURCES.includes(it.source as ArticleTopicSource)
       ? (it.source as ArticleTopicSource)
@@ -127,33 +166,24 @@ export async function POST(request: Request) {
     })
   }
 
-  if (rows.length === 0) return Response.json({ created: 0, skipped, ids: [], topics: [] })
-
-  // Return id + topic + primary_keyword of the created rows so the caller can
-  // offer the Phase 2F.1 internal-link planning step without refetching all
-  // topics or inferring which ones are new.
-  const { data, error } = await auth.admin.from('article_topics').insert(rows).select('id, topic, primary_keyword')
-  if (error) {
-    const code = (error as { code?: string }).code
-    if (code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
-    if (code === '42703' || code === '23514') {
-      // Missing column / CHECK violation → the automation migration isn't applied.
-      return Response.json({ error: 'automation_migration_required' }, { status: 503 })
+  // Insert the new rows (if any). Existing/duplicate ideas still get resolved to
+  // their existing topic id below, so the client can always act on every idea.
+  let createdRows: { id: string; topic: string; primary_keyword: string | null }[] = []
+  if (rows.length > 0) {
+    const { data, error } = await auth.admin.from('article_topics').insert(rows).select('id, topic, primary_keyword')
+    if (error) {
+      const code = (error as { code?: string }).code
+      if (code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
+      if (code === '42703' || code === '23514') {
+        // Missing column / CHECK violation → the automation migration isn't applied.
+        return Response.json({ error: 'automation_migration_required' }, { status: 503 })
+      }
+      console.error('[automation-topics-bulk] insert failed', { code, message: error.message })
+      return Response.json({ error: 'Failed to create topics' }, { status: 500 })
     }
-    console.error('[automation-topics-bulk] insert failed', { code, message: error.message })
-    return Response.json({ error: 'Failed to create topics' }, { status: 500 })
+    createdRows = (data ?? []) as { id: string; topic: string; primary_keyword: string | null }[]
   }
-
-  const createdRows = (data ?? []) as { id: string; topic: string; primary_keyword: string | null }[]
   const ids = createdRows.map((r) => r.id)
-
-  // Phase 3F.3.1 — mark the corresponding persisted ideas approved. Robust match
-  // by ideaId OR exact normalized title/keyword (pending-only) so approval works
-  // even without an ideaId; best-effort and no-ops when persistence is absent.
-  const approveMatch = incoming
-    .map((it) => ({ title: String(it.title ?? '').trim(), primaryKeyword: String(it.primaryKeyword ?? '').trim(), ideaId: typeof it.ideaId === 'string' ? it.ideaId : undefined }))
-    .filter((m) => m.title || m.primaryKeyword)
-  await markIdeasApprovedForTopics(auth.admin, auth.project.id, approveMatch, createdRows)
 
   // Phase 3F.3.2 — carry the idea-stage user-SELECTED suggested internal links
   // into the new topic's link PLAN (planned, never inserted). Behind the
@@ -224,6 +254,40 @@ export async function POST(request: Request) {
     }
   }
 
+  // Phase 3F.3.7e — AUTHORITATIVE per-idea resolution (created + existing), in the
+  // same order as the request. The client acts on these ids for BOTH flows and no
+  // longer guesses existing topics itself.
+  const createdByKw = new Map<string, string>()
+  for (const r of createdRows) createdByKw.set((r.primary_keyword || '').toLowerCase(), r.id)
+  const linkCountByTopicId = new Map<string, number>(savedPlans.map((p) => [p.topicId, p.linkCount]))
+  const resolvedTopics = resolutions.map((res) => {
+    let topicId: string | null = null
+    let source: 'created' | 'existing' | null = null
+    if (res.outcome === 'create') { topicId = createdByKw.get(res.batchKey || '') ?? null; source = topicId ? 'created' : null }
+    else if (res.outcome === 'existing') { topicId = res.existingTopicId ?? null; source = topicId ? 'existing' : null }
+    else if (res.outcome === 'batchdup') {
+      topicId = createdByKw.get(res.batchKey || '') ?? resolveExistingTopicId(res.title, res.primaryKeyword)
+      source = topicId ? (createdByKw.has(res.batchKey || '') ? 'created' : 'existing') : null
+    }
+    return {
+      ideaId: res.ideaId, topicId, title: res.title, primaryKeyword: res.primaryKeyword,
+      source: source ?? undefined,
+      linkCount: topicId ? (linkCountByTopicId.get(topicId) ?? 0) : 0,
+      unresolvedReason: topicId ? undefined : (res.reason ?? 'unresolved'),
+    }
+  })
+
+  // Phase 3F.3.1/3F.3.7e — mark the persisted ideas approved for EVERY resolved
+  // topic (created OR existing), so an idea that mapped to an already-existing topic
+  // does not reappear as pending after refresh. Best-effort; no-ops without ideas.
+  const approveMatch = incoming
+    .map((it) => ({ title: String(it.title ?? '').trim(), primaryKeyword: String(it.primaryKeyword ?? '').trim(), ideaId: typeof it.ideaId === 'string' ? it.ideaId : undefined }))
+    .filter((m) => m.title || m.primaryKeyword)
+  const resolvedRows = resolvedTopics
+    .filter((rt): rt is typeof rt & { topicId: string } => typeof rt.topicId === 'string')
+    .map((rt) => ({ id: rt.topicId, topic: rt.title, primary_keyword: rt.primaryKeyword }))
+  if (resolvedRows.length > 0) await markIdeasApprovedForTopics(auth.admin, auth.project.id, approveMatch, resolvedRows)
+
   const debug = process.env.NODE_ENV !== 'production' ? { cacheReason, linkPlans: linkPlanDebug, plannedTopicIds } : undefined
-  return Response.json({ created: ids.length, skipped, ids, topics: createdRows, linkPlansSaved, plannedTopicIds, savedPlans, cacheReason, debug })
+  return Response.json({ created: ids.length, skipped, ids, topics: createdRows, resolvedTopics, linkPlansSaved, plannedTopicIds, savedPlans, cacheReason, debug })
 }

@@ -47,6 +47,7 @@ export const dashboardHe = {
       linkSavePartialWarn: 'הנושאים נוספו לתור, אבל חלק מהקישורים לא נשמרו. אפשר לערוך קישורים מהטבלה.',
       queueFailedRetry: 'הנושאים אושרו אך ההוספה לתור נכשלה. לחץ ״הוסף לתור הפרסום״ כדי לנסות שוב.',
       reviewOpenFailed: 'לא הצלחנו לפתוח את בדיקת הקישורים לנושאים שנבחרו.',
+      topicResolveFailed: 'לא הצלחנו לזהות נושא עבור הרעיונות שנבחרו. הרעיונות נשארים ברשימה.',
       // Phase 3F.3.6 — money target vs supporting links on the idea card + review helper.
       primaryCommercialLink: 'קישור מסחרי ראשי',
       supportingLinks: 'קישורים תומכים',

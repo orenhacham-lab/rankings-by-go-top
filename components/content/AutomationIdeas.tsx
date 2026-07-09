@@ -221,28 +221,20 @@ export default function AutomationIdeas({
     void rejectIds(suggestions.filter((s) => selected.has(s.id)).map((s) => s.id))
   }
 
-  // Create/approve the selected ideas AND save their checked idea-stage links
-  // (server re-validates; unchecked omitted). Returns parsed results, or null on
-  // error (message already set). Does NOT itself enqueue or open the planner — the
-  // caller decides the next step (one-click queue vs. advanced review).
+  // Phase 3F.3.7e — ONE resolution used by BOTH buttons. The SERVER is authoritative:
+  // topics/bulk returns `resolvedTopics` (one per selected idea, in order) with the
+  // created OR existing topic id, so the client never guesses duplicates. No idea is
+  // removed here — the caller removes only after its action (enqueue / open panel)
+  // has succeeded.
   type ReviewTopic = { id: string; topic: string; primary_keyword: string | null }
   type CreateResult = {
-    ids: string[]
-    createdTopics: ReviewTopic[]
-    plannedIds: Set<string>
+    topicsForAction: ReviewTopic[]
+    resolvedIdeaIds: string[]
+    unresolved: { title: string; reason: string }[]
+    uncheckedByTopicId: Record<string, string[]>
     savedPlans: { topicId: string; linkCount: number }[]
     expectedPlans: number
-    // The chosen ideas (id + keyword + title) so the caller can resolve existing
-    // topics for duplicates and decide when to remove them from the list.
-    chosen: { id: string; primaryKeyword: string; title: string }[]
-    // keyword-lc → the idea-stage suggested-link URLs the user UNCHECKED, so the
-    // review panel preserves that choice for BOTH created and existing topics.
-    uncheckedByKw: Record<string, string[]>
   }
-  // Create/approve the selected ideas AND save their checked idea-stage links.
-  // IMPORTANT (Phase 3F.3.7c): this NO LONGER removes ideas from the list or clears
-  // the selection — the caller does that ONLY once its next step (enqueue / open
-  // review panel) has succeeded, so a duplicate/skip can never make an idea vanish.
   async function createTopics(): Promise<CreateResult | null> {
     const chosen = suggestions.filter((s) => selected.has(s.id))
     if (chosen.length === 0) return null
@@ -258,27 +250,54 @@ export default function AutomationIdeas({
       setMessage({ text: data?.error === 'automation_migration_required' ? 'automation_migration_required' : (data?.error || 'error'), ok: false })
       return null
     }
-    const ids: string[] = Array.isArray(data.ids) ? data.ids : []
-    const createdTopics: ReviewTopic[] = Array.isArray(data.topics)
-      ? (data.topics as { id?: unknown; topic?: unknown; primary_keyword?: unknown }[])
-          .filter((r): r is ReviewTopic => typeof r?.id === 'string')
-          .map((r) => ({ id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }))
-      : []
-    const plannedIds = new Set<string>(Array.isArray(data.plannedTopicIds) ? (data.plannedTopicIds as unknown[]).filter((x): x is string => typeof x === 'string') : [])
     const savedPlans = Array.isArray(data.savedPlans)
       ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
       : []
-    const uncheckedByKw: Record<string, string[]> = {}
-    for (const s of chosen) {
-      const checkedUrls = new Set(selectedLinksFor(s).map((l) => l.url))
-      const unchecked = s.suggestedInternalLinks.filter((l) => !checkedUrls.has(l.url)).map((l) => l.url)
-      if (unchecked.length) uncheckedByKw[(s.primaryKeyword || '').toLowerCase()] = unchecked
-    }
-    // Seed the topic-row plan badge so saved idea-stage links show immediately.
     if (savedPlans.length) onPlansSaved?.(savedPlans)
     setLastPlansCount(savedPlans.length)
     onCreated()
-    return { ids, createdTopics, plannedIds, savedPlans, expectedPlans, chosen: chosen.map((s) => ({ id: s.id, primaryKeyword: s.primaryKeyword, title: s.title })), uncheckedByKw }
+
+    const topicsForAction: ReviewTopic[] = []
+    const resolvedIdeaIds: string[] = []
+    const unresolved: { title: string; reason: string }[] = []
+    const uncheckedByTopicId: Record<string, string[]> = {}
+    const seen = new Set<string>()
+    const addResolved = (s: Suggestion, topicId: string, title: string, pk: string | null) => {
+      if (!seen.has(topicId)) { seen.add(topicId); topicsForAction.push({ id: topicId, topic: title, primary_keyword: pk }) }
+      resolvedIdeaIds.push(s.id)
+      const checked = new Set(selectedLinksFor(s).map((l) => l.url))
+      const unchecked = s.suggestedInternalLinks.filter((l) => !checked.has(l.url)).map((l) => l.url)
+      if (unchecked.length && !uncheckedByTopicId[topicId]) uncheckedByTopicId[topicId] = unchecked
+    }
+
+    // AUTHORITATIVE path: map resolvedTopics[i] ↔ chosen[i] by INDEX (same order).
+    const resolved: unknown[] = Array.isArray(data.resolvedTopics) ? data.resolvedTopics : []
+    if (resolved.length > 0) {
+      for (let i = 0; i < chosen.length; i++) {
+        const s = chosen[i]!
+        const r = resolved[i] as { topicId?: unknown; title?: unknown; primaryKeyword?: unknown; unresolvedReason?: unknown } | undefined
+        if (r && typeof r.topicId === 'string' && r.topicId) {
+          addResolved(s, r.topicId, typeof r.title === 'string' ? r.title : s.title, typeof r.primaryKeyword === 'string' ? r.primaryKeyword : s.primaryKeyword)
+        } else {
+          unresolved.push({ title: s.title, reason: r && typeof r.unresolvedReason === 'string' ? r.unresolvedReason : 'unresolved' })
+        }
+      }
+    } else {
+      // Fallback (older server without resolvedTopics): use created rows by keyword.
+      const createdTopics: ReviewTopic[] = Array.isArray(data.topics)
+        ? (data.topics as { id?: unknown; topic?: unknown; primary_keyword?: unknown }[])
+            .filter((r): r is ReviewTopic => typeof r?.id === 'string')
+            .map((r) => ({ id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }))
+        : []
+      const byKw = new Map<string, ReviewTopic>()
+      for (const ct of createdTopics) byKw.set((ct.primary_keyword || '').toLowerCase(), ct)
+      for (const s of chosen) {
+        const ct = byKw.get((s.primaryKeyword || '').toLowerCase())
+        if (ct) addResolved(s, ct.id, ct.topic, ct.primary_keyword)
+        else unresolved.push({ title: s.title, reason: 'unresolved' })
+      }
+    }
+    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, savedPlans, expectedPlans }
   }
 
   // Remove the given idea ids from the visible list + selection (called ONLY after
@@ -288,81 +307,6 @@ export default function AutomationIdeas({
     const set = new Set(ideaIds)
     setSuggestions((prev) => prev.filter((s) => !set.has(s.id)))
     setSelected((prev) => { const n = new Set(prev); for (const id of ideaIds) n.delete(id); return n })
-  }
-
-  // Build per-topic-id unchecked URL map (works for created AND existing topics).
-  function uncheckedFor(topicsList: ReviewTopic[], byKw: Record<string, string[]>): Record<string, string[]> {
-    const out: Record<string, string[]> = {}
-    for (const tp of topicsList) {
-      const u = byKw[(tp.primary_keyword || '').toLowerCase()]
-      if (u && u.length) out[tp.id] = u
-    }
-    return out
-  }
-
-  // Resolve EXISTING topic rows for ideas the bulk route skipped as duplicates,
-  // by projectId + primary_keyword (fallback: title). Read-only, best-effort.
-  async function resolveExistingTopics(needed: { primaryKeyword: string; title: string }[]): Promise<ReviewTopic[]> {
-    if (needed.length === 0) return []
-    try {
-      const res = await fetch(`/api/content/topics?projectId=${encodeURIComponent(projectId)}`)
-      if (!res.ok) return []
-      const data = await res.json().catch(() => ({}))
-      const rows: unknown[] = Array.isArray(data.topics) ? data.topics : []
-      const byKw = new Map<string, ReviewTopic>()
-      const byTitle = new Map<string, ReviewTopic>()
-      for (const raw of rows) {
-        const r = raw as { id?: unknown; topic?: unknown; primary_keyword?: unknown }
-        if (typeof r?.id !== 'string') continue
-        const tp: ReviewTopic = { id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }
-        const kw = (tp.primary_keyword || '').toLowerCase().trim()
-        const ti = tp.topic.toLowerCase().trim()
-        if (kw && !byKw.has(kw)) byKw.set(kw, tp) // list is newest-first → keep most recent
-        if (ti && !byTitle.has(ti)) byTitle.set(ti, tp)
-      }
-      const out: ReviewTopic[] = []
-      const seen = new Set<string>()
-      for (const n of needed) {
-        const kw = (n.primaryKeyword || '').toLowerCase().trim()
-        const ti = (n.title || '').toLowerCase().trim()
-        const match = (kw && byKw.get(kw)) || (ti && byTitle.get(ti)) || null
-        if (match && !seen.has(match.id)) { seen.add(match.id); out.push(match) }
-      }
-      return out
-    } catch {
-      return []
-    }
-  }
-
-  // Phase 3F.3.7d — ONE normalized resolution used by BOTH buttons: create/approve
-  // the selected ideas, resolve any bulk-route duplicates to their EXISTING topic
-  // rows, and return the exact topics to act on (+ which ideas resolved). No idea
-  // is ever removed here — the caller removes only after its action succeeds.
-  type ActionResolution = {
-    topicsForAction: ReviewTopic[]
-    resolvedIdeaIds: string[]
-    uncheckedByTopicId: Record<string, string[]>
-    savedPlans: { topicId: string; linkCount: number }[]
-    expectedPlans: number
-  }
-  async function resolveTopicsForAction(): Promise<ActionResolution | null> {
-    const res = await createTopics()
-    if (!res) return null
-    const createdKws = new Set(res.createdTopics.map((tp) => (tp.primary_keyword || '').toLowerCase()))
-    const skipped = res.chosen.filter((c) => !createdKws.has((c.primaryKeyword || '').toLowerCase()))
-    const existing = await resolveExistingTopics(skipped)
-    const seen = new Set<string>()
-    const topicsForAction: ReviewTopic[] = []
-    for (const tp of [...res.createdTopics, ...existing]) if (!seen.has(tp.id)) { seen.add(tp.id); topicsForAction.push(tp) }
-    const actionKws = new Set(topicsForAction.map((tp) => (tp.primary_keyword || '').toLowerCase()))
-    const resolvedIdeaIds = res.chosen.filter((c) => actionKws.has((c.primaryKeyword || '').toLowerCase())).map((c) => c.id)
-    return {
-      topicsForAction,
-      resolvedIdeaIds,
-      uncheckedByTopicId: uncheckedFor(topicsForAction, res.uncheckedByKw),
-      savedPlans: res.savedPlans,
-      expectedPlans: res.expectedPlans,
-    }
   }
 
   // Ensure the project's pool exists (never flips an active pool to paused) and add
@@ -409,11 +353,12 @@ export default function AutomationIdeas({
     if (creating) return
     setCreating(true); setBusyAction('queue'); setMessage(null)
     try {
-      const r = await resolveTopicsForAction()
+      const r = await createTopics()
       if (!r) return
       if (r.topicsForAction.length === 0) {
-        // Could not resolve ANY selected idea to a topic — keep them visible.
-        setMessage({ text: t.reviewOpenFailed, ok: false })
+        // Could not resolve ANY selected idea to a topic — keep them visible. This is
+        // the PRIMARY path, so it must NOT show the review-panel error.
+        setMessage({ text: `${t.topicResolveFailed}${r.unresolved[0]?.reason ? ` (${r.unresolved[0].reason})` : ''}`, ok: false })
         return
       }
       // Enqueue the EXACT resolved topics (newly created + existing duplicates).
@@ -448,7 +393,7 @@ export default function AutomationIdeas({
     if (creating) return
     setCreating(true); setBusyAction('review'); setMessage(null)
     try {
-      const r = await resolveTopicsForAction()
+      const r = await createTopics()
       if (!r) return
       if (r.topicsForAction.length > 0) {
         // Open the panel FIRST, then remove only the ideas that resolved.
@@ -456,7 +401,7 @@ export default function AutomationIdeas({
         removeChosenIdeas(r.resolvedIdeaIds)
       } else {
         // Nothing resolvable at all — keep the ideas visible + a real error.
-        setMessage({ text: t.reviewOpenFailed, ok: false })
+        setMessage({ text: `${t.reviewOpenFailed}${r.unresolved[0]?.reason ? ` (${r.unresolved[0].reason})` : ''}`, ok: false })
       }
     } catch {
       setMessage({ text: 'error', ok: false })
