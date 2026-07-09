@@ -79,6 +79,8 @@ export default function AutomationIdeas({
   // Which approve action is running (for per-button spinners): the one-click
   // queue action or the advanced review action. Phase 3F.3.5.
   const [busyAction, setBusyAction] = useState<'queue' | 'review' | null>(null)
+  // Phase 3F.3.7g — prominent success confirmation after a successful enqueue.
+  const [queueSuccess, setQueueSuccess] = useState<{ count: number; links: boolean } | null>(null)
   // Phase 3F.3.3a — the truthful "next step" CTA to scroll into view after approval.
   const ctaRef = useRef<HTMLDivElement | null>(null)
 
@@ -145,7 +147,7 @@ export default function AutomationIdeas({
     const reqId = ++reqRef.current
     // Do NOT clear the current list up-front — "find more" keeps existing pending
     // ideas visible and the response returns the combined active pending set.
-    setLoading(true); setMessage(null); setMeta(null)
+    setLoading(true); setMessage(null); setMeta(null); setQueueSuccess(null)
     try {
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
@@ -351,7 +353,7 @@ export default function AutomationIdeas({
   // queue in ONE action. No intermediate CTA / planner unless enqueue fails.
   async function approveAndQueue() {
     if (creating) return
-    setCreating(true); setBusyAction('queue'); setMessage(null)
+    setCreating(true); setBusyAction('queue'); setMessage(null); setQueueSuccess(null)
     try {
       const r = await createTopics()
       if (!r) return
@@ -373,11 +375,14 @@ export default function AutomationIdeas({
         setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
         return
       }
-      // SUCCESS — only now remove the ideas + show success + refresh the schedule.
+      // SUCCESS — only now remove the ideas + show the prominent success box + refresh.
       removeChosenIdeas(r.resolvedIdeaIds)
       const partial = r.expectedPlans > 0 && r.savedPlans.length < r.expectedPlans
       setLastCreatedIds([]); setLastPlansCount(0)
-      setMessage({ text: partial ? t.linkSavePartialWarn : t.queuedFinalSuccess, ok: !partial })
+      setQueueSuccess({ count: ids.length, links: r.savedPlans.length > 0 })
+      // Keep only the amber partial-save warning as an inline note; the prominent
+      // green box carries the success confirmation.
+      setMessage(partial ? { text: t.linkSavePartialWarn, ok: false } : null)
       onScheduled?.()
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -391,7 +396,7 @@ export default function AutomationIdeas({
   // selected idea resolves to a topic.
   async function approveAndReview() {
     if (creating) return
-    setCreating(true); setBusyAction('review'); setMessage(null)
+    setCreating(true); setBusyAction('review'); setMessage(null); setQueueSuccess(null)
     try {
       const r = await createTopics()
       if (!r) return
@@ -415,10 +420,13 @@ export default function AutomationIdeas({
     if (scheduling || lastCreatedIds.length === 0) return
     setScheduling(true); setMessage(null)
     try {
+      const count = lastCreatedIds.length
+      const hadLinks = lastPlansCount > 0
       const enq = await enqueueTopics(lastCreatedIds)
       if (enq.ok) {
         setLastCreatedIds([]); setLastPlansCount(0)
-        setMessage({ text: t.queuedSuccess, ok: true })
+        setQueueSuccess({ count, links: hadLinks })
+        setMessage(null)
         onScheduled?.()
       } else {
         setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
@@ -453,7 +461,23 @@ export default function AutomationIdeas({
           <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">4.</span> {t.onboardStep4}</li>
           <li><span className="font-semibold text-indigo-700 dark:text-indigo-300">5.</span> {t.onboardStep5}</li>
         </ol>
+        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{t.onboardHelperNote}</p>
       </div>
+
+      {/* Phase 3F.3.7g — prominent, dismissible success confirmation after enqueue. */}
+      {queueSuccess && (
+        <div className="mb-4 rounded-xl border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
+          <div className="flex items-start gap-2">
+            <span className="text-lg leading-none text-emerald-600 dark:text-emerald-400">✓</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{queueSuccess.count > 1 ? t.queueSuccessTitleMany : t.queueSuccessTitleOne}</div>
+              <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{queueSuccess.count > 1 ? t.queueSuccessBodyMany : t.queueSuccessBodyOne}</p>
+              {queueSuccess.links && <p className="mt-1 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queueSuccessLinksNote}</p>}
+            </div>
+            <button type="button" onClick={() => setQueueSuccess(null)} className="text-emerald-700/70 dark:text-emerald-300/70 hover:text-emerald-900 dark:hover:text-emerald-100 text-xs" aria-label={t.dismiss}>✕</button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {sourceTabs.map((s) => (

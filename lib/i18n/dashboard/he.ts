@@ -28,14 +28,22 @@ export const dashboardHe = {
     autoIdeas: {
       title: 'רעיונות אוטומטיים למאמרים',
       intro: 'מצאנו רעיונות למאמרים לפי נתוני האתר ומחקר ביטויים. אפשר לאשר נושאים עכשיו, ובשלב הבא להוסיף אותם לתזמון פרסום אוטומטי.',
-      // Phase 3F.3.3a — visible onboarding block + truthful two-step copy.
+      // Phase 3F.3.7g — onboarding block reflecting the direct one-click flow.
       onboardTitle: 'מה עושים כאן?',
-      onboardBody: 'זה השלב שבו בוחרים רעיונות למאמרים. אחרי האישור, הנושאים יעברו לרשימת נושאים מוכנים, ומשם אפשר להוסיף אותם לתור הפרסום האוטומטי.',
+      onboardBody: 'כאן בוחרים רעיונות למאמרים ומוסיפים אותם לתור הפרסום האוטומטי. אפשר לאשר נושאים ישירות, או לבדוק קודם את הקישורים הפנימיים שהמערכת מציעה.',
       onboardStep1: 'מצא רעיונות למאמרים',
       onboardStep2: 'בחר את הנושאים הרצויים',
-      onboardStep3: 'אשר קישורים פנימיים מומלצים, אם קיימים',
-      onboardStep4: 'אשר את הנושאים',
-      onboardStep5: 'הוסף אותם לתור הפרסום האוטומטי',
+      onboardStep3: 'אם הקישורים המוצעים מתאימים — לחץ על ״אשר נושאים והוסף לתור הפרסום״',
+      onboardStep4: 'אם תרצה לבדוק או לערוך קישורים לפני ההוספה — לחץ על ״בדוק / ערוך קישורים לפני ההוספה״',
+      onboardStep5: 'לאחר ההוספה לתור, המערכת תיצור ותפרסם את המאמרים לפי התזמון שהוגדר',
+      onboardHelperNote: 'הקישורים הם אופציונליים. אם לא נמצא קישור פנימי מדויק מספיק, עדיף לא להוסיף קישור אוטומטי.',
+      // Phase 3F.3.7g — prominent success confirmation after a successful enqueue.
+      queueSuccessTitleOne: 'הנושא נוסף לתור הפרסום',
+      queueSuccessTitleMany: 'הנושאים נוספו לתור הפרסום',
+      queueSuccessBodyOne: 'הנושא אושר ונוסף לתור הפרסום האוטומטי. המערכת תיצור ותפרסם את המאמר לפי התזמון שהוגדר.',
+      queueSuccessBodyMany: 'הנושאים אושרו ונוספו לתור הפרסום האוטומטי. המערכת תיצור ותפרסם את המאמרים לפי התזמון שהוגדר.',
+      queueSuccessLinksNote: 'הקישורים שסימנת נשמרו לתכנון המאמר.',
+      dismiss: 'סגור',
       approveNext: 'אשר נושאים לשלב הבא',
       approveNextHint: 'לאחר האישור, תוכל להוסיף את הנושאים לתור הפרסום האוטומטי.',
       // Phase 3F.3.5 — one-click primary flow (approve + save links + enqueue).

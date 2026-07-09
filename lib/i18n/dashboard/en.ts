@@ -30,14 +30,22 @@ export const dashboardEn = {
     autoIdeas: {
       title: 'Automatic article ideas',
       intro: 'We found article ideas from your site data and keyword research. Approve topics now, and next you can add them to an automatic publishing schedule.',
-      // Phase 3F.3.3a — visible onboarding block + truthful two-step copy.
+      // Phase 3F.3.7g — onboarding block reflecting the direct one-click flow.
       onboardTitle: 'What happens here?',
-      onboardBody: 'This is where you choose article ideas. After approval, topics move to the ready list, and from there you can add them to the automatic publishing queue.',
+      onboardBody: 'Here you choose article ideas and add them to the automatic publishing queue. You can approve topics directly, or first review the internal links the system suggests.',
       onboardStep1: 'Find article ideas',
       onboardStep2: 'Choose the topics you want',
-      onboardStep3: 'Review suggested internal links, if available',
-      onboardStep4: 'Approve the topics',
-      onboardStep5: 'Add them to the automatic publishing queue',
+      onboardStep3: 'If the suggested links fit — click “Approve topics and add to publishing queue”',
+      onboardStep4: 'To review or edit links before adding — click “Review / edit links before adding”',
+      onboardStep5: 'After adding to the queue, the system creates and publishes the articles on the configured schedule',
+      onboardHelperNote: 'Links are optional. If no sufficiently precise internal link is found, it is better not to add an automatic link.',
+      // Phase 3F.3.7g — prominent success confirmation after a successful enqueue.
+      queueSuccessTitleOne: 'Topic added to the publishing queue',
+      queueSuccessTitleMany: 'Topics added to the publishing queue',
+      queueSuccessBodyOne: 'The topic was approved and added to the automatic publishing queue. The system will create and publish the article on the configured schedule.',
+      queueSuccessBodyMany: 'The topics were approved and added to the automatic publishing queue. The system will create and publish the articles on the configured schedule.',
+      queueSuccessLinksNote: 'The links you selected were saved to the article plan.',
+      dismiss: 'Dismiss',
       approveNext: 'Approve topics for the next step',
       approveNextHint: 'After approval, you can add the topics to the automatic publishing queue.',
       // Phase 3F.3.5 — one-click primary flow (approve + save links + enqueue).
