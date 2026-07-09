@@ -107,6 +107,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (status === 'publish') { update.status = 'published'; update.published_at = new Date().toISOString() }
   await auth.admin.from('generated_articles').update(update).eq('id', id)
 
+  // Phase 3G.4 — when an article that ORIGINATED from a queue item is PUBLISHED here,
+  // mark that queue item published so it leaves the actionable queue. Matched EXACTLY
+  // by article_id (each pool item points at one article), so unrelated/future items
+  // for the same topic are never touched. Best-effort; never fails the export.
+  if (status === 'publish') {
+    try {
+      await auth.admin.from('article_pool_items')
+        .update({ status: 'published', published_at: new Date().toISOString(), last_error: null, locked_at: null, updated_at: new Date().toISOString() })
+        .eq('project_id', auth.project.id)
+        .eq('article_id', id)
+        .neq('status', 'published')
+    } catch (err) {
+      console.warn('[content-wp-export] pool item sync skipped', { ...logBase, message: err instanceof Error ? err.message : 'pool sync failed' })
+    }
+  }
+
   // Phase 3E — on a successful PUBLISH only (never draft), add the topic's
   // primary keyword to the project's tracked keywords. Best-effort: never fails
   // or blocks the publish.

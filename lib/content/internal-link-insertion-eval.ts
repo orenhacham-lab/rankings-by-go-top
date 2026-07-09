@@ -10,7 +10,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { getLatestBatchForTopic, getBatchLinks, evaluateStaleness } from '@/lib/content/internal-link-plan-store'
 import { selfOrDuplicateReason } from '@/lib/content/internal-link-planner-cache'
-import { findNaturalAnchorPlacement, existingLinkWordOffsets, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP, type OccurrenceEval } from '@/lib/content/internal-link-insertion'
+import { findNaturalAnchorPlacement, existingLinkWordOffsets, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP, type OccurrenceEval, type PlacementOpts } from '@/lib/content/internal-link-insertion'
 import { isInternalUrl, isUrlAlreadyLinked, normalizeUrlKey, manualAnchorShapeValid } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { InternalLinkPlanBatchRow, InternalLinkPlanLinkRow } from '@/lib/supabase/types'
@@ -59,7 +59,7 @@ export interface EvalArticle {
 }
 
 /** Evaluate approved plan links for a draft (non-mutating). */
-export async function evaluateApprovedLinks(admin: Admin, projectId: string, article: EvalArticle): Promise<EvalResult> {
+export async function evaluateApprovedLinks(admin: Admin, projectId: string, article: EvalArticle, placement?: PlacementOpts): Promise<EvalResult> {
   const html = article.contentHtml || ''
   const contentChecksum = sha256(html)
   const linksChecksum = sha256(JSON.stringify(article.internalLinksJson ?? null))
@@ -145,17 +145,17 @@ export async function evaluateApprovedLinks(admin: Admin, projectId: string, art
 
       if (skipReason) return { linkId: l.id, targetUrl: url, anchorText: anchor, status: 'skipped', reason: skipReason, sentencePreview: null, checks }
 
-      const placement = findNaturalAnchorPlacement(html, anchor, usedWordOffsets, { minWordGap: INTERNAL_LINK_APPLY_MIN_WORD_GAP })
+      const placementRes = findNaturalAnchorPlacement(html, anchor, usedWordOffsets, { minWordGap: INTERNAL_LINK_APPLY_MIN_WORD_GAP, ...placement })
       const diag = {
-        occurrenceCount: placement.occurrenceCount ?? 0,
-        evaluatedOccurrences: placement.evaluatedOccurrences ?? [],
-        selectedOccurrenceIndex: placement.selectedOccurrenceIndex ?? null,
-        wordCountBefore: placement.wordOffset ?? null,
+        occurrenceCount: placementRes.occurrenceCount ?? 0,
+        evaluatedOccurrences: placementRes.evaluatedOccurrences ?? [],
+        selectedOccurrenceIndex: placementRes.selectedOccurrenceIndex ?? null,
+        wordCountBefore: placementRes.wordOffset ?? null,
       }
-      if (!placement.found) return { linkId: l.id, targetUrl: url, anchorText: anchor, status: 'skipped', reason: placement.skipReason, sentencePreview: null, checks, placement: diag }
+      if (!placementRes.found) return { linkId: l.id, targetUrl: url, anchorText: anchor, status: 'skipped', reason: placementRes.skipReason, sentencePreview: null, checks, placement: diag }
       checks.natural_placement = true
-      usedWordOffsets.push(placement.wordOffset ?? 0)
-      return { linkId: l.id, targetUrl: url, anchorText: anchor, status: 'would_insert', reason: 'safe_prose_occurrence_found', sentencePreview: placement.sentence ?? null, checks, placement: diag }
+      usedWordOffsets.push(placementRes.wordOffset ?? 0)
+      return { linkId: l.id, targetUrl: url, anchorText: anchor, status: 'would_insert', reason: 'safe_prose_occurrence_found', sentencePreview: placementRes.sentence ?? null, checks, placement: diag }
     })
 
   const wouldInsert = items.filter((i) => i.status === 'would_insert').map((i) => ({ linkId: i.linkId, anchorText: i.anchorText, targetUrl: i.targetUrl }))

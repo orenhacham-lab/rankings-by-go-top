@@ -14,7 +14,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { evaluateApprovedLinks, type EvalResult } from '@/lib/content/internal-link-insertion-eval'
-import { applyNaturalAnchor, existingLinkWordOffsets, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP } from '@/lib/content/internal-link-insertion'
+import { applyNaturalAnchor, existingLinkWordOffsets, sha256, INTERNAL_LINK_APPLY_MIN_WORD_GAP, STRICT_AUTO_PLACEMENT, type PlacementOpts } from '@/lib/content/internal-link-insertion'
 import { isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 
@@ -38,6 +38,7 @@ export function applyWouldInsertToHtml(
   html: string,
   wouldInsert: { linkId: string; anchorText: string; targetUrl: string }[],
   seedOffsets: number[] = [],
+  placement?: PlacementOpts,
 ): { html: string; results: ApplyLinkResult[] } {
   const results: ApplyLinkResult[] = []
   const usedWordOffsets: number[] = [...seedOffsets]
@@ -47,7 +48,7 @@ export function applyWouldInsertToHtml(
       results.push({ linkId: w.linkId, targetUrl: w.targetUrl, anchorText: w.anchorText, outcome: 'skipped', reason: 'already_linked' })
       continue
     }
-    const applied = applyNaturalAnchor(cur, w.anchorText, w.targetUrl, usedWordOffsets, { minWordGap: INTERNAL_LINK_APPLY_MIN_WORD_GAP })
+    const applied = applyNaturalAnchor(cur, w.anchorText, w.targetUrl, usedWordOffsets, { minWordGap: INTERNAL_LINK_APPLY_MIN_WORD_GAP, ...placement })
     if (!applied.ok || !applied.html) {
       results.push({ linkId: w.linkId, targetUrl: w.targetUrl, anchorText: w.anchorText, outcome: 'skipped', reason: applied.skipReason || 'no_safe_placement' })
       continue
@@ -214,12 +215,15 @@ export async function autoApplyApprovedLinksToDraft(
     let passes = 0
 
     for (let pass = 0; pass < AUTO_APPLY_MAX_PASSES; pass++) {
-      const evalRes = await evaluateApprovedLinks(admin, projectId, { topicId: article.topic_id, contentHtml: currentHtml, internalLinksJson: currentJson })
+      // Phase 3G.4 — auto-insertion uses the STRICT placement preset (mirrors the SEO
+      // checker) in BOTH the evaluation and the actual insertion, so an auto link is
+      // never placed too early (intro / first paragraph / before the first <h2>).
+      const evalRes = await evaluateApprovedLinks(admin, projectId, { topicId: article.topic_id, contentHtml: currentHtml, internalLinksJson: currentJson }, STRICT_AUTO_PLACEMENT)
       finalEval = evalRes
       if (evalRes.reason) { if (insertedResults.length === 0) return emptyAuto(true, [evalRes.reason]); break }
       passes++
       if (evalRes.wouldInsert.length === 0) break
-      const { html: newHtml, results } = applyWouldInsertToHtml(currentHtml, evalRes.wouldInsert, existingLinkWordOffsets(currentHtml))
+      const { html: newHtml, results } = applyWouldInsertToHtml(currentHtml, evalRes.wouldInsert, existingLinkWordOffsets(currentHtml), STRICT_AUTO_PLACEMENT)
       const insertedThisPass = results.filter((r) => r.outcome === 'inserted')
       appliedByPass.push(insertedThisPass.length)
       if (insertedThisPass.length === 0) break

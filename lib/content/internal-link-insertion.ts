@@ -12,8 +12,19 @@
  */
 
 import { createHash } from 'crypto'
-import { ANCHOR_MIN_WORD_GAP } from '@/lib/content/anchors-check'
+import { ANCHOR_MIN_WORD_GAP, ANCHOR_MIN_WORDS_BEFORE_FIRST, ANCHOR_MIN_PARAGRAPHS_BEFORE_FIRST } from '@/lib/content/anchors-check'
 import { normalizeHref } from '@/lib/content/internal-links'
+
+/** Options controlling where a natural anchor may be placed. */
+export interface PlacementOpts {
+  minWordGap?: number
+  // Phase 3G.4 STRICT early gate (auto-insertion only): mirror the SEO checker so an
+  // auto-inserted link is never flagged "too early". Omitted ⇒ lenient (manual apply).
+  minWordsBeforeFirst?: number
+  requireAfterFirstH2?: boolean
+  rejectFirstParagraph?: boolean
+  minParagraphsBeforeFirst?: number
+}
 
 /**
  * "Too early" for NATURAL-occurrence INSERTION is defined by structure, not the
@@ -34,6 +45,20 @@ const INSERTION_MIN_WORDS_BEFORE_FIRST = 40
  * constant is unchanged.
  */
 export const INTERNAL_LINK_APPLY_MIN_WORD_GAP = 80
+
+/**
+ * Phase 3G.4 — placement preset for AUTOMATIC approved-link insertion. Matches the
+ * SEO/GEO checker's "too early" rule (anchors-check) so the auto-inserter and the
+ * quality panel agree: the first link never lands in the intro / first paragraph /
+ * before the first <h2> / before ~120 words. Prefers a later valid occurrence.
+ */
+export const STRICT_AUTO_PLACEMENT: PlacementOpts = {
+  minWordGap: INTERNAL_LINK_APPLY_MIN_WORD_GAP,
+  minWordsBeforeFirst: ANCHOR_MIN_WORDS_BEFORE_FIRST,
+  requireAfterFirstH2: true,
+  rejectFirstParagraph: true,
+  minParagraphsBeforeFirst: ANCHOR_MIN_PARAGRAPHS_BEFORE_FIRST,
+}
 
 // Regions a link must NEVER be placed inside. Blanked (equal-length spaces) so
 // their inner text can't match while character offsets stay aligned.
@@ -177,10 +202,32 @@ export interface PlacementResult {
  * links a normal paragraph well into the intro is a fine target. Only when NO
  * occurrence qualifies does it report a skip reason. Read-only.
  */
-export function findNaturalAnchorPlacement(html: string, anchor: string, usedWordOffsets: number[] = [], opts: { minWordGap?: number } = {}): PlacementResult {
+export function findNaturalAnchorPlacement(html: string, anchor: string, usedWordOffsets: number[] = [], opts: PlacementOpts = {}): PlacementResult {
   const minWordGap = opts.minWordGap ?? ANCHOR_MIN_WORD_GAP
   const needle = (anchor || '').trim()
   if (!needle) return { found: false, skipReason: 'empty_anchor', occurrenceCount: 0, evaluatedOccurrences: [] }
+
+  // Phase 3G.4 — STRICT early gate (auto-insertion): align with the SEO checker so an
+  // auto-inserted link is never "too early". Precompute structure signals once.
+  const strictMinWords = opts.minWordsBeforeFirst ?? 0
+  const strictAfterH2 = opts.requireAfterFirstH2 === true
+  const strictNotFirstPara = opts.rejectFirstParagraph === true
+  const strictMinParas = opts.minParagraphsBeforeFirst ?? 0
+  const firstH2Idx = html.search(/<h2[\s>]/i)
+  const firstParaCloseIdx = (() => {
+    const pOpen = html.search(/<p[\s>]/i)
+    if (pOpen < 0) return -1
+    const pClose = html.indexOf('</p>', pOpen)
+    return pClose < 0 ? -1 : pClose + 4
+  })()
+  const parasBeforeAt = (k: number): number => (html.slice(0, k).match(/<\/p>/gi) || []).length
+  const failsStrictEarly = (k: number, wordOffset: number): boolean => {
+    if (strictMinWords && wordOffset < strictMinWords) return true
+    if (strictNotFirstPara && firstParaCloseIdx >= 0 && k < firstParaCloseIdx) return true
+    if (strictAfterH2 && firstH2Idx >= 0 && k <= firstH2Idx) return true
+    if (strictMinParas && parasBeforeAt(k) < strictMinParas) return true
+    return false
+  }
 
   const blanked = blankForbidden(html)
   const ranges = proseRanges(html)
@@ -224,9 +271,11 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
 
     sawProse = true
     const wordOffset = wordsBefore(html, k)
-    // "Too early" = only the very opening snippet (below a modest manual floor).
-    // NO first-<h2> gate — a paragraph 100+ words in is a valid manual target.
-    const early = wordOffset < INSERTION_MIN_WORDS_BEFORE_FIRST
+    // "Too early": a modest manual floor by default, OR the STRICT gate (auto-insert)
+    // that mirrors the SEO checker (≥120 words, past the intro/first paragraph, after
+    // the first <h2>). A later occurrence that passes is preferred; if none passes it
+    // is skipped as placement_too_early rather than forced into the opening.
+    const early = wordOffset < INSERTION_MIN_WORDS_BEFORE_FIRST || failsStrictEarly(k, wordOffset)
     if (early) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_early', insideParagraph: true }); tooEarly = true; continue }
     if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < minWordGap)) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_close' }); tooClose = true; continue }
 
@@ -261,7 +310,7 @@ export interface ApplyResult {
  * ok:false + skipReason when no safe occurrence exists. Caller must sanitize the
  * returned html. Pure (no I/O).
  */
-export function applyNaturalAnchor(html: string, anchor: string, url: string, usedWordOffsets: number[] = [], opts: { minWordGap?: number } = {}): ApplyResult {
+export function applyNaturalAnchor(html: string, anchor: string, url: string, usedWordOffsets: number[] = [], opts: PlacementOpts = {}): ApplyResult {
   const p = findNaturalAnchorPlacement(html, anchor, usedWordOffsets, opts)
   if (!p.found || p.index === undefined || p.matchLength === undefined) {
     return { ok: false, skipReason: p.skipReason }
