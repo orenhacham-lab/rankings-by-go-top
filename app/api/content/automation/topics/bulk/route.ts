@@ -15,7 +15,7 @@ import { ExistingCorpus, tokens, jaccard } from '@/lib/content/recommendations/d
 import { markIdeasApprovedForTopics, normalizeText } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
-import { savePlanBatch, type PlanSubject } from '@/lib/content/internal-link-plan-store'
+import { savePlanBatch, approveBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import { CACHE_PLANNER_VERSION } from '@/lib/content/internal-link-planner-cache'
 import { buildIdeaSelectedPlanLinks, ideaSelectedPlan } from '@/lib/content/internal-link-idea-plan'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
@@ -243,7 +243,13 @@ export async function POST(request: Request) {
                 plannerVersion: CACHE_PLANNER_VERSION, cacheScannerVersion: row.scanner_version,
                 cacheScanCompletedAt: row.scan_completed_at, cacheState: 'ok', allowCaution: false, strict: false, staleAtCreation: false, warnings: [],
               })
-              if (batchId) { linkPlansSaved++; plannedTopicIds.push(r.id); savedPlans.push({ topicId: r.id, linkCount: links.length }) }
+              if (batchId) {
+                // Phase 3G — the user explicitly CHECKED these idea-stage links, so
+                // APPROVE them (planned→approved) so article generation inserts them
+                // automatically. Best-effort; never blocks topic creation.
+                try { await approveBatchLinks(auth.admin, auth.project.id, batchId) } catch { /* best-effort */ }
+                linkPlansSaved++; plannedTopicIds.push(r.id); savedPlans.push({ topicId: r.id, linkCount: links.length })
+              }
             }
             linkPlanDebug.push({
               topicId: r.id, topicTitle: r.topic, primaryKeyword: r.primary_keyword,

@@ -134,10 +134,15 @@ const CTA_GENERIC_STEMS = new Set([
   'פרטים', 'מידע', 'כאן', 'לחצו', 'לחץ', 'לחיצה', 'צפייה', 'צפו', 'צפה', 'הצגה', 'מעבר', 'עבור',
   'כניסה', 'קישור', 'פתח', 'פתחו', 'ראו', 'ראה', 'כתבות', 'כתבה', 'מאמרים', 'מאמר', 'פוסטים',
   'פוסט', 'עמוד', 'דף', 'בלוג', 'כל',
+  // Phase 3G — generic STRUCTURAL nouns (category/collection): a CTA like
+  // "לצפייה בקטגוריה" / "צפייה בקולקציה" has no topical token and must be blocked.
+  // A real anchor keeps a product/topic word (e.g. "קטגוריית קטלבלס" survives).
+  'קטגוריה', 'קטגוריות', 'קטגורית', 'קטגוריית', 'קולקציה', 'קולקציות', 'מחלקה', 'מחלקות',
   // English
   'read', 'reading', 'more', 'continue', 'learn', 'details', 'detail', 'info', 'information', 'see',
   'view', 'all', 'open', 'click', 'here', 'link', 'go', 'page', 'pages', 'posts', 'post', 'articles',
   'article', 'blog', 'next', 'previous', 'back',
+  'category', 'categories', 'collection', 'collections', 'department', 'section',
 ])
 const CTA_COMMERCE_STEMS = new Set([
   // Hebrew (buy / cart / shop / product / options)

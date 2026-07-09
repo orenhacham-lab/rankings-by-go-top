@@ -170,7 +170,7 @@ export default function NewTopicsLinkPlanPanel({
   // Persist the EXACT selection (checked recommended + checked manual per checked
   // topic; empty ⇒ zero-link plan) and return the topic ids that saved OK, or null
   // on request error. Shared by "Save" and "Save + add to queue".
-  const runSave = useCallback(async (): Promise<string[] | null> => {
+  const runSave = useCallback(async (forceApprove = false): Promise<string[] | null> => {
     const selectedLinks: { topicId: string; targetUrl: string; anchorText: string }[] = []
     for (const tid of topicIdsToSave) {
       const recs = plans[tid]?.selected ?? []
@@ -182,7 +182,9 @@ export default function NewTopicsLinkPlanPanel({
     }
     const res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: autoApprove, selectedLinks }),
+      // Phase 3G — "Save + add to queue" APPROVES the checked links (the user
+      // explicitly selected them), so article generation inserts them automatically.
+      body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: forceApprove || autoApprove, selectedLinks }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return null }
@@ -220,7 +222,8 @@ export default function NewTopicsLinkPlanPanel({
     if (saving || queuing || topicIdsToSave.length === 0 || !onEnqueue) return
     setQueuing(true); setError(null)
     try {
-      const okIds = await runSave()
+      // Phase 3G — approve the checked links so generation inserts them automatically.
+      const okIds = await runSave(true)
       if (okIds === null) return
       const idsToQueue = okIds.length > 0 ? okIds : topicIdsToSave
       const queued = await onEnqueue(idsToQueue)
