@@ -136,6 +136,14 @@ export default function AutomationIdeas({
     if (scrollCtaSignal > 0) window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
   }, [scrollCtaSignal])
 
+  // Phase 3F.3.7h — keep the enqueue success confirmation visible for ~3s, then
+  // auto-hide. (Still dismissible earlier via the ✕.) UX timing only.
+  useEffect(() => {
+    if (!queueSuccess) return
+    const id = window.setTimeout(() => setQueueSuccess(null), 3000)
+    return () => window.clearTimeout(id)
+  }, [queueSuccess])
+
   const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : s === 'site_scan' ? t.badgeSiteScan : t.badgeResearch)
 
   // Monotonic request id: only the latest generate() call is allowed to write
