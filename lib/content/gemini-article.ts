@@ -651,9 +651,30 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string)
     const usage: GeminiUsage | null = um ? { model: modelName, inputTokens: um.promptTokenCount ?? 0, outputTokens: um.candidatesTokenCount ?? 0 } : null
     return { structured, usage }
   } catch (err) {
-    console.error('[content-article-generation] gemini error', { message: err instanceof Error ? err.message : String(err) })
-    return { error: 'gemini_request_failed' }
+    const reason = classifyGeminiError(err)
+    console.error('[content-article-generation] gemini error', { reason, message: err instanceof Error ? err.message : String(err) })
+    return { error: reason }
   }
+}
+
+/** Transient provider failures that are worth retrying (do not consume the retry cap). */
+export const TRANSIENT_GEN_REASONS = new Set(['gemini_quota_exceeded', 'gemini_overloaded', 'gemini_timeout'])
+
+/**
+ * Phase 3G.2 — classify a Gemini SDK error into a PRECISE, safe reason code (never
+ * exposes the API key or raw payload). Reads the HTTP status when present, else the
+ * message text. Falls back to the generic 'gemini_request_failed'.
+ */
+export function classifyGeminiError(err: unknown): string {
+  const status = typeof (err as { status?: unknown })?.status === 'number' ? (err as { status: number }).status : undefined
+  const msg = (err instanceof Error ? err.message : String(err ?? '')).toLowerCase()
+  if (status === 429 || /quota|rate.?limit|resource.?exhausted|too many requests/.test(msg)) return 'gemini_quota_exceeded'
+  if (status === 503 || /overloaded|unavailable|try again later/.test(msg)) return 'gemini_overloaded'
+  if (/deadline|timeout|timed out|etimedout|econnreset|network|fetch failed|socket hang/.test(msg)) return 'gemini_timeout'
+  if (/safety|blocked|recitation|prohibited/.test(msg)) return 'gemini_safety_blocked'
+  if (status === 401 || status === 403 || /api key|permission|unauthorized|forbidden|invalid.*key/.test(msg)) return 'gemini_auth_error'
+  if (status === 400 || /invalid|bad request|malformed/.test(msg)) return 'gemini_invalid_request'
+  return 'gemini_request_failed'
 }
 
 export interface ValidatedArticle {
@@ -690,6 +711,7 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
   if (fellBack) console.warn('[content-article-generation] GEMINI_ARTICLE_MODEL missing, falling back to classifier model')
 
   let best: { structured: StructuredArticle; usage: GeminiUsage | null; safe: string; slug: string; audit: AuditResult } | null = null
+  let lastGenError: string | null = null // Phase 3G.2 — precise reason of the last Gemini call error.
   let attempts = 0
   const allowedYears = collectAllowedYears(brief)
   const casingTerms = buildCasingTerms(brief)
@@ -701,7 +723,7 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     const opts: GenOpts = attempt === 0 ? {} : { repairFailures }
     attempts = attempt + 1
     const g = await callGemini(brief, opts, model)
-    if ('error' in g) { if (!best) continue; else break }
+    if ('error' in g) { lastGenError = g.error; if (!best) continue; else break }
 
     // Safety net: strip an invented year from the highly-visible SEO fields
     // unless the user asked for it (the prompt already forbids adding one).
@@ -730,7 +752,7 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     if (audit.blockers.length === 0) break
   }
 
-  if (!best) return { error: 'Article generation failed', reason: 'gemini_request_failed', attempts }
+  if (!best) return { error: 'Article generation failed', reason: lastGenError ?? 'gemini_request_failed', attempts }
   if (!best.safe) return { error: 'Article generation failed', reason: 'empty_after_sanitize', attempts }
   if (best.audit.blockers.length > 0) {
     const reason = best.audit.requiredAnchorsMissing > 0 ? 'required_anchor_missing' : 'article_quality_gate_failed'

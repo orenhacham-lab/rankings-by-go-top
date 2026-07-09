@@ -683,6 +683,13 @@ export const dashboardHe = {
       missing_gemini_api_key: 'יצירת המאמר נכשלה — GEMINI_API_KEY לא מוגדר ב-Vercel.',
       gemini_init_failed: 'שגיאה באתחול Gemini. נסו שוב.',
       gemini_request_failed: 'הבקשה ל-Gemini נכשלה. נסו שוב עוד רגע.',
+      // Phase 3G.2 — precise Gemini failure reasons.
+      gemini_quota_exceeded: 'חריגה ממכסת Gemini / הגבלת קצב. נסו שוב מאוחר יותר.',
+      gemini_overloaded: 'שרתי Gemini עמוסים כרגע. נסו שוב עוד מספר רגעים.',
+      gemini_timeout: 'הבקשה ל-Gemini עברה את זמן ההמתנה. נסו שוב.',
+      gemini_safety_blocked: 'Gemini חסם את התוכן מטעמי בטיחות. נסו לנסח מחדש את הנושא.',
+      gemini_auth_error: 'בעיית הרשאה/מפתח מול Gemini. בדקו את הגדרת המפתח.',
+      gemini_invalid_request: 'הבקשה ל-Gemini לא תקינה. נסו שוב.',
       gemini_no_json: 'Gemini החזיר תשובה לא תקינה. נסו שוב.',
       gemini_missing_required_fields: 'Gemini לא החזיר מאמר שלם. נסו שוב.',
       article_structure_invalid: 'המאמר שנוצר לא עמד במבנה הנדרש (כותרות/פסקאות/אורך). נסו שוב.',

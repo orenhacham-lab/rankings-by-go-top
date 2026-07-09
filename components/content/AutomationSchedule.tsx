@@ -59,6 +59,14 @@ export default function AutomationSchedule({
 }) {
   const t = getDashboardDictionary(language).contentHub.autoSchedule
   const locale = language === 'he' ? 'he-IL' : 'en-US'
+  // Phase 3G.2 — map a raw failure code (e.g. gemini_quota_exceeded) to a friendly,
+  // short reason; unknown codes fall back to the raw string.
+  const genErrors = getDashboardDictionary(language).contentHub.genErrors as Record<string, string>
+  const reasonLabel = (code: string | null | undefined): string => {
+    if (!code) return ''
+    const base = code.split(':')[0]!.trim()
+    return genErrors[base] ?? code
+  }
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [items, setItems] = useState<QueueItem[]>([])
@@ -259,7 +267,7 @@ export default function AutomationSchedule({
       const res = await fetch(`/api/content/automation/items/${itemId}/generate`, { method: 'POST' })
       const d = await res.json().catch(() => ({}))
       if (d?.status === 'failed' || d?.status === 'quality_check_failed') {
-        setMessage({ text: `${d.status}${d.reason ? `: ${d.reason}` : ''}`, ok: false })
+        setMessage({ text: d.reason ? reasonLabel(d.reason) : d.status, ok: false })
       }
       await load(); onChanged?.()
     } finally {
@@ -273,7 +281,7 @@ export default function AutomationSchedule({
       const res = await fetch(`/api/content/automation/items/${itemId}/publish`, { method: 'POST' })
       const d = await res.json().catch(() => ({}))
       if (d?.status === 'failed' || d?.status === 'quality_check_failed') {
-        setMessage({ text: `${d.status}${d.reason ? `: ${d.reason}` : ''}`, ok: false })
+        setMessage({ text: d.reason ? reasonLabel(d.reason) : d.status, ok: false })
       }
       await load(); onChanged?.()
     } finally {
@@ -394,7 +402,7 @@ export default function AutomationSchedule({
                 health.overdue ? t.alertOverdue : null,
               ].filter(Boolean).join(' · ')}
             </p>
-            {health.latestError && <p className="mt-0.5 text-[11px] text-amber-700/90 dark:text-amber-400/90 break-words" dir="ltr">{health.latestError}</p>}
+            {health.latestError && <p className="mt-0.5 text-[11px] text-amber-700/90 dark:text-amber-400/90 break-words">{reasonLabel(health.latestError)}</p>}
             <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{t.alertHint}</p>
           </div>
         )}
@@ -449,7 +457,7 @@ export default function AutomationSchedule({
                 </div>
                 <div className="flex-1 min-w-[10rem]">
                   <div className="text-sm text-slate-800 dark:text-slate-100 truncate">{it.topicTitle}</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{fmtDay(it.projectedPublishAt, ['queued', 'scheduled', 'generated', 'generating', 'publishing'].includes(it.status))}{it.lastError ? ` · ${it.lastError}` : ''}</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{fmtDay(it.projectedPublishAt, ['queued', 'scheduled', 'generated', 'generating', 'publishing'].includes(it.status))}{it.lastError ? ` · ${reasonLabel(it.lastError)}` : ''}</div>
                 </div>
                 <Badge variant={it.status === 'published' || it.status === 'generated' ? 'success' : it.status === 'failed' || it.status === 'quality_check_failed' ? 'danger' : 'neutral'}>{statusLabel(it.status)}</Badge>
                 <div className="flex items-center gap-1">

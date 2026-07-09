@@ -10,6 +10,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateArticleForTopic } from '@/lib/content/article-generation'
+import { TRANSIENT_GEN_REASONS } from '@/lib/content/gemini-article'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -39,8 +40,12 @@ interface ItemRow {
 
 const nowIso = () => new Date().toISOString()
 
-async function finalize(admin: Admin, itemId: string, status: string, lastError: string | null): Promise<void> {
-  await admin.from('article_pool_items').update({ status, last_error: lastError, locked_at: null, updated_at: nowIso() }).eq('id', itemId)
+async function finalize(admin: Admin, itemId: string, status: string, lastError: string | null, attempts?: number): Promise<void> {
+  const patch: Record<string, unknown> = { status, last_error: lastError, locked_at: null, updated_at: nowIso() }
+  // Phase 3G.2 — roll the attempt counter back for transient provider failures so a
+  // Gemini quota/timeout blip doesn't consume the retry budget.
+  if (typeof attempts === 'number') patch.attempts = attempts
+  await admin.from('article_pool_items').update(patch).eq('id', itemId)
 }
 
 async function loadArticle(admin: Admin, articleId: string) {
@@ -145,7 +150,10 @@ export async function generatePoolItem(
         status = QUALITY_REASONS.has(gen.reason) ? 'quality_check_failed' : 'failed'
         reason = gen.reason
       }
-      await finalize(admin, itemId, status, reason)
+      // Transient provider failure (Gemini quota/overload/timeout) → keep the retry
+      // budget by rolling the attempt counter back to its pre-claim value.
+      const transient = gen.kind === 'generation' && TRANSIENT_GEN_REASONS.has(gen.reason)
+      await finalize(admin, itemId, status, reason, transient ? (item.attempts ?? 0) : undefined)
       return { itemId, status, articleId: null, reason }
     }
 

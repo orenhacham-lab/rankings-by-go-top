@@ -682,6 +682,13 @@ export const dashboardEn = {
       missing_gemini_api_key: 'Article generation failed — GEMINI_API_KEY is not set in Vercel.',
       gemini_init_failed: 'Failed to initialize Gemini. Please try again.',
       gemini_request_failed: 'The Gemini request failed. Please try again in a moment.',
+      // Phase 3G.2 — precise Gemini failure reasons.
+      gemini_quota_exceeded: 'Gemini quota / rate limit exceeded. Please try again later.',
+      gemini_overloaded: 'Gemini is overloaded right now. Please try again in a few moments.',
+      gemini_timeout: 'The Gemini request timed out. Please try again.',
+      gemini_safety_blocked: 'Gemini blocked the content for safety reasons. Try rephrasing the topic.',
+      gemini_auth_error: 'A Gemini auth/API-key problem. Please check the key configuration.',
+      gemini_invalid_request: 'The Gemini request was invalid. Please try again.',
       gemini_no_json: 'Gemini returned an invalid response. Please try again.',
       gemini_missing_required_fields: 'Gemini did not return a complete article. Please try again.',
       article_structure_invalid: 'The generated article did not meet the required structure (headings/paragraphs/length). Please try again.',
