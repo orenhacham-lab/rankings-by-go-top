@@ -85,6 +85,9 @@ export default function ContentHub() {
   // Phase 2F.1: internal-link planning step for freshly-created topics. Lifted
   // planStatus so the panel can seed the topic-row badges for those IDs only.
   const [newTopics, setNewTopics] = useState<NewTopic[] | null>(null)
+  // Phase 3F.3.7b — per created-topic-id, the idea-stage suggested-link URLs the
+  // user unchecked, so the review panel preserves that choice.
+  const [newTopicsUnchecked, setNewTopicsUnchecked] = useState<Record<string, string[]>>({})
   const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
   // Phase 3F.3.3a/b — after approving ideas, briefly highlight the new "ready"
   // rows. The truthful next-step CTA lives in the ideas card (which scrolls
@@ -806,7 +809,7 @@ export default function ContentHub() {
                     language={language}
                     onCreated={loadTopics}
                     onScheduled={handleScheduled}
-                    onTopicsCreated={(created) => { if (created.length) setNewTopics(created) }}
+                    onTopicsCreated={(created, unchecked) => { if (created.length) { setNewTopicsUnchecked(unchecked ?? {}); setNewTopics(created) } }}
                     onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: true, linkCount: p.linkCount, approvedCount: 0, stale: false }])) }))}
                     onApproved={handleTopicsQueued}
                     onReviewLinks={handleReviewLinks}
@@ -875,6 +878,7 @@ export default function ContentHub() {
                     projectId={projectId}
                     language={language}
                     topics={newTopics}
+                    initialUnchecked={newTopicsUnchecked}
                     onClose={() => setNewTopics(null)}
                     onEnqueue={ensurePoolAndEnqueue}
                     onSaved={(summaries) => setPlanStatus((prev) => {
@@ -937,7 +941,7 @@ export default function ContentHub() {
         editing={editingTopic}
         onSaved={loadTopics}
         onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
-        onTopicsCreated={(created) => { if (created.length) setNewTopics(created) }}
+        onTopicsCreated={(created) => { if (created.length) { setNewTopicsUnchecked({}); setNewTopics(created) } }}
       />
 
       <ToastHost toasts={toast.toasts} dismiss={toast.dismiss} dir={isHebrew ? 'rtl' : 'ltr'} />

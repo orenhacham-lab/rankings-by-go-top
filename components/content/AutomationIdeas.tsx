@@ -54,7 +54,7 @@ export default function AutomationIdeas({
   onScheduled?: () => void
   // Phase 2F.1 — fires with the newly-created topics so the hub can offer the
   // internal-link planning step for exactly those new topic IDs.
-  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[]) => void
+  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[], uncheckedByTopicId?: Record<string, string[]>) => void
   // Phase 3F.3.2a — fires with per-topic saved planned-link counts (from idea-stage
   // selection) so the hub can seed the topic-row plan badge immediately.
   onPlansSaved?: (plans: { topicId: string; linkCount: number }[]) => void
@@ -231,6 +231,10 @@ export default function AutomationIdeas({
     plannedIds: Set<string>
     savedPlans: { topicId: string; linkCount: number }[]
     expectedPlans: number
+    // Phase 3F.3.7b — per created-topic-id, the idea-stage suggested-link URLs the
+    // user UNCHECKED, so the review panel can preserve that choice (unchecked stays
+    // unchecked). Absent/empty ⇒ all recommended checked by default.
+    uncheckedByTopicId: Record<string, string[]>
   }
   async function createTopics(): Promise<CreateResult | null> {
     const chosen = suggestions.filter((s) => selected.has(s.id))
@@ -262,11 +266,25 @@ export default function AutomationIdeas({
     const savedPlans = Array.isArray(data.savedPlans)
       ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
       : []
+    // Phase 3F.3.7b — map each CREATED topic (by exact primary keyword, unique in
+    // batch) back to the idea's UNCHECKED suggested-link URLs, so the review panel
+    // can preserve the user's checked/unchecked choice.
+    const uncheckedByKw = new Map<string, string[]>()
+    for (const s of chosen) {
+      const checkedUrls = new Set(selectedLinksFor(s).map((l) => l.url))
+      const unchecked = s.suggestedInternalLinks.filter((l) => !checkedUrls.has(l.url)).map((l) => l.url)
+      uncheckedByKw.set((s.primaryKeyword || '').toLowerCase(), unchecked)
+    }
+    const uncheckedByTopicId: Record<string, string[]> = {}
+    for (const ct of createdTopics) {
+      const u = uncheckedByKw.get((ct.primary_keyword || '').toLowerCase())
+      if (u && u.length) uncheckedByTopicId[ct.id] = u
+    }
     // Seed the topic-row plan badge so saved idea-stage links show immediately.
     if (savedPlans.length) onPlansSaved?.(savedPlans)
     setLastPlansCount(savedPlans.length)
     onCreated()
-    return { ids, createdTopics, plannedIds, savedPlans, expectedPlans }
+    return { ids, createdTopics, plannedIds, savedPlans, expectedPlans, uncheckedByTopicId }
   }
 
   // Ensure the project's pool exists (never flips an active pool to paused) and
@@ -337,12 +355,12 @@ export default function AutomationIdeas({
     try {
       const res = await createTopics()
       if (!res) return
-      // Phase 3F.3.7 (Part F) — the FIRST click opens the ACTUAL review screen: the
-      // batch link-review panel listing the selected topics and their planned links
-      // (with save + "save and add to queue"). No scroll-then-another-button, no
-      // duplicate CTA, nothing enqueued until the user acts in that panel.
-      if (res.createdTopics.length) onTopicsCreated?.(res.createdTopics)
-      else setMessage({ text: t.approvedReady, ok: true })
+      // Phase 3F.3.7b — the review click ALWAYS opens the batch review panel for the
+      // created topics, regardless of how many idea-stage links were checked (all,
+      // partial, or zero). The unchecked choice is preserved via uncheckedByTopicId.
+      // The old "approved and ready" fallback message must NEVER appear here.
+      if (res.createdTopics.length) onTopicsCreated?.(res.createdTopics, res.uncheckedByTopicId)
+      else setMessage({ text: t.allDuplicates, ok: false }) // nothing new created (all already exist)
     } catch {
       setMessage({ text: 'error', ok: false })
     } finally {

@@ -52,7 +52,7 @@ function reasonLabel(r?: string | null): string {
 }
 
 export default function NewTopicsLinkPlanPanel({
-  projectId, language, topics, onClose, onSaved, onEnqueue,
+  projectId, language, topics, onClose, onSaved, onEnqueue, initialUnchecked = {},
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -62,6 +62,9 @@ export default function NewTopicsLinkPlanPanel({
   // Phase 3F.3.7 (Part G) — save the plans AND add the topics to the publishing
   // queue in one action. Returns success. When absent, only plain save is shown.
   onEnqueue?: (topicIds: string[]) => Promise<boolean>
+  // Phase 3F.3.7b — per topic-id, recommended-link URLs the user UNCHECKED at the
+  // idea stage; the panel starts those unchecked (preserving the user's choice).
+  initialUnchecked?: Record<string, string[]>
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.newTopicsPlan, [language])
   const isHebrew = language === 'he'
@@ -119,8 +122,10 @@ export default function NewTopicsLinkPlanPanel({
           const selectedLinks: DryLink[] = Array.isArray(p.selected) ? p.selected : []
           const plan: DryPlan = { topicId: p.topicId, selected: selectedLinks, rejected, reviewable, summary: p.summary ?? '' }
           map[p.topicId] = plan
-          // Recommended links checked by default; reviewable stay unchecked.
-          initLinkSel[p.topicId] = new Set(selectedLinks.map((l) => mkey(l)))
+          // Recommended links checked by default, EXCEPT any the user unchecked at
+          // the idea stage (Phase 3F.3.7b) — that choice is preserved here.
+          const unchecked = new Set(initialUnchecked[p.topicId] ?? [])
+          initLinkSel[p.topicId] = new Set(selectedLinks.filter((l) => !unchecked.has(l.targetUrl)).map((l) => mkey(l)))
         }
         setPlans(map)
         setLinkSel(initLinkSel)
