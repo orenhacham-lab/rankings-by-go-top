@@ -688,7 +688,7 @@ export const dashboardEn = {
       gemini_timeout: 'The Gemini request timed out. Please try again.',
       gemini_safety_blocked: 'Gemini blocked the content for safety reasons. Try rephrasing the topic.',
       gemini_auth_error: 'A Gemini auth/API-key problem. Please check the key configuration.',
-      gemini_invalid_request: 'The Gemini request was invalid. Please try again.',
+      gemini_invalid_request: 'The Gemini request was invalid. Check the model setting or request structure.',
       gemini_unknown_provider_error: 'Unrecognized Gemini provider error',
       gemini_no_json: 'Gemini returned an invalid response. Please try again.',
       gemini_missing_required_fields: 'Gemini did not return a complete article. Please try again.',

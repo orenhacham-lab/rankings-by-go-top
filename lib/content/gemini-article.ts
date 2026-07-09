@@ -639,9 +639,12 @@ function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
 async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string): Promise<{ structured: StructuredArticle; usage: GeminiUsage | null } | { error: string }> {
   const client = getGeminiClient()
   if (!client) return { error: process.env.GEMINI_API_KEY ? 'gemini_init_failed' : 'missing_gemini_api_key' }
+  let promptChars = 0
   try {
     const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.75 } })
-    const result = await model.generateContent(buildPrompt(brief, opts))
+    const prompt = buildPrompt(brief, opts)
+    promptChars = prompt.length
+    const result = await model.generateContent(prompt)
     const text = result.response.text()
     let parsed: Record<string, unknown>
     try { parsed = JSON.parse(text) } catch { const m = text.match(/\{[\s\S]*\}/); if (!m) return { error: 'gemini_no_json' }; parsed = JSON.parse(m[0]) }
@@ -653,18 +656,27 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string)
   } catch (err) {
     const code = classifyGeminiError(err)
     const preview = geminiErrorPreview(err)
-    // Full sanitized diagnostics to the server log (safe fields only, no key/prompt).
+    // Full sanitized diagnostics to the server log (safe fields + metadata only — no
+    // key, no full prompt). Prompt metadata helps diagnose invalid-request causes.
     console.error('[content-article-generation] gemini error', {
-      provider: 'gemini', code, requestStage: 'generate_content',
+      provider: 'gemini', code, model: modelName, requestStage: 'generate_content',
+      responseMimeType: 'application/json',
+      promptChars, anchorCount: brief.anchors?.length ?? 0, language: brief.language,
+      wordTarget: brief.targetWordMax ?? brief.desiredWordCount ?? null,
       rawName: (err as { name?: unknown })?.name ?? null,
       status: firstNumber((err as Record<string, unknown>)?.status, (err as Record<string, unknown>)?.statusCode, (err as { response?: { status?: unknown } })?.response?.status) ?? null,
       rawMessagePreview: preview,
     })
-    // For an UNCLASSIFIED provider error, carry the sanitized message preview in the
-    // reason so it reaches the queue item's last_error / UI (no DB schema change).
-    return { error: code === 'gemini_unknown_provider_error' && preview ? `${code}: ${preview}` : code }
+    // For TERMINAL / config errors (invalid request, auth, unknown provider), carry
+    // the sanitized message preview in the reason so it reaches the queue item's
+    // last_error / UI (no DB schema change) — the exact invalid field is visible.
+    // Transient codes (quota/overload/timeout/safety) stay clean/self-explanatory.
+    return { error: DIAGNOSTIC_CODES.has(code) && preview ? `${code}: ${preview}` : code }
   }
 }
+
+/** Terminal/config error codes whose sanitized message preview is surfaced to the UI. */
+const DIAGNOSTIC_CODES = new Set(['gemini_invalid_request', 'gemini_auth_error', 'gemini_unknown_provider_error'])
 
 /** Transient provider failures that are worth retrying (do not consume the retry cap). */
 export const TRANSIENT_GEN_REASONS = new Set(['gemini_quota_exceeded', 'gemini_overloaded', 'gemini_timeout'])
