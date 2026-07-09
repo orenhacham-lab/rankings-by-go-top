@@ -149,6 +149,9 @@ const CTA_COMMERCE_STEMS = new Set([
   'רכישה', 'לרכוש', 'קנייה', 'קניות', 'קנה', 'קנו', 'הזמן', 'הזמינו', 'הזמנה', 'סל', 'עגלה', 'חנות',
   'מוצר', 'מוצרים', 'אפשרויות', 'אופציות', 'מבצע', 'הוספה', 'הוסף', 'הוסיפו', 'בחר', 'בחרו', 'בחירת',
   'בחירה', 'רשימת', 'משאלות',
+  // Phase 3G.3 — all "add" verb forms so admin/CTA texts like "הוספת קטגוריות" /
+  // "להוסיף קטגוריות" (with the structural noun קטגוריות) classify as pure CTA.
+  'הוסיף', 'להוסיף', 'הוספת', 'להוספת', 'מוסיף', 'מוסיפים', 'הוספות',
   // English
   'buy', 'purchase', 'order', 'cart', 'basket', 'shop', 'store', 'product', 'products', 'options',
   'option', 'select', 'choose', 'wishlist', 'add', 'checkout', 'sale',

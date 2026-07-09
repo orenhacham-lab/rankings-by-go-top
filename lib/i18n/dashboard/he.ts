@@ -344,7 +344,8 @@ export const dashboardHe = {
         blocked_generic_only: 'התאמה על מילים כלליות בלבד',
         unknown_no_exact: 'ללא אשכול מזוהה — לא התאמה מדויקת',
       },
-      autoApprove: 'אשר את הקישורים לאחר שמירה',
+      autoApprove: 'אשר את הקישורים לאחר שמירה (רלוונטי ל״שמור תכנון״ בלבד)',
+      approveAutoNote: '״שמור קישורים והוסף לתור הפרסום״ מאשר תמיד את הקישורים המסומנים — אין צורך בסימון הזה.',
       // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't
       // surprised that a saved-only plan doesn't auto-insert when the article is created.
       planVsApproveNote: '"שמור תכנון" שומר תכנון בלבד. רק קישורים מאושרים מוטמעים אוטומטית בעת יצירת מאמר. כדי שיוטמעו אוטומטית ביצירה, סמנו "אשר את הקישורים לאחר שמירה". אחרת אפשר לאשר ולהטמיע ידנית מדף המאמר לאחר היצירה.',

@@ -345,7 +345,8 @@ export const dashboardEn = {
         blocked_generic_only: 'Matched on generic words only',
         unknown_no_exact: 'No identified cluster — not an exact match',
       },
-      autoApprove: 'Approve the links after saving',
+      autoApprove: 'Approve the links after saving (applies to “Save plan” only)',
+      approveAutoNote: '“Save links and add to publishing queue” always approves the checked links — this checkbox isn’t needed for it.',
       // Phase 3B.3 — clarify the planned-vs-approved distinction so users aren't
       // surprised that a saved-only plan doesn't auto-insert when the article is created.
       planVsApproveNote: '"Save plan" saves a plan only. Only approved links are auto-inserted when an article is created. To auto-insert on creation, check "Approve the links after saving". Otherwise you can approve and insert them manually from the article page after it is created.',

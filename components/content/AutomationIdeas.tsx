@@ -55,7 +55,7 @@ export default function AutomationIdeas({
   onScheduled?: () => void
   // Phase 2F.1 — fires with the newly-created topics so the hub can offer the
   // internal-link planning step for exactly those new topic IDs.
-  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[], uncheckedByTopicId?: Record<string, string[]>) => void
+  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[], uncheckedByTopicId?: Record<string, string[]>, selectedByTopicId?: Record<string, { url: string; anchor: string }[]>) => void
   // Phase 3F.3.2a — fires with per-topic saved planned-link counts (from idea-stage
   // selection) so the hub can seed the topic-row plan badge immediately.
   onPlansSaved?: (plans: { topicId: string; linkCount: number }[]) => void
@@ -256,6 +256,9 @@ export default function AutomationIdeas({
     resolvedIdeaIds: string[]
     unresolved: { title: string; reason: string }[]
     uncheckedByTopicId: Record<string, string[]>
+    // Phase 3G.3 — the CHECKED idea-stage links per created topic, so the review
+    // panel can seed/display them even if its fresh dry-run recomputes differently.
+    selectedByTopicId: Record<string, { url: string; anchor: string }[]>
     savedPlans: { topicId: string; linkCount: number }[]
     expectedPlans: number
   }
@@ -285,13 +288,16 @@ export default function AutomationIdeas({
     const resolvedIdeaIds: string[] = []
     const unresolved: { title: string; reason: string }[] = []
     const uncheckedByTopicId: Record<string, string[]> = {}
+    const selectedByTopicId: Record<string, { url: string; anchor: string }[]> = {}
     const seen = new Set<string>()
     const addResolved = (s: Suggestion, topicId: string, title: string, pk: string | null) => {
       if (!seen.has(topicId)) { seen.add(topicId); topicsForAction.push({ id: topicId, topic: title, primary_keyword: pk }) }
       resolvedIdeaIds.push(s.id)
-      const checked = new Set(selectedLinksFor(s).map((l) => l.url))
+      const checkedLinks = selectedLinksFor(s)
+      const checked = new Set(checkedLinks.map((l) => l.url))
       const unchecked = s.suggestedInternalLinks.filter((l) => !checked.has(l.url)).map((l) => l.url)
       if (unchecked.length && !uncheckedByTopicId[topicId]) uncheckedByTopicId[topicId] = unchecked
+      if (checkedLinks.length && !selectedByTopicId[topicId]) selectedByTopicId[topicId] = checkedLinks.map((l) => ({ url: l.url, anchor: l.anchor }))
     }
 
     // AUTHORITATIVE path: map resolvedTopics[i] ↔ chosen[i] by INDEX (same order).
@@ -321,7 +327,7 @@ export default function AutomationIdeas({
         else unresolved.push({ title: s.title, reason: 'unresolved' })
       }
     }
-    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, savedPlans, expectedPlans }
+    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, savedPlans, expectedPlans }
   }
 
   // Remove the given idea ids from the visible list + selection (called ONLY after
@@ -424,7 +430,7 @@ export default function AutomationIdeas({
       if (!r) return
       if (r.topicsForAction.length > 0) {
         // Open the panel FIRST, then remove only the ideas that resolved.
-        onTopicsCreated?.(r.topicsForAction, r.uncheckedByTopicId)
+        onTopicsCreated?.(r.topicsForAction, r.uncheckedByTopicId, r.selectedByTopicId)
         removeChosenIdeas(r.resolvedIdeaIds)
       } else {
         // Nothing resolvable at all — keep the ideas visible + a real error.

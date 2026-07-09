@@ -52,7 +52,7 @@ function reasonLabel(r?: string | null): string {
 }
 
 export default function NewTopicsLinkPlanPanel({
-  projectId, language, topics, onClose, onSaved, onEnqueue, initialUnchecked = {},
+  projectId, language, topics, onClose, onSaved, onEnqueue, initialUnchecked = {}, initialSelected = {},
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -65,6 +65,9 @@ export default function NewTopicsLinkPlanPanel({
   // Phase 3F.3.7b — per topic-id, recommended-link URLs the user UNCHECKED at the
   // idea stage; the panel starts those unchecked (preserving the user's choice).
   initialUnchecked?: Record<string, string[]>
+  // Phase 3G.3 — per topic-id, the CHECKED idea-stage links; the panel seeds/displays
+  // them (pre-checked) so they don't vanish when its fresh dry-run recomputes to fewer.
+  initialSelected?: Record<string, { url: string; anchor: string }[]>
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.newTopicsPlan, [language])
   const isHebrew = language === 'he'
@@ -120,12 +123,21 @@ export default function NewTopicsLinkPlanPanel({
           const rejected: DryLink[] = Array.isArray(p.rejected) ? p.rejected : []
           const reviewable = rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
           const selectedLinks: DryLink[] = Array.isArray(p.selected) ? p.selected : []
-          const plan: DryPlan = { topicId: p.topicId, selected: selectedLinks, rejected, reviewable, summary: p.summary ?? '' }
+          // Phase 3G.3 — merge the CHECKED idea-stage links so they don't disappear
+          // if the fresh dry-run recomputed fewer/none. Any idea link not already in
+          // the recommended list is added (labelled from the idea stage), pre-checked.
+          const present = new Set(selectedLinks.map((l) => mkey(l)))
+          const ideaLinks = (initialSelected[p.topicId] ?? [])
+            .map((l): DryLink => ({ targetUrl: l.url, targetTitle: l.url, anchorText: l.anchor, confidence: 0, relevance: 0, reason: 'idea_stage_selection', rejectedReasons: [] }))
+            .filter((l) => (l.anchorText || '').trim() && !present.has(mkey(l)))
+          const mergedSelected = [...selectedLinks, ...ideaLinks]
+          const plan: DryPlan = { topicId: p.topicId, selected: mergedSelected, rejected, reviewable, summary: p.summary ?? '' }
           map[p.topicId] = plan
           // Recommended links checked by default, EXCEPT any the user unchecked at
-          // the idea stage (Phase 3F.3.7b) — that choice is preserved here.
+          // the idea stage (Phase 3F.3.7b) — that choice is preserved here. The merged
+          // idea-stage links (3G.3) are always checked.
           const unchecked = new Set(initialUnchecked[p.topicId] ?? [])
-          initLinkSel[p.topicId] = new Set(selectedLinks.filter((l) => !unchecked.has(l.targetUrl)).map((l) => mkey(l)))
+          initLinkSel[p.topicId] = new Set(mergedSelected.filter((l) => !unchecked.has(l.targetUrl)).map((l) => mkey(l)))
         }
         setPlans(map)
         setLinkSel(initLinkSel)
@@ -410,7 +422,10 @@ export default function NewTopicsLinkPlanPanel({
             {/* Planned-vs-approved clarification (Phase 3B.3). */}
             <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">{t.planVsApproveNote}</p>
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            {/* Phase 3G.3 — clarify that this checkbox only affects plain "Save plan";
+                "Save + add to queue" always approves the checked links. */}
+            <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300">{t.approveAutoNote}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
               <label className="inline-flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
                 <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving || queuing} className="accent-indigo-600" />
                 {t.autoApprove}
