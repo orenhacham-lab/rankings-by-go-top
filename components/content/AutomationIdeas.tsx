@@ -225,22 +225,27 @@ export default function AutomationIdeas({
   // (server re-validates; unchecked omitted). Returns parsed results, or null on
   // error (message already set). Does NOT itself enqueue or open the planner — the
   // caller decides the next step (one-click queue vs. advanced review).
+  type ReviewTopic = { id: string; topic: string; primary_keyword: string | null }
   type CreateResult = {
     ids: string[]
-    createdTopics: { id: string; topic: string; primary_keyword: string | null }[]
+    createdTopics: ReviewTopic[]
     plannedIds: Set<string>
     savedPlans: { topicId: string; linkCount: number }[]
     expectedPlans: number
-    // Phase 3F.3.7b — per created-topic-id, the idea-stage suggested-link URLs the
-    // user UNCHECKED, so the review panel can preserve that choice (unchecked stays
-    // unchecked). Absent/empty ⇒ all recommended checked by default.
-    uncheckedByTopicId: Record<string, string[]>
+    // The chosen ideas (id + keyword + title) so the caller can resolve existing
+    // topics for duplicates and decide when to remove them from the list.
+    chosen: { id: string; primaryKeyword: string; title: string }[]
+    // keyword-lc → the idea-stage suggested-link URLs the user UNCHECKED, so the
+    // review panel preserves that choice for BOTH created and existing topics.
+    uncheckedByKw: Record<string, string[]>
   }
+  // Create/approve the selected ideas AND save their checked idea-stage links.
+  // IMPORTANT (Phase 3F.3.7c): this NO LONGER removes ideas from the list or clears
+  // the selection — the caller does that ONLY once its next step (enqueue / open
+  // review panel) has succeeded, so a duplicate/skip can never make an idea vanish.
   async function createTopics(): Promise<CreateResult | null> {
     const chosen = suggestions.filter((s) => selected.has(s.id))
     if (chosen.length === 0) return null
-    // How many of the chosen ideas had at least one link checked (Part I: used to
-    // detect a partial link-save so we can warn while still enqueuing).
     const expectedPlans = chosen.filter((s) => selectedLinksFor(s).length > 0).length
     const chosenPayload = chosen.map((s) => ({ ...s, selectedLinks: selectedLinksFor(s) }))
     const res = await fetch('/api/content/automation/topics/bulk', {
@@ -253,38 +258,80 @@ export default function AutomationIdeas({
       setMessage({ text: data?.error === 'automation_migration_required' ? 'automation_migration_required' : (data?.error || 'error'), ok: false })
       return null
     }
-    // Remove the created ones from the list and refresh the topics table.
-    setSuggestions((prev) => prev.filter((s) => !selected.has(s.id)))
-    setSelected(new Set())
     const ids: string[] = Array.isArray(data.ids) ? data.ids : []
-    const createdTopics = Array.isArray(data.topics)
+    const createdTopics: ReviewTopic[] = Array.isArray(data.topics)
       ? (data.topics as { id?: unknown; topic?: unknown; primary_keyword?: unknown }[])
-          .filter((r): r is { id: string; topic: string; primary_keyword: string | null } => typeof r?.id === 'string')
+          .filter((r): r is ReviewTopic => typeof r?.id === 'string')
           .map((r) => ({ id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }))
       : []
     const plannedIds = new Set<string>(Array.isArray(data.plannedTopicIds) ? (data.plannedTopicIds as unknown[]).filter((x): x is string => typeof x === 'string') : [])
     const savedPlans = Array.isArray(data.savedPlans)
       ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
       : []
-    // Phase 3F.3.7b — map each CREATED topic (by exact primary keyword, unique in
-    // batch) back to the idea's UNCHECKED suggested-link URLs, so the review panel
-    // can preserve the user's checked/unchecked choice.
-    const uncheckedByKw = new Map<string, string[]>()
+    const uncheckedByKw: Record<string, string[]> = {}
     for (const s of chosen) {
       const checkedUrls = new Set(selectedLinksFor(s).map((l) => l.url))
       const unchecked = s.suggestedInternalLinks.filter((l) => !checkedUrls.has(l.url)).map((l) => l.url)
-      uncheckedByKw.set((s.primaryKeyword || '').toLowerCase(), unchecked)
-    }
-    const uncheckedByTopicId: Record<string, string[]> = {}
-    for (const ct of createdTopics) {
-      const u = uncheckedByKw.get((ct.primary_keyword || '').toLowerCase())
-      if (u && u.length) uncheckedByTopicId[ct.id] = u
+      if (unchecked.length) uncheckedByKw[(s.primaryKeyword || '').toLowerCase()] = unchecked
     }
     // Seed the topic-row plan badge so saved idea-stage links show immediately.
     if (savedPlans.length) onPlansSaved?.(savedPlans)
     setLastPlansCount(savedPlans.length)
     onCreated()
-    return { ids, createdTopics, plannedIds, savedPlans, expectedPlans, uncheckedByTopicId }
+    return { ids, createdTopics, plannedIds, savedPlans, expectedPlans, chosen: chosen.map((s) => ({ id: s.id, primaryKeyword: s.primaryKeyword, title: s.title })), uncheckedByKw }
+  }
+
+  // Remove the given idea ids from the visible list + selection (called ONLY after
+  // the caller's next step succeeded).
+  function removeChosenIdeas(ideaIds: string[]) {
+    if (ideaIds.length === 0) return
+    const set = new Set(ideaIds)
+    setSuggestions((prev) => prev.filter((s) => !set.has(s.id)))
+    setSelected((prev) => { const n = new Set(prev); for (const id of ideaIds) n.delete(id); return n })
+  }
+
+  // Build per-topic-id unchecked URL map (works for created AND existing topics).
+  function uncheckedFor(topicsList: ReviewTopic[], byKw: Record<string, string[]>): Record<string, string[]> {
+    const out: Record<string, string[]> = {}
+    for (const tp of topicsList) {
+      const u = byKw[(tp.primary_keyword || '').toLowerCase()]
+      if (u && u.length) out[tp.id] = u
+    }
+    return out
+  }
+
+  // Resolve EXISTING topic rows for ideas the bulk route skipped as duplicates,
+  // by projectId + primary_keyword (fallback: title). Read-only, best-effort.
+  async function resolveExistingTopics(needed: { primaryKeyword: string; title: string }[]): Promise<ReviewTopic[]> {
+    if (needed.length === 0) return []
+    try {
+      const res = await fetch(`/api/content/topics?projectId=${encodeURIComponent(projectId)}`)
+      if (!res.ok) return []
+      const data = await res.json().catch(() => ({}))
+      const rows: unknown[] = Array.isArray(data.topics) ? data.topics : []
+      const byKw = new Map<string, ReviewTopic>()
+      const byTitle = new Map<string, ReviewTopic>()
+      for (const raw of rows) {
+        const r = raw as { id?: unknown; topic?: unknown; primary_keyword?: unknown }
+        if (typeof r?.id !== 'string') continue
+        const tp: ReviewTopic = { id: r.id, topic: typeof r.topic === 'string' ? r.topic : '', primary_keyword: typeof r.primary_keyword === 'string' ? r.primary_keyword : null }
+        const kw = (tp.primary_keyword || '').toLowerCase().trim()
+        const ti = tp.topic.toLowerCase().trim()
+        if (kw && !byKw.has(kw)) byKw.set(kw, tp) // list is newest-first → keep most recent
+        if (ti && !byTitle.has(ti)) byTitle.set(ti, tp)
+      }
+      const out: ReviewTopic[] = []
+      const seen = new Set<string>()
+      for (const n of needed) {
+        const kw = (n.primaryKeyword || '').toLowerCase().trim()
+        const ti = (n.title || '').toLowerCase().trim()
+        const match = (kw && byKw.get(kw)) || (ti && byTitle.get(ti)) || null
+        if (match && !seen.has(match.id)) { seen.add(match.id); out.push(match) }
+      }
+      return out
+    } catch {
+      return []
+    }
   }
 
   // Ensure the project's pool exists (never flips an active pool to paused) and
@@ -325,6 +372,8 @@ export default function AutomationIdeas({
     try {
       const res = await createTopics()
       if (!res) return
+      // Primary path approved the topics → remove the ideas from the list now.
+      removeChosenIdeas(res.chosen.map((c) => c.id))
       const queued = await enqueueTopics(res.ids)
       if (!queued) {
         // Enqueue failed → surface the manual CTA so the user can retry (Part G).
@@ -355,12 +404,30 @@ export default function AutomationIdeas({
     try {
       const res = await createTopics()
       if (!res) return
-      // Phase 3F.3.7b — the review click ALWAYS opens the batch review panel for the
-      // created topics, regardless of how many idea-stage links were checked (all,
-      // partial, or zero). The unchecked choice is preserved via uncheckedByTopicId.
-      // The old "approved and ready" fallback message must NEVER appear here.
-      if (res.createdTopics.length) onTopicsCreated?.(res.createdTopics, res.uncheckedByTopicId)
-      else setMessage({ text: t.allDuplicates, ok: false }) // nothing new created (all already exist)
+      // Phase 3F.3.7c — the review click ALWAYS opens the batch review panel for the
+      // selected topics, in EVERY case (0 / 1 / partial / all links; and topics the
+      // bulk route skipped as duplicates). Duplicates are resolved to their EXISTING
+      // topic rows so they can still be reviewed. The "all already exist" message is
+      // shown ONLY when nothing at all can be resolved.
+      const createdKws = new Set(res.createdTopics.map((tp) => (tp.primary_keyword || '').toLowerCase()))
+      const skipped = res.chosen.filter((c) => !createdKws.has((c.primaryKeyword || '').toLowerCase()))
+      const existing = await resolveExistingTopics(skipped)
+      // De-dupe by id (an existing match could coincide with a created one).
+      const seen = new Set<string>()
+      const topicsForReview: ReviewTopic[] = []
+      for (const tp of [...res.createdTopics, ...existing]) { if (!seen.has(tp.id)) { seen.add(tp.id); topicsForReview.push(tp) } }
+
+      if (topicsForReview.length > 0) {
+        // Open the panel FIRST, then remove only the ideas that resolved to a review
+        // topic (never hide an idea that couldn't be resolved).
+        onTopicsCreated?.(topicsForReview, uncheckedFor(topicsForReview, res.uncheckedByKw))
+        const reviewKws = new Set(topicsForReview.map((tp) => (tp.primary_keyword || '').toLowerCase()))
+        const resolvedIds = res.chosen.filter((c) => reviewKws.has((c.primaryKeyword || '').toLowerCase())).map((c) => c.id)
+        removeChosenIdeas(resolvedIds.length ? resolvedIds : res.chosen.map((c) => c.id))
+      } else {
+        // Nothing resolvable at all → leave the ideas visible and show a clear note.
+        setMessage({ text: t.allDuplicates, ok: false })
+      }
     } catch {
       setMessage({ text: 'error', ok: false })
     } finally {
