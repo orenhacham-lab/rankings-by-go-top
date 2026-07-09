@@ -48,6 +48,7 @@ export const dashboardEn = {
       queuedFinalSuccess: 'The topics were added to the automatic publishing queue. The system will create and publish them according to the configured schedule.',
       linkSavePartialWarn: 'The topics were added to the queue, but some links were not saved. You can edit links from the table.',
       queueFailedRetry: 'The topics were approved but adding them to the queue failed. Click “Add to publishing queue” to try again.',
+      reviewOpenFailed: 'We could not open link review for the selected topics.',
       // Phase 3F.3.6 — money target vs supporting links on the idea card + review helper.
       primaryCommercialLink: 'Primary commercial link',
       supportingLinks: 'Supporting links',
@@ -345,6 +346,7 @@ export const dashboardEn = {
       saveAndQueue: 'Save links and add to publishing queue',
       savingQueue: 'Saving and adding to queue…',
       queuedSuccess: 'The topics were added to the automatic publishing queue. The system will create and publish them according to the configured schedule.',
+      enqueueFailed: 'The links were saved, but adding to the queue failed. Please try again.',
       close: 'Close',
       saveError: 'Failed to save plan',
       statusSuggested: 'Suggested',

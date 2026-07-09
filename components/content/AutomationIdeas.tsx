@@ -334,10 +334,42 @@ export default function AutomationIdeas({
     }
   }
 
-  // Ensure the project's pool exists (never flips an active pool to paused) and
-  // add the given approved topics to its publishing queue. Returns success.
-  async function enqueueTopics(ids: string[]): Promise<boolean> {
-    if (ids.length === 0) return false
+  // Phase 3F.3.7d — ONE normalized resolution used by BOTH buttons: create/approve
+  // the selected ideas, resolve any bulk-route duplicates to their EXISTING topic
+  // rows, and return the exact topics to act on (+ which ideas resolved). No idea
+  // is ever removed here — the caller removes only after its action succeeds.
+  type ActionResolution = {
+    topicsForAction: ReviewTopic[]
+    resolvedIdeaIds: string[]
+    uncheckedByTopicId: Record<string, string[]>
+    savedPlans: { topicId: string; linkCount: number }[]
+    expectedPlans: number
+  }
+  async function resolveTopicsForAction(): Promise<ActionResolution | null> {
+    const res = await createTopics()
+    if (!res) return null
+    const createdKws = new Set(res.createdTopics.map((tp) => (tp.primary_keyword || '').toLowerCase()))
+    const skipped = res.chosen.filter((c) => !createdKws.has((c.primaryKeyword || '').toLowerCase()))
+    const existing = await resolveExistingTopics(skipped)
+    const seen = new Set<string>()
+    const topicsForAction: ReviewTopic[] = []
+    for (const tp of [...res.createdTopics, ...existing]) if (!seen.has(tp.id)) { seen.add(tp.id); topicsForAction.push(tp) }
+    const actionKws = new Set(topicsForAction.map((tp) => (tp.primary_keyword || '').toLowerCase()))
+    const resolvedIdeaIds = res.chosen.filter((c) => actionKws.has((c.primaryKeyword || '').toLowerCase())).map((c) => c.id)
+    return {
+      topicsForAction,
+      resolvedIdeaIds,
+      uncheckedByTopicId: uncheckedFor(topicsForAction, res.uncheckedByKw),
+      savedPlans: res.savedPlans,
+      expectedPlans: res.expectedPlans,
+    }
+  }
+
+  // Ensure the project's pool exists (never flips an active pool to paused) and add
+  // the given approved topics to its publishing queue. TRUTHFUL: success only when
+  // something was actually queued (or was already queued); otherwise a reason.
+  async function enqueueTopics(ids: string[]): Promise<{ ok: boolean; reason?: string }> {
+    if (ids.length === 0) return { ok: false, reason: 'no_topics' }
     try {
       let poolId: string | null = null
       try {
@@ -349,18 +381,25 @@ export default function AutomationIdeas({
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
         })
-        if (!pr.ok) return false
+        if (!pr.ok) { const d = await pr.json().catch(() => ({})); return { ok: false, reason: d.error || `pool_${pr.status}` } }
         const pd = await pr.json()
         poolId = pd.pool?.id ?? null
       }
-      if (!poolId) return false
+      if (!poolId) return { ok: false, reason: 'no_pool' }
       const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topicIds: ids }),
       })
-      return ir.ok
+      if (!ir.ok) { const d = await ir.json().catch(() => ({})); return { ok: false, reason: d.error || `items_${ir.status}` } }
+      const d = await ir.json().catch(() => ({}))
+      const added = typeof d.added === 'number' ? d.added : 0
+      const alreadyQueued = Array.isArray(d.alreadyQueued) ? d.alreadyQueued.length : 0
+      const notApproved = Array.isArray(d.notApproved) ? d.notApproved.length : 0
+      if (added > 0 || alreadyQueued > 0) return { ok: true }
+      if (notApproved > 0) return { ok: false, reason: 'topics_not_approved' }
+      return { ok: false, reason: 'nothing_queued' }
     } catch {
-      return false
+      return { ok: false, reason: 'network' }
     }
   }
 
@@ -370,22 +409,28 @@ export default function AutomationIdeas({
     if (creating) return
     setCreating(true); setBusyAction('queue'); setMessage(null)
     try {
-      const res = await createTopics()
-      if (!res) return
-      // Primary path approved the topics → remove the ideas from the list now.
-      removeChosenIdeas(res.chosen.map((c) => c.id))
-      const queued = await enqueueTopics(res.ids)
-      if (!queued) {
-        // Enqueue failed → surface the manual CTA so the user can retry (Part G).
-        setLastCreatedIds(res.ids)
-        if (res.createdTopics.length) onApproved?.({ topicIds: res.createdTopics.map((tp) => tp.id), plansSaved: res.savedPlans.length > 0 })
-        window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
-        setMessage({ text: t.queueFailedRetry, ok: false })
+      const r = await resolveTopicsForAction()
+      if (!r) return
+      if (r.topicsForAction.length === 0) {
+        // Could not resolve ANY selected idea to a topic — keep them visible.
+        setMessage({ text: t.reviewOpenFailed, ok: false })
         return
       }
-      // Queued. If the user had checked links but some didn't persist, warn while
-      // keeping the topics queued (Part I). Otherwise the clean success message.
-      const partial = res.expectedPlans > 0 && res.savedPlans.length < res.expectedPlans
+      // Enqueue the EXACT resolved topics (newly created + existing duplicates).
+      const ids = r.topicsForAction.map((tp) => tp.id)
+      const enq = await enqueueTopics(ids)
+      if (!enq.ok) {
+        // FAILURE — do NOT remove/hide the ideas. Show the exact reason + a clear
+        // retry CTA (adds the same resolved topics to the queue).
+        setLastCreatedIds(ids)
+        onApproved?.({ topicIds: ids, plansSaved: r.savedPlans.length > 0 })
+        window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+        setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
+        return
+      }
+      // SUCCESS — only now remove the ideas + show success + refresh the schedule.
+      removeChosenIdeas(r.resolvedIdeaIds)
+      const partial = r.expectedPlans > 0 && r.savedPlans.length < r.expectedPlans
       setLastCreatedIds([]); setLastPlansCount(0)
       setMessage({ text: partial ? t.linkSavePartialWarn : t.queuedFinalSuccess, ok: !partial })
       onScheduled?.()
@@ -396,37 +441,22 @@ export default function AutomationIdeas({
     }
   }
 
-  // SECONDARY / advanced (Part E) — approve + save links, then open the planner /
-  // manual CTA so the user can review & edit links BEFORE adding to the queue.
+  // SECONDARY / advanced (Part E) — approve/resolve topics, then open the batch
+  // review panel. Never enqueues here. Never shows "all duplicates" when any
+  // selected idea resolves to a topic.
   async function approveAndReview() {
     if (creating) return
     setCreating(true); setBusyAction('review'); setMessage(null)
     try {
-      const res = await createTopics()
-      if (!res) return
-      // Phase 3F.3.7c — the review click ALWAYS opens the batch review panel for the
-      // selected topics, in EVERY case (0 / 1 / partial / all links; and topics the
-      // bulk route skipped as duplicates). Duplicates are resolved to their EXISTING
-      // topic rows so they can still be reviewed. The "all already exist" message is
-      // shown ONLY when nothing at all can be resolved.
-      const createdKws = new Set(res.createdTopics.map((tp) => (tp.primary_keyword || '').toLowerCase()))
-      const skipped = res.chosen.filter((c) => !createdKws.has((c.primaryKeyword || '').toLowerCase()))
-      const existing = await resolveExistingTopics(skipped)
-      // De-dupe by id (an existing match could coincide with a created one).
-      const seen = new Set<string>()
-      const topicsForReview: ReviewTopic[] = []
-      for (const tp of [...res.createdTopics, ...existing]) { if (!seen.has(tp.id)) { seen.add(tp.id); topicsForReview.push(tp) } }
-
-      if (topicsForReview.length > 0) {
-        // Open the panel FIRST, then remove only the ideas that resolved to a review
-        // topic (never hide an idea that couldn't be resolved).
-        onTopicsCreated?.(topicsForReview, uncheckedFor(topicsForReview, res.uncheckedByKw))
-        const reviewKws = new Set(topicsForReview.map((tp) => (tp.primary_keyword || '').toLowerCase()))
-        const resolvedIds = res.chosen.filter((c) => reviewKws.has((c.primaryKeyword || '').toLowerCase())).map((c) => c.id)
-        removeChosenIdeas(resolvedIds.length ? resolvedIds : res.chosen.map((c) => c.id))
+      const r = await resolveTopicsForAction()
+      if (!r) return
+      if (r.topicsForAction.length > 0) {
+        // Open the panel FIRST, then remove only the ideas that resolved.
+        onTopicsCreated?.(r.topicsForAction, r.uncheckedByTopicId)
+        removeChosenIdeas(r.resolvedIdeaIds)
       } else {
-        // Nothing resolvable at all → leave the ideas visible and show a clear note.
-        setMessage({ text: t.allDuplicates, ok: false })
+        // Nothing resolvable at all — keep the ideas visible + a real error.
+        setMessage({ text: t.reviewOpenFailed, ok: false })
       }
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -440,13 +470,13 @@ export default function AutomationIdeas({
     if (scheduling || lastCreatedIds.length === 0) return
     setScheduling(true); setMessage(null)
     try {
-      const ok = await enqueueTopics(lastCreatedIds)
-      if (ok) {
+      const enq = await enqueueTopics(lastCreatedIds)
+      if (enq.ok) {
         setLastCreatedIds([]); setLastPlansCount(0)
         setMessage({ text: t.queuedSuccess, ok: true })
         onScheduled?.()
       } else {
-        setMessage({ text: 'error', ok: false })
+        setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
       }
     } finally {
       setScheduling(false)

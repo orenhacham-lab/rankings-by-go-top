@@ -224,8 +224,10 @@ export default function NewTopicsLinkPlanPanel({
       if (okIds === null) return
       const idsToQueue = okIds.length > 0 ? okIds : topicIdsToSave
       const queued = await onEnqueue(idsToQueue)
+      // Links were saved regardless. If the enqueue itself failed, KEEP the panel
+      // open and show the exact failure — never claim a false success.
       if (queued) { setQueuedOk(true); window.setTimeout(() => onClose(), 1800) }
-      else { setSavedOk(true) } // saved but enqueue failed — keep the panel with a plain success
+      else { setError(t.enqueueFailed) }
     } catch {
       setError(t.saveError)
     } finally {

@@ -146,6 +146,11 @@ export default function ContentHub() {
         body: JSON.stringify({ topicIds }),
       })
       if (!ir.ok) return false
+      // Truthful success: only when something was actually queued or already queued.
+      const d = await ir.json().catch(() => ({}))
+      const added = typeof d.added === 'number' ? d.added : 0
+      const alreadyQueued = Array.isArray(d.alreadyQueued) ? d.alreadyQueued.length : 0
+      if (added <= 0 && alreadyQueued <= 0) return false
       handleScheduled()
       return true
     } catch {

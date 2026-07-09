@@ -46,6 +46,7 @@ export const dashboardHe = {
       queuedFinalSuccess: 'הנושאים נוספו לתור הפרסום האוטומטי. המערכת תיצור ותפרסם אותם לפי התזמון שהוגדר.',
       linkSavePartialWarn: 'הנושאים נוספו לתור, אבל חלק מהקישורים לא נשמרו. אפשר לערוך קישורים מהטבלה.',
       queueFailedRetry: 'הנושאים אושרו אך ההוספה לתור נכשלה. לחץ ״הוסף לתור הפרסום״ כדי לנסות שוב.',
+      reviewOpenFailed: 'לא הצלחנו לפתוח את בדיקת הקישורים לנושאים שנבחרו.',
       // Phase 3F.3.6 — money target vs supporting links on the idea card + review helper.
       primaryCommercialLink: 'קישור מסחרי ראשי',
       supportingLinks: 'קישורים תומכים',
@@ -344,6 +345,7 @@ export const dashboardHe = {
       saveAndQueue: 'שמור קישורים והוסף לתור הפרסום',
       savingQueue: 'שומר ומוסיף לתור…',
       queuedSuccess: 'הנושאים נוספו לתור הפרסום האוטומטי. המערכת תיצור ותפרסם אותם לפי התזמון שהוגדר.',
+      enqueueFailed: 'הקישורים נשמרו, אך ההוספה לתור נכשלה. נסה שוב.',
       close: 'סגור',
       saveError: 'שמירת התכנון נכשלה',
       statusSuggested: 'הצעה',
