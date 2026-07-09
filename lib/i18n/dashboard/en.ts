@@ -689,6 +689,7 @@ export const dashboardEn = {
       gemini_safety_blocked: 'Gemini blocked the content for safety reasons. Try rephrasing the topic.',
       gemini_auth_error: 'A Gemini auth/API-key problem. Please check the key configuration.',
       gemini_invalid_request: 'The Gemini request was invalid. Please try again.',
+      gemini_unknown_provider_error: 'Unrecognized Gemini provider error',
       gemini_no_json: 'Gemini returned an invalid response. Please try again.',
       gemini_missing_required_fields: 'Gemini did not return a complete article. Please try again.',
       article_structure_invalid: 'The generated article did not meet the required structure (headings/paragraphs/length). Please try again.',

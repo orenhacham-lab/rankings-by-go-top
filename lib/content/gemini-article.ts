@@ -651,30 +651,71 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string)
     const usage: GeminiUsage | null = um ? { model: modelName, inputTokens: um.promptTokenCount ?? 0, outputTokens: um.candidatesTokenCount ?? 0 } : null
     return { structured, usage }
   } catch (err) {
-    const reason = classifyGeminiError(err)
-    console.error('[content-article-generation] gemini error', { reason, message: err instanceof Error ? err.message : String(err) })
-    return { error: reason }
+    const code = classifyGeminiError(err)
+    const preview = geminiErrorPreview(err)
+    // Full sanitized diagnostics to the server log (safe fields only, no key/prompt).
+    console.error('[content-article-generation] gemini error', {
+      provider: 'gemini', code, requestStage: 'generate_content',
+      rawName: (err as { name?: unknown })?.name ?? null,
+      status: firstNumber((err as Record<string, unknown>)?.status, (err as Record<string, unknown>)?.statusCode, (err as { response?: { status?: unknown } })?.response?.status) ?? null,
+      rawMessagePreview: preview,
+    })
+    // For an UNCLASSIFIED provider error, carry the sanitized message preview in the
+    // reason so it reaches the queue item's last_error / UI (no DB schema change).
+    return { error: code === 'gemini_unknown_provider_error' && preview ? `${code}: ${preview}` : code }
   }
 }
 
 /** Transient provider failures that are worth retrying (do not consume the retry cap). */
 export const TRANSIENT_GEN_REASONS = new Set(['gemini_quota_exceeded', 'gemini_overloaded', 'gemini_timeout'])
 
+/** First finite number among the args (reads status from various SDK error shapes). */
+function firstNumber(...vals: unknown[]): number | undefined {
+  for (const v of vals) {
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string' && /^\d{3}$/.test(v.trim())) return Number(v.trim())
+  }
+  return undefined
+}
+
 /**
- * Phase 3G.2 — classify a Gemini SDK error into a PRECISE, safe reason code (never
- * exposes the API key or raw payload). Reads the HTTP status when present, else the
- * message text. Falls back to the generic 'gemini_request_failed'.
+ * Phase 3G.2b — classify a Gemini SDK error into a PRECISE, safe reason code. Reads
+ * EVERY plausible field (status / statusCode / code / response.status, plus message,
+ * statusText, name, errorDetails, cause) since the SDK shape varies. Unknown errors
+ * return 'gemini_unknown_provider_error' (NOT the old generic string) so the caller
+ * can surface a message preview. Never exposes the API key or raw payload.
  */
 export function classifyGeminiError(err: unknown): string {
-  const status = typeof (err as { status?: unknown })?.status === 'number' ? (err as { status: number }).status : undefined
-  const msg = (err instanceof Error ? err.message : String(err ?? '')).toLowerCase()
-  if (status === 429 || /quota|rate.?limit|resource.?exhausted|too many requests/.test(msg)) return 'gemini_quota_exceeded'
-  if (status === 503 || /overloaded|unavailable|try again later/.test(msg)) return 'gemini_overloaded'
-  if (/deadline|timeout|timed out|etimedout|econnreset|network|fetch failed|socket hang/.test(msg)) return 'gemini_timeout'
-  if (/safety|blocked|recitation|prohibited/.test(msg)) return 'gemini_safety_blocked'
-  if (status === 401 || status === 403 || /api key|permission|unauthorized|forbidden|invalid.*key/.test(msg)) return 'gemini_auth_error'
-  if (status === 400 || /invalid|bad request|malformed/.test(msg)) return 'gemini_invalid_request'
-  return 'gemini_request_failed'
+  const e = (err ?? {}) as Record<string, unknown>
+  const status = firstNumber(e.status, e.statusCode, e.code, (e.response as { status?: unknown } | undefined)?.status)
+  const bag = [
+    e.message, e.statusText, e.name, e.code, (e.cause as { message?: unknown } | undefined)?.message,
+    (e.response as { statusText?: unknown } | undefined)?.statusText,
+    typeof e.errorDetails === 'object' ? JSON.stringify(e.errorDetails) : e.errorDetails,
+  ].filter((x) => x != null).map(String).join(' ').toLowerCase()
+  if (status === 429 || /\b429\b|quota|rate.?limit|resource.?exhausted|too many requests/.test(bag)) return 'gemini_quota_exceeded'
+  if (status === 503 || /\b503\b|overloaded|unavailable|try again later/.test(bag)) return 'gemini_overloaded'
+  if (status === 504 || /\b504\b|deadline|timeout|timed out|etimedout|econnreset|econnrefused|enotfound|network|fetch failed|socket hang|aborted|abort/.test(bag)) return 'gemini_timeout'
+  if (/safety|\bblocked\b|recitation|prohibited|harm_category|harmful/.test(bag)) return 'gemini_safety_blocked'
+  if (status === 401 || status === 403 || /\b401\b|\b403\b|api[_ ]?key|permission|unauthorized|forbidden|invalid.*key|api_key_invalid|permission_denied|unauthenticated/.test(bag)) return 'gemini_auth_error'
+  if (status === 400 || status === 404 || /\b400\b|\b404\b|invalid|bad request|malformed|not found|unsupported|model.*not.*(found|exist)|failed_precondition/.test(bag)) return 'gemini_invalid_request'
+  return 'gemini_unknown_provider_error'
+}
+
+/** Sanitized, ≤300-char preview of a Gemini error for admin/queue diagnostics. Redacts
+ *  API keys and never includes prompts/stack traces/secrets. */
+export function geminiErrorPreview(err: unknown): string {
+  const e = (err ?? {}) as Record<string, unknown>
+  const status = firstNumber(e.status, e.statusCode, (e.response as { status?: unknown } | undefined)?.status)
+  const name = typeof e.name === 'string' ? e.name : (err instanceof Error ? err.name : '')
+  const msg = typeof e.message === 'string' ? e.message : String(err ?? '')
+  const raw = `${name || 'Error'}${status ? ` [${status}]` : ''}: ${msg}`
+  return raw
+    .replace(/AIza[0-9A-Za-z_\-]{10,}/g, '[redacted-key]')
+    .replace(/key=[^\s&"']+/gi, 'key=[redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300)
 }
 
 export interface ValidatedArticle {

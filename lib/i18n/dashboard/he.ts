@@ -690,6 +690,7 @@ export const dashboardHe = {
       gemini_safety_blocked: 'Gemini חסם את התוכן מטעמי בטיחות. נסו לנסח מחדש את הנושא.',
       gemini_auth_error: 'בעיית הרשאה/מפתח מול Gemini. בדקו את הגדרת המפתח.',
       gemini_invalid_request: 'הבקשה ל-Gemini לא תקינה. נסו שוב.',
+      gemini_unknown_provider_error: 'שגיאת ספק לא מזוהה מ-Gemini',
       gemini_no_json: 'Gemini החזיר תשובה לא תקינה. נסו שוב.',
       gemini_missing_required_fields: 'Gemini לא החזיר מאמר שלם. נסו שוב.',
       article_structure_invalid: 'המאמר שנוצר לא עמד במבנה הנדרש (כותרות/פסקאות/אורך). נסו שוב.',

@@ -64,8 +64,12 @@ export default function AutomationSchedule({
   const genErrors = getDashboardDictionary(language).contentHub.genErrors as Record<string, string>
   const reasonLabel = (code: string | null | undefined): string => {
     if (!code) return ''
-    const base = code.split(':')[0]!.trim()
-    return genErrors[base] ?? code
+    const idx = code.indexOf(':')
+    const base = (idx >= 0 ? code.slice(0, idx) : code).trim()
+    const tail = idx >= 0 ? code.slice(idx + 1).trim() : ''
+    const label = genErrors[base] ?? base
+    // Keep the sanitized raw preview for unknown provider errors so it is debuggable.
+    return tail ? `${label} — ${tail}` : label
   }
 
   const [pool, setPool] = useState<Pool | null>(null)
