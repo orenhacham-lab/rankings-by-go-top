@@ -249,6 +249,64 @@ export function classifyAnchorForPlanning(anchor: string, ctx: AnchorContext): {
   return { usability: 'yes', reason: 'natural_phrase' }
 }
 
+// ── Phase 3G.6 — SAFE derived-anchor fallback from the target's own metadata ──
+// Many perfectly good targets have NO inbound anchors on the site (nobody linked
+// to them yet) and no clean keyword — the planner then hard-blocks them as
+// no_usable_anchor even though their TITLE contains an obvious topical phrase
+// ("תאורה לבית בזול – איך מאירים נכון…" → "תאורה לבית בזול"). This derives a
+// short anchor from the title's first segment (before – — - : |), else the whole
+// short title, else Hebrew slug words — each candidate validated by the SAME
+// CTA/generic/boilerplate classifier real anchors go through, so CTA/admin/
+// generic phrases can never come back. Homepages are never derived (brand-only
+// titles), and single words are refused (brand/generic risk). Deliberately
+// conservative: a target that truly has no topical phrase stays blocked.
+
+/** Title/slug segment separators: " – ", " — ", " - ", "|", ": " (colon+space). */
+const TITLE_SEGMENT_SPLIT = /\s+[–—-]\s+|\s*\|\s*|:\s+/
+
+export interface DerivedTargetAnchor { text: string; source: 'derived_title' | 'derived_slug' }
+
+/** Derive a safe topical anchor from a target's own title/slug, or null. */
+export function deriveTargetAnchorFromMeta(meta: { targetTitle: string; targetUrl: string }): DerivedTargetAnchor | null {
+  const url = (meta.targetUrl || '').trim()
+  const title = (meta.targetTitle || '').replace(/\s+/g, ' ').trim()
+  if (!url || isHomepageUrl(url)) return null // homepage titles are brand/site names
+  const ctx: AnchorContext = { targetTitle: title, targetUrl: url, isHomepage: false }
+
+  // Validate a candidate phrase with the SAME rules real anchors go through,
+  // plus derived-only bounds: 2–6 words (1 word = brand/generic risk; more = a
+  // full headline, not an anchor) and a sane character length.
+  const tryPhrase = (raw: string): string | null => {
+    const s = (raw || '').replace(/["“”'’«»…]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^[,.;:!?־-]+|[,.;:!?־-]+$/g, '').trim()
+    if (!s || s.length > 60) return null
+    const wc = s.split(/\s+/).length
+    if (wc < 2 || wc > 6) return null
+    if (classifyAnchorForPlanning(s, ctx).usability !== 'yes') return null
+    return s
+  }
+
+  if (title) {
+    // 1) First topical segment of the title ("X – how to…" / "X | brand" → "X").
+    const seg = (title.split(TITLE_SEGMENT_SPLIT)[0] ?? '').trim()
+    if (seg && seg !== title) {
+      const fromSeg = tryPhrase(seg)
+      if (fromSeg) return { text: fromSeg, source: 'derived_title' }
+    }
+    // 2) The whole title, when it is already a short keyword-like phrase.
+    const whole = tryPhrase(title)
+    if (whole) return { text: whole, source: 'derived_title' }
+  }
+
+  // 3) Slug words — ONLY when the slug decodes to real site-language (Hebrew)
+  // words; transliterated slugs ("nikayon-misradim") are not usable anchor text.
+  const slugPhrase = slugFromUrl(url).replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (slugPhrase && /[֐-׿]/.test(slugPhrase)) {
+    const fromSlug = tryPhrase(slugPhrase)
+    if (fromSlug) return { text: fromSlug, source: 'derived_slug' }
+  }
+  return null
+}
+
 export type TargetEligibility = 'yes' | 'no' | 'caution'
 
 export type TargetPriority =

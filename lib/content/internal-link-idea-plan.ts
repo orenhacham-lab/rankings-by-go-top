@@ -10,9 +10,9 @@
  */
 
 import { normalizeUrlKey, isInternalUrl, manualAnchorShapeValid } from '@/lib/content/internal-links'
-import { selfOrDuplicateReason, planFromCachedTargets, type CachePlannedLink, type CacheTopicPlan } from '@/lib/content/internal-link-planner-cache'
+import { selfOrDuplicateReason, planFromCachedTargets, type CachePlannedLink, type CacheTopicPlan, type CacheAnchorSource } from '@/lib/content/internal-link-planner-cache'
 import { resolveMoneyTargetFromPlan, type MoneyTargetMatchType } from '@/lib/content/money-target-resolver'
-import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
+import { deriveTargetAnchorFromMeta, type ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
 export interface SelectedIdeaLink { url: string; anchor: string }
 
@@ -24,8 +24,10 @@ export interface TopicForPlan {
 }
 
 /** Best safe anchor for a target from the selection: the chosen anchor if valid,
- *  else a vetted usable anchor, else the target's clean keyword. Null = unusable. */
-function resolveAnchor(target: ScannedTarget, chosen: string): { text: string; source: 'usable_anchor' | 'target_keyword' } | null {
+ *  else a vetted usable anchor, else the target's clean keyword, else — Phase
+ *  3G.6 — a safely DERIVED anchor from the target's own title/slug (validated by
+ *  the same CTA/generic rules). Null = truly unusable. */
+function resolveAnchor(target: ScannedTarget, chosen: string): { text: string; source: CacheAnchorSource } | null {
   const c = (chosen || '').trim()
   const usable = (target.usableAnchors ?? []).filter((a) => a?.usability === 'yes' && (a.text || '').trim())
   if (c && (usable.some((a) => a.text.toLowerCase() === c.toLowerCase()) || manualAnchorShapeValid(c))) {
@@ -35,6 +37,8 @@ function resolveAnchor(target: ScannedTarget, chosen: string): { text: string; s
   if (firstUsable && manualAnchorShapeValid(firstUsable)) return { text: firstUsable, source: 'usable_anchor' }
   const kw = (target.primaryKeywordCandidate || '').trim()
   if (target.keywordAvailable && kw && manualAnchorShapeValid(kw)) return { text: kw, source: 'target_keyword' }
+  const derived = deriveTargetAnchorFromMeta({ targetTitle: target.targetTitle, targetUrl: target.targetUrl })
+  if (derived && manualAnchorShapeValid(derived.text)) return derived
   return null
 }
 

@@ -24,7 +24,7 @@
 
 import { tokens, jaccard } from '@/lib/content/recommendations/dedupe'
 import { manualAnchorShapeValid, isInternalUrl, normalizeHref, normalizeUrlKey } from '@/lib/content/internal-links'
-import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
+import { deriveTargetAnchorFromMeta, type ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { TopicForPlanning } from '@/lib/content/internal-link-planner'
 
 /** Bump when the cache-planner scoring/guards change (stamped on saved plans). */
@@ -62,7 +62,7 @@ export const PRIORITY_BONUS: Record<string, number> = {
   ineligible: -1, // defensive; ineligible is filtered out anyway
 }
 
-export type CacheAnchorSource = 'usable_anchor' | 'target_keyword'
+export type CacheAnchorSource = 'usable_anchor' | 'target_keyword' | 'derived_title' | 'derived_slug'
 
 export type RelevanceMethod = 'jaccard' | 'containment' | 'entity_single_token'
 
@@ -160,8 +160,14 @@ export function isReviewableRejection(rejectedReasons: string[]): boolean {
  * url/anchor) — as opposed to being merely irrelevant (cluster gate) or merely
  * under-scored (soft). Review UIs show ONLY these in the "blocked" section so
  * the list stays accurate instead of dumping every unrelated page on the site.
+ *
+ * Phase 3G.6 — a candidate that is ALSO cluster-blocked (irrelevant to the
+ * topic) is hidden even when it additionally failed a hard check: it was never
+ * a plausible option for THIS topic, so listing it (e.g. 97 anchor-less
+ * unrelated pages) only buries the real blocked candidates.
  */
 export function isDisplayBlockedRejection(rejectedReasons: string[]): boolean {
+  if (rejectedReasons.some(isClusterGateRejection)) return false
   return rejectedReasons.some((r) => !isSoftRejection(r) && !isClusterGateRejection(r))
 }
 
@@ -329,7 +335,13 @@ export function selfOrDuplicateReason(topic: TopicForPlanning, t: ScannedTarget)
   return null
 }
 
-/** Best anchor for a target: vetted usableAnchors first, else a clean keyword. */
+/**
+ * Best anchor for a target: vetted usableAnchors first, else a clean keyword
+ * (Yoast focus / SEO primary when the scan surfaced one), else — Phase 3G.6 — a
+ * SAFELY DERIVED anchor from the target's own title/slug (first topical segment
+ * of the title, validated by the same CTA/generic classifier real anchors go
+ * through). Only when ALL of these fail is the target no_usable_anchor.
+ */
 function chooseAnchor(t: ScannedTarget): { text: string; source: CacheAnchorSource } | null {
   const usable = Array.isArray(t.usableAnchors) ? t.usableAnchors : []
   for (const a of usable) {
@@ -338,6 +350,8 @@ function chooseAnchor(t: ScannedTarget): { text: string; source: CacheAnchorSour
   }
   const kw = (t.primaryKeywordCandidate || '').trim()
   if (t.keywordAvailable && kw && manualAnchorShapeValid(kw)) return { text: kw, source: 'target_keyword' }
+  const derived = deriveTargetAnchorFromMeta({ targetTitle: t.targetTitle, targetUrl: t.targetUrl })
+  if (derived && manualAnchorShapeValid(derived.text)) return derived
   return null
 }
 
