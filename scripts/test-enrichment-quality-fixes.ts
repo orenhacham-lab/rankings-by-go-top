@@ -217,7 +217,10 @@ async function main() {
       language: 'he',
       businessCategory: 'ecommerce',
       businessName: 'Fashion Store',
-      allowedPatterns: ['בחור', 'מחיר', 'עולה'],  // selection or price
+      // Selection / price / recommendation-class product questions are all
+      // valid outcomes (the generator surfaces brand-recommendation phrasing
+      // like "אילו מותגים מציעים שמלות?" for product keywords).
+      allowedPatterns: ['בחור', 'מחיר', 'עולה', 'מותגים', 'מציעים'],
     },
 
     {
@@ -244,7 +247,9 @@ async function main() {
       language: 'he',
       businessCategory: 'agency',
       businessName: 'Digital Agency',
-      allowedPatterns: ['עולה', 'מחיר'],
+      // Pricing-CLASS phrasings: the generator's budget question ("איזה תקציב
+      // מומלץ לפרסום באינסטגרם?") IS the service-pricing candidate.
+      allowedPatterns: ['עולה', 'מחיר', 'תקציב'],
     },
 
     {

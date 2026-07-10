@@ -132,8 +132,11 @@ function extractDedupeEntities(text: string, language: 'he' | 'en'): string[] {
       { pattern: /הליכון/, entity: 'הליכון' },
       { pattern: /אופניים/, entity: 'אופניים' },
       { pattern: /ציוד ספורט|ציוד כושר/, entity: 'ציוד ספורט' },
-      // Services
-      { pattern: /ניקיון|ניקוי/, entity: 'ניקיון' },
+      // Services — include common VERB/participle forms of the same business
+      // root ("לנקות משרד" is the same cleaning entity as "ניקיון משרדים"),
+      // so entity+intent dedupe catches rephrased questions. Conservative:
+      // only unambiguous forms of the root.
+      { pattern: /ניקיון|ניקוי|לנקות|מנקה|מנקים/, entity: 'ניקיון' },
       { pattern: /קידום אתרים|seo|קידום/, entity: 'קידום אתרים' },
       { pattern: /פרסום|advertising/, entity: 'פרסום' },
       { pattern: /אינסטגרם|instagram/, entity: 'אינסטגרם' },
