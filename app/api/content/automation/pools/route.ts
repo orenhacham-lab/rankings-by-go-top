@@ -92,7 +92,13 @@ export async function GET(request: Request) {
   let pendingIndex = 0
   let weekdayCursor = base // sequential weekday projection cursor
   const dtoItems = items.map((i) => {
-    const pending = ['queued', 'scheduled'].includes(i.status)
+    // Phase 3G.9 — every NOT-YET-PUBLISHED working item occupies an upcoming
+    // cadence slot: the cron publishes the earliest GENERATED item at each due
+    // slot and generates queued items ahead, so 'generated' ("ready") items are
+    // the FIRST to consume slots — they must not fall through to scheduled_at
+    // (usually null) and display as "not scheduled" while automation is active.
+    // failed/skipped/published stay out (they show their own state instead).
+    const pending = ['queued', 'scheduled', 'generating', 'generated', 'publishing'].includes(i.status)
     let projected: string | null
     if (!pending || !base) {
       projected = i.published_at ?? i.scheduled_at ?? null
