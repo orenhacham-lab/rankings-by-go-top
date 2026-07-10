@@ -37,6 +37,15 @@ interface IndexStatus {
   errorMessage?: string | null
   siteUrl?: string | null
   truncated?: boolean | null
+  // Phase 3I.1 — why products are (or are not) in the index.
+  storeEntityDiscovery?: {
+    source: 'store_api' | 'store_api_legacy' | 'rest_product' | 'none'
+    lastHttpStatus: number | null
+    productsFound: number
+    categoriesFound: number
+    productTargetsAdded: number
+    categoryTargetsAdded: number
+  } | null
   counts?: {
     targetsStored?: number | null
     uniqueTargets?: number | null
@@ -178,6 +187,12 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
               <span><b className="text-slate-700 dark:text-slate-200">{c.targetsEligible ?? 0}</b> {t.cEligible}</span>
               <span><b className="text-slate-700 dark:text-slate-200">{c.targetsWithUsableAnchors ?? 0}</b> {t.cAnchors}</span>
               {(c.contentItemsSkipped ?? 0) > 0 && <span><b className="text-slate-700 dark:text-slate-200">{c.contentItemsSkipped}</b> {t.cSkipped}</span>}
+              {/* Phase 3I.1 — store entity discovery outcome, always visible. */}
+              {status?.storeEntityDiscovery && (
+                status.storeEntityDiscovery.source !== 'none'
+                  ? <span><b className="text-slate-700 dark:text-slate-200">{status.storeEntityDiscovery.productsFound}</b> {t.cStoreProducts} · <b className="text-slate-700 dark:text-slate-200">{status.storeEntityDiscovery.categoriesFound}</b> {t.cStoreCategories}</span>
+                  : <span className="text-amber-700 dark:text-amber-400">{t.storeDiscoveryNone}{status.storeEntityDiscovery.lastHttpStatus ? ` (HTTP ${status.storeEntityDiscovery.lastHttpStatus})` : ''}</span>
+              )}
               {(status?.scanCompletedAt || status?.scannerVersion) && <span className="text-slate-300 dark:text-slate-600">·</span>}
               {status?.scanCompletedAt && <span>{t.lastScanned}: {formatDateTime(status.scanCompletedAt)}</span>}
               {status?.scannerVersion && <span>{t.scannerVersion} {status.scannerVersion}</span>}

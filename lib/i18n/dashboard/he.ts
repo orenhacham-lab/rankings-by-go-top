@@ -309,6 +309,10 @@ export const dashboardHe = {
       cAnchors: 'יעדים עם עוגנים',
       cSkipped: 'תוכן שדולג',
       cStored: 'יעדים שנשמרו',
+      // Phase 3I.1 — store entity discovery visibility.
+      cStoreProducts: 'מוצרים מהחנות',
+      cStoreCategories: 'קטגוריות מהחנות',
+      storeDiscoveryNone: 'גילוי מוצרים ישיר לא זמין באתר זה',
       // Phase 3F.1.1 — clarify that the index intentionally covers the most useful
       // link destinations (from posts/pages), not necessarily every WooCommerce product.
       coverageNote: 'האינדקס כולל את העמודים השימושיים ביותר לקישורים פנימיים, וכן מוצרים וקטגוריות שמתגלים ישירות מחנות ווקומרס (כאשר זמינה). אם האינדקס מסומן חלקי — רעננו לאחר שהאתר זמין ומהיר יותר.',

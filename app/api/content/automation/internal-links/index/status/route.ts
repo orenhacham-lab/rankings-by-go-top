@@ -44,6 +44,8 @@ export async function GET(request: Request) {
     errorMessage: row.error_message,
     siteUrl: row.site_url,
     truncated: summary.truncated ?? null,
+    // Phase 3I.1 — why products are (or are not) in the index.
+    storeEntityDiscovery: summary.storeEntityDiscovery ?? null,
     counts: {
       targetsStored: Array.isArray(row.targets) ? row.targets.length : 0,
       uniqueTargets: num('uniqueTargets'),

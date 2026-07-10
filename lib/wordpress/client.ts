@@ -183,7 +183,7 @@ function buildAuthHeader(creds: WordPressCredentials): string {
  * Low-level HTTPS GET with the SSRF connect-time guard, redirect rejection,
  * a hard timeout, and a response-size cap. Returns { status, body }.
  */
-function httpsGet(target: URL, authHeader: string): Promise<{ status: number; body: string }> {
+function httpsGet(target: URL, authHeader?: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = https.request(
       {
@@ -193,7 +193,10 @@ function httpsGet(target: URL, authHeader: string): Promise<{ status: number; bo
         path: `${target.pathname}${target.search}`,
         method: 'GET',
         headers: {
-          Authorization: authHeader,
+          // Phase 3I.1 — the Authorization header is OPTIONAL: public endpoints
+          // (WooCommerce Store API) are fetched WITHOUT auth first, because some
+          // security setups reject Basic auth on public namespaces.
+          ...(authHeader ? { Authorization: authHeader } : {}),
           Accept: 'application/json',
           'User-Agent': 'RankingsByGoTop-Content/1.0',
         },
@@ -474,26 +477,22 @@ export async function getTaxonomyTerms(creds: WordPressCredentials, base: string
 }
 
 /**
- * Phase 3I — WooCommerce STORE API (public storefront JSON), read-only.
- * Direct product/category ENTITY discovery for the content index: name +
- * permalink only — no body fetch, no WooCommerce API keys (the Store API is the
- * same public endpoint the storefront itself uses). Returns null when the Store
- * API is absent (non-WooCommerce site) and [] on empty — callers can
- * distinguish "no WooCommerce" from "no products".
+ * Phase 3I / 3I.1 — direct product/category ENTITY discovery, read-only,
+ * metadata-only (name + permalink; never bodies). Tries, in order:
+ *   1. WooCommerce Store API `/wc/store/v1` (public storefront JSON) WITHOUT
+ *      auth, then WITH auth (some security setups reject Basic auth on public
+ *      namespaces — and some lock ALL of wp-json behind auth).
+ *   2. The legacy Store API namespace `/wc/store` (WooCommerce Blocks < 2021).
+ *   3. Core REST `/wp/v2/product` (sites exposing the product CPT).
+ * Captures the last HTTP status for diagnostics so a blocked/absent API is
+ * VISIBLE in the scan notes instead of silently contributing zero targets.
  */
 export interface StoreEntity { name: string; link: string }
-
-async function wcStoreGet(creds: WordPressCredentials, path: string): Promise<unknown[] | null> {
-  try {
-    const origin = await assertSafeSiteUrl(creds.siteUrl)
-    const target = new URL(`${origin}/wp-json/wc/store/v1${path}`)
-    const { status, body } = await httpsGet(target, buildAuthHeader(creds))
-    if (status < 200 || status >= 300) return null
-    const rows = JSON.parse(body)
-    return Array.isArray(rows) ? rows : null
-  } catch {
-    return null
-  }
+export interface StoreDiscoveryResult {
+  products: StoreEntity[]
+  categories: StoreEntity[]
+  source: 'store_api' | 'store_api_legacy' | 'rest_product' | 'none'
+  lastHttpStatus: number | null
 }
 
 const toStoreEntity = (r: unknown): StoreEntity | null => {
@@ -503,23 +502,62 @@ const toStoreEntity = (r: unknown): StoreEntity | null => {
   return name && link ? { name, link } : null
 }
 
-/** Products via the Store API (bounded pages of 100, popularity-first). */
-export async function getStoreProducts(creds: WordPressCredentials, maxPages = 2): Promise<StoreEntity[] | null> {
-  const out: StoreEntity[] = []
-  for (let page = 1; page <= maxPages; page++) {
-    const rows = await wcStoreGet(creds, `/products?per_page=100&page=${page}&orderby=popularity`)
-    if (rows === null) return page === 1 ? null : out // absent vs. pagination end
-    for (const r of rows) { const e = toStoreEntity(r); if (e) out.push(e) }
-    if (rows.length < 100) break
+async function rawJsonArray(origin: string, path: string, authHeader?: string): Promise<{ rows: unknown[] | null; status: number }> {
+  try {
+    const { status, body } = await httpsGet(new URL(`${origin}${path}`), authHeader)
+    if (status < 200 || status >= 300) return { rows: null, status }
+    const rows = JSON.parse(body)
+    return { rows: Array.isArray(rows) ? rows : null, status }
+  } catch {
+    return { rows: null, status: 0 }
   }
-  return out
 }
 
-/** Product categories via the Store API (single bounded page). */
-export async function getStoreProductCategories(creds: WordPressCredentials): Promise<StoreEntity[] | null> {
-  const rows = await wcStoreGet(creds, '/products/categories?per_page=100&orderby=count&order=desc')
-  if (rows === null) return null
-  return rows.map(toStoreEntity).filter((e): e is StoreEntity => !!e)
+export async function discoverStoreEntities(creds: WordPressCredentials): Promise<StoreDiscoveryResult> {
+  const origin = await assertSafeSiteUrl(creds.siteUrl).catch(() => null)
+  if (!origin) return { products: [], categories: [], source: 'none', lastHttpStatus: null }
+  const auth = buildAuthHeader(creds)
+  let lastStatus: number | null = null
+
+  // 1+2) Store API — resolve a WORKING (namespace, auth) variant on products
+  // page 1, then reuse it for pagination + categories.
+  const variants: { ns: string; source: 'store_api' | 'store_api_legacy'; authHeader?: string }[] = [
+    { ns: '/wp-json/wc/store/v1', source: 'store_api' },
+    { ns: '/wp-json/wc/store/v1', source: 'store_api', authHeader: auth },
+    { ns: '/wp-json/wc/store', source: 'store_api_legacy' },
+    { ns: '/wp-json/wc/store', source: 'store_api_legacy', authHeader: auth },
+  ]
+  for (const v of variants) {
+    const first = await rawJsonArray(origin, `${v.ns}/products?per_page=100&page=1&orderby=popularity`, v.authHeader)
+    if (first.status) lastStatus = first.status
+    if (first.rows === null) continue
+    const products = first.rows.map(toStoreEntity).filter((e): e is StoreEntity => !!e)
+    if (products.length === 100) {
+      const second = await rawJsonArray(origin, `${v.ns}/products?per_page=100&page=2&orderby=popularity`, v.authHeader)
+      for (const r of second.rows ?? []) { const e = toStoreEntity(r); if (e) products.push(e) }
+    }
+    const cats = await rawJsonArray(origin, `${v.ns}/products/categories?per_page=100&orderby=count&order=desc`, v.authHeader)
+    const categories = (cats.rows ?? []).map(toStoreEntity).filter((e): e is StoreEntity => !!e)
+    return { products, categories, source: v.source, lastHttpStatus: first.status }
+  }
+
+  // 3) Core REST product CPT fallback (title.rendered + link).
+  for (const authHeader of [undefined, auth]) {
+    const res = await rawJsonArray(origin, `/wp-json/wp/v2/product?per_page=50&_fields=title,link`, authHeader)
+    if (res.status) lastStatus = res.status
+    if (res.rows === null) continue
+    const products = res.rows
+      .map((r) => {
+        const o = r as { title?: { rendered?: unknown } | string; link?: unknown }
+        const name = String(typeof o?.title === 'object' ? (o.title as { rendered?: unknown })?.rendered ?? '' : o?.title ?? '').replace(/<[^>]+>/g, '').trim()
+        const link = String(o?.link ?? '').trim()
+        return name && link ? { name, link } : null
+      })
+      .filter((e): e is StoreEntity => !!e)
+    return { products, categories: [], source: 'rest_product', lastHttpStatus: res.status }
+  }
+
+  return { products: [], categories: [], source: 'none', lastHttpStatus: lastStatus }
 }
 
 export async function getTags(creds: WordPressCredentials): Promise<WordPressTag[]> {

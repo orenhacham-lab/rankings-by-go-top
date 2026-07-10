@@ -311,6 +311,10 @@ export const dashboardEn = {
       cAnchors: 'targets with anchors',
       cSkipped: 'content skipped',
       cStored: 'targets stored',
+      // Phase 3I.1 — store entity discovery visibility.
+      cStoreProducts: 'store products',
+      cStoreCategories: 'store categories',
+      storeDiscoveryNone: 'Direct product discovery is not available on this site',
       // Phase 3F.1.1 — clarify the index covers the most useful link destinations
       // (from posts/pages), not necessarily every WooCommerce product.
       coverageNote: 'The index covers the most useful pages for internal links, plus products and categories discovered directly from the WooCommerce store (when available). If the index is marked partial — refresh once the site responds faster.',

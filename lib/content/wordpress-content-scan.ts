@@ -13,7 +13,7 @@
  */
 
 import type { WordPressCredentials, WordPressContentItem } from '@/lib/wordpress/types'
-import { getPosts, getPages, getItemContentHtml, getCategories, getTags, getTaxonomyTerms, getStoreProducts, getStoreProductCategories, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
+import { getPosts, getPages, getItemContentHtml, getCategories, getTags, getTaxonomyTerms, discoverStoreEntities, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
 import {
   extractLinkAnchorsFromHtml,
   isInternalUrl,
@@ -563,6 +563,8 @@ export interface SiteScanReport {
   itemsScanned: number
   postsPagesRequested: number
   truncated: boolean
+  /** Phase 3I.1 — direct store entity discovery outcome (diagnostics). */
+  storeEntityDiscovery?: StoreEntityDiscoverySummary
   // Metadata-first / adaptive fetch stats (large-site handling).
   metadataItemsFetched: number
   postsMetadataFetched: number
@@ -806,7 +808,20 @@ async function buildTaxonomyTargets(creds: WordPressCredentials, existing: Set<s
 const MAX_STORE_PRODUCT_TARGETS = 80
 const MAX_STORE_CATEGORY_TARGETS = 40
 
-async function buildStoreEntityTargets(creds: WordPressCredentials, existing: Set<string>, note: (m: string) => void): Promise<ScannedTarget[]> {
+export interface StoreEntityDiscoverySummary {
+  source: 'store_api' | 'store_api_legacy' | 'rest_product' | 'none'
+  lastHttpStatus: number | null
+  productsFound: number
+  categoriesFound: number
+  productTargetsAdded: number
+  categoryTargetsAdded: number
+}
+
+async function buildStoreEntityTargets(
+  creds: WordPressCredentials,
+  existing: Set<string>,
+  note: (m: string) => void,
+): Promise<{ targets: ScannedTarget[]; summary: StoreEntityDiscoverySummary }> {
   const out: ScannedTarget[] = []
   const seen = new Set(existing)
   const push = (name: string, link: string, wpType: string, cap: number, count: { n: number }) => {
@@ -828,17 +843,26 @@ async function buildStoreEntityTargets(creds: WordPressCredentials, existing: Se
     })
   }
 
-  const [products, categories] = await Promise.all([getStoreProducts(creds), getStoreProductCategories(creds)])
-  if (products === null && categories === null) {
-    note('WooCommerce Store API not available — products are discoverable only via in-body links.')
-    return out
-  }
+  const d = await discoverStoreEntities(creds)
   const pc = { n: 0 }
-  for (const e of categories ?? []) push(e.name, e.link, 'product_cat', MAX_STORE_CATEGORY_TARGETS, pc)
+  for (const e of d.categories) push(e.name, e.link, 'product_cat', MAX_STORE_CATEGORY_TARGETS, pc)
   const pp = { n: 0 }
-  for (const e of products ?? []) push(e.name, e.link, 'product', MAX_STORE_PRODUCT_TARGETS, pp)
-  note(`Store API entity discovery: ${pp.n} product(s) + ${pc.n} product categorie(s) added as metadata targets.`)
-  return out
+  for (const e of d.products) push(e.name, e.link, 'product', MAX_STORE_PRODUCT_TARGETS, pp)
+  // Phase 3I.1 — the outcome is ALWAYS visible: which source worked (or the
+  // last HTTP status when none did), how many entities were found vs added.
+  if (d.source === 'none') {
+    note(`Store entity discovery unavailable (no Store API / product REST${d.lastHttpStatus ? `; last HTTP ${d.lastHttpStatus}` : ''}) — products are discoverable only via in-body links.`)
+  } else {
+    note(`Store entity discovery via ${d.source}: found ${d.products.length} product(s) + ${d.categories.length} categorie(s); added ${pp.n} + ${pc.n} new metadata targets.`)
+  }
+  return {
+    targets: out,
+    summary: {
+      source: d.source, lastHttpStatus: d.lastHttpStatus,
+      productsFound: d.products.length, categoriesFound: d.categories.length,
+      productTargetsAdded: pp.n, categoryTargetsAdded: pc.n,
+    },
+  }
 }
 
 export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanOptions = {}): Promise<SiteScanReport> {
@@ -1131,8 +1155,8 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   // against everything already discovered. Appended like taxonomy targets so
   // ecommerce entities are never crowded out by the content cap.
   const storeSeen = new Set<string>([...contentSlice.map((t) => taxKey(t.targetUrl)), ...taxTargets.map((t) => taxKey(t.targetUrl))])
-  const storeTargets = await buildStoreEntityTargets(creds, storeSeen, (m) => notes.push(m))
-  const finalTargets = [...contentSlice, ...taxTargets, ...storeTargets]
+  const store = await buildStoreEntityTargets(creds, storeSeen, (m) => notes.push(m))
+  const finalTargets = [...contentSlice, ...taxTargets, ...store.targets]
 
   return {
     siteUrl: creds.siteUrl,
@@ -1145,6 +1169,9 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     // coverage), not only the post/page fetch limit, so the index card can say
     // the coverage is partial.
     truncated: truncated || targetCapHit,
+    // Phase 3I.1 — persisted into the index summary so the status card / API can
+    // show WHY products are (or are not) in the index.
+    storeEntityDiscovery: store.summary,
     metadataItemsFetched: items.length,
     postsMetadataFetched: postsMeta.items.length,
     pagesMetadataFetched: pagesMeta.items.length,
