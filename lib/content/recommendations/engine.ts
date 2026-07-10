@@ -68,7 +68,14 @@ async function deriveScanSeedConcepts(admin: Admin, projectId: string): Promise<
  */
 async function buildSiteVocabulary(admin: Admin, projectId: string, extras: string[]): Promise<Set<string>> {
   const vocab = new Set<string>()
-  const absorb = (s: string | null | undefined) => { for (const tk of tokens(s || '')) vocab.add(tk) }
+  // Phase 3H.2 — store prefix-stripped variants too so "לכלבים" ↔ "כלבים" match
+  // in the alignment ratio regardless of which side carries the ל/ב/ה prefix.
+  const absorb = (s: string | null | undefined) => {
+    for (const tk of tokens(s || '')) {
+      vocab.add(tk)
+      if (tk.length >= 4 && /^[בלמהושכ]/.test(tk)) vocab.add(tk.slice(1))
+    }
+  }
   try {
     const cacheRow = await getCachedIndex(admin, projectId)
     if (cacheRow) {
@@ -402,6 +409,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const res = await recommendFromKeywordResearch(admin, {
       userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
       seedKeywords, avoid: [...existingTitles, ...(input.avoidKeywords ?? [])], siteVocab,
+      // Phase 3H.2 — the site's offering (scan-derived category/product titles)
+      // anchors the model's interpretation, wrong-market skipping and rewriting.
+      offerContext: scanSeeds,
     })
     const seenTitles = new Set<string>()
     let dupes = 0
@@ -426,6 +436,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, trackingSeedCount: trackingSeeds.length, scanSeedCount: scanSeeds.length,
         rawKeywords: res.meta.rawKeywords, afterBasicFilter: res.meta.afterBasicFilter, afterNoiseFilter: res.meta.afterNoiseFilter,
         filteredGenericCount: res.meta.filteredGenericCount, filteredUnrelatedCount: res.meta.filteredUnrelatedCount, filteredUnrelatedExamples: res.meta.filteredUnrelatedExamples,
+        skippedByModelCount: res.meta.skippedByModelCount, skippedByModelExamples: res.meta.skippedByModelExamples,
         candidateCount: res.meta.candidateCount, batchSent: res.meta.batchSent, unusedRemaining: res.meta.unusedRemaining,
         skippedKnownCount: res.meta.skippedKnownCount, skippedKnownExamples: res.meta.skippedKnownExamples,
         modelTopics: res.meta.generated, afterCorpusDedupe: suggestions.length,

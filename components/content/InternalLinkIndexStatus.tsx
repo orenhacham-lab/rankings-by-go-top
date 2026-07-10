@@ -66,18 +66,8 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
     }
   }, [projectId])
 
-  // Read-only status fetch on mount / project change. NEVER triggers a scan.
-  useEffect(() => {
-    mountedRef.current = true
-    setLoading(true)
-    fetchStatus().finally(() => { if (mountedRef.current) setLoading(false) })
-    return () => {
-      mountedRef.current = false
-      if (pollRef.current) clearTimeout(pollRef.current)
-    }
-  }, [fetchStatus])
-
-  // Poll status ONLY after a user-initiated refresh, until a terminal state.
+  // Poll status until a terminal state (used after a user-initiated refresh AND
+  // when a background auto-scan is detected). Read-only GETs; never writes.
   const startPolling = useCallback((attempt = 0) => {
     if (!mountedRef.current || attempt > 60) { setRefreshing(false); return }
     pollRef.current = setTimeout(async () => {
@@ -87,6 +77,38 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
       startPolling(attempt + 1)
     }, 5000)
   }, [fetchStatus])
+
+  // Phase 3H.2 — BOUNDED watch for the background auto-scan (triggered by a
+  // WordPress connection save): a not-yet-scanned project is re-checked every
+  // 10s for ~3 minutes so the card flips to running/completed WITHOUT a page
+  // refresh. Read-only; stops as soon as a terminal state exists.
+  const startWatch = useCallback((attempt = 0) => {
+    if (!mountedRef.current || attempt > 18) return
+    pollRef.current = setTimeout(async () => {
+      const s = await fetchStatus()
+      if (!mountedRef.current) return
+      if (s?.scanStatus === 'running') { startPolling(); return }
+      if (s?.exists && s.scanStatus && TERMINAL.has(s.scanStatus)) return
+      startWatch(attempt + 1)
+    }, 10000)
+  }, [fetchStatus, startPolling])
+
+  // Read-only status fetch on mount / project change. NEVER triggers a scan —
+  // but it FOLLOWS one that is already running (or about to start) in the
+  // background, so the status updates live.
+  useEffect(() => {
+    mountedRef.current = true
+    setLoading(true)
+    fetchStatus().then((s) => {
+      if (!mountedRef.current) return
+      if (s?.scanStatus === 'running') startPolling()
+      else if (!s?.exists) startWatch()
+    }).finally(() => { if (mountedRef.current) setLoading(false) })
+    return () => {
+      mountedRef.current = false
+      if (pollRef.current) clearTimeout(pollRef.current)
+    }
+  }, [fetchStatus, startPolling, startWatch])
 
   // Manual refresh — the ONLY write, and only on explicit click.
   const onRefresh = useCallback(async () => {

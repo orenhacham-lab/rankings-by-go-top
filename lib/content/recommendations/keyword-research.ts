@@ -95,8 +95,46 @@ export function sharesSiteVocab(keyword: string, vocab: Set<string> | null | und
   for (const tk of tokens(keyword)) if (vocab.has(tk)) return true
   return false
 }
-/** Minimum vocabulary size before the relevance gate is trusted to reject. */
-export const MIN_SITE_VOCAB_TOKENS = 10
+/** Minimum vocabulary size before the relevance gate is trusted to reject.
+ *  Phase 3H.2 — raised: the ratio-based alignment gate needs a representative
+ *  vocabulary; on a thin/partial index it stays permissive. */
+export const MIN_SITE_VOCAB_TOKENS = 25
+
+// ── Phase 3H.2 — SITE-OFFER ALIGNMENT (deeper than one shared token) ──────────
+// One broad token ("כלבים", "צעצועים") let wrong-intent keywords through on a
+// dog-products store: adoption/boarding/breed services, children's TV-brand
+// toys, sports-broadcast terms — all share ONE token with the site vocabulary
+// while the REST of the keyword points at a different market. Alignment now
+// requires the MAJORITY of the keyword's meaningful tokens to be site terms:
+// matched ≥ 2 AND matched/total > 0.5. Site-agnostic:
+//   "מיטה אורטופדית לכלב"  → 2–3/3 ✓ (product-aligned)
+//   "כלבים לאימוץ"          → 1/2 ✗ (service intent the store doesn't offer)
+//   "סמי הכבאי צעצועים"     → 1/3 ✗ (different entity class)
+//   "ספורט 365 לייב"        → ≤1/2 ✗ (numerals never count as matches)
+
+const HE_TOKEN_PREFIX = /^[בלמהושכ]/
+function tokenInVocab(tok: string, vocab: Set<string>): boolean {
+  if (vocab.has(tok)) return true
+  // Light Hebrew prefix slack (ל/ב/ה/ו/ש/כ/מ): "לכלבים" matches vocab "כלבים".
+  if (tok.length >= 4 && HE_TOKEN_PREFIX.test(tok) && vocab.has(tok.slice(1))) return true
+  return false
+}
+
+/** Matched/total meaningful tokens of a keyword vs the site vocabulary. */
+export function vocabAlignment(keyword: string, vocab: Set<string>): { matched: number; total: number } {
+  const meaningful = Array.from(tokens(keyword)).filter((t) => !/^\d+$/.test(t))
+  let matched = 0
+  for (const t of meaningful) if (tokenInVocab(t, vocab)) matched++
+  return { matched, total: meaningful.length }
+}
+
+/** Phase 3H.2 — is the keyword's intent aligned with the site's own vocabulary? */
+export function isVocabAligned(keyword: string, vocab: Set<string> | null | undefined): boolean {
+  if (!vocab || vocab.size === 0) return true // no vocabulary → cannot judge
+  const { matched, total } = vocabAlignment(keyword, vocab)
+  if (total === 0) return false
+  return matched >= 2 && matched / total > 0.5
+}
 /** Up to n other keywords sharing a significant token (>2 chars) — secondary context. */
 function relatedKeywords(primary: string, pool: KeywordIdeaResult[], n: number): string[] {
   const pk = normalizeText(primary)
@@ -133,6 +171,12 @@ export interface KeywordResearchInput {
    *  shares NO token with the site vocabulary is rejected as unrelated. Gate is
    *  skipped when the vocabulary is too small to judge (no scan yet). */
   siteVocab?: Set<string>
+  /** Phase 3H.2 — the site's OFFERING (top category/product/service titles from
+   *  the scan). Given to the model so keywords are interpreted in the store's
+   *  context (a product-name keyword is about the PRODUCT, not a same-named
+   *  organization), wrong-market clusters are skipped, and broad keywords are
+   *  rewritten into the site's differentiator. */
+  offerContext?: string[]
 }
 
 interface ClusterInput {
@@ -212,10 +256,12 @@ interface GeminiClusterTopic {
   searchIntent: string
   recommendedWordCount: number
   reason: string
+  /** Phase 3H.2 — the model marks wrong-market/entity-class clusters to skip. */
+  skip?: boolean
 }
 
 /** One Gemini call: clusters (primary + secondary keywords) → article topics. */
-async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string): Promise<GeminiClusterTopic[]> {
+async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[]): Promise<GeminiClusterTopic[]> {
   const client = getGeminiClient()
   if (!client) return []
   const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
@@ -223,11 +269,17 @@ async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en',
   const prompt = [
     `You turn keyword clusters (from Google Search data) into practical SEO article topics for a website.`,
     businessCtx ? `Business context: ${businessCtx}` : '',
+    // Phase 3H.2 — the site's actual OFFERING anchors interpretation, skipping
+    // and rewriting. Generic: the list comes from the site's own scan.
+    offerContext.length ? `The site's offering (its own categories/products/services): ${offerContext.slice(0, 20).join(' ; ')}.` : '',
+    offerContext.length ? `Interpret EVERY keyword in the context of this offering — a keyword matching a product/category name is about that PRODUCT/CATEGORY (never an unrelated organization, brand, TV franchise, or service with a similar name).` : '',
+    offerContext.length ? `If a cluster clearly belongs to a DIFFERENT market or entity class than the offering (e.g. adoption/boarding/breeding services on a products store, children's TV-brand toys on a pet-products store, broadcast/streaming terms on a clothing store), return {"primaryKeyword": "<as given>", "skip": true} for that cluster instead of a topic.` : '',
     `Write ALL output in ${langLabel}.`,
     `For EACH cluster below, produce ONE article topic that would naturally rank for those keywords.`,
     `Rules: the title is a natural, clickable article title (NOT a bare keyword); keep the given primaryKeyword EXACTLY as-is; searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600; reason = one short plain-language sentence a non-SEO business owner understands.`,
     `For product/category-like keywords, expand into a SPECIFIC article intent — buying guide, how to choose, comparison, benefits/risks, sizing/fit, maintenance/care, use-case, or an audience/problem-specific guide — never a bare store/navigation topic.`,
-    `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason"}]} — one entry per cluster, same order.`,
+    `For BROAD/generic keywords, rewrite the title into the site's specific differentiator as evidenced by the offering (e.g. a generic clothing keyword on a second-hand store → a second-hand/vintage angle). Never produce a generic "complete guide" title without a specific angle.`,
+    `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason","skip"}]} — one entry per cluster, same order ("skip" only when skipping).`,
     `Clusters:`,
     JSON.stringify(clusters.map((c) => ({ primaryKeyword: c.primaryKeyword, secondaryKeywords: c.secondaryKeywords }))),
   ].filter(Boolean).join('\n')
@@ -268,6 +320,9 @@ export interface KeywordResearchMeta {
   filteredGenericCount?: number
   filteredUnrelatedCount?: number
   filteredUnrelatedExamples?: string[]
+  // Phase 3H.2 — clusters the model marked as a different market/entity class.
+  skippedByModelCount?: number
+  skippedByModelExamples?: string[]
   candidateCount?: number
   batchSent?: number
   unusedRemaining?: number
@@ -358,9 +413,11 @@ export async function recommendFromKeywordResearch(
     if (!nk || seenPrimary.has(nk)) continue
     seenPrimary.add(nk)
     if (isTooGeneric(kw)) { filteredGenericCount++; continue }
-    // Phase 3H — site-relevance gate: reject keywords sharing NO token with the
-    // site's own vocabulary (Google URL ideas can be wildly associative).
-    if (vocab && !sharesSiteVocab(kw, vocab)) {
+    // Phase 3H.2 — site-OFFER alignment gate (majority of meaningful tokens must
+    // be site terms, not just one broad shared token): rejects wrong-intent
+    // keywords (adoption/boarding services, other-market entities, broadcast
+    // terms) that merely touch the site's vocabulary.
+    if (vocab && !isVocabAligned(kw, vocab)) {
       filteredUnrelatedCount++
       if (filteredUnrelatedExamples.length < 20) filteredUnrelatedExamples.push(kw)
       continue
@@ -389,12 +446,16 @@ export async function recommendFromKeywordResearch(
   }))
 
   // 5) Gemini candidate keywords → article topics (keep primaryKeyword EXACTLY;
-  // deterministic keyword-title fallback if the model is unavailable).
+  // deterministic keyword-title fallback if the model is unavailable). Phase
+  // 3H.2 — the model receives the site's OFFERING and may mark wrong-market
+  // clusters {skip:true}; those are dropped (counted, never silent).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
-  const geminiTopics = await clustersToTopics(clusterInputs, language, businessCtx)
+  const geminiTopics = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [])
   const byPrimary = new Map(geminiTopics.map((t) => [normalizeText(t.primaryKeyword), t]))
+  const skippedByModel = clusterInputs.filter((c) => byPrimary.get(normalizeText(c.primaryKeyword))?.skip === true)
+  const keptClusters = clusterInputs.filter((c) => byPrimary.get(normalizeText(c.primaryKeyword))?.skip !== true)
 
-  const suggestions: TopicSuggestion[] = clusterInputs.map((c) => {
+  const suggestions: TopicSuggestion[] = keptClusters.map((c) => {
     const g = byPrimary.get(normalizeText(c.primaryKeyword))
     // Phase 3H — never show the RAW keyword as a title: when the model gave no
     // title, fall back to a guide-style article title.
@@ -424,6 +485,7 @@ export async function recommendFromKeywordResearch(
     meta: {
       generated: suggestions.length, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter,
       filteredGenericCount, filteredUnrelatedCount, filteredUnrelatedExamples,
+      skippedByModelCount: skippedByModel.length, skippedByModelExamples: skippedByModel.slice(0, 10).map((c) => c.primaryKeyword),
       candidateCount, batchSent: batch.length, unusedRemaining: candidateCount - batch.length,
       skippedKnownCount, skippedKnownExamples, clusters: candidateCount,
       keywordResearchFailed: !!failureReason, failureReason,

@@ -29,7 +29,10 @@ import { tokens } from '@/lib/content/recommendations/dedupe'
 const DEFAULT_PER_PAGE = 25
 const DEFAULT_MAX_PAGES = 12 // per content type (metadata is light, so allow more)
 const DEFAULT_MAX_ITEMS = 200 // combined posts + pages
-const TOP_TARGETS = 100
+// Phase 3H.2 — raised 100 → 200: the cap is POST-PROCESSING only (no extra HTTP
+// fetching), and 100 crowded ecommerce products/categories out of the index,
+// starving site-scan idea generation on stores. Still bounded (storage-safe).
+const TOP_TARGETS = 200
 const TOP_ANCHORS_PER_TARGET = 8
 const MAX_EXAMPLE_SOURCES = 3
 const MAX_SAMPLE_LINKS = 40
@@ -1062,7 +1065,21 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   // reserving cap slots so these high-value hubs are never dropped by TOP_TARGETS.
   const taxTargets = await buildTaxonomyTargets(creds, new Set(targetList.map((t) => taxKey(t.targetUrl))), (m) => notes.push(m))
   const contentCap = Math.max(0, TOP_TARGETS - taxTargets.length)
-  const finalTargets = [...targetList.slice(0, contentCap), ...taxTargets]
+  // Phase 3H.2 — ECOMMERCE REPRESENTATION under the cap: products typically have
+  // few inbound links, so a pure inbound sort crowded them all out. Reserve up
+  // to a third of the content slots for the top product targets, fill the rest
+  // by inbound order, then backfill any unused slots. Bounded and deterministic.
+  const productSlots = Math.min(
+    targetList.filter((t) => t.targetType === 'product').length,
+    Math.min(50, Math.floor(contentCap / 3)),
+  )
+  const topProducts = targetList.filter((t) => t.targetType === 'product').slice(0, productSlots)
+  const productUrls = new Set(topProducts.map((t) => t.targetUrl))
+  const nonReserved = targetList.filter((t) => !productUrls.has(t.targetUrl))
+  const contentSlice = [...topProducts, ...nonReserved.slice(0, contentCap - topProducts.length)]
+    .sort((a, b) => b.inboundLinkCount - a.inboundLinkCount || Number(a.contentSkipped) - Number(b.contentSkipped))
+  const targetCapHit = targetList.length > contentSlice.length
+  const finalTargets = [...contentSlice, ...taxTargets]
 
   return {
     siteUrl: creds.siteUrl,
@@ -1071,7 +1088,10 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     pagesFetched: pagesMeta.items.length,
     itemsScanned: items.length,
     postsPagesRequested: maxItems,
-    truncated,
+    // Phase 3H.2 — 'truncated' now also reflects the TARGET cap (partial
+    // coverage), not only the post/page fetch limit, so the index card can say
+    // the coverage is partial.
+    truncated: truncated || targetCapHit,
     metadataItemsFetched: items.length,
     postsMetadataFetched: postsMeta.items.length,
     pagesMetadataFetched: pagesMeta.items.length,
