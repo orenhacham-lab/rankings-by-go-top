@@ -473,6 +473,55 @@ export async function getTaxonomyTerms(creds: WordPressCredentials, base: string
   }
 }
 
+/**
+ * Phase 3I — WooCommerce STORE API (public storefront JSON), read-only.
+ * Direct product/category ENTITY discovery for the content index: name +
+ * permalink only — no body fetch, no WooCommerce API keys (the Store API is the
+ * same public endpoint the storefront itself uses). Returns null when the Store
+ * API is absent (non-WooCommerce site) and [] on empty — callers can
+ * distinguish "no WooCommerce" from "no products".
+ */
+export interface StoreEntity { name: string; link: string }
+
+async function wcStoreGet(creds: WordPressCredentials, path: string): Promise<unknown[] | null> {
+  try {
+    const origin = await assertSafeSiteUrl(creds.siteUrl)
+    const target = new URL(`${origin}/wp-json/wc/store/v1${path}`)
+    const { status, body } = await httpsGet(target, buildAuthHeader(creds))
+    if (status < 200 || status >= 300) return null
+    const rows = JSON.parse(body)
+    return Array.isArray(rows) ? rows : null
+  } catch {
+    return null
+  }
+}
+
+const toStoreEntity = (r: unknown): StoreEntity | null => {
+  const o = r as { name?: unknown; permalink?: unknown } | null
+  const name = String(o?.name ?? '').replace(/<[^>]+>/g, '').trim()
+  const link = String(o?.permalink ?? '').trim()
+  return name && link ? { name, link } : null
+}
+
+/** Products via the Store API (bounded pages of 100, popularity-first). */
+export async function getStoreProducts(creds: WordPressCredentials, maxPages = 2): Promise<StoreEntity[] | null> {
+  const out: StoreEntity[] = []
+  for (let page = 1; page <= maxPages; page++) {
+    const rows = await wcStoreGet(creds, `/products?per_page=100&page=${page}&orderby=popularity`)
+    if (rows === null) return page === 1 ? null : out // absent vs. pagination end
+    for (const r of rows) { const e = toStoreEntity(r); if (e) out.push(e) }
+    if (rows.length < 100) break
+  }
+  return out
+}
+
+/** Product categories via the Store API (single bounded page). */
+export async function getStoreProductCategories(creds: WordPressCredentials): Promise<StoreEntity[] | null> {
+  const rows = await wcStoreGet(creds, '/products/categories?per_page=100&orderby=count&order=desc')
+  if (rows === null) return null
+  return rows.map(toStoreEntity).filter((e): e is StoreEntity => !!e)
+}
+
 export async function getTags(creds: WordPressCredentials): Promise<WordPressTag[]> {
   const rows = await wpGet<any[]>(creds, '/tags?per_page=100&orderby=name&order=asc')
   return (Array.isArray(rows) ? rows : []).map((t) => ({

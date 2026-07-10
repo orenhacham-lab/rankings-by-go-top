@@ -13,7 +13,7 @@
  */
 
 import type { WordPressCredentials, WordPressContentItem } from '@/lib/wordpress/types'
-import { getPosts, getPages, getItemContentHtml, getCategories, getTags, getTaxonomyTerms, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
+import { getPosts, getPages, getItemContentHtml, getCategories, getTags, getTaxonomyTerms, getStoreProducts, getStoreProductCategories, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
 import {
   extractLinkAnchorsFromHtml,
   isInternalUrl,
@@ -793,6 +793,54 @@ async function buildTaxonomyTargets(creds: WordPressCredentials, existing: Set<s
   return out
 }
 
+/**
+ * Phase 3I — DIRECT ecommerce entity discovery via the public WooCommerce Store
+ * API. Products were previously discoverable ONLY through in-body links of
+ * fetched posts/pages — on slow hosts the per-item content budget starves that
+ * path and the index ends up with no products at all (the "97 targets, 74
+ * skipped, 3 site-scan ideas" class of project). Metadata-only (name +
+ * permalink; NO body fetch, ≤3 requests), so it works regardless of the content
+ * budget. Product/category identity is enough to seed ideas and money targets;
+ * anchors/body remain a content-fetch concern.
+ */
+const MAX_STORE_PRODUCT_TARGETS = 80
+const MAX_STORE_CATEGORY_TARGETS = 40
+
+async function buildStoreEntityTargets(creds: WordPressCredentials, existing: Set<string>, note: (m: string) => void): Promise<ScannedTarget[]> {
+  const out: ScannedTarget[] = []
+  const seen = new Set(existing)
+  const push = (name: string, link: string, wpType: string, cap: number, count: { n: number }) => {
+    if (count.n >= cap) return
+    const key = taxKey(link)
+    if (!key || seen.has(key)) return
+    const cls = classifyTarget(link, name, wpType)
+    if (cls.eligibility === 'no') return
+    seen.add(key)
+    count.n++
+    const anchor: ScannedAnchor = { text: name, count: 0, usability: 'yes', reason: 'store_entity_name' }
+    out.push({
+      targetUrl: link, targetType: cls.targetType, targetTitle: name, inboundLinkCount: 0,
+      eligibility: cls.eligibility, eligibilityReason: cls.reason, targetRole: cls.targetRole, targetPriority: cls.targetPriority,
+      keywordSource: 'title', primaryKeywordCandidate: name, keywordAvailable: false,
+      usableAnchorsCount: 1, cautionAnchorsCount: 0, rejectedAnchorsCount: 0, onlyGenericAnchors: false,
+      usableAnchors: [anchor], cautionAnchors: [], rejectedAnchors: [],
+      exampleSources: [], matchedGeneratedArticleId: null, matchedGeneratedArticleTitle: null, contentSkipped: false,
+    })
+  }
+
+  const [products, categories] = await Promise.all([getStoreProducts(creds), getStoreProductCategories(creds)])
+  if (products === null && categories === null) {
+    note('WooCommerce Store API not available — products are discoverable only via in-body links.')
+    return out
+  }
+  const pc = { n: 0 }
+  for (const e of categories ?? []) push(e.name, e.link, 'product_cat', MAX_STORE_CATEGORY_TARGETS, pc)
+  const pp = { n: 0 }
+  for (const e of products ?? []) push(e.name, e.link, 'product', MAX_STORE_PRODUCT_TARGETS, pp)
+  note(`Store API entity discovery: ${pp.n} product(s) + ${pc.n} product categorie(s) added as metadata targets.`)
+  return out
+}
+
 export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanOptions = {}): Promise<SiteScanReport> {
   const startedAt = Date.now()
   const notes: string[] = []
@@ -1079,7 +1127,12 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   const contentSlice = [...topProducts, ...nonReserved.slice(0, contentCap - topProducts.length)]
     .sort((a, b) => b.inboundLinkCount - a.inboundLinkCount || Number(a.contentSkipped) - Number(b.contentSkipped))
   const targetCapHit = targetList.length > contentSlice.length
-  const finalTargets = [...contentSlice, ...taxTargets]
+  // Phase 3I — direct Store-API entities (metadata-only; ≤3 requests), deduped
+  // against everything already discovered. Appended like taxonomy targets so
+  // ecommerce entities are never crowded out by the content cap.
+  const storeSeen = new Set<string>([...contentSlice.map((t) => taxKey(t.targetUrl)), ...taxTargets.map((t) => taxKey(t.targetUrl))])
+  const storeTargets = await buildStoreEntityTargets(creds, storeSeen, (m) => notes.push(m))
+  const finalTargets = [...contentSlice, ...taxTargets, ...storeTargets]
 
   return {
     siteUrl: creds.siteUrl,

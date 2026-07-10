@@ -26,9 +26,10 @@ const TABLE = 'wordpress_content_index'
  * Bump when the scan classification logic changes so a cached index built by an
  * older version can be flagged as needing a refresh (versionStale).
  */
-// 2a.4 — Phase 3H.2: TOP_TARGETS 100→200 + reserved product slots (ecommerce
-// coverage); truncated also reflects the target cap.
-export const SCAN_INDEX_VERSION = '2a.4'
+// 2a.5 — Phase 3I: direct WooCommerce Store-API product/category entity
+// discovery (metadata-only), so ecommerce entities exist in the index even when
+// per-item content fetches are budget/host-limited.
+export const SCAN_INDEX_VERSION = '2a.5'
 
 /** TTL for a cached index (app-enforced). Configurable; default 7 days. */
 export function indexTtlDays(): number {
