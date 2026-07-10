@@ -565,13 +565,15 @@ export default function AutomationIdeas({
         <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
           {meta.reason === 'kr_exhausted'
             ? t.krExhausted
-            : meta.reason === 'primary_keyword_exists'
-              ? t.primaryKeywordExists
-              : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
-                ? t.krNoNew
-                : meta.reason === 'all_known' || meta.reason === 'no_new'
-                  ? t.allKnown
-                  : t.noNewThisRun.replace('{total}', String(suggestions.length))}
+            : meta.reason === 'covered_by_existing'
+              ? t.coveredByExisting
+              : meta.reason === 'primary_keyword_exists'
+                ? t.primaryKeywordExists
+                : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
+                  ? t.krNoNew
+                  : meta.reason === 'all_known' || meta.reason === 'no_new'
+                    ? t.allKnown
+                    : t.noNewThisRun.replace('{total}', String(suggestions.length))}
         </p>
       )}
       {/* Nothing to show at all — helpful empty reason. */}
@@ -581,21 +583,27 @@ export default function AutomationIdeas({
             ? t.noScan
             : meta.reason === 'insufficient_data'
               ? t.insufficientScan
-              : meta.reason === 'kr_exhausted'
-                ? t.krExhausted
-                : meta.reason === 'kr_thin' || meta.reason === 'no_keyword_data'
-                  ? t.krThin
-                  : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
-                    ? t.krNoNew
-                  : meta.reason === 'all_known' || meta.reason === 'no_new' || meta.reason === 'primary_keyword_exists'
-                    ? t.allKnown
-                    : meta.reason === 'model_error' || meta.reason === 'http_error'
-                      ? t.temporaryError
-                      : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
-                        ? t.researchFailed
-                        : meta.reason === 'all_duplicates'
-                          ? t.allDuplicates
-                          : t.tryOther}
+              : meta.reason === 'covered_by_existing'
+                ? t.coveredByExisting
+                : meta.reason === 'all_quality_filtered'
+                  ? t.qualityFiltered
+                  : meta.reason === 'kr_unrelated'
+                    ? t.krUnrelated
+                    : meta.reason === 'kr_exhausted'
+                      ? t.krExhausted
+                      : meta.reason === 'kr_thin' || meta.reason === 'no_keyword_data'
+                        ? t.krThin
+                        : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
+                          ? t.krNoNew
+                        : meta.reason === 'all_known' || meta.reason === 'no_new' || meta.reason === 'primary_keyword_exists'
+                          ? t.allKnown
+                          : meta.reason === 'model_error' || meta.reason === 'http_error'
+                            ? t.temporaryError
+                            : meta.keywordResearchFailed || meta.reason === 'keyword_research_failed'
+                              ? t.researchFailed
+                              : meta.reason === 'all_duplicates'
+                                ? t.allDuplicates
+                                : t.tryOther}
         </p>
       )}
       {/* No saved ideas yet (fresh project / after clearing all) — calm prompt. */}

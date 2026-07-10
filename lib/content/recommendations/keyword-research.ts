@@ -274,7 +274,7 @@ export interface KeywordResearchMeta {
   skippedKnownCount?: number
   skippedKnownExamples?: string[]
   clusters?: number
-  reason?: 'keyword_research_failed' | 'thin_data' | 'all_known' | 'exhausted'
+  reason?: 'keyword_research_failed' | 'thin_data' | 'all_known' | 'exhausted' | 'unrelated'
 }
 
 export async function recommendFromKeywordResearch(
@@ -373,7 +373,9 @@ export async function recommendFromKeywordResearch(
   // Fetched a pool but every usable keyword is already known → EXHAUSTED clusters
   // (distinct from "thin data" when the pool itself was tiny).
   if (candidateCount === 0) {
-    const reason = afterNoiseFilter > 0 ? 'exhausted' : 'thin_data'
+    // Phase 3H.1 — honest reason: when the relevance gate removed the remaining
+    // pool, say "unrelated" (index may be stale/wrong), not "exhausted".
+    const reason = filteredUnrelatedCount > 0 ? 'unrelated' : afterNoiseFilter > 0 ? 'exhausted' : 'thin_data'
     return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter, filteredGenericCount, filteredUnrelatedCount, filteredUnrelatedExamples, candidateCount: 0, batchSent: 0, unusedRemaining: 0, skippedKnownCount, skippedKnownExamples, keywordResearchFailed: !!failureReason, failureReason, reason } }
   }
 

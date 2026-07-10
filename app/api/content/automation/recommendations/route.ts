@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled } from '@/lib/content/ap
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
-import { buildKeywordGuard, partitionPending, keywordSourcesOf, coveredByExistingContent, normalizePhrase, titleMainPhrase } from '@/lib/content/recommendations/keyword-guard'
+import { buildKeywordGuard, partitionPending, keywordSourcesOf, coveredByExistingContent } from '@/lib/content/recommendations/keyword-guard'
 import { randomUUID } from 'crypto'
 
 const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan']
@@ -75,9 +75,11 @@ export async function POST(request: Request) {
       if (coveredByExistingContent(guard, s.title, s.primaryKeyword)) { filteredCoveredByContent++; pushEx('covered_by_existing_content'); return false }
       if (nk) guard.keywords.add(nk) // avoid intra-batch primary-keyword dupes
       if (nt) guard.titles.add(nt)
-      // Intra-batch phrase dedupe: two same-main-phrase ideas can't both pass.
-      const kp = normalizePhrase(s.primaryKeyword); if (kp && kp.split(' ').length >= 2) guard.contentPhrases.add(kp)
-      const mp = titleMainPhrase(s.title); if (mp) guard.contentPhrases.add(mp)
+      // Phase 3H.1 — NO intra-batch PHRASE dedupe: many legitimate ideas for one
+      // seed share the "<core phrase>: <angle>" title pattern; adding the first
+      // idea's main phrase to contentPhrases killed every sibling in the batch
+      // (part of the systemic zero-results bug). Exact keyword/title dedupe above
+      // still prevents true intra-batch duplicates.
       return true
     })
 
@@ -104,9 +106,13 @@ export async function POST(request: Request) {
 
     // Precise "nothing new this run" reason (accurate whether the model produced
     // known ideas that were filtered, or produced nothing because avoid-skip
-    // already covered every cluster).
+    // already covered every cluster). Phase 3H.1 — when the dominant filter was
+    // "covered by existing site content", say THAT instead of the misleading
+    // "already saved/approved/rejected" message.
     const allKnownReason = source === 'keyword_research_url' ? 'kr_all_known' : 'all_known'
-    const emptyBecause = filteredExisting > 0 && filteredPrimaryKeywordExists > 0 && filteredTitleExists === 0 ? 'primary_keyword_exists' : allKnownReason
+    const emptyBecause = filteredExisting > 0 && filteredCoveredByContent > 0 && filteredPrimaryKeywordExists === 0 && filteredTitleExists === 0
+      ? 'covered_by_existing'
+      : filteredExisting > 0 && filteredPrimaryKeywordExists > 0 && filteredTitleExists === 0 ? 'primary_keyword_exists' : allKnownReason
     let reason: string | undefined
     if (suggestions.length === 0) {
       reason = result.meta.reason ?? (result.suggestions.length > 0 ? emptyBecause : undefined)

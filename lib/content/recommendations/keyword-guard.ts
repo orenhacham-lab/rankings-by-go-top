@@ -91,7 +91,17 @@ export interface KeywordGuard {
   }
 }
 
-export async function buildKeywordGuard(admin: Admin, projectId: string): Promise<KeywordGuard> {
+/** Raw project data the guard is built from (pure builder input — testable). */
+export interface KeywordGuardData {
+  topics: { topic: string; primary_keyword: string | null }[]
+  generatedArticleTitles: (string | null)[]
+  trackingKeywords: string[]
+  ideas: { title: string; primary_keyword: string | null; fingerprint: string }[]
+  scanTargets: Pick<ScannedTarget, 'targetTitle' | 'targetUrl' | 'targetType' | 'keywordAvailable' | 'primaryKeywordCandidate'>[]
+}
+
+/** Pure guard construction from already-loaded project data. */
+export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard {
   const titles = new Set<string>()
   const keywords = new Set<string>()
   const contentKeywords = new Set<string>()
@@ -101,25 +111,25 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
   const scanSamples: string[] = []
   const counts = { existingProjectKeywordCount: 0, existingTopicKeywordCount: 0, existingIdeaKeywordCount: 0, existingScanKeywordCount: 0 }
 
-  // Phase 3G.7 — content phrase harvesting: title main-phrase + full-title phrase
-  // (multi-word only) for existing CONTENT titles; keywords also enter as phrases
-  // so the comparison is punctuation/finals-insensitive.
+  // Phase 3G.7 / 3H.1 — content phrases come from TITLES of existing content
+  // ONLY (existing articles/pages/topics): title main-phrase + full-title phrase
+  // (multi-word only). KEYWORDS are deliberately NOT phrases: a tracked keyword
+  // or a topic's primary keyword is not a published article — treating it as
+  // "covered" blocked EVERY new idea titled "<core keyword>: <angle>" (Gemini's
+  // dominant title pattern) and zeroed all idea sources. Exact keyword blocking
+  // (contentKeywords) still catches a true same-keyword duplicate.
   const addContentPhraseFromTitle = (raw: string | null | undefined) => {
     const main = titleMainPhrase(raw)
     if (main) contentPhrases.add(main)
     const full = normalizePhrase(raw)
     if (full && full.split(' ').length >= 2) contentPhrases.add(full)
   }
-  const addContentPhrase = (raw: string | null | undefined) => {
-    const v = normalizePhrase(raw)
-    if (v && v.split(' ').length >= 2) contentPhrases.add(v)
-  }
 
   const addKeyword = (raw: string | null | undefined, opts: { content: boolean; sourceSet?: Set<string>; bump?: () => void }) => {
     const v = normalizeText(raw)
     if (!v) return
     keywords.add(v)
-    if (opts.content) { contentKeywords.add(v); addContentPhrase(raw) }
+    if (opts.content) contentKeywords.add(v)
     opts.sourceSet?.add(v)
     opts.bump?.()
   }
@@ -127,65 +137,74 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
 
   // Article topics — title + primary keyword. Covers generated articles too,
   // since every generated_articles.topic_id references a project topic here.
-  try {
-    const { data } = await admin.from('article_topics').select('topic, primary_keyword').eq('project_id', projectId)
-    for (const t of (data ?? []) as { topic: string; primary_keyword: string | null }[]) {
-      addTitle(t.topic, true)
-      addKeyword(t.primary_keyword, { content: true, sourceSet: sources.topics, bump: () => counts.existingTopicKeywordCount++ })
-    }
-  } catch { /* optional */ }
+  for (const t of data.topics) {
+    addTitle(t.topic, true)
+    addKeyword(t.primary_keyword, { content: true, sourceSet: sources.topics, bump: () => counts.existingTopicKeywordCount++ })
+  }
 
   // Generated articles — exact titles (their topic keyword is already covered above).
-  try {
-    const { data } = await admin.from('generated_articles').select('title').eq('project_id', projectId)
-    for (const a of (data ?? []) as { title: string | null }[]) addTitle(a.title, true)
-  } catch { /* optional */ }
+  for (const title of data.generatedArticleTitles) addTitle(title, true)
 
-  // Project tracked keywords.
-  try {
-    const { data } = await admin.from('tracking_targets').select('keyword').eq('project_id', projectId)
-    for (const r of (data ?? []) as { keyword: string }[]) addKeyword(r.keyword, { content: true, sourceSet: sources.tracking, bump: () => counts.existingProjectKeywordCount++ })
-  } catch { /* optional */ }
+  // Project tracked keywords — EXACT keyword blocking only (never phrases).
+  for (const kw of data.trackingKeywords) addKeyword(kw, { content: true, sourceSet: sources.tracking, bump: () => counts.existingProjectKeywordCount++ })
 
   // Persisted ideas (any status) — title + fingerprint + primary keyword. These
   // are NOT content keywords (a pending idea must not block its own approval).
-  try {
-    const { data, error } = await admin.from('content_topic_ideas').select('title, primary_keyword, fingerprint').eq('project_id', projectId)
-    if (!error) {
-      for (const r of (data ?? []) as { title: string; primary_keyword: string | null; fingerprint: string }[]) {
-        addTitle(r.title, false)
-        if (r.fingerprint) titles.add(r.fingerprint)
-        addKeyword(r.primary_keyword, { content: false, sourceSet: sources.ideas, bump: () => counts.existingIdeaKeywordCount++ })
-      }
-    }
-  } catch { /* ideas table optional */ }
+  for (const r of data.ideas) {
+    addTitle(r.title, false)
+    if (r.fingerprint) titles.add(r.fingerprint)
+    addKeyword(r.primary_keyword, { content: false, sourceSet: sources.ideas, bump: () => counts.existingIdeaKeywordCount++ })
+  }
 
   // Reliable WordPress/site-scan focus keywords ONLY (keywordAvailable === true =
   // Yoast/RankMath/AIOSEO focus keyword or a matched generated-article keyword —
-  // never a title/slug/heading-derived guess). Read-only cache; no rescan.
-  try {
-    const cacheRow = await getCachedIndex(admin, projectId)
-    if (cacheRow) {
-      const report = reassembleReport(cacheRow)
-      for (const tg of (report.targets ?? []) as ScannedTarget[]) {
-        if (tg.keywordAvailable && tg.primaryKeywordCandidate) {
-          const before = sources.scan.size
-          addKeyword(tg.primaryKeywordCandidate, { content: true, sourceSet: sources.scan, bump: () => counts.existingScanKeywordCount++ })
-          if (sources.scan.size > before && scanSamples.length < 10) scanSamples.push(tg.primaryKeywordCandidate.trim())
-        }
-        // Phase 3G.7 — existing site ARTICLES/PAGES already cover their title's
-        // main phrase, keyword or not. Posts/pages only: a category or product
-        // page existing must NOT block writing a supporting article about it.
-        if (tg.targetType === 'post' || tg.targetType === 'page') {
-          addContentPhraseFromTitle(tg.targetTitle)
-          const slugPhrase = slugFromUrl(tg.targetUrl)
-          if (/[֐-׿]/.test(slugPhrase)) addContentPhrase(slugPhrase)
-        }
+  // never a title/slug/heading-derived guess).
+  for (const tg of data.scanTargets) {
+    if (tg.keywordAvailable && tg.primaryKeywordCandidate) {
+      const before = sources.scan.size
+      addKeyword(tg.primaryKeywordCandidate, { content: true, sourceSet: sources.scan, bump: () => counts.existingScanKeywordCount++ })
+      if (sources.scan.size > before && scanSamples.length < 10) scanSamples.push(tg.primaryKeywordCandidate.trim())
+    }
+    // Phase 3G.7 — existing site ARTICLES/PAGES already cover their title's
+    // main phrase, keyword or not. Posts/pages only: a category or product
+    // page existing must NOT block writing a supporting article about it.
+    if (tg.targetType === 'post' || tg.targetType === 'page') {
+      addContentPhraseFromTitle(tg.targetTitle)
+      const slugPhrase = slugFromUrl(tg.targetUrl)
+      if (/[֐-׿]/.test(slugPhrase)) {
+        const v = normalizePhrase(slugPhrase)
+        if (v && v.split(' ').length >= 2) contentPhrases.add(v)
       }
     }
-  } catch { /* scan cache optional */ }
+  }
 
   return { titles, keywords, contentKeywords, contentTitles, contentPhrases, sources, scanSamples, counts }
+}
+
+/** Load the project's guard data and build the guard. Never throws. */
+export async function buildKeywordGuard(admin: Admin, projectId: string): Promise<KeywordGuard> {
+  const data: KeywordGuardData = { topics: [], generatedArticleTitles: [], trackingKeywords: [], ideas: [], scanTargets: [] }
+  try {
+    const { data: rows } = await admin.from('article_topics').select('topic, primary_keyword').eq('project_id', projectId)
+    data.topics = (rows ?? []) as KeywordGuardData['topics']
+  } catch { /* optional */ }
+  try {
+    const { data: rows } = await admin.from('generated_articles').select('title').eq('project_id', projectId)
+    data.generatedArticleTitles = ((rows ?? []) as { title: string | null }[]).map((r) => r.title)
+  } catch { /* optional */ }
+  try {
+    const { data: rows } = await admin.from('tracking_targets').select('keyword').eq('project_id', projectId)
+    data.trackingKeywords = ((rows ?? []) as { keyword: string }[]).map((r) => r.keyword)
+  } catch { /* optional */ }
+  try {
+    const { data: rows, error } = await admin.from('content_topic_ideas').select('title, primary_keyword, fingerprint').eq('project_id', projectId)
+    if (!error) data.ideas = (rows ?? []) as KeywordGuardData['ideas']
+  } catch { /* ideas table optional */ }
+  try {
+    const cacheRow = await getCachedIndex(admin, projectId)
+    if (cacheRow) data.scanTargets = (reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]
+  } catch { /* scan cache optional */ }
+  return buildKeywordGuardFromData(data)
 }
 
 /**
@@ -199,16 +218,29 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
  */
 /**
  * Phase 3G.7 — is a suggested topic ALREADY COVERED by existing site content?
- * True when its normalized primary keyword, or its title's main phrase, exactly
- * equals a known content phrase (existing article title-prefix / short title /
- * Hebrew slug / content keyword). Full-phrase equality only — long-tail
- * variations with additional words remain allowed.
+ * True when its normalized primary keyword exactly equals a known content
+ * phrase (existing article title-prefix / short title / Hebrew slug), or when
+ * its title's main phrase is covered AND the idea brings no distinct primary
+ * keyword of its own.
+ *
+ * Phase 3H.1 — the bare title-prefix rule was part of the systemic zero-results
+ * bug: one existing article "בגדי יד שנייה לנשים: המדריך המלא" blocked EVERY
+ * future idea using the "<core phrase>: <angle>" title pattern, even ideas with
+ * their own distinct long-tail keywords (a different article intent). A covered
+ * title prefix now counts as duplication ONLY when the idea's primary keyword
+ * is missing, equals the prefix, or is itself a covered phrase — i.e. the idea
+ * is a re-angle of the same intent, not a new sub-topic. Full-phrase equality
+ * only — long-tail variations with additional words remain allowed.
  */
 export function coveredByExistingContent(guard: KeywordGuard, title: string | null | undefined, primaryKeyword: string | null | undefined): boolean {
   const kw = normalizePhrase(primaryKeyword)
-  if (kw && kw.split(' ').length >= 2 && guard.contentPhrases.has(kw)) return true
+  const kwIsPhrase = !!kw && kw.split(' ').length >= 2
+  if (kwIsPhrase && guard.contentPhrases.has(kw)) return true
   const main = titleMainPhrase(title)
-  return !!main && guard.contentPhrases.has(main)
+  if (!main || !guard.contentPhrases.has(main)) return false
+  // Covered prefix + a DISTINCT long-tail primary keyword ⇒ a new article
+  // intent under the same umbrella — allowed.
+  return !kwIsPhrase || kw === main
 }
 
 export function partitionPending(

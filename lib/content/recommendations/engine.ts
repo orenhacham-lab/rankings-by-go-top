@@ -421,7 +421,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       keywordResearchFailed: res.meta.keywordResearchFailed,
       failureReason: res.meta.failureReason,
       adsCalls: res.meta.adsCalls,
-      reason: suggestions.length === 0 ? (res.meta.reason === 'keyword_research_failed' || res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.reason === 'thin_data' ? 'kr_thin' : res.meta.reason === 'exhausted' ? 'kr_exhausted' : res.meta.reason === 'all_known' ? 'kr_all_known' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
+      reason: suggestions.length === 0 ? (res.meta.reason === 'keyword_research_failed' || res.meta.keywordResearchFailed ? 'keyword_research_failed' : res.meta.reason === 'thin_data' ? 'kr_thin' : res.meta.reason === 'unrelated' ? 'kr_unrelated' : res.meta.reason === 'exhausted' ? 'kr_exhausted' : res.meta.reason === 'all_known' ? 'kr_all_known' : res.meta.generated === 0 ? 'no_keyword_data' : 'all_duplicates') : undefined,
       debug: process.env.NODE_ENV !== 'production' ? {
         seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, trackingSeedCount: trackingSeeds.length, scanSeedCount: scanSeeds.length,
         rawKeywords: res.meta.rawKeywords, afterBasicFilter: res.meta.afterBasicFilter, afterNoiseFilter: res.meta.afterNoiseFilter,
@@ -447,6 +447,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     })
     if (before !== suggestions.length) {
       meta.finalCount = suggestions.length
+      // Phase 3H.1 — an honest empty reason: when the quality gate removed EVERY
+      // candidate, the UI must say that (never "already saved/approved/rejected").
+      if (suggestions.length === 0 && before > 0) meta.reason = 'all_quality_filtered'
       if (process.env.NODE_ENV !== 'production') meta.debug = { ...(meta.debug ?? {}), qualityFilteredCount: before - suggestions.length, qualityFilteredExamples: qualityExamples }
     }
   }

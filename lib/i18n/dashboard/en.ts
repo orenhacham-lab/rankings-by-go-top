@@ -125,6 +125,10 @@ export const dashboardEn = {
       rejecting: 'Rejecting…',
       noSavedIdeas: 'No saved ideas yet. Generate new ideas to get started.',
       allKnown: 'No new ideas were found beyond what is already saved, approved, or rejected.',
+      // Phase 3H.1 — honest empty reasons (never a misleading "already saved").
+      coveredByExisting: 'The generated ideas are already covered by existing site content. Try another source or a more specific keyword.',
+      qualityFiltered: 'All generated ideas were filtered as too generic or store/navigation terms. Try again or use a more specific keyword.',
+      krUnrelated: 'The keywords found were filtered as unrelated to the site content. Make sure the site index is fresh ("Internal-link index" card) and try again.',
       krAllKnown: 'All keyword-research ideas have already been saved, approved, or rejected.',
       krThin: 'Keyword research returned too little data. Try adding a broader starting keyword.',
       primaryKeywordExists: 'All generated ideas use primary keywords that already exist in the project or site.',
