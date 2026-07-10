@@ -363,14 +363,19 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // Phase 3H.4 — pass rotation memory: existing titles + PENDING idea titles/
     // keywords, so a repeat run generates DIFFERENT ideas from unused entities
     // instead of regenerating the first batch and "exhausting" after one click.
+    // Phase 3I.5 — the avoid list covers ALL idea statuses (bounded, recent
+    // first), not only pending: the model was blind to the rejected/duplicate/
+    // approved history, regenerated straight into it, and the exact-keyword
+    // guard then (correctly) killed every idea — permanent exhaustion on a
+    // long-tested project.
     let pendingAvoid: string[] = []
     try {
       const { data: ideaRows } = await admin
         .from('content_topic_ideas')
         .select('title, primary_keyword')
         .eq('project_id', input.projectId)
-        .eq('status', 'pending')
-        .limit(60)
+        .order('created_at', { ascending: false })
+        .limit(120)
       pendingAvoid = ((ideaRows ?? []) as { title: string; primary_keyword: string | null }[])
         .flatMap((r) => [r.title, r.primary_keyword ?? ''])
         .filter(Boolean)

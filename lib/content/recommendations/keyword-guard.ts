@@ -96,7 +96,7 @@ export interface KeywordGuardData {
   topics: { topic: string; primary_keyword: string | null }[]
   generatedArticleTitles: (string | null)[]
   trackingKeywords: string[]
-  ideas: { title: string; primary_keyword: string | null; fingerprint: string }[]
+  ideas: { title: string; primary_keyword: string | null; fingerprint: string; status?: string | null }[]
   scanTargets: Pick<ScannedTarget, 'targetTitle' | 'targetUrl' | 'targetType' | 'keywordAvailable' | 'primaryKeywordCandidate'>[]
 }
 
@@ -148,9 +148,19 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
   // Project tracked keywords — EXACT keyword blocking only (never phrases).
   for (const kw of data.trackingKeywords) addKeyword(kw, { content: true, sourceSet: sources.tracking, bump: () => counts.existingProjectKeywordCount++ })
 
-  // Persisted ideas (any status) — title + fingerprint + primary keyword. These
-  // are NOT content keywords (a pending idea must not block its own approval).
+  // Persisted ideas — title + fingerprint + primary keyword. These are NOT
+  // content keywords (a pending idea must not block its own approval).
+  //
+  // Phase 3I.5 — rows with status 'duplicate' are EXCLUDED from the guard: a
+  // TRUE duplicate's original (topic / article / pending idea) still blocks
+  // through its own entry, while a row that an earlier over-blocking guard
+  // WRONGLY marked duplicate stops poisoning future generations forever. On a
+  // long-tested niche project the graveyard of such rows had covered the whole
+  // natural keyword space, dead-locking site-scan into "primary_keyword_exists"
+  // on every run. pending/approved/rejected rows still block (an explicitly
+  // rejected idea must not be re-suggested).
   for (const r of data.ideas) {
+    if (r.status === 'duplicate') continue
     addTitle(r.title, false)
     if (r.fingerprint) titles.add(r.fingerprint)
     addKeyword(r.primary_keyword, { content: false, sourceSet: sources.ideas, bump: () => counts.existingIdeaKeywordCount++ })
@@ -202,7 +212,7 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
     data.trackingKeywords = ((rows ?? []) as { keyword: string }[]).map((r) => r.keyword)
   } catch { /* optional */ }
   try {
-    const { data: rows, error } = await admin.from('content_topic_ideas').select('title, primary_keyword, fingerprint').eq('project_id', projectId)
+    const { data: rows, error } = await admin.from('content_topic_ideas').select('title, primary_keyword, fingerprint, status').eq('project_id', projectId)
     if (!error) data.ideas = (rows ?? []) as KeywordGuardData['ideas']
   } catch { /* ideas table optional */ }
   try {
