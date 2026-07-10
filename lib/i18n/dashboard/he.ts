@@ -101,6 +101,8 @@ export const dashboardHe = {
       showLess: 'הצג פחות',
       allDuplicates: 'כל הרעיונות שנמצאו כבר קיימים או דומים מדי.',
       tryOther: 'לא נמצאו רעיונות. נסו מקור אחר או מילת מפתח רחבה יותר.',
+      // Phase 3I.3 — the exact funnel of the last run (counts only).
+      funnelLine: 'פירוט הריצה: {g} רעיונות נוצרו · {d} כפולים לנושאים קיימים · {q} סוננו באיכות · {k} עם כותרת/מילת מפתח שכבר קיימת · {c} מכוסים בתוכן קיים באתר',
       temporaryError: 'לא הצלחנו לייצר רעיונות כרגע. נסו שוב בעוד רגע.',
       keywordLabel: 'מילת מפתח',
       secondaryLabel: 'ביטויים משניים',
@@ -314,7 +316,11 @@ export const dashboardHe = {
       cStoreCategories: 'קטגוריות מהחנות',
       storeDiscoveryNone: 'גילוי מוצרים ישיר לא זמין באתר זה',
       // Phase 3I.2 — skip-reason visibility (rate limiting is the common cause).
-      rateLimitedNote: 'האתר הגביל את קצב הבקשות ({n} עמודים דולגו) — רעננו שוב מאוחר יותר לכיסוי מלא',
+      // Phase 3I.3 — truthful: repeated refresh does NOT fix a rate-limited host.
+      // Metadata discovery works (titles/URLs indexed → ideas still possible);
+      // full body/anchor extraction needs incremental scanning or server-side
+      // allow-listing of the scanner.
+      rateLimitedNote: 'האתר מגביל משיכת תוכן מלאה ({n} עמודים דולגו), לכן אינדקס הקישורים חלקי. אפשר עדיין ליצור רעיונות לפי כותרות ועמודי האתר, אבל סריקת עוגנים מלאה תדרוש סריקה הדרגתית או החרגת השרת.',
       skipBreakdown: 'פירוט דילוגים',
       sbRateLimited: 'הגבלת קצב:',
       sbTimeBudget: 'תקציב זמן:',

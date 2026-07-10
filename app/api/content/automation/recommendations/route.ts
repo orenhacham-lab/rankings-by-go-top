@@ -94,7 +94,11 @@ export async function POST(request: Request) {
     // No ideas table yet (migration not applied): still return the GUARD-FILTERED
     // list session-only, so the keyword guard works even before persistence.
     if (pending === null) {
-      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting, debug: buildDebug({ persisted: false }) } })
+      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
+        // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
+        // its exact bottleneck in the UI (counts only, no content).
+        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+        debug: buildDebug({ persisted: false }) } })
     }
 
     // Phase 3F.3.1c — revalidate ALREADY-PERSISTED pending ideas against the
@@ -136,6 +140,9 @@ export async function POST(request: Request) {
         revalidatedHidden: conflictIds.length,
         pendingCount: suggestions.length,
         reason,
+        // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
+        // its exact bottleneck in the UI (counts only, no content).
+        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: conflictIds.length },
         debug: buildDebug({ revalidatedHidden: conflictIds.length }),
       },
     })

@@ -474,6 +474,8 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     })
     if (before !== suggestions.length) {
       meta.finalCount = suggestions.length
+      // Phase 3I.3 — production-safe funnel counter (no content, count only).
+      meta.qualityFilteredCount = before - suggestions.length
       // Phase 3H.1 — an honest empty reason: when the quality gate removed EVERY
       // candidate, the UI must say that (never "already saved/approved/rejected").
       if (suggestions.length === 0 && before > 0) meta.reason = 'all_quality_filtered'

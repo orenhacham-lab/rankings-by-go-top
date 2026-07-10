@@ -52,6 +52,8 @@ export interface RecommendationMeta {
   attempts: number
   /** Machine reason when finalCount is 0 (e.g. 'all_duplicates', 'model_empty'). */
   reason?: string
+  /** Phase 3I.3 — how many candidates the final quality gate removed (count only). */
+  qualityFilteredCount?: number
   /** True when the keyword-research (Google Ads) leg failed but we still return. */
   keywordResearchFailed?: boolean
   failureReason?: string

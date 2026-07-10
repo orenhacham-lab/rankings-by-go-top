@@ -103,7 +103,7 @@ export default function AutomationIdeas({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [ideasExpanded, setIdeasExpanded] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number } } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -205,6 +205,8 @@ export default function AutomationIdeas({
         keywordResearchFailed: data.meta?.keywordResearchFailed,
         // This run's NEW additions (not the total pending). Falls back to legacy field.
         newlyAdded: typeof data.meta?.newlyAddedCount === 'number' ? data.meta.newlyAddedCount : (data.meta?.newlySaved ?? 0),
+        // Phase 3I.3 — production funnel counts (why a run produced 0/few).
+        funnel: data.meta?.funnel,
       })
     } catch {
       if (reqId !== reqRef.current) return
@@ -604,6 +606,19 @@ export default function AutomationIdeas({
                               : meta.reason === 'all_duplicates'
                                 ? t.allDuplicates
                                 : t.tryOther}
+        </p>
+      )}
+      {/* Phase 3I.3 — the exact funnel: where this run's candidates went. Shown
+          whenever a run produced candidates but few/none survived, so a 0-result
+          is explainable with numbers instead of guesswork. */}
+      {meta?.funnel && meta.funnel.generated > 0 && meta.newlyAdded === 0 && !loading && (
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
+          {t.funnelLine
+            .replace('{g}', String(meta.funnel.generated))
+            .replace('{d}', String(meta.funnel.corpusDuplicates))
+            .replace('{q}', String(meta.funnel.qualityFiltered))
+            .replace('{k}', String(meta.funnel.keywordExists + meta.funnel.titleExists))
+            .replace('{c}', String(meta.funnel.coveredByExisting))}
         </p>
       )}
       {/* No saved ideas yet (fresh project / after clearing all) — calm prompt. */}

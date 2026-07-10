@@ -103,6 +103,8 @@ export const dashboardEn = {
       showLess: 'Show less',
       allDuplicates: 'All the ideas we found already exist or are too similar.',
       tryOther: 'No ideas found. Try another source or a broader keyword.',
+      // Phase 3I.3 — the exact funnel of the last run (counts only).
+      funnelLine: 'Run breakdown: {g} ideas generated · {d} duplicates of existing topics · {q} quality-filtered · {k} title/keyword already exists · {c} covered by existing site content',
       temporaryError: 'We couldn’t generate ideas right now. Please try again in a moment.',
       keywordLabel: 'Keyword',
       secondaryLabel: 'Secondary keywords',
@@ -316,7 +318,8 @@ export const dashboardEn = {
       cStoreCategories: 'store categories',
       storeDiscoveryNone: 'Direct product discovery is not available on this site',
       // Phase 3I.2 — skip-reason visibility (rate limiting is the common cause).
-      rateLimitedNote: 'The site rate-limited our requests ({n} pages skipped) — refresh again later for fuller coverage',
+      // Phase 3I.3 — truthful: repeated refresh does NOT fix a rate-limited host.
+      rateLimitedNote: 'The site limits full content fetching ({n} pages skipped), so the link index is partial. Topic ideas still work from page titles and site structure, but full anchor scanning will require incremental scanning or allow-listing the scanner on the server.',
       skipBreakdown: 'Skip breakdown',
       sbRateLimited: 'rate-limited:',
       sbTimeBudget: 'time budget:',
