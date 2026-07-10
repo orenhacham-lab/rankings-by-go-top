@@ -355,6 +355,7 @@ export const dashboardEn = {
         not_in_plan: 'Target not found in the current index',
         invalid_anchor: 'Anchor text is not valid',
         duplicate_target: 'Duplicate target',
+        duplicate_anchor: 'Duplicate anchor in the selection',
       },
       autoApprove: 'Approve the links after saving (applies to “Save plan” only)',
       approveAutoNote: '“Save links and add to publishing queue” always approves the checked links — this checkbox isn’t needed for it.',

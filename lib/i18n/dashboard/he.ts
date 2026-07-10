@@ -354,6 +354,7 @@ export const dashboardHe = {
         not_in_plan: 'היעד לא נמצא באינדקס העדכני',
         invalid_anchor: 'טקסט העוגן אינו תקין',
         duplicate_target: 'יעד כפול',
+        duplicate_anchor: 'עוגן כפול בבחירה',
       },
       autoApprove: 'אשר את הקישורים לאחר שמירה (רלוונטי ל״שמור תכנון״ בלבד)',
       approveAutoNote: '״שמור קישורים והוסף לתור הפרסום״ מאשר תמיד את הקישורים המסומנים — אין צורך בסימון הזה.',

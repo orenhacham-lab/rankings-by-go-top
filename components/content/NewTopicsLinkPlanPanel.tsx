@@ -29,7 +29,7 @@ interface DryPlan { topicId: string; selected: DryLink[]; rejected: DryLink[]; r
 
 const mkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targetUrl}||${(l.anchorText ?? '').toLowerCase()}`
 
-interface DroppedLink { targetUrl: string; anchorText: string; reason: string }
+interface DroppedLink { targetUrl: string; anchorText: string; reason: string; rejectedReasons?: string[] }
 interface BulkResult { topicId: string; ok: boolean; linkCount: number; approvedCount: number; approvalWarning?: boolean; reason?: string; droppedLinks?: DroppedLink[] }
 
 const REASON_HE: Record<string, string> = {
@@ -131,12 +131,18 @@ export default function NewTopicsLinkPlanPanel({
           const reviewable = rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
           const selectedLinks: DryLink[] = Array.isArray(p.selected) ? p.selected : []
           // Phase 3G.3 — merge the CHECKED idea-stage links so they don't disappear
-          // if the fresh dry-run recomputed fewer/none. Any idea link not already in
-          // the recommended list is added (labelled from the idea stage), pre-checked.
-          const present = new Set(selectedLinks.map((l) => mkey(l)))
+          // if the fresh dry-run recomputed fewer/none.
+          // Phase 3G.8 — CONSISTENCY with save: an idea link is merged (pre-checked)
+          // ONLY when the fresh server plan can actually save it — i.e. its URL is a
+          // reviewable/approvable candidate. A URL the fresh plan hard-blocks, or no
+          // longer knows, would be dropped by bulk-save; showing it pre-checked as
+          // "recommended" was the recommended-but-dropped mismatch. URLs already in
+          // the fresh recommended list are skipped (that row already represents them).
+          const recommendedUrls = new Set(selectedLinks.map((l) => l.targetUrl))
+          const saveableUrls = new Set(rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove).map((r) => r.targetUrl))
           const ideaLinks = (initialSelected[p.topicId] ?? [])
             .map((l): DryLink => ({ targetUrl: l.url, targetTitle: l.url, anchorText: l.anchor, confidence: 0, relevance: 0, reason: 'idea_stage_selection', rejectedReasons: [] }))
-            .filter((l) => (l.anchorText || '').trim() && !present.has(mkey(l)))
+            .filter((l) => (l.anchorText || '').trim() && !recommendedUrls.has(l.targetUrl) && saveableUrls.has(l.targetUrl))
           const mergedSelected = [...selectedLinks, ...ideaLinks]
           const plan: DryPlan = { topicId: p.topicId, selected: mergedSelected, rejected, reviewable, summary: p.summary ?? '' }
           map[p.topicId] = plan
@@ -292,6 +298,10 @@ export default function NewTopicsLinkPlanPanel({
           <li key={`${tid}-dl-${i}`} className="text-[10px] text-amber-700 dark:text-amber-400">
             <span className="font-medium break-words">{d.anchorText || d.targetUrl}</span>
             {' · '}{(t.droppedReasons as Record<string, string>)[d.reason] ?? d.reason}
+            {/* Phase 3G.8 — before/after diagnostics: the fresh classification. */}
+            {Array.isArray(d.rejectedReasons) && d.rejectedReasons.length > 0 && (
+              <span className="text-amber-600/80 dark:text-amber-500/80"> ({d.rejectedReasons.map(revLabel).join(' · ')})</span>
+            )}
           </li>
         )))}
       </ul>

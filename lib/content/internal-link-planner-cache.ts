@@ -132,8 +132,18 @@ export type CandidateTier = 'recommended' | 'reviewable' | 'blocked'
  * so approving a caution target could only ever produce a dead
  * approved-but-never-insertable link.
  */
+/**
+ * Phase 3G.8 — duplicate_url / duplicate_anchor are SOFT: they are artifacts of
+ * the AUTO-selection dedup race (which same-anchor sibling variant won the
+ * confidence sort), not intrinsic safety failures of the candidate itself. A
+ * user may deliberately pick the OTHER variant; exact-mode saving re-enforces
+ * URL+anchor uniqueness WITHIN the user's own selection (see selectClientLinks),
+ * so two duplicates can still never be saved together. This is what made a
+ * recommended candidate ("oscar by oscar de la renta") intermittently unsaveable
+ * when a sibling product outranked it at save time.
+ */
 const SOFT_REJECTION_BASES = new Set([
-  'low_relevance', 'low_confidence', 'over_cap',
+  'low_relevance', 'low_confidence', 'over_cap', 'duplicate_url', 'duplicate_anchor',
 ])
 /**
  * Strict cluster-gate verdicts (Phase 3F.3.7): the candidate is merely
@@ -747,6 +757,10 @@ export function promoteManualCandidates(
   if (!Array.isArray(manual) || manual.length === 0) return { plan, promoted: 0, rejectedManual: 0 }
   const keyOf = (u: string, a: string | null | undefined) => `${normalizeUrlKey(u)}::${(a ?? '').trim().toLowerCase()}`
   const selectedKeys = new Set(plan.selected.map((s) => keyOf(s.targetUrl, s.anchorText)))
+  // Phase 3G.8 — duplicate_url/duplicate_anchor are soft now, so promotion must
+  // itself keep URL + anchor uniqueness across the final selected set.
+  const usedUrls = new Set(plan.selected.map((s) => normalizeUrlKey(s.targetUrl)))
+  const usedAnchors = new Set(plan.selected.map((s) => (s.anchorText ?? '').trim().toLowerCase()).filter(Boolean))
   const promotedLinks: CachePlannedLink[] = []
   let rejectedManual = 0
   for (const m of manual) {
@@ -754,7 +768,12 @@ export function promoteManualCandidates(
     if (selectedKeys.has(key)) continue // already recommended → nothing to do
     const cand = plan.rejected.find((r) => keyOf(r.targetUrl, r.anchorText) === key && r.reviewability === 'reviewable' && r.canManualApprove)
     if (!cand) { rejectedManual++; continue } // not found OR blocked → refuse
+    const urlKey = normalizeUrlKey(cand.targetUrl)
+    const anchorKey = (cand.anchorText ?? '').trim().toLowerCase()
+    if (usedUrls.has(urlKey) || (anchorKey && usedAnchors.has(anchorKey))) { rejectedManual++; continue } // would duplicate the final set
     selectedKeys.add(key)
+    usedUrls.add(urlKey)
+    if (anchorKey) usedAnchors.add(anchorKey)
     promotedLinks.push({ ...cand, selected: true, reason: `manual_override (${cand.rejectedReasons.join(', ')})` })
   }
   if (promotedLinks.length === 0) return { plan, promoted: 0, rejectedManual }
@@ -771,8 +790,17 @@ export function promoteManualCandidates(
 }
 
 /** Why a user-checked link could not be saved (Phase 3G.5 — never silent). */
-export type DroppedSelectionReason = 'blocked' | 'not_in_plan' | 'invalid_anchor' | 'duplicate_target'
-export interface DroppedSelection { targetUrl: string; anchorText: string; reason: DroppedSelectionReason }
+export type DroppedSelectionReason = 'blocked' | 'not_in_plan' | 'invalid_anchor' | 'duplicate_target' | 'duplicate_anchor'
+export interface DroppedSelection {
+  targetUrl: string
+  anchorText: string
+  reason: DroppedSelectionReason
+  // Phase 3G.8 — before/after diagnostics: the fresh plan's rejection reasons
+  // for this candidate, and a flag when the drop means the candidate's
+  // classification CHANGED between the panel's dry-run and this save.
+  rejectedReasons?: string[]
+  note?: 'candidate_changed_between_plan_and_save'
+}
 export interface SelectClientLinksResult { plan: CacheTopicPlan; dropped: DroppedSelection[] }
 
 /**
@@ -810,6 +838,10 @@ export function selectClientLinks(
   }
 
   const seenUrl = new Set<string>()
+  // Phase 3G.8 — URL *and* anchor uniqueness are enforced WITHIN the user's own
+  // selection (the auto-pass duplicate_url/duplicate_anchor verdicts are soft —
+  // they only describe who won the automatic dedup race).
+  const seenAnchor = new Set<string>()
   const selected: CachePlannedLink[] = []
   const dropped: DroppedSelection[] = []
   const promote = (cand: CachePlannedLink, anchorText: string): CachePlannedLink => ({
@@ -818,6 +850,17 @@ export function selectClientLinks(
     selected: true,
     reason: cand.selected ? cand.reason : `manual_override (${cand.rejectedReasons.join(', ')})`,
   })
+  const accept = (cand: CachePlannedLink, anchorText: string, urlKey: string): boolean => {
+    const anchorKey = anchorText.trim().toLowerCase()
+    if (anchorKey && seenAnchor.has(anchorKey)) {
+      dropped.push({ targetUrl: cand.targetUrl, anchorText, reason: 'duplicate_anchor' })
+      return false
+    }
+    seenUrl.add(urlKey)
+    if (anchorKey) seenAnchor.add(anchorKey)
+    selected.push(promote(cand, anchorText))
+    return true
+  }
 
   for (const d of Array.isArray(desired) ? desired : []) {
     if (!d || typeof d.targetUrl !== 'string' || !d.targetUrl.trim()) continue
@@ -827,21 +870,29 @@ export function selectClientLinks(
 
     // 1) Exact (url + anchor) match against the approvable pool.
     const exact = poolByKey.get(keyOf(d.targetUrl, anchor))
-    if (exact) { seenUrl.add(urlKey); selected.push(promote(exact, exact.anchorText ?? anchor)); continue }
+    if (exact) { accept(exact, exact.anchorText ?? anchor, urlKey); continue }
 
     // 2) Same approvable target, different chosen anchor (e.g. the idea-stage
     // anchor): keep the USER'S anchor when it passes the same shape rule the
     // insertion evaluator uses — the exact selection persists end-to-end.
     const byUrl = poolByUrl.get(urlKey)
     if (byUrl) {
-      if (anchor && manualAnchorShapeValid(anchor)) { seenUrl.add(urlKey); selected.push(promote(byUrl, anchor)) }
+      if (anchor && manualAnchorShapeValid(anchor)) accept(byUrl, anchor, urlKey)
       else dropped.push({ targetUrl: d.targetUrl, anchorText: anchor, reason: 'invalid_anchor' })
       continue
     }
 
     // 3) Not approvable: a hard-blocked/irrelevant candidate, or not in the plan.
-    const knownRejected = plan.rejected.some((r) => normalizeUrlKey(r.targetUrl) === urlKey)
-    dropped.push({ targetUrl: d.targetUrl, anchorText: anchor, reason: knownRejected ? 'blocked' : 'not_in_plan' })
+    // Phase 3G.8 — include the fresh plan's classification so a drop is
+    // diagnosable: a candidate the panel showed as selectable that is now
+    // hard-blocked means its classification CHANGED between dry-run and save.
+    const rej = plan.rejected.find((r) => normalizeUrlKey(r.targetUrl) === urlKey)
+    dropped.push({
+      targetUrl: d.targetUrl, anchorText: anchor,
+      reason: rej ? 'blocked' : 'not_in_plan',
+      rejectedReasons: rej ? rej.rejectedReasons : undefined,
+      note: 'candidate_changed_between_plan_and_save',
+    })
   }
 
   return {
