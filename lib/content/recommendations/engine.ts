@@ -360,7 +360,23 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
   } else if (input.source === 'site_scan') {
     // From the CACHED site scan — content-gap ideas, then dedupe. Never rescans.
-    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel }, businessCtx)
+    // Phase 3H.4 — pass rotation memory: existing titles + PENDING idea titles/
+    // keywords, so a repeat run generates DIFFERENT ideas from unused entities
+    // instead of regenerating the first batch and "exhausting" after one click.
+    let pendingAvoid: string[] = []
+    try {
+      const { data: ideaRows } = await admin
+        .from('content_topic_ideas')
+        .select('title, primary_keyword')
+        .eq('project_id', input.projectId)
+        .eq('status', 'pending')
+        .limit(60)
+      pendingAvoid = ((ideaRows ?? []) as { title: string; primary_keyword: string | null }[])
+        .flatMap((r) => [r.title, r.primary_keyword ?? ''])
+        .filter(Boolean)
+    } catch { /* ideas table optional */ }
+    const avoidTitles = Array.from(new Set([...existingTitles, ...pendingAvoid, ...(input.avoidKeywords ?? [])]))
+    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
     for (const s of res.suggestions) {

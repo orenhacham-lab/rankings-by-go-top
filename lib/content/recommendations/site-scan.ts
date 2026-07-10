@@ -26,6 +26,11 @@ export interface SiteScanRecoInput {
   projectId: string
   language: 'he' | 'en'
   langLabel: string
+  /** Phase 3H.4 — titles/keywords already existing or already SUGGESTED (pending
+   *  ideas). Without this the source had NO MEMORY between runs: a second click
+   *  regenerated the same ideas, the guard rejected them all against the first
+   *  run's pending rows, and the source "exhausted" after one batch. */
+  avoidTitles?: string[]
 }
 
 export type SiteScanReason = 'no_scan' | 'insufficient_data' | 'model_error' | 'model_empty'
@@ -155,10 +160,13 @@ function sourceUrlList(d: ReturnType<typeof buildDigest>): { url: string; title:
   return out.slice(0, 30)
 }
 
-function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number): string {
+function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[]): string {
   return [
     `You are an SEO content strategist. Analyze a website's existing content (from a site scan) and propose NEW article topics that fill content gaps and strengthen the site's internal structure.`,
     businessCtx ? `Website: ${businessCtx}.` : '',
+    // Phase 3H.4 — rotation memory: never re-emit what already exists or was
+    // already suggested; move on to UNUSED entities/clusters/angles instead.
+    avoidTitles.length ? `Do NOT repeat or closely overlap these existing/already-suggested titles and keywords:\n${avoidTitles.slice(0, 40).map((t) => `- ${t}`).join('\n')}\nInstead, ROTATE to entities, categories, products and angles NOT represented in that list (different clusters, different sub-intents, different audiences).` : '',
     `Write ALL output in ${langLabel}.`,
     `Here is a compact digest of the EXISTING site content:`,
     digestBlock,
@@ -230,7 +238,10 @@ const MAX_SITE_SCAN_IDEAS = 20
  * non-crashing ideas. Built from important pages + categories (a "complete
  * guide" supporting-article angle). No AI. 3–5 items when possible.
  */
-function deterministicFallback(digest: ReturnType<typeof buildDigest>, language: 'he' | 'en'): TopicSuggestion[] {
+function deterministicFallback(digest: ReturnType<typeof buildDigest>, language: 'he' | 'en', avoidTitles: string[] = []): TopicSuggestion[] {
+  // Phase 3H.4 — rotation memory for the fallback too: skip templates that were
+  // already suggested/exist, so a repeat run moves on to unused seeds.
+  const avoid = new Set(avoidTitles.map((t) => t.trim().toLowerCase()).filter(Boolean))
   const he = language === 'he'
   const guide = (name: string) => (he ? `המדריך המלא: ${name}` : `The complete guide to ${name}`)
   const tips = (name: string) => (he ? `${name} — טעויות נפוצות וטיפים` : `${name} — common mistakes and tips`)
@@ -260,7 +271,7 @@ function deterministicFallback(digest: ReturnType<typeof buildDigest>, language:
     for (const makeTitle of [guide, tips]) {
       const title = makeTitle(name)
       const key = title.toLowerCase()
-      if (seenTitles.has(key)) continue
+      if (seenTitles.has(key) || avoid.has(key)) continue
       seenTitles.add(key)
       out.push({
         id: `site_scan:${slugKey(title)}`,
@@ -303,7 +314,7 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
 
   const urlList = sourceUrlList(digest)
   const urlByKey = new Map(urlList.map((u) => [u.url, u.title]))
-  const prompt = buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, MAX_SITE_SCAN_IDEAS)
+  const prompt = buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, MAX_SITE_SCAN_IDEAS, input.avoidTitles ?? [])
 
   const { ideas, ok } = await callModel(prompt)
   debug.modelCalled = true
@@ -342,7 +353,7 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   // Model failed or produced nothing usable → deterministic scan-derived ideas
   // so the user is never stuck with a bare error on a project that HAS a scan.
   if (suggestions.length === 0) {
-    const fallback = deterministicFallback(digest, input.language)
+    const fallback = deterministicFallback(digest, input.language, input.avoidTitles ?? [])
     debug.usedFallback = fallback.length > 0
     debug.rawSuggestionCount = fallback.length
     if (fallback.length > 0) return { suggestions: fallback, meta: { generated: fallback.length, debug } }
