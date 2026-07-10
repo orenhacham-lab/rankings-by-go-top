@@ -46,6 +46,9 @@ export async function GET(request: Request) {
     truncated: summary.truncated ?? null,
     // Phase 3I.1 — why products are (or are not) in the index.
     storeEntityDiscovery: summary.storeEntityDiscovery ?? null,
+    // Phase 3I.2 — skip breakdown + type mix (site-type-aware diagnostics).
+    contentSkipBreakdown: summary.contentSkipBreakdown ?? null,
+    targetsByType: summary.targetsByType ?? null,
     counts: {
       targetsStored: Array.isArray(row.targets) ? row.targets.length : 0,
       uniqueTargets: num('uniqueTargets'),

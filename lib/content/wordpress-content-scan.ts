@@ -565,6 +565,10 @@ export interface SiteScanReport {
   truncated: boolean
   /** Phase 3I.1 — direct store entity discovery outcome (diagnostics). */
   storeEntityDiscovery?: StoreEntityDiscoverySummary
+  /** Phase 3I.2 — why content items were skipped (rate limit / budget / errors). */
+  contentSkipBreakdown?: { timeBudget: number; fetchFailed: number; rateLimited: number; tooLarge: number; abortedAfterFailures: number }
+  /** Phase 3I.2 — target count per type (site-type-aware diagnostics). */
+  targetsByType?: Record<string, number>
   // Metadata-first / adaptive fetch stats (large-site handling).
   metadataItemsFetched: number
   postsMetadataFetched: number
@@ -966,30 +970,69 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   let postsContentFetched = 0
   let pagesContentFetched = 0
   let budgetNoted = false
+  // Phase 3I.2 — VISIBLE skip breakdown + rate-limit protection. On throttled
+  // hosts (HTTP 429) the old loop hammered the next item immediately, turning
+  // one rate limit into a total anchor blackout ("74 skipped, 1 with anchors").
+  const skipBreakdown = { timeBudget: 0, fetchFailed: 0, rateLimited: 0, tooLarge: 0, abortedAfterFailures: 0 }
+  let consecutiveFailures = 0
+  let fetchAborted = false
+  const MAX_CONSECUTIVE_CONTENT_FAILURES = 5
+  const CONTENT_FETCH_PACING_MS = 200
+  const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
+  let firstContentFetch = true
 
   for (const { item, endpoint } of metaItems) {
     const itemKey = item.link ? internalTargetKey(item.link) : ''
     const ownTarget = itemKey ? targets.get(itemKey) : undefined
 
+    // Circuit breaker: repeated consecutive failures (rate limiting / host block)
+    // → stop fetching content entirely; keep every remaining item as a metadata
+    // target instead of burning the whole budget on doomed requests.
+    if (fetchAborted) {
+      contentItemsSkipped++
+      skipBreakdown.abortedAfterFailures++
+      if (ownTarget) { ownTarget.contentSkipped = true; ownTarget.contentSkippedReason = 'aborted_after_failures' }
+      continue
+    }
+
     // Soft time budget: keep remaining items as metadata targets, skip content.
     if (Date.now() - startedAt > CONTENT_TIME_BUDGET_MS) {
       contentItemsSkipped++
+      skipBreakdown.timeBudget++
       if (ownTarget) { ownTarget.contentSkipped = true; ownTarget.contentSkippedReason = 'time_budget' }
       if (!budgetNoted) { notes.push('Content time budget reached — remaining items kept as metadata targets without anchor extraction.'); budgetNoted = true }
       continue
     }
 
+    // Gentle pacing between per-item fetches (rate-limit friendliness).
+    if (!firstContentFetch) await pause(CONTENT_FETCH_PACING_MS)
+    firstContentFetch = false
+
     let html = ''
     try {
       html = await getItemContentHtml(creds, endpoint, item.id)
       contentItemsFetched++
+      consecutiveFailures = 0
       if (endpoint === '/posts') postsContentFetched++
       else pagesContentFetched++
     } catch (e) {
       contentItemsSkipped++
       const tooLarge = isTooLarge(e)
-      if (tooLarge) contentTooLargeCount++
-      if (ownTarget) { ownTarget.contentSkipped = true; ownTarget.contentSkippedReason = tooLarge ? 'response_too_large' : 'content_fetch_failed' }
+      const rateLimited = e instanceof WordPressClientError && /HTTP 429/.test(e.message)
+      if (tooLarge) { contentTooLargeCount++; skipBreakdown.tooLarge++ }
+      else if (rateLimited) skipBreakdown.rateLimited++
+      else skipBreakdown.fetchFailed++
+      if (ownTarget) { ownTarget.contentSkipped = true; ownTarget.contentSkippedReason = tooLarge ? 'response_too_large' : rateLimited ? 'rate_limited' : 'content_fetch_failed' }
+      // Rate-limited: back off once before the next item; too-large doesn't count
+      // toward the consecutive-failure breaker (it is item-specific, not host state).
+      if (rateLimited) await pause(2000)
+      if (!tooLarge) {
+        consecutiveFailures++
+        if (consecutiveFailures >= MAX_CONSECUTIVE_CONTENT_FAILURES) {
+          fetchAborted = true
+          notes.push(`Content fetching stopped after ${consecutiveFailures} consecutive failures${skipBreakdown.rateLimited ? ' (rate limiting detected — HTTP 429)' : ''} — remaining items kept as metadata targets.`)
+        }
+      }
       continue
     }
 
@@ -1172,6 +1215,11 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
     // Phase 3I.1 — persisted into the index summary so the status card / API can
     // show WHY products are (or are not) in the index.
     storeEntityDiscovery: store.summary,
+    // Phase 3I.2 — WHY content items were skipped (rate limiting vs budget vs
+    // errors) + the index's type mix (lets the UI tailor diagnostics by site
+    // type: ecommerce vs service/content).
+    contentSkipBreakdown: skipBreakdown,
+    targetsByType: finalTargets.reduce<Record<string, number>>((acc, t) => { acc[t.targetType] = (acc[t.targetType] ?? 0) + 1; return acc }, {}),
     metadataItemsFetched: items.length,
     postsMetadataFetched: postsMeta.items.length,
     pagesMetadataFetched: pagesMeta.items.length,

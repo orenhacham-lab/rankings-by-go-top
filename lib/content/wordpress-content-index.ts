@@ -26,10 +26,10 @@ const TABLE = 'wordpress_content_index'
  * Bump when the scan classification logic changes so a cached index built by an
  * older version can be flagged as needing a refresh (versionStale).
  */
-// 2a.6 — Phase 3I.1: hardened store entity discovery (no-auth-first, legacy
-// wc/store namespace, /wp/v2/product fallback) + visible discovery diagnostics
-// (source / HTTP status / found / added) persisted in the index summary.
-export const SCAN_INDEX_VERSION = '2a.6'
+// 2a.7 — Phase 3I.2: rate-limit-aware content fetching (429 backoff + pacing +
+// consecutive-failure circuit breaker), visible content-skip breakdown, and
+// targets-by-type for site-type-aware diagnostics.
+export const SCAN_INDEX_VERSION = '2a.7'
 
 /** TTL for a cached index (app-enforced). Configurable; default 7 days. */
 export function indexTtlDays(): number {

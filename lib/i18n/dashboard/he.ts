@@ -313,6 +313,13 @@ export const dashboardHe = {
       cStoreProducts: 'מוצרים מהחנות',
       cStoreCategories: 'קטגוריות מהחנות',
       storeDiscoveryNone: 'גילוי מוצרים ישיר לא זמין באתר זה',
+      // Phase 3I.2 — skip-reason visibility (rate limiting is the common cause).
+      rateLimitedNote: 'האתר הגביל את קצב הבקשות ({n} עמודים דולגו) — רעננו שוב מאוחר יותר לכיסוי מלא',
+      skipBreakdown: 'פירוט דילוגים',
+      sbRateLimited: 'הגבלת קצב:',
+      sbTimeBudget: 'תקציב זמן:',
+      sbFetchFailed: 'שגיאות:',
+      sbTooLarge: 'גדול מדי:',
       // Phase 3F.1.1 — clarify that the index intentionally covers the most useful
       // link destinations (from posts/pages), not necessarily every WooCommerce product.
       coverageNote: 'האינדקס כולל את העמודים השימושיים ביותר לקישורים פנימיים, וכן מוצרים וקטגוריות שמתגלים ישירות מחנות ווקומרס (כאשר זמינה). אם האינדקס מסומן חלקי — רעננו לאחר שהאתר זמין ומהיר יותר.',

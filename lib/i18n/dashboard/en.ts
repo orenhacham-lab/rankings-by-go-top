@@ -315,6 +315,13 @@ export const dashboardEn = {
       cStoreProducts: 'store products',
       cStoreCategories: 'store categories',
       storeDiscoveryNone: 'Direct product discovery is not available on this site',
+      // Phase 3I.2 — skip-reason visibility (rate limiting is the common cause).
+      rateLimitedNote: 'The site rate-limited our requests ({n} pages skipped) — refresh again later for fuller coverage',
+      skipBreakdown: 'Skip breakdown',
+      sbRateLimited: 'rate-limited:',
+      sbTimeBudget: 'time budget:',
+      sbFetchFailed: 'errors:',
+      sbTooLarge: 'too large:',
       // Phase 3F.1.1 — clarify the index covers the most useful link destinations
       // (from posts/pages), not necessarily every WooCommerce product.
       coverageNote: 'The index covers the most useful pages for internal links, plus products and categories discovered directly from the WooCommerce store (when available). If the index is marked partial — refresh once the site responds faster.',

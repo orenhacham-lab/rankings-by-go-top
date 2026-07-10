@@ -46,6 +46,9 @@ interface IndexStatus {
     productTargetsAdded: number
     categoryTargetsAdded: number
   } | null
+  // Phase 3I.2 — skip breakdown + type mix (site-type-aware diagnostics).
+  contentSkipBreakdown?: { timeBudget: number; fetchFailed: number; rateLimited: number; tooLarge: number; abortedAfterFailures: number } | null
+  targetsByType?: Record<string, number> | null
   counts?: {
     targetsStored?: number | null
     uniqueTargets?: number | null
@@ -187,11 +190,27 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
               <span><b className="text-slate-700 dark:text-slate-200">{c.targetsEligible ?? 0}</b> {t.cEligible}</span>
               <span><b className="text-slate-700 dark:text-slate-200">{c.targetsWithUsableAnchors ?? 0}</b> {t.cAnchors}</span>
               {(c.contentItemsSkipped ?? 0) > 0 && <span><b className="text-slate-700 dark:text-slate-200">{c.contentItemsSkipped}</b> {t.cSkipped}</span>}
-              {/* Phase 3I.1 — store entity discovery outcome, always visible. */}
-              {status?.storeEntityDiscovery && (
-                status.storeEntityDiscovery.source !== 'none'
-                  ? <span><b className="text-slate-700 dark:text-slate-200">{status.storeEntityDiscovery.productsFound}</b> {t.cStoreProducts} · <b className="text-slate-700 dark:text-slate-200">{status.storeEntityDiscovery.categoriesFound}</b> {t.cStoreCategories}</span>
-                  : <span className="text-amber-700 dark:text-amber-400">{t.storeDiscoveryNone}{status.storeEntityDiscovery.lastHttpStatus ? ` (HTTP ${status.storeEntityDiscovery.lastHttpStatus})` : ''}</span>
+              {/* Phase 3I.1/3I.2 — store entity discovery outcome. The negative
+                  (amber) variant is shown ONLY when the index actually contains
+                  ecommerce targets — on a service/content site, missing product
+                  discovery is irrelevant and must not read as the blocker. */}
+              {status?.storeEntityDiscovery && (() => {
+                const d = status.storeEntityDiscovery!
+                const ecomTargets = (status.targetsByType?.product ?? 0) + (status.targetsByType?.category ?? 0)
+                if (d.source !== 'none') {
+                  return <span><b className="text-slate-700 dark:text-slate-200">{d.productsFound}</b> {t.cStoreProducts} · <b className="text-slate-700 dark:text-slate-200">{d.categoriesFound}</b> {t.cStoreCategories}</span>
+                }
+                if (ecomTargets > 0) {
+                  return <span className="text-amber-700 dark:text-amber-400">{t.storeDiscoveryNone}{d.lastHttpStatus ? ` (HTTP ${d.lastHttpStatus})` : ''}</span>
+                }
+                return null // service/content site — product discovery not relevant
+              })()}
+              {/* Phase 3I.2 — WHY content was skipped (rate limit is the common
+                  real-world cause of "74 skipped, 1 with anchors"). */}
+              {status?.contentSkipBreakdown && (status.contentSkipBreakdown.rateLimited > 0 || status.contentSkipBreakdown.abortedAfterFailures > 0) && (
+                <span className="text-amber-700 dark:text-amber-400">
+                  {t.rateLimitedNote.replace('{n}', String(status.contentSkipBreakdown.rateLimited + status.contentSkipBreakdown.abortedAfterFailures))}
+                </span>
               )}
               {(status?.scanCompletedAt || status?.scannerVersion) && <span className="text-slate-300 dark:text-slate-600">·</span>}
               {status?.scanCompletedAt && <span>{t.lastScanned}: {formatDateTime(status.scanCompletedAt)}</span>}
@@ -219,6 +238,13 @@ export default function InternalLinkIndexStatus({ projectId, language }: { proje
                 {status?.expiresAt && <div>{t.expires}: {formatDateTime(status.expiresAt)}</div>}
                 {typeof status?.scanDurationMs === 'number' && <div>{t.duration}: {status.scanDurationMs}ms</div>}
                 <div>{t.cStored}: {c.targetsStored ?? 0}</div>
+                {/* Phase 3I.2 — full skip-reason breakdown + type mix. */}
+                {status?.contentSkipBreakdown && (
+                  <div className="sm:col-span-2">{t.skipBreakdown}: {t.sbRateLimited} {status.contentSkipBreakdown.rateLimited + status.contentSkipBreakdown.abortedAfterFailures} · {t.sbTimeBudget} {status.contentSkipBreakdown.timeBudget} · {t.sbFetchFailed} {status.contentSkipBreakdown.fetchFailed} · {t.sbTooLarge} {status.contentSkipBreakdown.tooLarge}</div>
+                )}
+                {status?.targetsByType && (
+                  <div className="sm:col-span-2" dir="ltr">{Object.entries(status.targetsByType).map(([k, v]) => `${k}: ${v}`).join(' · ')}</div>
+                )}
               </div>
             </details>
           )}
