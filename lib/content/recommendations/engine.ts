@@ -19,8 +19,9 @@ import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
-import { recommendFromKeywordResearch } from './keyword-research'
+import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
+import { slugFromUrl } from '@/lib/content/internal-links'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { previewStructuredLinks } from '@/lib/content/internal-link-idea-plan'
 import { isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
@@ -56,6 +57,32 @@ async function deriveScanSeedConcepts(admin: Admin, projectId: string): Promise<
     }
     return out.slice(0, 20)
   } catch { return [] }
+}
+
+/**
+ * Phase 3H — the site's OWN vocabulary: tokens from every scanned target's
+ * title / focus keyword / Hebrew slug, plus explicit extra context (business
+ * name, tracked keywords). Used as the relevance gate for keyword research —
+ * a Google URL-idea sharing NO token with this set is unrelated to the site.
+ * Purely project-derived; empty set when no scan exists (gate then skipped).
+ */
+async function buildSiteVocabulary(admin: Admin, projectId: string, extras: string[]): Promise<Set<string>> {
+  const vocab = new Set<string>()
+  const absorb = (s: string | null | undefined) => { for (const tk of tokens(s || '')) vocab.add(tk) }
+  try {
+    const cacheRow = await getCachedIndex(admin, projectId)
+    if (cacheRow) {
+      const report = reassembleReport(cacheRow)
+      for (const t of (report.targets ?? []) as ScannedTarget[]) {
+        absorb(t.targetTitle)
+        if (t.keywordAvailable) absorb(t.primaryKeywordCandidate)
+        const slug = slugFromUrl(t.targetUrl)
+        if (/[֐-׿]/.test(slug)) absorb(slug)
+      }
+    }
+  } catch { /* no scan → vocabulary from extras only */ }
+  for (const e of extras) absorb(e)
+  return vocab
 }
 
 const TARGET_NEW = 15
@@ -370,9 +397,11 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // keyword pool spans the whole catalogue, not just the homepage's terms.
     const scanSeeds = await deriveScanSeedConcepts(admin, input.projectId)
     const seedKeywords = Array.from(new Set([...trackingSeeds, ...scanSeeds].map((s) => s.trim()).filter(Boolean)))
+    // Phase 3H — the site's own vocabulary gates Google's associative URL ideas.
+    const siteVocab = await buildSiteVocabulary(admin, input.projectId, [project.business_name || '', ...trackingSeeds])
     const res = await recommendFromKeywordResearch(admin, {
       userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
-      seedKeywords, avoid: [...existingTitles, ...(input.avoidKeywords ?? [])],
+      seedKeywords, avoid: [...existingTitles, ...(input.avoidKeywords ?? [])], siteVocab,
     })
     const seenTitles = new Set<string>()
     let dupes = 0
@@ -396,10 +425,29 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       debug: process.env.NODE_ENV !== 'production' ? {
         seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, trackingSeedCount: trackingSeeds.length, scanSeedCount: scanSeeds.length,
         rawKeywords: res.meta.rawKeywords, afterBasicFilter: res.meta.afterBasicFilter, afterNoiseFilter: res.meta.afterNoiseFilter,
+        filteredGenericCount: res.meta.filteredGenericCount, filteredUnrelatedCount: res.meta.filteredUnrelatedCount, filteredUnrelatedExamples: res.meta.filteredUnrelatedExamples,
         candidateCount: res.meta.candidateCount, batchSent: res.meta.batchSent, unusedRemaining: res.meta.unusedRemaining,
         skippedKnownCount: res.meta.skippedKnownCount, skippedKnownExamples: res.meta.skippedKnownExamples,
         modelTopics: res.meta.generated, afterCorpusDedupe: suggestions.length,
       } : undefined,
+    }
+  }
+
+  // 4b) Phase 3H — FINAL topic-quality gate for EVERY source (model output
+  // included): single-word titles/keywords and commercial/navigation vocabulary
+  // ("sale", "כלבים", "קטגוריה", …) are never article-worthy topics. Counted in
+  // debug so a heavy filter is visible, never silent.
+  {
+    const before = suggestions.length
+    const qualityExamples: { title: string; issue: string }[] = []
+    suggestions = suggestions.filter((s) => {
+      const issue = topicQualityIssue(s.title, s.primaryKeyword)
+      if (issue) { if (qualityExamples.length < 10) qualityExamples.push({ title: s.title, issue }); return false }
+      return true
+    })
+    if (before !== suggestions.length) {
+      meta.finalCount = suggestions.length
+      if (process.env.NODE_ENV !== 'production') meta.debug = { ...(meta.debug ?? {}), qualityFilteredCount: before - suggestions.length, qualityFilteredExamples: qualityExamples }
     }
   }
 

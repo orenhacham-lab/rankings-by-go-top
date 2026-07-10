@@ -10,12 +10,15 @@
  * Gated by ENABLE_CONTENT. Auth + project ownership on every method.
  */
 
+import { after } from 'next/server'
 import {
   isContentModuleEnabled,
   authContentProject,
   sanitizeConnection,
+  isInternalLinkPlanningEnabled,
   type WordPressConnectionRow,
 } from '@/lib/content/api-auth'
+import { runProjectIndexRefresh } from '@/lib/content/wordpress-index-refresh'
 import {
   encryptCredential,
   decryptCredential,
@@ -23,6 +26,9 @@ import {
   isCredentialsCryptoConfigured,
 } from '@/lib/security/credentials-crypto'
 import { assertSafeSiteUrl, testConnection, WordPressClientError } from '@/lib/wordpress/client'
+
+// Phase 3H — allow the background auto index scan (after()) to finish.
+export const maxDuration = 300
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) {
@@ -192,6 +198,25 @@ export async function POST(request: Request) {
     hasPassword: !!applicationPassword,
     connectionStatus,
   })
+
+  // Phase 3H — a VERIFIED connection triggers the site-index scan automatically
+  // in the BACKGROUND (after the response is sent), so idea generation has an
+  // index without the user remembering to scan first. Never blocks or fails the
+  // save; the fresh-cache short-circuit + refresh claim inside make it
+  // duplicate-safe, and the index-status card shows running/completed/failed.
+  if (test.ok && isInternalLinkPlanningEnabled()) {
+    const projectId = auth.project.id
+    const userId = auth.user.id
+    const admin = auth.admin
+    after(async () => {
+      try {
+        const res = await runProjectIndexRefresh(admin, { projectId, userId, force: false })
+        console.log('[Content WP] auto index scan after connection save', { projectId, outcome: res.outcome })
+      } catch (e) {
+        console.warn('[Content WP] auto index scan failed', { projectId, message: e instanceof Error ? e.message : String(e) })
+      }
+    })
+  }
 
   return Response.json({
     connection: sanitizeConnection((updated || write.data) as WordPressConnectionRow),

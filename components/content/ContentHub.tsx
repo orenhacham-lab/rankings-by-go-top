@@ -831,6 +831,7 @@ export default function ContentHub() {
                     planSavedHint={linkPlanSavedHint}
                     scrollCtaSignal={ctaScrollSignal}
                     queueSuccessSignal={ideasSuccessSignal}
+                    onGoToQueue={() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   />
                   <div ref={scheduleSectionRef} className="scroll-mt-4">
                     <AutomationSchedule
@@ -898,6 +899,7 @@ export default function ContentHub() {
                     initialSelected={newTopicsSelected}
                     onClose={() => setNewTopics(null)}
                     onEnqueue={ensurePoolAndEnqueue}
+                    onGoToQueue={() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                     onSaved={(summaries) => setPlanStatus((prev) => {
                       const next = { ...prev }
                       for (const s of summaries) next[s.topicId] = s.summary

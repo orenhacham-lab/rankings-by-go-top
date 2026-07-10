@@ -53,7 +53,7 @@ function reasonLabel(r?: string | null): string {
 }
 
 export default function NewTopicsLinkPlanPanel({
-  projectId, language, topics, onClose, onSaved, onEnqueue, initialUnchecked = {}, initialSelected = {},
+  projectId, language, topics, onClose, onSaved, onEnqueue, initialUnchecked = {}, initialSelected = {}, onGoToQueue,
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -69,6 +69,9 @@ export default function NewTopicsLinkPlanPanel({
   // Phase 3G.3 — per topic-id, the CHECKED idea-stage links; the panel seeds/displays
   // them (pre-checked) so they don't vanish when its fresh dry-run recomputes to fewer.
   initialSelected?: Record<string, { url: string; anchor: string }[]>
+  // Phase 3H — "go to queue" navigation from the success banner (scrolls the hub
+  // to the publishing-schedule section). Only the BUTTON navigates — no auto-scroll.
+  onGoToQueue?: () => void
 }) {
   const t = useMemo(() => getDashboardDictionary(language).contentHub.newTopicsPlan, [language])
   const isHebrew = language === 'he'
@@ -266,7 +269,8 @@ export default function NewTopicsLinkPlanPanel({
       // Links were saved regardless. If the enqueue itself failed, KEEP the panel
       // open and show the exact failure — never claim a false success. A dropped
       // link also keeps the panel open so the warning is actually seen.
-      if (queued) { setQueuedOk(true); if (r.droppedCount === 0) window.setTimeout(() => onClose(), 1800) }
+      // Phase 3H — the success banner stays ~8s (dismissible earlier).
+      if (queued) { setQueuedOk(true); if (r.droppedCount === 0) window.setTimeout(() => onClose(), 8000) }
       else { setError(t.enqueueFailed) }
     } catch {
       setError(t.saveError)
@@ -334,11 +338,21 @@ export default function NewTopicsLinkPlanPanel({
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
         {queuedOk ? (
-          /* Save + enqueue success — panel auto-dismisses shortly after (unless links were dropped). */
+          /* Save + enqueue success — stays ~8s (Phase 3H), dismissible, with a
+             "go to queue" button. Only the button navigates — no auto-scroll. */
           <>
-            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
-              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.queuedSuccess}</span>
-              <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
+            <div className="mt-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5">
+              <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t.queuedTitle}</div>
+              <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queuedSuccess}</p>
+              {Object.values(saveStatus).some((s) => s === 'approved' || s === 'saved') && (
+                <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queuedLinksSaved}</p>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {onGoToQueue && (
+                  <Button size="sm" onClick={() => { onGoToQueue(); onClose() }}>{t.goToQueue}</Button>
+                )}
+                <Button size="sm" variant="outline" onClick={onClose}>{t.close}</Button>
+              </div>
             </div>
             {droppedNote}
           </>

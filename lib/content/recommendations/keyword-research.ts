@@ -38,8 +38,10 @@ const SUPPORT_TERMS = [
   'phone', 'shipping', 'delivery', 'warranty', 'coupon', 'branch', 'return', 'refund', 'contact',
 ]
 
-// Phase 3F.3.1e — used-goods / support / review noise. Skipped by default (not a
-// good article-topic pool); relevant commercial/informational terms are kept.
+// Phase 3F.3.1e — used-goods / support / review noise. Phase 3H: RELEVANCE-AWARE
+// — a "noise" term that is part of the site's OWN vocabulary is NOT noise there
+// (e.g. "יד שנייה" is the core business of a second-hand fashion store), so the
+// caller passes the site vocabulary and overlapping terms are kept.
 const NOISE_TERMS = [
   'יד 2', 'יד2', 'יד שנייה', 'יד שניה', 'למסירה', 'מודעות', 'ביקורת', 'ביקורות',
   'קטלוג', 'טלפון', 'כתובת', 'שעות פתיחה', 'ביד2', 'yad2', 'used',
@@ -48,11 +50,53 @@ function isNoise(keyword: string): boolean {
   const lower = keyword.toLowerCase()
   return NOISE_TERMS.some((t) => lower.includes(t))
 }
-/** Skip only very short single-token head terms (e.g. 3-char generics). */
-function isTooGeneric(keyword: string): boolean {
-  const parts = keyword.trim().split(/\s+/)
-  return parts.length === 1 && parts[0]!.length < 4
+
+// ── Phase 3H — generic topic-quality rules (site-agnostic, multilingual) ──────
+// Commercial/navigation vocabulary that is NEVER an article topic on its own:
+// store navigation, promotions, catalogue structure. Token-level match (not
+// substring) so real phrases like "מדריך קנייה" are unaffected.
+const NAV_COMMERCE_TOKENS = new Set([
+  'sale', 'sales', 'shop', 'store', 'outlet', 'category', 'categories', 'collection',
+  'collections', 'products', 'product', 'checkout', 'cart', 'brands', 'menu', 'tags',
+  'מבצע', 'מבצעים', 'הנחה', 'הנחות', 'קולקציה', 'קולקציות', 'קטגוריה', 'קטגוריות',
+  'חנות', 'מוצרים', 'תגית', 'תגיות', 'אאוטלט', 'מותגים', 'תפריט', 'קופה',
+])
+function hasNavCommerceToken(text: string): boolean {
+  return (text || '').toLowerCase().split(/\s+/).some((w) => NAV_COMMERCE_TOKENS.has(w.replace(/[^\p{L}\p{N}]+/gu, '')))
 }
+
+/**
+ * Phase 3H — a RAW keyword is too generic to be an article topic when it is a
+ * single word (any length): "sale", "sport2", "euro2024", "כלבים", "צעצועים"
+ * all fail here generically. Real article keywords are phrases; the long-tail
+ * variants of a broad head term arrive as separate multi-word keywords anyway.
+ */
+function isTooGeneric(keyword: string): boolean {
+  return keyword.trim().split(/\s+/).filter(Boolean).length < 2
+}
+
+/**
+ * Phase 3H — shared final quality check for a suggested topic (any source):
+ * returns the problem, or null when article-worthy. Generic rules only —
+ * single-word titles/keywords and commercial/navigation vocabulary are never
+ * valid article topics, regardless of the site's niche.
+ */
+export function topicQualityIssue(title: string, primaryKeyword: string): 'too_generic' | 'nav_commerce' | null {
+  const t = (title || '').trim()
+  const k = (primaryKeyword || '').trim()
+  if (t.split(/\s+/).filter(Boolean).length < 2 || k.split(/\s+/).filter(Boolean).length < 2) return 'too_generic'
+  if (hasNavCommerceToken(k) || hasNavCommerceToken(t)) return 'nav_commerce'
+  return null
+}
+
+/** Phase 3H — does the keyword share at least one token with the site vocabulary? */
+export function sharesSiteVocab(keyword: string, vocab: Set<string> | null | undefined): boolean {
+  if (!vocab || vocab.size === 0) return true // no vocabulary → cannot judge
+  for (const tk of tokens(keyword)) if (vocab.has(tk)) return true
+  return false
+}
+/** Minimum vocabulary size before the relevance gate is trusted to reject. */
+export const MIN_SITE_VOCAB_TOKENS = 10
 /** Up to n other keywords sharing a significant token (>2 chars) — secondary context. */
 function relatedKeywords(primary: string, pool: KeywordIdeaResult[], n: number): string[] {
   const pk = normalizeText(primary)
@@ -83,6 +127,12 @@ export interface KeywordResearchInput {
   seedKeywords?: string[]
   /** Phase 3F.3.1 — normalized primary keywords already known; those clusters are skipped. */
   avoid?: string[]
+  /** Phase 3H — the site's OWN vocabulary tokens (scan titles/keywords/slugs +
+   *  business context). Google's URL-seeded ideas can include totally unrelated
+   *  associations (e.g. "sport2"/"euro2024" on a fashion site); a keyword that
+   *  shares NO token with the site vocabulary is rejected as unrelated. Gate is
+   *  skipped when the vocabulary is too small to judge (no scan yet). */
+  siteVocab?: Set<string>
 }
 
 interface ClusterInput {
@@ -176,6 +226,7 @@ async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en',
     `Write ALL output in ${langLabel}.`,
     `For EACH cluster below, produce ONE article topic that would naturally rank for those keywords.`,
     `Rules: the title is a natural, clickable article title (NOT a bare keyword); keep the given primaryKeyword EXACTLY as-is; searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600; reason = one short plain-language sentence a non-SEO business owner understands.`,
+    `For product/category-like keywords, expand into a SPECIFIC article intent — buying guide, how to choose, comparison, benefits/risks, sizing/fit, maintenance/care, use-case, or an audience/problem-specific guide — never a bare store/navigation topic.`,
     `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason"}]} — one entry per cluster, same order.`,
     `Clusters:`,
     JSON.stringify(clusters.map((c) => ({ primaryKeyword: c.primaryKeyword, secondaryKeywords: c.secondaryKeywords }))),
@@ -213,6 +264,10 @@ export interface KeywordResearchMeta {
   rawKeywords?: number
   afterBasicFilter?: number
   afterNoiseFilter?: number
+  // Phase 3H — quality/relevance gate diagnostics.
+  filteredGenericCount?: number
+  filteredUnrelatedCount?: number
+  filteredUnrelatedExamples?: string[]
   candidateCount?: number
   batchSent?: number
   unusedRemaining?: number
@@ -271,11 +326,15 @@ export async function recommendFromKeywordResearch(
   const rawKeywords = merged.size
 
   // 2) Basic + noise filtering (brand/support/used-goods/competitor-support).
+  // Phase 3H — noise is RELEVANCE-AWARE: a "noise" term that overlaps the site's
+  // own vocabulary is the site's actual subject matter and is kept.
   const brandTokens = tokens(input.businessName || '')
+  const vocab = input.siteVocab && input.siteVocab.size >= MIN_SITE_VOCAB_TOKENS ? input.siteVocab : null
   const afterBrand = Array.from(merged.values()).filter((r) => !isBrandOrSupport(r.keyword, brandTokens))
   const afterBasicFilter = afterBrand.length
   const cleaned = afterBrand
-    .filter((r) => !isNoise(r.keyword))
+    .filter((r) => !(isNoise(r.keyword) && !(vocab && sharesSiteVocab(r.keyword, vocab))))
+    .filter((r) => !hasNavCommerceToken(r.keyword))
     .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
   const afterNoiseFilter = cleaned.length
 
@@ -288,13 +347,24 @@ export async function recommendFromKeywordResearch(
   const seenPrimary = new Set<string>()
   const skippedKnownExamples: string[] = []
   let skippedKnownCount = 0
+  // Phase 3H — diagnostics for the new quality/relevance gates (never silent).
+  let filteredGenericCount = 0
+  let filteredUnrelatedCount = 0
+  const filteredUnrelatedExamples: string[] = []
   const candidates: { keyword: string; volume: number }[] = []
   for (const r of cleaned) {
     const kw = r.keyword.trim()
     const nk = normalizeText(kw)
     if (!nk || seenPrimary.has(nk)) continue
     seenPrimary.add(nk)
-    if (isTooGeneric(kw)) continue
+    if (isTooGeneric(kw)) { filteredGenericCount++; continue }
+    // Phase 3H — site-relevance gate: reject keywords sharing NO token with the
+    // site's own vocabulary (Google URL ideas can be wildly associative).
+    if (vocab && !sharesSiteVocab(kw, vocab)) {
+      filteredUnrelatedCount++
+      if (filteredUnrelatedExamples.length < 20) filteredUnrelatedExamples.push(kw)
+      continue
+    }
     if (avoidSet.has(nk)) { skippedKnownCount++; if (skippedKnownExamples.length < 20) skippedKnownExamples.push(kw); continue }
     candidates.push({ keyword: kw, volume: r.avgMonthlySearches ?? 0 })
   }
@@ -304,7 +374,7 @@ export async function recommendFromKeywordResearch(
   // (distinct from "thin data" when the pool itself was tiny).
   if (candidateCount === 0) {
     const reason = afterNoiseFilter > 0 ? 'exhausted' : 'thin_data'
-    return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter, candidateCount: 0, batchSent: 0, unusedRemaining: 0, skippedKnownCount, skippedKnownExamples, keywordResearchFailed: !!failureReason, failureReason, reason } }
+    return { suggestions: [], meta: { generated: 0, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter, filteredGenericCount, filteredUnrelatedCount, filteredUnrelatedExamples, candidateCount: 0, batchSent: 0, unusedRemaining: 0, skippedKnownCount, skippedKnownExamples, keywordResearchFailed: !!failureReason, failureReason, reason } }
   }
 
   // 4) Take the next batch (highest-volume unused first). Attach light related
@@ -324,7 +394,9 @@ export async function recommendFromKeywordResearch(
 
   const suggestions: TopicSuggestion[] = clusterInputs.map((c) => {
     const g = byPrimary.get(normalizeText(c.primaryKeyword))
-    const title = g?.title?.trim() || c.primaryKeyword
+    // Phase 3H — never show the RAW keyword as a title: when the model gave no
+    // title, fall back to a guide-style article title.
+    const title = g?.title?.trim() || (language === 'he' ? `${c.primaryKeyword}: המדריך המלא` : `The complete guide to ${c.primaryKeyword}`)
     const intent = g?.searchIntent?.trim() || 'informational'
     const wc = typeof g?.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000
     const reasonBase = language === 'he'
@@ -349,6 +421,7 @@ export async function recommendFromKeywordResearch(
     suggestions,
     meta: {
       generated: suggestions.length, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter,
+      filteredGenericCount, filteredUnrelatedCount, filteredUnrelatedExamples,
       candidateCount, batchSent: batch.length, unusedRemaining: candidateCount - batch.length,
       skippedKnownCount, skippedKnownExamples, clusters: candidateCount,
       keywordResearchFailed: !!failureReason, failureReason,

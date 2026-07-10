@@ -17,6 +17,7 @@ import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { clusterByTokens, slugKey } from './dedupe'
+import { topicQualityIssue } from './keyword-research'
 import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -100,9 +101,13 @@ function buildDigest(targets: ScannedTarget[]) {
     anchors: topAnchors(t, 3),
   }))
 
+  // Phase 3H — products and product categories are FIRST-CLASS idea sources for
+  // ecommerce/service sites: categories first, then products, then tags.
+  const typeOrder: Record<string, number> = { category: 0, product: 1, tag: 2 }
   const categories = eligible
-    .filter((t) => t.targetType === 'category' || t.targetType === 'tag')
-    .slice(0, 20)
+    .filter((t) => t.targetType === 'category' || t.targetType === 'product' || t.targetType === 'tag')
+    .sort((a, b) => (typeOrder[a.targetType] ?? 9) - (typeOrder[b.targetType] ?? 9) || (b.inboundLinkCount ?? 0) - (a.inboundLinkCount ?? 0))
+    .slice(0, 24)
     .map((t) => ({ title: (t.targetTitle || slugOf(t.targetUrl)).slice(0, 100), type: t.targetType, inbound: t.inboundLinkCount ?? 0, url: t.targetUrl }))
 
   // Orphan / weakly-linked pages that could be supported by new content.
@@ -127,7 +132,7 @@ function digestToPromptBlock(d: ReturnType<typeof buildDigest>): string {
   lines.push('IMPORTANT PAGES (high internal-link importance) [title | type | inbound | keyword]:')
   for (const p of d.importantPages) lines.push(`- ${p.title} | ${p.type} | ${p.inbound} | ${p.keyword}`)
   if (d.categories.length) {
-    lines.push('CATEGORIES/TAGS [title | type]:')
+    lines.push('CATEGORIES/PRODUCTS/TAGS [title | type]:')
     for (const c of d.categories) lines.push(`- ${c.title} | ${c.type}`)
   }
   if (d.orphans.length) {
@@ -165,6 +170,7 @@ function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string
     `- cover entities that recur in titles/anchors/categories but have no dedicated article,`,
     `- are natural follow-ups to existing pages.`,
     `Each topic MUST be a concrete article that does NOT duplicate an existing page above. Give each a SPECIFIC long-tail primaryKeyword (never a bare category name).`,
+    `For products / product categories / service pages, EXPAND the raw entity into a specific article intent: buying guide, how to choose, comparison, benefits/risks, sizing/fit, maintenance/care, use-case, or an audience/problem-specific guide (e.g. entity "מיטות לכלבים" → "מיטות לכלבים: איך לבחור מיטה מתאימה לפי גודל והרגלי שינה"). NEVER output a raw one-word topic or a store/navigation topic (sale / קטגוריה / מבצעים / קולקציה).`,
     urlList.length ? `When a new article should link to an existing page, set suggestedLinkUrl to EXACTLY one of these URLs (or omit it):\n${urlList.map((u) => `- ${u.url}`).join('\n')}` : '',
     `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason","sourceContext","suggestedLinkUrl"}]}.`,
     `searchIntent ∈ informational|commercial|comparison|transactional|local|other. recommendedWordCount 800-1600. reason = one short plain-language sentence explaining the gap it fills. sourceContext = the existing page/category/cluster it supports.`,
@@ -241,6 +247,11 @@ function deterministicFallback(digest: ReturnType<typeof buildDigest>, language:
     const name = (s.name || '').trim()
     const keyword = (s.keyword || name).trim()
     if (!name || !keyword) continue
+    // Phase 3H — a deterministic template can't expand a bare one-word entity or
+    // a store/navigation name into a real article ("המדריך המלא: SALE" is junk);
+    // only multi-word, non-navigation seeds are used. The model path handles the
+    // broad entities; here quality beats coverage.
+    if (topicQualityIssue(name, name) !== null) continue
     for (const makeTitle of [guide, tips]) {
       const title = makeTitle(name)
       const key = title.toLowerCase()

@@ -48,6 +48,7 @@ export default function AutomationIdeas({
   planSavedHint = false,
   scrollCtaSignal = 0,
   queueSuccessSignal = null,
+  onGoToQueue,
 }: {
   projectId: string
   language: 'he' | 'en'
@@ -72,6 +73,9 @@ export default function AutomationIdeas({
   // Phase 3F.3.7i — bumped by the hub when an enqueue succeeds from the drawer/
   // review panel, so this section shows + scrolls its success box into view.
   queueSuccessSignal?: { n: number; count: number } | null
+  // Phase 3H — "go to queue" button in the success box (scrolls the hub to the
+  // publishing-schedule section). Only the button navigates — no auto-scroll.
+  onGoToQueue?: () => void
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
@@ -149,12 +153,13 @@ export default function AutomationIdeas({
   }, [queueSuccessSignal])
 
   // Phase 3F.3.7h/i — when the enqueue success box appears, scroll IT into view
-  // (so the viewport lands on the Automatic Ideas section, not the schedule), keep
-  // it visible ~3s, then auto-hide. Still dismissible earlier via the ✕.
+  // (so the viewport lands on the Automatic Ideas section, not the schedule).
+  // Phase 3H — keep it visible ~8s (still dismissible earlier via the ✕), with a
+  // "go to queue" button as the only way to navigate to the schedule.
   useEffect(() => {
     if (!queueSuccess) return
     window.setTimeout(() => successRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
-    const id = window.setTimeout(() => setQueueSuccess(null), 3000)
+    const id = window.setTimeout(() => setQueueSuccess(null), 8000)
     return () => window.clearTimeout(id)
   }, [queueSuccess])
 
@@ -501,6 +506,11 @@ export default function AutomationIdeas({
               <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{queueSuccess.count > 1 ? t.queueSuccessTitleMany : t.queueSuccessTitleOne}</div>
               <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{queueSuccess.count > 1 ? t.queueSuccessBodyMany : t.queueSuccessBodyOne}</p>
               {queueSuccess.links && <p className="mt-1 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queueSuccessLinksNote}</p>}
+              {onGoToQueue && (
+                <div className="mt-2">
+                  <Button size="sm" onClick={() => { setQueueSuccess(null); onGoToQueue() }}>{t.goToQueue}</Button>
+                </div>
+              )}
             </div>
             <button type="button" onClick={() => setQueueSuccess(null)} className="text-emerald-700/70 dark:text-emerald-300/70 hover:text-emerald-900 dark:hover:text-emerald-100 text-xs" aria-label={t.dismiss}>✕</button>
           </div>
