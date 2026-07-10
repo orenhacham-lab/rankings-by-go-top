@@ -608,10 +608,12 @@ export default function AutomationIdeas({
                                 : t.tryOther}
         </p>
       )}
-      {/* Phase 3I.3 — the exact funnel: where this run's candidates went. Shown
-          whenever a run produced candidates but few/none survived, so a 0-result
-          is explainable with numbers instead of guesswork. */}
-      {meta?.funnel && meta.funnel.generated > 0 && meta.newlyAdded === 0 && !loading && (
+      {/* Phase 3I.3/3I.4 — the exact funnel: where this run's candidates went.
+          Shown for EVERY run that added nothing — INCLUDING generated=0 ("0
+          נוצרו" is itself the answer: the blocker is the generator stage, not
+          the filters). The old `generated > 0` gate hid the line in exactly
+          that case. */}
+      {meta?.funnel && meta.newlyAdded === 0 && !loading && (
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
           {t.funnelLine
             .replace('{g}', String(meta.funnel.generated))
