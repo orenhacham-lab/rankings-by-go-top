@@ -165,10 +165,15 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
       addKeyword(tg.primaryKeywordCandidate, { content: true, sourceSet: sources.scan, bump: () => counts.existingScanKeywordCount++ })
       if (sources.scan.size > before && scanSamples.length < 10) scanSamples.push(tg.primaryKeywordCandidate.trim())
     }
-    // Phase 3G.7 — existing site ARTICLES/PAGES already cover their title's
-    // main phrase, keyword or not. Posts/pages only: a category or product
-    // page existing must NOT block writing a supporting article about it.
-    if (tg.targetType === 'post' || tg.targetType === 'page') {
+    // Phase 3G.7 / 3H.3 — only existing site ARTICLES ('post') cover their
+    // title's main phrase. 'page' targets are deliberately EXCLUDED: on
+    // ecommerce/service sites, WP pages are commonly entity/landing pages
+    // (category-style pages, custom-permalink products, service pages) — those
+    // entities must SEED article ideas, never block them as "already covered".
+    // Site-scan ideas are BY CONSTRUCTION derived from the site's own entities,
+    // so page-title phrases were self-blocking the entire site-scan source.
+    // Real informational coverage = posts + own topics/generated articles.
+    if (tg.targetType === 'post') {
       addContentPhraseFromTitle(tg.targetTitle)
       const slugPhrase = slugFromUrl(tg.targetUrl)
       if (/[֐-׿]/.test(slugPhrase)) {

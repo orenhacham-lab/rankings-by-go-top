@@ -169,7 +169,7 @@ function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string
     `- give orphan/weakly-linked pages a logical supporting article,`,
     `- cover entities that recur in titles/anchors/categories but have no dedicated article,`,
     `- are natural follow-ups to existing pages.`,
-    `Each topic MUST be a concrete article that does NOT duplicate an existing page above. Give each a SPECIFIC long-tail primaryKeyword (never a bare category name).`,
+    `Each topic MUST be a concrete article that does NOT duplicate an existing page above. Give each a SPECIFIC long-tail primaryKeyword that includes the article's INTENT words (how to choose / benefits / comparison / care / audience) — NEVER just the bare entity/category/product name on its own (e.g. for the entity "קרני אייל לכלבים" use "איך לבחור קרן אייל לכלב", not "קרני אייל לכלבים").`,
     `For products / product categories / service pages, EXPAND the raw entity into a specific article intent: buying guide, how to choose, comparison, benefits/risks, sizing/fit, maintenance/care, use-case, or an audience/problem-specific guide (e.g. entity "מיטות לכלבים" → "מיטות לכלבים: איך לבחור מיטה מתאימה לפי גודל והרגלי שינה"). NEVER output a raw one-word topic or a store/navigation topic (sale / קטגוריה / מבצעים / קולקציה).`,
     urlList.length ? `When a new article should link to an existing page, set suggestedLinkUrl to EXACTLY one of these URLs (or omit it):\n${urlList.map((u) => `- ${u.url}`).join('\n')}` : '',
     `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason","sourceContext","suggestedLinkUrl"}]}.`,
@@ -245,7 +245,12 @@ function deterministicFallback(digest: ReturnType<typeof buildDigest>, language:
   const seenTitles = new Set<string>()
   for (const s of seeds) {
     const name = (s.name || '').trim()
-    const keyword = (s.keyword || name).trim()
+    // Phase 3H.3 — the fallback keyword carries INTENT, never the bare entity
+    // name: a bare-entity keyword exactly matches existing entity-prefixed topic
+    // titles and gets (correctly) blocked as covered — which zeroed the whole
+    // fallback. "X מדריך"/"X guide" is a real search phrase and a distinct
+    // sub-intent under the coverage rules.
+    const keyword = (s.keyword || name).trim() === name ? (he ? `${name} מדריך` : `${name} guide`) : (s.keyword || name).trim()
     if (!name || !keyword) continue
     // Phase 3H — a deterministic template can't expand a bare one-word entity or
     // a store/navigation name into a real article ("המדריך המלא: SALE" is junk);
