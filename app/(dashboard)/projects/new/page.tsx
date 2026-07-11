@@ -8,11 +8,17 @@ import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import ProjectForm from '@/components/projects/ProjectForm'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function NewProjectPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultClientId = searchParams.get('client_id') || ''
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const t = dict.projects
+  const common = dict.common
 
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,11 +53,11 @@ export default function NewProjectPage() {
   return (
     <div>
       <Header
-        title="פרויקט חדש"
-        subtitle="יצירת פרויקט חדש ללקוח"
+        title={t.newProjectTitle}
+        subtitle={t.newProjectSubtitle}
         actions={
           <Button variant="outline" onClick={() => router.back()}>
-            ← חזרה
+            {common.back}
           </Button>
         }
       />
@@ -59,7 +65,7 @@ export default function NewProjectPage() {
       {loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען לקוחות...
+          {common.loading}
         </div>
       ) : (
         <Card>

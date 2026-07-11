@@ -9,13 +9,19 @@ import Modal from '@/components/ui/Modal'
 import ClientForm from './ClientForm'
 import { formatDate } from '@/lib/utils'
 import { toggleClientActiveAction } from '@/app/actions/clients'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
 
 interface ClientsTableProps {
   clients: Client[]
+  onClientsChange?: () => Promise<void>
 }
 
-export default function ClientsTable({ clients }: ClientsTableProps) {
+export default function ClientsTable({ clients, onClientsChange }: ClientsTableProps) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -31,6 +37,9 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
     setTogglingId(client.id)
     try {
       await toggleClientActiveAction(client.id, client.is_active)
+      if (onClientsChange) {
+        await onClientsChange()
+      }
     } finally {
       setTogglingId(null)
     }
@@ -42,28 +51,28 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="חיפוש לפי שם, איש קשר, אימייל..."
+          placeholder={dict.clients.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
       </div>
 
       <Table>
         <TableHead>
           <tr>
-            <Th>שם לקוח</Th>
-            <Th>איש קשר</Th>
-            <Th>אימייל</Th>
-            <Th>טלפון</Th>
-            <Th>סטטוס</Th>
-            <Th>תאריך הוספה</Th>
-            <Th>פעולות</Th>
+            <Th>{dict.clients.table.clientName}</Th>
+            <Th>{dict.clients.table.contactName}</Th>
+            <Th>{dict.clients.table.email}</Th>
+            <Th>{dict.clients.table.phone}</Th>
+            <Th>{dict.clients.table.status}</Th>
+            <Th>{dict.clients.table.createdAt}</Th>
+            <Th>{dict.clients.table.actions}</Th>
           </tr>
         </TableHead>
         <TableBody>
           {filtered.length === 0 && (
-            <EmptyRow colSpan={7} message="לא נמצאו לקוחות" />
+            <EmptyRow colSpan={7} message={dict.clients.table.emptyState} />
           )}
           {filtered.map((client) => (
             <TableRow key={client.id}>
@@ -89,7 +98,7 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
                     variant="ghost"
                     onClick={() => setEditingClient(client)}
                   >
-                    עריכה
+                    {dict.clients.actions.edit}
                   </Button>
                   <Button
                     size="sm"
@@ -97,7 +106,7 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
                     loading={togglingId === client.id}
                     onClick={() => handleToggleActive(client)}
                   >
-                    {client.is_active ? 'השבת' : 'הפעל'}
+                    {client.is_active ? dict.clients.actions.deactivate : dict.clients.actions.activate}
                   </Button>
                 </div>
               </Td>
@@ -110,7 +119,7 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
         <Modal
           open={!!editingClient}
           onClose={() => setEditingClient(null)}
-          title="עריכת לקוח"
+          title={dict.clients.modal.editTitle}
           size="md"
         >
           <ClientForm

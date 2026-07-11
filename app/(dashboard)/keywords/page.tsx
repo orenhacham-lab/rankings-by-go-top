@@ -7,10 +7,16 @@ import Header from '@/components/layout/Header'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import { formatDateTime } from '@/lib/utils'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 
 export default function KeywordsPage() {
+  const { language } = useDashboardLanguage()
+  const dict = getDashboardDictionary(language)
+  const k = dict.keywordsPage
+
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [targets, setTargets] = useState<(TrackingTarget & { projects?: { name: string; id: string; clients?: { name: string } } })[]>([])
@@ -19,6 +25,7 @@ export default function KeywordsPage() {
   const [search, setSearch] = useState('')
   const [engineFilter, setEngineFilter] = useState('')
   const [positionSort, setPositionSort] = useState<'none' | 'asc' | 'desc'>('none')
+  const [volumeSort, setVolumeSort] = useState<'none' | 'asc' | 'desc'>('none')
 
   useEffect(() => {
     async function loadProjects() {
@@ -93,18 +100,27 @@ export default function KeywordsPage() {
   })
 
   const sorted = [...filtered].sort((a, b) => {
-    if (positionSort === 'none') return 0
+    if (volumeSort !== 'none') {
+      const aVol = a.avg_monthly_searches ?? -1
+      const bVol = b.avg_monthly_searches ?? -1
+      if (aVol !== bVol) {
+        return volumeSort === 'asc' ? aVol - bVol : bVol - aVol
+      }
+    }
 
-    const aResult = latestResults[a.id]
-    const bResult = latestResults[b.id]
+    if (positionSort !== 'none') {
+      const aResult = latestResults[a.id]
+      const bResult = latestResults[b.id]
+      const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
+      const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
+      return positionSort === 'asc' ? aPos - bPos : bPos - aPos
+    }
 
-    const aPos = aResult?.found && aResult.position !== null ? aResult.position : Number.POSITIVE_INFINITY
-    const bPos = bResult?.found && bResult.position !== null ? bResult.position : Number.POSITIVE_INFINITY
-
-    return positionSort === 'asc' ? aPos - bPos : bPos - aPos
+    return 0
   })
 
   function togglePositionSort() {
+    setVolumeSort('none')
     setPositionSort((prev) => {
       if (prev === 'none') return 'asc'
       if (prev === 'asc') return 'desc'
@@ -112,20 +128,38 @@ export default function KeywordsPage() {
     })
   }
 
+  function toggleVolumeSort() {
+    setPositionSort('none')
+    setVolumeSort((prev) => {
+      if (prev === 'none') return 'desc'
+      if (prev === 'desc') return 'asc'
+      return 'none'
+    })
+  }
+
+  const selectedProject = projects.find((p) => p.id === selectedProjectId)
+
   return (
     <div>
       <Header
-        title="מילות מפתח"
-        subtitle={selectedProjectId ? `סה"כ ${targets.length} מילות מפתח` : 'בחר פרויקט לצפייה במילות המפתח'}
+        title={k.title}
+        subtitle={selectedProjectId ? `${k.countPrefix} ${targets.length} ${k.countSuffix}` : k.selectProjectHint}
+        actions={
+          selectedProjectId ? (
+            <Link href={`/projects/${selectedProjectId}?section=rankings`}>
+              <Button size="sm">{k.openProjectButton}</Button>
+            </Link>
+          ) : null
+        }
       />
 
       <div className="flex gap-3 mb-4">
         <select
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
-          <option value="">בחר פרויקט (חובה)</option>
+          <option value="">{k.selectProjectPlaceholder}</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>{project.name}</option>
           ))}
@@ -133,61 +167,73 @@ export default function KeywordsPage() {
 
         <input
           type="text"
-          placeholder="חיפוש מילת מפתח, פרויקט..."
+          placeholder={k.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 max-w-sm px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         />
         <select
           value={engineFilter}
           onChange={(e) => setEngineFilter(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
-          <option value="">כל המנועים</option>
-          <option value="google_search">גוגל חיפוש</option>
-          <option value="google_maps">גוגל מפות</option>
+          <option value="">{k.allEngines}</option>
+          <option value="google_search">{k.engineGoogleSearch}</option>
+          <option value="google_maps">{k.engineGoogleMaps}</option>
         </select>
       </div>
 
       {!selectedProjectId ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500">
-          יש לבחור פרויקט כדי להציג מילות מפתח.
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400">
+          {k.selectProjectMessage}
         </div>
       ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען...
+          {dict.common.loading}
         </div>
       ) : (
         <Table>
           <TableHead>
             <tr>
-              <Th>מילת מפתח</Th>
-              <Th>פרויקט</Th>
-              <Th>לקוח</Th>
-              <Th>מנוע</Th>
+              <Th>{k.table.keyword}</Th>
+              <Th>{k.table.project}</Th>
+              <Th>
+                <button
+                  type="button"
+                  onClick={toggleVolumeSort}
+                  className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
+                  title={k.sortByVolumeTooltip}
+                >
+                  {k.table.searchVolume}
+                  <span className="text-xs">
+                    {volumeSort === 'asc' ? '▲' : volumeSort === 'desc' ? '▼' : '↕'}
+                  </span>
+                </button>
+              </Th>
+              <Th>{k.table.engine}</Th>
               <Th>
                 <button
                   type="button"
                   onClick={togglePositionSort}
                   className="inline-flex items-center gap-1 hover:text-blue-700 transition-colors"
-                  title="מיין לפי מיקום"
+                  title={k.sortByPositionTooltip}
                 >
-                  מיקום
+                  {k.table.position}
                   <span className="text-xs">
                     {positionSort === 'asc' ? '▲' : positionSort === 'desc' ? '▼' : '↕'}
                   </span>
                 </button>
               </Th>
-              <Th>שינוי</Th>
-              <Th>בדיקה אחרונה</Th>
-              <Th>סטטוס</Th>
-              <Th>פעולות</Th>
+              <Th>{k.table.change}</Th>
+              <Th>{k.table.lastChecked}</Th>
+              <Th>{k.table.status}</Th>
+              <Th>{k.table.actions}</Th>
             </tr>
           </TableHead>
           <TableBody>
             {sorted.length === 0 && (
-              <EmptyRow colSpan={9} message="לא נמצאו מילות מפתח" />
+              <EmptyRow colSpan={9} message={k.table.emptyState} />
             )}
             {sorted.map((target) => {
               const result = latestResults[target.id]
@@ -198,14 +244,17 @@ export default function KeywordsPage() {
                   </Td>
                   <Td>
                     {target.projects ? (
-                      <Link href={`/projects/${target.projects.id}`} className="text-blue-600 hover:underline text-sm">
+                      <Link
+                        href={`/projects/${target.projects.id}?section=rankings`}
+                        className="text-blue-600 hover:underline text-sm"
+                      >
                         {target.projects.name}
                       </Link>
                     ) : '—'}
                   </Td>
                   <Td>
-                    <span className="text-slate-500 text-sm">
-                      {(target.projects as { clients?: { name: string } })?.clients?.name || '—'}
+                    <span className="text-slate-700 dark:text-slate-200 text-sm tabular-nums">
+                      {target.avg_monthly_searches ? target.avg_monthly_searches.toLocaleString() : '—'}
                     </span>
                   </Td>
                   <Td>
@@ -216,11 +265,11 @@ export default function KeywordsPage() {
                   </Td>
                   <Td>
                     {result?.error_message ? (
-                      <span className="text-amber-600 text-sm" title={result.error_message}>שגיאת סריקה</span>
+                      <span className="text-amber-600 text-sm" title={result.error_message}>{k.table.scanError}</span>
                     ) : result?.found ? (
                       <span className="font-bold">#{result.position}</span>
                     ) : result ? (
-                      <span className="text-slate-400 text-sm">לא נמצא</span>
+                      <span className="text-slate-400 text-sm">{k.table.notFound}</span>
                     ) : '—'}
                   </Td>
                   <Td>
@@ -235,9 +284,16 @@ export default function KeywordsPage() {
                     <ActiveBadge active={target.is_active} />
                   </Td>
                   <Td>
-                    <Link href={`/keywords/${target.id}/history`}>
-                      <Button size="sm" variant="ghost">היסטוריה</Button>
-                    </Link>
+                    <div className="flex gap-1">
+                      <Link href={`/keywords/${target.id}/history`}>
+                        <Button size="sm" variant="ghost">{k.actions.history}</Button>
+                      </Link>
+                      {target.projects && (
+                        <Link href={`/projects/${target.projects.id}?section=rankings`}>
+                          <Button size="sm" variant="outline">{k.actions.open}</Button>
+                        </Link>
+                      )}
+                    </div>
                   </Td>
                 </TableRow>
               )

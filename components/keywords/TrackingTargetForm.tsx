@@ -11,6 +11,8 @@ import {
   updateTrackingTargetAction,
   createBulkTrackingTargetsAction,
 } from '@/app/actions/tracking-targets'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 interface TrackingTargetFormProps {
   target?: TrackingTarget
@@ -33,6 +35,11 @@ export default function TrackingTargetForm({
   onSuccess,
   onCancel,
 }: TrackingTargetFormProps) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+  const t = dict.trackingTargetForm
+  const isEnglish = language === 'en'
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
@@ -42,10 +49,8 @@ export default function TrackingTargetForm({
   )
   const [customCity, setCustomCity] = useState(target?.custom_city || '')
   const [postalCode, setPostalCode] = useState(target?.postal_code || '')
-  const [radiusMiles, setRadiusMiles] = useState<string>(
-    target?.radius_miles ? String(target.radius_miles) : '5'
-  )
   const [radiusCenterZip, setRadiusCenterZip] = useState(target?.radius_center_zip || '')
+  const [radiusMiles, setRadiusMiles] = useState<number>(target?.radius_miles || 5)
   const [bulkMode, setBulkMode] = useState(false)
   const [validationError, setValidationError] = useState('')
 
@@ -85,14 +90,14 @@ export default function TrackingTargetForm({
     if (projectCountry?.toUpperCase() === 'US') {
       // Project city must be in "City, ST" format (not required for exact_point)
       if (locationMode !== 'exact_point' && (!projectCity || !validateUSCityFormat(projectCity))) {
-        setError(`פרויקט ארה"ב חייב להגדיר עיר בפורמט: "עיר, קוד מדינה" (לדוגמה: "New York, NY")`)
+        setError(t.errorUsCity)
         return
       }
 
       // Custom city must be in "City, ST" format if specified
       if (locationMode === 'custom' && customCity.trim()) {
         if (!validateUSCityFormat(customCity)) {
-          setValidationError(`עיר מותאמת חייבת להיות בפורמט: "עיר, קוד מדינה" (לדוגמה: "Los Angeles, CA")`)
+          setValidationError(t.errorUsCustomCity)
           return
         }
       }
@@ -118,12 +123,12 @@ export default function TrackingTargetForm({
         const lng = parseFloat(exactLng)
         if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
             lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-          setValidationError('קואורדינטות לא תקינות: lat (-90..90), lng (-180..180)')
+          setValidationError(t.errorInvalidCoords)
           return
         }
       } else {
         if (!exactAddress.trim()) {
-          setValidationError('דרוש להזין כתובת מלאה עבור מצב "נקודה מדויקת"')
+          setValidationError(t.errorAddressRequired)
           return
         }
       }
@@ -138,15 +143,14 @@ export default function TrackingTargetForm({
         onSuccess()
       } else if (bulkMode) {
         const result = await createBulkTrackingTargetsAction(formData)
-        const msg = `נוספו ${result.created} מילות מפתח${result.skipped > 0 ? ` (${result.skipped} כבר קיימות)` : ''}`
-        setSuccessMsg(msg)
+        setSuccessMsg(t.bulkSuccess(result.created, result.skipped))
         setTimeout(() => onSuccess(), 1200)
       } else {
         await createTrackingTargetAction(formData)
         onSuccess()
       }
     } catch (err) {
-      setError((err as Error).message || 'שגיאה בשמירה')
+      setError((err as Error).message || t.errorSave)
     } finally {
       setLoading(false)
     }
@@ -169,17 +173,17 @@ export default function TrackingTargetForm({
 
       {/* Bulk mode toggle — only when creating */}
       {!target && (
-        <div className="flex gap-2 border-b border-slate-100 pb-3">
+        <div className="flex gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
           <button
             type="button"
             onClick={() => setBulkMode(false)}
             className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
               !bulkMode
                 ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
-            מילה בודדת
+            {t.modeSingle}
           </button>
           <button
             type="button"
@@ -187,82 +191,82 @@ export default function TrackingTargetForm({
             className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
               bulkMode
                 ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
-            הוספה מרובה
+            {t.modeBulk}
           </button>
         </div>
       )}
 
       {bulkMode ? (
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            מילות מפתח (שורה אחת לכל מילה) *
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            {t.bulkKeywordsLabel}
           </label>
           <textarea
             name="keywords"
             required
             rows={6}
-            dir="rtl"
-            placeholder={'קידום אתרים בפתח תקווה\nקידום אתרים בתל אביב\nקידום אתרים לעסקים קטנים'}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-['Rubik']"
+            dir={isEnglish ? 'ltr' : 'rtl'}
+            placeholder={t.bulkPlaceholder}
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-['Rubik']"
           />
-          <p className="text-xs text-slate-400 mt-1">
-            הדבק מילות מפתח — שורה אחת לכל מילה. שורות ריקות ישוחו. כפולות תידלגנה.
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+            {t.bulkHint}
           </p>
         </div>
       ) : (
         <Input
-          label="מילת מפתח *"
+          label={t.keywordLabel}
           name="keyword"
           defaultValue={target?.keyword}
           required
-          placeholder="קידום אתרים תל אביב"
+          placeholder={t.keywordPlaceholder}
         />
       )}
 
       <Select
-        label="מנוע חיפוש *"
+        label={t.engineLabel}
         name="engine_type"
         value={engine}
         onChange={(e) => setEngine(e.target.value as 'google_search' | 'google_maps')}
         options={[
-          { value: 'google_search', label: 'גוגל חיפוש אורגני' },
-          { value: 'google_maps', label: 'גוגל מפות' },
+          { value: 'google_search', label: t.engineGoogleSearch },
+          { value: 'google_maps', label: t.engineGoogleMaps },
         ]}
       />
 
       {engine === 'google_search' && (
         <Input
-          label="דומיין יעד"
+          label={t.targetDomainLabel}
           name="target_domain"
           defaultValue={target?.target_domain || defaultDomain || ''}
-          placeholder="example.co.il"
-          hint="הדומיין שמחפשים בתוצאות החיפוש"
+          placeholder={t.targetDomainPlaceholder}
+          hint={t.targetDomainHint}
         />
       )}
 
       {engine === 'google_maps' && (
         <Input
-          label="שם עסק ביעד"
+          label={t.targetBusinessNameLabel}
           name="target_business_name"
           defaultValue={target?.target_business_name || defaultBusinessName || ''}
-          placeholder="שם העסק כפי שמופיע בגוגל מפות"
+          placeholder={t.targetBusinessNamePlaceholder}
         />
       )}
 
       <Input
-        label="דף נחיתה מועדף (אופציונלי)"
+        label={t.preferredLandingPageLabel}
         name="preferred_landing_page"
         defaultValue={target?.preferred_landing_page || ''}
-        placeholder="/שירותים/קידום-אתרים"
+        placeholder={t.preferredLandingPagePlaceholder}
       />
 
       {/* Location Mode */}
       <div>
         <Select
-          label="מצב מיקום"
+          label={t.locationModeLabel}
           name="location_mode"
           value={locationMode}
           onChange={(e) => {
@@ -274,20 +278,20 @@ export default function TrackingTargetForm({
             setLocationMode(mode)
           }}
           options={[
-            { value: 'project', label: `עיר הפרויקט${projectCity ? ` (${projectCity})` : ''}` },
-            { value: 'custom', label: 'עיר מותאמת אישית' },
+            { value: 'project', label: `${t.locationModeProject}${projectCity ? ` (${projectCity})` : ''}` },
+            { value: 'custom', label: t.locationModeCustom },
             ...(projectCountry?.toUpperCase() === 'US'
               ? [
-                  { value: 'zip', label: 'ZIP Code (US Only)' },
-                  { value: 'radius', label: 'Radius Scan (US Only)' },
-                  { value: 'exact_point', label: 'נקודה מדויקת — כתובת / lat,lng (מדויק ביותר)' },
+                  { value: 'zip', label: t.locationModeZip },
+                  { value: 'radius', label: t.locationModeRadius },
+                  { value: 'exact_point', label: t.locationModeExactPoint },
                 ]
               : []),
           ]}
         />
         {projectCountry?.toUpperCase() !== 'US' && (
           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
-            ZIP Code וגם נקודה מדויקת זמינים לפרויקטי ארה"ב בלבד
+            {t.locationUsOnlyNote}
           </div>
         )}
       </div>
@@ -295,15 +299,15 @@ export default function TrackingTargetForm({
       {locationMode === 'custom' && (
         <div>
           <Input
-            label="עיר מותאמת *"
+            label={t.customCityLabel}
             name="custom_city"
             value={customCity}
             onChange={(e) => {
               setCustomCity(e.target.value)
               setValidationError('')
             }}
-            placeholder={projectCountry?.toUpperCase() === 'US' ? 'Los Angeles, CA' : 'תל אביב'}
-            hint={projectCountry?.toUpperCase() === 'US' ? 'פורמט: "עיר, קוד מדינה" (לדוגמה: "New York, NY")' : ''}
+            placeholder={projectCountry?.toUpperCase() === 'US' ? 'Los Angeles, CA' : t.customCityPlaceholderIL}
+            hint={projectCountry?.toUpperCase() === 'US' ? t.customCityHintUS : ''}
             required
           />
           {validationError && (
@@ -313,7 +317,7 @@ export default function TrackingTargetForm({
           )}
           {customCityDiffers && (
             <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
-              הביטוי משתמש בעיר שונה מהעיר המוגדרת בפרויקט
+              {t.customCityDiffers}
             </div>
           )}
         </div>
@@ -321,7 +325,7 @@ export default function TrackingTargetForm({
 
       {locationMode === 'zip' && (
         <Input
-          label="ZIP code *"
+          label={t.zipLabel}
           name="postal_code"
           value={postalCode}
           onChange={(e) => {
@@ -332,46 +336,44 @@ export default function TrackingTargetForm({
           placeholder="12345"
           maxLength={5}
           pattern="\d{5}"
-          hint="5-digit US ZIP code"
+          hint={t.zipHint}
         />
       )}
 
       {locationMode === 'radius' && (
         <div className="space-y-3">
           <Input
-            label="Center ZIP Code *"
+            label={t.radiusCenterZipLabel}
             name="radius_center_zip"
             value={radiusCenterZip}
             onChange={(e) => {
               const val = e.target.value.replace(/\D/g, '').slice(0, 5)
               setRadiusCenterZip(val)
-              setValidationError('')
             }}
             required
             placeholder="12345"
             maxLength={5}
             pattern="\d{5}"
-            hint="5-digit US ZIP code for scan center"
+            hint={t.radiusCenterZipHint}
           />
           <Select
-            label="Radius *"
+            label={t.radiusDistanceLabel}
             name="radius_miles"
-            value={radiusMiles}
-            onChange={(e) => setRadiusMiles(e.target.value)}
+            value={String(radiusMiles)}
+            onChange={(e) => setRadiusMiles(Number(e.target.value))}
             options={[
               { value: '3', label: '3 miles' },
-              { value: '5', label: '5 miles' },
+              { value: '5', label: '5 miles (default)' },
               { value: '10', label: '10 miles' },
             ]}
-            required
           />
         </div>
       )}
 
       {locationMode === 'exact_point' && (
-        <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-          <div className="text-sm text-slate-700 font-medium">
-            נקודה מדויקת (source of truth לסריקה)
+        <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+          <div className="text-sm text-slate-700 dark:text-slate-200 font-medium">
+            {t.exactPointTitle}
           </div>
           <div className="flex gap-2">
             <button
@@ -383,10 +385,10 @@ export default function TrackingTargetForm({
               className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
                 exactSubMode === 'address'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
-              כתובת מלאה
+              {t.exactSubModeAddress}
             </button>
             <button
               type="button"
@@ -397,24 +399,24 @@ export default function TrackingTargetForm({
               className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
                 exactSubMode === 'coords'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
-              קואורדינטות (lat, lng)
+              {t.exactSubModeCoords}
             </button>
           </div>
 
           {exactSubMode === 'address' ? (
             <Input
-              label="כתובת מלאה *"
+              label={t.exactAddressLabel}
               name="exact_address_input"
               value={exactAddress}
               onChange={(e) => {
                 setExactAddress(e.target.value)
                 setValidationError('')
               }}
-              placeholder={projectCountry?.toUpperCase() === 'US' ? '1600 Amphitheatre Pkwy, Mountain View, CA 94043' : 'רחוב ושם הרחוב, עיר'}
-              hint="הכתובת תפתור אוטומטית ל-lat/lng בעת השמירה (Google → Nominatim fallback)"
+              placeholder={projectCountry?.toUpperCase() === 'US' ? '1600 Amphitheatre Pkwy, Mountain View, CA 94043' : t.exactAddressPlaceholderIL}
+              hint={t.exactAddressHint}
               required
             />
           ) : (
@@ -455,7 +457,7 @@ export default function TrackingTargetForm({
           )}
 
           <div className="text-xs text-slate-500">
-            סריקה תשלח רק ll=@lat,lng,13z. אין נפילה לעיר או ZIP.
+            {t.exactCoordsNote}
           </div>
         </div>
       )}
@@ -466,6 +468,12 @@ export default function TrackingTargetForm({
       )}
       {locationMode !== 'zip' && (
         <input type="hidden" name="postal_code" value="" />
+      )}
+      {locationMode !== 'radius' && (
+        <>
+          <input type="hidden" name="radius_center_zip" value="" />
+          <input type="hidden" name="radius_miles" value="" />
+        </>
       )}
       {locationMode !== 'exact_point' && (
         <>
@@ -485,19 +493,19 @@ export default function TrackingTargetForm({
       )}
 
       <Textarea
-        label="הערות"
+        label={t.notesLabel}
         name="notes"
         defaultValue={target?.notes || ''}
-        placeholder="הערות נוספות..."
+        placeholder={t.notesPlaceholder}
         rows={2}
       />
 
       <div className="flex gap-3 pt-2">
         <Button type="submit" loading={loading}>
-          {target ? 'שמור שינויים' : bulkMode ? 'הוסף מילות מפתח' : 'הוסף מילת מפתח'}
+          {target ? t.submitUpdate : bulkMode ? t.submitBulkCreate : t.submitCreate}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel}>
-          ביטול
+          {t.cancel}
         </Button>
       </div>
     </form>

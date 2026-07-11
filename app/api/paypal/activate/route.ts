@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     // Validate plan
-    const validPlans = ['regular', 'advanced', 'premium']
+    const validPlans = ['regular', 'advanced', 'premium', 'large_agency']
     if (!validPlans.includes(plan)) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 })
     }

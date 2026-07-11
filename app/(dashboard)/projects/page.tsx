@@ -9,11 +9,16 @@ import ProjectForm from '@/components/projects/ProjectForm'
 import ProjectsTable from '@/components/projects/ProjectsTable'
 import { createClient } from '@/lib/supabase/client'
 import { Project, Client } from '@/lib/supabase/types'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams()
   const defaultClientId = searchParams.get('client_id') || ''
   const shouldOpenCreate = searchParams.get('create') === '1'
+
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
 
   const [projects, setProjects] = useState<(Project & { clients?: Client })[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -80,11 +85,11 @@ export default function ProjectsPage() {
   return (
     <div>
       <Header
-        title="פרויקטים"
-        subtitle={`סה"כ ${projects.length} פרויקטים`}
+        title={dict.projects.title}
+        subtitle={`${dict.projects.countPrefix} ${projects.length} ${dict.projects.countSuffix}`}
         actions={
           <Button onClick={() => setShowCreate(true)}>
-            + פרויקט חדש
+            {dict.projects.newProject}
           </Button>
         }
       />
@@ -92,7 +97,7 @@ export default function ProjectsPage() {
       {loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          טוען...
+          {dict.common.loading}
         </div>
       ) : (
         <ProjectsTable projects={projects} clients={clients} />
@@ -101,7 +106,7 @@ export default function ProjectsPage() {
       <Modal
         open={showCreate}
         onClose={() => setShowCreate(false)}
-        title="פרויקט חדש"
+        title={dict.projects.modal.newTitle}
         size="lg"
       >
         <ProjectForm

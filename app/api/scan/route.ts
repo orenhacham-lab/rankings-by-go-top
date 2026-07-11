@@ -2,6 +2,16 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { runScan } from '@/lib/scanner'
 import { getUserEntitlement } from '@/lib/subscription'
+import {
+  buildQuotaError,
+  buildTrialTargetAlreadyScannedError,
+  countActiveTargets,
+  countKeywordChecksThisPeriodForProject,
+  countKeywordChecksTrialLifetime,
+  hasTrialTargetAlreadyBeenScanned,
+  areAnyTrialTargetsAlreadyScanned,
+} from '@/lib/quota'
+import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
 
 export async function POST(request: Request) {
   // Auth check
@@ -28,35 +38,65 @@ export async function POST(request: Request) {
   let scan: any = null
 
   try {
-    // Check entitlement and scan limits
+    // Check entitlement and keyword-check limits.
+    //
+    // One keyword check = one tracking_target scan (one keyword × one engine).
+    // For "Scan All" we pre-count active targets in the project; for a single
+    // target scan it's always 1. The pre-check blocks BEFORE any scan_run /
+    // Serper call is made when the projected usage would exceed the quota.
     const entitlement = await getUserEntitlement(user.id, supabase)
+    const checksThisScan = targetId
+      ? 1
+      : await countActiveTargets(projectId, admin)
+
+    if (checksThisScan === 0) {
+      return Response.json({ error: 'No active targets found' }, { status: 404 })
+    }
+
     if (!entitlement.isAdmin) {
+      const isTrial = entitlement.plan === 'trial'
+      const limit = isTrial
+        ? entitlement.limits.maxKeywordChecksTotal
+        : entitlement.limits.maxKeywordChecksPerPeriodPerProject
+      const used = isTrial
+        ? await countKeywordChecksTrialLifetime(user.id, admin)
+        : await countKeywordChecksThisPeriodForProject(projectId, admin)
+
+      if (used + checksThisScan > limit) {
+        const payload = buildQuotaError(
+          'QUOTA_KEYWORD_CHECKS',
+          entitlement.plan,
+          entitlement.limits,
+          limit
+        )
+        return Response.json(payload, { status: 403 })
+      }
+
+      // Trial plan: prevent rescanning the same tracking_target.
       if (entitlement.plan === 'trial') {
-        // Trial users get 1 scan total for the project
-        const { count: projectScanCount } = await supabase
-          .from('scans')
-          .select('id', { count: 'exact', head: true })
-          .eq('project_id', projectId)
+        if (targetId) {
+          // Single target scan: check if this specific target has been scanned
+          const alreadyScanned = await hasTrialTargetAlreadyBeenScanned(targetId, admin)
+          if (alreadyScanned) {
+            const payload = buildTrialTargetAlreadyScannedError(false, entitlement.plan, entitlement.limits)
+            return Response.json(payload, { status: 403 })
+          }
+        } else {
+          // Scan All: check if any active target has been scanned
+          const { data: activeTargets, error: targetIdsErr } = await admin
+            .from('tracking_targets')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('is_active', true)
 
-        if ((projectScanCount ?? 0) >= 1) {
-          return Response.json(
-            { error: 'הגעת למגבלת סריקה אחת בתוכנית הניסיון' },
-            { status: 403 }
-          )
-        }
-      } else {
-        // Paid users are limited by scans per project per period
-        const { count: projectScansThisPeriod } = await supabase
-          .from('scans')
-          .select('id', { count: 'exact', head: true })
-          .eq('project_id', projectId)
-          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-
-        if ((projectScansThisPeriod ?? 0) >= entitlement.limits.maxScansPerPeriod) {
-          return Response.json(
-            { error: `הגעת למגבלת ${entitlement.limits.maxScansPerPeriod} סריקות בחודש לפרוייקט זה בתוכנית ${entitlement.limits.label}` },
-            { status: 403 }
-          )
+          if (!targetIdsErr && activeTargets && activeTargets.length > 0) {
+            const targetIds = activeTargets.map((t: { id: string }) => t.id)
+            const anyScanned = await areAnyTrialTargetsAlreadyScanned(targetIds, admin)
+            if (anyScanned) {
+              const payload = buildTrialTargetAlreadyScannedError(true, entitlement.plan, entitlement.limits)
+              return Response.json(payload, { status: 403 })
+            }
+          }
         }
       }
     }
@@ -144,7 +184,7 @@ export async function POST(request: Request) {
           businessName: target.target_business_name || project.business_name,
         })
 
-        let locationMode: 'project' | 'custom' | 'zip' | 'exact_point' = target.location_mode || 'project'
+        let locationMode: 'project' | 'custom' | 'zip' | 'exact_point' | 'radius' = target.location_mode || 'project'
 
         // Backward compatibility: convert removed 'grid' mode to custom or project
         if (locationMode === 'grid' as any) {
@@ -152,21 +192,28 @@ export async function POST(request: Request) {
         }
 
         // DEBUG: log what was actually loaded
-        console.log('[Scan] Target loaded from DB:', {
-          id: target.id,
-          keyword: target.keyword,
-          location_mode: target.location_mode,
-          effective_location_mode: locationMode,
-          exact_address_input: target.exact_address_input,
-          exact_resolved_lat: target.exact_resolved_lat,
-          exact_resolved_lng: target.exact_resolved_lng,
-          exact_resolution_source: target.exact_resolution_source,
-          exact_geocoding_provider: target.exact_geocoding_provider,
-          custom_city: target.custom_city,
-          postal_code: target.postal_code,
-        })
+        console.log('[Scan] === TARGET LOADED FROM DB ===')
+        console.log('[Scan] Target ID:', target.id)
+        console.log('[Scan] Keyword:', target.keyword)
+        console.log('[Scan] location_mode from DB:', target.location_mode)
+        console.log('[Scan] effective_location_mode:', locationMode)
+        if (target.location_mode === 'radius') {
+          console.log('[Scan] RADIUS TARGET DETAILS:')
+          console.log('  - radius_center_zip from DB:', target.radius_center_zip, `(type: ${typeof target.radius_center_zip})`)
+          console.log('  - radius_miles from DB:', target.radius_miles, `(type: ${typeof target.radius_miles})`)
+        }
+        console.log('[Scan] exact_address_input:', target.exact_address_input)
+        console.log('[Scan] exact_resolved_lat:', target.exact_resolved_lat)
+        console.log('[Scan] exact_resolved_lng:', target.exact_resolved_lng)
+        console.log('[Scan] custom_city:', target.custom_city)
+        console.log('[Scan] postal_code:', target.postal_code)
+        console.log('[Scan] === END TARGET LOAD ===')
+
         if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
           throw new Error('ZIP code mode is only supported for US projects')
+        }
+        if (locationMode === 'radius' && project.country.toUpperCase() !== 'US') {
+          throw new Error('Radius mode is only supported for US projects')
         }
 
         // exact_point is the SOURCE OF TRUTH — block scan if coords missing/invalid.
@@ -193,9 +240,77 @@ export async function POST(request: Request) {
           }
         }
 
+        // radius mode — resolve ZIP to coordinates
+        let radiusCenterInput: {
+          lat: number
+          lng: number
+          centerZip?: string | null
+          radiusMiles?: number | null
+        } | null = null
+        if (locationMode === 'radius') {
+          const rawZip = target.radius_center_zip
+          const centerZip = target.radius_center_zip?.trim() || null
+          const radiusMiles = typeof target.radius_miles === 'number' ? target.radius_miles : null
+
+          console.log('[Scan] RADIUS MODE INITIATED', {
+            keyword: target.keyword,
+            rawZipFromDB: rawZip,
+            centerZipAfterTrim: centerZip,
+            radiusMilesFromDB: radiusMiles,
+            radiusMilesType: typeof radiusMiles,
+          })
+
+          if (!centerZip) {
+            throw new Error(`Radius mode requires a center ZIP code for keyword "${target.keyword}"`)
+          }
+          if (radiusMiles === null || radiusMiles <= 0) {
+            throw new Error(`Radius mode requires a valid radius distance (must be > 0) for keyword "${target.keyword}". Got: ${radiusMiles}`)
+          }
+
+          console.log('[Scan] Radius mode: attempting to resolve ZIP', {
+            centerZip,
+            keyword: target.keyword,
+          })
+          const resolved = resolveUSZipCodeToCoordinates(centerZip)
+
+          console.log('[Scan] Radius mode: ZIP resolution result', {
+            inputZip: centerZip,
+            resolved: resolved ? `lat=${resolved.lat}, lng=${resolved.lng}` : 'null/undefined',
+          })
+
+          if (!resolved) {
+            throw new Error(`Could not resolve ZIP code "${centerZip}" for keyword "${target.keyword}". Check if the ZIP is valid and exists in US database.`)
+          }
+
+          console.log('[Scan] ✓ RADIUS ZIP SUCCESSFULLY RESOLVED', {
+            enteredZIP: centerZip,
+            resolvedLat: resolved.lat,
+            resolvedLng: resolved.lng,
+            radiusMiles: radiusMiles,
+            keyword: target.keyword,
+          })
+          console.log(`[Scan] PROOF: ZIP "${centerZip}" → LAT=${resolved.lat}, LNG=${resolved.lng} (should be Bakersfield-area for 93313)`)
+
+          radiusCenterInput = {
+            lat: resolved.lat,
+            lng: resolved.lng,
+            centerZip,
+            radiusMiles,
+          }
+
+          console.log('[Scan] radiusCenterInput object created:', {
+            lat: radiusCenterInput.lat,
+            lng: radiusCenterInput.lng,
+            centerZip: radiusCenterInput.centerZip,
+            radiusMiles: radiusCenterInput.radiusMiles,
+          })
+        }
+
         const effectiveCity =
           locationMode === 'custom' && target.custom_city?.trim()
             ? target.custom_city.trim()
+            : locationMode === 'radius' || locationMode === 'exact_point'
+            ? null
             : project.city
 
         const scanPayload = {
@@ -208,21 +323,49 @@ export async function POST(request: Request) {
           city: effectiveCity,
           deviceType: project.device_type,
           locationMode,
-          customCity: target.custom_city,
+          customCity: locationMode === 'radius' ? null : target.custom_city,
           postalCode: locationMode === 'zip'
             ? ((target.postal_code || null) as string | null)
             : null,
           exactPoint: exactPointInput,
+          radiusCenter: radiusCenterInput,
         }
 
-        console.log('[Scan:route] Payload passed to runScan():', {
+        if (locationMode === 'radius') {
+          console.log('[Scan:route] === RADIUS MODE: FINAL PAYLOAD VERIFICATION ===')
+          console.log('[Scan:route] locationMode:', scanPayload.locationMode)
+          console.log('[Scan:route] city:', scanPayload.city, '← MUST BE null for radius')
+          console.log('[Scan:route] customCity:', scanPayload.customCity, '← MUST BE null for radius')
+          console.log('[Scan:route] radiusCenter is null?', scanPayload.radiusCenter === null, '← MUST BE false')
+          if (scanPayload.radiusCenter) {
+            console.log('[Scan:route] ✓ radiusCenter OBJECT EXISTS:')
+            console.log('[Scan:route]   - centerZip:', scanPayload.radiusCenter.centerZip, '← should be 93313 for test')
+            console.log('[Scan:route]   - lat:', scanPayload.radiusCenter.lat, '← should be 35.32 for Bakersfield')
+            console.log('[Scan:route]   - lng:', scanPayload.radiusCenter.lng, '← should be -119.08 for Bakersfield')
+            console.log('[Scan:route]   - radiusMiles:', scanPayload.radiusCenter.radiusMiles, '← should be 5')
+          } else {
+            console.log('[Scan:route] ✗ CRITICAL ERROR: radiusCenter is NULL but locationMode is radius!')
+          }
+          console.log('[Scan:route] postalCode:', scanPayload.postalCode, '← MUST BE null for radius')
+          console.log('[Scan:route] === END RADIUS MODE PAYLOAD VERIFICATION ===')
+        }
+
+        console.log('[Scan:route] === ABOUT TO CALL runScan ===')
+        console.log('[Scan:route] Payload summary:', {
           keyword: scanPayload.keyword,
           locationMode: scanPayload.locationMode,
+          city: scanPayload.city,
           postalCode: scanPayload.postalCode,
           exactPointNull: scanPayload.exactPoint === null,
           exactPointLat: scanPayload.exactPoint?.lat,
           exactPointLng: scanPayload.exactPoint?.lng,
+          radiusCenterNull: scanPayload.radiusCenter === null,
+          radiusCenterZip: scanPayload.radiusCenter?.centerZip,
+          radiusCenterLat: scanPayload.radiusCenter?.lat,
+          radiusCenterLng: scanPayload.radiusCenter?.lng,
+          radiusMiles: scanPayload.radiusCenter?.radiusMiles,
         })
+        console.log('[Scan:route] === END PAYLOAD SUMMARY ===')
 
         const scanOutput = await runScan(target.engine_type, scanPayload)
 
@@ -266,6 +409,9 @@ export async function POST(request: Request) {
           if (locationMode === 'exact_point') {
             resultData.audit_location_mode = 'exact_point'
             resultData.audit_resolved_location = target.exact_address_input || `${exactPointInput?.lat},${exactPointInput?.lng}`
+          } else if (locationMode === 'radius') {
+            resultData.audit_location_mode = 'radius'
+            resultData.audit_resolved_location = `${target.radius_center_zip} (center: ${radiusCenterInput?.lat},${radiusCenterInput?.lng}, radius: ${target.radius_miles}mi)`
           } else {
             resultData.audit_location_mode = locationMode === 'zip' ? 'zip_centroid' : 'city_state'
             resultData.audit_resolved_location = locationMode === 'zip' ? target.postal_code : effectiveCity
@@ -357,12 +503,16 @@ export async function POST(request: Request) {
       .update(updatePayload)
       .eq('id', scan.id)
 
-    // Increment scan counter for paid subscriptions
+    // Source of truth for keyword-check usage is the scan_results table,
+    // which we count from at quota-check time. We also maintain the legacy
+    // subscriptions.scans_this_period field as a coarse running counter
+    // (incremented by the number of checks consumed, not by 1) so old
+    // consumers don't break — it is no longer used for enforcement.
     if (!entitlement.isAdmin && entitlement.plan !== 'trial' && entitlement.subscriptionId) {
       await admin
         .from('subscriptions')
         .update({
-          scans_this_period: entitlement.scansThisPeriod + 1,
+          scans_this_period: entitlement.scansThisPeriod + completedTargets + failedTargets,
         })
         .eq('id', entitlement.subscriptionId)
     }

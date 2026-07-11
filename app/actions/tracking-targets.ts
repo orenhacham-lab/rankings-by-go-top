@@ -112,12 +112,19 @@ export async function createTrackingTargetAction(formData: FormData) {
 
     if ((count ?? 0) >= entitlement.limits.maxKeywordsPerProject) {
       throw new Error(
-        `הגעת למגבלת ${entitlement.limits.maxKeywordsPerProject} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}. שדרג את המנוי להוספת מילות מפתח נוספות.`
+        `הגעת למגבלת ${entitlement.limits.maxKeywordsPerProject} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}. שדרג את המנוי כדי להוסיף מילות מפתח נוספות.`
       )
     }
   }
 
   const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
+  console.log('[CreateTarget] Form submission - locationMode:', {
+    extracted: safeStringFromFormData(formData, 'location_mode'),
+    final: locationMode,
+    radius_center_zip: safeStringFromFormData(formData, 'radius_center_zip'),
+    radius_miles: formData.get('radius_miles'),
+    location_mode_from_form: formData.get('location_mode'),
+  })
 
   const radiusMilesStr = safeStringFromFormData(formData, 'radius_miles')
   const radiusMiles = radiusMilesStr ? parseInt(radiusMilesStr, 10) : null
@@ -141,6 +148,17 @@ export async function createTrackingTargetAction(formData: FormData) {
     is_active: true,
   }
 
+  if (locationMode === 'radius') {
+    console.log('[CreateTarget] RADIUS MODE DATA:', {
+      keyword: data.keyword,
+      location_mode: data.location_mode,
+      radius_center_zip: data.radius_center_zip,
+      radius_miles: data.radius_miles,
+      custom_city: data.custom_city,
+      postal_code: data.postal_code,
+    })
+  }
+
   if (locationMode === 'exact_point') {
     const projectCountry = await fetchProjectCountry(supabase, projectId)
     // exact_point is US-only
@@ -149,12 +167,32 @@ export async function createTrackingTargetAction(formData: FormData) {
     }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry)
     Object.assign(data, resolved)
+  } else if (locationMode === 'radius') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId)
+    // radius is US-only
+    if (projectCountry.toUpperCase() !== 'US') {
+      throw new Error('Radius Scan זמין רק לפרויקטי ארה"ב')
+    }
+    if (!data.radius_center_zip) {
+      throw new Error('Radius Scan דורש ZIP code למרכז הסריקה')
+    }
+    if (!data.radius_miles || typeof data.radius_miles !== 'number' || data.radius_miles <= 0) {
+      throw new Error('Radius Scan דורש מרחק תקין (מיילים)')
+    }
+    // Clear exact_point fields
+    data.exact_address_input = null
+    data.exact_resolved_lat = null
+    data.exact_resolved_lng = null
+    data.exact_resolution_source = null
+    data.exact_geocoding_provider = null
   } else {
     data.exact_address_input = null
     data.exact_resolved_lat = null
     data.exact_resolved_lng = null
     data.exact_resolution_source = null
     data.exact_geocoding_provider = null
+    data.radius_center_zip = null
+    data.radius_miles = null
   }
 
   const { error } = await supabase.from('tracking_targets').insert(data)
@@ -171,6 +209,18 @@ export async function createTrackingTargetAction(formData: FormData) {
     } = data
     void _a; void _b; void _c; void _d; void _e
     const { error: retryError } = await supabase.from('tracking_targets').insert(dataWithoutExact)
+    if (retryError) throw new Error(retryError.message)
+  } else if (error && error.message && /radius_(center_zip|miles)/.test(error.message)) {
+    const {
+      radius_center_zip: _r,
+      radius_miles: _m,
+      ...dataWithoutRadius
+    } = data
+    void _r; void _m
+    if (locationMode === 'radius') {
+      throw new Error('Radius Scan לא זמין — יש להפעיל את מיגרציית DB')
+    }
+    const { error: retryError } = await supabase.from('tracking_targets').insert(dataWithoutRadius)
     if (retryError) throw new Error(retryError.message)
   } else if (error) {
     throw new Error(error.message)
@@ -349,12 +399,39 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry)
     Object.assign(data, resolved)
+  } else if (locationMode === 'radius') {
+    // Need project country to validate — look up via the target row
+    const { data: existing, error: lookupErr } = await supabase
+      .from('tracking_targets')
+      .select('project_id, projects!inner(country)')
+      .eq('id', id)
+      .single<{ project_id: string; projects: { country: string } }>()
+    if (lookupErr || !existing) throw new Error('לא ניתן לטעון פרויקט עבור עדכון')
+    const projectCountry = existing.projects.country || 'IL'
+    // radius is US-only
+    if (projectCountry.toUpperCase() !== 'US') {
+      throw new Error('Radius Scan זמין רק לפרויקטי ארה"ב')
+    }
+    if (!data.radius_center_zip) {
+      throw new Error('Radius Scan דורש ZIP code למרכז הסריקה')
+    }
+    if (!data.radius_miles || typeof data.radius_miles !== 'number' || data.radius_miles <= 0) {
+      throw new Error('Radius Scan דורש מרחק תקין (מיילים)')
+    }
+    // Clear exact_point fields
+    data.exact_address_input = null
+    data.exact_resolved_lat = null
+    data.exact_resolved_lng = null
+    data.exact_resolution_source = null
+    data.exact_geocoding_provider = null
   } else {
     data.exact_address_input = null
     data.exact_resolved_lat = null
     data.exact_resolved_lng = null
     data.exact_resolution_source = null
     data.exact_geocoding_provider = null
+    data.radius_center_zip = null
+    data.radius_miles = null
   }
 
   let { error } = await supabase.from('tracking_targets').update(data).eq('id', id)
@@ -372,6 +449,20 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     void _a; void _b; void _c; void _d; void _e
     if (locationMode === 'exact_point') {
       throw new Error('מצב "נקודה מדויקת" לא זמין — יש להפעיל את מיגרציית DB')
+    }
+    ;({ error } = await supabase.from('tracking_targets').update(reduced).eq('id', id))
+  }
+
+  // If radius columns don't exist (migration not applied), retry without them
+  if (error && error.message && /radius_(center_zip|miles)/.test(error.message)) {
+    const {
+      radius_center_zip: _r,
+      radius_miles: _m,
+      ...reduced
+    } = data
+    void _r; void _m
+    if (locationMode === 'radius') {
+      throw new Error('Radius Scan לא זמין — יש להפעיל את מיגרציית DB')
     }
     ;({ error } = await supabase.from('tracking_targets').update(reduced).eq('id', id))
   }

@@ -1,12 +1,21 @@
+import Link from 'next/link'
+import { PublicNav } from '@/components/PublicNav'
+import { Footer } from '@/components/Footer'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+
 export const metadata = {
   title: 'מדיניות פרטיות | Rankings by Go Top',
   description: 'מדיניות הפרטיות של Rankings by Go Top',
+  robots: 'noindex, nofollow',
 }
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 py-12 px-4">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
+      <PublicNav />
+      <div className="flex-1 pt-28 lg:pt-36 pb-12 px-4">
+        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+          <Breadcrumbs items={[{ label: 'מדיניות פרטיות', href: '/privacy' }]} />
         <h1 className="text-4xl font-bold text-slate-900 mb-2">מדיניות פרטיות</h1>
         <p className="text-slate-600 mb-8">מדיניות הפרטיות של Rankings by Go Top</p>
 
@@ -14,7 +23,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">מבוא</h2>
             <p>
-              Rankings by Go Top (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;) מפעילה את האתר https://rankings.gotop.co.il (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
+              גו טופ שיווק ופרסום דיגיטלי בע״מ (&ldquo;אנחנו&rdquo;, &ldquo;שלנו&rdquo; או &ldquo;החברה&rdquo;), המפעילה את השירות Rankings by Go Top ב-https://www.gotopseo.com (להלן &ldquo;השירות&rdquo;). מדיניות הפרטיות הזו מציינת את המדיניות שלנו בנוגע לאיסוף, שימוש וגילוי של מידע אישי בעת השימוש בשירות שלנו.
             </p>
           </section>
 
@@ -57,6 +66,7 @@ export default function PrivacyPage() {
               <li><strong>Supabase:</strong> לאחסון נתונים מאובטח</li>
               <li><strong>Serper:</strong> לביצוע חיפושים בגוגל</li>
               <li><strong>Vercel:</strong> להנעת האתר</li>
+              <li><strong>Meta (Facebook / Instagram):</strong> לצורך פרסום ממוקד — ראה פירוט בסעיף שירותי פרסום מטא</li>
               <li>כאשר דרוש על פי חוק</li>
             </ul>
           </section>
@@ -82,8 +92,17 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-4">
               כדי להפעיל את הזכויות הללו, צור קשר עם:
-              <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline mr-1 ml-1">
+            </p>
+            <p className="mt-2">
+              <strong>דואר אלקטרוני:</strong>{' '}
+              <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
                 oren@gotop.co.il
+              </a>
+            </p>
+            <p>
+              <strong>טלפון:</strong>{' '}
+              <a href="tel:0549489377" className="text-blue-600 hover:underline">
+                054-9489377
               </a>
             </p>
           </section>
@@ -91,7 +110,68 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">עוגיות (Cookies)</h2>
             <p>
-              אנו משתמשים בעוגיות לנתונים סשן (session) בלבד. עוגיות אלו משמשות לתקשורת מאובטחת עם השרת ולא כוללות מעקב אחר משתמשים.
+              אנו משתמשים בעוגיות לצרכים חיוניים:
+            </p>
+            <ul className="list-disc list-inside space-y-2">
+              <li><strong>עוגיות סשן:</strong> לתקשורת מאובטחת עם השרת ולניהול ההתחברות</li>
+              <li><strong>עוגיות Analytics:</strong> לניתוח שימוש באתר דרך Google Analytics ו-Google Tag Manager</li>
+            </ul>
+            <p className="mt-4">
+              בהמשך השימוש באתר, אתה מסכים לשימוש בעוגיות כמפורט לעיל.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שירותי ניתוח וערוץ שיווק</h2>
+            <p>
+              אנו משתמשים בשירותים הבאים לניתוח התנהגות משתמשים וניהול ערוצי שיווק:
+            </p>
+            <ul className="list-disc list-inside space-y-2">
+              <li><strong>Google Analytics:</strong> לניתוח נתוני עברות וערוצי תעבורה לאתר</li>
+              <li><strong>Google Tag Manager:</strong> לניהול תגיות וניתוח הרכב משתמשים</li>
+            </ul>
+            <p className="mt-4">
+              עוגיות אלו אינן מזהות אותך באופן אישי ומשמשות לשיפור חוויית ההשתמש והשירות.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">שירותי פרסום מטא (Meta / Facebook)</h2>
+            <p>
+              אנו משתמשים ב-Meta Pixel (פיקסל פייסבוק) לצורך ניהול קמפיינים פרסומיים ב-Facebook ו-Instagram. הפיקסל מאפשר לנו למדוד אירועי המרה (לדוגמה: השלמת הרשמה), לבנות קהלי פרסום מותאמים, ולהציג מודעות רלוונטיות.
+            </p>
+            <p className="mt-4">
+              המידע שעשוי להיאסף ולהישלח למטא כולל:
+            </p>
+            <ul className="list-disc list-inside space-y-2">
+              <li>נתוני גלישה ועמודים שבוקרו באתר</li>
+              <li>אירועי המרה (כגון הרשמה לשירות)</li>
+              <li>כתובת IP ומידע טכני על הדפדפן</li>
+              <li>מידע שנאסף באמצעות עוגיות Meta</li>
+            </ul>
+            <p className="mt-4">
+              שימוש זה כפוף למדיניות הפרטיות של Meta Platforms, Inc. ניתן לעיין בה בכתובת{' '}
+              <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                facebook.com/privacy/policy
+              </a>
+              {'. '}
+              ניתן לבטל פרסום מותאם אישית באמצעות הגדרות הפרטיות של חשבון Facebook שלך.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">פנייה אלינו באמצעות WhatsApp</h2>
+            <p>
+              באתר ובשירותים שלנו עשויה להופיע אפשרות ליצור איתנו קשר באמצעות WhatsApp. כאשר משתמש בוחר לפנות אלינו באמצעות WhatsApp, אנו עשויים לקבל ולעבד את המידע שנמסר במסגרת הפנייה, לרבות שם, מספר טלפון, תוכן ההודעות, קבצים או תמונות שנשלחו אלינו מיוזמת המשתמש, ופרטי התקשרות נוספים שנמסרו במסגרת השיחה.
+            </p>
+            <p className="mt-4">
+              המידע שנמסר לנו באמצעות WhatsApp ישמש לצורך מענה לפנייה, מתן שירות ותמיכה, טיפול בבקשות, תיעוד פניות, שיפור השירות, שמירה על אבטחת המידע והגנה על זכויותינו, וכן לצורך עמידה בדרישות הדין ככל שיידרש.
+            </p>
+            <p className="mt-4">
+              השימוש ב-WhatsApp כפוף גם לתנאי השימוש ולמדיניות הפרטיות של WhatsApp ו/או Meta, ואנו ממליצים לעיין בהם לפני השימוש בערוץ זה. אין לשלוח אלינו באמצעות WhatsApp מידע רגיש שאינו נחוץ לטיפול בפנייה, לרבות סיסמאות, פרטי תשלום מלאים, מידע רפואי, תעודות מזהות או מידע אישי רגיש אחר, אלא אם התבקשתם לעשות זאת במפורש ולמטרה מוגדרת.
+            </p>
+            <p className="mt-4">
+              אנו עשויים לשמור את תיעוד ההתכתבות למשך הזמן הדרוש לצורך מתן השירות, טיפול בפניות, תיעוד, בקרה, הגנה משפטית ועמידה בדרישות הדין. משתמשים רשאים לפנות אלינו בבקשה לעיין במידע האישי שנמסר, לתקנו או לבקש את מחיקתו, בכפוף להוראות הדין ולמדיניות פרטיות זו.
             </p>
           </section>
 
@@ -113,6 +193,12 @@ export default function PrivacyPage() {
                 oren@gotop.co.il
               </a>
             </p>
+            <p>
+              <strong>טלפון:</strong>{' '}
+              <a href="tel:0549489377" className="text-blue-600 hover:underline">
+                054-9489377
+              </a>
+            </p>
           </section>
 
           <section>
@@ -122,6 +208,8 @@ export default function PrivacyPage() {
           </section>
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   )
 }

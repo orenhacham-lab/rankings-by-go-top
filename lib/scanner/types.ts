@@ -6,6 +6,13 @@ export interface ExactPointInput {
   geocodingProvider?: string | null
 }
 
+export interface RadiusCenter {
+  lat: number
+  lng: number
+  centerZip?: string | null
+  radiusMiles?: number | null
+}
+
 export interface ScanInput {
   engine: string
   keyword: string
@@ -15,10 +22,11 @@ export interface ScanInput {
   language?: string
   city?: string | null
   deviceType?: string | null
-  locationMode?: 'project' | 'custom' | 'zip' | 'exact_point'
+  locationMode?: 'project' | 'custom' | 'zip' | 'exact_point' | 'radius'
   customCity?: string | null
   postalCode?: string | null
   exactPoint?: ExactPointInput | null
+  radiusCenter?: RadiusCenter | null
 }
 
 export interface ScanAttempt {
@@ -56,7 +64,7 @@ export interface ScanAudit {
   response: {
     searchParameters?: Record<string, unknown>
     placesCount?: number
-    placesSample?: Array<{ title?: string }>
+    placesSample?: Array<{ title?: string; position?: number; website?: string | null; address?: string | null }>
     rawResponse?: unknown
     rawResponseTruncated?: boolean
   }
@@ -69,6 +77,9 @@ export interface ScanAudit {
     successfulAttemptIndex?: number
     geoValidationPassed?: boolean
     rejectionReason?: string | null
+    targetBusinessName?: string | null
+    targetDomain?: string | null
+    matchingStrategy?: 'domain_verification' | 'strict_name_match' | 'no_match'
   }
 }
 
@@ -80,4 +91,26 @@ export interface ScanOutput {
   resultAddress: string | null
   error: string | null
   audit?: ScanAudit
+  radiusScanMetadata?: {
+    centerZip?: string | null
+    centerLat: number
+    centerLng: number
+    radiusMiles: number
+    pointsScanned: number
+    successfulScans: number
+    radiusAttempts: Array<{
+      direction: string
+      label: string
+      lat: number
+      lng: number
+      distanceMiles: number
+      found: boolean
+      position?: number | null
+    }>
+    bestMatch: {
+      direction: string
+      label: string
+      position: number
+    } | null
+  }
 }
