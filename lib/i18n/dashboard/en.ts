@@ -142,6 +142,8 @@ export const dashboardEn = {
       krAllKnown: 'All keyword-research ideas have already been saved, approved, or rejected.',
       krThin: 'Keyword research returned too little data. Try adding a broader starting keyword.',
       primaryKeywordExists: 'All generated ideas use primary keywords that already exist in the project or site.',
+      // Phase 3I.7 — the site-scan repeat-run state is a success state, not a failure.
+      primaryKeywordExistsScan: 'All new ideas from the site scan are already saved in this project. You can review and approve the saved ideas, or try another source / a more specific keyword.',
       // Phase 3F.3.1d — accurate per-run counts (new this run vs total saved).
       runSummary: 'Added {new} new ideas · {total} saved ideas available',
       noNewThisRun: '{total} saved ideas are available. No new ideas were added in this run.',

@@ -584,7 +584,10 @@ export default function AutomationIdeas({
             : meta.reason === 'covered_by_existing'
               ? t.coveredByExisting
               : meta.reason === 'primary_keyword_exists'
-                ? t.primaryKeywordExists
+                // Phase 3I.7 — after a SUCCESSFUL site-scan run saved its ideas, a
+                // repeat click hitting only known keywords is a normal state, not
+                // a failure: point at the saved ideas + the real next actions.
+                ? (source === 'site_scan' ? t.primaryKeywordExistsScan : t.primaryKeywordExists)
                 : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
                   ? t.krNoNew
                   : meta.reason === 'all_known' || meta.reason === 'no_new'
@@ -611,6 +614,8 @@ export default function AutomationIdeas({
                         ? t.krThin
                         : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
                           ? t.krNoNew
+                        : meta.reason === 'primary_keyword_exists' && source === 'site_scan'
+                          ? t.primaryKeywordExistsScan
                         : meta.reason === 'all_known' || meta.reason === 'no_new' || meta.reason === 'primary_keyword_exists'
                           ? t.allKnown
                           : meta.reason === 'model_error' || meta.reason === 'http_error'

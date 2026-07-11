@@ -140,6 +140,8 @@ export const dashboardHe = {
       krAllKnown: 'כל הרעיונות ממחקר הביטויים כבר נשמרו, אושרו או נדחו.',
       krThin: 'מחקר הביטויים החזיר מעט מדי נתונים. נסה להוסיף מילת מפתח התחלתית רחבה יותר.',
       primaryKeywordExists: 'כל הרעיונות שנמצאו משתמשים במילות מפתח שכבר קיימות בפרויקט או באתר.',
+      // Phase 3I.7 — the site-scan repeat-run state is a success state, not a failure.
+      primaryKeywordExistsScan: 'כל הרעיונות החדשים מהסריקה כבר שמורים בפרויקט. אפשר להציג ולאשר את הרעיונות השמורים, או לנסות מקור אחר / מילת מפתח ממוקדת יותר.',
       // Phase 3F.3.1d — accurate per-run counts (new this run vs total saved).
       runSummary: 'נוספו {new} רעיונות חדשים · {total} רעיונות שמורים להצגה',
       noNewThisRun: 'יש {total} רעיונות שמורים. לא נמצאו רעיונות חדשים בהרצה הזו.',

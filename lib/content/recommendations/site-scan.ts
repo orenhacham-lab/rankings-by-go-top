@@ -160,13 +160,21 @@ function sourceUrlList(d: ReturnType<typeof buildDigest>): { url: string; title:
   return out.slice(0, 30)
 }
 
-function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[]): string {
+// Phase 3I.7 — how many avoid entries reach the prompt. Was 40: on a project
+// with 40+ existing topic/article titles, the JUST-SAVED ideas (appended after
+// them) were sliced away, the repeat run's prompt was identical to the first
+// run's, and the model regenerated the exact same batch → instant "exhaustion"
+// while unused scan targets remained. 120 covers the recent idea history the
+// engine loads (recent-first) plus existing titles. Exported for the harness.
+export const AVOID_PROMPT_CAP = 120
+
+export function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[]): string {
   return [
     `You are an SEO content strategist. Analyze a website's existing content (from a site scan) and propose NEW article topics that fill content gaps and strengthen the site's internal structure.`,
     businessCtx ? `Website: ${businessCtx}.` : '',
     // Phase 3H.4 — rotation memory: never re-emit what already exists or was
     // already suggested; move on to UNUSED entities/clusters/angles instead.
-    avoidTitles.length ? `Do NOT repeat or closely overlap these existing/already-suggested titles and keywords:\n${avoidTitles.slice(0, 40).map((t) => `- ${t}`).join('\n')}\nInstead, ROTATE to entities, categories, products and angles NOT represented in that list (different clusters, different sub-intents, different audiences).` : '',
+    avoidTitles.length ? `Do NOT repeat or closely overlap these existing/already-suggested titles and keywords:\n${avoidTitles.slice(0, AVOID_PROMPT_CAP).map((t) => `- ${t}`).join('\n')}\nInstead, ROTATE to entities, categories, products and angles NOT represented in that list (different clusters, different sub-intents, different audiences).` : '',
     `Write ALL output in ${langLabel}.`,
     `Here is a compact digest of the EXISTING site content:`,
     digestBlock,

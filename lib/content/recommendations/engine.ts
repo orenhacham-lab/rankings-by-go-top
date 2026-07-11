@@ -380,7 +380,14 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         .flatMap((r) => [r.title, r.primary_keyword ?? ''])
         .filter(Boolean)
     } catch { /* ideas table optional */ }
-    const avoidTitles = Array.from(new Set([...existingTitles, ...pendingAvoid, ...(input.avoidKeywords ?? [])]))
+    // Phase 3I.7 — RECENT SAVED IDEAS FIRST: the prompt caps the avoid list, so
+    // whatever is beyond the cap is invisible to the model. With existingTitles
+    // first, a project with many topics/articles pushed the JUST-SAVED ideas
+    // past the cap — the second run's prompt was identical to the first run's,
+    // the model regenerated the same batch, and everything (correctly) died as
+    // primary_keyword_exists despite plenty of unused scan targets. The newest
+    // idea rows are exactly what changed between runs, so they lead the list.
+    const avoidTitles = Array.from(new Set([...pendingAvoid, ...existingTitles, ...(input.avoidKeywords ?? [])]))
     const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
