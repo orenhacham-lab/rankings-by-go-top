@@ -41,7 +41,6 @@ export async function POST(request: Request) {
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const approve = body.approve === true
   const allowCaution = body.allowCaution === true
-  const force = body.force === true
   const topicIds = Array.isArray(body.topicIds)
     ? Array.from(new Set(body.topicIds.filter((x): x is string => typeof x === 'string' && x.length > 0))).slice(0, 50)
     : []
@@ -91,9 +90,17 @@ export async function POST(request: Request) {
   if (row.scan_status === 'failed') { cacheState = 'failed_last_refresh'; warnings.push('last_refresh_failed') }
   if (versionStale) { cacheState = 'version_stale'; warnings.push('cache_version_stale') }
   if (stale) { cacheState = 'stale'; warnings.push('cache_stale') }
-  if ((stale || versionStale) && !force) {
-    return Response.json({ ok: false, cacheState, warnings, hint: 'refresh the index (force=true) or pass force=true to save anyway' }, { status: 409 })
-  }
+  // Hotfix (bulk-save 409) — a stale / version-stale index is NOT a hard failure
+  // for SAVING a reviewed plan. The dry-run/review step already ran against this
+  // SAME cache leniently (plan/route only blocks stale under strict=1), so the
+  // user selected these links from a stale-index preview; hard-409ing the save
+  // produced "שמירת התכנון נכשלה" for the very links they just reviewed. We now
+  // SAVE with staleAtCreation=true and surface the staleness in `warnings`
+  // (ok:true). Nothing unsafe reaches an article: approved links are
+  // re-validated against the current cache at apply time (evaluateApprovedLinks)
+  // before any insertion, and the batch's cacheState + staleAtCreation keep the
+  // staleness fully auditable. (A body `force` flag, if sent by older clients,
+  // is simply ignored — the save always proceeds now.)
   const staleAtCreation = stale || versionStale
 
   const report = reassembleReport(row)

@@ -207,7 +207,11 @@ export default function TopicPlanDrawer({
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return { ok: false, warning: null } }
+      // Hotfix (bulk-save 409) — show the REAL reason (Hebrew) for a genuine
+      // failure instead of the generic "save failed". A stale index no longer
+      // fails the save (the server saves with a warning), so the only remaining
+      // hard failure here is a missing index → prompt to refresh, not a dead end.
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.cacheState === 'missing' ? t.cacheMissing : (d.error || t.saveError)); return { ok: false, warning: null } }
       if (approve) {
         const d = await res.json().catch(() => ({}))
         const r0 = Array.isArray(d.results) ? d.results[0] : null
