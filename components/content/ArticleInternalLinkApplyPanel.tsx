@@ -63,7 +63,15 @@ const APPROVE_PLANNED_URL = '/api/content/automation/internal-links/plan/insert/
 const REANCHOR_SUGGEST_URL = '/api/content/automation/internal-links/plan/insert/reanchor/suggest'
 const REANCHOR_SELECT_URL = '/api/content/automation/internal-links/plan/insert/reanchor/select'
 
-export interface ApplyOutcome { applied: number; skipped: number; snapshotId: string | null }
+export interface ApplyOutcome {
+  applied: number
+  skipped: number
+  snapshotId: string | null
+  // Phase 3J — success accounting: links whose target was ALREADY linked in the
+  // content count as embedded (success), and the total approved is the "of Y".
+  alreadyLinked?: number
+  approvedTotal?: number
+}
 export interface PreviewSummary { hasPreview: boolean; approvedLinks: number; wouldInsert: number; wouldSkip: number }
 
 export default function ArticleInternalLinkApplyPanel({
@@ -280,7 +288,12 @@ export default function ArticleInternalLinkApplyPanel({
       if (data.contentChanged && (data.applied ?? 0) > 0) {
         // Persist the session outcome to the PARENT before resync so the rollback
         // button survives the contentHtml-driven re-render that follows.
-        onApplyOutcomeChange({ applied: data.applied, skipped: data.skipped ?? 0, snapshotId: data.snapshotId ?? null })
+        // Phase 3J — carry the success accounting (already-linked = success) from
+        // the preview that produced this apply, for the "X/Y embedded" line.
+        const alreadyLinked = previewResult && !previewResult.reason
+          ? previewResult.items.filter((it) => (it.reason || '').startsWith('target_already_linked')).length
+          : 0
+        onApplyOutcomeChange({ applied: data.applied, skipped: data.skipped ?? 0, snapshotId: data.snapshotId ?? null, alreadyLinked, approvedTotal: previewResult?.approvedLinks })
         onRollbackAvailableChange(true)
         onPreviewSummaryChange?.(null) // links applied → no longer "unapplied"
         setPreviewResult(null); setPreviewToken(null)
@@ -297,7 +310,7 @@ export default function ArticleInternalLinkApplyPanel({
     } finally {
       setApplying(false)
     }
-  }, [applying, canApply, previewToken, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
+  }, [applying, canApply, previewToken, previewResult, projectId, generatedArticleId, onContentReplaced, onApplyOutcomeChange, onRollbackAvailableChange, onNoticeChange, onPreviewSummaryChange, t])
 
   const rollback = useCallback(async () => {
     if (rollingBack) return
@@ -423,6 +436,15 @@ export default function ArticleInternalLinkApplyPanel({
                 {/* Apply result */}
                 {applyOutcome && (
                   <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+                    {/* Phase 3J — the definitive success line: inserted + already-
+                        existing links both count as embedded, out of all approved. */}
+                    {typeof applyOutcome.approvedTotal === 'number' && applyOutcome.approvedTotal > 0 && (
+                      <p className="mb-0.5 text-sm font-semibold">
+                        {t.embeddedLine
+                          .replace('{x}', String(applyOutcome.applied + (applyOutcome.alreadyLinked ?? 0)))
+                          .replace('{y}', String(applyOutcome.approvedTotal))}
+                      </p>
+                    )}
                     <span className="font-medium">{t.appliedTitle}</span>
                     {' · '}{t.appliedCount}: {applyOutcome.applied} · {t.skippedCount}: {applyOutcome.skipped}
                     {applyOutcome.snapshotId && <span className="text-emerald-600/80 dark:text-emerald-400/70"> · {t.snapshotLabel}: {applyOutcome.snapshotId.slice(0, 8)}</span>}
@@ -457,6 +479,15 @@ export default function ArticleInternalLinkApplyPanel({
                 {previewResult && !previewResult.reason && (
                   <div className="mt-3">
                     <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.previewTitle}</div>
+                    {/* Phase 3J — success accounting up front: already-existing links
+                        ARE embedded links, out of everything the user approved. */}
+                    {previewResult.approvedLinks > 0 && (
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                        {t.embeddedLine
+                          .replace('{x}', String(previewResult.items.filter((it) => (it.reason || '').startsWith('target_already_linked')).length))
+                          .replace('{y}', String(previewResult.approvedLinks))}
+                      </p>
+                    )}
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                       {t.summaryApproved}: {previewResult.approvedLinks} · {t.summaryWouldInsert}: {previewResult.wouldInsert} · {t.summaryWouldSkip}: {previewResult.wouldSkip} · {t.contentUnchanged}
                     </p>

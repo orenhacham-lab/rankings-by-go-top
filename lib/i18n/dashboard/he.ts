@@ -950,6 +950,8 @@ export const dashboardHe = {
         appliedTitle: 'הטמעה הושלמה',
         appliedCount: 'הוטמעו',
         skippedCount: 'דולגו',
+        // Phase 3J — success accounting: inserted + already-existing = embedded.
+        embeddedLine: '{x}/{y} קישורים הוטמעו או כבר קיימים בתוכן',
         snapshotLabel: 'נקודת שחזור',
         rollbackAvailable: 'שחזור זמין',
         rollbackConfirm: 'לשחזר את הטיוטה למצב שלפני הטמעת הקישורים? הפעולה תחזיר את התוכן ואת רשימת הקישורים הפנימיים לגיבוי.',

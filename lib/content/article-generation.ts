@@ -26,6 +26,11 @@ import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
+// Phase 3J — how many approved plan anchors are threaded into the generation
+// prompt as writing requirements (was 3 — the 4th+ selected link never reached
+// the model and was later skipped as "anchor not found").
+const MAX_PLANNED_ANCHOR_GUIDANCE = 6
+
 export interface GenerateForTopicSuccess {
   ok: true
   articleId: string
@@ -104,13 +109,17 @@ export async function generateArticleForTopic(
   console.log('[content-article-generation] depth', { topicId, depth: depth.depth, auto: depth.auto, words: `${depth.minWords}-${depth.maxWords}` })
 
   // Phase 2F.2: fold the topic's APPROVED saved-plan anchors into the phrase-only
-  // internal-link guidance (max 3, stale plans skipped). Guidance ONLY — the model
-  // is asked to include the phrase as plain text; nothing here inserts <a> tags or
+  // internal-link guidance (stale plans skipped). Guidance ONLY — the model is
+  // asked to include the phrase as plain text; nothing here inserts <a> tags or
   // writes internal_links_json. If none/stale, generation proceeds unchanged.
+  //
+  // Phase 3J — the cap was 3, so with 4+ user-approved links the extra anchors
+  // never reached the prompt and died at apply time as "anchor not found".
+  // EVERY approved anchor now flows (bounded at 6 to keep placement natural).
   const approvedGuidance = await loadApprovedPlanAnchors(
     admin, projectId, topicId,
     { title: String(t.topic || ''), primaryKeyword: (t.primary_keyword as string) ?? null },
-    3,
+    MAX_PLANNED_ANCHOR_GUIDANCE,
   )
   const plannedInternalAnchors = Array.from(new Set([
     ...decodedNotes.flags.internalLinks.map((l) => l.anchorText),

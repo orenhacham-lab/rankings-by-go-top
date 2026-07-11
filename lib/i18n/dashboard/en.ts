@@ -946,6 +946,8 @@ export const dashboardEn = {
         appliedTitle: 'Apply complete',
         appliedCount: 'Inserted',
         skippedCount: 'Skipped',
+        // Phase 3J — success accounting: inserted + already-existing = embedded.
+        embeddedLine: '{x}/{y} links embedded or already in the content',
         snapshotLabel: 'Restore point',
         rollbackAvailable: 'Rollback available',
         rollbackConfirm: 'Restore the draft to before links were applied? This restores content and the internal-links list from the snapshot.',

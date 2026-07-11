@@ -16,7 +16,7 @@ import {
   validateAnchorPlacement, scanAnchorHits, isAnchorTooEarly,
   ANCHOR_MIN_WORDS_BEFORE_FIRST, ANCHOR_MIN_PARAGRAPHS_BEFORE_FIRST, ANCHOR_MIN_WORD_GAP,
 } from '@/lib/content/anchors-check'
-import { runArticleAudit, thresholdsFor, auditSummary, type AuditResult, type AuditSummary } from '@/lib/content/article-audit'
+import { runArticleAudit, thresholdsFor, auditSummary, includesKw, type AuditResult, type AuditSummary } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 
@@ -64,10 +64,10 @@ export interface GeneratedArticleContent {
 }
 export interface GeminiUsage { model: string; inputTokens: number; outputTokens: number }
 
-interface ArticleTable { caption: string; columns: string[]; rows: string[][] }
-interface Subsection { heading: string; paragraphs: string[] }
-interface Section { heading: string; answerFirst: string; paragraphs: string[]; bullets: string[]; table: ArticleTable | null; subsections: Subsection[] }
-interface StructuredArticle {
+export interface ArticleTable { caption: string; columns: string[]; rows: string[][] }
+export interface Subsection { heading: string; paragraphs: string[] }
+export interface Section { heading: string; answerFirst: string; paragraphs: string[]; bullets: string[]; table: ArticleTable | null; subsections: Subsection[] }
+export interface StructuredArticle {
   title: string; slug: string; metaTitle: string; metaDescription: string; excerpt: string
   directAnswer: string; intro: string[]; sections: Section[]; comparisonTables: ArticleTable[]
   faq: GeneratedArticleFaq[]; imagePrompt: string; warnings: string[]
@@ -93,6 +93,8 @@ export function articleModel(): { model: string; fellBack: boolean } {
 interface GenOpts { repairFailures?: string[] }
 
 const FAILURE_HINT: Record<string, string> = {
+  primary_keyword_in_title: 'include the primary keyword naturally in the title AND the metaTitle',
+  meta_description_exists: 'write a metaDescription of 120-160 characters that includes the primary keyword',
   too_few_h2: 'add more distinct <h2> sections',
   h2_below_ideal: 'add a few more distinct <h2> sections',
   enough_paragraphs: 'add more real paragraphs',
@@ -200,7 +202,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     anchorTopics.length ? `- LINK PLACEMENT RULES: never place a link in the directAnswer or the first paragraph; place the first link only after the article has established context (after the first <h2> and a couple of paragraphs). If there are multiple links, distribute them across DIFFERENT sections — never two links in the same paragraph or back-to-back. Integrate every link into a genuinely relevant sentence; do NOT use generic phrases like "read more", "click here", "אתר כמו", "למידע נוסף".` : '',
-    plannedPhrases.length ? `- INTERNAL-LINK PHRASES: include EACH of the following exact phrases verbatim, at most ONCE, woven naturally into a normal prose paragraph (a list item is acceptable) — NEVER in a heading, table, button/CTA, FAQ question, image alt text, navigation-like text, or the first paragraph. Do NOT wrap them in an HTML link, a markdown link, or any markup — they will be linked later by the editor. Only include a phrase if it genuinely fits the topic; if it would feel forced, SKIP it rather than forcing it:` : '',
+    plannedPhrases.length ? `- INTERNAL-LINK PHRASES: include EACH of the following exact phrases verbatim, at most ONCE, woven naturally into a normal prose paragraph (a list item is acceptable) — NEVER in a heading, table, button/CTA, FAQ question, image alt text, navigation-like text, or the first paragraph. Do NOT wrap them in an HTML link, a markdown link, or any markup — they will be linked later by the editor. DISTRIBUTE the phrases across DIFFERENT sections of the article — never two of these phrases in the same paragraph or in adjacent paragraphs; keep them well apart (roughly 100+ words between phrases). Only include a phrase if it genuinely fits the topic; if it would feel forced, SKIP it rather than forcing it:` : '',
     ...plannedPhrases.map((p) => `  - "${p}"`),
     ``,
     `MINIMUMS (mandatory): >=${th.minH2} sections (<h2>), >=${th.minP} paragraphs total, ${th.minLists} list(s), ${th.minFaq} FAQ pairs${th.minH3 ? `, >=${th.minH3} subsections (<h3>)` : ''}.`,
@@ -340,6 +342,9 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
   }
   return out.join('\n')
 }
+
+/** Phase 3J — the server HTML builder, exported for the QA harness. */
+export const buildArticleHtml = buildHtml
 
 function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): string {
   const out: string[] = []
@@ -577,6 +582,142 @@ function enforceAnchors(html: string, anchors: ArticleTopicAnchor[], language: S
   return out
 }
 
+// ── Phase 3J — planned internal-link phrases: generation-stage presence fix ────
+// The prompt ASKS the model to weave every approved anchor phrase into the body,
+// but a phrase the model skipped used to die later at apply time as
+// "anchor_not_found_in_safe_prose" — a user-approved link silently lost. When a
+// planned phrase is missing from the generated body, ONE natural plain-text
+// sentence containing the phrase verbatim is appended to an eligible paragraph
+// (never the intro/first paragraph, after the first <h2>, in a paragraph with
+// no existing link, spaced from links and other planted phrases) so the later
+// apply pass can wrap it safely. Plain TEXT only — never inserts an <a> tag.
+const PLANNED_PHRASE_MIN_WORD_GAP = 100
+
+export function ensurePlannedPhrases(html: string, phrases: string[], language: SuggestionLanguage): string {
+  const wanted = Array.from(new Set((phrases || []).map((p) => (p || '').trim()).filter(Boolean)))
+  if (!wanted.length || !html) return html
+  let out = html
+  // Spacing seeds: existing links (so the later wrap keeps the apply gap from
+  // them) + paragraphs already carrying one of the WANTED phrases (each becomes
+  // a link later — a planted phrase must keep its distance from those too) +
+  // each planted phrase (so two planted phrases never end up adjacent).
+  const used: number[] = scanAnchorHits(out).hits.map((h) => h.wordIndex)
+  for (const p of collectParagraphs(out)) {
+    const innerLower = p.inner.toLowerCase()
+    if (wanted.some((w) => innerLower.includes(w.toLowerCase()))) used.push(p.wordStart)
+  }
+  for (const phrase of wanted) {
+    const visible = out.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').toLowerCase()
+    if (visible.includes(phrase.toLowerCase())) continue
+    const paras = collectParagraphs(out)
+    const firstH2 = out.search(/<h2[\s>]/i)
+    const eligible = paras.filter((p) =>
+      !p.hasLink &&
+      p.index >= ANCHOR_MIN_PARAGRAPHS_BEFORE_FIRST &&
+      p.wordStart >= ANCHOR_MIN_WORDS_BEFORE_FIRST &&
+      (firstH2 < 0 || p.start > firstH2))
+    const pool = eligible.length ? eligible : paras.filter((p) => !p.hasLink && p.index >= 1)
+    const target = pool.find((p) => used.every((u) => Math.abs(p.wordStart - u) >= PLANNED_PHRASE_MIN_WORD_GAP)) || pool[pool.length - 1]
+    const sentence = language === 'he'
+      ? ` בהקשר זה, כדאי להכיר מקרוב גם ${esc(phrase)}.`
+      : ` In this context, it is also worth exploring ${esc(phrase)}.`
+    if (target) {
+      out = out.slice(0, target.start) + `<p>${target.inner}${sentence}</p>` + out.slice(target.end)
+      used.push(target.wordStart)
+    } else {
+      out = `${out}\n<p>${sentence.trim()}</p>`
+    }
+  }
+  return out
+}
+
+// ── Phase 3J — deterministic basic-SEO autofix (runs BEFORE save) ──────────────
+// The repair loop used to run ONLY on blockers, so an article could save with
+// the three basic SEO warnings (keyword not in title, metaDescription outside
+// 120–160, no list). These are now (a) critical warnings that trigger the model
+// repair attempt, and (b) deterministically fixed here when the model still
+// missed them — then the audit re-runs before save.
+export const META_DESCRIPTION_MIN = 120
+export const META_DESCRIPTION_MAX = 160
+
+/** Trim to ≤160 chars at a word boundary (kept ≥120 when possible), clean tail
+ *  punctuation, end with a sentence mark. */
+function clampMetaDescription(d: string): string {
+  if (d.length <= META_DESCRIPTION_MAX) return d
+  let cut = d.slice(0, META_DESCRIPTION_MAX + 1)
+  const sp = cut.lastIndexOf(' ')
+  cut = sp >= META_DESCRIPTION_MIN ? cut.slice(0, sp) : d.slice(0, META_DESCRIPTION_MAX)
+  cut = cut.trim().replace(/[\s,;:־–—-]+$/, '')
+  if (!/[.!?…]$/.test(cut)) {
+    if (cut.length >= META_DESCRIPTION_MAX) cut = cut.slice(0, META_DESCRIPTION_MAX - 1).trim().replace(/[\s,;:־–—-]+$/, '')
+    cut = `${cut}.`
+  }
+  return cut
+}
+
+/** Fit a metaDescription into 120–160 chars using the article's own text
+ *  (excerpt / direct answer / intro / section answers) — no invented content. */
+export function fitMetaDescription(current: string, fallbacks: (string | null | undefined)[]): string {
+  let d = (current || '').trim().replace(/\s+/g, ' ')
+  if (d.length >= META_DESCRIPTION_MIN && d.length <= META_DESCRIPTION_MAX) return d
+  if (d.length < META_DESCRIPTION_MIN) {
+    for (const f of fallbacks) {
+      const add = (f || '').trim().replace(/\s+/g, ' ')
+      if (!add || (d && d.toLowerCase().includes(add.toLowerCase()))) continue
+      d = d ? `${d} ${add}` : add
+      if (d.length >= META_DESCRIPTION_MIN) break
+    }
+  }
+  if (d.length > META_DESCRIPTION_MAX) d = clampMetaDescription(d)
+  return d
+}
+
+/**
+ * Deterministic fixes for the three basic-SEO warnings, mutating the STRUCTURED
+ * article (title/meta fields + a summary list). Uses only the article's own
+ * content — nothing is invented. Returns which fixes were applied; the caller
+ * rebuilds the HTML and re-audits before saving.
+ */
+export function applyBasicSeoAutofix(brief: ArticleBrief, a: StructuredArticle, audit: AuditResult): { changed: boolean; fixes: string[] } {
+  const fixes: string[] = []
+  const kw = (brief.primaryKeyword || '').trim()
+
+  // 1) Primary keyword must appear in the H1/title OR the metaTitle. When both
+  //    miss it, prefix the metaTitle with the keyword (≤60 chars kept).
+  if (kw && kw.length <= 60 && !includesKw(a.title, kw) && !includesKw(a.metaTitle || '', kw)) {
+    const base = (a.metaTitle || a.title || '').trim()
+    const room = 60 - kw.length - 3
+    a.metaTitle = base && room >= 8
+      ? `${kw} | ${(base.length > room ? base.slice(0, room).trim().replace(/[\s,;:־–—-]+$/, '') : base)}`
+      : kw
+    fixes.push('meta_title_keyword_added')
+  }
+
+  // 2) metaDescription must be 120–160 chars — pad from the article's own text
+  //    or trim at a word boundary.
+  const before = (a.metaDescription || '').trim()
+  if (before.length < META_DESCRIPTION_MIN || before.length > META_DESCRIPTION_MAX) {
+    const fitted = fitMetaDescription(before, [a.excerpt, a.directAnswer, ...(a.intro || []), ...(a.sections || []).map((s) => s.answerFirst)])
+    if (fitted !== before) { a.metaDescription = fitted; fixes.push('meta_description_fitted') }
+  }
+
+  // 3) At least one real list — inject a "key points" summary list built from
+  //    the sections' own answer-first sentences (fallback: section headings)
+  //    into the first section that has no list yet.
+  if (audit.warnings.includes('has_list')) {
+    const answers = (a.sections || []).map((s) => (s.answerFirst || '').trim()).filter((x) => x && x.length <= 180)
+    const headings = (a.sections || []).map((s) => (s.heading || '').trim()).filter(Boolean)
+    const items = (answers.length >= 3 ? answers : headings).slice(0, 6)
+    const host = (a.sections || []).find((s) => (s.bullets || []).length === 0)
+    if (items.length >= 3 && host) {
+      host.bullets = items
+      fixes.push('summary_list_added')
+    }
+  }
+
+  return { changed: fixes.length > 0, fixes }
+}
+
 // -- parse + generate -------------------------------------------------------
 
 function str(v: unknown): string { return typeof v === 'string' ? v : '' }
@@ -757,22 +898,40 @@ function auditFor(brief: ArticleBrief, structured: StructuredArticle, safeHtml: 
 
 export interface ValidatedArticleError { error: string; reason?: string; audit?: AuditSummary; attempts: number }
 
-/** Generate → build → audit → repair (once) → audit. Never saves a bad draft. */
+// Phase 3J — warnings that must NOT reach a saved draft: they trigger the model
+// repair attempt (previously blockers-only) and, if still unmet, the
+// deterministic autofix below. These are the "basic SEO" trio + missing meta.
+const CRITICAL_SEO_WARNINGS = new Set(['primary_keyword_in_title', 'meta_description_exists', 'meta_description_length', 'has_list'])
+const criticalWarningCount = (a: AuditResult) => a.warnings.filter((w) => CRITICAL_SEO_WARNINGS.has(w)).length
+
+/** Generate → build → audit → repair (once) → deterministic basic-SEO autofix →
+ *  re-audit. Never saves a bad draft. */
 export async function generateValidatedArticle(brief: ArticleBrief): Promise<ValidatedArticle | ValidatedArticleError> {
   const language = brief.language
   const { model, fellBack } = articleModel()
   if (fellBack) console.warn('[content-article-generation] GEMINI_ARTICLE_MODEL missing, falling back to classifier model')
 
-  let best: { structured: StructuredArticle; usage: GeminiUsage | null; safe: string; slug: string; audit: AuditResult } | null = null
+  type Candidate = { structured: StructuredArticle; usage: GeminiUsage | null; safe: string; slug: string; audit: AuditResult }
+  let best: Candidate | null = null
   let lastGenError: string | null = null // Phase 3G.2 — precise reason of the last Gemini call error.
   let attempts = 0
   const allowedYears = collectAllowedYears(brief)
   const casingTerms = buildCasingTerms(brief)
 
+  // Phase 3J — a repair attempt may regress (e.g. introduce a blocker the first
+  // draft didn't have). Keep the BETTER candidate: fewer blockers, then fewer
+  // critical SEO warnings, then higher score — never save a worse repair.
+  const isBetter = (cand: Candidate, prev: Candidate) =>
+    cand.audit.blockers.length !== prev.audit.blockers.length
+      ? cand.audit.blockers.length < prev.audit.blockers.length
+      : criticalWarningCount(cand.audit) !== criticalWarningCount(prev.audit)
+        ? criticalWarningCount(cand.audit) < criticalWarningCount(prev.audit)
+        : cand.audit.score >= prev.audit.score
+
   for (let attempt = 0; attempt < 2; attempt++) {
     // Repair uses the EXACT unmet checks (blockers first, then warnings).
     const repairFailures = attempt === 0 ? [] : [...(best?.audit.blockers || []), ...(best?.audit.warnings || [])]
-    if (attempt > 0) console.log(`[content-article-generation] repair attempt=${attempt + 1} reason=quality_blockers failing=[${repairFailures.join(',')}]`)
+    if (attempt > 0) console.log(`[content-article-generation] repair attempt=${attempt + 1} reason=quality_gate failing=[${repairFailures.join(',')}]`)
     const opts: GenOpts = attempt === 0 ? {} : { repairFailures }
     attempts = attempt + 1
     const g = await callGemini(brief, opts, model)
@@ -792,6 +951,9 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     // Enforce required anchors AND good placement quality (not in the direct
     // answer / first paragraph, spaced apart, integrated into a real sentence).
     safe = sanitizeArticleHtml(enforceAnchors(safe, brief.anchors, language))
+    // Phase 3J — a user-approved internal-link phrase the model skipped is added
+    // as one natural plain-text sentence so the apply pass can wrap it later.
+    safe = sanitizeArticleHtml(ensurePlannedPhrases(safe, brief.plannedInternalAnchors ?? [], language))
     const slug = toEnglishSlug(g.structured.slug, brief.primaryKeyword)
     const audit = auditFor(brief, g.structured, safe, slug)
 
@@ -801,8 +963,27 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     console.log(`[content-article-generation] attempt=${attempt + 1} counts words=${cnt.words} h2=${cnt.h2} h3=${cnt.h3} p=${cnt.p} lists=${cnt.lists} tables=${cnt.tables} faq=${cnt.faq}`)
     console.log(`[content-article-generation] attempt=${attempt + 1} score=${audit.score} blockers=[${audit.blockers.join(',')}] warnings=[${audit.warnings.join(',')}]`)
 
-    best = { structured: g.structured, usage: g.usage, safe, slug, audit }
-    if (audit.blockers.length === 0) break
+    const candidate: Candidate = { structured: g.structured, usage: g.usage, safe, slug, audit }
+    best = !best || isBetter(candidate, best) ? candidate : best
+    // Phase 3J — the repair attempt also runs on the basic-SEO warnings, not
+    // only on blockers (the three live warnings previously never re-generated).
+    if (audit.blockers.length === 0 && criticalWarningCount(audit) === 0) break
+  }
+
+  // Phase 3J — deterministic basic-SEO autofix before save: whatever critical
+  // warning the model still missed is fixed from the article's own content
+  // (keyword → metaTitle, metaDescription fitted to 120–160, summary list),
+  // then the HTML is rebuilt and the audit re-runs. Kept only if still clean.
+  if (best && best.audit.blockers.length === 0 && criticalWarningCount(best.audit) > 0) {
+    const fix = applyBasicSeoAutofix(brief, best.structured, best.audit)
+    if (fix.changed) {
+      let safe2 = sanitizeArticleHtml(buildHtml(best.structured, language, brief.includeManualToc))
+      safe2 = sanitizeArticleHtml(enforceAnchors(safe2, brief.anchors, language))
+      safe2 = sanitizeArticleHtml(ensurePlannedPhrases(safe2, brief.plannedInternalAnchors ?? [], language))
+      const audit2 = auditFor(brief, best.structured, safe2, best.slug)
+      console.log(`[content-article-generation] seo-autofix fixes=[${fix.fixes.join(',')}] scoreBefore=${best.audit.score} scoreAfter=${audit2.score} warningsAfter=[${audit2.warnings.join(',')}]`)
+      if (audit2.blockers.length === 0) best = { ...best, safe: safe2, audit: audit2 }
+    }
   }
 
   if (!best) return { error: 'Article generation failed', reason: lastGenError ?? 'gemini_request_failed', attempts }

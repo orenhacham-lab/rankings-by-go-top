@@ -158,7 +158,7 @@ function paragraphs(html: string): string[] {
 function textOf(html: string): string { return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim() }
 function words(text: string): string[] { return text ? text.split(/\s+/).filter(Boolean) : [] }
 function sentences(text: string): string[] { return text.split(/(?<=[.!?])\s+|(?<=[\.।])\s+/).map((s) => s.trim()).filter((s) => s.length > 0) }
-function includesKw(haystack: string, kw: string): boolean {
+export function includesKw(haystack: string, kw: string): boolean {
   const h = (haystack || '').toLowerCase(); const k = (kw || '').trim().toLowerCase()
   if (!k) return true
   if (h.includes(k)) return true
@@ -280,7 +280,10 @@ export function runArticleAudit(input: AuditInput): AuditResult {
 
   // --- SEO ---
   add('title_exists', 'seo', 'blocker', !!input.title.trim())
-  add('primary_keyword_in_title', 'seo', 'warning', !kw || includesKw(input.title, kw))
+  // Phase 3J — the keyword satisfies this check in the H1/title OR the meta
+  // title (the SEO-visible titles): a natural H1 like "האיים הקנריים לחובבי
+  // אקסטרים" with the keyword in metaTitle is valid — only BOTH missing warns.
+  add('primary_keyword_in_title', 'seo', 'warning', !kw || includesKw(input.title, kw) || includesKw(input.metaTitle || '', kw))
   add('meta_title_exists', 'seo', 'warning', !!(input.metaTitle || '').trim())
   add('meta_title_length', 'seo', 'warning', (input.metaTitle || '').length <= 60)
   add('meta_description_exists', 'seo', 'warning', !!(input.metaDescription || '').trim())
