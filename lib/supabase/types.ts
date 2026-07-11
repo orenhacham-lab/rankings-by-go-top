@@ -83,8 +83,32 @@ export interface Database {
         Insert: Omit<AIUsageLog, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<AIUsageLog, 'id' | 'created_at'>>
       }
+      content_automation_alerts: {
+        Row: ContentAutomationAlert
+        Insert: Partial<Omit<ContentAutomationAlert, 'id' | 'created_at'>> & { dedupe_key: string; user_id: string; project_id: string }
+        Update: Partial<Omit<ContentAutomationAlert, 'id' | 'created_at'>>
+      }
     }
   }
+}
+
+// Phase 4B.1 — persisted content-automation failure alert (in-app, owner-scoped).
+export interface ContentAutomationAlert {
+  id: string
+  user_id: string
+  project_id: string
+  pool_item_id: string | null
+  article_id: string | null
+  topic_id: string | null
+  kind: string
+  dedupe_key: string
+  title: string | null
+  error: string | null
+  attempts: number
+  status: 'open' | 'resolved' | 'dismissed'
+  created_at: string
+  updated_at: string
+  resolved_at: string | null
 }
 
 export interface Client {

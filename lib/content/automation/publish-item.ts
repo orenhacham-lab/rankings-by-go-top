@@ -13,6 +13,7 @@ import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
+import { recordPublishFinalFailureAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -75,9 +76,22 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       // Phase 3E — first time this item reaches published, ensure its keyword.
       // Idempotent (deduped), so the already_published path is a cheap no-op too.
       await ensureProjectKeywordFromPublishedArticle(admin, article.id)
+      // Phase 4B.1 — a recovered/reconciled publish resolves any open failure alert.
+      await resolvePublishAlerts(admin, itemId)
       return { itemId, status: 'published', articleId: article.id, wpPostUrl: article.wp_post_url, noop: item.status === 'published' ? 'already_published' : 'reconciled' }
     }
     if (item.status === 'published') return { itemId, status: 'published', articleId: article.id, noop: 'already_published' }
+
+    // Phase 4B.1 — record ONE persisted, owner-scoped alert ONLY after the FINAL
+    // failed publish attempt. attempts is incremented at the claim below, so the
+    // attempt that runs now = item.attempts + 1; alert only when that hits the cap.
+    const alertOnFinalFailure = async (reason: string) => {
+      if (((item.attempts ?? 0) + 1) < AUTOMATION_MAX_ATTEMPTS) return
+      await recordPublishFinalFailureAlert(admin, {
+        projectId: item.project_id, poolItemId: itemId, articleId: article.id, topicId: item.topic_id,
+        title: article.title, error: reason, attempts: (item.attempts ?? 0) + 1,
+      })
+    }
 
     // (E) Publish-time quality gate (structural backstop).
     const gate = runQualityGate(article)
@@ -137,7 +151,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
         await finalizeItem(admin, itemId, 'quality_check_failed', 'wordpress_media_upload_failed')
         return { itemId, status: 'quality_check_failed', articleId: article.id, reason: 'wordpress_media_upload_failed' }
       }
-      await finalizeItem(admin, itemId, 'failed', created.detail ? `wordpress_post_failed: ${created.detail.slice(0, 120)}` : 'wordpress_post_failed')
+      const wpReason = created.detail ? `wordpress_post_failed: ${created.detail.slice(0, 120)}` : 'wordpress_post_failed'
+      await finalizeItem(admin, itemId, 'failed', wpReason)
+      await alertOnFinalFailure(wpReason)
       return { itemId, status: 'failed', articleId: article.id, reason: 'wordpress_post_failed' }
     }
 
@@ -160,6 +176,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       // retry will reconcile ONLY if the id later persists, so flag for a human.
       console.error('[automation-publish] wp id persist failed after publish', { itemId, articleId: article.id, wpPostId: created.wpPostId })
       await finalizeItem(admin, itemId, 'failed', 'db_persist_failed_after_wp_publish')
+      await alertOnFinalFailure('db_persist_failed_after_wp_publish')
       return { itemId, status: 'failed', articleId: article.id, reason: 'db_persist_failed_after_wp_publish', wpPostUrl: created.wpPostUrl }
     }
 
@@ -175,6 +192,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // Phase 3E — add the topic's primary keyword to the project's tracked
     // keywords. Best-effort + idempotent; never affects the publish outcome.
     await ensureProjectKeywordFromPublishedArticle(admin, article.id)
+
+    // Phase 4B.1 — a successful publish resolves any open failure alert.
+    await resolvePublishAlerts(admin, itemId)
 
     return { itemId, status: 'published', articleId: article.id, wpPostUrl: created.wpPostUrl }
   } catch (e) {

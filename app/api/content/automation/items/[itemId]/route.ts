@@ -34,8 +34,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ it
   if ('error' in owned) return Response.json({ error: owned.error }, { status: owned.status })
 
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
-  // Retry/reset clears the previous error + lock.
-  if (status === 'queued') { patch.last_error = null; patch.locked_at = null }
+  // Retry/reset clears the previous error + lock. Phase 4B.1 — it ALSO resets the
+  // attempt counter to 0 so a MANUAL retry makes a maxed-out (failed at
+  // AUTOMATION_MAX_ATTEMPTS) item eligible again; without this reset the runner /
+  // publish-item cap would immediately no-op the retry. wp_post_id reconciliation
+  // still prevents any duplicate WordPress post on the subsequent publish.
+  if (status === 'queued') { patch.last_error = null; patch.locked_at = null; patch.attempts = 0 }
 
   const { error } = await owned.auth.admin.from('article_pool_items').update(patch).eq('id', itemId)
   if (error) {
