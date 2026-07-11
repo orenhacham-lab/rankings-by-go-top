@@ -61,6 +61,25 @@ export function titleMainPhrase(title: string | null | undefined): string {
 
 type Admin = ReturnType<typeof createAdminClient>
 
+// ── Phase 3I.6 — keyword ORIGIN evidence ───────────────────────────────────────
+// Zero-result runs die in `guard.keywords.has(nk)`, but the guard only knew
+// WHICH source-set a keyword sits in (keywordSourcesOf) — never the concrete
+// ROW it came from, so live QA could not say WHAT blocked each idea. The guard
+// now records, per normalized keyword, its originating rows (bounded per
+// keyword): source kind, the original keyword text, the row's status (idea
+// rows) and a short human detail (topic/idea title, scan target type + URL).
+// Diagnostics only — NO blocking behavior reads this map.
+export interface KeywordOriginEntry {
+  source: 'tracking_keyword' | 'topic_keyword' | 'idea_keyword' | 'scan_focus_keyword'
+  /** The original (pre-normalization) keyword text on the originating row. */
+  original: string
+  /** Idea rows: row status (pending/approved/rejected/generated/…); else null. */
+  status: string | null
+  /** Human context: topic/idea title, or scan target "type url". */
+  detail: string
+}
+const MAX_ORIGINS_PER_KEYWORD = 5
+
 export interface KeywordGuard {
   titles: Set<string>
   keywords: Set<string>
@@ -81,6 +100,8 @@ export interface KeywordGuard {
     ideas: Set<string>
     scan: Set<string>
   }
+  /** Phase 3I.6 — normalized keyword → originating rows (bounded). Evidence only. */
+  origins: Map<string, KeywordOriginEntry[]>
   /** Up to 10 example scan focus keywords actually included (dev diagnostics). */
   scanSamples: string[]
   counts: {
@@ -108,6 +129,7 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
   const contentTitles = new Set<string>()
   const contentPhrases = new Set<string>()
   const sources = { tracking: new Set<string>(), topics: new Set<string>(), ideas: new Set<string>(), scan: new Set<string>() }
+  const origins = new Map<string, KeywordOriginEntry[]>()
   const scanSamples: string[] = []
   const counts = { existingProjectKeywordCount: 0, existingTopicKeywordCount: 0, existingIdeaKeywordCount: 0, existingScanKeywordCount: 0 }
 
@@ -125,13 +147,18 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
     if (full && full.split(' ').length >= 2) contentPhrases.add(full)
   }
 
-  const addKeyword = (raw: string | null | undefined, opts: { content: boolean; sourceSet?: Set<string>; bump?: () => void }) => {
+  const addKeyword = (raw: string | null | undefined, opts: { content: boolean; sourceSet?: Set<string>; bump?: () => void; origin?: KeywordOriginEntry }) => {
     const v = normalizeText(raw)
     if (!v) return
     keywords.add(v)
     if (opts.content) contentKeywords.add(v)
     opts.sourceSet?.add(v)
     opts.bump?.()
+    // Phase 3I.6 — record the originating row (evidence only, bounded).
+    if (opts.origin) {
+      const list = origins.get(v) ?? []
+      if (list.length < MAX_ORIGINS_PER_KEYWORD) { list.push(opts.origin); origins.set(v, list) }
+    }
   }
   const addTitle = (raw: string | null | undefined, content: boolean) => { const v = normalizeText(raw); if (v) { titles.add(v); if (content) { contentTitles.add(v); addContentPhraseFromTitle(raw) } } }
 
@@ -139,14 +166,14 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
   // since every generated_articles.topic_id references a project topic here.
   for (const t of data.topics) {
     addTitle(t.topic, true)
-    addKeyword(t.primary_keyword, { content: true, sourceSet: sources.topics, bump: () => counts.existingTopicKeywordCount++ })
+    addKeyword(t.primary_keyword, { content: true, sourceSet: sources.topics, bump: () => counts.existingTopicKeywordCount++, origin: { source: 'topic_keyword', original: t.primary_keyword ?? '', status: null, detail: t.topic } })
   }
 
   // Generated articles — exact titles (their topic keyword is already covered above).
   for (const title of data.generatedArticleTitles) addTitle(title, true)
 
   // Project tracked keywords — EXACT keyword blocking only (never phrases).
-  for (const kw of data.trackingKeywords) addKeyword(kw, { content: true, sourceSet: sources.tracking, bump: () => counts.existingProjectKeywordCount++ })
+  for (const kw of data.trackingKeywords) addKeyword(kw, { content: true, sourceSet: sources.tracking, bump: () => counts.existingProjectKeywordCount++, origin: { source: 'tracking_keyword', original: kw, status: null, detail: '' } })
 
   // Persisted ideas — title + fingerprint + primary keyword. These are NOT
   // content keywords (a pending idea must not block its own approval).
@@ -163,7 +190,7 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
     if (r.status === 'duplicate') continue
     addTitle(r.title, false)
     if (r.fingerprint) titles.add(r.fingerprint)
-    addKeyword(r.primary_keyword, { content: false, sourceSet: sources.ideas, bump: () => counts.existingIdeaKeywordCount++ })
+    addKeyword(r.primary_keyword, { content: false, sourceSet: sources.ideas, bump: () => counts.existingIdeaKeywordCount++, origin: { source: 'idea_keyword', original: r.primary_keyword ?? '', status: r.status ?? null, detail: r.title } })
   }
 
   // Reliable WordPress/site-scan focus keywords ONLY (keywordAvailable === true =
@@ -172,7 +199,7 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
   for (const tg of data.scanTargets) {
     if (tg.keywordAvailable && tg.primaryKeywordCandidate) {
       const before = sources.scan.size
-      addKeyword(tg.primaryKeywordCandidate, { content: true, sourceSet: sources.scan, bump: () => counts.existingScanKeywordCount++ })
+      addKeyword(tg.primaryKeywordCandidate, { content: true, sourceSet: sources.scan, bump: () => counts.existingScanKeywordCount++, origin: { source: 'scan_focus_keyword', original: tg.primaryKeywordCandidate, status: null, detail: `${tg.targetType} ${tg.targetUrl}` } })
       if (sources.scan.size > before && scanSamples.length < 10) scanSamples.push(tg.primaryKeywordCandidate.trim())
     }
     // Phase 3G.7 / 3H.3 — only existing site ARTICLES ('post') cover their
@@ -193,7 +220,7 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
     }
   }
 
-  return { titles, keywords, contentKeywords, contentTitles, contentPhrases, sources, scanSamples, counts }
+  return { titles, keywords, contentKeywords, contentTitles, contentPhrases, sources, origins, scanSamples, counts }
 }
 
 /** Load the project's guard data and build the guard. Never throws. */
@@ -276,6 +303,14 @@ export function partitionPending(
     visible.push(r)
   }
   return { visible, conflictIds, conflicts }
+}
+
+/** Phase 3I.6 — the concrete originating ROWS of a blocking keyword (evidence).
+ *  Empty array = the keyword is in guard.keywords without a recorded origin
+ *  (only possible for intra-batch additions made by the route's dedupe). */
+export function keywordOriginsOf(guard: KeywordGuard, primaryKeyword: string): KeywordOriginEntry[] {
+  const v = normalizeText(primaryKeyword)
+  return v ? (guard.origins.get(v) ?? []) : []
 }
 
 /** Which guard source(s) contain this exact normalized primary keyword (diagnostics). */

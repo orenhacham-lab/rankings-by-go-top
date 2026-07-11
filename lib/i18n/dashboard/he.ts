@@ -103,6 +103,14 @@ export const dashboardHe = {
       tryOther: 'לא נמצאו רעיונות. נסו מקור אחר או מילת מפתח רחבה יותר.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
       funnelLine: 'פירוט הריצה: {g} רעיונות נוצרו · {d} כפולים לנושאים קיימים · {q} סוננו באיכות · {k} עם כותרת/מילת מפתח שכבר קיימת · {c} מכוסים בתוכן קיים באתר',
+      // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
+      kwMatchTitle: 'אבחון: מה בדיוק חסם כל רעיון ({n} דוגמאות)',
+      kwMatchKeyword: 'מילת מפתח',
+      kwMatchBlockedBy: 'נחסם על ידי',
+      kwSrcTracking: 'מילת מפתח במעקב',
+      kwSrcTopic: 'נושא/מאמר קיים',
+      kwSrcIdea: 'רעיון שמור',
+      kwSrcScan: 'מילת פוקוס מסריקת האתר',
       temporaryError: 'לא הצלחנו לייצר רעיונות כרגע. נסו שוב בעוד רגע.',
       keywordLabel: 'מילת מפתח',
       secondaryLabel: 'ביטויים משניים',

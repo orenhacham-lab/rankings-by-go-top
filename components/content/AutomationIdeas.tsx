@@ -17,6 +17,18 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 
 type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan'
 
+/** Phase 3I.6 — per-rejected-idea evidence of WHAT blocked it (from
+ *  meta.debug.primaryKeywordMatches; returned on runs that added nothing new). */
+interface KeywordMatchEvidence {
+  ideaTitle: string
+  ideaPrimaryKeyword: string
+  normalizedPrimaryKeyword: string
+  ideaSourceContext: string
+  ideaSuggestedUrl: string | null
+  rule: string
+  matches: { source: string; original: string; status: string | null; detail: string }[]
+}
+
 interface Suggestion {
   id: string
   /** Persisted idea id (Phase 3F.3) — present when the idea is stored server-side. */
@@ -103,7 +115,7 @@ export default function AutomationIdeas({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [ideasExpanded, setIdeasExpanded] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number } } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[] } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -207,6 +219,8 @@ export default function AutomationIdeas({
         newlyAdded: typeof data.meta?.newlyAddedCount === 'number' ? data.meta.newlyAddedCount : (data.meta?.newlySaved ?? 0),
         // Phase 3I.3 — production funnel counts (why a run produced 0/few).
         funnel: data.meta?.funnel,
+        // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
+        keywordMatches: Array.isArray(data.meta?.debug?.primaryKeywordMatches) ? data.meta.debug.primaryKeywordMatches : undefined,
       })
     } catch {
       if (reqId !== reqRef.current) return
@@ -622,6 +636,36 @@ export default function AutomationIdeas({
             .replace('{k}', String(meta.funnel.keywordExists + meta.funnel.titleExists))
             .replace('{c}', String(meta.funnel.coveredByExisting))}
         </p>
+      )}
+      {/* Phase 3I.6 — EXACT match evidence for a zero-new run blocked on existing
+          keywords: which existing row (source/status/keyword) killed each idea.
+          Collapsible tech details; rendered only when the API returned evidence. */}
+      {meta?.keywordMatches && meta.keywordMatches.length > 0 && meta.newlyAdded === 0 && !loading && (
+        <details className="mb-2 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-2 py-1.5">
+          <summary className="cursor-pointer text-[11px] font-medium text-slate-600 dark:text-slate-300">
+            {t.kwMatchTitle.replace('{n}', String(meta.keywordMatches.length))}
+          </summary>
+          <ul className="mt-1.5 space-y-1.5">
+            {meta.keywordMatches.map((m, i) => (
+              <li key={i} className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 border-t border-slate-200/70 dark:border-slate-700/70 pt-1.5 first:border-t-0 first:pt-0">
+                <span className="font-medium text-slate-700 dark:text-slate-300">{m.ideaTitle}</span>
+                {' · '}{t.kwMatchKeyword}: „{m.ideaPrimaryKeyword}”
+                <br />
+                {t.kwMatchBlockedBy}:{' '}
+                {m.matches.map((x, j) => (
+                  <span key={j}>
+                    {j > 0 && ' · '}
+                    {x.source === 'tracking_keyword' ? t.kwSrcTracking : x.source === 'topic_keyword' ? t.kwSrcTopic : x.source === 'idea_keyword' ? t.kwSrcIdea : t.kwSrcScan}
+                    {' „'}{x.original}{'”'}
+                    {x.status ? ` (${x.status})` : ''}
+                    {x.detail ? ` — ${x.detail}` : ''}
+                  </span>
+                ))}
+                {m.ideaSourceContext ? <><br /><span className="text-slate-500 dark:text-slate-500">{m.ideaSourceContext}</span></> : null}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {/* No saved ideas yet (fresh project / after clearing all) — calm prompt. */}
       {initialLoaded && !loading && !meta && suggestions.length === 0 && (

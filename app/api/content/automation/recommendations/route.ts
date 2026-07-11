@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled } from '@/lib/content/ap
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
-import { buildKeywordGuard, partitionPending, keywordSourcesOf, coveredByExistingContent } from '@/lib/content/recommendations/keyword-guard'
+import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { randomUUID } from 'crypto'
 
 const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan']
@@ -63,11 +63,45 @@ export async function POST(request: Request) {
     let filteredTitleExists = 0
     let filteredCoveredByContent = 0
     const filteredExamples: { title: string; primaryKeyword: string; reason: string; sources: string[] }[] = []
+    // Phase 3I.6 — PRODUCTION evidence for primary_keyword_exists rejections:
+    // for each blocked idea, the exact originating row(s) of the blocking
+    // keyword (source table, original keyword, row status, row title/URL) and
+    // the exact rule. Owner-only response data; capped; returned only on runs
+    // that added nothing new. This exists because zero-result runs were
+    // undiagnosable in production (debug is dev-only).
+    const primaryKeywordMatches: {
+      ideaTitle: string
+      ideaPrimaryKeyword: string
+      normalizedPrimaryKeyword: string
+      /** Site-scan ideas: the model's source context is embedded in the reason. */
+      ideaSourceContext: string
+      ideaSuggestedUrl: string | null
+      rule: 'exact_normalized_primary_keyword'
+      matches: KeywordOriginEntry[]
+    }[] = []
     const fresh = result.suggestions.filter((s) => {
       const nt = normalizeText(s.title)
       const nk = normalizeText(s.primaryKeyword)
       const pushEx = (reason: string) => { if (filteredExamples.length < 10) filteredExamples.push({ title: s.title, primaryKeyword: s.primaryKeyword, reason, sources: keywordSourcesOf(guard, s.primaryKeyword) }) }
-      if (nk && guard.keywords.has(nk)) { filteredPrimaryKeywordExists++; pushEx('primary_keyword_exists'); return false }
+      if (nk && guard.keywords.has(nk)) {
+        filteredPrimaryKeywordExists++
+        pushEx('primary_keyword_exists')
+        if (primaryKeywordMatches.length < 20) {
+          const origins = keywordOriginsOf(guard, s.primaryKeyword)
+          primaryKeywordMatches.push({
+            ideaTitle: s.title,
+            ideaPrimaryKeyword: s.primaryKeyword,
+            normalizedPrimaryKeyword: nk,
+            ideaSourceContext: s.suggestionReason || '',
+            ideaSuggestedUrl: s.suggestedInternalLinks[0]?.url ?? null,
+            rule: 'exact_normalized_primary_keyword',
+            // No recorded origin ⇒ the keyword was added by THIS run's intra-batch
+            // dedupe below (an earlier idea in the same batch used the same keyword).
+            matches: origins.length ? origins : [{ source: 'idea_keyword', original: s.primaryKeyword, status: 'intra_batch_earlier_idea', detail: '' }],
+          })
+        }
+        return false
+      }
       if (nt && guard.titles.has(nt)) { filteredTitleExists++; pushEx('title_exists'); return false }
       // Phase 3G.7 — re-angled duplicate of an EXISTING SITE ARTICLE (same main
       // phrase, different suffix — e.g. "מנורות לילה לשבת: …" vs the site's
@@ -86,9 +120,12 @@ export async function POST(request: Request) {
     await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
 
     const filteredExisting = result.suggestions.length - fresh.length
+    // Phase 3I.6 — in PRODUCTION, a run that added nothing new returns the
+    // primary-keyword match evidence (and only it) so the exact blockers are
+    // visible in the UI/API without a dev build. Dev keeps the full debug.
     const buildDebug = (extra: Record<string, unknown>) => process.env.NODE_ENV !== 'production'
-      ? { ...guard.counts, scanKeywordSamples: guard.scanSamples, modelSuggestions: result.suggestions.length, filteredPrimaryKeywordExistsCount: filteredPrimaryKeywordExists, filteredTitleExistsCount: filteredTitleExists, filteredCoveredByContentCount: filteredCoveredByContent, filteredExamples, kr: (result.meta as { debug?: unknown }).debug, ...extra }
-      : undefined
+      ? { ...guard.counts, scanKeywordSamples: guard.scanSamples, modelSuggestions: result.suggestions.length, filteredPrimaryKeywordExistsCount: filteredPrimaryKeywordExists, filteredTitleExistsCount: filteredTitleExists, filteredCoveredByContentCount: filteredCoveredByContent, filteredExamples, primaryKeywordMatches, kr: (result.meta as { debug?: unknown }).debug, ...extra }
+      : (fresh.length === 0 && primaryKeywordMatches.length > 0 ? { primaryKeywordMatches } : undefined)
 
     const pending = await loadPendingIdeas(auth.admin, auth.project.id)
     // No ideas table yet (migration not applied): still return the GUARD-FILTERED

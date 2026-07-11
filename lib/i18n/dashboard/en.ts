@@ -105,6 +105,14 @@ export const dashboardEn = {
       tryOther: 'No ideas found. Try another source or a broader keyword.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
       funnelLine: 'Run breakdown: {g} ideas generated · {d} duplicates of existing topics · {q} quality-filtered · {k} title/keyword already exists · {c} covered by existing site content',
+      // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
+      kwMatchTitle: 'Diagnostics: what exactly blocked each idea ({n} examples)',
+      kwMatchKeyword: 'Keyword',
+      kwMatchBlockedBy: 'Blocked by',
+      kwSrcTracking: 'Tracked keyword',
+      kwSrcTopic: 'Existing topic/article',
+      kwSrcIdea: 'Saved idea',
+      kwSrcScan: 'Site-scan focus keyword',
       temporaryError: 'We couldn’t generate ideas right now. Please try again in a moment.',
       keywordLabel: 'Keyword',
       secondaryLabel: 'Secondary keywords',
