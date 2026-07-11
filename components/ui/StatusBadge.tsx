@@ -1,31 +1,48 @@
+'use client'
+
 import Badge from './Badge'
-import { getSearchTypeLabel } from '@/lib/utils'
+import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export function ActiveBadge({ active }: { active: boolean }) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
   return (
     <Badge variant={active ? 'success' : 'neutral'}>
-      {active ? 'פעיל' : 'לא פעיל'}
+      {active ? dict.common.active : dict.common.inactive}
     </Badge>
   )
 }
 
 export function ScanStatusBadge({ status }: { status: string }) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   const map: Record<string, { variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; label: string }> = {
-    completed: { variant: 'success', label: 'הושלם' },
-    running: { variant: 'info', label: 'רץ...' },
-    pending: { variant: 'warning', label: 'ממתין' },
-    failed: { variant: 'danger', label: 'נכשל' },
+    completed: { variant: 'success', label: dict.scans.status.completed },
+    running: { variant: 'info', label: dict.scans.status.running },
+    pending: { variant: 'warning', label: dict.scans.status.pending },
+    failed: { variant: 'danger', label: dict.scans.status.failed },
   }
   const cfg = map[status] || { variant: 'neutral', label: status }
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>
 }
 
 export function EngineBadge({ engine, device }: { engine: string; device?: string | null }) {
+  const { language, isLoaded } = useDashboardLanguage()
+  const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
+
   if (engine === 'google_search') {
-    return <Badge variant="info">{getSearchTypeLabel(engine, device)}</Badge>
+    let label: string
+    if (device === 'mobile') {
+      label = dict.common.searchTypeGoogleMobile
+    } else {
+      label = dict.common.searchTypeGoogleDesktop
+    }
+    return <Badge variant="info">{label}</Badge>
   }
   if (engine === 'google_maps') {
-    return <Badge variant="success">גוגל מפות</Badge>
+    return <Badge variant="success">{dict.common.engineGoogleMaps}</Badge>
   }
   return <Badge>{engine}</Badge>
 }

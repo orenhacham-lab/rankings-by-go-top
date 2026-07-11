@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { Database, Search, CheckCircle2 } from 'lucide-react'
 
 /* ─── Types ─────────────────────────────────────────────── */
 
@@ -97,18 +98,18 @@ function StatusTab() {
   if (!status) return null
 
   const connections = [
-    { key: 'supabase', data: status.supabase, icon: '🗄️', title: 'Supabase' },
-    { key: 'serper', data: status.serper, icon: '🔍', title: 'Serper API' },
+    { key: 'supabase', data: status.supabase, icon: Database, title: 'Supabase' },
+    { key: 'serper', data: status.serper, icon: Search, title: 'Serper API' },
   ]
 
   return (
     <div className="space-y-6">
       {/* Connection cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {connections.map(({ key, data, icon, title }) => (
+        {connections.map(({ key, data, icon: IconComponent, title }) => (
           <Card key={key} className="p-5">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">{icon}</span>
+              <IconComponent size={24} strokeWidth={2} className="text-slate-600 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <StatusDot ok={data.ok} />
@@ -145,12 +146,12 @@ function StatusTab() {
       {status.supabase.ok && status.serper.ok &&
         Object.values(status.envVars).every(Boolean) && (
           <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-5 py-4 text-green-800 text-sm">
-            <span className="text-xl">✅</span>
+            <CheckCircle2 size={24} strokeWidth={2} className="text-green-600 flex-shrink-0" />
             <div>
               <p className="font-semibold">כל החיבורים פעילים!</p>
               <p className="text-green-700 text-xs mt-0.5">
                 המערכת מוכנה לשימוש.{' '}
-                <a href="/login" className="underline font-medium">היכנס למערכת</a>
+                <a href="/signup" className="underline font-medium">היכנס למערכת</a>
               </p>
             </div>
           </div>

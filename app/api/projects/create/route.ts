@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
+import { buildQuotaError } from '@/lib/quota'
 import { calculateNextScanDate } from '@/lib/utils'
 
 // API Route for creating new projects
@@ -52,10 +53,13 @@ export async function POST(request: NextRequest) {
       // Check if user has reached their project quota
       if ((projectCount || 0) >= planLimits.maxProjects) {
         console.log('[API] User reached project quota:', { userId: user.id, plan: entitlement.plan, limit: planLimits.maxProjects })
-        return NextResponse.json(
-          { error: `הגעת למגבלת ${planLimits.maxProjects} פרויקטים בתוכנית ${planLimits.label}. שדרג את המנוי להוספת פרויקטים נוספים.` },
-          { status: 403 }
+        const payload = buildQuotaError(
+          'QUOTA_PROJECTS',
+          entitlement.plan,
+          planLimits,
+          planLimits.maxProjects
         )
+        return NextResponse.json(payload, { status: 403 })
       }
     }
 

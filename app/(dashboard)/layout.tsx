@@ -1,4 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar'
+import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
+import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
+import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -24,11 +27,14 @@ export default async function DashboardLayout({
   const isAdmin = profile?.role === 'admin'
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-screen">
-      <Sidebar isAdmin={isAdmin} />
-      <main className="flex-1 md:mr-64 p-4 md:p-8 overflow-auto min-h-screen">
-        {children}
-      </main>
-    </div>
+    <DashboardLanguageProvider>
+      <div className="flex flex-col md:flex-row h-full min-h-screen dark:bg-slate-950">
+        <DashboardLocaleEffect />
+        <Sidebar isAdmin={isAdmin} />
+        <main className="flex-1 md:mr-64 p-4 md:p-8 overflow-auto min-h-screen dark:bg-slate-950 dark:text-slate-50">
+          <DashboardDirectionWrapper>{children}</DashboardDirectionWrapper>
+        </main>
+      </div>
+    </DashboardLanguageProvider>
   )
 }

@@ -1,0 +1,529 @@
+'use client'
+
+/**
+ * NewTopicsLinkPlanPanel — Phase 2F.1.
+ *
+ * Shown ONCE, right after topics are created, for the newly-created topic IDs.
+ * Runs a single read-only dry-run (GET /plan?topicIds=…) on mount to surface
+ * internal-link suggestions, lets the user select topics and Save (POST
+ * /plan/bulk-save) with an optional auto-approve. It writes NOTHING to articles:
+ * only plan batches/links are persisted, and approval is review-status only.
+ *
+ * Manual only: the mount-time dry-run is the sole automatic call (it exists only
+ * because the panel itself is mounted by the explicit "create topics" action —
+ * never on page load or list render). Save/approve happen on button click.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Card } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
+import { Link2, X } from 'lucide-react'
+
+export interface NewTopic { id: string; topic: string; primary_keyword: string | null }
+
+interface DryLink { targetUrl: string; targetTitle: string; anchorText: string | null; confidence: number; relevance: number; reason: string; rejectedReasons: string[]; reviewability?: string; canManualApprove?: boolean; displayBlocked?: boolean }
+interface DryPlan { topicId: string; selected: DryLink[]; rejected: DryLink[]; reviewable: DryLink[]; summary: string }
+
+const mkey = (l: { targetUrl: string; anchorText: string | null }) => `${l.targetUrl}||${(l.anchorText ?? '').toLowerCase()}`
+
+interface DroppedLink { targetUrl: string; anchorText: string; reason: string; rejectedReasons?: string[] }
+interface BulkResult { topicId: string; ok: boolean; linkCount: number; approvedCount: number; approvalWarning?: boolean; reason?: string; droppedLinks?: DroppedLink[] }
+
+const REASON_HE: Record<string, string> = {
+  low_relevance: 'רלוונטיות נמוכה',
+  no_usable_anchor: 'אין עוגן שמיש',
+  no_natural_anchor: 'אין עוגן טבעי',
+  too_similar_self_link: 'דומה מדי (קישור עצמי)',
+  self_target: 'קישור עצמי',
+  duplicate_topic_target: 'נושא כפול',
+  too_similar_to_planned_topic: 'דומה מדי לנושא',
+  target_ineligible: 'יעד לא כשיר',
+  low_confidence: 'ביטחון נמוך',
+  duplicate_url: 'כתובת כפולה',
+  duplicate_anchor: 'עוגן כפול',
+  over_cap: 'מעל המכסה',
+}
+function reasonLabel(r?: string | null): string {
+  if (!r) return ''
+  const base = r.split('(')[0]!
+  return REASON_HE[base] ?? r
+}
+
+export default function NewTopicsLinkPlanPanel({
+  projectId, language, topics, onClose, onSaved, onEnqueue, initialUnchecked = {}, initialSelected = {}, onGoToQueue,
+}: {
+  projectId: string
+  language: 'he' | 'en'
+  topics: NewTopic[]
+  onClose: () => void
+  onSaved: (results: { topicId: string; summary: TopicPlanSummary }[]) => void
+  // Phase 3F.3.7 (Part G) — save the plans AND add the topics to the publishing
+  // queue in one action. Returns success. When absent, only plain save is shown.
+  onEnqueue?: (topicIds: string[]) => Promise<boolean>
+  // Phase 3F.3.7b — per topic-id, recommended-link URLs the user UNCHECKED at the
+  // idea stage; the panel starts those unchecked (preserving the user's choice).
+  initialUnchecked?: Record<string, string[]>
+  // Phase 3G.3 — per topic-id, the CHECKED idea-stage links; the panel seeds/displays
+  // them (pre-checked) so they don't vanish when its fresh dry-run recomputes to fewer.
+  initialSelected?: Record<string, { url: string; anchor: string }[]>
+  // Phase 3H — "go to queue" navigation from the success banner (scrolls the hub
+  // to the publishing-schedule section). Only the BUTTON navigates — no auto-scroll.
+  onGoToQueue?: () => void
+}) {
+  const t = useMemo(() => getDashboardDictionary(language).contentHub.newTopicsPlan, [language])
+  const isHebrew = language === 'he'
+  // Locale-aware label for soft (reviewable) reasons; falls back to REASON_HE.
+  const revLabel = useCallback((r?: string | null) => {
+    const base = (r || '').split('(')[0]!
+    return (t.reviewReasons as Record<string, string>)[base] ?? reasonLabel(r)
+  }, [t])
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [warnNote, setWarnNote] = useState<string | null>(null)
+  const [plans, setPlans] = useState<Record<string, DryPlan>>({})
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Checked RECOMMENDED links per topic (mkey set) — default all recommended.
+  const [linkSel, setLinkSel] = useState<Record<string, Set<string>>>({})
+  // Manually-selected reviewable candidates, keyed by topicId → set of mkey().
+  const [manualSel, setManualSel] = useState<Record<string, Set<string>>>({})
+  // Phase 3F.3.7a — per-topic "show all manual options" toggle (first batch shown).
+  const [revExpanded, setRevExpanded] = useState<Set<string>>(new Set())
+  const [autoApprove, setAutoApprove] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [queuing, setQueuing] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'approved' | 'zero' | 'failed'>>({})
+  // Phase 3G.5 — checked links the server could NOT save (per topic), surfaced
+  // with their reasons instead of being dropped silently.
+  const [droppedByTopic, setDroppedByTopic] = useState<Record<string, DroppedLink[]>>({})
+  // Phase 3G.7 — approval-count verification: true when an approve-intent save
+  // reported fewer approved rows than saved rows (never silently accepted).
+  const [approvalShort, setApprovalShort] = useState(false)
+  const [savedOk, setSavedOk] = useState(false) // compact success state after save
+  const [queuedOk, setQueuedOk] = useState(false) // success state after save + enqueue
+
+  // Bring the panel into view once when it first appears (after topic creation).
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const scrolled = useRef(false)
+  useEffect(() => {
+    if (scrolled.current) return
+    scrolled.current = true
+    const id = window.setTimeout(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+    return () => window.clearTimeout(id)
+  }, [])
+
+  // Single dry-run on mount (this component only mounts after topic creation).
+  const ran = useRef(false)
+  useEffect(() => {
+    if (ran.current) return
+    ran.current = true
+    const ids = topics.map((tp) => tp.id).join(',')
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(ids)}`)
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.loadError); return }
+        if (Array.isArray(data.warnings) && (data.warnings.includes('cache_stale') || data.warnings.includes('cache_version_stale'))) setWarnNote(t.cacheStale)
+        const map: Record<string, DryPlan> = {}
+        const initLinkSel: Record<string, Set<string>> = {}
+        for (const p of Array.isArray(data.topics) ? data.topics : []) {
+          const rejected: DryLink[] = Array.isArray(p.rejected) ? p.rejected : []
+          const reviewable = rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove && (r.anchorText || '').trim())
+          const selectedLinks: DryLink[] = Array.isArray(p.selected) ? p.selected : []
+          // Phase 3G.3 — merge the CHECKED idea-stage links so they don't disappear
+          // if the fresh dry-run recomputed fewer/none.
+          // Phase 3G.8 — CONSISTENCY with save: an idea link is merged (pre-checked)
+          // ONLY when the fresh server plan can actually save it — i.e. its URL is a
+          // reviewable/approvable candidate. A URL the fresh plan hard-blocks, or no
+          // longer knows, would be dropped by bulk-save; showing it pre-checked as
+          // "recommended" was the recommended-but-dropped mismatch. URLs already in
+          // the fresh recommended list are skipped (that row already represents them).
+          const recommendedUrls = new Set(selectedLinks.map((l) => l.targetUrl))
+          const saveableUrls = new Set(rejected.filter((r) => r.reviewability === 'reviewable' && r.canManualApprove).map((r) => r.targetUrl))
+          const ideaLinks = (initialSelected[p.topicId] ?? [])
+            .map((l): DryLink => ({ targetUrl: l.url, targetTitle: l.url, anchorText: l.anchor, confidence: 0, relevance: 0, reason: 'idea_stage_selection', rejectedReasons: [] }))
+            .filter((l) => (l.anchorText || '').trim() && !recommendedUrls.has(l.targetUrl) && saveableUrls.has(l.targetUrl))
+          const mergedSelected = [...selectedLinks, ...ideaLinks]
+          const plan: DryPlan = { topicId: p.topicId, selected: mergedSelected, rejected, reviewable, summary: p.summary ?? '' }
+          map[p.topicId] = plan
+          // Recommended links checked by default, EXCEPT any the user unchecked at
+          // the idea stage (Phase 3F.3.7b) — that choice is preserved here. The merged
+          // idea-stage links (3G.3) are always checked.
+          const unchecked = new Set(initialUnchecked[p.topicId] ?? [])
+          initLinkSel[p.topicId] = new Set(mergedSelected.filter((l) => !unchecked.has(l.targetUrl)).map((l) => mkey(l)))
+        }
+        setPlans(map)
+        setLinkSel(initLinkSel)
+        // Check ALL newly-created topics by default (not only those with
+        // recommended links) so a zero-link/no-recommendation topic is still part
+        // of the batch — it saves an auditable zero-link plan and its row badge
+        // updates. Users can uncheck any topic they don't want saved.
+        setSelected(new Set(topics.map((tp) => tp.id)))
+      } catch {
+        setError(t.loadError)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [projectId, topics, t])
+
+  const toggle = useCallback((id: string) => {
+    setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }, [])
+  const toggleLink = useCallback((topicId: string, key: string) => {
+    setLinkSel((prev) => {
+      const set = new Set(prev[topicId] ?? [])
+      set.has(key) ? set.delete(key) : set.add(key)
+      return { ...prev, [topicId]: set }
+    })
+  }, [])
+  const toggleManual = useCallback((topicId: string, key: string) => {
+    setManualSel((prev) => {
+      const set = new Set(prev[topicId] ?? [])
+      set.has(key) ? set.delete(key) : set.add(key)
+      return { ...prev, [topicId]: set }
+    })
+  }, [])
+
+  // A topic is saved when its topic checkbox is checked (or it has manual picks).
+  const topicIdsToSave = useMemo(() => {
+    const ids = new Set(selected)
+    for (const [tid, set] of Object.entries(manualSel)) if (set.size > 0) ids.add(tid)
+    return Array.from(ids)
+  }, [selected, manualSel])
+
+  // Persist the EXACT selection (checked recommended + checked manual per checked
+  // topic; empty ⇒ zero-link plan) and return the topic ids that saved OK (plus
+  // how many checked links the server refused, so callers can keep the panel
+  // open and show the warning), or null on request error. Shared by "Save" and
+  // "Save + add to queue".
+  const runSave = useCallback(async (forceApprove = false): Promise<{ okIds: string[]; droppedCount: number } | null> => {
+    const selectedLinks: { topicId: string; targetUrl: string; anchorText: string }[] = []
+    for (const tid of topicIdsToSave) {
+      const recs = plans[tid]?.selected ?? []
+      const lset = linkSel[tid] ?? new Set(recs.map((l) => mkey(l)))
+      for (const l of recs) if (lset.has(mkey(l)) && l.anchorText) selectedLinks.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
+      const rev = plans[tid]?.reviewable ?? []
+      const mset = manualSel[tid] ?? new Set<string>()
+      for (const l of rev) if (mset.has(mkey(l)) && l.anchorText) selectedLinks.push({ topicId: tid, targetUrl: l.targetUrl, anchorText: l.anchorText })
+    }
+    const res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      // Phase 3G — "Save + add to queue" APPROVES the checked links (the user
+      // explicitly selected them), so article generation inserts them automatically.
+      body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: forceApprove || autoApprove, selectedLinks }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return null }
+    const results: BulkResult[] = Array.isArray(data.results) ? data.results : []
+    const nextStatus: Record<string, 'saved' | 'approved' | 'zero' | 'failed'> = {}
+    const nextDropped: Record<string, DroppedLink[]> = {}
+    const summaries: { topicId: string; summary: TopicPlanSummary }[] = []
+    const okIds: string[] = []
+    let anyApprovalShort = false
+    for (const r of results) {
+      if (Array.isArray(r.droppedLinks) && r.droppedLinks.length > 0) nextDropped[r.topicId] = r.droppedLinks
+      if (r.ok && r.approvalWarning) anyApprovalShort = true
+      if (!r.ok) { nextStatus[r.topicId] = 'failed'; continue }
+      nextStatus[r.topicId] = r.linkCount === 0 ? 'zero' : r.approvedCount > 0 ? 'approved' : 'saved'
+      summaries.push({ topicId: r.topicId, summary: { exists: true, linkCount: r.linkCount, approvedCount: r.approvedCount, stale: false } })
+      okIds.push(r.topicId)
+    }
+    setSaveStatus((prev) => ({ ...prev, ...nextStatus }))
+    setDroppedByTopic((prev) => ({ ...prev, ...nextDropped }))
+    setApprovalShort(anyApprovalShort)
+    onSaved(summaries)
+    // An approval shortfall behaves like a dropped link: warn + keep panel open.
+    return { okIds, droppedCount: Object.values(nextDropped).reduce((n, a) => n + a.length, 0) + (anyApprovalShort ? 1 : 0) }
+  }, [topicIdsToSave, linkSel, manualSel, plans, projectId, autoApprove, t, onSaved])
+
+  const save = useCallback(async () => {
+    if (saving || queuing || topicIdsToSave.length === 0) return
+    setSaving(true); setError(null)
+    try {
+      const r = await runSave()
+      // Auto-close only when EVERY checked link was saved — a dropped link keeps
+      // the panel open so the user actually sees the warning.
+      if (r && r.okIds.length > 0) { setSavedOk(true); if (r.droppedCount === 0) window.setTimeout(() => onClose(), 1800) }
+    } catch {
+      setError(t.saveError)
+    } finally {
+      setSaving(false)
+    }
+  }, [saving, queuing, topicIdsToSave, runSave, onClose, t])
+
+  // Phase 3F.3.7 (Part G) — save the plans AND add the topics to the publishing
+  // queue in one action, then show final success and close.
+  const saveAndQueue = useCallback(async () => {
+    if (saving || queuing || topicIdsToSave.length === 0 || !onEnqueue) return
+    setQueuing(true); setError(null)
+    try {
+      // Phase 3G — approve the checked links so generation inserts them automatically.
+      const r = await runSave(true)
+      if (r === null) return
+      const idsToQueue = r.okIds.length > 0 ? r.okIds : topicIdsToSave
+      const queued = await onEnqueue(idsToQueue)
+      // Links were saved regardless. If the enqueue itself failed, KEEP the panel
+      // open and show the exact failure — never claim a false success. A dropped
+      // link also keeps the panel open so the warning is actually seen.
+      // Phase 3H — the success banner stays ~8s (dismissible earlier).
+      if (queued) { setQueuedOk(true); if (r.droppedCount === 0) window.setTimeout(() => onClose(), 8000) }
+      else { setError(t.enqueueFailed) }
+    } catch {
+      setError(t.saveError)
+    } finally {
+      setQueuing(false)
+    }
+  }, [saving, queuing, topicIdsToSave, onEnqueue, runSave, onClose, t])
+
+  // Summary counts (session-only, from the dry-run + save results).
+  const topicsWithLinks = Object.values(plans).filter((p) => p.selected.length > 0).length
+  const linksSuggested = Object.values(plans).reduce((n, p) => n + p.selected.length, 0)
+  const reviewableTotal = Object.values(plans).reduce((n, p) => n + p.reviewable.length, 0)
+  const plansSaved = Object.values(saveStatus).filter((s) => s !== 'failed').length
+  const linksApproved = Object.entries(saveStatus).filter(([, s]) => s === 'approved').length
+  // Calm empty state: no recommended AND no reviewable across all new topics.
+  const nothingFound = Object.keys(plans).length > 0 && linksSuggested === 0 && reviewableTotal === 0
+
+  // Phase 3G.5 — checked links the server refused, with per-link reasons. Shown
+  // in the success banners AND the list view; a non-empty list suppresses the
+  // auto-close so the user actually sees it.
+  const droppedEntries = Object.entries(droppedByTopic)
+  const droppedTotal = droppedEntries.reduce((n, [, a]) => n + a.length, 0)
+  const droppedNote = droppedTotal > 0 || approvalShort ? (
+    <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+      {approvalShort && <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.approvalIncomplete}</p>}
+      {droppedTotal > 0 && <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">{t.droppedWarning} ({droppedTotal})</p>}
+      <ul className="mt-1 space-y-0.5">
+        {droppedEntries.flatMap(([tid, arr]) => arr.map((d, i) => (
+          <li key={`${tid}-dl-${i}`} className="text-[10px] text-amber-700 dark:text-amber-400">
+            <span className="font-medium break-words">{d.anchorText || d.targetUrl}</span>
+            {' · '}{(t.droppedReasons as Record<string, string>)[d.reason] ?? d.reason}
+            {/* Phase 3G.8 — before/after diagnostics: the fresh classification. */}
+            {Array.isArray(d.rejectedReasons) && d.rejectedReasons.length > 0 && (
+              <span className="text-amber-600/80 dark:text-amber-500/80"> ({d.rejectedReasons.map(revLabel).join(' · ')})</span>
+            )}
+          </li>
+        )))}
+      </ul>
+    </div>
+  ) : null
+
+  const statusBadge = (id: string) => {
+    const s = saveStatus[id]
+    if (s === 'approved') return <Badge variant="success">{t.statusApproved}</Badge>
+    if (s === 'saved') return <Badge variant="success">{t.statusSaved}</Badge>
+    if (s === 'zero') return <Badge variant="neutral">{t.statusZero}</Badge>
+    if (s === 'failed') return <Badge variant="danger">{t.statusFailed}</Badge>
+    return <Badge variant="neutral">{t.statusSuggested}</Badge>
+  }
+
+  return (
+    <Card className="mb-4 hover:translate-y-0 border-indigo-200 dark:border-indigo-500/30 ring-1 ring-indigo-100 dark:ring-indigo-500/20">
+      <div ref={rootRef} dir={isHebrew ? 'rtl' : 'ltr'} className="scroll-mt-4">
+        <div className="flex items-start justify-between gap-3">
+          <span className="inline-flex items-center gap-2">
+            <Link2 size={16} className="text-indigo-600 dark:text-indigo-400" />
+            <span className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</span>
+          </span>
+          <button type="button" onClick={onClose} aria-label={t.close} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={16} /></button>
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t.intro}</p>
+        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.sessionOnlyNote} {t.alsoFromRow}</p>
+
+        {warnNote && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{warnNote}</p>}
+        {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+
+        {queuedOk ? (
+          /* Save + enqueue success — stays ~8s (Phase 3H), dismissible, with a
+             "go to queue" button. Only the button navigates — no auto-scroll. */
+          <>
+            <div className="mt-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5">
+              <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t.queuedTitle}</div>
+              <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queuedSuccess}</p>
+              {Object.values(saveStatus).some((s) => s === 'approved' || s === 'saved') && (
+                <p className="mt-0.5 text-xs text-emerald-700/90 dark:text-emerald-300/90">{t.queuedLinksSaved}</p>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {onGoToQueue && (
+                  <Button size="sm" onClick={() => { onGoToQueue(); onClose() }}>{t.goToQueue}</Button>
+                )}
+                <Button size="sm" variant="outline" onClick={onClose}>{t.close}</Button>
+              </div>
+            </div>
+            {droppedNote}
+          </>
+        ) : savedOk ? (
+          /* Compact success state — panel auto-dismisses shortly after (unless links were dropped). */
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
+              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t.savedSuccess}</span>
+              <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70">{t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</span>
+              <Button size="sm" variant="outline" onClick={onClose} className="ms-auto">{t.close}</Button>
+            </div>
+            {droppedNote}
+          </>
+        ) : loading ? (
+          <div className="py-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />{t.loading}
+          </div>
+        ) : (
+          <>
+            {/* Summary */}
+            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+              {t.sumTopicsChecked}: {topicIdsToSave.length} · {t.sumTopicsWithLinks}: {topicsWithLinks} · {t.sumLinksSuggested}: {linksSuggested} · {t.sumReviewable}: {reviewableTotal}
+              {plansSaved > 0 && <> · {t.sumPlansSaved}: {plansSaved} · {t.sumLinksApproved}: {linksApproved}</>}
+            </p>
+            {droppedNote}
+
+            {/* Calm empty state — not an error. */}
+            {nothingFound && (
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">{t.noneFound}</p>
+            )}
+
+            <div className="mt-3 space-y-2">
+              {topics.map((tp) => {
+                const plan = plans[tp.id]
+                const links = plan?.selected ?? []
+                const reviewable = plan?.reviewable ?? []
+                // Phase 3G.5 — the blocked list shows ONLY true hard-safety/target
+                // failures (displayBlocked). Merely-irrelevant candidates (cluster
+                // gate) are noise, not "blocked candidates", and are hidden.
+                const blocked = (plan?.rejected ?? []).filter((r) => r.reviewability !== 'reviewable' && r.displayBlocked !== false)
+                const mset = manualSel[tp.id] ?? new Set<string>()
+                const lset = linkSel[tp.id] ?? new Set<string>(links.map((l) => mkey(l)))
+                return (
+                  <div key={tp.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input type="checkbox" checked={selected.has(tp.id)} onChange={() => toggle(tp.id)} disabled={saving} className="accent-indigo-600" />
+                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100 break-words">{tp.topic}</span>
+                      {statusBadge(tp.id)}
+                      <span className="text-[11px] text-slate-400 ms-auto">{links.length ? `${links.length} ${t.suggestedLinks}` : ''}</span>
+                    </div>
+                    {tp.primary_keyword && <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t.primaryKeyword}: {tp.primary_keyword}</p>}
+
+                    {/* Recommended */}
+                    {links.length === 0 ? (
+                      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">{t.zeroLink}</p>
+                    ) : (
+                      <>
+                        <div className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{t.recommendedTitle}</div>
+                        <div className="mt-1 space-y-1.5">
+                          {links.map((l, i) => {
+                            const k = mkey(l)
+                            return (
+                            <label key={`${l.targetUrl}-${i}`} className="flex flex-wrap items-start gap-2 rounded-md bg-slate-50 dark:bg-slate-800/60 p-2 text-[11px] cursor-pointer">
+                              <input type="checkbox" checked={lset.has(k)} onChange={() => toggleLink(tp.id, k)} disabled={saving} className="mt-0.5 accent-indigo-600" />
+                              <span className="flex-1 min-w-0">
+                                <span className="flex flex-wrap items-center gap-2">
+                                  <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
+                                  <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                                </span>
+                                <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
+                              </span>
+                            </label>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Manual / additional options — Phase 3F.3.7a: EXPANDED by
+                        default (no click-to-reveal). Automatic recommendations stay
+                        strict, but the user may deliberately pick an additional link
+                        here even if the strict cluster gate would not auto-select it.
+                        A reasonable first batch is shown with an optional "show more". */}
+                    {reviewable.length > 0 && (() => {
+                      const showAll = revExpanded.has(tp.id)
+                      const CAP = 6
+                      const shown = showAll ? reviewable : reviewable.slice(0, CAP)
+                      return (
+                      <div className="mt-2">
+                        <div className="text-[11px] font-medium text-indigo-700 dark:text-indigo-300">{t.reviewableTitle} ({reviewable.length})</div>
+                        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t.manualOptionsNote}</p>
+                        <div className="mt-1.5 space-y-1.5">
+                          {shown.map((l, i) => {
+                            const k = mkey(l)
+                            return (
+                              <label key={`${l.targetUrl}-rv-${i}`} className="flex flex-wrap items-start gap-2 rounded-md border border-indigo-100 dark:border-indigo-500/20 p-2 text-[11px] cursor-pointer">
+                                <input type="checkbox" checked={mset.has(k)} onChange={() => toggleManual(tp.id, k)} disabled={saving} className="mt-0.5 accent-indigo-600" />
+                                <span className="flex-1 min-w-0">
+                                  <span className="flex flex-wrap items-center gap-2">
+                                    <span className="font-medium text-slate-800 dark:text-slate-100 break-words">{l.anchorText || '—'}</span>
+                                    <Badge variant="neutral">{t.manualBadge}</Badge>
+                                    <span className="text-amber-700 dark:text-amber-400">{l.rejectedReasons.map(revLabel).join(' · ')}</span>
+                                    <span className="text-slate-400">{t.confidence} {l.confidence}</span>
+                                  </span>
+                                  <a href={l.targetUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block text-indigo-600 dark:text-indigo-400 hover:underline break-all">{l.targetTitle || l.targetUrl}</a>
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                        {reviewable.length > CAP && (
+                          <button type="button" onClick={() => setRevExpanded((prev) => { const n = new Set(prev); n.has(tp.id) ? n.delete(tp.id) : n.add(tp.id); return n })}
+                            className="mt-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                            {showAll ? t.showLess : `${t.showMore} (${reviewable.length - CAP})`}
+                          </button>
+                        )}
+                      </div>
+                      )
+                    })()}
+
+                    {/* Phase 3G.7 — honest empty state: no manual alternatives passed
+                        the quality filter (instead of looking broken/empty). */}
+                    {reviewable.length === 0 && links.length > 0 && (
+                      <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t.noManualOptions}</p>
+                    )}
+
+                    {/* Blocked — advanced diagnostics, not selectable */}
+                    {blocked.length > 0 && (
+                      <details className="mt-1.5">
+                        <summary className="cursor-pointer select-none text-[10px] text-slate-400">{t.blockedTitle} ({blocked.length})</summary>
+                        <div className="mt-1 space-y-1">
+                          {blocked.slice(0, 20).map((l, i) => (
+                            <div key={`${l.targetUrl}-b-${i}`} className="text-[10px] text-slate-400 line-through decoration-slate-300">
+                              <span className="break-words no-underline">{l.anchorText || l.targetTitle || l.targetUrl}</span>
+                              {l.rejectedReasons?.length ? <span className="text-slate-400"> · {l.rejectedReasons.map(revLabel).join(' · ')}</span> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Planned-vs-approved clarification (Phase 3B.3). */}
+            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2">{t.planVsApproveNote}</p>
+
+            {/* Phase 3G.3 — clarify that this checkbox only affects plain "Save plan";
+                "Save + add to queue" always approves the checked links. */}
+            <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300">{t.approveAutoNote}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} disabled={saving || queuing} className="accent-indigo-600" />
+                {t.autoApprove}
+              </label>
+              {/* Plain save (secondary) + save-and-enqueue (primary, Part G). */}
+              <div className="ms-auto flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={save} loading={saving} disabled={saving || queuing || topicIdsToSave.length === 0}>
+                  {saving ? t.saving : t.save}
+                </Button>
+                {onEnqueue && (
+                  <Button size="sm" onClick={saveAndQueue} loading={queuing} disabled={saving || queuing || topicIdsToSave.length === 0}>
+                    {queuing ? t.savingQueue : t.saveAndQueue}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
+  )
+}

@@ -53,9 +53,9 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       onCancel={handleCancel}
       // No onClose binding here — we manage state ourselves
       className={cn(
-        'rounded-xl shadow-2xl border border-slate-200 p-0 m-auto',
+        'rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-0 m-auto bg-white dark:bg-slate-800',
         // Backdrop styled via globals.css (dialog::backdrop)
-        'backdrop:bg-slate-900/40 backdrop:backdrop-blur-sm',
+        'backdrop:bg-slate-900/40 dark:backdrop:bg-black/60 backdrop:backdrop-blur-sm',
         {
           'w-full max-w-sm': size === 'sm',
           'w-full max-w-lg': size === 'md',
@@ -65,12 +65,12 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">{title}</h2>
         <button
           type="button"
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors text-sm leading-none"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm leading-none"
           aria-label="סגור"
         >
           ✕
