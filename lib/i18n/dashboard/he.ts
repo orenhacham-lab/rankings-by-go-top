@@ -954,6 +954,8 @@ export const dashboardHe = {
         skippedCount: 'דולגו',
         // Phase 3J — success accounting: inserted + already-existing = embedded.
         embeddedLine: '{x}/{y} קישורים הוטמעו או כבר קיימים בתוכן',
+        // Phase 3J.1 — PREVIEW breakdown (before apply): three distinct states.
+        previewStatusLine: '{a} כבר קיימים · {r} מוכן להטמעה · {s} דולג',
         snapshotLabel: 'נקודת שחזור',
         rollbackAvailable: 'שחזור זמין',
         rollbackConfirm: 'לשחזר את הטיוטה למצב שלפני הטמעת הקישורים? הפעולה תחזיר את התוכן ואת רשימת הקישורים הפנימיים לגיבוי.',
@@ -993,7 +995,7 @@ export const dashboardHe = {
           anchor_not_found_in_safe_prose: 'העוגן לא נמצא כטקסט טבעי בגוף המאמר',
           target_already_linked: 'הקישור כבר קיים בטיוטה',
           placement_too_early: 'העוגן מופיע מוקדם מדי במאמר',
-          placement_too_close: 'קרוב מדי לקישור מתוכנן אחר',
+          placement_too_close: 'דולג — קרוב מדי לקישור אחר, ולא נמצא מיקום חלופי בטוח.',
           plan_stale: 'תכנון הקישורים התיישן',
           cache_stale: 'אינדקס האתר התיישן',
           cache_version_stale: 'גרסת הסריקה התיישנה',

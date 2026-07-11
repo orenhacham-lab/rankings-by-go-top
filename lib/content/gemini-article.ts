@@ -582,34 +582,44 @@ function enforceAnchors(html: string, anchors: ArticleTopicAnchor[], language: S
   return out
 }
 
-// ── Phase 3J — planned internal-link phrases: generation-stage presence fix ────
+// ── Phase 3J / 3J.1 — planned internal-link phrases: generation-stage presence
+// AND spacing recovery ─────────────────────────────────────────────────────────
 // The prompt ASKS the model to weave every approved anchor phrase into the body,
-// but a phrase the model skipped used to die later at apply time as
-// "anchor_not_found_in_safe_prose" — a user-approved link silently lost. When a
-// planned phrase is missing from the generated body, ONE natural plain-text
-// sentence containing the phrase verbatim is appended to an eligible paragraph
-// (never the intro/first paragraph, after the first <h2>, in a paragraph with
-// no existing link, spaced from links and other planted phrases) so the later
-// apply pass can wrap it safely. Plain TEXT only — never inserts an <a> tag.
+// but two failure modes lost a user-approved link at apply time:
+//   (3J)   the phrase was MISSING → apply reported anchor_not_found_in_safe_prose.
+//   (3J.1) the phrase was present but its ONLY occurrence(s) sat within the apply
+//          word-gap of another link → apply reported placement_too_close, with no
+//          alternative to fall back to.
+// For each approved phrase we now guarantee at least ONE occurrence that is
+// well-spaced (>= the planted gap) from existing links and from every other
+// approved phrase's committed position. If none exists (missing OR all crowded)
+// we append ONE natural plain-text sentence carrying the phrase verbatim into an
+// eligible paragraph — never the intro/first paragraph, after the first <h2>, in
+// a paragraph with no existing link, spaced from links and other phrases — so the
+// later apply pass has a safe, distinct occurrence to wrap. Plain TEXT only:
+// never inserts an <a> tag, and never forces an unsafe/irrelevant placement (a
+// crowded occurrence that already exists is left untouched as prose).
 const PLANNED_PHRASE_MIN_WORD_GAP = 100
 
 export function ensurePlannedPhrases(html: string, phrases: string[], language: SuggestionLanguage): string {
   const wanted = Array.from(new Set((phrases || []).map((p) => (p || '').trim()).filter(Boolean)))
   if (!wanted.length || !html) return html
   let out = html
-  // Spacing seeds: existing links (so the later wrap keeps the apply gap from
-  // them) + paragraphs already carrying one of the WANTED phrases (each becomes
-  // a link later — a planted phrase must keep its distance from those too) +
-  // each planted phrase (so two planted phrases never end up adjacent).
+  // Committed spacing positions: existing links first (so a planted/kept phrase
+  // keeps the apply gap from them). Each processed phrase then commits ITS chosen
+  // position so the next phrase stays clear of it.
   const used: number[] = scanAnchorHits(out).hits.map((h) => h.wordIndex)
-  for (const p of collectParagraphs(out)) {
-    const innerLower = p.inner.toLowerCase()
-    if (wanted.some((w) => innerLower.includes(w.toLowerCase()))) used.push(p.wordStart)
-  }
+  const farEnough = (w: number) => used.every((u) => Math.abs(w - u) >= PLANNED_PHRASE_MIN_WORD_GAP)
+
   for (const phrase of wanted) {
-    const visible = out.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').toLowerCase()
-    if (visible.includes(phrase.toLowerCase())) continue
+    const pl = phrase.toLowerCase()
     const paras = collectParagraphs(out)
+    // 3J.1 — a WELL-SPACED natural occurrence already exists (link-free prose
+    // paragraph carrying the phrase, clear of committed positions) → keep it as
+    // the linkable occurrence; add nothing.
+    const spaced = paras.find((p) => !p.hasLink && p.inner.toLowerCase().includes(pl) && farEnough(p.wordStart))
+    if (spaced) { used.push(spaced.wordStart); continue }
+    // Missing, or every occurrence is crowded → append ONE well-spaced sentence.
     const firstH2 = out.search(/<h2[\s>]/i)
     const eligible = paras.filter((p) =>
       !p.hasLink &&
@@ -617,7 +627,7 @@ export function ensurePlannedPhrases(html: string, phrases: string[], language: 
       p.wordStart >= ANCHOR_MIN_WORDS_BEFORE_FIRST &&
       (firstH2 < 0 || p.start > firstH2))
     const pool = eligible.length ? eligible : paras.filter((p) => !p.hasLink && p.index >= 1)
-    const target = pool.find((p) => used.every((u) => Math.abs(p.wordStart - u) >= PLANNED_PHRASE_MIN_WORD_GAP)) || pool[pool.length - 1]
+    const target = pool.find((p) => farEnough(p.wordStart)) || pool[pool.length - 1]
     const sentence = language === 'he'
       ? ` בהקשר זה, כדאי להכיר מקרוב גם ${esc(phrase)}.`
       : ` In this context, it is also worth exploring ${esc(phrase)}.`

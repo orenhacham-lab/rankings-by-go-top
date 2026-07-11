@@ -479,15 +479,22 @@ export default function ArticleInternalLinkApplyPanel({
                 {previewResult && !previewResult.reason && (
                   <div className="mt-3">
                     <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{t.previewTitle}</div>
-                    {/* Phase 3J — success accounting up front: already-existing links
-                        ARE embedded links, out of everything the user approved. */}
-                    {previewResult.approvedLinks > 0 && (
-                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                        {t.embeddedLine
-                          .replace('{x}', String(previewResult.items.filter((it) => (it.reason || '').startsWith('target_already_linked')).length))
-                          .replace('{y}', String(previewResult.approvedLinks))}
-                      </p>
-                    )}
+                    {/* Phase 3J.1 — a PREVIEW is not a final count: separate the
+                        three states so "ready to embed" isn't mistaken for a skip.
+                        already-existing (success) · ready to embed · skipped. */}
+                    {previewResult.approvedLinks > 0 && (() => {
+                      const already = previewResult.items.filter((it) => (it.reason || '').startsWith('target_already_linked')).length
+                      const ready = previewResult.wouldInsert
+                      const skipped = Math.max(0, previewResult.approvedLinks - already - ready)
+                      return (
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                          {t.previewStatusLine
+                            .replace('{a}', String(already))
+                            .replace('{r}', String(ready))
+                            .replace('{s}', String(skipped))}
+                        </p>
+                      )
+                    })()}
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                       {t.summaryApproved}: {previewResult.approvedLinks} · {t.summaryWouldInsert}: {previewResult.wouldInsert} · {t.summaryWouldSkip}: {previewResult.wouldSkip} · {t.contentUnchanged}
                     </p>
