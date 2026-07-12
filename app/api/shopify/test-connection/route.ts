@@ -1,0 +1,39 @@
+/**
+ * Phase 4F.1 — POST /api/shopify/test-connection { projectId }
+ * Tests the project's SAVED Shopify connection and records the result
+ * (status/last_tested_at/storefront_domain/last_error). Never returns the token.
+ */
+
+import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-auth'
+import { loadShopifyConnection } from '@/lib/shopify/api-auth'
+import { testShopifyConnection } from '@/lib/shopify/client'
+
+export async function POST(request: Request) {
+  if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
+
+  let body: { projectId?: string }
+  try { body = await request.json() } catch { body = {} }
+  const auth = await authContentProject(body.projectId)
+  if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  const loaded = await loadShopifyConnection(auth.admin, auth.project.id)
+  if ('error' in loaded) {
+    const reason = loaded.status === 404 ? 'no_shopify_connection' : 'shopify_connection_error'
+    return Response.json({ error: reason, reason }, { status: loaded.status === 404 ? 400 : loaded.status })
+  }
+
+  const test = await testShopifyConnection(loaded.creds)
+  const storefront = test.ok && test.storefrontDomain ? test.storefrontDomain : loaded.connection.storefront_domain
+  await auth.admin
+    .from('shopify_connections')
+    .update({
+      connection_status: test.ok ? 'connected' : 'failed',
+      last_tested_at: new Date().toISOString(),
+      storefront_domain: storefront,
+      last_error: test.ok ? null : test.error ?? 'connection_failed',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', loaded.connection.id)
+
+  return Response.json({ ok: test.ok, ...(test.ok ? { shopName: test.shopName, storefrontDomain: test.storefrontDomain ?? null } : { error: test.error, kind: test.kind }) })
+}
