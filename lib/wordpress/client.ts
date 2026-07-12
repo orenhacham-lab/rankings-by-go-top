@@ -30,6 +30,7 @@ import type {
   WordPressListOptions,
   SeoKeywordSource,
 } from './types'
+import { seoPluginFromNamespaces, seoMetaKeys, verifySeoMeta, type SeoPlugin, type SeoMetaStatus } from '@/lib/content/wordpress-taxonomy'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_RESPONSE_BYTES = 2_000_000
@@ -366,38 +367,129 @@ export type WordPressPostStatus = 'draft' | 'publish'
  * decides the status — this function never defaults to publish. Returns the new
  * post id + link + the status WordPress reports.
  */
-export async function createPost(
-  creds: WordPressCredentials,
-  post: { title: string; content: string; status: WordPressPostStatus; slug?: string; excerpt?: string; featuredMedia?: number }
-): Promise<{ id: number; link: string; status: string }> {
+export interface WordPressPostFields {
+  title: string
+  content: string
+  status: WordPressPostStatus
+  slug?: string
+  excerpt?: string
+  featuredMedia?: number
+  /** Phase 4E — WP category term IDs (WordPress SETS, never appends). */
+  categories?: number[]
+  /** Phase 4E — WP tag term IDs. */
+  tags?: number[]
+}
+
+function buildPostPayload(post: WordPressPostFields): Record<string, unknown> {
   const status: WordPressPostStatus = post.status === 'publish' ? 'publish' : 'draft'
   const payload: Record<string, unknown> = { title: post.title, content: post.content, status }
   if (post.slug) payload.slug = post.slug
   if (post.excerpt) payload.excerpt = post.excerpt
   if (typeof post.featuredMedia === 'number') payload.featured_media = post.featuredMedia
+  // Send taxonomy ONLY when provided. WordPress replaces (sets) the post's terms
+  // with these IDs, so repeated export/update never duplicates categories/tags.
+  if (Array.isArray(post.categories)) payload.categories = post.categories
+  if (Array.isArray(post.tags)) payload.tags = post.tags
+  return payload
+}
 
-  const created = await wpPostJson<{ id?: number; link?: string; status?: string }>(creds, '/posts', payload)
+export async function createPost(
+  creds: WordPressCredentials,
+  post: WordPressPostFields,
+): Promise<{ id: number; link: string; status: string }> {
+  const created = await wpPostJson<{ id?: number; link?: string; status?: string }>(creds, '/posts', buildPostPayload(post))
   if (!created || typeof created.id !== 'number') throw new WordPressClientError('WordPress did not return a post id.')
-  return { id: created.id, link: created.link || '', status: created.status || status }
+  return { id: created.id, link: created.link || '', status: created.status || (post.status === 'publish' ? 'publish' : 'draft') }
 }
 
 /**
- * Best-effort SEO meta update (Yoast + Rank Math keys). Registered/protected
- * meta may be rejected by the REST API — the caller MUST wrap this in try/catch
- * and never fail the export on its account.
+ * Phase 4E — UPDATE an existing post in place (idempotent re-export). Same
+ * payload shape as createPost; targets /posts/{id}. Used when the article already
+ * has a wp_post_id so a re-export never creates a duplicate post, and taxonomy
+ * (a SET operation) never duplicates terms.
+ */
+export async function updatePost(
+  creds: WordPressCredentials,
+  postId: number,
+  post: WordPressPostFields,
+): Promise<{ id: number; link: string; status: string }> {
+  const updated = await wpPostJson<{ id?: number; link?: string; status?: string }>(creds, `/posts/${postId}`, buildPostPayload(post))
+  if (!updated || typeof updated.id !== 'number') throw new WordPressClientError('WordPress did not return a post id.')
+  return { id: updated.id, link: updated.link || '', status: updated.status || (post.status === 'publish' ? 'publish' : 'draft') }
+}
+
+/**
+ * Phase 4E — detect the SEO plugin exposed by the site's REST API. Uses the
+ * smallest reliable probe: the REST root's `namespaces` list (Yoast → yoast/v1,
+ * Rank Math → rankmath/v1). Never throws — returns a clear state.
+ */
+export async function detectSeoPlugin(creds: WordPressCredentials): Promise<SeoPlugin> {
+  try {
+    const origin = await assertSafeSiteUrl(creds.siteUrl)
+    const target = new URL(`${origin}/wp-json/?_fields=namespaces`)
+    const { status, body } = await httpsGet(target, buildAuthHeader(creds))
+    if (status === 401 || status === 403) return 'permission_error'
+    if (status < 200 || status >= 300) return 'unknown'
+    let parsed: { namespaces?: unknown }
+    try { parsed = JSON.parse(body) } catch { return 'unknown' }
+    return seoPluginFromNamespaces(parsed?.namespaces)
+  } catch {
+    return 'unknown'
+  }
+}
+
+/**
+ * Phase 4E — write the article's SEO meta to the DETECTED plugin ONLY (never
+ * both key sets), then verify by reading the post meta back where the REST API
+ * permits. Returns { plugin, status } — status is one of verified /
+ * written_not_verifiable / plugin_unavailable / permission_error / exact_failure.
+ * Never throws; SEO-meta failure is a warning, never a silent success and never
+ * fatal to the post itself (the caller decides how to surface it).
+ */
+export async function writeVerifiedSeoMeta(
+  creds: WordPressCredentials,
+  postId: number,
+  seo: { metaTitle?: string | null; metaDescription?: string | null; focusKeyword?: string | null },
+  knownPlugin?: SeoPlugin,
+): Promise<{ plugin: SeoPlugin; status: SeoMetaStatus; detail?: string }> {
+  const plugin = knownPlugin && knownPlugin !== 'unknown' ? knownPlugin : await detectSeoPlugin(creds)
+  if (plugin === 'permission_error') return { plugin, status: 'permission_error' }
+  if (plugin === 'none' || plugin === 'unknown') return { plugin, status: 'plugin_unavailable' }
+
+  const meta = seoMetaKeys(plugin, seo)
+  if (Object.keys(meta).length === 0) return { plugin, status: 'plugin_unavailable' }
+
+  try {
+    await wpPostJson(creds, `/posts/${postId}`, { meta })
+  } catch (err) {
+    const msg = err instanceof WordPressClientError ? err.message : 'SEO meta write failed.'
+    if (/authentication failed/i.test(msg)) return { plugin, status: 'permission_error', detail: msg }
+    return { plugin, status: 'exact_failure', detail: msg }
+  }
+
+  // Verify by reading the meta back (protected meta is often not exposed → then
+  // we honestly report written_not_verifiable rather than claiming success).
+  let readback: Record<string, unknown> | null = null
+  try {
+    const obj = await wpGet<{ meta?: Record<string, unknown> }>(creds, `/posts/${postId}?_fields=meta`)
+    readback = obj && typeof obj.meta === 'object' ? (obj.meta as Record<string, unknown>) : null
+  } catch {
+    readback = null
+  }
+  return { plugin, status: verifySeoMeta(meta, readback) }
+}
+
+/**
+ * Back-compat best-effort SEO meta update (used by the headless automation
+ * publisher). Now plugin-aware: writes ONLY the detected plugin's keys instead
+ * of both sets. Still non-fatal — the caller wraps it and never fails on it.
  */
 export async function updatePostSeoMeta(
   creds: WordPressCredentials,
   postId: number,
-  seo: { metaTitle?: string | null; metaDescription?: string | null }
+  seo: { metaTitle?: string | null; metaDescription?: string | null; focusKeyword?: string | null }
 ): Promise<void> {
-  const meta: Record<string, string> = {}
-  const t = (seo.metaTitle || '').trim()
-  const d = (seo.metaDescription || '').trim()
-  if (t) { meta._yoast_wpseo_title = t; meta.rank_math_title = t }
-  if (d) { meta._yoast_wpseo_metadesc = d; meta.rank_math_description = d }
-  if (Object.keys(meta).length === 0) return
-  await wpPostJson(creds, `/posts/${postId}`, { meta })
+  await writeVerifiedSeoMeta(creds, postId, seo)
 }
 
 /**

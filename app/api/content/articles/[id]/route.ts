@@ -102,9 +102,27 @@ function sanitizeArticleRow(a: Record<string, unknown>) {
     wp_post_id: a.wp_post_id,
     wp_post_url: a.wp_post_url,
     wp_featured_media_id: a.wp_featured_media_id,
+    // Phase 4E — WordPress taxonomy selection (term IDs).
+    wp_primary_category_id: a.wp_primary_category_id ?? null,
+    wp_category_ids: Array.isArray(a.wp_category_ids) ? a.wp_category_ids : [],
+    wp_tag_ids: Array.isArray(a.wp_tag_ids) ? a.wp_tag_ids : [],
     created_at: a.created_at,
     updated_at: a.updated_at,
   }
+}
+
+/** Normalize a taxonomy ID list from the request into unique positive integers. */
+function normalizeTermIds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return []
+  const out: number[] = []
+  const seen = new Set<number>()
+  for (const v of raw) {
+    const n = typeof v === 'number' ? v : Number(v)
+    if (!Number.isInteger(n) || n <= 0 || seen.has(n)) continue
+    seen.add(n)
+    out.push(n)
+  }
+  return out
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -152,6 +170,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   if ('excerpt' in body) patch.excerpt = String(body.excerpt ?? '').trim() || null
   if ('image_prompt' in body) patch.image_prompt = String(body.image_prompt ?? '').trim() || null
+  // Phase 4E — WordPress taxonomy selection (term IDs; the primary is also kept
+  // in wp_category_ids at publish time). Stored as-is; validated against the site
+  // only at export. null primary clears it.
+  if ('wp_primary_category_id' in body) {
+    const n = Number(body.wp_primary_category_id)
+    patch.wp_primary_category_id = Number.isInteger(n) && n > 0 ? n : null
+  }
+  if ('wp_category_ids' in body) patch.wp_category_ids = normalizeTermIds(body.wp_category_ids)
+  if ('wp_tag_ids' in body) patch.wp_tag_ids = normalizeTermIds(body.wp_tag_ids)
   if ('content_markdown' in body) patch.content_markdown = String(body.content_markdown ?? '') || null
   if ('faq_json' in body) {
     const faq = Array.isArray(body.faq_json)
