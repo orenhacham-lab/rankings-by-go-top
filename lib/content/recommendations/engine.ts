@@ -21,6 +21,7 @@ import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidat
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
+import { mergeHybrid, hybridProvenanceReason } from './hybrid'
 import { slugFromUrl } from '@/lib/content/internal-links'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { previewStructuredLinks } from '@/lib/content/internal-link-idea-plan'
@@ -329,7 +330,43 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   let suggestions: TopicSuggestion[] = []
   let meta: RecommendationResult['meta']
 
-  if (input.source === 'keyword') {
+  if (input.source === 'hybrid') {
+    // Phase 4C — HYBRID orchestrator. Run every ELIGIBLE provider INDEPENDENTLY
+    // (each is the existing single-source path, unchanged, and reuses its own
+    // caches — site-scan index, keyword-research cache — since they key by
+    // project). Failures are isolated via allSettled; one dead provider never
+    // stops the others. Then merge + cluster + rank + attach provenance. The
+    // 'keyword' provider is only eligible when a seed keyword was supplied.
+    const eligible: RecommendationSource[] = ['site_scan', 'keyword_research_url', 'project_data']
+    if ((input.keyword || '').trim()) eligible.unshift('keyword')
+    const settled = await Promise.allSettled(
+      eligible.map((s) => generateRecommendations(admin, { ...input, source: s })),
+    )
+    const runs = eligible.map((s, i) => {
+      const r = settled[i]
+      if (r.status === 'fulfilled') return { source: s, ok: true, reason: r.value.meta.reason, suggestions: r.value.suggestions }
+      console.error('[recommendations] hybrid provider failed', { source: s, message: String(r.reason).slice(0, 200) })
+      return { source: s, ok: false, reason: 'provider_error', suggestions: [] as TopicSuggestion[] }
+    })
+    const merged = mergeHybrid(runs)
+    // Fold a language-aware "supported by…" summary into the reason so provenance
+    // survives persistence; supportingSources drives the badges on the fresh run.
+    suggestions = merged.suggestions.map((s) => ({ ...s, suggestionReason: hybridProvenanceReason(s.supportingSources ?? [], language, s.suggestionReason) }))
+    const rawGenerated = runs.reduce((n, r) => n + r.suggestions.length, 0)
+    const anyOk = runs.some((r) => r.ok)
+    meta = {
+      source: 'hybrid',
+      generated: rawGenerated,
+      skippedDuplicates: merged.duplicatesRemoved,
+      finalCount: suggestions.length,
+      attempts: 1,
+      reason: suggestions.length > 0 ? undefined : (!anyOk ? 'model_error' : rawGenerated > 0 ? 'all_duplicates' : 'model_empty'),
+      providers: merged.providerStatus,
+      debug: process.env.NODE_ENV !== 'production'
+        ? { providerStatus: merged.providerStatus, rawCount: merged.rawCount, clusterCount: merged.clusterCount, duplicatesRemoved: merged.duplicatesRemoved }
+        : undefined,
+    }
+  } else if (input.source === 'keyword') {
     const keyword = (input.keyword || '').trim()
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {

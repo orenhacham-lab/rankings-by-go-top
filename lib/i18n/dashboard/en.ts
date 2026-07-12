@@ -89,6 +89,11 @@ export const dashboardEn = {
       sourceProject: 'By project data',
       sourceResearch: 'By site keyword research',
       sourceSiteScan: 'From site scan',
+      // Phase 4C — hybrid combined source.
+      sourceHybrid: 'Combined scan',
+      badgeHybrid: 'Hybrid',
+      hybridSupportedBy: 'Supported by {n} sources',
+      hybridProviderUnavailable: '{s} unavailable',
       keywordPlaceholder: 'Type a keyword…',
       generate: 'Find ideas',
       generating: 'Finding ideas…',

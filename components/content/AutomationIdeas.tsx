@@ -15,7 +15,8 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
-type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan'
+type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
+type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: string }
 
 /** Phase 3I.6 — per-rejected-idea evidence of WHAT blocked it (from
  *  meta.debug.primaryKeywordMatches; returned on runs that added nothing new). */
@@ -47,6 +48,8 @@ interface Suggestion {
   linkPreviewReason?: string
   /** Phase 3F.3.6 — URL of the best commercial destination (shown first, labelled). */
   moneyTargetUrl?: string | null
+  /** Phase 4C — hybrid provenance: which providers support this idea. */
+  supportingSources?: Source[]
 }
 
 export default function AutomationIdeas({
@@ -115,7 +118,7 @@ export default function AutomationIdeas({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [ideasExpanded, setIdeasExpanded] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[] } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[] } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -175,7 +178,7 @@ export default function AutomationIdeas({
     return () => window.clearTimeout(id)
   }, [queueSuccess])
 
-  const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : s === 'site_scan' ? t.badgeSiteScan : t.badgeResearch)
+  const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : s === 'site_scan' ? t.badgeSiteScan : s === 'hybrid' ? t.badgeHybrid : t.badgeResearch)
 
   // Monotonic request id: only the latest generate() call is allowed to write
   // state, so a slow earlier response can never overwrite a newer one.
@@ -221,6 +224,8 @@ export default function AutomationIdeas({
         funnel: data.meta?.funnel,
         // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
         keywordMatches: Array.isArray(data.meta?.debug?.primaryKeywordMatches) ? data.meta.debug.primaryKeywordMatches : undefined,
+        // Phase 4C — per-provider status for a hybrid run (partial-failure transparency).
+        providers: Array.isArray(data.meta?.providers) ? data.meta.providers : undefined,
       })
     } catch {
       if (reqId !== reqRef.current) return
@@ -485,8 +490,10 @@ export default function AutomationIdeas({
     }
   }
 
-  // Strongest SEO source first (site keyword research), then keyword, then project data.
+  // Phase 4C — hybrid first (combines all sources), then the individual sources
+  // kept for advanced/manual use.
   const sourceTabs: { key: Source; label: string }[] = [
+    { key: 'hybrid', label: t.sourceHybrid },
     { key: 'keyword_research_url', label: t.sourceResearch },
     { key: 'site_scan', label: t.sourceSiteScan },
     { key: 'keyword', label: t.sourceKeyword },
@@ -573,6 +580,18 @@ export default function AutomationIdeas({
       {meta && suggestions.length > 0 && (
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
           {t.runSummary.replace('{new}', String(meta.newlyAdded)).replace('{total}', String(suggestions.length))}
+        </p>
+      )}
+      {/* Phase 4C — hybrid per-provider transparency: which sources ran, and a
+          clear "X unavailable" for any that failed (the run never fails wholesale). */}
+      {meta?.providers && meta.providers.length > 0 && !loading && (
+        <p className="text-[11px] mb-2">
+          {meta.providers.map((p, i) => (
+            <span key={p.source} className={p.ok ? 'text-slate-500 dark:text-slate-400' : 'text-amber-700 dark:text-amber-400'}>
+              {i > 0 && ' · '}
+              {p.ok ? `${sourceBadge(p.source)}: ${p.count}` : t.hybridProviderUnavailable.replace('{s}', sourceBadge(p.source))}
+            </span>
+          ))}
         </p>
       )}
       {/* When this run added nothing new, explain WHY (existing keywords / all
@@ -730,7 +749,20 @@ export default function AutomationIdeas({
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.title}</span>
-                      <Badge variant="neutral">{sourceBadge(s.source)}</Badge>
+                      {/* Phase 4C — hybrid provenance: show each supporting source
+                          as a badge + a count when >1 (multi-source agreement). */}
+                      {s.supportingSources && s.supportingSources.length > 0 ? (
+                        <>
+                          {s.supportingSources.map((ss) => (
+                            <Badge key={ss} variant="success">{sourceBadge(ss)}</Badge>
+                          ))}
+                          {s.supportingSources.length > 1 && (
+                            <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">{t.hybridSupportedBy.replace('{n}', String(s.supportingSources.length))}</span>
+                          )}
+                        </>
+                      ) : (
+                        <Badge variant="neutral">{sourceBadge(s.source)}</Badge>
+                      )}
                       {typeof s.suggestionScore === 'number' && (
                         <span className="text-[10px] text-slate-400">{Math.round(s.suggestionScore * 100)}%</span>
                       )}

@@ -8,7 +8,9 @@
 
 import type { ArticleTopicSource } from '@/lib/supabase/types'
 
-export type RecommendationSource = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan'
+// 'hybrid' (Phase 4C) is an ORCHESTRATOR source: it runs every eligible provider
+// below and merges their results. It is never a leaf provider itself.
+export type RecommendationSource = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
 
 export interface SuggestedInternalLink {
   url: string
@@ -38,6 +40,11 @@ export interface TopicSuggestion {
   moneyTargetUrl?: string | null
   /** Phase 3F.3.6 — money-target match classification (dev/diagnostic + card badge). */
   moneyTargetMatchType?: string
+  /** Phase 4C — hybrid provenance: the distinct providers that produced/support
+   *  this idea (present only on hybrid runs). Response-only. */
+  supportingSources?: RecommendationSource[]
+  /** Phase 4C — per-source evidence (source + that source's own reason). */
+  sourceEvidence?: { source: RecommendationSource; reason: string }[]
 }
 
 export interface RecommendationMeta {
@@ -58,6 +65,9 @@ export interface RecommendationMeta {
   keywordResearchFailed?: boolean
   failureReason?: string
   adsCalls?: number
+  /** Phase 4C — per-provider execution status for a hybrid run (partial-failure
+   *  transparency): which providers ran, their raw counts, and any failure. */
+  providers?: { source: RecommendationSource; ok: boolean; count: number; reason?: string }[]
   /** Non-production diagnostics (Phase 3F.1) — safe counters, no secrets. */
   debug?: Record<string, unknown>
 }
@@ -69,8 +79,9 @@ export interface RecommendationResult {
 
 /** Map a UI recommendation source to the persisted article_topics.source tag. */
 export function toArticleTopicSource(source: RecommendationSource): ArticleTopicSource {
-  // 'site_scan' has no dedicated article_topics.source value (no schema change);
-  // it persists as 'project_data' — provenance is kept in suggestion_reason.
-  if (source === 'site_scan') return 'project_data'
+  // 'site_scan' / 'hybrid' have no dedicated article_topics.source value (no
+  // schema change); they persist as 'project_data' — provenance is kept in
+  // suggestion_reason (Phase 4C hybrid folds a "supported by…" summary there).
+  if (source === 'site_scan' || source === 'hybrid') return 'project_data'
   return source // remaining values intentionally align with the widened CHECK
 }
