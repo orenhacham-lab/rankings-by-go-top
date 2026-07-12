@@ -36,7 +36,11 @@ export async function GET(request: Request) {
   if (!config) return Response.json({ error: 'shopify_oauth_not_configured', reason: 'not_configured' }, { status: 500 })
 
   const shop = normalizeShopDomain(shopRaw)
-  if (!shop) return fail('invalid_domain')
+  if (!shop) {
+    console.warn('[Shopify OAuth] invalid shop', { route: 'shopify_oauth_start', receivedShop: shopRaw || null, normalizedShop: null, reason: 'invalid_domain' })
+    return fail('invalid_domain')
+  }
+  console.log('[Shopify OAuth] start', { route: 'shopify_oauth_start', receivedShop: shopRaw, normalizedShop: shop, projectId: auth.project.id })
 
   // Platform exclusivity: refuse if the project already uses WordPress.
   const { data: wordpress } = await auth.admin

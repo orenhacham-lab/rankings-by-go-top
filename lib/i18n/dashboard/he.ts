@@ -1506,7 +1506,7 @@ export const dashboardHe = {
         versionFallback: 'Shopify החזיר גרסת API שונה מזו שהתבקשה',
         counts: { product: 'מוצרים', collection: 'קטגוריות', page: 'עמודים', blog: 'בלוגים', article: 'מאמרים' },
         errors: {
-          invalid_domain: 'דומיין חנות לא תקין (נדרש *.myshopify.com).',
+          invalid_domain: 'כתובת חנות Shopify לא תקינה. יש להזין כתובת בפורמט your-store.myshopify.com',
           invalid_token: 'הטוקן שגוי או פג תוקף.',
           missing_scope: 'חסרה הרשאת קריאה בטוקן (read_products / read_content).',
           permission_error: 'לא ניתן לקרוא את ההרשאות שהוענקו לטוקן (שגיאת הרשאה).',
@@ -1528,7 +1528,7 @@ export const dashboardHe = {
           expired_state: 'בקשת החיבור פגה. התחילו מחדש.',
           state_replay: 'קישור החיבור כבר נוצל. התחילו מחדש.',
           invalid_nonce: 'לא ניתן היה לאמת את החיבור בדפדפן זה. התחילו מחדש באותו דפדפן.',
-          invalid_shop: 'דומיין חנות Shopify לא תקין.',
+          invalid_shop: 'כתובת חנות Shopify לא תקינה. יש להזין כתובת בפורמט your-store.myshopify.com',
           missing_code: 'Shopify לא החזיר קוד הרשאה. נסו שוב.',
           token_exchange_failed: 'לא ניתן להשלים את ההרשאה מול Shopify. נסו שוב.',
           missing_scopes: 'החיבור בוצע, אך הרשאות הקריאה הנדרשות לא אושרו (read_products, read_content).',

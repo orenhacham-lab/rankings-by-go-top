@@ -8,23 +8,32 @@ import type { ShopifyEntityType } from './types'
 
 /**
  * Normalize a user-entered shop identifier into a bare *.myshopify.com host.
- * Accepts: "acme", "acme.myshopify.com", "https://acme.myshopify.com/admin",
- * "ACME.MyShopify.com". Returns null when it can't be resolved to a valid
- * *.myshopify.com host. Custom storefront domains are NOT accepted here — the
- * admin API domain must be *.myshopify.com (the custom domain is discovered
- * from the shop after connecting and used only for canonical URLs).
+ *
+ * Accepts, returning `{store}.myshopify.com`:
+ *   - "acme"                              → "acme.myshopify.com"
+ *   - "acme.myshopify.com"                → "acme.myshopify.com"
+ *   - "https://acme.myshopify.com"        → "acme.myshopify.com"
+ *   - "http://acme.myshopify.com/"        → "acme.myshopify.com" (one trailing slash)
+ *   - "ACME.MyShopify.com"                → "acme.myshopify.com"
+ *
+ * Returns null (invalid) for: empty, non-myshopify domains, a leftover protocol,
+ * whitespace, credentials/ports, or ANY path / query / hash (e.g. ".../admin",
+ * "...?x=1"). A single trailing slash is tolerated; a real path segment is not.
  */
 export function normalizeShopDomain(input: string): string | null {
   if (typeof input !== 'string') return null
   let s = input.trim().toLowerCase()
   if (!s) return null
-  // Strip scheme, path, query, and any leading/trailing slashes.
-  s = s.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\s+/g, '')
-  if (!s) return null
-  // A bare handle → append the canonical suffix.
+  // Strip a single leading http(s):// scheme, and exactly one trailing slash.
+  s = s.replace(/^https?:\/\//, '')
+  if (s.endsWith('/')) s = s.slice(0, -1)
+  // Reject anything that still carries a path, query, hash, whitespace,
+  // credentials, port, or a leftover protocol — never silently strip it.
+  if (!s || /[/\s?#@:]/.test(s)) return null
+  // A bare handle (no dot) → append the canonical suffix.
   if (!s.includes('.')) s = `${s}.myshopify.com`
-  // Validate the final shape: one label + .myshopify.com, DNS-safe label.
-  const m = s.match(/^([a-z0-9][a-z0-9-]*[a-z0-9]|[a-z0-9])\.myshopify\.com$/)
+  // Final shape: one DNS-safe label + .myshopify.com, nothing else.
+  const m = s.match(/^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\.myshopify\.com$/)
   if (!m) return null
   return s
 }

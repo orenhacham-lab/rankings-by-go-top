@@ -52,6 +52,13 @@ export default function ContentSection({ projectId }: { projectId: string }) {
 
   useEffect(() => { refresh() }, [refresh])
 
+  // Returning from a Shopify OAuth attempt (?shopify=connected|warning|error)
+  // opens the Shopify view so its panel shows the result + a re-entry field
+  // (instead of a silent platform-choice screen). No-op when already connected.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('shopify')) setChoice('shopify')
+  }, [])
+
   const stats = [
     { label: t.statsDrafts, value: 0 },
     { label: t.statsReady, value: 0 },
