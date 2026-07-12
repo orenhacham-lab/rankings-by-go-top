@@ -11,7 +11,7 @@
  * eligible section. No auto-generation on article creation.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -31,15 +31,20 @@ type InlineImage = {
   position: number
 }
 
+// Client-side upload guardrails for Replace (server re-validates independently).
+const REPLACE_ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+const REPLACE_MAX_SIZE = 5 * 1024 * 1024 // 5MB — matches the existing project upload convention.
+
 type Dict = {
   title: string; hint: string; migrationRequired: string; add: string; adding: string
   max: string; noEligible: string; empty: string; section: string; selectSection: string
   promptLabel: string; promptPlaceholder: string; altLabel: string; altPlaceholder: string
   captionLabel: string; captionPlaceholder: string; generate: string; generating: string
-  regenerate: string; save: string; saving: string; move: string; remove: string
-  removeConfirm: string; saved: string; created: string; removed: string; generated: string
-  failed: string; statusPending: string; statusGenerating: string; statusReady: string
-  statusUploaded: string; statusFailed: string; errors: Record<string, string>
+  regenerate: string; replace: string; replacing: string; save: string; saving: string
+  move: string; remove: string; removeConfirm: string; saved: string; created: string
+  removed: string; generated: string; replaced: string; failed: string; statusPending: string
+  statusGenerating: string; statusReady: string; statusUploaded: string; statusFailed: string
+  errors: Record<string, string>
 }
 
 const inputCls =
@@ -50,11 +55,14 @@ export default function ArticleInlineImagesPanel({
   dict,
   dir,
   onNotify,
+  onImagesChange,
 }: {
   articleId: string
   dict: Dict
   dir: 'rtl' | 'ltr'
   onNotify?: (text: string, ok: boolean) => void
+  /** Emits the current image rows so the parent can compose the body preview. */
+  onImagesChange?: (images: InlineImage[]) => void
 }) {
   const t = dict
   const [loading, setLoading] = useState(true)
@@ -66,8 +74,15 @@ export default function ArticleInlineImagesPanel({
   const [drafts, setDrafts] = useState<Record<string, { prompt: string; alt: string; caption: string }>>({})
   const [busy, setBusy] = useState<string | null>(null) // imageId or 'add'
   const [addSection, setAddSection] = useState('')
+  // Hidden file input reused by every row's Replace action; targets one image id.
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const replaceTargetRef = useRef<string | null>(null)
 
   const notify = useCallback((text: string, ok: boolean) => onNotify?.(text, ok), [onNotify])
+
+  // Keep the parent's body-preview in sync with the current image rows so any
+  // add/generate/regenerate/replace/move/delete/edit refreshes the preview.
+  useEffect(() => { onImagesChange?.(images) }, [images, onImagesChange])
   const errText = useCallback((code: unknown) => t.errors[typeof code === 'string' ? code : 'unknown'] || t.errors.unknown, [t])
 
   const applyImages = useCallback((rows: InlineImage[]) => {
@@ -180,6 +195,31 @@ export default function ArticleInlineImagesPanel({
     } catch { notify(t.failed, false) } finally { setBusy(null) }
   }
 
+  // Replace = manual upload of a user-chosen file (distinct from AI Regenerate).
+  function pickReplacement(id: string) {
+    replaceTargetRef.current = id
+    if (fileInputRef.current) { fileInputRef.current.value = ''; fileInputRef.current.click() }
+  }
+  async function onReplaceFileSelected(ev: React.ChangeEvent<HTMLInputElement>) {
+    const id = replaceTargetRef.current
+    const file = ev.target.files?.[0]
+    ev.target.value = ''
+    if (!id || !file) return
+    if (!REPLACE_ALLOWED_TYPES.includes(file.type)) { notify(errText('invalid_type'), false); return }
+    if (file.size > REPLACE_MAX_SIZE) { notify(errText('file_too_large'), false); return }
+    setBusy(id)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/content/articles/${articleId}/inline-images/${id}`, { method: 'PUT', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { notify(errText(data.error), false); return }
+      const img = data.image as InlineImage | undefined
+      if (img) applyImages(images.map((i) => (i.id === id ? img : i)))
+      notify(t.replaced, true)
+    } catch { notify(t.failed, false) } finally { setBusy(null) }
+  }
+
   async function remove(id: string) {
     if (!window.confirm(t.removeConfirm)) return
     setBusy(id)
@@ -202,6 +242,14 @@ export default function ArticleInlineImagesPanel({
 
   return (
     <Card className="hover:translate-y-0" >
+      {/* Single hidden input reused by every row's Replace action. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={onReplaceFileSelected}
+      />
       <div className="flex items-center justify-between gap-2 mb-1">
         <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
         <Badge variant="neutral">{images.length}/{max}</Badge>
@@ -266,6 +314,8 @@ export default function ArticleInlineImagesPanel({
                     <Button size="sm" onClick={() => generate(img.id)} loading={isBusy} disabled={isBusy}>
                       {isBusy ? t.generating : (url ? t.regenerate : t.generate)}
                     </Button>
+                    {/* Replace = upload a chosen file; separate from AI Regenerate. */}
+                    <Button size="sm" variant="outline" onClick={() => pickReplacement(img.id)} disabled={isBusy}>{t.replace}</Button>
                     <Button size="sm" variant="outline" onClick={() => saveDetails(img.id)} disabled={isBusy}>{t.save}</Button>
                     <Button size="sm" variant="ghost" onClick={() => remove(img.id)} disabled={isBusy} className="text-red-600 dark:text-red-400">{t.remove}</Button>
                   </div>
