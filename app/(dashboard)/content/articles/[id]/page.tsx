@@ -15,6 +15,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
+import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/lib/content/internal-links'
@@ -479,6 +480,15 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           )}
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{e.imageSafetyNote}</p>
         </Card>
+
+        {/* Phase 4D — inline article images (in-body <figure>s, separate from the
+            featured image). Manages its own rows via the inline-images API. */}
+        <ArticleInlineImagesPanel
+          articleId={id}
+          dict={e.inline}
+          dir={isHebrew ? 'rtl' : 'ltr'}
+          onNotify={(text, ok) => { setMessage({ text, ok }); if (ok) toast.success(text) }}
+        />
 
         {/* WordPress export — draft (safe) or publish now (confirmed). */}
         <Card className="hover:translate-y-0">
