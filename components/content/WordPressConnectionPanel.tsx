@@ -26,7 +26,7 @@ type SanitizedConnection = {
   last_tested_at: string | null
 }
 
-export default function WordPressConnectionPanel({ projectId }: { projectId: string }) {
+export default function WordPressConnectionPanel({ projectId, onChanged }: { projectId: string; onChanged?: () => void }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
 
@@ -122,11 +122,13 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
       })
       const data = await res.json()
       if (!res.ok) {
-        setMessage({ text: data.error || t.genericError, ok: false })
+        const text = data.reason === 'platform_already_connected' ? t.platformAlreadyConnected : (data.error || t.genericError)
+        setMessage({ text, ok: false })
         return
       }
       setConnection(data.connection ?? null)
       setAppPassword('')
+      onChanged?.()
       if (data.test?.ok) {
         setMessage({ text: t.testSuccess, ok: true })
         setShowForm(false)
@@ -141,7 +143,7 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
   }
 
   async function handleDisconnect() {
-    if (!window.confirm(t.confirmDisconnect)) return
+    if (!window.confirm(t.confirmDisconnectExclusive)) return
     setDisconnecting(true)
     setMessage(null)
     try {
@@ -151,6 +153,7 @@ export default function WordPressConnectionPanel({ projectId }: { projectId: str
       if (res.ok) {
         setConnection(null)
         setShowForm(false)
+        onChanged?.()
       } else {
         setMessage({ text: t.genericError, ok: false })
       }
