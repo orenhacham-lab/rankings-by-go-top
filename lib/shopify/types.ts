@@ -7,9 +7,17 @@ export interface ShopifyCredentials {
   shopDomain: string
   /** Admin API access token (plaintext, decrypted server-side at call time). */
   accessToken: string
-  /** Pinned Admin API version (e.g. 2024-10). */
+  /** Pinned Admin API version (server-controlled; see SHOPIFY_API_VERSION). */
   apiVersion: string
 }
+
+/** Precise connection-test outcome (distinct from transport ShopifyErrorKind). */
+export type ShopifyConnectionStatus =
+  | 'connection_ok'
+  | 'invalid_token'
+  | 'missing_scopes'
+  | 'permission_error'
+  | 'api_version_fallback'
 
 export type ShopifyEntityType = 'product' | 'collection' | 'page' | 'blog' | 'article'
 
@@ -31,13 +39,23 @@ export interface ShopifyEntity {
 }
 
 export interface ShopifyTestResult {
+  /** True when the token is valid and the store is reachable (may still warn). */
   ok: boolean
-  /** Shop display name + resolved storefront host (present when ok). */
+  /** Precise classification of the test. */
+  status: ShopifyConnectionStatus
+  /** Shop display name + resolved storefront host (present when reachable). */
   shopName?: string
   storefrontDomain?: string | null
-  /** Human-readable failure reason (present when not ok). Never contains the token. */
+  /** Granted Admin API scopes (handles only — never the token). */
+  grantedScopes?: string[]
+  /** Required scopes NOT granted (exact list). */
+  missingScopes?: string[]
+  /** Requested (pinned) vs actual (X-Shopify-API-Version header) version. */
+  apiVersionRequested?: string
+  apiVersionActual?: string | null
+  /** Human-readable reason (present when not ok). Never contains the token. */
   error?: string
-  /** Classified failure kind for the UI/error map. */
+  /** Classified transport failure kind (network/api/rate-limit) when applicable. */
   kind?: ShopifyErrorKind
 }
 

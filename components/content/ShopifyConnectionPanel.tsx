@@ -75,8 +75,8 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
       if (!res.ok) { setMessage({ text: mapErr(data.reason || data.error), ok: false }); return }
       setConnection(data.connection ?? null)
       setAccessToken(''); setShowForm(false)
-      if (data.test && data.test.ok === false) setMessage({ text: `${t.saved} · ${mapErr(data.test.kind)}`, ok: false })
-      else setMessage({ text: t.saved, ok: true })
+      const msg = testStatusMessage(data.test)
+      setMessage({ text: `${t.saved}${msg.text ? ` · ${msg.text}` : ''}`, ok: msg.ok })
     } catch { setMessage({ text: t.saveError, ok: false }) } finally { setSaving(false) }
   }
 
@@ -87,8 +87,10 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.ok) setMessage({ text: `${t.testOk}${data.shopName ? ` — ${data.shopName}` : ''}`, ok: true })
-      else setMessage({ text: mapErr(data.kind || data.reason || data.error), ok: false })
+      if (res.ok && (data.status || typeof data.ok === 'boolean')) {
+        const msg = testStatusMessage(data, data.shopName)
+        setMessage({ text: msg.text, ok: msg.ok })
+      } else setMessage({ text: mapErr(data.kind || data.reason || data.error), ok: false })
       await load()
     } catch { setMessage({ text: t.testFail, ok: false }) } finally { setTesting(false) }
   }
@@ -122,6 +124,25 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
   function mapErr(code: unknown): string {
     const k = String(code || '')
     return (t.errors as Record<string, string>)[k] || t.errors.generic
+  }
+
+  /** Build a precise message from a rich test result ({status, missingScopes, versions}). */
+  function testStatusMessage(test: { status?: string; ok?: boolean; missingScopes?: string[] | null; apiVersionRequested?: string | null; apiVersionActual?: string | null } | undefined, shopName?: string): { text: string; ok: boolean } {
+    if (!test) return { text: '', ok: true }
+    switch (test.status) {
+      case 'connection_ok':
+        return { text: `${t.testOk}${shopName ? ` — ${shopName}` : ''}`, ok: true }
+      case 'missing_scopes':
+        return { text: `${t.missingScopesLabel}: ${(test.missingScopes || []).join(', ')}`, ok: false }
+      case 'api_version_fallback':
+        return { text: `${t.versionFallback} (${test.apiVersionRequested} → ${test.apiVersionActual})`, ok: false }
+      case 'invalid_token':
+        return { text: t.errors.invalid_token, ok: false }
+      case 'permission_error':
+        return { text: t.errors.permission_error, ok: false }
+      default:
+        return { text: test.ok ? t.testOk : t.errors.generic, ok: !!test.ok }
+    }
   }
 
   const statusVariant = connection?.connection_status === 'connected' ? 'success' : connection?.connection_status === 'failed' ? 'danger' : 'neutral'
@@ -175,8 +196,8 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
           <div className="text-xs text-slate-500 dark:text-slate-400">
             {connection.last_synced_at ? `${t.lastSync}: ${formatDateTime(connection.last_synced_at)}` : t.neverSynced}
           </div>
-          {connection.last_error && connection.connection_status === 'failed' && (
-            <div className="text-xs text-red-600 dark:text-red-400">{connection.last_error}</div>
+          {connection.last_error && (
+            <div className={`text-xs ${connection.connection_status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{connection.last_error}</div>
           )}
 
           <div className="flex flex-wrap gap-2">

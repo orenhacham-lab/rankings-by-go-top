@@ -6,6 +6,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { decryptCredential, CredentialsCryptoError } from '@/lib/security/credentials-crypto'
+import { SHOPIFY_API_VERSION } from './constants'
 import type { ShopifyCredentials } from './types'
 
 export type ShopifyConnectionRow = {
@@ -54,7 +55,8 @@ export async function loadShopifyConnection(
     const accessToken = decryptCredential(connection.access_token_encrypted)
     return {
       connection,
-      creds: { shopDomain: connection.shop_domain, accessToken, apiVersion: connection.api_version },
+      // Always the server-pinned version (centralized), never a stale stored value.
+      creds: { shopDomain: connection.shop_domain, accessToken, apiVersion: SHOPIFY_API_VERSION },
     }
   } catch (err) {
     const reason = err instanceof CredentialsCryptoError ? err.message : 'decryption failed'

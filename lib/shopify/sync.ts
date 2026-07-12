@@ -18,13 +18,26 @@ const ALL_TYPES: ShopifyEntityType[] = ['product', 'collection', 'page', 'blog',
 
 const nowIso = () => new Date().toISOString()
 
+/**
+ * Types whose stale entities may be deactivated this run = ONLY the types that
+ * synced successfully. A type that failed (e.g. missing scope → its query was
+ * denied) is excluded, so its previously-valid entities are preserved untouched.
+ * PURE + unit-tested.
+ */
+export function succeededSyncTypes(perType: EntitySyncTypeResult[]): ShopifyEntityType[] {
+  return perType.filter((t) => t.ok).map((t) => t.type)
+}
+
 export async function runShopifySync(
   admin: Admin,
   connection: ShopifyConnectionRow,
   creds: ShopifyCredentials,
 ): Promise<ShopifySyncResult> {
   const runStart = nowIso()
-  const { entities, perType } = await discoverEntities(creds, connection.storefront_domain)
+  const { entities, perType, apiVersionActual } = await discoverEntities(creds, connection.storefront_domain)
+  // Flag a silent Shopify fall-forward away from the pinned version (warning
+  // only — the sync itself still ran and its data is valid).
+  const versionFallback = !!apiVersionActual && apiVersionActual !== creds.apiVersion
 
   // Upsert every discovered entity (idempotent on project_id+shopify_gid).
   let upserted = 0
@@ -67,7 +80,7 @@ export async function runShopifySync(
   // touched by this run (older synced_at). Failed types are skipped so their
   // previously-valid rows are preserved unchanged (partial-sync safety).
   let deactivated = 0
-  const succeededTypes = new Set(perType.filter((t) => t.ok).map((t) => t.type))
+  const succeededTypes = new Set(succeededSyncTypes(perType))
   for (const type of ALL_TYPES) {
     if (!succeededTypes.has(type)) continue
     const { data, error } = await admin
@@ -83,7 +96,8 @@ export async function runShopifySync(
 
   const counts = await countActiveByType(admin, connection.project_id)
   const warnings = perTypeWarnings(perType)
-  const allOk = perType.every((t) => t.ok)
+  if (versionFallback) warnings.push(`api_version_fallback: requested ${creds.apiVersion}, actual ${apiVersionActual}`)
+  const allOk = perType.every((t) => t.ok) && !versionFallback
 
   // Persist sync status on the connection (never the token).
   await admin

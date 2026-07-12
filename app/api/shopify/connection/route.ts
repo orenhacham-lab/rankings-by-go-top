@@ -16,10 +16,10 @@ import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-au
 import { loadShopifyConnection, sanitizeShopifyConnection, type ShopifyConnectionRow } from '@/lib/shopify/api-auth'
 import { normalizeShopDomain, normalizeStorefrontDomain } from '@/lib/shopify/domain'
 import { testShopifyConnection } from '@/lib/shopify/client'
+import { SHOPIFY_API_VERSION } from '@/lib/shopify/constants'
 import { encryptCredential, isCredentialsCryptoConfigured, CredentialsCryptoError } from '@/lib/security/credentials-crypto'
 import type { ShopifyEntityType } from '@/lib/shopify/types'
 
-const PINNED_API_VERSION = '2024-10'
 const TYPES: ShopifyEntityType[] = ['product', 'collection', 'page', 'blog', 'article']
 
 export async function GET(request: Request) {
@@ -60,7 +60,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  let body: { projectId?: string; shopDomain?: string; accessToken?: string; storefrontDomain?: string; apiVersion?: string }
+  // Note: apiVersion is intentionally NOT read from the client — it is always the
+  // server-pinned SHOPIFY_API_VERSION (no arbitrary client-supplied versions).
+  let body: { projectId?: string; shopDomain?: string; accessToken?: string; storefrontDomain?: string }
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
 
   const auth = await authContentProject(body.projectId)
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
   if (!shopDomain) {
     return Response.json({ error: 'invalid_domain', reason: 'invalid_domain' }, { status: 400 })
   }
-  const apiVersion = typeof body.apiVersion === 'string' && /^\d{4}-\d{2}$/.test(body.apiVersion) ? body.apiVersion : PINNED_API_VERSION
+  const apiVersion = SHOPIFY_API_VERSION
   const providedToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : ''
 
   // Existing connection (for update-without-token + ownership already checked).
@@ -99,16 +101,23 @@ export async function POST(request: Request) {
 
   const storefrontOverride = normalizeStorefrontDomain(body.storefrontDomain)
 
-  // Test + resolve the storefront domain when we have a usable token.
+  // Test + resolve the storefront domain when we have a usable token. The test
+  // verifies granted scopes + the served API version (never a silent success).
   let connectionStatus: ShopifyConnectionRow['connection_status'] = 'untested'
   let lastError: string | null = existing?.last_error ?? null
   let resolvedStorefront: string | null = storefrontOverride ?? existing?.storefront_domain ?? null
-  let testResult: { ok: boolean; error?: string; kind?: string } = { ok: true }
+  let testResult: Record<string, unknown> = { ok: true, status: 'connection_ok' }
   if (providedToken) {
     const test = await testShopifyConnection({ shopDomain, accessToken: providedToken, apiVersion })
-    testResult = { ok: test.ok, error: test.error, kind: test.kind }
+    testResult = {
+      ok: test.ok, status: test.status, kind: test.kind, error: test.error,
+      grantedScopes: test.grantedScopes, missingScopes: test.missingScopes,
+      apiVersionRequested: test.apiVersionRequested, apiVersionActual: test.apiVersionActual,
+    }
+    // Token valid (even with scope/version warnings) → 'connected'; a hard token/
+    // permission failure → 'failed'. The precise state is carried in last_error.
     connectionStatus = test.ok ? 'connected' : 'failed'
-    lastError = test.ok ? null : test.error ?? 'connection_failed'
+    lastError = test.status === 'connection_ok' ? null : test.error ?? test.status
     if (test.ok && !storefrontOverride && test.storefrontDomain) resolvedStorefront = test.storefrontDomain
   }
 

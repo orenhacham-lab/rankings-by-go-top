@@ -27,13 +27,24 @@ export async function POST(request: Request) {
   await auth.admin
     .from('shopify_connections')
     .update({
+      // Token valid (even with scope/version warnings) → connected; hard failure → failed.
       connection_status: test.ok ? 'connected' : 'failed',
       last_tested_at: new Date().toISOString(),
       storefront_domain: storefront,
-      last_error: test.ok ? null : test.error ?? 'connection_failed',
+      last_error: test.status === 'connection_ok' ? null : test.error ?? test.status,
       updated_at: new Date().toISOString(),
     })
     .eq('id', loaded.connection.id)
 
-  return Response.json({ ok: test.ok, ...(test.ok ? { shopName: test.shopName, storefrontDomain: test.storefrontDomain ?? null } : { error: test.error, kind: test.kind }) })
+  return Response.json({
+    ok: test.ok,
+    status: test.status,
+    shopName: test.shopName ?? null,
+    storefrontDomain: test.storefrontDomain ?? null,
+    grantedScopes: test.grantedScopes ?? null,
+    missingScopes: test.missingScopes ?? null,
+    apiVersionRequested: test.apiVersionRequested ?? null,
+    apiVersionActual: test.apiVersionActual ?? null,
+    ...(test.error ? { error: test.error, kind: test.kind } : {}),
+  })
 }

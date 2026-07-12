@@ -12,6 +12,7 @@
  */
 
 import { buildCanonicalUrl, numericIdFromGid } from './domain'
+import { SHOPIFY_REQUIRED_SCOPES, missingScopes, classifyConnection } from './constants'
 import type {
   ShopifyCredentials,
   ShopifyEntity,
@@ -68,7 +69,7 @@ function classifyGraphqlErrors(errors: NonNullable<GraphQLResponse<unknown>['err
  * One GraphQL call with transient-only retry (429 / 5xx / network / THROTTLED).
  * Returns { data, throttle }. Throws ShopifyClientError (classified) otherwise.
  */
-async function graphql<T>(creds: ShopifyCredentials, query: string, variables: Record<string, unknown> = {}): Promise<{ data: T; available: number | null }> {
+async function graphql<T>(creds: ShopifyCredentials, query: string, variables: Record<string, unknown> = {}): Promise<{ data: T; available: number | null; apiVersion: string | null }> {
   let lastErr: ShopifyClientError | null = null
   for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
     if (attempt > 0) await sleep(backoffMs(attempt - 1))
@@ -104,6 +105,10 @@ async function graphql<T>(creds: ShopifyCredentials, query: string, variables: R
       throw new ShopifyClientError('api_error', `Shopify returned HTTP ${res.status}.`)
     }
 
+    // Shopify echoes the version it ACTUALLY served here — used to detect a
+    // silent fall-forward away from the pinned version.
+    const apiVersion = res.headers.get('x-shopify-api-version')
+
     let json: GraphQLResponse<T>
     try { json = (await res.json()) as GraphQLResponse<T> } catch {
       throw new ShopifyClientError('api_error', 'Shopify returned an invalid response.')
@@ -115,26 +120,87 @@ async function graphql<T>(creds: ShopifyCredentials, query: string, variables: R
     }
     if (!json.data) throw new ShopifyClientError('api_error', 'Shopify returned no data.')
     const available = json.extensions?.cost?.throttleStatus?.currentlyAvailable ?? null
-    return { data: json.data, available }
+    return { data: json.data, available, apiVersion }
   }
   throw lastErr ?? new ShopifyClientError('network', 'Shopify request failed after retries.')
 }
 
 /**
- * Verify credentials + resolve the storefront host. Never throws — returns a
- * normalized result (with a classified `kind`) for the API route to relay.
+ * Read the Admin API scopes GRANTED to the current access token via the
+ * supported `currentAppInstallation.accessScopes` query. Returns { scopes,
+ * readable } — readable=false when the query itself is denied (permission_error)
+ * or errors, so the caller can distinguish "no required scope" from "can't tell".
+ * Never returns the token.
+ */
+export async function getGrantedScopes(creds: ShopifyCredentials): Promise<{ scopes: string[]; readable: boolean; apiVersion: string | null }> {
+  const query = `{ currentAppInstallation { accessScopes { handle } } }`
+  try {
+    const { data, apiVersion } = await graphql<{ currentAppInstallation?: { accessScopes?: { handle?: string }[] } }>(creds, query)
+    const list = data.currentAppInstallation?.accessScopes
+    if (!Array.isArray(list)) return { scopes: [], readable: false, apiVersion }
+    return { scopes: list.map((s) => String(s?.handle || '').trim()).filter(Boolean), readable: true, apiVersion }
+  } catch {
+    return { scopes: [], readable: false, apiVersion: null }
+  }
+}
+
+/**
+ * Verify credentials, resolve the storefront host, VERIFY the granted read
+ * scopes against SHOPIFY_REQUIRED_SCOPES, and validate the served API version
+ * against the pinned request. Never throws — returns a precise `status`
+ * (connection_ok | invalid_token | missing_scopes | permission_error |
+ * api_version_fallback) plus grantedScopes/missingScopes/versions. Never
+ * returns the token.
  */
 export async function testShopifyConnection(creds: ShopifyCredentials): Promise<ShopifyTestResult> {
   const query = `{ shop { name myshopifyDomain primaryDomain { host } } }`
+  let shopName: string | undefined
+  let storefrontDomain: string | null = null
+  let apiVersionActual: string | null = null
   try {
-    const { data } = await graphql<{ shop?: { name?: string; myshopifyDomain?: string; primaryDomain?: { host?: string } } }>(creds, query)
+    const { data, apiVersion } = await graphql<{ shop?: { name?: string; myshopifyDomain?: string; primaryDomain?: { host?: string } } }>(creds, query)
+    apiVersionActual = apiVersion
     const shop = data.shop
-    if (!shop || !shop.name) return { ok: false, error: 'Unexpected response from Shopify.', kind: 'api_error' }
+    if (!shop || !shop.name) {
+      return { ok: false, status: 'permission_error', error: 'Unexpected response from Shopify.', kind: 'api_error', apiVersionRequested: creds.apiVersion, apiVersionActual }
+    }
+    shopName = shop.name
     const host = shop.primaryDomain?.host || null
-    return { ok: true, shopName: shop.name, storefrontDomain: host && !host.endsWith('.myshopify.com') ? host : null }
+    storefrontDomain = host && !host.endsWith('.myshopify.com') ? host : null
   } catch (err) {
-    if (err instanceof ShopifyClientError) return { ok: false, error: err.message, kind: err.kind }
-    return { ok: false, error: 'Connection failed.', kind: 'api_error' }
+    const kind = err instanceof ShopifyClientError ? err.kind : 'api_error'
+    // A bad/expired token is a hard failure; scope denial on the shop query maps
+    // to permission_error (we could reach the API but were refused).
+    const status = kind === 'invalid_token' ? 'invalid_token' : kind === 'missing_scope' ? 'permission_error' : 'permission_error'
+    return { ok: false, status, error: err instanceof ShopifyClientError ? err.message : 'Connection failed.', kind, apiVersionRequested: creds.apiVersion, apiVersionActual }
+  }
+
+  // Token is valid + store reachable → verify granted scopes explicitly.
+  const granted = await getGrantedScopes(creds)
+  if (granted.apiVersion) apiVersionActual = granted.apiVersion
+  const missing = missingScopes(granted.scopes, SHOPIFY_REQUIRED_SCOPES)
+  const status = classifyConnection({
+    tokenValid: true,
+    scopesReadable: granted.readable,
+    missing,
+    apiVersionRequested: creds.apiVersion,
+    apiVersionActual,
+  })
+  // ok = the connection works; missing_scopes / api_version_fallback are
+  // actionable WARNINGS the UI surfaces (never a silent full-health claim).
+  const ok = status === 'connection_ok' || status === 'missing_scopes' || status === 'api_version_fallback'
+  const error =
+    status === 'permission_error' ? 'Could not read the token’s granted scopes.'
+    : status === 'missing_scopes' ? `Missing required scopes: ${missing.join(', ')}`
+    : status === 'api_version_fallback' ? `Shopify served API version ${apiVersionActual} (requested ${creds.apiVersion}).`
+    : undefined
+  return {
+    ok, status, shopName, storefrontDomain,
+    grantedScopes: granted.readable ? granted.scopes : undefined,
+    missingScopes: granted.readable ? missing : undefined,
+    apiVersionRequested: creds.apiVersion,
+    apiVersionActual,
+    ...(error ? { error } : {}),
   }
 }
 
@@ -159,11 +225,13 @@ async function paginate<N>(
   query: string,
   pick: (data: unknown) => PagedNodes<N>,
   onNodes: (nodes: N[]) => void,
+  versionRef?: { value: string | null },
 ): Promise<void> {
   let cursor: string | null = null
   for (let page = 0; page < MAX_PAGES_PER_TYPE; page++) {
-    const { data, available }: { data: unknown; available: number | null } =
+    const { data, available, apiVersion }: { data: unknown; available: number | null; apiVersion: string | null } =
       await graphql(creds, query, { cursor })
+    if (versionRef && apiVersion) versionRef.value = apiVersion
     const conn = pick(data)
     onNodes(conn.nodes || [])
     if (!conn.pageInfo?.hasNextPage || !conn.pageInfo.endCursor) return
@@ -186,10 +254,11 @@ const Q_ARTICLES = `query($cursor:String){ articles(first:${PAGE_SIZE}, after:$c
 export async function discoverEntities(
   creds: ShopifyCredentials,
   storefrontDomain: string | null,
-): Promise<{ entities: ShopifyEntity[]; perType: EntitySyncTypeResult[] }> {
+): Promise<{ entities: ShopifyEntity[]; perType: EntitySyncTypeResult[]; apiVersionActual: string | null }> {
   const host = resolveHost(creds, storefrontDomain)
   const entities: ShopifyEntity[] = []
   const perType: EntitySyncTypeResult[] = []
+  const versionRef = { value: null as string | null }
 
   const run = async (type: ShopifyEntityType, fn: () => Promise<number>) => {
     try {
@@ -207,6 +276,7 @@ export async function discoverEntities(
       creds, Q_PRODUCTS,
       (d) => (d as { products: PagedNodes<never> }).products,
       (nodes) => { for (const p of nodes) { entities.push(mapProduct(p, host)); n++ } },
+      versionRef,
     )
     return n
   })
@@ -217,6 +287,7 @@ export async function discoverEntities(
       creds, Q_COLLECTIONS,
       (d) => (d as { collections: PagedNodes<never> }).collections,
       (nodes) => { for (const c of nodes) { entities.push(mapCollection(c, host)); n++ } },
+      versionRef,
     )
     return n
   })
@@ -227,6 +298,7 @@ export async function discoverEntities(
       creds, Q_PAGES,
       (d) => (d as { pages: PagedNodes<never> }).pages,
       (nodes) => { for (const p of nodes) { entities.push(mapPage(p, host)); n++ } },
+      versionRef,
     )
     return n
   })
@@ -237,6 +309,7 @@ export async function discoverEntities(
       creds, Q_BLOGS,
       (d) => (d as { blogs: PagedNodes<never> }).blogs,
       (nodes) => { for (const b of nodes) { entities.push(mapBlog(b, host)); n++ } },
+      versionRef,
     )
     return n
   })
@@ -247,11 +320,12 @@ export async function discoverEntities(
       creds, Q_ARTICLES,
       (d) => (d as { articles: PagedNodes<never> }).articles,
       (nodes) => { for (const a of nodes) { entities.push(mapArticle(a, host)); n++ } },
+      versionRef,
     )
     return n
   })
 
-  return { entities, perType }
+  return { entities, perType, apiVersionActual: versionRef.value }
 }
 
 // --- pure node → ShopifyEntity mappers (host-aware) --------------------------

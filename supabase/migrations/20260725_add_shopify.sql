@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.shopify_connections (
   -- NEVER returned to the client; decrypted server-side only at call time.
   access_token_encrypted   text NOT NULL,
 
-  api_version              text NOT NULL DEFAULT '2024-10',
+  api_version              text NOT NULL DEFAULT '2026-07',
 
   connection_status        text NOT NULL DEFAULT 'untested'
                              CHECK (connection_status IN ('untested', 'connected', 'failed')),
