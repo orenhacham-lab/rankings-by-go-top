@@ -1,16 +1,19 @@
 'use client'
 
 /**
- * Content & Articles section — project page module (Phase 1).
+ * Content & Articles section — project page module.
  *
- * Phase 1 scope: dashboard skeleton (zero counters) + WordPress connection.
- * Topic/article generation, publishing, scheduling and pools arrive in later
- * phases. Deliberately lean — do not grow this into a monolith.
+ * Phase 4F.1 UX: a project uses ONE primary platform. This section derives the
+ * active platform from the existing connection tables (no migration) and shows
+ * exactly one of: platform choice (neither connected), the WordPress panel, the
+ * Shopify panel, or a configuration-conflict warning (both connected). Server-
+ * side exclusivity is enforced in the connection routes — this is the UI half.
  */
 
-import { useMemo } from 'react'
-import { Newspaper } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Newspaper, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
 import WordPressConnectionPanel from './WordPressConnectionPanel'
 import ShopifyConnectionPanel from './ShopifyConnectionPanel'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
@@ -20,13 +23,43 @@ export default function ContentSection({ projectId }: { projectId: string }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
 
-  // Phase 1: no articles exist yet — static zero counters.
+  const [loading, setLoading] = useState(true)
+  const [wpConnected, setWpConnected] = useState(false)
+  const [shopifyConnected, setShopifyConnected] = useState(false)
+  // When neither platform is connected, which one the user chose to connect.
+  const [choice, setChoice] = useState<'wordpress' | 'shopify' | null>(null)
+
+  const refresh = useCallback(async () => {
+    try {
+      const [wpRes, shRes] = await Promise.all([
+        fetch(`/api/wordpress/connection?projectId=${projectId}`),
+        fetch(`/api/shopify/connection?projectId=${projectId}`),
+      ])
+      const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
+      const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
+      const wpc = !!wp.connection
+      const shc = !!sh.connection
+      setWpConnected(wpc)
+      setShopifyConnected(shc)
+      // Returning to the neither-connected state resets to the platform choice.
+      if (!wpc && !shc) setChoice(null)
+    } catch {
+      /* leave as-is; panels still render on demand */
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => { refresh() }, [refresh])
+
   const stats = [
     { label: t.statsDrafts, value: 0 },
     { label: t.statsReady, value: 0 },
     { label: t.statsScheduled, value: 0 },
     { label: t.statsPublished, value: 0 },
   ]
+
+  const both = wpConnected && shopifyConnected
 
   return (
     <section className="mb-6">
@@ -47,8 +80,53 @@ export default function ContentSection({ projectId }: { projectId: string }) {
         ))}
       </div>
 
-      <WordPressConnectionPanel projectId={projectId} />
-      <ShopifyConnectionPanel projectId={projectId} />
+      {loading ? (
+        <Card className="hover:translate-y-0">
+          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-3">
+            <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        </Card>
+      ) : both ? (
+        // Unexpected dual connection — surface a conflict, delete nothing. Both
+        // panels render so the owner can disconnect one to resolve it.
+        <div className="space-y-3">
+          <Card className="hover:translate-y-0 border-amber-300 dark:border-amber-700">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold text-amber-800 dark:text-amber-300">{t.conflictTitle}</div>
+                <p className="text-sm text-amber-800/90 dark:text-amber-300/90">{t.conflictBody}</p>
+              </div>
+            </div>
+          </Card>
+          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+        </div>
+      ) : wpConnected ? (
+        <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+      ) : shopifyConnected ? (
+        <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+      ) : choice === 'wordpress' ? (
+        <div className="space-y-2">
+          <button type="button" onClick={() => setChoice(null)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">← {t.back}</button>
+          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+        </div>
+      ) : choice === 'shopify' ? (
+        <div className="space-y-2">
+          <button type="button" onClick={() => setChoice(null)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">← {t.back}</button>
+          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+        </div>
+      ) : (
+        // Neither connected → platform choice (never both full panels at once).
+        <Card className="hover:translate-y-0">
+          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">{t.platformChoiceTitle}</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{t.platformChoiceHint}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setChoice('wordpress')}>{t.connectWordPress}</Button>
+            <Button size="sm" variant="outline" onClick={() => setChoice('shopify')}>{t.connectShopify}</Button>
+          </div>
+        </Card>
+      )}
     </section>
   )
 }

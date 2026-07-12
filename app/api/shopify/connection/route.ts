@@ -80,6 +80,20 @@ export async function POST(request: Request) {
     .from('shopify_connections').select('*').eq('project_id', auth.project.id).maybeSingle()
   const existing = existingData as ShopifyConnectionRow | null
 
+  // Phase 4F.1 — one primary platform per project: refuse to CREATE a Shopify
+  // connection when the project already has a WordPress connection. Updating an
+  // existing Shopify connection stays allowed. Enforced server-side.
+  if (!existing) {
+    const { data: wordpress } = await auth.admin
+      .from('wordpress_connections')
+      .select('id')
+      .eq('project_id', auth.project.id)
+      .maybeSingle()
+    if (wordpress) {
+      return Response.json({ error: 'platform_already_connected', reason: 'platform_already_connected', platform: 'wordpress' }, { status: 409 })
+    }
+  }
+
   if (!existing && !providedToken) {
     return Response.json({ error: 'access_token_required', reason: 'access_token_required' }, { status: 400 })
   }

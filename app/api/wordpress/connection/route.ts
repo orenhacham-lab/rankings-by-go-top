@@ -112,6 +112,21 @@ export async function POST(request: Request) {
     .eq('project_id', auth.project.id)
     .maybeSingle()
 
+  // Phase 4F.1 — one primary platform per project: refuse to CREATE a WordPress
+  // connection when the project already has a Shopify connection. Updating an
+  // existing WordPress connection stays allowed (so a conflicted project can be
+  // fixed). Enforced server-side — never rely on hidden UI.
+  if (!existing) {
+    const { data: shopify } = await auth.admin
+      .from('shopify_connections')
+      .select('id')
+      .eq('project_id', auth.project.id)
+      .maybeSingle()
+    if (shopify) {
+      return Response.json({ error: 'platform_already_connected', reason: 'platform_already_connected', platform: 'shopify' }, { status: 409 })
+    }
+  }
+
   if (!existing && !applicationPassword) {
     return Response.json({ error: 'applicationPassword is required' }, { status: 400 })
   }

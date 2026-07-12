@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import Modal from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -31,9 +32,10 @@ type Counts = { product: number; collection: number; page: number; blog: number;
 
 const ZERO: Counts = { product: 0, collection: 0, page: 0, blog: 0, article: 0 }
 
-export default function ShopifyConnectionPanel({ projectId }: { projectId: string }) {
+export default function ShopifyConnectionPanel({ projectId, onChanged }: { projectId: string; onChanged?: () => void }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.shopify, [language])
+  const dir: 'ltr' | 'rtl' = language === 'he' ? 'rtl' : 'ltr'
 
   const [loading, setLoading] = useState(true)
   const [connection, setConnection] = useState<SanitizedConnection | null>(null)
@@ -48,7 +50,9 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
   const [testing, setTesting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  const g = t.guide
 
   const load = useCallback(async () => {
     try {
@@ -75,6 +79,7 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
       if (!res.ok) { setMessage({ text: mapErr(data.reason || data.error), ok: false }); return }
       setConnection(data.connection ?? null)
       setAccessToken(''); setShowForm(false)
+      onChanged?.()
       const msg = testStatusMessage(data.test)
       setMessage({ text: `${t.saved}${msg.text ? ` · ${msg.text}` : ''}`, ok: msg.ok })
     } catch { setMessage({ text: t.saveError, ok: false }) } finally { setSaving(false) }
@@ -116,7 +121,7 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
     setDisconnecting(true); setMessage(null)
     try {
       const res = await fetch(`/api/shopify/connection?projectId=${projectId}`, { method: 'DELETE' })
-      if (res.ok) { setConnection(null); setCounts(ZERO); setMessage({ text: t.disconnected, ok: true }) }
+      if (res.ok) { setConnection(null); setCounts(ZERO); setMessage({ text: t.disconnected, ok: true }); onChanged?.() }
       else setMessage({ text: t.disconnectError, ok: false })
     } catch { setMessage({ text: t.disconnectError, ok: false }) } finally { setDisconnecting(false) }
   }
@@ -154,7 +159,10 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
     <Card className="hover:translate-y-0">
       <div className="flex items-center justify-between gap-2 mb-2">
         <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
-        {connection && <Badge variant={statusVariant}>{statusLabel}</Badge>}
+        <div className="flex items-center gap-2">
+          {connection && <Badge variant={statusVariant}>{statusLabel}</Badge>}
+          <button type="button" onClick={() => setGuideOpen(true)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">{g.openGuide}</button>
+        </div>
       </div>
 
       {!connection && !showForm && (
@@ -166,8 +174,14 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
 
       {(showForm || (connection && showForm)) && (
         <div className="space-y-2">
-          <Input label={t.shopDomain} placeholder="acme.myshopify.com" value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} />
-          <Input label={t.token} type="password" placeholder="shpat_…" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} />
+          <div>
+            <Input label={t.shopDomain} placeholder="acme.myshopify.com" value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} />
+            <button type="button" onClick={() => setGuideOpen(true)} className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{g.whereToFind}</button>
+          </div>
+          <div>
+            <Input label={t.token} type="password" placeholder="shpat_…" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} />
+            <button type="button" onClick={() => setGuideOpen(true)} className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{g.whereToFind}</button>
+          </div>
           <Input label={t.storefrontDomain} placeholder="shop.example.com" value={storefrontDomain} onChange={(e) => setStorefrontDomain(e.target.value)} />
           <p className="text-[11px] text-slate-400">{t.scopesHint}</p>
           <div className="flex gap-2">
@@ -212,6 +226,25 @@ export default function ShopifyConnectionPanel({ projectId }: { projectId: strin
       {message && (
         <p className={`mt-2 text-xs ${message.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
       )}
+
+      <Modal open={guideOpen} onClose={() => setGuideOpen(false)} title={g.title} size="lg">
+        <div className="space-y-4 text-sm text-slate-700 dark:text-slate-200" dir={dir}>
+          <p className="text-slate-600 dark:text-slate-300">{g.intro}</p>
+          <ol className="list-decimal ms-5 space-y-1.5">
+            {g.steps.map((s, i) => <li key={i}>{s}</li>)}
+          </ol>
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
+            <div className="font-medium text-amber-800 dark:text-amber-300 mb-1">{g.warningsTitle}</div>
+            <ul className="list-disc ms-5 space-y-1 text-amber-800 dark:text-amber-300/90">
+              {g.warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+          <a href={g.docsUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-indigo-600 dark:text-indigo-400 hover:underline">{g.docsLabel}</a>
+          <div className="pt-1">
+            <Button size="sm" onClick={() => setGuideOpen(false)}>{g.close}</Button>
+          </div>
+        </div>
+      </Modal>
     </Card>
   )
 }
