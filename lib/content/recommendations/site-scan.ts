@@ -16,6 +16,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
+import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
 import { topicQualityIssue } from './keyword-research'
 import type { TopicSuggestion } from './types'
@@ -304,11 +305,16 @@ function deterministicFallback(digest: ReturnType<typeof buildDigest>, language:
 export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInput, businessCtx: string): Promise<SiteScanRecoResult> {
   const emptyDebug = { scanFound: false, targetCount: 0, digestCounts: { importantPages: 0, categories: 0, orphans: 0, clusters: 0 }, modelCalled: false, modelOk: false, modelRawCount: 0, usedFallback: false, rawSuggestionCount: 0 }
 
+  // Corpus = the WordPress cached scan (if any) UNIONED with synced Shopify
+  // entities mapped to the same ScannedTarget model. Shopify-only projects have
+  // no WP cache row but a full Shopify corpus; WordPress-only projects get [] for
+  // Shopify → identical to before. No ranking/dedup/provenance change.
   const cacheRow = await getCachedIndex(admin, input.projectId)
-  if (!cacheRow) return { suggestions: [], meta: { reason: 'no_scan', generated: 0, debug: emptyDebug } }
-  const report = reassembleReport(cacheRow)
-  const targets = (report.targets ?? []) as ScannedTarget[]
-  if (targets.length === 0) return { suggestions: [], meta: { reason: 'no_scan', generated: 0, debug: { ...emptyDebug, scanFound: true } } }
+  const wpTargets = cacheRow ? ((reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]) : []
+  const shopifyTargets = await loadShopifyScannedTargets(admin, input.projectId)
+  const targets = [...wpTargets, ...shopifyTargets]
+  const scanFound = !!cacheRow || shopifyTargets.length > 0
+  if (targets.length === 0) return { suggestions: [], meta: { reason: 'no_scan', generated: 0, debug: { ...emptyDebug, scanFound } } }
 
   const digest = buildDigest(targets)
   const digestCounts = { importantPages: digest.importantPages.length, categories: digest.categories.length, orphans: digest.orphans.length, clusters: digest.clusters.length }
