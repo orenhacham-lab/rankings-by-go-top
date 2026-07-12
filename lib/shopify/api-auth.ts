@@ -21,6 +21,9 @@ export type ShopifyConnectionRow = {
   last_tested_at: string | null
   last_synced_at: string | null
   last_error: string | null
+  // Phase 4F.1 OAuth — scopes the merchant approved + how the token was obtained.
+  granted_scopes: string[] | null
+  auth_method: 'manual' | 'oauth'
   created_at: string
   updated_at: string
 }
@@ -77,6 +80,8 @@ export function sanitizeShopifyConnection(c: ShopifyConnectionRow) {
     last_tested_at: c.last_tested_at,
     last_synced_at: c.last_synced_at,
     last_error: c.last_error,
+    granted_scopes: Array.isArray(c.granted_scopes) ? c.granted_scopes : [],
+    auth_method: c.auth_method ?? 'oauth',
     created_at: c.created_at,
     updated_at: c.updated_at,
   }
