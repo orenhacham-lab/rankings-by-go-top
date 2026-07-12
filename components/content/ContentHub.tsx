@@ -18,6 +18,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import WordPressConnectionPanel from '@/components/content/WordPressConnectionPanel'
+import ContentHubPlatformCard from '@/components/content/ContentHubPlatformCard'
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
@@ -938,15 +939,20 @@ export default function ContentHub() {
                 )}
               </div>
 
-              {/* WordPress connection — reuse the existing self-contained panel */}
-              <WordPressConnectionPanel projectId={projectId} />
+              {/* Phase 4F.1 — platform-aware card: a Shopify project shows a
+                  compact Shopify status card; WordPress/neither/both show the
+                  existing WordPress panel + index status unchanged. */}
+              <ContentHubPlatformCard projectId={projectId}>
+                {/* WordPress connection — reuse the existing self-contained panel */}
+                <WordPressConnectionPanel projectId={projectId} />
 
-              {/* Internal-link index status (Phase 2E.1) — flag-gated, read-only + manual refresh */}
-              {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && (
-                <div className="mt-4">
-                  <InternalLinkIndexStatus projectId={projectId} language={language} />
-                </div>
-              )}
+                {/* Internal-link index status (Phase 2E.1) — flag-gated, read-only + manual refresh */}
+                {process.env.NEXT_PUBLIC_ENABLE_INTERNAL_LINK_PLANNING === 'true' && (
+                  <div className="mt-4">
+                    <InternalLinkIndexStatus projectId={projectId} language={language} />
+                  </div>
+                )}
+              </ContentHubPlatformCard>
             </>
           )}
         </>

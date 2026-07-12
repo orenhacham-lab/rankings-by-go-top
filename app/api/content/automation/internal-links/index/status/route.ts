@@ -10,6 +10,7 @@
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { getCachedIndex, isStale, isVersionStale, SCAN_INDEX_VERSION, indexTtlDays } from '@/lib/content/wordpress-content-index'
+import { getShopifyIndexSummary } from '@/lib/shopify/site-targets'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,13 +25,31 @@ export async function GET(request: Request) {
 
   const row = await getCachedIndex(auth.admin, auth.project.id)
   if (!row) {
-    return Response.json({ exists: false, currentScannerVersion: SCAN_INDEX_VERSION, ttlDays: indexTtlDays() })
+    // Phase 4F.1 — a Shopify project has no WordPress index row, but its synced
+    // entities ARE the indexed corpus. Report "indexed" with Shopify counts so
+    // the UI never shows "not indexed" while active entities exist.
+    const shopify = await getShopifyIndexSummary(auth.admin, auth.project.id)
+    if (shopify.connected && shopify.activeTargets > 0) {
+      return Response.json({
+        exists: true,
+        source: 'shopify',
+        scanStatus: 'completed',
+        shopify,
+        counts: { targetsStored: shopify.activeTargets },
+        scanCompletedAt: shopify.lastSyncedAt,
+        errorMessage: shopify.lastError,
+        currentScannerVersion: SCAN_INDEX_VERSION,
+        ttlDays: indexTtlDays(),
+      })
+    }
+    return Response.json({ exists: false, source: shopify.connected ? 'shopify' : 'none', currentScannerVersion: SCAN_INDEX_VERSION, ttlDays: indexTtlDays() })
   }
 
   const summary = (row.summary || {}) as Record<string, unknown>
   const num = (k: string) => (typeof summary[k] === 'number' ? (summary[k] as number) : null)
   return Response.json({
     exists: true,
+    source: 'wordpress',
     scanStatus: row.scan_status,
     scannerVersion: row.scanner_version,
     currentScannerVersion: SCAN_INDEX_VERSION,
