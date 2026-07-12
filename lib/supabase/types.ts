@@ -515,6 +515,10 @@ export interface GeneratedArticle {
   wp_post_id: number | null
   wp_post_url: string | null
   wp_featured_media_id: number | null
+  // Phase 4E — WordPress taxonomy selection (term IDs, never labels).
+  wp_primary_category_id: number | null
+  wp_category_ids: number[]
+  wp_tag_ids: number[]
   scheduled_at: string | null
   published_at: string | null
   last_error: string | null

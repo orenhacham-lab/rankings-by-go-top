@@ -10,6 +10,7 @@ import {
   loadWordPressCredentials,
 } from '@/lib/content/api-auth'
 import { getTags, WordPressClientError } from '@/lib/wordpress/client'
+import { cached } from '@/lib/content/wordpress-cache'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const tags = await getTags(loaded.creds)
+    const tags = await cached(`tags:${loaded.connection.id}`, 60_000, () => getTags(loaded.creds))
     return Response.json({ tags })
   } catch (err) {
     const msg = err instanceof WordPressClientError ? err.message : 'Failed to fetch tags'

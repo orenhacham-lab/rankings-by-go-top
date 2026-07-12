@@ -10,6 +10,7 @@ import {
   loadWordPressCredentials,
 } from '@/lib/content/api-auth'
 import { getCategories, WordPressClientError } from '@/lib/wordpress/client'
+import { cached } from '@/lib/content/wordpress-cache'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const categories = await getCategories(loaded.creds)
+    const categories = await cached(`categories:${loaded.connection.id}`, 60_000, () => getCategories(loaded.creds))
     return Response.json({ categories })
   } catch (err) {
     const msg = err instanceof WordPressClientError ? err.message : 'Failed to fetch categories'

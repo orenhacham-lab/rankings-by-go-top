@@ -17,6 +17,7 @@ import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
+import WordPressPublishSettings, { type WpExportStatus } from '@/components/content/WordPressPublishSettings'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
@@ -72,6 +73,12 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   // Phase 4D — current inline-image rows (emitted by the panel) so the body
   // preview composes figures without mutating stored content_html.
   const [inlineImages, setInlineImages] = useState<ComposableInlineImage[]>([])
+  // Phase 4E — WordPress taxonomy selection (loaded from the article) + the
+  // taxonomy/SEO status from the latest export.
+  const [wpPrimaryCategoryId, setWpPrimaryCategoryId] = useState<number | null>(null)
+  const [wpCategoryIds, setWpCategoryIds] = useState<number[]>([])
+  const [wpTagIds, setWpTagIds] = useState<number[]>([])
+  const [wpExportStatus, setWpExportStatus] = useState<WpExportStatus>(null)
 
   // Internal linking — editor is QA-only: verify each planned anchor exists and
   // insert its link. Planning/selection happens pre-generation in the brief.
@@ -112,6 +119,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setFeaturedImageUrl(a.featured_image_url ?? null)
       setWpPostId(a.wp_post_id ?? null)
       setWpPostUrl(a.wp_post_url ?? null)
+      setWpPrimaryCategoryId(typeof a.wp_primary_category_id === 'number' ? a.wp_primary_category_id : null)
+      setWpCategoryIds(Array.isArray(a.wp_category_ids) ? a.wp_category_ids : [])
+      setWpTagIds(Array.isArray(a.wp_tag_ids) ? a.wp_tag_ids : [])
       setWpStatus(a.status === 'published' ? 'publish' : a.wp_post_id != null ? 'draft' : null)
       // Load the article's approved planned internal links (editor is QA-only).
       try {
@@ -267,27 +277,35 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     if (wpBusy) return // one export at a time
     // Publishing goes live → confirm. Draft needs no dangerous confirmation.
     if (status === 'publish' && !window.confirm(e.wpPublishConfirm)) return
-    // Already exported once → creating a NEW post requires explicit confirmation.
-    let force = false
-    if (wpPostId) {
-      if (!window.confirm(status === 'publish' ? e.wpPublishNewConfirm : e.wpDraftNewConfirm)) return
-      force = true
-    }
+    // Phase 4E — once exported, a re-export UPDATES the same post in place
+    // (idempotent: no duplicate post/taxonomy). A brand-new separate post is no
+    // longer the default; the existing post is reconciled by wp_post_id.
+    const isUpdate = !!wpPostId
     setWpBusy(status)
     setMessage(null)
     try {
       const res = await fetch(`/api/content/articles/${id}/wordpress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, force }),
+        body: JSON.stringify({ status, ...(isUpdate ? { update: true } : {}) }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.wp_post_id) {
         setWpPostId(data.wp_post_id)
         setWpPostUrl(data.wp_post_url ?? null)
         setWpStatus(data.wp_status === 'publish' ? 'publish' : 'draft')
+        // Phase 4E — surface taxonomy + SEO-meta status from the export.
+        setWpExportStatus({
+          seoPlugin: data.seoPlugin,
+          seoStatus: data.seoStatus,
+          taxonomyWarning: data.taxonomyWarning,
+          invalidCategoryIds: data.taxonomy?.invalidCategoryIds,
+          invalidTagIds: data.taxonomy?.invalidTagIds,
+        })
         let base: string = status === 'publish' ? e.wpPublished : e.wpExported
         if (data.imageWarning) base = `${base} · ${e.wpImageWarn}`
+        if (data.taxonomyWarning) base = `${base} · ${e.wpTax.taxonomyWarning}`
+        if (data.seoStatus && data.seoStatus !== 'verified') base = `${base} · ${e.wpTax.seoMetaWarn}`
         // Phase 3E — subtle note when the article's primary keyword was added.
         if (status === 'publish' && data.keywordAdded) base = `${base} · ${e.wpKeywordAdded}`
         setMessage({ text: base, ok: true })
@@ -509,6 +527,21 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
               emptyHint={e.inline.previewEmpty}
             />
           </Card>
+        )}
+
+        {/* Phase 4E — WordPress taxonomy + SEO settings (categories/tags/plugin). */}
+        {projectId && (
+          <WordPressPublishSettings
+            projectId={projectId}
+            articleId={id}
+            dict={e.wpTax}
+            dir={isHebrew ? 'rtl' : 'ltr'}
+            initialPrimaryCategoryId={wpPrimaryCategoryId}
+            initialCategoryIds={wpCategoryIds}
+            initialTagIds={wpTagIds}
+            lastExport={wpExportStatus}
+            onNotify={(text, ok) => { setMessage({ text, ok }); if (ok) toast.success(text) }}
+          />
         )}
 
         {/* WordPress export — draft (safe) or publish now (confirmed). */}
