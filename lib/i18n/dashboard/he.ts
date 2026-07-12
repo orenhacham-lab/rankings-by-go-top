@@ -87,6 +87,11 @@ export const dashboardHe = {
       sourceProject: 'לפי נתוני הפרויקט',
       sourceResearch: 'לפי מחקר ביטויים מהאתר',
       sourceSiteScan: 'לפי סריקת האתר',
+      // Phase 4C — hybrid combined source.
+      sourceHybrid: 'סריקה משולבת',
+      badgeHybrid: 'משולב',
+      hybridSupportedBy: 'נתמך על ידי {n} מקורות',
+      hybridProviderUnavailable: '{s} לא זמין',
       keywordPlaceholder: 'הקלד מילת מפתח…',
       generate: 'מצא רעיונות',
       generating: 'מחפש רעיונות…',

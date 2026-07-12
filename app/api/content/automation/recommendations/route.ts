@@ -15,7 +15,7 @@ import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, 
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { randomUUID } from 'crypto'
 
-const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan']
+const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan', 'hybrid']
 
 export async function POST(request: Request) {
   if (!isContentAutomationEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -143,7 +143,16 @@ export async function POST(request: Request) {
     // primary keyword/title are marked 'duplicate' (history kept) and hidden.
     const { visible, conflictIds } = partitionPending(pending, guard)
     if (conflictIds.length > 0) await markIdeasDuplicate(auth.admin, auth.project.id, conflictIds)
-    const suggestions = visible.map(ideaToSuggestion)
+    // Phase 4C — re-attach hybrid provenance (lost by ideaToSuggestion, which
+    // reads persisted rows). Keyed by normalized primary keyword from THIS run's
+    // fresh merged set, so the "סריקה משולבת" run shows source badges + counts.
+    const provByKw = new Map(result.suggestions
+      .filter((s) => s.supportingSources && s.supportingSources.length)
+      .map((s) => [normalizeText(s.primaryKeyword), { supportingSources: s.supportingSources, sourceEvidence: s.sourceEvidence }]))
+    const suggestions = visible.map(ideaToSuggestion).map((s) => {
+      const prov = provByKw.get(normalizeText(s.primaryKeyword))
+      return prov ? { ...s, ...prov } : s
+    })
 
     // Precise "nothing new this run" reason (accurate whether the model produced
     // known ideas that were filtered, or produced nothing because avoid-skip
