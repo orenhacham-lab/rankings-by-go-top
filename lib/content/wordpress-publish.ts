@@ -15,6 +15,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { uploadMedia, createPost, WordPressClientError, type WordPressPostStatus } from '@/lib/wordpress/client'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
+import { reconcileInlineImagesForWordPress, injectInlineImages, type InlineWpResult } from '@/lib/content/inline-images'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -29,6 +30,9 @@ function mimeFromExt(ext: string): string {
 }
 
 export interface WpArticleForExport {
+  /** Phase 4D — when present, inline images for this article are uploaded to WP
+   *  media and composed into the body. Optional for back-compat. */
+  id?: string
   title: unknown
   slug: unknown
   excerpt: unknown
@@ -45,6 +49,8 @@ export interface WpCreateResult {
   wpPostUrl: string | null
   featuredMediaId: number | null
   imageWarning: boolean
+  /** Phase 4D — inline-image upload/reconcile outcome (undefined when none). */
+  inlineImages?: InlineWpResult
 }
 export type WpCreateError = { ok: false; kind: 'media_upload_failed' | 'post_failed'; detail?: string }
 
@@ -91,16 +97,30 @@ export async function wpCreatePost(
     }
   }
 
+  // Phase 4D — inline images: upload/reconcile each to WP media (idempotent via
+  // wp_media_id) and compose the body from the WP URLs. A per-image failure is
+  // recorded on its row + reported; the export continues with the valid ones and
+  // NEVER emits a temporary storage URL live ('publish' mode skips un-uploaded
+  // images). The featured-image handling above is unchanged.
+  let content = String(article.content_html || '')
+  let inlineImages: InlineWpResult | undefined
+  if (typeof article.id === 'string' && article.id) {
+    const { images, result } = await reconcileInlineImagesForWordPress(admin, creds, article.id, slug)
+    content = injectInlineImages(content, images, 'publish')
+    inlineImages = result
+    if (result.failed.length > 0) imageWarning = true
+  }
+
   try {
     const post = await createPost(creds, {
       title,
-      content: String(article.content_html || ''),
+      content,
       status,
       slug,
       excerpt: String(article.excerpt || article.meta_description || '') || undefined,
       featuredMedia,
     })
-    return { ok: true, wpPostId: post.id, wpPostUrl: post.link || null, featuredMediaId: featuredMedia ?? null, imageWarning }
+    return { ok: true, wpPostId: post.id, wpPostUrl: post.link || null, featuredMediaId: featuredMedia ?? null, imageWarning, inlineImages }
   } catch (err) {
     const detail = err instanceof WordPressClientError ? err.message : 'Post creation failed.'
     return { ok: false, kind: 'post_failed', detail }

@@ -16,6 +16,8 @@ const ALLOWED_TAGS = [
   'blockquote', 'code', 'pre',
   'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
   'figure', 'figcaption', 'span',
+  // Phase 4D — inline article images (composed as <figure><img><figcaption>).
+  'img',
 ]
 
 /** Plain text of an HTML fragment (tags stripped, whitespace collapsed). */
@@ -87,7 +89,13 @@ export function sanitizeArticleHtml(html: string): string {
       // TOC support: heading anchor targets + a nav wrapper.
       h2: ['id'], h3: ['id'], h4: ['id'],
       nav: ['class', 'aria-label'],
+      // Phase 4D — inline images: only safe, responsive attributes. No on*,
+      // no style, no srcset; http/https src only (enforced by allowedSchemes).
+      img: ['src', 'alt', 'width', 'height', 'loading', 'class'],
+      figure: ['class', 'data-inline-image-id'],
+      figcaption: ['class'],
     },
+    allowedSchemesByTag: { img: ['http', 'https'] },
     allowedSchemes: ['http', 'https', 'mailto', 'tel'],
     transformTags: {
       // Any link that opens a new tab must be safe.

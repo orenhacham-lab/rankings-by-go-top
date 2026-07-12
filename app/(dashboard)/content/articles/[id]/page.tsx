@@ -15,7 +15,10 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import ArticleContentEditor from '@/components/content/ArticleContentEditor'
+import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
+import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
+import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
@@ -66,6 +69,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [wpPostUrl, setWpPostUrl] = useState<string | null>(null)
   const [wpStatus, setWpStatus] = useState<'draft' | 'publish' | null>(null)
   const [wpBusy, setWpBusy] = useState<'draft' | 'publish' | null>(null)
+  // Phase 4D — current inline-image rows (emitted by the panel) so the body
+  // preview composes figures without mutating stored content_html.
+  const [inlineImages, setInlineImages] = useState<ComposableInlineImage[]>([])
 
   // Internal linking — editor is QA-only: verify each planned anchor exists and
   // insert its link. Planning/selection happens pre-generation in the brief.
@@ -479,6 +485,31 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           )}
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{e.imageSafetyNote}</p>
         </Card>
+
+        {/* Phase 4D — inline article images (in-body <figure>s, separate from the
+            featured image). Manages its own rows via the inline-images API and
+            emits them so the body preview below composes figures on demand. */}
+        <ArticleInlineImagesPanel
+          articleId={id}
+          dict={e.inline}
+          dir={isHebrew ? 'rtl' : 'ltr'}
+          onNotify={(text, ok) => { setMessage({ text, ok }); if (ok) toast.success(text) }}
+          onImagesChange={(imgs) => setInlineImages(imgs)}
+        />
+
+        {/* Read-only body preview with inline figures composed in (content_html
+            itself stays image-free). Refreshes on any image add/edit/move/etc. */}
+        {inlineImages.length > 0 && (
+          <Card className="hover:translate-y-0">
+            <ArticleBodyPreview
+              html={contentHtml}
+              images={inlineImages}
+              dir={isHebrew ? 'rtl' : 'ltr'}
+              label={e.inline.preview}
+              emptyHint={e.inline.previewEmpty}
+            />
+          </Card>
+        )}
 
         {/* WordPress export — draft (safe) or publish now (confirmed). */}
         <Card className="hover:translate-y-0">

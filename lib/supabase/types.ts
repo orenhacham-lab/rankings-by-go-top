@@ -88,8 +88,36 @@ export interface Database {
         Insert: Partial<Omit<ContentAutomationAlert, 'id' | 'created_at'>> & { dedupe_key: string; user_id: string; project_id: string }
         Update: Partial<Omit<ContentAutomationAlert, 'id' | 'created_at'>>
       }
+      article_inline_images: {
+        Row: ArticleInlineImage
+        Insert: Partial<Omit<ArticleInlineImage, 'id' | 'created_at' | 'updated_at'>> & { user_id: string; project_id: string; article_id: string; section_id: string }
+        Update: Partial<Omit<ArticleInlineImage, 'id' | 'created_at'>>
+      }
     }
   }
+}
+
+// Phase 4D — persisted editable inline article image (owner/project scoped).
+// Rows are the source of truth; they are NOT baked into content_html. The
+// <figure> is composed on demand for editor preview and WordPress publish.
+export interface ArticleInlineImage {
+  id: string
+  user_id: string
+  project_id: string
+  article_id: string
+  section_id: string
+  prompt: string | null
+  alt_text: string | null
+  caption: string | null
+  storage_url: string | null
+  storage_path: string | null
+  wp_media_id: number | null
+  wp_media_url: string | null
+  position: number
+  status: 'pending' | 'generating' | 'ready' | 'failed' | 'uploading' | 'uploaded'
+  last_error: string | null
+  created_at: string
+  updated_at: string
 }
 
 // Phase 4B.1 — persisted content-automation failure alert (in-app, owner-scoped).
