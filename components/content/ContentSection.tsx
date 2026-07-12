@@ -12,6 +12,7 @@ import { useMemo } from 'react'
 import { Newspaper } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import WordPressConnectionPanel from './WordPressConnectionPanel'
+import ShopifyConnectionPanel from './ShopifyConnectionPanel'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
@@ -47,6 +48,7 @@ export default function ContentSection({ projectId }: { projectId: string }) {
       </div>
 
       <WordPressConnectionPanel projectId={projectId} />
+      <ShopifyConnectionPanel projectId={projectId} />
     </section>
   )
 }

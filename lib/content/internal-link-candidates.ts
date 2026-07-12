@@ -24,6 +24,7 @@ import {
   isInternalUrl,
   slugFromUrl,
 } from '@/lib/content/internal-links'
+import { loadShopifyLinkCandidates } from '@/lib/shopify/link-candidates'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -178,5 +179,12 @@ export async function loadInternalLinkCandidates(
       }
     })
 
-  return { candidates: [...articleCandidates, ...urlCandidates], hosts: hostList }
+  // Phase 4F.1 — additively include synced, ACTIVE Shopify entities (products/
+  // collections/pages/articles) as source-neutral internal-link candidates.
+  // Best-effort + no-op for WordPress-only projects (no Shopify entities → []).
+  // Their storefront hosts are added to hostList so they validate as internal.
+  const shopifyCandidates = await loadShopifyLinkCandidates(admin, projectId)
+  for (const c of shopifyCandidates) { const h = extractUrlHost(c.url); if (h && !hostList.includes(h)) hostList.push(h) }
+
+  return { candidates: [...articleCandidates, ...urlCandidates, ...shopifyCandidates], hosts: hostList }
 }
