@@ -1527,6 +1527,7 @@ export const dashboardHe = {
           invalid_state: 'בקשת החיבור פגה או אינה תקינה. התחילו מחדש.',
           expired_state: 'בקשת החיבור פגה. התחילו מחדש.',
           state_replay: 'קישור החיבור כבר נוצל. התחילו מחדש.',
+          invalid_nonce: 'לא ניתן היה לאמת את החיבור בדפדפן זה. התחילו מחדש באותו דפדפן.',
           invalid_shop: 'דומיין חנות Shopify לא תקין.',
           missing_code: 'Shopify לא החזיר קוד הרשאה. נסו שוב.',
           token_exchange_failed: 'לא ניתן להשלים את ההרשאה מול Shopify. נסו שוב.',

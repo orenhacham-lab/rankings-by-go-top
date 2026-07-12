@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-auth'
 import { normalizeShopDomain } from '@/lib/shopify/domain'
@@ -16,6 +17,7 @@ import { SHOPIFY_API_VERSION, missingScopes } from '@/lib/shopify/constants'
 import { testShopifyConnection } from '@/lib/shopify/client'
 import {
   getShopifyOAuthConfig, verifyShopifyHmac, exchangeCodeForToken, projectReturnUrl,
+  verifyNonceCookie, OAUTH_NONCE_COOKIE, OAUTH_COOKIE_PATH,
 } from '@/lib/shopify/oauth'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
 
@@ -29,8 +31,17 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const params: Record<string, string> = {}
   url.searchParams.forEach((v, k) => { params[k] = v })
-  const generic = (reason: string) => NextResponse.redirect(`${appUrl}/projects?shopify=error&reason=${encodeURIComponent(reason)}`)
-  const toProject = (projectId: string, q: Record<string, string>) => NextResponse.redirect(projectReturnUrl(appUrl, projectId, q))
+
+  // The signed nonce cookie set at start. Every terminal response clears it so a
+  // stale nonce can't be reused.
+  const cookieStore = await cookies()
+  const nonceCookieRaw = cookieStore.get(OAUTH_NONCE_COOKIE)?.value
+  const clearNonce = (res: NextResponse): NextResponse => {
+    res.cookies.set(OAUTH_NONCE_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: OAUTH_COOKIE_PATH, maxAge: 0 })
+    return res
+  }
+  const generic = (reason: string) => clearNonce(NextResponse.redirect(`${appUrl}/projects?shopify=error&reason=${encodeURIComponent(reason)}`))
+  const toProject = (projectId: string, q: Record<string, string>) => clearNonce(NextResponse.redirect(projectReturnUrl(appUrl, projectId, q)))
 
   // 1) Integrity: HMAC over all params (except hmac) with the client secret.
   if (!verifyShopifyHmac(params, config.clientSecret)) return generic('invalid_hmac')
@@ -51,13 +62,18 @@ export async function GET(request: Request) {
   // 4) Merchant cancelled the install (Shopify appends an error param).
   if (params.error) return toProject(st.project_id, { shopify: 'error', reason: 'cancelled' })
 
-  // 5) Ownership + identity: the callback user must be the state's user and own
+  // 5) Browser nonce cookie: must be present, untampered, and equal to the
+  //    callback state (which equals the DB state). Do NOT rely on the DB alone.
+  const cookieNonce = verifyNonceCookie(nonceCookieRaw, config.clientSecret)
+  if (!cookieNonce || cookieNonce !== params.state) return toProject(st.project_id, { shopify: 'error', reason: 'invalid_nonce' })
+
+  // 6) Ownership + identity: the callback user must be the state's user and own
   //    the project (rejects a callback for another user/project).
   const auth = await authContentProject(st.project_id)
   if ('error' in auth) return toProject(st.project_id, { shopify: 'error', reason: 'forbidden' })
   if (auth.user.id !== st.user_id) return toProject(st.project_id, { shopify: 'error', reason: 'forbidden' })
 
-  // 6) Consume the state ONCE (atomic: only succeeds while used_at is null).
+  // 7) Consume the state ONCE (atomic: only succeeds while used_at is null).
   const { data: consumed } = await auth.admin
     .from('shopify_oauth_states')
     .update({ used_at: new Date().toISOString() })
@@ -67,17 +83,17 @@ export async function GET(request: Request) {
     .maybeSingle()
   if (!consumed) return toProject(st.project_id, { shopify: 'error', reason: 'state_replay' })
 
-  // 7) Authorization code required.
+  // 8) Authorization code required.
   if (!params.code) return toProject(st.project_id, { shopify: 'error', reason: 'missing_code' })
 
-  // 8) Platform exclusivity (re-check at save time).
+  // 9) Platform exclusivity (re-check at save time).
   const { data: wordpress } = await auth.admin
     .from('wordpress_connections').select('id').eq('project_id', auth.project.id).maybeSingle()
   if (wordpress) return toProject(st.project_id, { shopify: 'error', reason: 'platform_already_connected' })
 
   if (!isCredentialsCryptoConfigured()) return toProject(st.project_id, { shopify: 'error', reason: 'not_configured' })
 
-  // 9) Exchange the code for an OFFLINE access token (server-side).
+  // 10) Exchange the code for an OFFLINE access token (server-side).
   let token: { accessToken: string; scope: string }
   try {
     token = await exchangeCodeForToken({ shop, code: params.code, clientId: config.clientId, clientSecret: config.clientSecret })
@@ -85,7 +101,7 @@ export async function GET(request: Request) {
     return toProject(st.project_id, { shopify: 'error', reason: 'token_exchange_failed' })
   }
 
-  // 10) Verify granted scopes + resolve storefront host (reuses scope verification).
+  // 11) Verify granted scopes + resolve storefront host (reuses scope verification).
   const creds = { shopDomain: shop, accessToken: token.accessToken, apiVersion: SHOPIFY_API_VERSION }
   const test = await testShopifyConnection(creds)
   const grantedScopes = test.grantedScopes ?? token.scope.split(/[,\s]+/).filter(Boolean)
@@ -94,7 +110,7 @@ export async function GET(request: Request) {
   const status = missing.length > 0 ? 'failed' : 'connected'
   const lastError = missing.length > 0 ? `missing_scopes: ${missing.join(', ')}` : null
 
-  // 11) Encrypt + persist (token never leaves the server).
+  // 12) Encrypt + persist (token never leaves the server).
   let tokenEncrypted: string
   try { tokenEncrypted = encryptCredential(token.accessToken) } catch {
     return toProject(st.project_id, { shopify: 'error', reason: 'encryption_failed' })

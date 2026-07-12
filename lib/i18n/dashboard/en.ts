@@ -1522,6 +1522,7 @@ export const dashboardEn = {
           invalid_state: 'The connection request expired or was invalid. Please start again.',
           expired_state: 'The connection request expired. Please start again.',
           state_replay: 'This connection link was already used. Please start again.',
+          invalid_nonce: 'The connection could not be verified in this browser. Please start again in the same browser.',
           invalid_shop: 'Invalid Shopify store domain.',
           missing_code: 'Shopify did not return an authorization code. Please try again.',
           token_exchange_failed: 'Could not complete the Shopify authorization. Please try again.',

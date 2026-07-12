@@ -86,9 +86,41 @@ export function verifyShopifyHmac(params: Record<string, string>, clientSecret: 
   return crypto.timingSafeEqual(a, b)
 }
 
-/** A cryptographically-random opaque state token. */
+/** A cryptographically-random opaque state token (also used as the nonce). */
 export function generateOAuthState(): string {
   return crypto.randomBytes(32).toString('hex')
+}
+
+/** Name + path of the signed browser nonce cookie (scoped to the OAuth routes). */
+export const OAUTH_NONCE_COOKIE = 'shopify_oauth_nonce'
+export const OAUTH_COOKIE_PATH = '/api/shopify/oauth'
+
+/**
+ * Sign the nonce for the browser cookie: `${nonce}.${hmac}`. The HMAC (over the
+ * nonce, with the app client secret) lets the callback detect tampering without
+ * any server storage of the cookie value. PURE.
+ */
+export function signNonceCookie(nonce: string, secret: string): string {
+  const mac = crypto.createHmac('sha256', secret).update(nonce).digest('hex')
+  return `${nonce}.${mac}`
+}
+
+/**
+ * Verify a signed nonce cookie and return the nonce, or null when the value is
+ * missing, malformed, or the signature doesn't match (tampering). Constant-time
+ * comparison. PURE.
+ */
+export function verifyNonceCookie(value: string | undefined | null, secret: string): string | null {
+  if (!value || typeof value !== 'string') return null
+  const dot = value.lastIndexOf('.')
+  if (dot <= 0) return null
+  const nonce = value.slice(0, dot)
+  const provided = value.slice(dot + 1)
+  const expected = crypto.createHmac('sha256', secret).update(nonce).digest('hex')
+  const a = Buffer.from(provided, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  if (a.length !== b.length) return null
+  return crypto.timingSafeEqual(a, b) ? nonce : null
 }
 
 /**

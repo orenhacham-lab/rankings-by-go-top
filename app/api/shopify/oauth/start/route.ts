@@ -12,9 +12,11 @@ import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-au
 import { normalizeShopDomain } from '@/lib/shopify/domain'
 import {
   getShopifyOAuthConfig, oauthRedirectUri, buildAuthorizeUrl, generateOAuthState, projectReturnUrl,
+  signNonceCookie, OAUTH_NONCE_COOKIE, OAUTH_COOKIE_PATH,
 } from '@/lib/shopify/oauth'
 
 const STATE_TTL_MS = 10 * 60_000
+const STATE_TTL_SECONDS = STATE_TTL_MS / 1000
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -61,5 +63,16 @@ export async function GET(request: Request) {
     redirectUri: oauthRedirectUri(config.appUrl),
     state,
   })
-  return NextResponse.redirect(authorizeUrl)
+
+  // Signed browser nonce cookie carrying the SAME state — the callback requires
+  // both the DB state AND this cookie to match (Shopify OAuth nonce requirement).
+  const res = NextResponse.redirect(authorizeUrl)
+  res.cookies.set(OAUTH_NONCE_COOKIE, signNonceCookie(state, config.clientSecret), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: OAUTH_COOKIE_PATH,
+    maxAge: STATE_TTL_SECONDS,
+  })
+  return res
 }
