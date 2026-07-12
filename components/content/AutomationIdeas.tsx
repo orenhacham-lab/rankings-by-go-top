@@ -110,7 +110,9 @@ export default function AutomationIdeas({
   const successRef = useRef<HTMLDivElement | null>(null)
 
   // Default to the most SEO-grounded source (real Google Ads keyword data).
-  const [source, setSource] = useState<Source>('keyword_research_url')
+  // Phase 4C — default to the combined "סריקה משולבת" source (still switchable to
+  // any individual source). Selection only; nothing runs until the user clicks.
+  const [source, setSource] = useState<Source>('hybrid')
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
