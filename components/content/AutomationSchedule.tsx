@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -75,6 +76,11 @@ export default function AutomationSchedule({
   const [pool, setPool] = useState<Pool | null>(null)
   const [items, setItems] = useState<QueueItem[]>([])
   const [health, setHealth] = useState<{ needsAttention: boolean; overdue: boolean; failedCount: number; stuckCount: number; latestError: string | null } | null>(null)
+  // Phase 4B.1 — persisted final-failure alerts (one per item, owner-scoped).
+  const [alerts, setAlerts] = useState<{ id: string; pool_item_id: string | null; article_id: string | null; title: string | null; error: string | null; attempts: number; created_at: string }[]>([])
+  // Safety A — surface a clear config error when the alerts migration is missing
+  // (never silently hide that failures aren't being recorded).
+  const [alertsMigrationMissing, setAlertsMigrationMissing] = useState(false)
   const [approved, setApproved] = useState<ApprovedTopic[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -98,10 +104,16 @@ export default function AutomationSchedule({
     if (!projectId) return
     setLoading(true)
     try {
-      const [pr, tr] = await Promise.all([
+      const [pr, tr, ar] = await Promise.all([
         fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`),
         fetch(`/api/content/topics?projectId=${encodeURIComponent(projectId)}`),
+        fetch(`/api/content/automation/alerts?projectId=${encodeURIComponent(projectId)}`),
       ])
+      {
+        const ad = await ar.json().catch(() => ({}))
+        setAlertsMigrationMissing(ar.status === 503 && ad?.migrationRequired === true)
+        setAlerts(ar.ok && Array.isArray(ad.alerts) ? ad.alerts : [])
+      }
       if (pr.status === 503) { setMessage({ text: t.migrationRequired, ok: false }); setLoading(false); return }
       const pd = pr.ok ? await pr.json() : { pool: null, items: [] }
       const p: Pool | null = pd.pool ?? null
@@ -245,6 +257,33 @@ export default function AutomationSchedule({
       onChanged?.()
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Phase 4B.1 — dismiss a persisted failure alert (owner-scoped).
+  async function dismissAlert(alertId: string) {
+    setAlerts((prev) => prev.filter((a) => a.id !== alertId)) // optimistic
+    try {
+      await fetch(`/api/content/automation/alerts/${alertId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
+      })
+    } catch { /* best-effort; a reload reconciles */ }
+  }
+
+  // Phase 4B.1 — retry from an alert: reset the item to an eligible state
+  // (status=queued clears the error/lock AND resets attempts server-side). The
+  // alert stays open until the next SUCCESSFUL publish resolves it. No duplicate
+  // WordPress post — wp_post_id reconciliation guards the eventual publish.
+  async function retryFromAlert(poolItemId: string) {
+    setBusyItem(poolItemId)
+    try {
+      await fetch(`/api/content/automation/items/${poolItemId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'queued' }),
+      })
+      await load(); onChanged?.()
+      setMessage({ text: t.alertRetryQueued, ok: true })
+    } finally {
+      setBusyItem(null)
     }
   }
 
@@ -408,6 +447,48 @@ export default function AutomationSchedule({
             </p>
             {health.latestError && <p className="mt-0.5 text-[11px] text-amber-700/90 dark:text-amber-400/90 break-words">{reasonLabel(health.latestError)}</p>}
             <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{t.alertHint}</p>
+          </div>
+        )}
+
+        {/* Safety A — the alert store is a required dependency; if its migration
+            is missing, say so clearly instead of showing a healthy-looking zero. */}
+        {alertsMigrationMissing && (
+          <div className="mt-2 rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/20 px-3 py-2">
+            <p className="text-xs font-semibold text-red-800 dark:text-red-300">{t.alertsMigrationMissing}</p>
+          </div>
+        )}
+
+        {/* Phase 4B.1 — persisted final-failure alerts: one per item after the
+            LAST failed publish attempt, with view / retry-now / dismiss. */}
+        {alerts.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {alerts.map((a) => (
+              <div key={a.id} className="rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/20 px-3 py-2">
+                <p className="text-xs font-semibold text-red-800 dark:text-red-300">
+                  {t.alertPublishFailedTitle}{a.title ? ` — ${a.title}` : ''}
+                </p>
+                <p className="mt-0.5 text-[11px] text-red-700 dark:text-red-400 break-words">
+                  {t.alertAttempts.replace('{n}', String(a.attempts))}{a.error ? ` · ${reasonLabel(a.error)}` : ''}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  {a.article_id && (
+                    <Link href={`/content/articles/${a.article_id}`} className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                      {t.alertViewArticle}
+                    </Link>
+                  )}
+                  {a.pool_item_id && (
+                    <button type="button" onClick={() => retryFromAlert(a.pool_item_id!)} disabled={busyItem === a.pool_item_id}
+                      className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline disabled:opacity-50">
+                      {t.alertRetryNow}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => dismissAlert(a.id)}
+                    className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:underline">
+                    {t.alertDismiss}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
