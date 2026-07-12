@@ -1501,7 +1501,7 @@ export const dashboardEn = {
         versionFallback: 'Shopify served a different API version than requested',
         counts: { product: 'Products', collection: 'Collections', page: 'Pages', blog: 'Blogs', article: 'Articles' },
         errors: {
-          invalid_domain: 'Invalid shop domain (must be *.myshopify.com).',
+          invalid_domain: 'Invalid Shopify store address. Enter it as your-store.myshopify.com.',
           invalid_token: 'The token is invalid or expired.',
           missing_scope: 'The token is missing a read scope (read_products / read_content).',
           permission_error: 'Could not read the token’s granted scopes (permission error).',
@@ -1523,7 +1523,7 @@ export const dashboardEn = {
           expired_state: 'The connection request expired. Please start again.',
           state_replay: 'This connection link was already used. Please start again.',
           invalid_nonce: 'The connection could not be verified in this browser. Please start again in the same browser.',
-          invalid_shop: 'Invalid Shopify store domain.',
+          invalid_shop: 'Invalid Shopify store address. Enter it as your-store.myshopify.com.',
           missing_code: 'Shopify did not return an authorization code. Please try again.',
           token_exchange_failed: 'Could not complete the Shopify authorization. Please try again.',
           missing_scopes: 'Connected, but required read permissions were not approved (read_products, read_content).',
