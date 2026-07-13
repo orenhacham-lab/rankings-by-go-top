@@ -18,6 +18,7 @@ import ArticleContentEditor from '@/components/content/ArticleContentEditor'
 import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPanel'
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
 import WordPressPublishSettings, { type WpExportStatus } from '@/components/content/WordPressPublishSettings'
+import ArticleEditorPublishGate from '@/components/content/ArticleEditorPublishGate'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
@@ -529,42 +530,48 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
           </Card>
         )}
 
-        {/* Phase 4E — WordPress taxonomy + SEO settings (categories/tags/plugin). */}
-        {projectId && (
-          <WordPressPublishSettings
-            projectId={projectId}
-            articleId={id}
-            dict={e.wpTax}
-            dir={isHebrew ? 'rtl' : 'ltr'}
-            initialPrimaryCategoryId={wpPrimaryCategoryId}
-            initialCategoryIds={wpCategoryIds}
-            initialTagIds={wpTagIds}
-            lastExport={wpExportStatus}
-            onNotify={(text, ok) => { setMessage({ text, ok }); if (ok) toast.success(text) }}
-          />
-        )}
+        {/* Phase 4F.1 — platform gate: WordPress publishing controls render only
+            for a WordPress project. A Shopify project sees an info card; neither
+            → connect prompt; both → conflict. Detection uses the project's
+            connection state (never the WordPress post id). */}
+        <ArticleEditorPublishGate projectId={projectId}>
+          {/* Phase 4E — WordPress taxonomy + SEO settings (categories/tags/plugin). */}
+          {projectId && (
+            <WordPressPublishSettings
+              projectId={projectId}
+              articleId={id}
+              dict={e.wpTax}
+              dir={isHebrew ? 'rtl' : 'ltr'}
+              initialPrimaryCategoryId={wpPrimaryCategoryId}
+              initialCategoryIds={wpCategoryIds}
+              initialTagIds={wpTagIds}
+              lastExport={wpExportStatus}
+              onNotify={(text, ok) => { setMessage({ text, ok }); if (ok) toast.success(text) }}
+            />
+          )}
 
-        {/* WordPress export — draft (safe) or publish now (confirmed). */}
-        <Card className="hover:translate-y-0">
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.wpTitle}</h3>
-          {!featuredImageUrl && <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.wpNoImageWarn}</p>}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
-              {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
-              {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
-            </Button>
-            {wpPostId && wpPostUrl && (
-              <span className="inline-flex items-center gap-2 text-sm">
-                <Badge variant={wpStatus === 'publish' ? 'success' : 'neutral'}>{wpStatus === 'publish' ? e.wpPublishedBadge : e.wpDraftBadge}</Badge>
-                <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
-                  {wpStatus === 'publish' ? e.wpOpenLive : e.wpOpenDraft}
-                </a>
-              </span>
-            )}
-          </div>
-        </Card>
+          {/* WordPress export — draft (safe) or publish now (confirmed). */}
+          <Card className="hover:translate-y-0">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-2">{e.wpTitle}</h3>
+            {!featuredImageUrl && <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{e.wpNoImageWarn}</p>}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={() => exportWordPress('draft')} loading={wpBusy === 'draft'} disabled={!!wpBusy}>
+                {wpBusy === 'draft' ? e.wpSendingDraft : e.wpSendDraft}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => exportWordPress('publish')} loading={wpBusy === 'publish'} disabled={!!wpBusy}>
+                {wpBusy === 'publish' ? e.wpPublishing : e.wpPublishNow}
+              </Button>
+              {wpPostId && wpPostUrl && (
+                <span className="inline-flex items-center gap-2 text-sm">
+                  <Badge variant={wpStatus === 'publish' ? 'success' : 'neutral'}>{wpStatus === 'publish' ? e.wpPublishedBadge : e.wpDraftBadge}</Badge>
+                  <a href={wpPostUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                    {wpStatus === 'publish' ? e.wpOpenLive : e.wpOpenDraft}
+                  </a>
+                </span>
+              )}
+            </div>
+          </Card>
+        </ArticleEditorPublishGate>
 
         {/* Planned internal links — QA/insertion only. Hidden entirely when the
             article has no planned links (no ad-hoc suggestions here anymore). */}

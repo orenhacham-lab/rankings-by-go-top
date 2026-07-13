@@ -879,6 +879,16 @@ export const dashboardHe = {
           unknown: 'הפעולה נכשלה. נסו שוב.',
         },
       },
+      // Phase 4F.1 — platform gate for the editor's publishing controls.
+      publishGate: {
+        shopifyTitle: 'פרסום ל-Shopify',
+        shopifyText: 'חיבור החנות והנתונים פעילים. יצירה ופרסום של מאמרים ישירות ל-Shopify יתווספו בשלב הפרסום הבא.',
+        shopifySecondary: 'בינתיים ניתן ליצור ולערוך את המאמר במערכת, אך לא לפרסם אותו ישירות ל-Shopify.',
+        neitherText: 'לא מחוברת פלטפורמה לפרויקט. חברו WordPress או Shopify מעמוד הפרויקט כדי לפרסם.',
+        conflictTitle: 'התנגשות הגדרות',
+        conflictText: 'לפרויקט זה יש גם חיבור WordPress וגם חיבור Shopify. נתקו אחת מהפלטפורמות בעמוד הפרויקט כדי להמשיך. שום דבר לא נמחק אוטומטית.',
+        projectPageLink: 'מעבר לעמוד הפרויקט →',
+      },
       wpTitle: 'WordPress',
       // Phase 4E — WordPress taxonomy + SEO meta settings.
       wpTax: {
