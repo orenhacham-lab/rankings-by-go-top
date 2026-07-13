@@ -464,6 +464,13 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         : res.meta.generated > 0
           ? 'all_duplicates'
           : 'model_empty'
+    // Diagnostic count breakdown so "16 of 20" is never ambiguous:
+    //  generated_count      = raw model ideas across both Pro calls
+    //  valid_count          = survived minimal validation (site-scan side)
+    //  already_existing_count = dropped here as duplicates of saved content
+    //  newly_saved_count    = distinct NEW ideas returned to the UI
+    //  shortfall_count      = requested minus valid (model couldn't supply more)
+    const d = (res.meta.debug ?? {}) as Record<string, unknown>
     meta = {
       source: 'site_scan',
       generated: res.meta.generated,
@@ -471,7 +478,14 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       finalCount: suggestions.length,
       attempts: 1,
       reason,
-      debug: process.env.NODE_ENV !== 'production' ? { ...res.meta.debug, afterDedupeCount: suggestions.length, noResultsReason: reason ?? null } : undefined,
+      debug: process.env.NODE_ENV !== 'production' ? {
+        ...d, afterDedupeCount: suggestions.length, noResultsReason: reason ?? null,
+        generated_count: d.generatedCount ?? res.meta.generated,
+        valid_count: d.validCount ?? res.meta.generated,
+        already_existing_count: dupes,
+        newly_saved_count: suggestions.length,
+        shortfall_count: d.shortfall ?? 0,
+      } : undefined,
     }
   } else {
     // keyword_research_url — Google Ads over URL + keyword seeds → clusters →

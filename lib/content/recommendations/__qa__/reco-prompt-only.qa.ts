@@ -7,7 +7,7 @@
  */
 import { validateIdea, normalizeTitleKey, hasStaleCurrentYear, isHistoricalYear } from '../validate'
 import { recommendationGuidance, structuredOutputContract } from '../prompt-guidance'
-import { buildPrompt } from '../site-scan'
+import { buildPrompt, completeSiteScanIdeas, type RawIdeaGen } from '../site-scan'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
 
 let pass = 0, fail = 0
@@ -23,7 +23,7 @@ const runValidation = (ideas: Idea[]) => {
   return { kept, rejects }
 }
 
-function main() {
+async function main() {
   console.log('A) minimal validation is NON-DESTRUCTIVE (byte-identical pass-through)')
   {
     // Real Hebrew words the earlier pipeline corrupted MUST pass through untouched.
@@ -102,6 +102,61 @@ function main() {
     check('primary is a pinned Pro id', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-pro')
     check('fallback is NOT flash-lite', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-flash-lite' && /flash|pro/.test(RECOMMENDATION_MODEL_FALLBACK))
     check('version tag present', typeof RECOMMENDATION_MODEL_VERSION === 'string' && RECOMMENDATION_MODEL_VERSION.length > 0)
+  }
+
+  console.log('G) Site Scan count-completion (injected model) — no deterministic fallback')
+  {
+    const idea = (t: string) => ({ title: t, primaryKeyword: t, reason: `ר-${t}`, evidenceSummary: `ראיה ל-${t}` })
+    const many = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => idea(`${prefix} ${i + 1}`))
+
+    // F.2/F.5: primary returns 16 → completion asked for exactly 4 → final 20.
+    {
+      const calls: { need: number; avoid: string[] }[] = []
+      const stub = (batch1: number, batch2: number): (need: number, avoid: string[]) => Promise<RawIdeaGen> => {
+        let call = 0
+        return async (need, avoid) => {
+          calls.push({ need, avoid })
+          const ideas = call === 0 ? many('בסיס', batch1) : many('השלמה', batch2)
+          call++
+          return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY }
+        }
+      }
+      calls.length = 0
+      const r = await completeSiteScanIdeas(20, ['קיים מאמר'], YEAR, stub(16, 4))
+      check('first call requests 20', calls[0].need === 20)
+      check('completion requested exactly 4', calls[1] && calls[1].need === 4, `got ${calls[1]?.need}`)
+      check('4 valid completion ideas → final 20', r.validIdeas.length === 20, `got ${r.validIdeas.length}`)
+      check('retry was used', r.retryUsed && r.shortfall === 0)
+      check('completion model is the centralized primary', r.modelUsed === RECOMMENDATION_MODEL_PRIMARY)
+      check('completion avoid includes already-generated titles', calls[1].avoid.includes('בסיס 1') && calls[1].avoid.includes('בסיס 16'))
+      check('completion avoid keeps existing article title', calls[1].avoid.includes('קיים מאמר'))
+    }
+
+    // F.6: completion returns only 2 → final 18, shortfall recorded, no filler.
+    {
+      let call = 0
+      const stub = async (): Promise<RawIdeaGen> => { const ideas = call === 0 ? many('בסיס', 16) : many('השלמה', 2); call++; return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY } }
+      const r = await completeSiteScanIdeas(20, [], YEAR, stub)
+      check('2 valid completion ideas → final 18', r.validIdeas.length === 18, `got ${r.validIdeas.length}`)
+      check('exact shortfall recorded (2)', r.shortfall === 2)
+      check('no deterministic filler in the set', r.validIdeas.every((g) => !/טעויות נפוצות וטיפים|המדריך המלא:/.test(g.title || '')))
+    }
+
+    // Never emits the legacy fallback templates, and drops invalid/dup in completion.
+    {
+      let call = 0
+      const stub = async (): Promise<RawIdeaGen> => {
+        const ideas = call === 0
+          ? [...many('בסיס', 15), { title: 'המדריך המלא: Guerlain', primaryKeyword: 'x', reason: 'r' }] // includes a legacy-looking model title (still just data, but…)
+          : [idea('חדש א'), idea('בסיס 1') /* dup */, { title: '  ', primaryKeyword: 'y', reason: 'r' } /* empty */]
+        call++
+        return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY }
+      }
+      const r = await completeSiteScanIdeas(20, [], YEAR, stub)
+      check('completion dedups against generated (בסיס 1 dropped)', r.rejects.duplicate_title === 1)
+      check('completion drops empty title', r.rejects.empty_title === 1)
+      check('no application-side fallback templates injected', r.validIdeas.filter((g) => /טעויות נפוצות וטיפים/.test(g.title || '')).length === 0)
+    }
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

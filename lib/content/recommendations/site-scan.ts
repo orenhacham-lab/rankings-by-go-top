@@ -17,7 +17,6 @@ import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-conten
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
-import { topicQualityIssue } from './keyword-research'
 import { generateRecommendationJSON } from './model'
 import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
 import { validateIdea } from './validate'
@@ -235,64 +234,70 @@ async function callModel(prompt: string): Promise<{ ideas: SiteScanIdea[]; ok: b
 
 const MAX_SITE_SCAN_IDEAS = 20
 
+// NOTE: the legacy deterministic fallback (static entity-name-plus-suffix
+// editorial templates) has been REMOVED from the user-facing path. When the model
+// is short, we run ONE Pro count-completion call and otherwise return fewer with
+// an internal shortfall diagnostic — never a static editorial title.
+
+/** One model attempt: raw ideas + ok + which model produced them. */
+export interface RawIdeaGen { ideas: SiteScanIdea[]; ok: boolean; modelUsed: string | null }
+
+export interface CompletionResult {
+  validIdeas: SiteScanIdea[]
+  rawCount: number
+  ok: boolean
+  modelUsed: string | null
+  retryUsed: boolean
+  rejects: Record<string, number>
+  shortfall: number
+  /** The avoid list passed to each call (call 0, then the completion call). */
+  avoidHistory: string[][]
+}
+
 /**
- * Deterministic scan-derived suggestions used when the model is unavailable /
- * fails / returns nothing — so a project with a usable scan still gets useful,
- * non-crashing ideas. Built from important pages + categories (a "complete
- * guide" supporting-article angle). No AI. 3–5 items when possible.
+ * Bounded count completion (max TWO calls) over an INJECTED model function — the
+ * SAME model for both calls. The first call requests `target`; if fewer than
+ * `target` VALID ideas survive minimal validation, ONE completion call requests
+ * exactly the missing number, avoiding everything already produced (valid AND
+ * rejected). No deterministic fallback, no rewriting. Pure/testable: the network
+ * call is injected. Returns the valid ideas + a full diagnostic breakdown.
  */
-function deterministicFallback(digest: ReturnType<typeof buildDigest>, language: 'he' | 'en', avoidTitles: string[] = []): TopicSuggestion[] {
-  // Phase 3H.4 — rotation memory for the fallback too: skip templates that were
-  // already suggested/exist, so a repeat run moves on to unused seeds.
-  const avoid = new Set(avoidTitles.map((t) => t.trim().toLowerCase()).filter(Boolean))
-  const he = language === 'he'
-  const guide = (name: string) => (he ? `המדריך המלא: ${name}` : `The complete guide to ${name}`)
-  const tips = (name: string) => (he ? `${name} — טעויות נפוצות וטיפים` : `${name} — common mistakes and tips`)
-  const prefix = he ? 'לפי סריקת האתר' : 'From the site scan'
-  const supportReason = (name: string) => (he ? `נושא תומך לעמוד/קטגוריה קיימים באתר: ${name} (${prefix})` : `A supporting topic for an existing page/category: ${name} (${prefix})`)
-
-  const seeds: { name: string; keyword: string; url?: string }[] = []
-  for (const c of digest.categories) seeds.push({ name: c.title, keyword: c.title, url: c.url })
-  for (const p of digest.importantPages) seeds.push({ name: p.title, keyword: p.keyword || p.title, url: p.url })
-
-  const out: TopicSuggestion[] = []
-  const seenTitles = new Set<string>()
-  for (const s of seeds) {
-    const name = (s.name || '').trim()
-    // Phase 3H.3 — the fallback keyword carries INTENT, never the bare entity
-    // name: a bare-entity keyword exactly matches existing entity-prefixed topic
-    // titles and gets (correctly) blocked as covered — which zeroed the whole
-    // fallback. "X מדריך"/"X guide" is a real search phrase and a distinct
-    // sub-intent under the coverage rules.
-    const keyword = (s.keyword || name).trim() === name ? (he ? `${name} מדריך` : `${name} guide`) : (s.keyword || name).trim()
-    if (!name || !keyword) continue
-    // Phase 3H — a deterministic template can't expand a bare one-word entity or
-    // a store/navigation name into a real article ("המדריך המלא: SALE" is junk);
-    // only multi-word, non-navigation seeds are used. The model path handles the
-    // broad entities; here quality beats coverage.
-    if (topicQualityIssue(name, name) !== null) continue
-    for (const makeTitle of [guide, tips]) {
-      const title = makeTitle(name)
-      const key = title.toLowerCase()
-      if (seenTitles.has(key) || avoid.has(key)) continue
-      seenTitles.add(key)
-      out.push({
-        id: `site_scan:${slugKey(title)}`,
-        title,
-        primaryKeyword: keyword,
-        secondaryKeywords: [],
-        searchIntent: 'informational',
-        recommendedWordCount: 1200,
-        angle: '',
-        suggestedInternalLinks: s.url ? [{ url: s.url, anchor: name }] : [],
-        source: 'site_scan',
-        suggestionReason: supportReason(name),
-        suggestionScore: 0.5,
-      })
-      if (out.length >= 6) return out
+export async function completeSiteScanIdeas(
+  target: number,
+  baseAvoid: string[],
+  year: number,
+  callModelFor: (need: number, avoid: string[]) => Promise<RawIdeaGen>,
+): Promise<CompletionResult> {
+  const validateSeen = new Set<string>()
+  const rejects: Record<string, number> = {}
+  const validIdeas: SiteScanIdea[] = []
+  const producedTitles: string[] = []
+  const avoidHistory: string[][] = []
+  let rawCount = 0
+  let ok = false
+  let modelUsed: string | null = null
+  let retryUsed = false
+  for (let call = 0; call < 2 && validIdeas.length < target; call++) {
+    if (call > 0) retryUsed = true
+    const need = target - validIdeas.length
+    const avoidNow = Array.from(new Set([...baseAvoid, ...producedTitles]))
+    avoidHistory.push(avoidNow)
+    const res = await callModelFor(need, avoidNow)
+    if (res.modelUsed) modelUsed = res.modelUsed
+    ok = ok || res.ok
+    if (!res.ok) break
+    if (res.ideas.length === 0) break
+    rawCount += res.ideas.length
+    for (const g of res.ideas) {
+      const t = (g.title || '').trim()
+      if (t) producedTitles.push(t)
+      const r = validateIdea(g, validateSeen, year)
+      if (r) { rejects[r] = (rejects[r] ?? 0) + 1; continue }
+      validIdeas.push(g)
+      if (validIdeas.length >= target) break
     }
   }
-  return out
+  return { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall: Math.max(0, target - validIdeas.length), avoidHistory }
 }
 
 /** Generate topic ideas from the cached site scan. Read-only; never rescans. */
@@ -323,37 +328,18 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   const urlList = sourceUrlList(digest)
   const urlByKey = new Map(urlList.map((u) => [u.url, u.title]))
 
-  // Up to TWO model calls: the first, then ONE bounded count-completion retry if
-  // the first returns fewer than requested (asks only for the remaining count and
-  // avoids what was already produced). No multi-stage refill architecture.
+  // Up to TWO Gemini calls, BOTH using the centralized primary (Pro) model: the
+  // first, then ONE bounded count-completion call for the exact missing number of
+  // VALID ideas (gated on VALID count, not raw). NO deterministic fallback.
   const year = currentYear()
-  const rawIdeas: SiteScanIdea[] = []
-  let ok = false
-  let modelUsed: string | null = null
-  for (let call = 0; call < 2 && rawIdeas.length < MAX_SITE_SCAN_IDEAS; call++) {
-    const need = MAX_SITE_SCAN_IDEAS - rawIdeas.length
-    const avoidNow = [...(input.avoidTitles ?? []), ...rawIdeas.map((i) => (i.title || '').trim()).filter(Boolean)]
-    const prompt = buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoidNow)
-    const res = await callModel(prompt)
-    if (res.modelUsed) modelUsed = res.modelUsed
-    ok = ok || res.ok
-    if (!res.ok) break
-    rawIdeas.push(...res.ideas)
-    if (res.ideas.length === 0) break // genuine empty → stop (don't spin the retry)
-  }
-  debug.modelCalled = true
-  debug.modelOk = ok
-  debug.modelRawCount = rawIdeas.length
-  ;(debug as Record<string, unknown>).modelUsed = modelUsed
+  const { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall } = await completeSiteScanIdeas(
+    MAX_SITE_SCAN_IDEAS, input.avoidTitles ?? [], year,
+    (need, avoid) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid)),
+  )
 
-  // Minimal, NON-destructive validation — drop only unsafe items; keep the rest
-  // exactly as returned. Reason is the model's own evidence sentence (Hebrew).
-  const validateSeen = new Set<string>()
-  const rejects: Record<string, number> = {}
-  const suggestions: TopicSuggestion[] = []
-  for (const g of rawIdeas) {
-    const r = validateIdea(g, validateSeen, year)
-    if (r) { rejects[r] = (rejects[r] ?? 0) + 1; continue }
+  // Build suggestions from the VALID ideas — titles/reasons byte-identical to the
+  // model output (reason = the model's own Hebrew evidence sentence).
+  const suggestions: TopicSuggestion[] = validIdeas.slice(0, MAX_SITE_SCAN_IDEAS).map((g) => {
     const title = (g.title || '').trim()
     const primaryKeyword = (g.primaryKeyword || title).trim()
     const suggestionReason = (g.evidenceSummary && g.evidenceSummary.trim()) || (g.reason && g.reason.trim()) || ''
@@ -361,7 +347,7 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     const suggestedInternalLinks = linkUrl && urlByKey.has(linkUrl)
       ? [{ url: linkUrl, anchor: urlByKey.get(linkUrl) || primaryKeyword }]
       : []
-    suggestions.push({
+    return {
       id: `site_scan:${slugKey(title)}`,
       title,
       primaryKeyword,
@@ -370,25 +356,26 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
       recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1200,
       angle: g.angle || '',
       suggestedInternalLinks,
-      source: 'site_scan',
+      source: 'site_scan' as const,
       suggestionReason,
       suggestionScore: 0.75,
       ...(modelUsed ? { modelUsed } : {}),
-    })
-    if (suggestions.length >= MAX_SITE_SCAN_IDEAS) break
-  }
-  ;(debug as Record<string, unknown>).validationRejects = rejects
+    }
+  })
 
-  // Model failed or produced nothing usable → deterministic scan-derived ideas
-  // so the user is never stuck with a bare error on a project that HAS a scan.
+  // Internal shortfall diagnostic (from completeSiteScanIdeas) — how many short of
+  // the request after the ONE completion call. NO deterministic filler is added.
+  debug.modelCalled = true
+  debug.modelOk = ok
+  debug.modelRawCount = rawCount
+  debug.rawSuggestionCount = suggestions.length
+  Object.assign(debug as Record<string, unknown>, {
+    modelUsed, retryUsed, validationRejects: rejects,
+    generatedCount: rawCount, validCount: suggestions.length, shortfall,
+  })
+
   if (suggestions.length === 0) {
-    const fallback = deterministicFallback(digest, input.language, input.avoidTitles ?? [])
-    debug.usedFallback = fallback.length > 0
-    debug.rawSuggestionCount = fallback.length
-    if (fallback.length > 0) return { suggestions: fallback, meta: { generated: fallback.length, debug } }
     return { suggestions: [], meta: { reason: ok ? 'model_empty' : 'model_error', generated: 0, debug } }
   }
-
-  debug.rawSuggestionCount = suggestions.length
   return { suggestions, meta: { generated: suggestions.length, debug } }
 }
