@@ -875,6 +875,16 @@ export const dashboardEn = {
           unknown: 'The action failed. Please try again.',
         },
       },
+      // Phase 4F.1 — platform gate for the editor's publishing controls.
+      publishGate: {
+        shopifyTitle: 'פרסום ל-Shopify',
+        shopifyText: 'חיבור החנות והנתונים פעילים. יצירה ופרסום של מאמרים ישירות ל-Shopify יתווספו בשלב הפרסום הבא.',
+        shopifySecondary: 'בינתיים ניתן ליצור ולערוך את המאמר במערכת, אך לא לפרסם אותו ישירות ל-Shopify.',
+        neitherText: 'No platform is connected to this project. Connect WordPress or Shopify from the project page to publish.',
+        conflictTitle: 'Configuration conflict',
+        conflictText: 'This project has both a WordPress and a Shopify connection. Disconnect one platform on the project page to continue. Nothing is deleted automatically.',
+        projectPageLink: 'Go to the project page →',
+      },
       wpTitle: 'WordPress',
       // Phase 4E — WordPress taxonomy + SEO meta settings.
       wpTax: {
