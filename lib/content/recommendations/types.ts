@@ -45,6 +45,12 @@ export interface TopicSuggestion {
   supportingSources?: RecommendationSource[]
   /** Phase 4C — per-source evidence (source + that source's own reason). */
   sourceEvidence?: { source: RecommendationSource; reason: string }[]
+  /** Grounding — canonical entity identity carried internally for entity-correct
+   *  supporting links + evidence. Response-only; raw ids are NEVER rendered. */
+  primaryEntityId?: string
+  primaryEntityType?: 'product' | 'category' | 'brand' | 'article' | 'page'
+  canonicalEntityName?: string
+  supportingEntityIds?: string[]
 }
 
 export interface RecommendationMeta {

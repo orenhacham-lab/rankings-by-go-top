@@ -22,6 +22,7 @@ import { topicQualityIssue } from './keyword-research'
 import { qualityGuidance, currentYear } from './quality'
 import { refineAndSelect, type RefineCtx } from './refine'
 import { geminiRepairTitle } from './gemini-repair'
+import { assessGrounding, sanitizeReason, type EntityRecord, type GroundingEvidence } from './grounding'
 import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -35,6 +36,10 @@ export interface SiteScanRecoInput {
    *  regenerated the same ideas, the guard rejected them all against the first
    *  run's pending rows, and the source "exhausted" after one batch. */
   avoidTitles?: string[]
+  /** Grounding — canonical indexed entities + existing topics (for the grounding
+   *  gate and answer-level cannibalization). Supplied by the engine. */
+  entities?: EntityRecord[]
+  existingTopics?: { title: string; primaryKeyword?: string; searchIntent?: string }[]
 }
 
 export type SiteScanReason = 'no_scan' | 'insufficient_data' | 'model_error' | 'model_empty'
@@ -348,8 +353,10 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     const title = (g.title || '').trim()
     const primaryKeyword = (g.primaryKeyword || title).trim()
     if (!title || !primaryKeyword) continue
-    const ctx = (g.sourceContext || '').trim()
-    const baseReason = (g.reason || '').trim()
+    // Never surface an internal label (e.g. "cluster 8") as user-facing evidence:
+    // sanitize the model's sourceContext and drop it if nothing concrete remains.
+    const ctx = sanitizeReason((g.sourceContext || '').trim())
+    const baseReason = sanitizeReason((g.reason || '').trim())
     const suggestionReason = [baseReason, ctx ? `(${reasonPrefix}: ${ctx})` : `(${reasonPrefix})`].filter(Boolean).join(' ')
     const linkUrl = (g.suggestedLinkUrl || '').trim()
     const suggestedInternalLinks = linkUrl && urlByKey.has(linkUrl)
@@ -376,7 +383,16 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   // source → no refill pass (refill = null).
   const year = currentYear()
   const avoid = input.avoidTitles ?? []
-  const ctx: RefineCtx = { existingTitles: avoid, language: input.language, year, isDuplicate: () => false }
+  const entities = input.entities ?? []
+  const ev: GroundingEvidence = { entities, keywordBacked: false, existingTitles: avoid }
+  const ctx: RefineCtx = {
+    existingTitles: avoid, language: input.language, year, isDuplicate: () => false,
+    // A site-scan topic must be grounded in a real indexed entity (or a distinct
+    // gap): a brand topic without a matching product/category is discarded.
+    assessGrounding: entities.length ? (c) => assessGrounding(c, ev) : undefined,
+    evidenceTextFor: (c) => [c.primaryKeyword, ...entities.map((e) => e.title), ...avoid].join(' '),
+    existingTopics: input.existingTopics ?? [],
+  }
   const { selected: diversified } = await refineAndSelect(
     suggestions, MAX_SITE_SCAN_IDEAS, ctx,
     (c) => geminiRepairTitle(input.langLabel, year, c), null,

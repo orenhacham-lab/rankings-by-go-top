@@ -8,10 +8,15 @@
 
 import type { TopicSuggestion } from './types'
 import {
-  repairStaleYear, repairReason, looksEnglish, cannibalizes, isUnsupportedClaim,
+  repairStaleYear, repairReason, cannibalizes, isUnsupportedClaim,
   needsTitleRepair, isPureGenericTitle, subjectKey, primaryEntityKey, selectDiverse,
+  hebrewFallbackReason,
   type CandidateOutcome,
 } from './quality'
+import {
+  sanitizeReason, isNonEvidenceReason, neutralizeClaims, cannibalizesAnswer,
+  type GroundingResult,
+} from './grounding'
 
 export interface RefineCtx {
   existingTitles: string[]
@@ -19,6 +24,15 @@ export interface RefineCtx {
   year: number
   /** Corpus near-duplicate test (wraps ExistingCorpus.isDuplicate); title + subject. */
   isDuplicate: (title: string) => boolean
+  /** Grounding gate — is the topic backed by a real indexed entity / query /
+   *  distinct gap? Carries canonical entity identity. Optional (single-generation
+   *  sources without an evidence package skip it). */
+  assessGrounding?: (c: TopicSuggestion) => GroundingResult
+  /** Evidence text (indexed entity titles + keyword) used to test whether a
+   *  superlative/attribute claim is supported before neutralizing it. */
+  evidenceTextFor?: (c: TopicSuggestion) => string
+  /** Existing topics (with intent) for answer-level cannibalization. */
+  existingTopics?: { title: string; primaryKeyword?: string; searchIntent?: string }[]
 }
 
 /** ONE bounded Gemini title-repair for a valid-but-weak title (topic preserved). */
@@ -64,13 +78,42 @@ async function evaluateCandidate(
   // Deterministic repairs (do not consume the title-repair budget).
   const yr = repairStaleYear(c.title, ctx.year)
   if (yr.changed) { c.title = yr.title; wasRepaired = true }
+
+  // Reason cleanup: strip cluster ids / internal labels ("cluster 8", "מותגים
+  // פופולריים", "קהל יעד חדש") from the user-facing reason, THEN fix language.
+  const cleaned = sanitizeReason(c.suggestionReason ?? '')
+  if (cleaned !== (c.suggestionReason ?? '')) { c.suggestionReason = cleaned; wasRepaired = true }
   const fixedReason = repairReason(c.suggestionReason ?? '', ctx.language, c.title)
   if (fixedReason !== (c.suggestionReason ?? '')) { c.suggestionReason = fixedReason; wasRepaired = true }
+
+  // Grounding gate: a brand topic needs a matching indexed entity, a comparison
+  // needs both products, an audience-safety claim needs evidence. Carry canonical
+  // identity onto the kept suggestion.
+  const evidenceText = ctx.evidenceTextFor ? ctx.evidenceTextFor(c) : ''
+  if (ctx.assessGrounding) {
+    const g = ctx.assessGrounding(c)
+    if (!g.grounded) return { outcome: 'discard_unsupported', wasRepaired }
+    if (g.canonicalEntityName) c.canonicalEntityName = g.canonicalEntityName
+    if (g.primaryEntityId) c.primaryEntityId = g.primaryEntityId
+    if (g.primaryEntityType) c.primaryEntityType = g.primaryEntityType
+    if (g.supportingEntityIds?.length) c.supportingEntityIds = g.supportingEntityIds
+  }
+
+  // Neutralize unsupported superlative/attribute claims (iconic/best/luxurious/
+  // seasonal/oriental…) not backed by the evidence — keep the grounded subject.
+  if (evidenceText) {
+    const n = neutralizeClaims(c.title, evidenceText)
+    if (n.changed && n.title.trim()) { c.title = n.title; wasRepaired = true }
+  }
 
   // Hard discards that a title repair cannot fix.
   if (ctx.isDuplicate(c.title)) return { outcome: 'discard_duplicate', wasRepaired }
   if (cannibalizes(c.title, ctx.existingTitles)) return { outcome: 'discard_cannibalization', wasRepaired }
+  if (ctx.existingTopics && cannibalizesAnswer(c, ctx.existingTopics)) return { outcome: 'discard_cannibalization', wasRepaired }
   if (isUnsupportedClaim(c.title)) return { outcome: 'discard_unsupported', wasRepaired }
+  // A reason that reduced to a bare non-evidence label → replace with a grounded
+  // fallback so the card never shows an empty or label-only "why suggested".
+  if (ctx.language === 'he' && isNonEvidenceReason(c.suggestionReason ?? '')) { c.suggestionReason = hebrewFallbackReason(c.title); wasRepaired = true }
 
   // Valid-but-weak title → one bounded repair (topic/keyword/intent preserved).
   if (needsTitleRepair(c.title)) {
@@ -84,8 +127,10 @@ async function evaluateCandidate(
       // Re-check the repaired title.
       if (isPureGenericTitle(c.title) || needsTitleRepair(c.title)) return { outcome: 'discard_unrecoverable_generic', wasRepaired }
       if (isUnsupportedClaim(c.title)) return { outcome: 'discard_unsupported', wasRepaired }
+      if (ctx.assessGrounding && !ctx.assessGrounding(c).grounded) return { outcome: 'discard_unsupported', wasRepaired }
       if (ctx.isDuplicate(c.title)) return { outcome: 'discard_duplicate', wasRepaired }
       if (cannibalizes(c.title, ctx.existingTitles)) return { outcome: 'discard_cannibalization', wasRepaired }
+      if (ctx.existingTopics && cannibalizesAnswer(c, ctx.existingTopics)) return { outcome: 'discard_cannibalization', wasRepaired }
       return { outcome: 'repair_title', item: c, wasRepaired }
     }
     // No repair produced → discard the unrecoverable weak title (never keep it).

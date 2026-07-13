@@ -22,6 +22,11 @@ import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { subjectKey, currentYear, qualityGuidance } from './quality'
 import { refineAndSelect, type RefineCtx, type RefineFunnel, type RepairTitleFn, type RefillFn } from './refine'
 import { geminiRepairTitle } from './gemini-repair'
+import {
+  assessGrounding, brandTokens, filterBrandLinks, sanitizeReason, canonicalizeBrandForms,
+  collapseCrossSource, type EntityRecord, type GroundingEvidence,
+} from './grounding'
+import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
@@ -94,6 +99,37 @@ async function buildSiteVocabulary(admin: Admin, projectId: string, extras: stri
   } catch { /* no scan → vocabulary from extras only */ }
   for (const e of extras) absorb(e)
   return vocab
+}
+
+/**
+ * Grounding — the project's CANONICAL indexed entities (products / categories /
+ * articles / pages) from the cached WordPress scan UNIONED with synced Shopify
+ * entities. This is the ONLY source of a brand's canonical spelling and the set a
+ * brand topic / comparison / supporting link is validated against. Read-only;
+ * never rescans. Empty when nothing is indexed (grounding then relies on keyword
+ * backing only). Raw ids are internal — never rendered.
+ */
+async function loadEntityRecords(admin: Admin, projectId: string): Promise<EntityRecord[]> {
+  const out: EntityRecord[] = []
+  const seen = new Set<string>()
+  const typeOf = (t: ScannedTarget['targetType']): EntityRecord['type'] =>
+    t === 'product' ? 'product' : t === 'category' || t === 'tag' ? 'category' : t === 'post' ? 'article' : 'page'
+  const push = (id: string, type: EntityRecord['type'], title: string, url?: string) => {
+    const t = (title || '').trim()
+    if (!t || seen.has(id)) return
+    seen.add(id)
+    out.push({ id, type, title: t, url })
+  }
+  try {
+    const cacheRow = await getCachedIndex(admin, projectId)
+    const wpTargets = cacheRow ? ((reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]) : []
+    const shopifyTargets = await loadShopifyScannedTargets(admin, projectId)
+    for (const t of [...wpTargets, ...shopifyTargets]) {
+      if (t.eligibility === 'no') continue
+      push(t.targetUrl, typeOf(t.targetType), t.targetTitle || '', t.targetUrl)
+    }
+  } catch { /* no scan → entities from corpus only */ }
+  return out
 }
 
 const TARGET_NEW = 15
@@ -258,6 +294,7 @@ async function accumulate(
   target: number,
   language: 'he' | 'en' = 'he',
   langLabel = 'Hebrew',
+  grounding?: { entities: EntityRecord[]; keywordBacked: boolean; existingTopics: { title: string; primaryKeyword?: string; searchIntent?: string }[] },
 ): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string; funnel?: RefineFunnel }> {
   const year = currentYear()
   // 1) Gather a raw candidate POOL (dedup only — quality/repair happens next), so
@@ -278,9 +315,17 @@ async function accumulate(
   }
 
   // 2) Repair weak-but-groundable titles + ONE bounded refill → keep the count.
+  const ev: GroundingEvidence | null = grounding
+    ? { entities: grounding.entities, keywordBacked: grounding.keywordBacked, existingTitles }
+    : null
   const ctx: RefineCtx = {
     existingTitles, language, year,
     isDuplicate: (t) => corpus.isDuplicate(t) || corpus.isDuplicate(subjectKey(t), 0.72),
+    ...(ev ? {
+      assessGrounding: (c) => assessGrounding(c, ev),
+      evidenceTextFor: (c) => [c.primaryKeyword, ...ev.entities.map((e) => e.title), ...existingTitles].join(' '),
+      existingTopics: grounding!.existingTopics,
+    } : {}),
   }
   const repair: RepairTitleFn = (c) => geminiRepairTitle(langLabel, year, c)
   const refill: RefillFn = async (_need, avoidSubjects) => {
@@ -308,20 +353,26 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   const country = (project.country || 'IL').toUpperCase()
   const businessCtx = [project.business_name, project.target_domain].filter(Boolean).join(' — ')
 
-  // 2) Existing-content corpus (dedupe) + existing titles (prompt avoid list).
+  // 2) Existing-content corpus (dedupe) + existing titles (prompt avoid list) +
+  //    existing TOPICS (title + keyword + intent) for answer-level cannibalization.
   const corpus = new ExistingCorpus()
   const existingTitles: string[] = []
+  const existingTopics: { title: string; primaryKeyword?: string; searchIntent?: string }[] = []
   const { data: topicRows } = await admin.from('article_topics').select('topic, primary_keyword, secondary_keywords').eq('project_id', input.projectId)
   for (const t of (topicRows ?? []) as { topic: string; primary_keyword: string | null; secondary_keywords: string[] | null }[]) {
     corpus.add(t.topic); corpus.add(t.primary_keyword)
     for (const s of t.secondary_keywords ?? []) corpus.add(s)
-    if (t.topic) existingTitles.push(t.topic)
+    if (t.topic) { existingTitles.push(t.topic); existingTopics.push({ title: t.topic, primaryKeyword: t.primary_keyword ?? '' }) }
   }
   const { data: articleRows } = await admin.from('generated_articles').select('title, slug').eq('project_id', input.projectId)
   for (const a of (articleRows ?? []) as { title: string; slug: string | null }[]) {
     corpus.add(a.title); corpus.add(a.slug)
-    if (a.title) existingTitles.push(a.title)
+    if (a.title) { existingTitles.push(a.title); existingTopics.push({ title: a.title }) }
   }
+
+  // Canonical indexed entities (products/categories/articles) — grounding + brand
+  // spelling. Loaded once per source run (cached scan; no rescan).
+  const entities = await loadEntityRecords(admin, input.projectId)
 
   // 3) Internal-link candidates (for "suggested internal links" enrichment).
   let linkCandidates: { url: string; title: string; keyword: string | null; historicalAnchors: string[] }[] = []
@@ -353,9 +404,14 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       return { source: s, ok: false, reason: 'provider_error', suggestions: [] as TopicSuggestion[] }
     })
     const merged = mergeHybrid(runs)
+    // Cross-source semantic identity: the same topic reaching the merge from more
+    // than one provider (e.g. "בשמי מזרחיים" from site-scan AND keyword research)
+    // is collapsed to the single strongest grounded version — additive, does NOT
+    // reopen the frozen Hybrid ranking (runs on its already-merged output).
+    const collapsed = collapseCrossSource(merged.suggestions)
     // Fold a language-aware "supported by…" summary into the reason so provenance
     // survives persistence; supportingSources drives the badges on the fresh run.
-    suggestions = merged.suggestions.map((s) => ({ ...s, suggestionReason: hybridProvenanceReason(s.supportingSources ?? [], language, s.suggestionReason) }))
+    suggestions = collapsed.map((s) => ({ ...s, suggestionReason: hybridProvenanceReason(s.supportingSources ?? [], language, s.suggestionReason) }))
     const rawGenerated = runs.reduce((n, r) => n + r.suggestions.length, 0)
     const anyOk = runs.some((r) => r.ok)
     meta = {
@@ -378,6 +434,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         return { items: ideas.map((g) => mapIdea(g, 'keyword', 0.7)).filter((x): x is TopicSuggestion => !!x), ok }
       },
       corpus, existingTitles, TARGET_NEW, language, langLabel,
+      { entities, keywordBacked: true, existingTopics },
     )
     suggestions = acc
     meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
@@ -396,6 +453,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         return { items, ok }
       },
       corpus, existingTitles, TARGET_NEW, language, langLabel,
+      { entities, keywordBacked: false, existingTopics },
     )
     suggestions = acc
     meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
@@ -429,7 +487,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // primary_keyword_exists despite plenty of unused scan targets. The newest
     // idea rows are exactly what changed between runs, so they lead the list.
     const avoidTitles = Array.from(new Set([...pendingAvoid, ...existingTitles, ...(input.avoidKeywords ?? [])]))
-    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles }, businessCtx)
+    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles, entities, existingTopics }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
     for (const s of res.suggestions) {
@@ -570,6 +628,27 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     })
   enriched.sort((a, b) => b.suggestionScore - a.suggestionScore)
 
+  // 5b) Grounding polish for EVERY source: (a) drop supporting links whose target
+  // is NOT the topic's canonical brand (fixes "Acqua di Parma → Profumum Roma"
+  // partial-token links), (b) rewrite brand-name spelling to the indexed canonical
+  // form, (c) final reason sanitation so no internal label ever reaches the UI.
+  const linkTitleByUrl = new Map<string, string>()
+  for (const t of planTargets) if (t.targetUrl) linkTitleByUrl.set(t.targetUrl, t.targetTitle || '')
+  for (const e of entities) if (e.url) linkTitleByUrl.set(e.url, e.title)
+  const grounded = enriched.map((s) => {
+    const brand = brandTokens(s.title, s.primaryKeyword)
+    const { kept } = filterBrandLinks(brand, s.suggestedInternalLinks, (url) => linkTitleByUrl.get(url))
+    const money = s.moneyTargetUrl && kept.some((l) => l.url === s.moneyTargetUrl) ? s.moneyTargetUrl : (kept[0]?.url ?? null)
+    const reason = sanitizeReason(canonicalizeBrandForms(s.suggestionReason || '', entities))
+    return {
+      ...s,
+      title: canonicalizeBrandForms(s.title, entities),
+      suggestionReason: reason || s.suggestionReason,
+      suggestedInternalLinks: kept,
+      moneyTargetUrl: money,
+    }
+  })
+
   // Phase 3F.3.4 — link-target diagnostics (dev only): how many category / product
   // targets the planner had to work with (QA can see if ecommerce hubs exist).
   if (process.env.NODE_ENV !== 'production' && meta.debug) {
@@ -578,5 +657,5 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     meta.debug = { ...meta.debug, linkTargetTypes: byType, eligibleLinkTargets: planTargets.filter((t) => t.eligibility === 'yes').length, productCategoryTargetCount: byType.category, productTargetCount: byType.product }
   }
 
-  return { suggestions: enriched, meta }
+  return { suggestions: grounded, meta }
 }
