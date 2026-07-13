@@ -6,7 +6,7 @@
  * live Gemini quality (that is the Preview smoke).
  */
 import { validateIdea, normalizeTitleKey, hasStaleCurrentYear, isHistoricalYear } from '../validate'
-import { recommendationGuidance, structuredOutputContract } from '../prompt-guidance'
+import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, type PendingTopic } from '../prompt-guidance'
 import { buildPrompt, completeSiteScanIdeas, type RawIdeaGen } from '../site-scan'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
 import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
@@ -196,6 +196,42 @@ async function main() {
     const kwPromptHasAvoid = buildPrompt('Hebrew', 'ctx', 'digest', [], 20, [pending[0].title])
       .includes('do NOT repeat or paraphrase')
     check('prompt tells the model not to paraphrase pending/existing titles', kwPromptHasAvoid)
+  }
+
+  console.log('I) structured pending context + Gemini duplicate self-check')
+  {
+    const pending: PendingTopic[] = [
+      { title: 'טכניקת שכבות (Layering) בבשמים: איך לשלב ניחוחות וליצור חתימת ריח אישית', primaryKeyword: 'שכבות של בשמים', intent: 'informational', secondaryKeywords: ['שילוב בשמים', 'בושם בשכבות', 'perfume layering'] },
+      { title: 'מה זה בושם נישה?', primaryKeyword: 'בושם נישה', intent: 'informational', secondaryKeywords: [] },
+    ]
+    const block = pendingTopicsBlock(pending)
+    // G.1: records include title / primaryKeyword / intent / secondaryKeywords
+    check('block includes pending title (byte-identical)', block.includes(pending[0].title))
+    check('block includes primaryKeyword', block.includes('"primaryKeyword":"שכבות של בשמים"'))
+    check('block includes intent', block.includes('"intent":"informational"'))
+    check('block includes secondaryKeywords', block.includes('perfume layering') && block.includes('שילוב בשמים'))
+    // G.2: explicit duplicate families
+    check('family: Layering / שילוב בשמים / perfume layering', /שכבות בושם.*שילוב בשמים.*perfume layering/s.test(block))
+    check('family: niche beginner vs what-is-niche', /מה זה בושם נישה.*מדריך למתחילים בבשמי נישה/s.test(block))
+    check('family: office vs work perfume', /בושם לעבודה.*בושם למשרד/s.test(block))
+    check('family: EDP vs EDT / concentrations', /ריכוזי בושם.*EDP מול EDT/s.test(block))
+    check('family: general Oud (and Sandalwood) guides', /Oud.*Sandalwood/s.test(block))
+    // G.3: comparison dimensions required
+    check('requires core question comparison', /core question/i.test(block))
+    check('requires expected answer comparison', /expected answer/i.test(block))
+    check('requires search intent comparison', /search intent/i.test(block))
+    check('requires planned content sections comparison', /planned content sections/i.test(block))
+    // D: preserve distinct depth
+    check('allows materially different follow-up (no over-block)', /materially different follow-up|do NOT over-block/i.test(block))
+    // G.4: pending context must NOT leak into user-facing reason
+    check('instructs to keep the comparison note OUT of reason/evidenceSummary', /NEVER put that note.*reason.*evidenceSummary/s.test(block))
+    // empty pending → empty block
+    check('no pending → empty block', pendingTopicsBlock([]) === '')
+    // The site-scan prompt actually injects the block.
+    const sp = buildPrompt('Hebrew', 'ctx', 'digest', [], 20, ['קיים'], block)
+    check('site-scan prompt injects the pending block', sp.includes('ALREADY-PENDING topics') && sp.includes('DUPLICATE SELF-CHECK'))
+    // no pending block → prompt still valid, no empty artifacts
+    check('site-scan prompt without pending block is clean', !buildPrompt('Hebrew', 'ctx', 'digest', [], 20, ['קיים']).includes('ALREADY-PENDING topics'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

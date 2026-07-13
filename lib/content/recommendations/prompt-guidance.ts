@@ -39,6 +39,41 @@ export function recommendationGuidance(langLabel: string, year: number, count: n
   ].join('\n')
 }
 
+/** A compact structured record of one already-pending suggestion (no DB ids). */
+export interface PendingTopic {
+  title: string
+  primaryKeyword: string
+  intent?: string
+  secondaryKeywords?: string[]
+  sourceEntityName?: string
+}
+
+/**
+ * The ALREADY-PENDING context block + the mandatory Gemini duplicate self-check.
+ * Sends each pending suggestion as {title, primaryKeyword, intent,
+ * secondaryKeywords, sourceEntityName?} so the model can recognise a semantic
+ * duplicate (synonyms / Hebrew↔English / restructured title) — the correction
+ * happens INSIDE generation, not by post-hoc deletion. Empty when nothing is
+ * pending. Bounded by `cap` (most-recent-first ordering is the caller's job).
+ */
+export function pendingTopicsBlock(pending: PendingTopic[], cap = 60): string {
+  if (!pending || pending.length === 0) return ''
+  const items = pending.slice(0, cap).map((p) => ({
+    title: p.title,
+    primaryKeyword: p.primaryKeyword,
+    intent: p.intent || 'informational',
+    secondaryKeywords: (p.secondaryKeywords || []).slice(0, 6),
+    ...(p.sourceEntityName ? { sourceEntityName: p.sourceEntityName } : {}),
+  }))
+  return [
+    `ALREADY-PENDING topics for this project — do NOT propose any of these again, and do NOT propose a paraphrase, synonym, translated or restructured version of them:`,
+    JSON.stringify(items),
+    `DUPLICATE SELF-CHECK (mandatory): before returning EACH idea, compare it against every existing and pending topic above. Treat two topics as duplicates when they would answer substantially the SAME user question — even when the wording differs, synonyms are used, Hebrew and English terms are mixed, or the title structure changes. These are the SAME topic and must NOT be duplicated: "שכבות בושם" / "שילוב בשמים" / "perfume layering"; "מה זה בושם נישה" / "מדריך למתחילים בבשמי נישה"; "איך לגרום לבושם להחזיק מעמד" / "שיפור עמידות הבושם"; "ריכוזי בושם" / "EDP מול EDT"; "בושם לעבודה" / "בושם למשרד"; two general guides explaining Oud (or Sandalwood).`,
+    `A candidate is DISTINCT only when its core question, expected answer, search intent AND planned content sections are materially different — a rephrasing is NOT distinct. But do NOT over-block genuine depth: a materially different follow-up (e.g. "השוואה בין אוד טבעי לאקורד אוד סינתטי" vs a general Oud guide, or how a niche house develops a scent vs "מה זה בושם נישה") is allowed WHEN the supplied corpus supports it.`,
+    `Internally decide which existing/pending topic each idea was compared against, but NEVER put that note — or any pending-context data — into the user-facing "reason" or "evidenceSummary".`,
+  ].join('\n')
+}
+
 /** The strict JSON output contract appended to every recommendation prompt. */
 export function structuredOutputContract(langLabel: string, count: number): string {
   return [

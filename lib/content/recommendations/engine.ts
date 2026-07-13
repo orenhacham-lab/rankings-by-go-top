@@ -20,7 +20,7 @@ import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidat
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { absorbPendingIntoAvoid, type PendingRow } from './pending-avoid'
 import { generateRecommendationJSON } from './model'
-import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
+import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
@@ -190,25 +190,27 @@ async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; o
 }
 
 /** Expand a BROAD seed keyword into many distinct long-tail article ideas. */
-function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string, count: number, avoid: string[]): string {
+function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string, count: number, avoid: string[], pendingBlock = ''): string {
   const year = currentYear()
   return [
     `You generate specific SEO article ideas for a website. Today's year is ${year}.`,
     businessCtx ? `Website context: ${businessCtx}.` : '',
     `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic. Give each idea a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own.`,
     avoid.length ? `EXISTING titles (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
+    pendingBlock,
     recommendationGuidance(langLabel, year, count),
     structuredOutputContract(langLabel, count),
   ].filter(Boolean).join('\n')
 }
 
 /** Gap-based ideas from existing project context (missing / adjacent / deeper). */
-function projectDataPrompt(project: ProjectRow, langLabel: string, count: number, avoid: string[]): string {
+function projectDataPrompt(project: ProjectRow, langLabel: string, count: number, avoid: string[], pendingBlock = ''): string {
   const year = currentYear()
   return [
     `You are an SEO content strategist finding CONTENT GAPS for a website. Today's year is ${year}.`,
     `Business: ${project.business_name || '(unknown)'} — domain: ${project.target_domain || '(unknown)'}.`,
     avoid.length ? `EXISTING titles the site ALREADY covers (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
+    pendingBlock,
     recommendationGuidance(langLabel, year, count),
     structuredOutputContract(langLabel, count),
   ].filter(Boolean).join('\n')
@@ -330,14 +332,31 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   // Reuses ExistingCorpus (exact + the existing jaccard near-dup) — no new fuzzy
   // rules, no schema change. Table is optional (pre-migration → skipped).
   let pendingAvoidCount = 0
+  const pendingTopics: PendingTopic[] = []
   try {
     const { data: pendingRows } = await admin
       .from('content_topic_ideas')
-      .select('title, primary_keyword')
+      .select('title, primary_keyword, secondary_keywords, search_intent')
       .eq('project_id', input.projectId)
       .eq('status', 'pending')
-    pendingAvoidCount = absorbPendingIntoAvoid((pendingRows ?? []) as PendingRow[], corpus, existingTitles)
+      .order('created_at', { ascending: false })
+    const rows = (pendingRows ?? []) as { title: string; primary_keyword: string | null; secondary_keywords: string[] | null; search_intent: string | null }[]
+    // Corpus + avoid backstop (exact + frozen jaccard near-dup) — unchanged.
+    pendingAvoidCount = absorbPendingIntoAvoid(rows as PendingRow[], corpus, existingTitles)
+    // Rich structured context for the Gemini duplicate self-check (title + keyword
+    // + intent + secondary keywords). Most-recent-first; raw ids never included.
+    for (const r of rows) {
+      if (!r.title || !r.title.trim()) continue
+      pendingTopics.push({
+        title: r.title,
+        primaryKeyword: r.primary_keyword || r.title,
+        intent: r.search_intent || 'informational',
+        secondaryKeywords: Array.isArray(r.secondary_keywords) ? r.secondary_keywords.filter((s) => typeof s === 'string' && s.trim()) : [],
+      })
+    }
   } catch { /* content_topic_ideas optional (migration not applied) → skip */ }
+  const pendingBlock = pendingTopicsBlock(pendingTopics)
+  const pendingWithSecondary = pendingTopics.filter((p) => (p.secondaryKeywords?.length ?? 0) > 0).length
 
   // 3) Internal-link candidates (for "suggested internal links" enrichment).
   let linkCandidates: { url: string; title: string; keyword: string | null; historicalAnchors: string[] }[] = []
@@ -403,18 +422,18 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const keyword = (input.keyword || '').trim()
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid, pendingBlock))
         if (m) modelUsed = m
         return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok }
       },
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount } : undefined }
+    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'project_data') {
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid))
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid, pendingBlock))
         if (m) modelUsed = m
         const items = keepValid(ideas).map((g) => {
           const s = mapIdea(g, 'project_data', 0, modelUsed)
@@ -429,7 +448,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount } : undefined }
+    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'site_scan') {
     // From the CACHED site scan — content-gap ideas, then dedupe. Never rescans.
     // Phase 3H.4 — pass rotation memory: existing titles + PENDING idea titles/
@@ -460,7 +479,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // primary_keyword_exists despite plenty of unused scan targets. The newest
     // idea rows are exactly what changed between runs, so they lead the list.
     const avoidTitles = Array.from(new Set([...pendingAvoid, ...existingTitles, ...(input.avoidKeywords ?? [])]))
-    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles }, businessCtx)
+    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
     for (const s of res.suggestions) {
@@ -499,6 +518,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         valid_count: d.validCount ?? res.meta.generated,
         already_existing_count: dupes,
         already_pending_in_avoid_count: pendingAvoidCount,
+        pending_context_count: pendingTopics.length,
+        pending_context_with_secondary_keywords_count: pendingWithSecondary,
+        model_returned_count: d.generatedCount ?? res.meta.generated,
         newly_saved_count: suggestions.length,
         shortfall_count: d.shortfall ?? 0,
       } : undefined,
@@ -527,6 +549,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       // Phase 3H.2 — the site's offering (scan-derived category/product titles)
       // anchors the model's interpretation, wrong-market skipping and rewriting.
       offerContext: scanSeeds,
+      pendingBlock,
     })
     const seenTitles = new Set<string>()
     let dupes = 0

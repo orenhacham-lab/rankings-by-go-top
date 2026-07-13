@@ -35,6 +35,9 @@ export interface SiteScanRecoInput {
    *  regenerated the same ideas, the guard rejected them all against the first
    *  run's pending rows, and the source "exhausted" after one batch. */
   avoidTitles?: string[]
+  /** PR #23 — the structured ALREADY-PENDING block + Gemini duplicate self-check
+   *  (built by the engine via pendingTopicsBlock). Injected into the prompt. */
+  pendingBlock?: string
 }
 
 export type SiteScanReason = 'no_scan' | 'insufficient_data' | 'model_error' | 'model_empty'
@@ -175,7 +178,7 @@ function sourceUrlList(d: ReturnType<typeof buildDigest>): { url: string; title:
 // engine loads (recent-first) plus existing titles. Exported for the harness.
 export const AVOID_PROMPT_CAP = 120
 
-export function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[]): string {
+export function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[], pendingBlock = ''): string {
   const year = currentYear()
   return [
     `You are an SEO content strategist. Analyze a website's existing content (from a site scan) and propose NEW article topics that fill content gaps and strengthen the site's internal structure. Today's year is ${year}.`,
@@ -183,6 +186,7 @@ export function buildPrompt(langLabel: string, businessCtx: string, digestBlock:
     // Phase 3H.4 — rotation memory: never re-emit what already exists or was
     // already suggested; move on to UNUSED entities/clusters/angles instead.
     avoidTitles.length ? `EXISTING/already-suggested titles (do NOT repeat or paraphrase these; rotate to UNUSED entities, categories, products and angles):\n${avoidTitles.slice(0, AVOID_PROMPT_CAP).map((t) => `- ${t}`).join('\n')}` : '',
+    pendingBlock,
     `Here is a compact digest of the EXISTING site content — treat every listed page/category/product/brand as the ONLY supplied entities (use exact names; never invent a brand that is not listed):`,
     digestBlock,
     ``,
@@ -334,7 +338,7 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   const year = currentYear()
   const { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall } = await completeSiteScanIdeas(
     MAX_SITE_SCAN_IDEAS, input.avoidTitles ?? [], year,
-    (need, avoid) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid)),
+    (need, avoid) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, input.pendingBlock ?? '')),
   )
 
   // Build suggestions from the VALID ideas — titles/reasons byte-identical to the

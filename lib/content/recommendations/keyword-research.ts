@@ -178,6 +178,9 @@ export interface KeywordResearchInput {
    *  organization), wrong-market clusters are skipped, and broad keywords are
    *  rewritten into the site's differentiator. */
   offerContext?: string[]
+  /** PR #23 — structured ALREADY-PENDING block + duplicate self-check (from the
+   *  engine's pendingTopicsBlock). Injected into the cluster→topic prompt. */
+  pendingBlock?: string
 }
 
 interface ClusterInput {
@@ -262,7 +265,7 @@ interface GeminiClusterTopic {
 }
 
 /** One Gemini call: clusters (primary + secondary keywords) → article topics. */
-async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[]): Promise<GeminiClusterTopic[]> {
+async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = ''): Promise<GeminiClusterTopic[]> {
   const langLabel = language === 'he' ? 'Hebrew' : 'English'
   const year = new Date().getFullYear()
   const prompt = [
@@ -274,6 +277,7 @@ async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en',
     offerContext.length ? `Interpret EVERY keyword in the context of this offering — a keyword matching a product/category name is about that PRODUCT/CATEGORY (never an unrelated organization, brand, TV franchise, or service with a similar name).` : '',
     offerContext.length ? `If a cluster clearly belongs to a DIFFERENT market or entity class than the offering, return {"primaryKeyword": "<as given>", "skip": true} for that cluster instead of a topic.` : '',
     `For EACH cluster below, produce ONE article topic that would naturally rank for those keywords. Keep the given primaryKeyword EXACTLY as-is; the title is a natural, clickable article title (NOT a bare keyword).`,
+    pendingBlock,
     recommendationGuidance(langLabel, year, clusters.length),
     `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason","evidenceSummary","skip"}]} — one entry per cluster, same order ("skip" only when skipping). searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600.`,
     `Clusters:`,
@@ -440,7 +444,7 @@ export async function recommendFromKeywordResearch(
   // 3H.2 — the model receives the site's OFFERING and may mark wrong-market
   // clusters {skip:true}; those are dropped (counted, never silent).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
-  const geminiTopics = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [])
+  const geminiTopics = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '')
   const byPrimary = new Map(geminiTopics.map((t) => [normalizeText(t.primaryKeyword), t]))
   const skippedByModel = clusterInputs.filter((c) => byPrimary.get(normalizeText(c.primaryKeyword))?.skip === true)
   const keptClusters = clusterInputs.filter((c) => byPrimary.get(normalizeText(c.primaryKeyword))?.skip !== true)
