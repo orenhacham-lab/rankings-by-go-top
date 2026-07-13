@@ -119,37 +119,78 @@ export function canonicalBrandKey(tokensList: string[]): string {
 }
 
 /**
- * Does an indexed entity title belong to the topic's brand? Requires the topic's
- * FULL brand phrase to be contained (as a token set) in the entity title — so
- * "acqua di parma" (3 tokens) does NOT match "Profumum Roma Acqua Viva" (shares
- * only "acqua"). A single-token brand must appear as a standalone entity token.
+ * STRICT (exact-token) match: the topic's full brand phrase is contained in the
+ * entity title's token set — "acqua di parma" (3 tokens) does NOT match "Profumum
+ * Roma Acqua Viva" (shares only "acqua"); a single-token brand must appear as a
+ * standalone token. No fuzzy/skeleton — used for supporting-LINK validation where
+ * a wrong keep is worse than a miss.
  */
 export function entityMatchesBrand(topicBrand: string[], entityTitle: string): boolean {
   const brand = topicBrand.map(normEntityToken).filter(Boolean)
   if (brand.length === 0) return false
-  const bagTokens = entityTokens(entityTitle)
-  const bag = new Set(bagTokens)
-  // Skeletons of the entity's Hebrew tokens bridge transliteration variants
-  // (topic "ברוז'" ↔ indexed "בורוג׳") without a brand list.
-  const bagSkel = bagTokens.filter((t) => HEBREW.test(t) && brandSkeleton(t).length >= 3).map((t) => brandSkeleton(t))
-  const matched = (t: string): boolean => {
-    if (bag.has(t)) return true
-    if (!HEBREW.test(t)) return false
-    const s = brandSkeleton(t)
-    if (s.length < 3) return false
-    return bagSkel.some((bs) => bs === s || (Math.abs(bs.length - s.length) <= 1 && levenshtein(bs, s) <= 1))
-  }
+  const bag = new Set(entityTokens(entityTitle))
   let hit = 0
-  for (const t of brand) if (matched(t)) hit++
-  // Multi-token brand: require (almost) the whole phrase; single-token: exact/skeleton.
+  for (const t of brand) if (bag.has(t)) hit++
   if (brand.length >= 2) return hit >= Math.max(2, Math.ceil(brand.length * 0.8))
   return hit === 1
 }
 
-/** Indexed entities whose canonical brand matches the topic's brand phrase. */
+/** Skeleton-only fuzzy match for a Hebrew transliteration variant (topic "ברוז'"
+ *  ↔ indexed "בורוג׳"). Never used on its own — only as the LAST, disambiguated
+ *  tier of resolveEntities. */
+function fuzzyMatchesBrand(topicBrand: string[], entityTitle: string): boolean {
+  const brand = topicBrand.map(normEntityToken).filter((t) => HEBREW.test(t))
+  if (brand.length === 0) return false
+  const bagSkel = entityTokens(entityTitle).filter((t) => HEBREW.test(t) && brandSkeleton(t).length >= 3).map((t) => brandSkeleton(t))
+  if (bagSkel.length === 0) return false
+  let hit = 0
+  for (const t of brand) {
+    const s = brandSkeleton(t)
+    if (s.length >= 3 && bagSkel.some((bs) => bs === s || (Math.abs(bs.length - s.length) <= 1 && levenshtein(bs, s) <= 1))) hit++
+  }
+  return brand.length >= 2 ? hit >= Math.ceil(brand.length * 0.8) : hit === 1
+}
+
+/** Explicit aliases derived from ONE indexed entity title: the full normalized
+ *  phrase, its Latin-only form and its Hebrew-only form (English/Hebrew/combined).
+ *  Used for authoritative canonical resolution — no cross-entity guessing. */
+export function entityAliases(entityTitle: string): Set<string> {
+  const toks = entityTokens(entityTitle)
+  const out = new Set<string>()
+  if (toks.length) out.add(toks.join(' '))
+  const latin = toks.filter((t) => /[a-z]/.test(t))
+  const heb = toks.filter((t) => HEBREW.test(t))
+  if (latin.length) out.add(latin.join(' '))
+  if (heb.length) out.add(heb.join(' '))
+  return out
+}
+
+function exactOrAlias(topicBrand: string[], entity: EntityRecord): boolean {
+  const key = canonicalBrandKey(topicBrand)
+  if (key && entityAliases(entity.title).has(key)) return true
+  return entityMatchesBrand(topicBrand, entity.title)
+}
+
+/**
+ * Resolve a topic's brand to indexed entities using a SAFE tier order:
+ *   1. exact / alias (English form, Hebrew form, combined title) — authoritative,
+ *   2. conservative fuzzy — applied ONLY when exactly ONE entity matches (no
+ *      competing similar entity), so similar-looking brands are never merged.
+ * Returns the matches and whether the result came from the (weaker) fuzzy tier.
+ */
+export function resolveEntities(topicBrand: string[], entities: EntityRecord[]): { matches: EntityRecord[]; fuzzy: boolean; ambiguous: boolean } {
+  if (topicBrand.length === 0) return { matches: [], fuzzy: false, ambiguous: false }
+  const exacts = (entities || []).filter((e) => exactOrAlias(topicBrand, e))
+  if (exacts.length) return { matches: exacts, fuzzy: false, ambiguous: false }
+  const fuzz = (entities || []).filter((e) => fuzzyMatchesBrand(topicBrand, e.title))
+  // A fuzzy match is authoritative ONLY when it is unambiguous (one candidate).
+  if (fuzz.length === 1) return { matches: fuzz, fuzzy: true, ambiguous: false }
+  return { matches: [], fuzzy: false, ambiguous: fuzz.length > 1 }
+}
+
+/** Indexed entities that safely resolve to the topic's brand (see resolveEntities). */
 export function matchingEntities(topicBrand: string[], entities: EntityRecord[]): EntityRecord[] {
-  if (topicBrand.length === 0) return []
-  return (entities || []).filter((e) => entityMatchesBrand(topicBrand, e.title))
+  return resolveEntities(topicBrand, entities).matches
 }
 
 // ── Supporting-link entity validation ───────────────────────────────────────
@@ -241,32 +282,12 @@ export function claimsProtectedAudience(title: string): boolean {
   return CLAIM_LEXICON.filter((c) => c.discard).some((c) => c.res.test((title || '').trim()))
 }
 
-/**
- * Neutralize unsupported NON-safety claim adjectives (iconic/best/luxurious/
- * seasonal…) by removing the claim word and cleaning spacing/punctuation. Safety
- * claims are never neutralized (the topic is discarded instead). Conservative:
- * only strips the matched claim tokens, leaving the concrete subject intact.
- */
-export function neutralizeClaims(title: string, evidenceText: string): { title: string; changed: boolean } {
-  const before = (title || '').trim()
-  const bad = unsupportedClaims(before, evidenceText).filter((c) => !c.discard).map((c) => c.label)
-  if (bad.length === 0) return { title: before, changed: false }
-  const badRes = CLAIM_LEXICON.filter((c) => bad.includes(c.label))
-  // Remove the WHOLE word carrying an unsupported claim (including any attached
-  // Hebrew prefix like ה/ו) so no dangling fragment ("ה", "וה") is left behind.
-  const kept = before.split(/\s+/).filter((w) => {
-    const bareRoot = w.replace(/^[והבכלמש]{1,2}/, '')
-    return !badRes.some((c) => c.res.test(w) || c.res.test(bareRoot))
-  })
-  const t = kept.join(' ')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\s+([,.!?:])/g, '$1')
-    .replace(/\s*[-–—:|]\s*$/g, '')
-    .replace(/^\s*[-–—:|]\s*/g, '')
-    .replace(/(^|\s)ו(\s|$)/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-  return { title: t, changed: t !== before }
+/** True when the title carries an unsupported NON-safety claim (iconic/best/
+ *  luxurious/seasonal/oriental…). Such a title is REPAIRED (one bounded natural
+ *  rewrite that drops the claim), never token-deleted; discarded only if the
+ *  claim survives the repair. */
+export function hasUnsupportedClaim(title: string, evidenceText: string): boolean {
+  return unsupportedClaims(title, evidenceText).some((c) => !c.discard)
 }
 
 // ── User-facing reason cleanup ──────────────────────────────────────────────
@@ -392,6 +413,33 @@ export function assessGrounding(
     return { grounded: false, kind: 'none', supportingEntityIds: [], discardReason: 'non_evidence_reason' }
   }
   return { grounded: true, kind: 'informational', supportingEntityIds: [] }
+}
+
+const ENTITY_TYPE_HE: Record<EntityRecord['type'], string> = {
+  category: 'קטגוריה', brand: 'מותג', product: 'מוצר', article: 'מאמר', page: 'עמוד',
+}
+const ENTITY_TYPE_EN: Record<EntityRecord['type'], string> = {
+  category: 'category', brand: 'brand', product: 'product', article: 'article', page: 'page',
+}
+
+/**
+ * Build the user-facing "why suggested" reason from STRUCTURED evidence — the
+ * canonical entity, its type, how many matching items exist, or keyword backing —
+ * NOT from the model's sourceContext. Guarantees no internal label ever reaches
+ * the UI because the string is composed here, from facts.
+ */
+export function buildEvidenceReason(g: GroundingResult, language: 'he' | 'en', keyword: string): string {
+  const he = language === 'he'
+  if (g.kind === 'entity' && g.canonicalEntityName) {
+    const type = he ? ENTITY_TYPE_HE[g.primaryEntityType ?? 'category'] : ENTITY_TYPE_EN[g.primaryEntityType ?? 'category']
+    const n = g.supportingEntityIds.length
+    if (he) return `קיימת ${type} "${g.canonicalEntityName}" באתר${n > 1 ? ` (${n} פריטים רלוונטיים)` : ''}, אך אין מאמר ייעודי בנושא.`
+    return `The site has the ${type} "${g.canonicalEntityName}"${n > 1 ? ` (${n} relevant items)` : ''}, but no dedicated article on it.`
+  }
+  if (g.kind === 'keyword') {
+    return he ? `קיים נפח חיפוש לביטוי "${keyword}", ובאתר קיימת התאמה מסחרית רלוונטית.` : `There is search demand for "${keyword}" with a relevant commercial match on the site.`
+  }
+  return he ? 'נושא ממוקד שממלא פער תוכן קיים באתר.' : 'A focused topic that fills an existing content gap on the site.'
 }
 
 /** A demonstrable, distinct content gap: the subject shares tokens with existing
@@ -532,10 +580,12 @@ export function canonicalizeBrandForms(text: string, entities: EntityRecord[]): 
     if (!HEBREW.test(piece)) return piece
     const skel = brandSkeleton(piece)
     if (skel.length < 3) return piece
-    for (const c of canon) {
-      if (c.skel === skel) return normEntityToken(piece) === normEntityToken(c.display) ? piece : c.display
-      if (Math.abs(c.skel.length - skel.length) <= 1 && levenshtein(c.skel, skel) <= 1) return c.display
-    }
-    return piece
+    // Exact skeleton is authoritative. A fuzzy (Lev ≤ 1) rewrite is applied ONLY
+    // when a SINGLE canonical form is near — if two indexed brands are similarly
+    // close, the word is ambiguous and left untouched (never merge lookalikes).
+    const exact = canon.find((c) => c.skel === skel)
+    if (exact) return normEntityToken(piece) === normEntityToken(exact.display) ? piece : exact.display
+    const near = canon.filter((c) => Math.abs(c.skel.length - skel.length) <= 1 && levenshtein(c.skel, skel) <= 1)
+    return near.length === 1 ? near[0].display : piece
   }).join('')
 }

@@ -23,7 +23,7 @@ import { subjectKey, currentYear, qualityGuidance } from './quality'
 import { refineAndSelect, type RefineCtx, type RefineFunnel, type RepairTitleFn, type RefillFn } from './refine'
 import { geminiRepairTitle } from './gemini-repair'
 import {
-  assessGrounding, brandTokens, filterBrandLinks, sanitizeReason, canonicalizeBrandForms,
+  assessGrounding, brandTokens, isBrandedTopic, filterBrandLinks, sanitizeReason, canonicalizeBrandForms,
   collapseCrossSource, type EntityRecord, type GroundingEvidence,
 } from './grounding'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
@@ -636,7 +636,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   for (const t of planTargets) if (t.targetUrl) linkTitleByUrl.set(t.targetUrl, t.targetTitle || '')
   for (const e of entities) if (e.url) linkTitleByUrl.set(e.url, e.title)
   const grounded = enriched.map((s) => {
-    const brand = brandTokens(s.title, s.primaryKeyword)
+    // Only a genuinely branded topic constrains its links to that brand; an
+    // informational topic keeps its keyword-relevant links untouched.
+    const brand = isBrandedTopic(s.title, s.primaryKeyword) ? brandTokens(s.title, s.primaryKeyword) : []
     const { kept } = filterBrandLinks(brand, s.suggestedInternalLinks, (url) => linkTitleByUrl.get(url))
     const money = s.moneyTargetUrl && kept.some((l) => l.url === s.moneyTargetUrl) ? s.moneyTargetUrl : (kept[0]?.url ?? null)
     const reason = sanitizeReason(canonicalizeBrandForms(s.suggestionReason || '', entities))

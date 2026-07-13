@@ -353,11 +353,11 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     const title = (g.title || '').trim()
     const primaryKeyword = (g.primaryKeyword || title).trim()
     if (!title || !primaryKeyword) continue
-    // Never surface an internal label (e.g. "cluster 8") as user-facing evidence:
-    // sanitize the model's sourceContext and drop it if nothing concrete remains.
-    const ctx = sanitizeReason((g.sourceContext || '').trim())
+    // Do NOT feed the model's sourceContext (e.g. "cluster 8") into the reason at
+    // all — user-facing evidence is rebuilt from STRUCTURED grounding downstream
+    // (buildEvidenceReason). Here we keep only a sanitized plain-language base.
     const baseReason = sanitizeReason((g.reason || '').trim())
-    const suggestionReason = [baseReason, ctx ? `(${reasonPrefix}: ${ctx})` : `(${reasonPrefix})`].filter(Boolean).join(' ')
+    const suggestionReason = baseReason || reasonPrefix
     const linkUrl = (g.suggestedLinkUrl || '').trim()
     const suggestedInternalLinks = linkUrl && urlByKey.has(linkUrl)
       ? [{ url: linkUrl, anchor: urlByKey.get(linkUrl) || primaryKeyword }]

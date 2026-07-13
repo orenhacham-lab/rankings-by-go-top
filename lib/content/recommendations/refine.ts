@@ -14,7 +14,7 @@ import {
   type CandidateOutcome,
 } from './quality'
 import {
-  sanitizeReason, isNonEvidenceReason, neutralizeClaims, cannibalizesAnswer,
+  sanitizeReason, isNonEvidenceReason, hasUnsupportedClaim, cannibalizesAnswer, buildEvidenceReason,
   type GroundingResult,
 } from './grounding'
 
@@ -88,7 +88,8 @@ async function evaluateCandidate(
 
   // Grounding gate: a brand topic needs a matching indexed entity, a comparison
   // needs both products, an audience-safety claim needs evidence. Carry canonical
-  // identity onto the kept suggestion.
+  // identity onto the kept suggestion, and build the reason from STRUCTURED
+  // evidence (entity/type/count/keyword) rather than the model's own text.
   const evidenceText = ctx.evidenceTextFor ? ctx.evidenceTextFor(c) : ''
   if (ctx.assessGrounding) {
     const g = ctx.assessGrounding(c)
@@ -97,13 +98,7 @@ async function evaluateCandidate(
     if (g.primaryEntityId) c.primaryEntityId = g.primaryEntityId
     if (g.primaryEntityType) c.primaryEntityType = g.primaryEntityType
     if (g.supportingEntityIds?.length) c.supportingEntityIds = g.supportingEntityIds
-  }
-
-  // Neutralize unsupported superlative/attribute claims (iconic/best/luxurious/
-  // seasonal/oriental…) not backed by the evidence — keep the grounded subject.
-  if (evidenceText) {
-    const n = neutralizeClaims(c.title, evidenceText)
-    if (n.changed && n.title.trim()) { c.title = n.title; wasRepaired = true }
+    if (g.kind === 'entity' || g.kind === 'keyword') { c.suggestionReason = buildEvidenceReason(g, ctx.language, c.primaryKeyword); wasRepaired = true }
   }
 
   // Hard discards that a title repair cannot fix.
@@ -111,22 +106,28 @@ async function evaluateCandidate(
   if (cannibalizes(c.title, ctx.existingTitles)) return { outcome: 'discard_cannibalization', wasRepaired }
   if (ctx.existingTopics && cannibalizesAnswer(c, ctx.existingTopics)) return { outcome: 'discard_cannibalization', wasRepaired }
   if (isUnsupportedClaim(c.title)) return { outcome: 'discard_unsupported', wasRepaired }
-  // A reason that reduced to a bare non-evidence label → replace with a grounded
-  // fallback so the card never shows an empty or label-only "why suggested".
+  // A reason that reduced to a bare non-evidence label → grounded fallback.
   if (ctx.language === 'he' && isNonEvidenceReason(c.suggestionReason ?? '')) { c.suggestionReason = hebrewFallbackReason(c.title); wasRepaired = true }
 
-  // Valid-but-weak title → one bounded repair (topic/keyword/intent preserved).
-  if (needsTitleRepair(c.title)) {
+  // Valid topic with a weak title OR an unsupported superlative/attribute claim
+  // ("iconic / trends / luxurious / seasonal / oriental") → ONE bounded natural
+  // title repair (entity/keyword/intent preserved). NEVER destructive word
+  // deletion. Discard only if the claim/weakness survives the repair.
+  // Claims are checked whenever grounding is active (an empty evidence string
+  // means NOTHING supports the claim, so it is unsupported — not "skip").
+  const claimUnsupported = !!ctx.evidenceTextFor && hasUnsupportedClaim(c.title, evidenceText)
+  if (needsTitleRepair(c.title) || claimUnsupported) {
     const repaired = await repairTitle(c)
     if (repaired && repaired.title && repaired.title.trim()) {
       c.title = repaired.title.trim()
-      if (repaired.reason && repaired.reason.trim()) c.suggestionReason = repaired.reason.trim()
+      if (repaired.reason && repaired.reason.trim() && !(c.suggestionReason && ctx.assessGrounding)) c.suggestionReason = repaired.reason.trim()
       // Keep language consistent after the model repair.
       c.suggestionReason = repairReason(c.suggestionReason ?? '', ctx.language, c.title)
       wasRepaired = true
-      // Re-check the repaired title.
+      // Re-check the repaired title (still weak / still unsupported → discard).
       if (isPureGenericTitle(c.title) || needsTitleRepair(c.title)) return { outcome: 'discard_unrecoverable_generic', wasRepaired }
       if (isUnsupportedClaim(c.title)) return { outcome: 'discard_unsupported', wasRepaired }
+      if (ctx.evidenceTextFor && hasUnsupportedClaim(c.title, evidenceText)) return { outcome: 'discard_unsupported', wasRepaired }
       if (ctx.assessGrounding && !ctx.assessGrounding(c).grounded) return { outcome: 'discard_unsupported', wasRepaired }
       if (ctx.isDuplicate(c.title)) return { outcome: 'discard_duplicate', wasRepaired }
       if (cannibalizes(c.title, ctx.existingTitles)) return { outcome: 'discard_cannibalization', wasRepaired }
