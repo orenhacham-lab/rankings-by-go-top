@@ -13,7 +13,13 @@ import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
+import { domainFlags } from '@/lib/content/recommendations/domain-flags'
 import { randomUUID } from 'crypto'
+
+/** Domain flags for a set of suggestions (titles + keywords) — Preview diagnostic. */
+function suggestionsDomainFlags(items: { title: string; primaryKeyword: string }[]) {
+  return domainFlags(items.map((s) => `${s.title} ${s.primaryKeyword}`).join(' \n '))
+}
 
 const SOURCES: RecommendationSource[] = ['keyword', 'project_data', 'keyword_research_url', 'site_scan', 'hybrid']
 
@@ -30,6 +36,13 @@ export async function POST(request: Request) {
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const source = typeof body.source === 'string' ? (body.source as RecommendationSource) : null
   const keyword = typeof body.keyword === 'string' ? body.keyword.trim() : ''
+  // Isolation diagnostics — a server-generated immutable run id + the client's
+  // request id (echoed back so the UI can reject a stale response for another
+  // project). Preview-only debug is gated behind RECO_ISOLATION_DIAGNOSTICS.
+  const generationRunId = randomUUID()
+  const clientRequestId = typeof body.clientRequestId === 'string' ? body.clientRequestId : null
+  const diagnostics = process.env.RECO_ISOLATION_DIAGNOSTICS === '1'
+  const excludePendingContext = diagnostics && body.excludePendingContext === true
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
@@ -52,6 +65,9 @@ export async function POST(request: Request) {
       source,
       keyword,
       avoidKeywords: Array.from(guard.keywords),
+      generationRunId,
+      collectTrace: diagnostics,
+      excludePendingContext,
     })
 
     // Phase 3F.3.1b — gentle EXACT primary-keyword + exact-title guard. Blocks a
@@ -131,7 +147,7 @@ export async function POST(request: Request) {
     // No ideas table yet (migration not applied): still return the GUARD-FILTERED
     // list session-only, so the keyword guard works even before persistence.
     if (pending === null) {
-      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
+      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, projectId: auth.project.id, generationRunId, clientRequestId, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
@@ -170,12 +186,30 @@ export async function POST(request: Request) {
       // Total pending > 0 but this run added nothing new — surface WHY.
       reason = result.meta.reason ?? (result.suggestions.length > 0 ? emptyBecause : (source === 'keyword_research_url' ? 'kr_no_new' : 'no_new'))
     }
+    // Preview-only isolation diagnostics: current-run flags vs the accumulated
+    // pending list (the UI shows the full pending set) + the Site Scan call trace.
+    const isolationDebug = diagnostics ? {
+      generationRunId,
+      clientRequestId,
+      freshCurrentRunCount: fresh.length,
+      freshCurrentRunDomainFlags: suggestionsDomainFlags(fresh),
+      accumulatedPendingCount: suggestions.length,
+      accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
+      persistedCurrentRunCount: fresh.length,
+      excludePendingContext,
+      siteScanTrace: (result.meta as { debug?: { siteScanCallTrace?: unknown } }).debug?.siteScanCallTrace ?? null,
+    } : undefined
     return Response.json({
       suggestions,
       meta: {
         ...result.meta,
         persisted: true,
         source,
+        // Scope echo — the client verifies these before applying the response.
+        projectId: auth.project.id,
+        generationRunId,
+        clientRequestId,
+        isolationDebug,
         newlyAddedCount: fresh.length,
         totalPendingCount: suggestions.length,
         filteredCount: filteredExisting,

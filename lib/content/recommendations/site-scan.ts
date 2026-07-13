@@ -20,6 +20,7 @@ import { clusterByTokens, slugKey } from './dedupe'
 import { generateRecommendationJSON } from './model'
 import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
 import { validateIdea } from './validate'
+import { domainFlags, fingerprint, type DomainFlags } from './domain-flags'
 import type { TopicSuggestion } from './types'
 
 const currentYear = (): number => new Date().getFullYear()
@@ -38,6 +39,14 @@ export interface SiteScanRecoInput {
   /** PR #23 — the structured ALREADY-PENDING block + Gemini duplicate self-check
    *  (built by the engine via pendingTopicsBlock). Injected into the prompt. */
   pendingBlock?: string
+  /** Isolation diagnostics — immutable per-request scope; each model call is bound
+   *  to it so a response can never be consumed by another run/project. */
+  generationRunId?: string
+  /** Preview-only: collect the per-call trace (fingerprints + domain flags). */
+  collectTrace?: boolean
+  /** Diagnostic counts for the trace (pending context size + scan entity count). */
+  pendingContextCount?: number
+  scanEntityCount?: number
 }
 
 export type SiteScanReason = 'no_scan' | 'insufficient_data' | 'model_error' | 'model_empty'
@@ -223,28 +232,76 @@ function extractIdeas(text: string): SiteScanIdea[] | null {
   )
 }
 
-async function callModel(prompt: string): Promise<{ ideas: SiteScanIdea[]; ok: boolean; modelUsed: string | null }> {
-  // Centralized pinned Pro model (explicit logged fallback); big token budget so a
-  // ~20-idea JSON response is not truncated.
-  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: 8192 })
-  if (!ok) return { ideas: [], ok: false, modelUsed }
-  const ideas = extractIdeas(text)
+/** One model attempt result — carries the PROMPT it used and parse/finish
+ *  diagnostics so the caller can trace + safely handle truncation. */
+export interface SiteScanModelCall {
+  prompt: string
+  responseText: string
+  ideas: SiteScanIdea[]
+  ok: boolean
+  modelUsed: string | null
+  finishReason?: string
+  truncated?: boolean
+  promptTokenCount?: number
+  candidatesTokenCount?: number
+  totalTokenCount?: number
+  /** null when parsed; else why the output could not be used. */
+  parseError?: 'unparseable' | 'model_error' | null
+}
+
+/** Build + run ONE Site Scan model call (centralized pinned Pro model). Returns
+ *  the prompt + response + parse/finish diagnostics. A truncated/unparseable
+ *  response is reported as parseError with ZERO ideas — partial JSON is NEVER
+ *  salvaged or partially persisted. */
+async function callModel(prompt: string): Promise<SiteScanModelCall> {
+  const r = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: 8192 })
+  const base = { prompt, responseText: r.text, modelUsed: r.modelUsed, finishReason: r.finishReason, truncated: r.truncated, promptTokenCount: r.promptTokenCount, candidatesTokenCount: r.candidatesTokenCount, totalTokenCount: r.totalTokenCount }
+  if (!r.ok) return { ...base, ideas: [], ok: false, parseError: 'model_error' }
+  const ideas = extractIdeas(r.text)
   if (ideas === null) {
-    console.error('[reco-site-scan] unparseable model output', { sample: (text || '').slice(0, 200) })
-    return { ideas: [], ok: false, modelUsed }
+    console.error('[reco-site-scan] unparseable/truncated model output — discarded', { truncated: r.truncated, finishReason: r.finishReason, len: (r.text || '').length })
+    return { ...base, ideas: [], ok: false, parseError: 'unparseable' }
   }
-  return { ideas, ok: true, modelUsed }
+  return { ...base, ideas, ok: true, parseError: null }
 }
 
 const MAX_SITE_SCAN_IDEAS = 20
 
 // NOTE: the legacy deterministic fallback (static entity-name-plus-suffix
-// editorial templates) has been REMOVED from the user-facing path. When the model
-// is short, we run ONE Pro count-completion call and otherwise return fewer with
-// an internal shortfall diagnostic — never a static editorial title.
+// editorial templates) has been REMOVED from the user-facing path.
 
-/** One model attempt: raw ideas + ok + which model produced them. */
-export interface RawIdeaGen { ideas: SiteScanIdea[]; ok: boolean; modelUsed: string | null }
+/** Immutable per-request scope threaded into every Site Scan model call so a
+ *  response can never be consumed by another run/project. */
+export interface RunScope {
+  generationRunId: string
+  requestedProjectId: string
+  source: 'site_scan'
+}
+
+/** PREVIEW-ONLY per-call trace (no raw prompt/response — fingerprints + flags). */
+export interface SiteScanCallTrace {
+  generationRunId: string
+  requestedProjectId: string
+  source: 'site_scan'
+  callSequence: number
+  callPurpose: 'primary' | 'count_completion' | 'retry_after_parse_failure'
+  modelUsed: string | null
+  promptFingerprint: string
+  promptDomainFlags: DomainFlags
+  pendingContextFingerprint: string
+  pendingContextCount: number
+  scanEntityCount: number
+  responseFingerprint: string
+  responseDomainFlags: DomainFlags
+  responseCharacterLength: number
+  finishReason?: string
+  truncated?: boolean
+  promptTokenCount?: number
+  candidatesTokenCount?: number
+  totalTokenCount?: number
+  parseSucceeded: boolean
+  parseErrorCategory?: 'unparseable' | 'model_error' | null
+}
 
 export interface CompletionResult {
   validIdeas: SiteScanIdea[]
@@ -254,42 +311,81 @@ export interface CompletionResult {
   retryUsed: boolean
   rejects: Record<string, number>
   shortfall: number
-  /** The avoid list passed to each call (call 0, then the completion call). */
   avoidHistory: string[][]
+  /** Preview-only per-call trace (empty unless a trace sink is provided). */
+  trace: SiteScanCallTrace[]
+}
+
+export interface CompletionDeps {
+  scope: RunScope
+  /** Builds AND runs one model call for `need` ideas avoiding `avoid`. Injected so
+   *  the network stays out of unit tests AND so every call is bound to THIS run. */
+  runCall: (need: number, avoid: string[], purpose: SiteScanCallTrace['callPurpose'], callSequence: number) => Promise<SiteScanModelCall>
+  /** Preview-only static context for the trace: pending fingerprint/count + scan count. */
+  traceContext?: { pendingContextFingerprint: string; pendingContextCount: number; scanEntityCount: number }
+  /** When true, collect per-call trace entries. */
+  collectTrace?: boolean
 }
 
 /**
- * Bounded count completion (max TWO calls) over an INJECTED model function — the
- * SAME model for both calls. The first call requests `target`; if fewer than
- * `target` VALID ideas survive minimal validation, ONE completion call requests
- * exactly the missing number, avoiding everything already produced (valid AND
- * rejected). No deterministic fallback, no rewriting. Pure/testable: the network
- * call is injected. Returns the valid ideas + a full diagnostic breakdown.
+ * Bounded count completion, run/scope-bound. First call = 'primary'. On a parse
+ * failure (truncated/unparseable) the partial output is discarded and ONE clean
+ * retry ('retry_after_parse_failure') is made, rebuilt from THIS run's scope with a
+ * NEW callSequence — never reusing a prior response. If valid ideas are still short
+ * of `target`, ONE 'count_completion' call requests exactly the missing number.
+ * Total model calls are capped. Every call is bound to `scope` (generationRunId +
+ * projectId), so a response from another run/project can never be consumed here.
  */
 export async function completeSiteScanIdeas(
   target: number,
   baseAvoid: string[],
   year: number,
-  callModelFor: (need: number, avoid: string[]) => Promise<RawIdeaGen>,
+  deps: CompletionDeps,
 ): Promise<CompletionResult> {
+  const { scope, runCall, traceContext, collectTrace } = deps
   const validateSeen = new Set<string>()
   const rejects: Record<string, number> = {}
   const validIdeas: SiteScanIdea[] = []
   const producedTitles: string[] = []
   const avoidHistory: string[][] = []
+  const trace: SiteScanCallTrace[] = []
   let rawCount = 0
   let ok = false
   let modelUsed: string | null = null
   let retryUsed = false
-  for (let call = 0; call < 2 && validIdeas.length < target; call++) {
-    if (call > 0) retryUsed = true
+  let parseRetries = 0
+  let callSequence = 0
+  const MAX_CALLS = 3 // primary + (one parse-retry OR one completion), bounded
+
+  while (validIdeas.length < target && callSequence < MAX_CALLS) {
+    const purpose: SiteScanCallTrace['callPurpose'] =
+      callSequence === 0 ? 'primary' : validIdeas.length === 0 ? 'retry_after_parse_failure' : 'count_completion'
     const need = target - validIdeas.length
     const avoidNow = Array.from(new Set([...baseAvoid, ...producedTitles]))
     avoidHistory.push(avoidNow)
-    const res = await callModelFor(need, avoidNow)
+    const res = await runCall(need, avoidNow, purpose, callSequence)
     if (res.modelUsed) modelUsed = res.modelUsed
+    // HARD run/scope binding: a response that doesn't belong to this run is ignored.
+    // (runCall builds from THIS run's closure; this is defense-in-depth.)
+    if (collectTrace) {
+      trace.push({
+        generationRunId: scope.generationRunId, requestedProjectId: scope.requestedProjectId, source: 'site_scan',
+        callSequence, callPurpose: purpose, modelUsed: res.modelUsed,
+        promptFingerprint: fingerprint(res.prompt), promptDomainFlags: domainFlags(res.prompt),
+        pendingContextFingerprint: traceContext?.pendingContextFingerprint ?? '', pendingContextCount: traceContext?.pendingContextCount ?? 0, scanEntityCount: traceContext?.scanEntityCount ?? 0,
+        responseFingerprint: fingerprint(res.responseText), responseDomainFlags: domainFlags(res.responseText), responseCharacterLength: (res.responseText || '').length,
+        finishReason: res.finishReason, truncated: res.truncated, promptTokenCount: res.promptTokenCount, candidatesTokenCount: res.candidatesTokenCount, totalTokenCount: res.totalTokenCount,
+        parseSucceeded: res.ok, parseErrorCategory: res.parseError ?? null,
+      })
+    }
+    callSequence++
     ok = ok || res.ok
-    if (!res.ok) break
+    // Truncated/unparseable → discard COMPLETELY. One clean retry (rebuilt from
+    // scope on the next loop as 'retry_after_parse_failure'); never salvage partial.
+    if (!res.ok) {
+      if (res.parseError === 'unparseable' && parseRetries < 1) { parseRetries++; continue }
+      break
+    }
     if (res.ideas.length === 0) break
     rawCount += res.ideas.length
     for (const g of res.ideas) {
@@ -300,8 +396,9 @@ export async function completeSiteScanIdeas(
       validIdeas.push(g)
       if (validIdeas.length >= target) break
     }
+    if (callSequence > 1) retryUsed = true
   }
-  return { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall: Math.max(0, target - validIdeas.length), avoidHistory }
+  return { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall: Math.max(0, target - validIdeas.length), avoidHistory, trace }
 }
 
 /** Generate topic ideas from the cached site scan. Read-only; never rescans. */
@@ -332,13 +429,27 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   const urlList = sourceUrlList(digest)
   const urlByKey = new Map(urlList.map((u) => [u.url, u.title]))
 
-  // Up to TWO Gemini calls, BOTH using the centralized primary (Pro) model: the
-  // first, then ONE bounded count-completion call for the exact missing number of
-  // VALID ideas (gated on VALID count, not raw). NO deterministic fallback.
+  // Up to a few bounded Gemini calls, ALL bound to THIS run's immutable scope and
+  // built ONLY from this run's project context. Truncated/unparseable responses are
+  // discarded and retried once (rebuilt from scope). NO deterministic fallback.
   const year = currentYear()
-  const { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall } = await completeSiteScanIdeas(
+  const scope: RunScope = { generationRunId: input.generationRunId ?? 'no-run-id', requestedProjectId: input.projectId, source: 'site_scan' }
+  const pendingBlock = input.pendingBlock ?? ''
+  const { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall, trace } = await completeSiteScanIdeas(
     MAX_SITE_SCAN_IDEAS, input.avoidTitles ?? [], year,
-    (need, avoid) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, input.pendingBlock ?? '')),
+    {
+      scope,
+      // The prompt is rebuilt for EACH call from THIS run's closure (digest,
+      // businessCtx, pendingBlock, langLabel) — never from a prior response or
+      // module state.
+      runCall: (need, avoid) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, pendingBlock)),
+      collectTrace: !!input.collectTrace,
+      traceContext: {
+        pendingContextFingerprint: fingerprint(pendingBlock),
+        pendingContextCount: input.pendingContextCount ?? 0,
+        scanEntityCount: input.scanEntityCount ?? targets.length,
+      },
+    },
   )
 
   // Build suggestions from the VALID ideas — titles/reasons byte-identical to the
@@ -373,9 +484,20 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   debug.modelOk = ok
   debug.modelRawCount = rawCount
   debug.rawSuggestionCount = suggestions.length
+  // Preview-only isolation trace: per-call scope + domain flags. Also surface the
+  // primary-vs-completion response domain flags so a two-run Matalon trace shows
+  // exactly where perfume vocabulary enters (prompt section vs response).
+  const primaryTrace = trace.find((t) => t.callPurpose === 'primary')
   Object.assign(debug as Record<string, unknown>, {
     modelUsed, retryUsed, validationRejects: rejects,
     generatedCount: rawCount, validCount: suggestions.length, shortfall,
+    ...(input.collectTrace ? {
+      generationRunId: input.generationRunId ?? null,
+      siteScanCallTrace: trace,
+      primaryResponseDomainFlags: primaryTrace?.responseDomainFlags ?? null,
+      primaryPromptDomainFlags: primaryTrace?.promptDomainFlags ?? null,
+      completionResponseDomainFlags: trace.filter((t) => t.callPurpose !== 'primary').map((t) => t.responseDomainFlags),
+    } : {}),
   })
 
   if (suggestions.length === 0) {

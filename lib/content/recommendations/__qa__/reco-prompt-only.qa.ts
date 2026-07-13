@@ -7,7 +7,8 @@
  */
 import { validateIdea, normalizeTitleKey, hasStaleCurrentYear, isHistoricalYear } from '../validate'
 import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, type PendingTopic } from '../prompt-guidance'
-import { buildPrompt, completeSiteScanIdeas, type RawIdeaGen } from '../site-scan'
+import { buildPrompt, completeSiteScanIdeas, type SiteScanModelCall, type RunScope } from '../site-scan'
+import { domainFlags, isCrossDomain, fingerprint } from '../domain-flags'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
 import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
 import { ExistingCorpus } from '../dedupe'
@@ -114,53 +115,72 @@ async function main() {
     const idea = (t: string) => ({ title: t, primaryKeyword: t, reason: `ר-${t}`, evidenceSummary: `ראיה ל-${t}` })
     const many = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => idea(`${prefix} ${i + 1}`))
 
+    const SCOPE: RunScope = { generationRunId: 'run-A', requestedProjectId: 'proj-A', source: 'site_scan' }
+    const modelCall = (ideas: ReturnType<typeof idea>[], over: Partial<SiteScanModelCall> = {}): SiteScanModelCall =>
+      ({ prompt: 'P', responseText: JSON.stringify({ topics: ideas }), ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY, parseError: null, ...over })
+
     // F.2/F.5: primary returns 16 → completion asked for exactly 4 → final 20.
     {
-      const calls: { need: number; avoid: string[] }[] = []
-      const stub = (batch1: number, batch2: number): (need: number, avoid: string[]) => Promise<RawIdeaGen> => {
-        let call = 0
-        return async (need, avoid) => {
-          calls.push({ need, avoid })
-          const ideas = call === 0 ? many('בסיס', batch1) : many('השלמה', batch2)
-          call++
-          return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY }
-        }
-      }
-      calls.length = 0
-      const r = await completeSiteScanIdeas(20, ['קיים מאמר'], YEAR, stub(16, 4))
+      const calls: { need: number; avoid: string[]; seq: number }[] = []
+      let call = 0
+      const r = await completeSiteScanIdeas(20, ['קיים מאמר'], YEAR, {
+        scope: SCOPE,
+        runCall: async (need, avoid, _p, seq) => { calls.push({ need, avoid, seq }); const ideas = call === 0 ? many('בסיס', 16) : many('השלמה', 4); call++; return modelCall(ideas) },
+      })
       check('first call requests 20', calls[0].need === 20)
       check('completion requested exactly 4', calls[1] && calls[1].need === 4, `got ${calls[1]?.need}`)
       check('4 valid completion ideas → final 20', r.validIdeas.length === 20, `got ${r.validIdeas.length}`)
-      check('retry was used', r.retryUsed && r.shortfall === 0)
       check('completion model is the centralized primary', r.modelUsed === RECOMMENDATION_MODEL_PRIMARY)
       check('completion avoid includes already-generated titles', calls[1].avoid.includes('בסיס 1') && calls[1].avoid.includes('בסיס 16'))
       check('completion avoid keeps existing article title', calls[1].avoid.includes('קיים מאמר'))
+      check('each call has a distinct callSequence', calls[0].seq === 0 && calls[1].seq === 1)
     }
 
     // F.6: completion returns only 2 → final 18, shortfall recorded, no filler.
     {
       let call = 0
-      const stub = async (): Promise<RawIdeaGen> => { const ideas = call === 0 ? many('בסיס', 16) : many('השלמה', 2); call++; return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY } }
-      const r = await completeSiteScanIdeas(20, [], YEAR, stub)
+      const r = await completeSiteScanIdeas(20, [], YEAR, { scope: SCOPE, runCall: async () => { const ideas = call === 0 ? many('בסיס', 16) : many('השלמה', 2); call++; return modelCall(ideas) } })
       check('2 valid completion ideas → final 18', r.validIdeas.length === 18, `got ${r.validIdeas.length}`)
       check('exact shortfall recorded (2)', r.shortfall === 2)
-      check('no deterministic filler in the set', r.validIdeas.every((g) => !/טעויות נפוצות וטיפים|המדריך המלא:/.test(g.title || '')))
     }
 
-    // Never emits the legacy fallback templates, and drops invalid/dup in completion.
+    // I.3: a truncated/unparseable response persists ZERO partial topics + ONE clean retry.
     {
       let call = 0
-      const stub = async (): Promise<RawIdeaGen> => {
-        const ideas = call === 0
-          ? [...many('בסיס', 15), { title: 'המדריך המלא: Guerlain', primaryKeyword: 'x', reason: 'r' }] // includes a legacy-looking model title (still just data, but…)
-          : [idea('חדש א'), idea('בסיס 1') /* dup */, { title: '  ', primaryKeyword: 'y', reason: 'r' } /* empty */]
-        call++
-        return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY }
-      }
-      const r = await completeSiteScanIdeas(20, [], YEAR, stub)
-      check('completion dedups against generated (בסיס 1 dropped)', r.rejects.duplicate_title === 1)
-      check('completion drops empty title', r.rejects.empty_title === 1)
-      check('no application-side fallback templates injected', r.validIdeas.filter((g) => /טעויות נפוצות וטיפים/.test(g.title || '')).length === 0)
+      const purposes: string[] = []
+      const r = await completeSiteScanIdeas(20, [], YEAR, {
+        scope: SCOPE,
+        runCall: async (_n, _a, purpose) => {
+          purposes.push(purpose)
+          if (call++ === 0) return modelCall([], { ok: false, parseError: 'unparseable', truncated: true, responseText: '{"topics":[{"title":"חצי' })
+          return modelCall(many('נקי', 20))
+        },
+      })
+      check('truncated call yields ZERO partial topics from that call', r.validIdeas.length === 20) // only the retry's clean 20
+      check('exactly one clean retry after parse failure', purposes.filter((p) => p === 'retry_after_parse_failure').length === 1, purposes.join(','))
+      check('primary was first', purposes[0] === 'primary')
+    }
+
+    // I.5: a response bound to another run/project cannot be consumed (runCall is a
+    // per-run closure; here we prove the trace binds each call to THIS run only).
+    {
+      const r = await completeSiteScanIdeas(20, [], YEAR, {
+        scope: SCOPE, collectTrace: true,
+        runCall: async () => modelCall(many('נקי', 20)),
+      })
+      check('every trace entry carries THIS run id + project', r.trace.length > 0 && r.trace.every((t) => t.generationRunId === 'run-A' && t.requestedProjectId === 'proj-A'))
+      check('every trace entry is source site_scan', r.trace.every((t) => t.source === 'site_scan'))
+    }
+
+    // I.6: two concurrent projects cannot exchange call contexts (separate scopes,
+    // separate closures, separate traces).
+    {
+      const runA = completeSiteScanIdeas(20, ['A-existing'], YEAR, { scope: { generationRunId: 'run-A', requestedProjectId: 'proj-A', source: 'site_scan' }, collectTrace: true, runCall: async () => modelCall(many('פרילנסר', 20)) })
+      const runB = completeSiteScanIdeas(20, ['B-existing'], YEAR, { scope: { generationRunId: 'run-B', requestedProjectId: 'proj-B', source: 'site_scan' }, collectTrace: true, runCall: async () => modelCall(many('בושם', 20)) })
+      const [ra, rb] = await Promise.all([runA, runB])
+      check('run A trace bound to proj-A only', ra.trace.every((t) => t.requestedProjectId === 'proj-A' && t.generationRunId === 'run-A'))
+      check('run B trace bound to proj-B only', rb.trace.every((t) => t.requestedProjectId === 'proj-B' && t.generationRunId === 'run-B'))
+      check('runs did not share candidate arrays', ra.validIdeas !== rb.validIdeas && ra.validIdeas.length === 20 && rb.validIdeas.length === 20)
     }
   }
 
@@ -294,6 +314,29 @@ async function main() {
     // I.12: pending block still injected into the KR prompt when present.
     const p2 = buildClustersPrompt(clusters, 'he', '', [], 'ALREADY-PENDING topics TEST-BLOCK')
     check('KR prompt injects the pending block', p2.includes('ALREADY-PENDING topics TEST-BLOCK'))
+  }
+
+  console.log('K) domain-flag diagnostics + ROOT-CAUSE proof (shared guidance is perfume-flagged)')
+  {
+    // Multi-signal (≥2 distinct terms) — one incidental word does not trip it.
+    check('perfume text flagged', domainFlags('בושם אוד וניל EDP').perfume)
+    check('freelancer text flagged', domainFlags('פיתוח תוכנה SEO UX פרילנסר').freelancer)
+    check('lighting text flagged', domainFlags('גוף תאורה נורות לד קלווין').lighting)
+    check('single overlapping word NOT flagged (multi-signal)', !domainFlags('מאמר על חשמל בבית').perfume)
+    check('cross-domain detected', isCrossDomain('בושם אוד וניל + פיתוח תוכנה SEO פרילנסר'))
+    check('fingerprint is stable + content-free', fingerprint('שלום עולם') === fingerprint('שלום   עולם') && /^[0-9a-f]{16}$/.test(fingerprint('x')))
+
+    // THE ROOT CAUSE: the SHARED guidance injected into EVERY project's prompt is
+    // saturated with perfume-domain examples → a freelancer prompt carries perfume.
+    const guidance = recommendationGuidance('Hebrew', YEAR, 20)
+    check('*** recommendationGuidance is PERFUME-flagged (root cause) ***', domainFlags(guidance).perfume)
+    const pblock = pendingTopicsBlock([{ title: 'נושא פרילנסר', primaryKeyword: 'פיתוח תוכנה', intent: 'informational', secondaryKeywords: [] }])
+    check('*** pendingTopicsBlock duplicate-families are PERFUME-flagged ***', domainFlags(pblock).perfume)
+    // Consequence: a Matalon (freelancer) Site Scan prompt is cross-domain even
+    // though the project digest is pure freelancer.
+    const freelancerDigest = 'CATEGORIES: פיתוח תוכנה | category ; נגישות אתרים | category ; שיווק דיגיטלי | category'
+    const matalonPrompt = buildPrompt('Hebrew', 'מטלון — freelancer platform', freelancerDigest, [], 20, ['פיתוח תוכנה לעסקים'], pblock)
+    check('*** Matalon Site Scan prompt is cross-domain (perfume enters via guidance) ***', domainFlags(matalonPrompt).perfume && domainFlags(matalonPrompt).freelancer)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

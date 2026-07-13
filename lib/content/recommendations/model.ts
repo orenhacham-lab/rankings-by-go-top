@@ -31,6 +31,13 @@ export interface RecoGenResult {
   modelUsed: string | null
   /** true only when the primary failed and the fallback was used. */
   usedFallback: boolean
+  /** Diagnostics (Preview) — the model's finish reason ('STOP' | 'MAX_TOKENS' | …). */
+  finishReason?: string
+  /** true when the response was cut by the output-token limit (truncated JSON). */
+  truncated?: boolean
+  promptTokenCount?: number
+  candidatesTokenCount?: number
+  totalTokenCount?: number
 }
 
 export interface RecoGenOptions {
@@ -60,9 +67,16 @@ export async function generateRecommendationJSON(prompt: string, opts: RecoGenOp
   for (const { tier, id } of tiers) {
     try {
       const model = client.getGenerativeModel({ model: id, generationConfig })
-      const text = (await model.generateContent(prompt)).response.text()
+      const resp = (await model.generateContent(prompt)).response
+      const text = resp.text()
+      const finishReason = resp.candidates?.[0]?.finishReason
+      const usage = resp.usageMetadata
       if (tier === 'fallback') console.warn('[reco-model] primary failed → used explicit fallback', { primary: RECOMMENDATION_MODEL_PRIMARY, fallback: id })
-      return { text, ok: true, modelUsed: id, usedFallback: tier === 'fallback' }
+      return {
+        text, ok: true, modelUsed: id, usedFallback: tier === 'fallback',
+        finishReason, truncated: finishReason === 'MAX_TOKENS',
+        promptTokenCount: usage?.promptTokenCount, candidatesTokenCount: usage?.candidatesTokenCount, totalTokenCount: usage?.totalTokenCount,
+      }
     } catch (err) {
       console.error('[reco-model] generation error', { tier, model: id, message: err instanceof Error ? err.message : String(err) })
       // primary error → loop continues to the fallback; fallback error → give up.

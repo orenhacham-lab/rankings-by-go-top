@@ -118,6 +118,14 @@ export interface GenerateInput {
   /** Phase 3F.3.1c — normalized keywords to skip (keyword-research clusters), so
    *  "find more" surfaces fresh clusters instead of re-emitting known ones. */
   avoidKeywords?: string[]
+  /** Isolation diagnostics — immutable per-request run id (server-generated). */
+  generationRunId?: string
+  /** Preview-only: collect the per-call Site Scan trace (fingerprints + flags). */
+  collectTrace?: boolean
+  /** Preview-only: exclude PENDING ideas from the prompt AND the corpus (to test
+   *  whether contaminated pending rows are the active feedback source). Never
+   *  deletes rows; articles/generated/scan stay enabled. */
+  excludePendingContext?: boolean
 }
 
 /** Raw idea shape returned by the Gemini prompts below. */
@@ -333,7 +341,10 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   // rules, no schema change. Table is optional (pre-migration → skipped).
   let pendingAvoidCount = 0
   const pendingTopics: PendingTopic[] = []
+  // Preview diagnostic: skip ALL pending context (prompt + corpus) to test whether
+  // contaminated pending rows are the active feedback loop. Rows are never deleted.
   try {
+    if (input.excludePendingContext) throw new Error('__skip_pending__')
     const { data: pendingRows } = await admin
       .from('content_topic_ideas')
       .select('title, primary_keyword, secondary_keywords, search_intent')
@@ -479,7 +490,10 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // primary_keyword_exists despite plenty of unused scan targets. The newest
     // idea rows are exactly what changed between runs, so they lead the list.
     const avoidTitles = Array.from(new Set([...pendingAvoid, ...existingTitles, ...(input.avoidKeywords ?? [])]))
-    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock }, businessCtx)
+    const res = await recommendFromSiteScan(admin, {
+      projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock,
+      generationRunId: input.generationRunId, collectTrace: input.collectTrace, pendingContextCount: pendingTopics.length,
+    }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
     for (const s of res.suggestions) {
