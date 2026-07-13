@@ -11,6 +11,9 @@ import { buildPrompt, completeSiteScanIdeas, type RawIdeaGen } from '../site-sca
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
 import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
 import { ExistingCorpus } from '../dedupe'
+import { buildClustersPrompt, isVocabAligned, type ClusterInput } from '../keyword-research'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -232,6 +235,65 @@ async function main() {
     check('site-scan prompt injects the pending block', sp.includes('ALREADY-PENDING topics') && sp.includes('DUPLICATE SELF-CHECK'))
     // no pending block → prompt still valid, no empty artifacts
     check('site-scan prompt without pending block is clean', !buildPrompt('Hebrew', 'ctx', 'digest', [], 20, ['קיים']).includes('ALREADY-PENDING topics'))
+  }
+
+  console.log('J) Keyword Research — editorial batch reasoning, no keyword→title templates')
+  {
+    const clusters: ClusterInput[] = [
+      { primaryKeyword: 'גוף תאורה צמוד תקרה', secondaryKeywords: ['גופי תאורה צמודי תקרה', 'מאווררי תקלה', 'מראה עם תאורה'], volume: 2400 },
+      { primaryKeyword: 'מראה עם תאורה איקאה', secondaryKeywords: [], volume: 1900 },
+      { primaryKeyword: 'בית מנורה', secondaryKeywords: [], volume: 900 },
+    ]
+    const p = buildClustersPrompt(clusters, 'he', 'חשמל אור בע"מ', ['גופי תאורה צמודי תקרה', 'מנורות תלויות', 'תאורת פסים'], '')
+
+    // I.1: the deterministic keyword→title template is GONE from production code
+    // (the phrase may appear in the PROMPT as a forbidden example — that's the
+    // point — but never as a template-literal title construction).
+    const src = readFileSync(join(process.cwd(), 'lib/content/recommendations/keyword-research.ts'), 'utf8')
+    check('no "[keyword]: המדריך המלא" template construction in source', !src.includes('}: המדריך המלא') && !src.includes('The complete guide to ${'))
+    check('title comes only from the model (no title fallback expression)', !/title\s*=\s*g\?\.title\?\.trim\(\)\s*\|\|/.test(src))
+    // Prompt forbids the template + keyword-as-title.
+    check('prompt: keywords are evidence, never ready-made titles', /Raw keywords are EVIDENCE, not ready-made titles/.test(p))
+    check('prompt: never append המדריך המלא', /NEVER copy a keyword and append.*המדריך המלא/.test(p))
+
+    // I.2: navigational/competitor (ikea) classified + rejected by default.
+    check('prompt: reject navigational/competitor with ikea example', /navigational\/competitor.*איקאה/s.test(p))
+    check('prompt: competitor allowed only with explicit comparison support', /unless the offering explicitly supports comparison/.test(p))
+    // I.3/I.4: malformed/ambiguous examples required to be rejected without support.
+    check('prompt: reject malformed "מחסני תאורה צמודי תקרה"', /מחסני תאורה צמודי תקרה/.test(p))
+    check('prompt: ambiguous "בית מנורה" needs supported context', /בית מנורה/.test(p))
+
+    // I.5: consolidation of synonymous ceiling-light clusters into ONE topic.
+    check('prompt: consolidate same-question clusters (ceiling-light example)', /CONSOLIDATE.*גוף תאורה צמוד תקרה.*ONE strong topic/s.test(p))
+    check('prompt: mergedKeywords field in schema', /"mergedKeywords"/.test(p))
+    check('prompt: fewer topics than clusters allowed (quality over count)', /FEWER topics than clusters/.test(p))
+
+    // I.6: secondaries must belong to the SAME article (fans/mirrors excluded).
+    check('prompt: same-article secondaries with fan/mirror example', /secondaryKeywords.*SAME article.*ceiling-FAN or mirror/s.test(p))
+    check('related terms passed only as CANDIDATES', /secondary CANDIDATES/.test(p))
+
+    // I.7: business scope from offering only — the חשמל brand-name trap.
+    check('prompt: scope from offering, never business name', /BUSINESS SCOPE comes ONLY from the supplied offering.*NEVER from the business name/s.test(p))
+    check('prompt: חשמל-in-brand-name is not scope evidence', /"חשמל".*NOT evidence/s.test(p))
+    check('prompt: no electrical-safety/dimmer topics without real products', /electrical-safety advice, socket\/dimmer installation/.test(p))
+
+    // Reason must explain gap + relevance, not just volume; volume passed as evidence.
+    check('prompt: reason explains gap+relevance not only volume', /CONTENT GAP and business relevance.*not just the search volume/s.test(p))
+    check('prompt: monthlyVolume supplied per cluster', /"monthlyVolume":2400/.test(p))
+    check('prompt: strict rejected classification schema', /"rejected":\[\{"primaryKeyword"/.test(p) && /navigational\|competitor\|malformed\|ambiguous\|out_of_scope/.test(p))
+    check('prompt: every cluster accounted for exactly once', /Every supplied cluster must appear exactly once/.test(p))
+
+    // I.8: valid technical lighting keywords are NOT blocked by the deterministic
+    // gates. Vocab mirrors what a real lighting-store scan absorbs (exact tokens
+    // from titles like "תאורת פסים" / "נורות לד גוון אור חם" / "תאורה לסלון").
+    const lightingVocab = new Set(['תאורה', 'תאורת', 'גופי', 'מנורות', 'תקרה', 'פסים', 'לד', 'נורות', 'גוון', 'אור', 'סלון', 'מסלול'])
+    check('valid lighting keyword passes the vocab gate', isVocabAligned('תאורת פסים לסלון', lightingVocab))
+    check('kelvin/CRI-style keyword passes the vocab gate', isVocabAligned('נורות לד גוון אור', lightingVocab))
+    check('track-lighting keyword passes the vocab gate', isVocabAligned('תאורת מסלול לתקרה', lightingVocab))
+
+    // I.12: pending block still injected into the KR prompt when present.
+    const p2 = buildClustersPrompt(clusters, 'he', '', [], 'ALREADY-PENDING topics TEST-BLOCK')
+    check('KR prompt injects the pending block', p2.includes('ALREADY-PENDING topics TEST-BLOCK'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

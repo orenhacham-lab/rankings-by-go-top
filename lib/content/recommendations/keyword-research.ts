@@ -183,7 +183,7 @@ export interface KeywordResearchInput {
   pendingBlock?: string
 }
 
-interface ClusterInput {
+export interface ClusterInput {
   primaryKeyword: string
   secondaryKeywords: string[]
   volume: number
@@ -260,41 +260,76 @@ interface GeminiClusterTopic {
   searchIntent: string
   recommendedWordCount: number
   reason: string
-  /** Phase 3H.2 — the model marks wrong-market/entity-class clusters to skip. */
-  skip?: boolean
+  evidenceSummary?: string
+  /** Model-SELECTED secondaries (only terms that belong in the same article). */
+  secondaryKeywords?: string[]
+  /** Other supplied primary keywords this topic consolidates (synonym clusters). */
+  mergedKeywords?: string[]
 }
 
-/** One Gemini call: clusters (primary + secondary keywords) → article topics. */
-async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = ''): Promise<GeminiClusterTopic[]> {
+/** A cluster the model rejected as an unsuitable opportunity, with why. */
+interface GeminiRejectedCluster {
+  primaryKeyword: string
+  classification?: string // navigational|competitor|malformed|ambiguous|out_of_scope|duplicate|other_market
+}
+
+export interface ClustersToTopicsResult { topics: GeminiClusterTopic[]; rejected: GeminiRejectedCluster[]; ok: boolean }
+
+/**
+ * ONE Gemini Pro call: a BATCH of keyword opportunities → an editorial set of
+ * article topics. The model reasons over the whole batch — consolidating
+ * synonymous clusters, rejecting navigational/competitor/malformed/out-of-scope
+ * queries, and choosing only secondaries that belong in the same article. Raw
+ * keywords are EVIDENCE, never ready-made titles; there is NO deterministic
+ * keyword→title template anywhere in this path.
+ */
+/** Pure prompt builder (exported for snapshot tests — proves the instructions
+ *  are actually present in the request). */
+export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = ''): string {
   const langLabel = language === 'he' ? 'Hebrew' : 'English'
   const year = new Date().getFullYear()
-  const prompt = [
-    `You turn keyword clusters (from Google Search data) into practical SEO article topics for a website. Today's year is ${year}.`,
+  return [
+    `You are an SEO editor turning RAW Google keyword data into a small set of high-quality article topics for a website. Today's year is ${year}.`,
     businessCtx ? `Business context: ${businessCtx}` : '',
-    // Phase 3H.2 — the site's actual OFFERING anchors interpretation, skipping
-    // and rewriting. Generic: the list comes from the site's own scan.
-    offerContext.length ? `The site's offering (its own categories/products/services): ${offerContext.slice(0, 20).join(' ; ')}.` : '',
+    // Phase 3H.2 — the site's actual OFFERING anchors interpretation. Generic:
+    // the list comes from the site's own scan.
+    offerContext.length ? `The site's ACTUAL offering (its own categories/products/services — this is the ONLY business-scope evidence): ${offerContext.slice(0, 20).join(' ; ')}.` : '',
     offerContext.length ? `Interpret EVERY keyword in the context of this offering — a keyword matching a product/category name is about that PRODUCT/CATEGORY (never an unrelated organization, brand, TV franchise, or service with a similar name).` : '',
-    offerContext.length ? `If a cluster clearly belongs to a DIFFERENT market or entity class than the offering, return {"primaryKeyword": "<as given>", "skip": true} for that cluster instead of a topic.` : '',
-    `For EACH cluster below, produce ONE article topic that would naturally rank for those keywords. Keep the given primaryKeyword EXACTLY as-is; the title is a natural, clickable article title (NOT a bare keyword).`,
+    `KEYWORD-RESEARCH RULES (critical):`,
+    `- Raw keywords are EVIDENCE, not ready-made titles. NEVER copy a keyword and append a generic suffix like "המדריך המלא" or "כל מה שצריך לדעת" — write a natural, editorial ${langLabel} title that answers the query's real intent.`,
+    `- Do NOT create one topic per cluster automatically. CONSOLIDATE clusters that express the same core question (e.g. "גוף תאורה צמוד תקרה" / "גופי תאורה צמודי תקרה" / "תאורה צמודת תקרה" → ONE strong topic); list the absorbed primaries in "mergedKeywords".`,
+    `- Classify each query's intent first: informational | commercial | comparison | transactional | navigational/competitor | ambiguous | malformed. REJECT navigational/competitor queries (e.g. a keyword naming another store or brand like "מראה עם תאורה איקאה") unless the offering explicitly supports comparison content. REJECT malformed or ambiguous queries (e.g. "מחסני תאורה צמודי תקרה", "בית מנורה") unless the supplied offering makes their meaning clear and supported.`,
+    `- BUSINESS SCOPE comes ONLY from the supplied offering/categories/existing content — NEVER from the business name. A word inside the brand name (e.g. "חשמל") is NOT evidence the business provides electrical-safety advice, socket/dimmer installation or electrician services; do NOT generate such topics unless real products/services above support them.`,
+    `- "secondaryKeywords": choose ONLY terms that belong in the SAME article (same intent, same expected answer). Do NOT include a nearby export term that belongs to a different article (e.g. ceiling-FAN or mirror terms on a ceiling-LIGHT topic).`,
+    `- The "reason" must explain the CONTENT GAP and business relevance in ${langLabel} — not just the search volume.`,
     pendingBlock,
     recommendationGuidance(langLabel, year, clusters.length),
-    `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason","evidenceSummary","skip"}]} — one entry per cluster, same order ("skip" only when skipping). searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600.`,
-    `Clusters:`,
-    JSON.stringify(clusters.map((c) => ({ primaryKeyword: c.primaryKeyword, secondaryKeywords: c.secondaryKeywords }))),
+    `Return ONLY JSON:`,
+    `{"topics":[{"primaryKeyword": "<EXACTLY one of the supplied primaryKeyword values>", "title", "angle", "searchIntent", "recommendedWordCount", "reason", "evidenceSummary", "secondaryKeywords": [], "mergedKeywords": []}],`,
+    ` "rejected":[{"primaryKeyword": "<EXACTLY as supplied>", "classification": "navigational|competitor|malformed|ambiguous|out_of_scope|duplicate|other_market"}]}.`,
+    `Every supplied cluster must appear exactly once: as a topic's primaryKeyword, inside a topic's mergedKeywords, or in "rejected". Return FEWER topics than clusters when consolidation/rejection warrants it — quality over count. searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600.`,
+    `Clusters (primaryKeyword + monthlyVolume + related export terms as secondary CANDIDATES):`,
+    JSON.stringify(clusters.map((c) => ({ primaryKeyword: c.primaryKeyword, monthlyVolume: c.volume, secondaryCandidates: c.secondaryKeywords }))),
   ].filter(Boolean).join('\n')
+}
 
+export async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = ''): Promise<ClustersToTopicsResult> {
+  const prompt = buildClustersPrompt(clusters, language, businessCtx, offerContext, pendingBlock)
   const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: 8192 })
-  if (!ok) return []
-  let parsed: { topics?: unknown }
+  if (!ok) return { topics: [], rejected: [], ok: false }
+  let parsed: { topics?: unknown; rejected?: unknown }
   try {
     parsed = JSON.parse(text)
   } catch {
     const m = text.match(/\{[\s\S]*\}/)
-    if (!m) return []
-    try { parsed = JSON.parse(m[0]) } catch { return [] }
+    if (!m) return { topics: [], rejected: [], ok: false }
+    try { parsed = JSON.parse(m[0]) } catch { return { topics: [], rejected: [], ok: false } }
   }
-  return Array.isArray(parsed.topics) ? (parsed.topics as GeminiClusterTopic[]) : []
+  return {
+    topics: Array.isArray(parsed.topics) ? (parsed.topics as GeminiClusterTopic[]) : [],
+    rejected: Array.isArray(parsed.rejected) ? (parsed.rejected as GeminiRejectedCluster[]) : [],
+    ok: true,
+  }
 }
 
 /**
@@ -317,6 +352,10 @@ export interface KeywordResearchMeta {
   // Phase 3H.2 — clusters the model marked as a different market/entity class.
   skippedByModelCount?: number
   skippedByModelExamples?: string[]
+  /** PR #23 — model topics dropped by minimal validation (unknown keyword / no title). */
+  droppedInvalidTopicCount?: number
+  /** PR #23 — clusters absorbed into another topic via mergedKeywords. */
+  consolidatedCount?: number
   candidateCount?: number
   batchSent?: number
   unusedRemaining?: number
@@ -439,47 +478,65 @@ export async function recommendFromKeywordResearch(
     volume: c.volume,
   }))
 
-  // 5) Gemini candidate keywords → article topics (keep primaryKeyword EXACTLY;
-  // deterministic keyword-title fallback if the model is unavailable). Phase
-  // 3H.2 — the model receives the site's OFFERING and may mark wrong-market
-  // clusters {skip:true}; those are dropped (counted, never silent).
+  // 5) ONE Gemini Pro editorial pass over the whole batch: the model consolidates
+  // synonymous clusters, rejects navigational/competitor/malformed/out-of-scope
+  // queries, writes natural titles and selects only same-article secondaries.
+  // Suggestions are built ONLY from model-returned topics — there is NO
+  // deterministic "[keyword]: המדריך המלא" fallback (an unusable batch returns
+  // fewer/none, with rejected classifications counted in diagnostics).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
-  const geminiTopics = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '')
-  const byPrimary = new Map(geminiTopics.map((t) => [normalizeText(t.primaryKeyword), t]))
-  const skippedByModel = clusterInputs.filter((c) => byPrimary.get(normalizeText(c.primaryKeyword))?.skip === true)
-  const keptClusters = clusterInputs.filter((c) => byPrimary.get(normalizeText(c.primaryKeyword))?.skip !== true)
+  const { topics: geminiTopics, rejected: rejectedByModel } = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '')
+  const clusterByPrimary = new Map(clusterInputs.map((c) => [normalizeText(c.primaryKeyword), c]))
 
-  const suggestions: TopicSuggestion[] = keptClusters.map((c) => {
-    const g = byPrimary.get(normalizeText(c.primaryKeyword))
-    // Phase 3H — never show the RAW keyword as a title: when the model gave no
-    // title, fall back to a guide-style article title.
-    const title = g?.title?.trim() || (language === 'he' ? `${c.primaryKeyword}: המדריך המלא` : `The complete guide to ${c.primaryKeyword}`)
-    const intent = g?.searchIntent?.trim() || 'informational'
-    const wc = typeof g?.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000
+  const suggestions: TopicSuggestion[] = []
+  let droppedInvalidTopic = 0
+  for (const g of geminiTopics) {
+    const cluster = clusterByPrimary.get(normalizeText(g.primaryKeyword || ''))
+    const title = (g.title || '').trim()
+    // Non-destructive validation only: the topic must reference a SUPPLIED
+    // cluster (no invented keywords) and carry a real model-written title.
+    if (!cluster || !title) { droppedInvalidTopic++; continue }
+    // Consolidated volume = the primary cluster + every merged synonym cluster
+    // (volume stays EVIDENCE for the score; eligibility was the model's call).
+    const merged = (Array.isArray(g.mergedKeywords) ? g.mergedKeywords : [])
+      .map((k) => clusterByPrimary.get(normalizeText(k)))
+      .filter((c): c is ClusterInput => !!c && c !== cluster)
+    const volume = cluster.volume + merged.reduce((n, c) => n + c.volume, 0)
+    // Secondaries = the MODEL's same-article selection (verbatim strings, no
+    // rewriting); merged primaries are folded in so their demand is kept visible.
+    const secondaryKeywords = Array.from(new Set([
+      ...(Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : []),
+      ...merged.map((c) => c.primaryKeyword),
+    ]))
     const reasonBase = language === 'he'
-      ? `נמצא בנתוני חיפוש עם כ-${c.volume.toLocaleString('he-IL')} חיפושים חודשיים`
-      : `Found in search data with ~${c.volume.toLocaleString('en-US')} monthly searches`
-    return {
-      id: `keyword_research_url:${slugKey(c.primaryKeyword)}`,
+      ? `נמצא בנתוני חיפוש עם כ-${volume.toLocaleString('he-IL')} חיפושים חודשיים`
+      : `Found in search data with ~${volume.toLocaleString('en-US')} monthly searches`
+    const editorial = (g.evidenceSummary && g.evidenceSummary.trim()) || (g.reason && g.reason.trim()) || ''
+    suggestions.push({
+      id: `keyword_research_url:${slugKey(cluster.primaryKeyword)}`,
       title,
-      primaryKeyword: c.primaryKeyword,
-      secondaryKeywords: c.secondaryKeywords,
-      searchIntent: intent,
-      recommendedWordCount: wc,
-      angle: g?.angle?.trim() || '',
+      primaryKeyword: cluster.primaryKeyword,
+      secondaryKeywords,
+      searchIntent: g.searchIntent?.trim() || 'informational',
+      recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000,
+      angle: g.angle?.trim() || '',
       suggestedInternalLinks: [],
       source: 'keyword_research_url',
-      suggestionReason: g?.reason?.trim() ? `${g.reason.trim()} · ${reasonBase}` : reasonBase,
-      suggestionScore: scoreFromVolume(c.volume),
-    }
-  })
+      suggestionReason: editorial ? `${editorial} · ${reasonBase}` : reasonBase,
+      suggestionScore: scoreFromVolume(volume),
+    })
+  }
+  const skippedByModel = rejectedByModel.filter((r) => clusterByPrimary.has(normalizeText(r.primaryKeyword || '')))
 
   return {
     suggestions,
     meta: {
       generated: suggestions.length, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter,
       filteredGenericCount, filteredUnrelatedCount, filteredUnrelatedExamples,
-      skippedByModelCount: skippedByModel.length, skippedByModelExamples: skippedByModel.slice(0, 10).map((c) => c.primaryKeyword),
+      skippedByModelCount: skippedByModel.length,
+      skippedByModelExamples: skippedByModel.slice(0, 10).map((r) => `${r.primaryKeyword}${r.classification ? ` (${r.classification})` : ''}`),
+      droppedInvalidTopicCount: droppedInvalidTopic,
+      consolidatedCount: Math.max(0, batch.length - skippedByModel.length - suggestions.length - droppedInvalidTopic),
       candidateCount, batchSent: batch.length, unusedRemaining: candidateCount - batch.length,
       skippedKnownCount, skippedKnownExamples, clusters: candidateCount,
       keywordResearchFailed: !!failureReason, failureReason,
