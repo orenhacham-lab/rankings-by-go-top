@@ -19,7 +19,7 @@ import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
-import { subjectKey, diversifySuggestions, currentYear, qualityGuidance, applyQualityRepairs } from './quality'
+import { subjectKey, selectDiverse, currentYear, qualityGuidance, applyQualityRepairs, cannibalizes } from './quality'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
@@ -278,21 +278,21 @@ async function accumulate(
     if (items.length === 0) break // genuine empty response → stop looping
     raw += items.length
     for (const s of items) {
-      applyQualityRepairs(s, language, year)
+      // Repair (year/reason) + discard an irreparable pure-generic title outright.
+      if (applyQualityRepairs(s, language, year).discard) { dupes++; continue }
       const key = s.title.trim().toLowerCase()
       if (!key || seenTitles.has(key)) { dupes++; continue }
-      // Enhanced existing-content gap check: title near-dup OR the same core
-      // SUBJECT after stripping a generic/elaborative suffix (catches
-      // "X: the story behind it" vs an existing "X").
-      if (corpus.isDuplicate(s.title) || corpus.isDuplicate(subjectKey(s.title), 0.72)) { dupes++; continue }
+      // Existing-content gap: title near-dup, same core SUBJECT after stripping a
+      // generic/elaborative suffix, OR a broadened paraphrase (cannibalization).
+      if (corpus.isDuplicate(s.title) || corpus.isDuplicate(subjectKey(s.title), 0.72) || cannibalizes(s.title, existingTitles)) { dupes++; continue }
       seenTitles.add(key)
       acc.push(s)
       if (acc.length >= target) break
     }
   }
-  // Deterministic diversification: collapse near-identical (entity+intent/subject)
-  // clusters + soft concentration penalty so one brand never dominates.
-  const diversified = diversifySuggestions(acc).slice(0, target)
+  // Adaptive full-set diversification (MMR): collapse near-identical clusters +
+  // marginal-utility selection so one brand/skeleton can't dominate the result.
+  const diversified = selectDiverse(acc, target)
   acc.length = 0
   acc.push(...diversified)
   const reason = acc.length > 0

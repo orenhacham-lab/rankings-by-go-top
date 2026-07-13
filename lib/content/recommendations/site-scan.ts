@@ -19,7 +19,7 @@ import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
 import { topicQualityIssue } from './keyword-research'
-import { qualityGuidance, currentYear, applyQualityRepairs, diversifySuggestions } from './quality'
+import { qualityGuidance, currentYear, applyQualityRepairs, selectDiverse, cannibalizes } from './quality'
 import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -369,11 +369,12 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     if (suggestions.length >= MAX_SITE_SCAN_IDEAS) break
   }
 
-  // Deterministic per-idea repairs (stale year, reason language, generic-title
-  // penalty) + semantic diversification so one brand can't dominate.
+  // Per-idea repairs (stale year, reason language) + DISCARD pure-generic and
+  // cannibalizing titles + adaptive full-set diversification (MMR).
   const year = currentYear()
-  for (const s of suggestions) applyQualityRepairs(s, input.language, year)
-  const diversified = diversifySuggestions(suggestions)
+  const avoid = input.avoidTitles ?? []
+  const cleaned = suggestions.filter((s) => !applyQualityRepairs(s, input.language, year).discard && !cannibalizes(s.title, avoid))
+  const diversified = selectDiverse(cleaned, MAX_SITE_SCAN_IDEAS)
 
   // Model failed or produced nothing usable → deterministic scan-derived ideas
   // so the user is never stuck with a bare error on a project that HAS a scan.
