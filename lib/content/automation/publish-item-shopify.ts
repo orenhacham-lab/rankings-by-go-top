@@ -42,9 +42,12 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
   const loaded = await loadShopifyConnection(admin, item.project_id)
   if ('error' in loaded) { await finalizeItem(admin, item.id, 'quality_check_failed', 'no_shopify_connection'); return { itemId: item.id, status: 'quality_check_failed', articleId, reason: 'no_shopify_connection' } }
 
-  // Publishing prerequisites — surfaced clearly, not retried into the alert cap.
+  // Publishing prerequisite — a config gate that won't change on retry.
   if (!hasWriteContent(loaded.connection.granted_scopes)) { await finalizeItem(admin, item.id, 'quality_check_failed', 'missing_write_content_scope'); return { itemId: item.id, status: 'quality_check_failed', articleId, reason: 'missing_write_content_scope' } }
-  if (!article.shopify_blog_id) { await finalizeItem(admin, item.id, 'quality_check_failed', 'no_shopify_blog'); return { itemId: item.id, status: 'quality_check_failed', articleId, reason: 'no_shopify_blog' } }
+  // NOTE: the target blog is NOT checked here — publishArticleToShopify resolves
+  // the article-level blog OR the project default. A missing blog fails through
+  // the normal publish path below (retry-bounded + alert after max attempts), so
+  // a never-opened queue article publishes to the project default automatically.
 
   // Retry cap (same bound as WordPress).
   if (item.status === 'failed' && (item.attempts ?? 0) >= AUTOMATION_MAX_ATTEMPTS) {

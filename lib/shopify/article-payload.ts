@@ -98,3 +98,16 @@ export function summarizeUserErrors(errs: ShopifyUserError[]): string {
 export function decideArticleAction(storedArticleId: string | null | undefined): 'create' | 'update' {
   return storedArticleId && String(storedArticleId).trim() ? 'update' : 'create'
 }
+
+/**
+ * Resolve the target Blog GID: the article-level selection ALWAYS overrides the
+ * project/connection default. Returns null when neither is set (→ no_shopify_blog).
+ * PURE — the caller persists the resolved id on the article so retries are
+ * deterministic and a later default change never moves a published article.
+ */
+export function resolveTargetBlogId(articleBlogId: string | null | undefined, defaultBlogId: string | null | undefined): string | null {
+  const a = (articleBlogId || '').trim()
+  if (a) return a
+  const d = (defaultBlogId || '').trim()
+  return d || null
+}

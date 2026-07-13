@@ -19,7 +19,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 type Blog = { id: string; title: string; handle: string }
-type Conn = { shop_domain: string; can_publish: boolean; granted_scopes: string[] } | null
+type Conn = { shop_domain: string; can_publish: boolean; granted_scopes: string[]; default_blog_id: string | null } | null
 
 export default function ShopifyPublishSettings({
   projectId, articleId,
@@ -42,6 +42,7 @@ export default function ShopifyPublishSettings({
   const [blogs, setBlogs] = useState<Blog[]>([])
   const [blogsError, setBlogsError] = useState<string | null>(null)
   const [blogId, setBlogId] = useState<string>(initialBlogId ?? '')
+  const [usingDefault, setUsingDefault] = useState(false)
   const [tags, setTags] = useState<string>((initialTags ?? []).join(', '))
   const [publishDate, setPublishDate] = useState<string>('')
   const [saving, setSaving] = useState(false)
@@ -75,10 +76,14 @@ export default function ShopifyPublishSettings({
       if (!res.ok) { setBlogsError(mapErr(data.reason || data.error)); return }
       const list: Blog[] = Array.isArray(data.blogs) ? data.blogs : []
       setBlogs(list)
-      // One blog → preselect it (still shown by name).
-      if (list.length === 1 && !blogId) setBlogId(list[0].id)
+      // Effective blog when the article has no explicit selection: the project
+      // default (if set), else the single blog. The article override always wins.
+      if (!blogId) {
+        const fallback = (conn?.default_blog_id && list.some((b) => b.id === conn.default_blog_id)) ? conn.default_blog_id : (list.length === 1 ? list[0].id : '')
+        if (fallback) { setBlogId(fallback); setUsingDefault(!!conn?.default_blog_id && fallback === conn.default_blog_id) }
+      }
     } catch { setBlogsError(t.errors.exact_failure) }
-  }, [projectId, blogId, mapErr, t])
+  }, [projectId, blogId, conn, mapErr, t])
 
   useEffect(() => { loadConn() }, [loadConn])
   useEffect(() => { if (canPublish) loadBlogs() }, [canPublish, loadBlogs])
@@ -155,11 +160,12 @@ export default function ShopifyPublishSettings({
             ) : blogs.length === 1 ? (
               <div className="text-sm text-slate-700 dark:text-slate-200">{blogs[0].title}</div>
             ) : (
-              <select value={blogId} onChange={(e) => setBlogId(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+              <select value={blogId} onChange={(e) => { setBlogId(e.target.value); setUsingDefault(false) }} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                 <option value="">{t.selectBlog}</option>
                 {blogs.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
               </select>
             )}
+            {usingDefault && <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.usingProjectDefault}</p>}
           </div>
 
           <Input label={t.tags} placeholder={t.tagsPlaceholder} value={tags} onChange={(e) => setTags(e.target.value)} />

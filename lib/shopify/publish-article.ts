@@ -19,7 +19,7 @@ import type { ShopifyConnectionRow } from './api-auth'
 import { hasWriteContent } from './constants'
 import { buildCanonicalUrl } from './domain'
 import { ShopifyClientError, shopifyArticleCreate, shopifyArticleUpdate, shopifyGetArticle } from './client'
-import { buildArticleInput, isStableImageUrl, summarizeUserErrors, decideArticleAction, type ShopifyUserError } from './article-payload'
+import { buildArticleInput, isStableImageUrl, summarizeUserErrors, decideArticleAction, resolveTargetBlogId, type ShopifyUserError } from './article-payload'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
 
@@ -111,9 +111,15 @@ export async function publishArticleToShopify(
   if (!hasWriteContent(connection.granted_scopes)) {
     return { ok: false, reason: 'missing_write_content_scope', imageWarnings: [] }
   }
-  // 2) A target blog GID is required (no auto-create in v1).
-  const blogId = (article.shopify_blog_id || '').trim()
+  // 2) Resolve the target blog: article-level selection overrides the project
+  //    default. Persist the resolved id on the article so retries are
+  //    deterministic and a later default change never moves a published article.
+  const blogId = resolveTargetBlogId(article.shopify_blog_id, connection.default_blog_id)
   if (!blogId) return { ok: false, reason: 'no_shopify_blog', imageWarnings: [] }
+  if (!article.shopify_blog_id) {
+    await admin.from('generated_articles').update({ shopify_blog_id: blogId, updated_at: nowIso() }).eq('id', article.id)
+    article.shopify_blog_id = blogId
+  }
 
   // 3) Compose the body: sanitize + inject inline-image figures (stable URLs).
   const sanitized = sanitizeArticleHtml(String(article.content_html || ''))

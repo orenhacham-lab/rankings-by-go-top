@@ -12,6 +12,12 @@
 -- Rollback: ALTER TABLE public.generated_articles DROP COLUMN shopify_blog_id, …
 -- ============================================================================
 
+-- Project/connection-level DEFAULT publishing Blog (GID). Used when an article
+-- has no per-article blog (e.g. a queue item never opened in the editor). The
+-- article-level shopify_blog_id always overrides this.
+ALTER TABLE public.shopify_connections
+  ADD COLUMN IF NOT EXISTS default_blog_id text;
+
 ALTER TABLE public.generated_articles
   -- Per-article Shopify publishing selection.
   ADD COLUMN IF NOT EXISTS shopify_blog_id       text,
