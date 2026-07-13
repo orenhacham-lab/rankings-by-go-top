@@ -19,7 +19,9 @@ import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
-import { subjectKey, selectDiverse, currentYear, qualityGuidance, applyQualityRepairs, cannibalizes } from './quality'
+import { subjectKey, currentYear, qualityGuidance } from './quality'
+import { refineAndSelect, type RefineCtx, type RefineFunnel, type RepairTitleFn, type RefillFn } from './refine'
+import { geminiRepairTitle } from './gemini-repair'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
@@ -255,54 +257,42 @@ async function accumulate(
   existingTitles: string[],
   target: number,
   language: 'he' | 'en' = 'he',
-): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string }> {
-  const acc: TopicSuggestion[] = []
-  const seenTitles = new Set<string>()
+  langLabel = 'Hebrew',
+): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string; funnel?: RefineFunnel }> {
   const year = currentYear()
-  let raw = 0
-  let dupes = 0
+  // 1) Gather a raw candidate POOL (dedup only — quality/repair happens next), so
+  //    the refine pass has surplus to repair/diversify without starving the count.
+  const pool: TopicSuggestion[] = []
+  const seen = new Set<string>()
   let attempts = 0
   let hadSuccess = false
   let hadError = false
-  while (acc.length < target && attempts < MAX_ATTEMPTS) {
+  while (pool.length < target && attempts < MAX_ATTEMPTS) {
     attempts++
-    const avoid = [...existingTitles, ...acc.map((a) => a.title)]
+    const avoid = [...existingTitles, ...pool.map((a) => a.title)]
     const { items, ok } = await genBatch(avoid)
-    if (!ok) {
-      // Transient failure — back off and retry (do NOT report "no ideas").
-      hadError = true
-      await sleep(300 * attempts)
-      continue
-    }
+    if (!ok) { hadError = true; await sleep(300 * attempts); continue }
     hadSuccess = true
-    if (items.length === 0) break // genuine empty response → stop looping
-    raw += items.length
-    for (const s of items) {
-      // Repair (year/reason) + discard an irreparable pure-generic title outright.
-      if (applyQualityRepairs(s, language, year).discard) { dupes++; continue }
-      const key = s.title.trim().toLowerCase()
-      if (!key || seenTitles.has(key)) { dupes++; continue }
-      // Existing-content gap: title near-dup, same core SUBJECT after stripping a
-      // generic/elaborative suffix, OR a broadened paraphrase (cannibalization).
-      if (corpus.isDuplicate(s.title) || corpus.isDuplicate(subjectKey(s.title), 0.72) || cannibalizes(s.title, existingTitles)) { dupes++; continue }
-      seenTitles.add(key)
-      acc.push(s)
-      if (acc.length >= target) break
-    }
+    if (items.length === 0) break
+    for (const s of items) { const k = s.title.trim().toLowerCase(); if (!k || seen.has(k)) continue; seen.add(k); pool.push(s) }
   }
-  // Adaptive full-set diversification (MMR): collapse near-identical clusters +
-  // marginal-utility selection so one brand/skeleton can't dominate the result.
-  const diversified = selectDiverse(acc, target)
-  acc.length = 0
-  acc.push(...diversified)
-  const reason = acc.length > 0
+
+  // 2) Repair weak-but-groundable titles + ONE bounded refill → keep the count.
+  const ctx: RefineCtx = {
+    existingTitles, language, year,
+    isDuplicate: (t) => corpus.isDuplicate(t) || corpus.isDuplicate(subjectKey(t), 0.72),
+  }
+  const repair: RepairTitleFn = (c) => geminiRepairTitle(langLabel, year, c)
+  const refill: RefillFn = async (_need, avoidSubjects) => {
+    const { items, ok } = await genBatch(avoidSubjects)
+    return ok ? items : []
+  }
+  const { selected, funnel } = await refineAndSelect(pool, target, ctx, repair, refill)
+
+  const reason = selected.length > 0
     ? undefined
-    : !hadSuccess && hadError
-      ? 'model_error'
-      : raw > 0
-        ? 'all_duplicates'
-        : 'model_empty'
-  return { acc, raw, dupes, attempts, reason }
+    : !hadSuccess && hadError ? 'model_error' : pool.length > 0 ? 'all_duplicates' : 'model_empty'
+  return { acc: selected, raw: pool.length, dupes: pool.length - selected.length, attempts, reason, funnel }
 }
 
 export async function generateRecommendations(admin: Admin, input: GenerateInput): Promise<RecommendationResult> {
@@ -387,7 +377,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         const { ideas, ok } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
         return { items: ideas.map((g) => mapIdea(g, 'keyword', 0.7)).filter((x): x is TopicSuggestion => !!x), ok }
       },
-      corpus, existingTitles, TARGET_NEW, language,
+      corpus, existingTitles, TARGET_NEW, language, langLabel,
     )
     suggestions = acc
     meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
@@ -405,7 +395,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         }).filter((x): x is TopicSuggestion => !!x)
         return { items, ok }
       },
-      corpus, existingTitles, TARGET_NEW, language,
+      corpus, existingTitles, TARGET_NEW, language, langLabel,
     )
     suggestions = acc
     meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }

@@ -357,6 +357,28 @@ export function titleSkeleton(title: string): string {
   return 'specific'
 }
 
+/** Per-candidate outcome of the refine pipeline. */
+export type CandidateOutcome =
+  | 'keep' | 'repair_title' | 'repair_language' | 'repair_year'
+  | 'discard_duplicate' | 'discard_cannibalization' | 'discard_unsupported' | 'discard_unrecoverable_generic'
+
+/** Rarity / limited-edition / exclusivity claims that need product evidence — an
+ *  invented one is discarded (not repaired into fabricated content). */
+export const UNSUPPORTED_CLAIM_PATTERNS: RegExp[] = [
+  /מהדור(ה|ות)\s*מוגבל/, /limited edition/i, /\bנדיר(ים|ה)?\b/, /\brare(st)?\b/i,
+  /בלעדי(ת|ים)?/, /\bexclusive\b/i, /אספנ/, /\bcollector'?s?\b/i,
+]
+export function isUnsupportedClaim(title: string): boolean {
+  const t = (title || '').trim()
+  return UNSUPPORTED_CLAIM_PATTERNS.some((re) => re.test(t))
+}
+
+/** True when a valid-but-weak title should get ONE bounded title-repair pass. */
+export function needsTitleRepair(title: string): boolean {
+  const t = (title || '').trim()
+  return isGenericTitle(t) || titleSkeleton(t) === 'lead_sep' || hasMixedBrandForm(t)
+}
+
 /** True when a title mixes an English brand form and its Hebrew form redundantly. */
 export function hasMixedBrandForm(title: string): boolean {
   // e.g. "Amouage אמואג׳ …" — a Latin word immediately followed by a Hebrew word
@@ -401,31 +423,25 @@ export function selectDiverse<T extends DiversifiableIdea>(items: T[], limit = I
     if (!cur || f.score > cur.score || (f.score === cur.score && f.item.title < cur.item.title)) byCluster.set(key, f)
   }
 
-  // 2) greedy marginal-utility selection.
+  // 2) greedy marginal-utility selection — ADAPTIVE penalties only, NO fixed
+  //    skeleton or per-entity cap. Repeated syntax/entity lowers marginal utility
+  //    but never blocks an otherwise strong, distinct topic when it beats the best
+  //    remaining alternative.
   const remaining = Array.from(byCluster.values()).sort((a, b) => b.score - a.score || (a.item.title < b.item.title ? -1 : 1))
   const selected: F[] = []
   const entC = new Map<string, number>()
   const skelC = new Map<string, number>()
   const intentC = new Map<string, number>()
-  // A repeated non-'specific' skeleton is capped so it never fills most of the
-  // set — but only while a differently-shaped alternative is still available.
-  const cap = Math.max(2, Math.floor((Number.isFinite(limit) ? limit : remaining.length) * 0.4))
   while (selected.length < limit && remaining.length) {
-    // Prefer items that don't exceed the skeleton cap; fall back only if none.
-    const eligibleIdx = remaining
-      .map((f, i) => ({ f, i }))
-      .filter(({ f }) => f.skel === 'specific' || (skelC.get(f.skel) ?? 0) < cap)
-      .map(({ i }) => i)
-    const pool = eligibleIdx.length ? eligibleIdx : remaining.map((_, i) => i)
     let bestIdx = -1
     let bestU = -Infinity
-    for (const i of pool) {
+    for (let i = 0; i < remaining.length; i++) {
       const f = remaining[i]
       const eK = entC.get(f.entity) ?? 0
       const sK = f.skel === 'specific' ? 0 : (skelC.get(f.skel) ?? 0)
       const iK = intentC.get(f.intent) ?? 0
-      const entPenalty = entityWeight * (1 - Math.pow(decay, eK))            // 0 for first, grows
-      const skelPenalty = f.skel === 'specific' ? 0 : (sK > 0 ? 0.5 * sK : 0.08)
+      const entPenalty = entityWeight * (1 - Math.pow(decay, eK))                 // 0 for first, grows
+      const skelPenalty = f.skel === 'specific' ? 0 : 0.12 * (1 + sK)             // grows per repeat, never a hard cap
       const intentPenalty = iK > 0 ? 0.04 * iK : 0
       const u = f.score - entPenalty - skelPenalty - intentPenalty
       if (bestIdx === -1 || u > bestU || (u === bestU && f.item.title < remaining[bestIdx].item.title)) { bestU = u; bestIdx = i }

@@ -19,7 +19,9 @@ import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
 import { topicQualityIssue } from './keyword-research'
-import { qualityGuidance, currentYear, applyQualityRepairs, selectDiverse, cannibalizes } from './quality'
+import { qualityGuidance, currentYear } from './quality'
+import { refineAndSelect, type RefineCtx } from './refine'
+import { geminiRepairTitle } from './gemini-repair'
 import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -369,12 +371,16 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     if (suggestions.length >= MAX_SITE_SCAN_IDEAS) break
   }
 
-  // Per-idea repairs (stale year, reason language) + DISCARD pure-generic and
-  // cannibalizing titles + adaptive full-set diversification (MMR).
+  // Repair weak-but-groundable titles (bounded Gemini) + discard only the
+  // unrecoverable / cannibalizing / unsupported, then diversify. Single-generation
+  // source → no refill pass (refill = null).
   const year = currentYear()
   const avoid = input.avoidTitles ?? []
-  const cleaned = suggestions.filter((s) => !applyQualityRepairs(s, input.language, year).discard && !cannibalizes(s.title, avoid))
-  const diversified = selectDiverse(cleaned, MAX_SITE_SCAN_IDEAS)
+  const ctx: RefineCtx = { existingTitles: avoid, language: input.language, year, isDuplicate: () => false }
+  const { selected: diversified } = await refineAndSelect(
+    suggestions, MAX_SITE_SCAN_IDEAS, ctx,
+    (c) => geminiRepairTitle(input.langLabel, year, c), null,
+  )
 
   // Model failed or produced nothing usable → deterministic scan-derived ideas
   // so the user is never stuck with a bare error on a project that HAS a scan.
