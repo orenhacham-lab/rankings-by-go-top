@@ -12,7 +12,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { generateRecommendationJSON } from './model'
+import { recommendationGuidance } from './prompt-guidance'
 import { generateKeywordIdeas, type KeywordIdeaResult } from '@/lib/google-ads/keyword-ideas'
 import { GoogleAdsError } from '@/lib/google-ads/client'
 import { isValidCountry, isValidLanguage } from '@/lib/google-ads/constants'
@@ -262,45 +263,34 @@ interface GeminiClusterTopic {
 
 /** One Gemini call: clusters (primary + secondary keywords) → article topics. */
 async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[]): Promise<GeminiClusterTopic[]> {
-  const client = getGeminiClient()
-  if (!client) return []
-  const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
   const langLabel = language === 'he' ? 'Hebrew' : 'English'
+  const year = new Date().getFullYear()
   const prompt = [
-    `You turn keyword clusters (from Google Search data) into practical SEO article topics for a website.`,
+    `You turn keyword clusters (from Google Search data) into practical SEO article topics for a website. Today's year is ${year}.`,
     businessCtx ? `Business context: ${businessCtx}` : '',
     // Phase 3H.2 — the site's actual OFFERING anchors interpretation, skipping
     // and rewriting. Generic: the list comes from the site's own scan.
     offerContext.length ? `The site's offering (its own categories/products/services): ${offerContext.slice(0, 20).join(' ; ')}.` : '',
     offerContext.length ? `Interpret EVERY keyword in the context of this offering — a keyword matching a product/category name is about that PRODUCT/CATEGORY (never an unrelated organization, brand, TV franchise, or service with a similar name).` : '',
-    offerContext.length ? `If a cluster clearly belongs to a DIFFERENT market or entity class than the offering (e.g. adoption/boarding/breeding services on a products store, children's TV-brand toys on a pet-products store, broadcast/streaming terms on a clothing store), return {"primaryKeyword": "<as given>", "skip": true} for that cluster instead of a topic.` : '',
-    `Write ALL output in ${langLabel}.`,
-    `For EACH cluster below, produce ONE article topic that would naturally rank for those keywords.`,
-    `Rules: the title is a natural, clickable article title (NOT a bare keyword); keep the given primaryKeyword EXACTLY as-is; searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600; reason = one short plain-language sentence a non-SEO business owner understands.`,
-    `For product/category-like keywords, expand into a SPECIFIC article intent — buying guide, how to choose, comparison, benefits/risks, sizing/fit, maintenance/care, use-case, or an audience/problem-specific guide — never a bare store/navigation topic.`,
-    `For BROAD/generic keywords, rewrite the title into the site's specific differentiator as evidenced by the offering (e.g. a generic clothing keyword on a second-hand store → a second-hand/vintage angle). Never produce a generic "complete guide" title without a specific angle.`,
-    `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason","skip"}]} — one entry per cluster, same order ("skip" only when skipping).`,
+    offerContext.length ? `If a cluster clearly belongs to a DIFFERENT market or entity class than the offering, return {"primaryKeyword": "<as given>", "skip": true} for that cluster instead of a topic.` : '',
+    `For EACH cluster below, produce ONE article topic that would naturally rank for those keywords. Keep the given primaryKeyword EXACTLY as-is; the title is a natural, clickable article title (NOT a bare keyword).`,
+    recommendationGuidance(langLabel, year, clusters.length),
+    `Return ONLY JSON: {"topics":[{"primaryKeyword","title","angle","searchIntent","recommendedWordCount","reason","evidenceSummary","skip"}]} — one entry per cluster, same order ("skip" only when skipping). searchIntent ∈ informational|commercial|comparison|transactional|local|other; recommendedWordCount 800-1600.`,
     `Clusters:`,
     JSON.stringify(clusters.map((c) => ({ primaryKeyword: c.primaryKeyword, secondaryKeywords: c.secondaryKeywords }))),
   ].filter(Boolean).join('\n')
 
+  const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: 8192 })
+  if (!ok) return []
+  let parsed: { topics?: unknown }
   try {
-    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.8 } })
-    const result = await model.generateContent(prompt)
-    const text = result.response.text()
-    let parsed: { topics?: unknown }
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      const m = text.match(/\{[\s\S]*\}/)
-      if (!m) return []
-      parsed = JSON.parse(m[0])
-    }
-    return Array.isArray(parsed.topics) ? (parsed.topics as GeminiClusterTopic[]) : []
-  } catch (err) {
-    console.error('[recommendations] clustersToTopics gemini error', { message: err instanceof Error ? err.message : String(err) })
-    return []
+    parsed = JSON.parse(text)
+  } catch {
+    const m = text.match(/\{[\s\S]*\}/)
+    if (!m) return []
+    try { parsed = JSON.parse(m[0]) } catch { return [] }
   }
+  return Array.isArray(parsed.topics) ? (parsed.topics as GeminiClusterTopic[]) : []
 }
 
 /**

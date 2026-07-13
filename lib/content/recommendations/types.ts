@@ -45,6 +45,9 @@ export interface TopicSuggestion {
   supportingSources?: RecommendationSource[]
   /** Phase 4C — per-source evidence (source + that source's own reason). */
   sourceEvidence?: { source: RecommendationSource; reason: string }[]
+  /** Internal diagnostic — which Gemini model produced this idea (primary or
+   *  fallback id). Response/diagnostic-only; NEVER rendered on the idea card. */
+  modelUsed?: string
 }
 
 export interface RecommendationMeta {

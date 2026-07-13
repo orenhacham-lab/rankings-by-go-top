@@ -13,13 +13,17 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
 import { topicQualityIssue } from './keyword-research'
+import { generateRecommendationJSON } from './model'
+import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
+import { validateIdea } from './validate'
 import type { TopicSuggestion } from './types'
+
+const currentYear = (): number => new Date().getFullYear()
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -62,11 +66,14 @@ interface SiteScanIdea {
   primaryKeyword?: string
   secondaryKeywords?: string[]
   searchIntent?: string
+  intent?: string
   angle?: string
   recommendedWordCount?: number
   reason?: string
-  /** Which existing page/category/cluster inspired it (source context). */
-  sourceContext?: string
+  /** Structured-output evidence fields (compose the Hebrew reason). */
+  sourceEntityName?: string
+  sourceEntityType?: string
+  evidenceSummary?: string
   /** A URL from the provided list this new article should link to, if any. */
   suggestedLinkUrl?: string
 }
@@ -170,27 +177,21 @@ function sourceUrlList(d: ReturnType<typeof buildDigest>): { url: string; title:
 export const AVOID_PROMPT_CAP = 120
 
 export function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[]): string {
+  const year = currentYear()
   return [
-    `You are an SEO content strategist. Analyze a website's existing content (from a site scan) and propose NEW article topics that fill content gaps and strengthen the site's internal structure.`,
+    `You are an SEO content strategist. Analyze a website's existing content (from a site scan) and propose NEW article topics that fill content gaps and strengthen the site's internal structure. Today's year is ${year}.`,
     businessCtx ? `Website: ${businessCtx}.` : '',
     // Phase 3H.4 — rotation memory: never re-emit what already exists or was
     // already suggested; move on to UNUSED entities/clusters/angles instead.
-    avoidTitles.length ? `Do NOT repeat or closely overlap these existing/already-suggested titles and keywords:\n${avoidTitles.slice(0, AVOID_PROMPT_CAP).map((t) => `- ${t}`).join('\n')}\nInstead, ROTATE to entities, categories, products and angles NOT represented in that list (different clusters, different sub-intents, different audiences).` : '',
-    `Write ALL output in ${langLabel}.`,
-    `Here is a compact digest of the EXISTING site content:`,
+    avoidTitles.length ? `EXISTING/already-suggested titles (do NOT repeat or paraphrase these; rotate to UNUSED entities, categories, products and angles):\n${avoidTitles.slice(0, AVOID_PROMPT_CAP).map((t) => `- ${t}`).join('\n')}` : '',
+    `Here is a compact digest of the EXISTING site content — treat every listed page/category/product/brand as the ONLY supplied entities (use exact names; never invent a brand that is not listed):`,
     digestBlock,
     ``,
-    `Propose ${count} NEW, specific article topics that:`,
-    `- support important pages that lack supporting/cluster content,`,
-    `- develop underdeveloped content clusters,`,
-    `- give orphan/weakly-linked pages a logical supporting article,`,
-    `- cover entities that recur in titles/anchors/categories but have no dedicated article,`,
-    `- are natural follow-ups to existing pages.`,
-    `Each topic MUST be a concrete article that does NOT duplicate an existing page above. Give each a SPECIFIC long-tail primaryKeyword that includes the article's INTENT words (how to choose / benefits / comparison / care / audience) — NEVER just the bare entity/category/product name on its own (e.g. for the entity "קרני אייל לכלבים" use "איך לבחור קרן אייל לכלב", not "קרני אייל לכלבים").`,
-    `For products / product categories / service pages, EXPAND the raw entity into a specific article intent: buying guide, how to choose, comparison, benefits/risks, sizing/fit, maintenance/care, use-case, or an audience/problem-specific guide (e.g. entity "מיטות לכלבים" → "מיטות לכלבים: איך לבחור מיטה מתאימה לפי גודל והרגלי שינה"). NEVER output a raw one-word topic or a store/navigation topic (sale / קטגוריה / מבצעים / קולקציה).`,
-    urlList.length ? `When a new article should link to an existing page, set suggestedLinkUrl to EXACTLY one of these URLs (or omit it):\n${urlList.map((u) => `- ${u.url}`).join('\n')}` : '',
-    `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason","sourceContext","suggestedLinkUrl"}]}.`,
-    `searchIntent ∈ informational|commercial|comparison|transactional|local|other. recommendedWordCount 800-1600. reason = one short plain-language sentence explaining the gap it fills. sourceContext = the existing page/category/cluster it supports.`,
+    `Base each topic on a real listed entity or a demonstrable gap between them. Give each a SPECIFIC long-tail primaryKeyword that includes the article's intent — never the bare entity name alone. Never output a store/navigation topic (sale / קטגוריה / מבצעים / קולקציה).`,
+    recommendationGuidance(langLabel, year, count),
+    urlList.length ? `If a new article should link to a listed page, set suggestedLinkUrl to EXACTLY one of these URLs (or omit it):\n${urlList.map((u) => `- ${u.url}`).join('\n')}` : '',
+    structuredOutputContract(langLabel, count),
+    `You MAY additionally include an optional "suggestedLinkUrl" field per topic (one of the URLs above).`,
   ].filter(Boolean).join('\n')
 }
 
@@ -219,24 +220,17 @@ function extractIdeas(text: string): SiteScanIdea[] | null {
   )
 }
 
-async function callModel(prompt: string): Promise<{ ideas: SiteScanIdea[]; ok: boolean }> {
-  const client = getGeminiClient()
-  if (!client) { console.warn('[reco-site-scan] no gemini client configured'); return { ideas: [], ok: false } }
-  const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
-  try {
-    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 8192 } })
-    const result = await model.generateContent(prompt)
-    const text = result.response.text()
-    const ideas = extractIdeas(text)
-    if (ideas === null) {
-      console.error('[reco-site-scan] unparseable model output', { sample: (text || '').slice(0, 200) })
-      return { ideas: [], ok: false }
-    }
-    return { ideas, ok: true }
-  } catch (err) {
-    console.error('[reco-site-scan] model error', { message: err instanceof Error ? err.message : String(err) })
-    return { ideas: [], ok: false }
+async function callModel(prompt: string): Promise<{ ideas: SiteScanIdea[]; ok: boolean; modelUsed: string | null }> {
+  // Centralized pinned Pro model (explicit logged fallback); big token budget so a
+  // ~20-idea JSON response is not truncated.
+  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: 8192 })
+  if (!ok) return { ideas: [], ok: false, modelUsed }
+  const ideas = extractIdeas(text)
+  if (ideas === null) {
+    console.error('[reco-site-scan] unparseable model output', { sample: (text || '').slice(0, 200) })
+    return { ideas: [], ok: false, modelUsed }
   }
+  return { ideas, ok: true, modelUsed }
 }
 
 const MAX_SITE_SCAN_IDEAS = 20
@@ -328,22 +322,41 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
 
   const urlList = sourceUrlList(digest)
   const urlByKey = new Map(urlList.map((u) => [u.url, u.title]))
-  const prompt = buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, MAX_SITE_SCAN_IDEAS, input.avoidTitles ?? [])
 
-  const { ideas, ok } = await callModel(prompt)
+  // Up to TWO model calls: the first, then ONE bounded count-completion retry if
+  // the first returns fewer than requested (asks only for the remaining count and
+  // avoids what was already produced). No multi-stage refill architecture.
+  const year = currentYear()
+  const rawIdeas: SiteScanIdea[] = []
+  let ok = false
+  let modelUsed: string | null = null
+  for (let call = 0; call < 2 && rawIdeas.length < MAX_SITE_SCAN_IDEAS; call++) {
+    const need = MAX_SITE_SCAN_IDEAS - rawIdeas.length
+    const avoidNow = [...(input.avoidTitles ?? []), ...rawIdeas.map((i) => (i.title || '').trim()).filter(Boolean)]
+    const prompt = buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoidNow)
+    const res = await callModel(prompt)
+    if (res.modelUsed) modelUsed = res.modelUsed
+    ok = ok || res.ok
+    if (!res.ok) break
+    rawIdeas.push(...res.ideas)
+    if (res.ideas.length === 0) break // genuine empty → stop (don't spin the retry)
+  }
   debug.modelCalled = true
   debug.modelOk = ok
-  debug.modelRawCount = ideas.length
+  debug.modelRawCount = rawIdeas.length
+  ;(debug as Record<string, unknown>).modelUsed = modelUsed
 
-  const reasonPrefix = input.language === 'he' ? 'לפי סריקת האתר' : 'From the site scan'
+  // Minimal, NON-destructive validation — drop only unsafe items; keep the rest
+  // exactly as returned. Reason is the model's own evidence sentence (Hebrew).
+  const validateSeen = new Set<string>()
+  const rejects: Record<string, number> = {}
   const suggestions: TopicSuggestion[] = []
-  for (const g of ideas) {
+  for (const g of rawIdeas) {
+    const r = validateIdea(g, validateSeen, year)
+    if (r) { rejects[r] = (rejects[r] ?? 0) + 1; continue }
     const title = (g.title || '').trim()
     const primaryKeyword = (g.primaryKeyword || title).trim()
-    if (!title || !primaryKeyword) continue
-    const ctx = (g.sourceContext || '').trim()
-    const baseReason = (g.reason || '').trim()
-    const suggestionReason = [baseReason, ctx ? `(${reasonPrefix}: ${ctx})` : `(${reasonPrefix})`].filter(Boolean).join(' ')
+    const suggestionReason = (g.evidenceSummary && g.evidenceSummary.trim()) || (g.reason && g.reason.trim()) || ''
     const linkUrl = (g.suggestedLinkUrl || '').trim()
     const suggestedInternalLinks = linkUrl && urlByKey.has(linkUrl)
       ? [{ url: linkUrl, anchor: urlByKey.get(linkUrl) || primaryKeyword }]
@@ -353,16 +366,18 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
       title,
       primaryKeyword,
       secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : [],
-      searchIntent: g.searchIntent || 'informational',
+      searchIntent: g.intent || g.searchIntent || 'informational',
       recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1200,
       angle: g.angle || '',
       suggestedInternalLinks,
       source: 'site_scan',
       suggestionReason,
       suggestionScore: 0.75,
+      ...(modelUsed ? { modelUsed } : {}),
     })
     if (suggestions.length >= MAX_SITE_SCAN_IDEAS) break
   }
+  ;(debug as Record<string, unknown>).validationRejects = rejects
 
   // Model failed or produced nothing usable → deterministic scan-derived ideas
   // so the user is never stuck with a bare error on a project that HAS a scan.

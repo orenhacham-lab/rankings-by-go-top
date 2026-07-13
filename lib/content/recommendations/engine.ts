@@ -15,10 +15,12 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
+import { generateRecommendationJSON } from './model'
+import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
+import { validateIdea } from './validate'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
@@ -123,10 +125,18 @@ interface GeminiIdea {
   primaryKeyword?: string
   secondaryKeywords?: string[]
   searchIntent?: string
+  /** New structured-output field (aligned with the shared contract). */
+  intent?: string
   angle?: string
   recommendedWordCount?: number
   reason?: string
+  /** Structured-output evidence fields (used to compose the Hebrew reason). */
+  sourceEntityName?: string
+  sourceEntityType?: string
+  evidenceSummary?: string
 }
+
+const currentYear = (): number => new Date().getFullYear()
 
 /** Build https://host/ from a stored target_domain (bare host or full URL). */
 function homepageFromDomain(domain: string | null): string | null {
@@ -162,73 +172,68 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  * empty) from a transient failure (no client / thrown request / unparseable
  * output) so the caller can RETRY on failure instead of reporting "no ideas".
  */
-async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; ok: boolean }> {
-  const client = getGeminiClient()
-  if (!client) return { ideas: [], ok: false }
-  const modelName = process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite'
+async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
+  // Centralized pinned Pro model (with explicit logged fallback); big token budget
+  // so a ~20-idea JSON response is never truncated mid-array.
+  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: 8192 })
+  if (!ok) return { ideas: [], ok: false, modelUsed }
+  let parsed: { topics?: unknown }
   try {
-    const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.95 } })
-    const result = await model.generateContent(prompt)
-    const text = result.response.text()
-    let parsed: { topics?: unknown }
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      const m = text.match(/\{[\s\S]*\}/)
-      if (!m) return { ideas: [], ok: false } // unparseable → treat as transient, retry
-      parsed = JSON.parse(m[0])
-    }
-    return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : [], ok: true }
-  } catch (err) {
-    console.error('[recommendations] gemini ideas error', { message: err instanceof Error ? err.message : String(err) })
-    return { ideas: [], ok: false }
+    parsed = JSON.parse(text)
+  } catch {
+    const m = text.match(/\{[\s\S]*\}/)
+    if (!m) return { ideas: [], ok: false, modelUsed } // unparseable → treat as transient, retry
+    try { parsed = JSON.parse(m[0]) } catch { return { ideas: [], ok: false, modelUsed } }
   }
+  return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : [], ok: true, modelUsed }
 }
 
 /** Expand a BROAD seed keyword into many distinct long-tail article ideas. */
 function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string, count: number, avoid: string[]): string {
+  const year = currentYear()
   return [
-    `You generate specific SEO article ideas for a website.`,
+    `You generate specific SEO article ideas for a website. Today's year is ${year}.`,
     businessCtx ? `Website context: ${businessCtx}.` : '',
-    `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic.`,
-    `Write ALL output in ${langLabel}.`,
-    `Produce up to ${count} DISTINCT, specific, long-tail article ideas a real site in this area would publish — vary the angle: subtopics, regions, itineraries, comparisons, how-tos, costs/budgets, seasons, audiences (families/couples/first-timers), tips, and deep dives.`,
-    `Each idea MUST be a concrete article (e.g. for seed "יפן": "מסלול ביפן ל-14 יום", "יפן עם ילדים", "קיוטו בפעם הראשונה", "אוכל רחוב ביפן", "עלויות טיול ביפן"), NOT a rephrasing of the seed.`,
-    `Give each a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own.`,
-    avoid.length ? `Do NOT repeat or closely overlap these existing titles: ${avoid.slice(0, 40).map((t) => `"${t}"`).join(', ')}.` : '',
-    `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason"}]}. searchIntent ∈ informational|commercial|comparison|transactional|local|other. recommendedWordCount 800-1600. reason = one short plain-language sentence.`,
+    `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic. Give each idea a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own.`,
+    avoid.length ? `EXISTING titles (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
+    recommendationGuidance(langLabel, year, count),
+    structuredOutputContract(langLabel, count),
   ].filter(Boolean).join('\n')
 }
 
 /** Gap-based ideas from existing project context (missing / adjacent / deeper). */
 function projectDataPrompt(project: ProjectRow, langLabel: string, count: number, avoid: string[]): string {
+  const year = currentYear()
   return [
-    `You are an SEO content strategist finding CONTENT GAPS for a website.`,
+    `You are an SEO content strategist finding CONTENT GAPS for a website. Today's year is ${year}.`,
     `Business: ${project.business_name || '(unknown)'} — domain: ${project.target_domain || '(unknown)'}.`,
-    `Write ALL output in ${langLabel}.`,
-    avoid.length ? `The site ALREADY covers these — do NOT repeat or closely overlap them:\n${avoid.slice(0, 40).map((t) => `- ${t}`).join('\n')}` : '',
-    `Suggest up to ${count} NEW article ideas that fill real gaps: missing adjacent topics, deeper sub-topics of what already exists, supporting/comparison/how-to articles, and audience- or season-specific angles. Each must be specific and genuinely useful — not a variant of the existing list.`,
-    `Give each a SPECIFIC long-tail primaryKeyword.`,
-    `Return ONLY JSON: {"topics":[{"title","primaryKeyword","secondaryKeywords":[],"searchIntent","angle","recommendedWordCount","reason"}]}. searchIntent ∈ informational|commercial|comparison|transactional|local|other. recommendedWordCount 800-1600. reason = one short plain-language sentence.`,
+    avoid.length ? `EXISTING titles the site ALREADY covers (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
+    recommendationGuidance(langLabel, year, count),
+    structuredOutputContract(langLabel, count),
   ].filter(Boolean).join('\n')
 }
 
-function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number): TopicSuggestion | null {
+function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number, modelUsed?: string | null): TopicSuggestion | null {
+  // NON-DESTRUCTIVE: title/reason are used exactly as the model returned them.
   const title = (g.title || '').trim()
   const primaryKeyword = (g.primaryKeyword || title).trim()
   if (!title || !primaryKeyword) return null
+  // Reason = the model's evidence-grounded sentence (evidenceSummary preferred,
+  // else reason). No rewriting, no word substitution.
+  const reason = (g.evidenceSummary && g.evidenceSummary.trim()) || (g.reason && g.reason.trim()) || ''
   return {
     id: `${source}:${slugKey(title)}`,
     title,
     primaryKeyword,
     secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : [],
-    searchIntent: g.searchIntent || 'informational',
+    searchIntent: g.intent || g.searchIntent || 'informational',
     recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000,
     angle: g.angle || '',
     suggestedInternalLinks: [],
     source,
-    suggestionReason: g.reason?.trim() || '',
+    suggestionReason: reason,
     suggestionScore: score,
+    ...(modelUsed ? { modelUsed } : {}),
   }
 }
 
@@ -329,6 +334,19 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   // 4) Run the requested source into a deduped batch.
   let suggestions: TopicSuggestion[] = []
   let meta: RecommendationResult['meta']
+  // Minimal-validation bookkeeping (non-destructive): exact-dup title set, reject
+  // counts by reason, and which model produced the batch (internal diagnostics).
+  const year = currentYear()
+  const validateSeen = new Set<string>()
+  const rejects: Record<string, number> = {}
+  let modelUsed: string | null = null
+  /** Apply the minimal safe validation to raw model ideas, counting rejects.
+   *  Items that pass are returned UNCHANGED (byte-identical title/reason). */
+  const keepValid = (ideas: GeminiIdea[]): GeminiIdea[] => ideas.filter((g) => {
+    const r = validateIdea(g, validateSeen, year)
+    if (r) { rejects[r] = (rejects[r] ?? 0) + 1; return false }
+    return true
+  })
 
   if (input.source === 'hybrid') {
     // Phase 4C — HYBRID orchestrator. Run every ELIGIBLE provider INDEPENDENTLY
@@ -370,19 +388,21 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const keyword = (input.keyword || '').trim()
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
-        return { items: ideas.map((g) => mapIdea(g, 'keyword', 0.7)).filter((x): x is TopicSuggestion => !!x), ok }
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
+        if (m) modelUsed = m
+        return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok }
       },
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
+    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects } : undefined }
   } else if (input.source === 'project_data') {
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok } = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid))
-        const items = ideas.map((g) => {
-          const s = mapIdea(g, 'project_data', 0)
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid))
+        if (m) modelUsed = m
+        const items = keepValid(ideas).map((g) => {
+          const s = mapIdea(g, 'project_data', 0, modelUsed)
           if (!s) return null
           const fit = assessProjectKeywordFit(s.primaryKeyword, { businessName: project.business_name, category: null })
           s.suggestionScore = Number(Math.min(1, 0.6 + (fit === 'aligned' ? 0.2 : fit === 'weak' ? 0.1 : 0)).toFixed(2))
@@ -394,7 +414,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
+    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects } : undefined }
   } else if (input.source === 'site_scan') {
     // From the CACHED site scan — content-gap ideas, then dedupe. Never rescans.
     // Phase 3H.4 — pass rotation memory: existing titles + PENDING idea titles/
