@@ -22,7 +22,7 @@ import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
-export default function ArticleEditorPublishGate({ projectId, children }: { projectId: string | null; children: React.ReactNode }) {
+export default function ArticleEditorPublishGate({ projectId, children, shopifyPanel }: { projectId: string | null; children: React.ReactNode; shopifyPanel?: React.ReactNode }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).contentHub.editor.publishGate, [language])
   const dir: 'rtl' | 'ltr' = language === 'he' ? 'rtl' : 'ltr'
@@ -77,8 +77,10 @@ export default function ArticleEditorPublishGate({ projectId, children }: { proj
   // WordPress connected → the existing WordPress publishing subtree, unchanged.
   if (wpConnected) return <>{children}</>
 
-  // Shopify connected → informational card only (no fake/disabled CTA).
+  // Shopify connected → the Shopify publishing panel (Phase 4F.2). Falls back to
+  // an informational card only when no panel is supplied.
   if (shopifyConnected) {
+    if (shopifyPanel) return <>{shopifyPanel}</>
     return (
       <Card className="hover:translate-y-0" >
         <div dir={dir}>

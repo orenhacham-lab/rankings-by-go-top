@@ -106,9 +106,34 @@ function sanitizeArticleRow(a: Record<string, unknown>) {
     wp_primary_category_id: a.wp_primary_category_id ?? null,
     wp_category_ids: Array.isArray(a.wp_category_ids) ? a.wp_category_ids : [],
     wp_tag_ids: Array.isArray(a.wp_tag_ids) ? a.wp_tag_ids : [],
+    // Phase 4F.2 — Shopify publishing selection + result (never any token/secret).
+    shopify_blog_id: a.shopify_blog_id ?? null,
+    shopify_tags: Array.isArray(a.shopify_tags) ? a.shopify_tags : [],
+    shopify_article_id: a.shopify_article_id ?? null,
+    shopify_article_url: a.shopify_article_url ?? null,
+    shopify_handle: a.shopify_handle ?? null,
+    shopify_status: a.shopify_status ?? null,
+    shopify_published_at: a.shopify_published_at ?? null,
+    shopify_last_error: a.shopify_last_error ?? null,
+    shopify_last_synced_at: a.shopify_last_synced_at ?? null,
     created_at: a.created_at,
     updated_at: a.updated_at,
   }
+}
+
+/** Normalize a Shopify tag list (unique, trimmed, non-empty strings). */
+function normalizeStringTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const v of raw) {
+    const s = String(v ?? '').trim()
+    if (!s || seen.has(s.toLowerCase())) continue
+    seen.add(s.toLowerCase())
+    out.push(s)
+    if (out.length >= 50) break
+  }
+  return out
 }
 
 /** Normalize a taxonomy ID list from the request into unique positive integers. */
@@ -179,6 +204,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   if ('wp_category_ids' in body) patch.wp_category_ids = normalizeTermIds(body.wp_category_ids)
   if ('wp_tag_ids' in body) patch.wp_tag_ids = normalizeTermIds(body.wp_tag_ids)
+  // Phase 4F.2 — Shopify publishing selection (target blog GID + tags). Stored
+  // as-is; validated against the store only at publish. Result fields
+  // (shopify_article_id/url/…) are set by the publish route, never here.
+  if ('shopify_blog_id' in body) {
+    const v = String(body.shopify_blog_id ?? '').trim()
+    patch.shopify_blog_id = v && /^gid:\/\/shopify\/Blog\//.test(v) ? v : null
+  }
+  if ('shopify_tags' in body) patch.shopify_tags = normalizeStringTags(body.shopify_tags)
   if ('content_markdown' in body) patch.content_markdown = String(body.content_markdown ?? '') || null
   if ('faq_json' in body) {
     const faq = Array.isArray(body.faq_json)

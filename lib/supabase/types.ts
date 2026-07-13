@@ -519,6 +519,16 @@ export interface GeneratedArticle {
   wp_primary_category_id: number | null
   wp_category_ids: number[]
   wp_tag_ids: number[]
+  // Phase 4F.2 — Shopify Blog Article publishing (separate from WordPress fields).
+  shopify_blog_id: string | null
+  shopify_tags: string[]
+  shopify_article_id: string | null
+  shopify_article_url: string | null
+  shopify_handle: string | null
+  shopify_status: string | null
+  shopify_published_at: string | null
+  shopify_last_error: string | null
+  shopify_last_synced_at: string | null
   scheduled_at: string | null
   published_at: string | null
   last_error: string | null

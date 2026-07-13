@@ -17,6 +17,21 @@ export const SHOPIFY_API_VERSION = '2026-07'
 export const SHOPIFY_REQUIRED_SCOPES = ['read_products', 'read_content'] as const
 export type RequiredScope = (typeof SHOPIFY_REQUIRED_SCOPES)[number]
 
+/** Phase 4F.2 — the single extra scope required to CREATE/UPDATE Blog Articles. */
+export const SHOPIFY_WRITE_SCOPE = 'write_content'
+/**
+ * Scopes requested during the publishing scope upgrade: the read scopes PLUS
+ * write_content. No write_products / write_files / write_themes / customer /
+ * order scopes are ever requested.
+ */
+export const SHOPIFY_PUBLISH_SCOPES = ['read_products', 'read_content', 'write_content'] as const
+
+/** True when the granted set allows creating/updating Blog Articles. */
+export function hasWriteContent(granted: string[] | null | undefined): boolean {
+  const g = Array.isArray(granted) ? granted.map((s) => String(s).trim()) : []
+  return g.includes(SHOPIFY_WRITE_SCOPE)
+}
+
 /** A granted `read_x` requirement is satisfied by `read_x` OR the implied `write_x`. */
 function hasScope(granted: string[], required: string): boolean {
   if (granted.includes(required)) return true

@@ -14,6 +14,7 @@ import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { recordPublishFinalFailureAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
+import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-shopify'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -61,6 +62,22 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     const item = itemData as { id: string; project_id: string; topic_id: string | null; article_id: string | null; status: string; attempts: number } | null
     if (!item) return { itemId, status: 'failed', articleId: null, noop: 'item_not_found' }
     if (!item.article_id) return { itemId, status: item.status, articleId: null, noop: 'no_article' }
+
+    // Phase 4F.2 — backend selection by the project's connected platform. Only a
+    // Shopify-only project takes the Shopify path; WordPress / dual / none fall
+    // through to the WordPress path below (unchanged). Dual connection fails
+    // visibly rather than silently publishing to one side.
+    const [{ data: wpConn }, { data: shConn }] = await Promise.all([
+      admin.from('wordpress_connections').select('id').eq('project_id', item.project_id).maybeSingle(),
+      admin.from('shopify_connections').select('id').eq('project_id', item.project_id).maybeSingle(),
+    ])
+    if (wpConn && shConn) {
+      await finalizeItem(admin, itemId, 'quality_check_failed', 'platform_conflict')
+      return { itemId, status: 'quality_check_failed', articleId: item.article_id, reason: 'platform_conflict' }
+    }
+    if (shConn && !wpConn) {
+      return await publishShopifyPoolItem(admin, item)
+    }
 
     const { data: artData } = await admin.from('generated_articles').select(ARTICLE_SELECT).eq('id', item.article_id).maybeSingle()
     const article = artData as ArticleRow | null

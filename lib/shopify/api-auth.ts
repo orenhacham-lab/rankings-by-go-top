@@ -6,7 +6,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { decryptCredential, CredentialsCryptoError } from '@/lib/security/credentials-crypto'
-import { SHOPIFY_API_VERSION } from './constants'
+import { SHOPIFY_API_VERSION, hasWriteContent } from './constants'
 import type { ShopifyCredentials } from './types'
 
 export type ShopifyConnectionRow = {
@@ -82,6 +82,8 @@ export function sanitizeShopifyConnection(c: ShopifyConnectionRow) {
     last_error: c.last_error,
     granted_scopes: Array.isArray(c.granted_scopes) ? c.granted_scopes : [],
     auth_method: c.auth_method ?? 'oauth',
+    // Phase 4F.2 — true when write_content was granted (publishing is enabled).
+    can_publish: hasWriteContent(c.granted_scopes),
     created_at: c.created_at,
     updated_at: c.updated_at,
   }

@@ -19,6 +19,7 @@ import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPa
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
 import WordPressPublishSettings, { type WpExportStatus } from '@/components/content/WordPressPublishSettings'
 import ArticleEditorPublishGate from '@/components/content/ArticleEditorPublishGate'
+import ShopifyPublishSettings from '@/components/content/ShopifyPublishSettings'
 import ArticleInternalLinkApplyPanel from '@/components/content/ArticleInternalLinkApplyPanel'
 import type { ComposableInlineImage } from '@/lib/content/inline-images-compose'
 import { useToasts, ToastHost } from '@/components/content/Toast'
@@ -80,6 +81,12 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [wpCategoryIds, setWpCategoryIds] = useState<number[]>([])
   const [wpTagIds, setWpTagIds] = useState<number[]>([])
   const [wpExportStatus, setWpExportStatus] = useState<WpExportStatus>(null)
+  // Phase 4F.2 — Shopify publishing selection + result (loaded from the article).
+  const [shopifyBlogId, setShopifyBlogId] = useState<string | null>(null)
+  const [shopifyTags, setShopifyTags] = useState<string[]>([])
+  const [shopifyArticleUrl, setShopifyArticleUrl] = useState<string | null>(null)
+  const [shopifyStatus, setShopifyStatus] = useState<string | null>(null)
+  const [shopifyLastError, setShopifyLastError] = useState<string | null>(null)
 
   // Internal linking — editor is QA-only: verify each planned anchor exists and
   // insert its link. Planning/selection happens pre-generation in the brief.
@@ -123,6 +130,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       setWpPrimaryCategoryId(typeof a.wp_primary_category_id === 'number' ? a.wp_primary_category_id : null)
       setWpCategoryIds(Array.isArray(a.wp_category_ids) ? a.wp_category_ids : [])
       setWpTagIds(Array.isArray(a.wp_tag_ids) ? a.wp_tag_ids : [])
+      setShopifyBlogId(a.shopify_blog_id ?? null)
+      setShopifyTags(Array.isArray(a.shopify_tags) ? a.shopify_tags : [])
+      setShopifyArticleUrl(a.shopify_article_url ?? null)
+      setShopifyStatus(a.shopify_status ?? null)
+      setShopifyLastError(a.shopify_last_error ?? null)
       setWpStatus(a.status === 'published' ? 'publish' : a.wp_post_id != null ? 'draft' : null)
       // Load the article's approved planned internal links (editor is QA-only).
       try {
@@ -534,7 +546,20 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             for a WordPress project. A Shopify project sees an info card; neither
             → connect prompt; both → conflict. Detection uses the project's
             connection state (never the WordPress post id). */}
-        <ArticleEditorPublishGate projectId={projectId}>
+        <ArticleEditorPublishGate
+          projectId={projectId}
+          shopifyPanel={projectId && (
+            <ShopifyPublishSettings
+              projectId={projectId}
+              articleId={id}
+              initialBlogId={shopifyBlogId}
+              initialTags={shopifyTags}
+              initialArticleUrl={shopifyArticleUrl}
+              initialStatus={shopifyStatus}
+              initialLastError={shopifyLastError}
+            />
+          )}
+        >
           {/* Phase 4E — WordPress taxonomy + SEO settings (categories/tags/plugin). */}
           {projectId && (
             <WordPressPublishSettings

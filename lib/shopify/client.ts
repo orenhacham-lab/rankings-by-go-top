@@ -13,6 +13,7 @@
 
 import { buildCanonicalUrl, numericIdFromGid } from './domain'
 import { SHOPIFY_REQUIRED_SCOPES, missingScopes, classifyConnection } from './constants'
+import { parseUserErrors, type ShopifyUserError } from './article-payload'
 import type {
   ShopifyCredentials,
   ShopifyEntity,
@@ -356,4 +357,69 @@ function mapArticle(a: { id: string; title?: string; handle?: string; updatedAt?
   const b = base(a.id, 'article', a.title, a.handle, a.updatedAt)
   const blogHandle = a.blog?.handle || null
   return { ...b, canonicalUrl: buildCanonicalUrl(host, 'article', b.handle, blogHandle), status: a.isPublished === false ? 'unpublished' : 'published', isActive: a.isPublished !== false, bodyExcerpt: toText(a.summary), metadata: { blog_handle: blogHandle || '' } }
+}
+
+// ============================================================================
+// Phase 4F.2 — Blog Article PUBLISHING (write_content). All mutations treat
+// GraphQL userErrors as failures even on HTTP 200. Never logs the token.
+// ============================================================================
+
+export interface ShopifyBlog { id: string; title: string; handle: string }
+
+interface BlogsQueryData { blogs?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: { id?: string; title?: string; handle?: string }[] } }
+
+/** Load the store's Blogs (GID + title + handle) for the target-blog selector. */
+export async function getShopifyBlogs(creds: ShopifyCredentials): Promise<ShopifyBlog[]> {
+  const query = `query($cursor:String){ blogs(first:100, after:$cursor){ pageInfo{hasNextPage endCursor} nodes{ id title handle } } }`
+  const out: ShopifyBlog[] = []
+  let cursor: string | null = null
+  for (let page = 0; page < 5; page++) {
+    const resp: { data: BlogsQueryData; available: number | null; apiVersion: string | null } = await graphql(creds, query, { cursor })
+    const conn = resp.data.blogs
+    for (const b of conn?.nodes ?? []) if (b?.id) out.push({ id: b.id, title: String(b.title ?? '').trim(), handle: String(b.handle ?? '').trim() })
+    if (!conn?.pageInfo?.hasNextPage || !conn.pageInfo.endCursor) break
+    cursor = conn.pageInfo.endCursor
+  }
+  return out
+}
+
+export interface ShopifyArticleNode { id: string; handle: string; title: string; isPublished: boolean; publishedAt: string | null; blogHandle: string | null }
+export type ShopifyArticleResult =
+  | { ok: true; article: ShopifyArticleNode }
+  | { ok: false; userErrors: ShopifyUserError[] }
+
+const ARTICLE_FIELDS = `article { id handle title isPublished publishedAt blog { handle } }`
+
+function toArticleNode(a: { id?: string; handle?: string; title?: string; isPublished?: boolean; publishedAt?: string | null; blog?: { handle?: string } } | null | undefined): ShopifyArticleNode | null {
+  if (!a || !a.id) return null
+  return { id: a.id, handle: String(a.handle ?? '').trim(), title: String(a.title ?? '').trim(), isPublished: !!a.isPublished, publishedAt: a.publishedAt ?? null, blogHandle: a.blog?.handle ? String(a.blog.handle).trim() : null }
+}
+
+/** Create a Blog Article. `input` is a pre-built ArticleCreateInput (buildArticleInput). */
+export async function shopifyArticleCreate(creds: ShopifyCredentials, input: Record<string, unknown>): Promise<ShopifyArticleResult> {
+  const mutation = `mutation($article: ArticleCreateInput!){ articleCreate(article: $article){ ${ARTICLE_FIELDS} userErrors { field message code } } }`
+  const { data } = await graphql<{ articleCreate?: { article?: unknown; userErrors?: unknown } }>(creds, mutation, { article: input })
+  const userErrors = parseUserErrors(data.articleCreate?.userErrors)
+  if (userErrors.length) return { ok: false, userErrors }
+  const node = toArticleNode(data.articleCreate?.article as never)
+  if (!node) return { ok: false, userErrors: [{ field: null, message: 'Shopify did not return the created article.', code: null }] }
+  return { ok: true, article: node }
+}
+
+/** Update an existing Blog Article by GID. `input` is a pre-built ArticleUpdateInput. */
+export async function shopifyArticleUpdate(creds: ShopifyCredentials, id: string, input: Record<string, unknown>): Promise<ShopifyArticleResult> {
+  const mutation = `mutation($id: ID!, $article: ArticleUpdateInput!){ articleUpdate(id: $id, article: $article){ ${ARTICLE_FIELDS} userErrors { field message code } } }`
+  const { data } = await graphql<{ articleUpdate?: { article?: unknown; userErrors?: unknown } }>(creds, mutation, { id, article: input })
+  const userErrors = parseUserErrors(data.articleUpdate?.userErrors)
+  if (userErrors.length) return { ok: false, userErrors }
+  const node = toArticleNode(data.articleUpdate?.article as never)
+  if (!node) return { ok: false, userErrors: [{ field: null, message: 'Shopify did not return the updated article.', code: null }] }
+  return { ok: true, article: node }
+}
+
+/** Read an article by GID for reconciliation. Returns null when it no longer exists. */
+export async function shopifyGetArticle(creds: ShopifyCredentials, id: string): Promise<ShopifyArticleNode | null> {
+  const query = `query($id: ID!){ node(id: $id){ ... on Article { id handle title isPublished publishedAt blog { handle } } } }`
+  const { data } = await graphql<{ node?: unknown }>(creds, query, { id })
+  return toArticleNode(data.node as never)
 }
