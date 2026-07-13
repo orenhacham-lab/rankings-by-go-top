@@ -19,6 +19,7 @@ import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
 import { topicQualityIssue } from './keyword-research'
+import { qualityGuidance, currentYear, applyQualityRepairs, diversifySuggestions } from './quality'
 import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -177,6 +178,7 @@ export function buildPrompt(langLabel: string, businessCtx: string, digestBlock:
     // already suggested; move on to UNUSED entities/clusters/angles instead.
     avoidTitles.length ? `Do NOT repeat or closely overlap these existing/already-suggested titles and keywords:\n${avoidTitles.slice(0, AVOID_PROMPT_CAP).map((t) => `- ${t}`).join('\n')}\nInstead, ROTATE to entities, categories, products and angles NOT represented in that list (different clusters, different sub-intents, different audiences).` : '',
     `Write ALL output in ${langLabel}.`,
+    qualityGuidance(langLabel, currentYear()),
     `Here is a compact digest of the EXISTING site content:`,
     digestBlock,
     ``,
@@ -252,8 +254,11 @@ function deterministicFallback(digest: ReturnType<typeof buildDigest>, language:
   // already suggested/exist, so a repeat run moves on to unused seeds.
   const avoid = new Set(avoidTitles.map((t) => t.trim().toLowerCase()).filter(Boolean))
   const he = language === 'he'
+  // Entity-appropriate archetypes only — NEVER the generic "טעויות נפוצות וטיפים"
+  // cliché (it was applied blindly to brands like "Tom Ford"). A "complete guide"
+  // and a "how to choose" buying angle fit products/brands/categories safely.
   const guide = (name: string) => (he ? `המדריך המלא: ${name}` : `The complete guide to ${name}`)
-  const tips = (name: string) => (he ? `${name} — טעויות נפוצות וטיפים` : `${name} — common mistakes and tips`)
+  const howToChoose = (name: string) => (he ? `איך לבחור ${name}` : `How to choose ${name}`)
   const prefix = he ? 'לפי סריקת האתר' : 'From the site scan'
   const supportReason = (name: string) => (he ? `נושא תומך לעמוד/קטגוריה קיימים באתר: ${name} (${prefix})` : `A supporting topic for an existing page/category: ${name} (${prefix})`)
 
@@ -277,7 +282,7 @@ function deterministicFallback(digest: ReturnType<typeof buildDigest>, language:
     // only multi-word, non-navigation seeds are used. The model path handles the
     // broad entities; here quality beats coverage.
     if (topicQualityIssue(name, name) !== null) continue
-    for (const makeTitle of [guide, tips]) {
+    for (const makeTitle of [guide, howToChoose]) {
       const title = makeTitle(name)
       const key = title.toLowerCase()
       if (seenTitles.has(key) || avoid.has(key)) continue
@@ -364,9 +369,15 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     if (suggestions.length >= MAX_SITE_SCAN_IDEAS) break
   }
 
+  // Deterministic per-idea repairs (stale year, reason language, generic-title
+  // penalty) + semantic diversification so one brand can't dominate.
+  const year = currentYear()
+  for (const s of suggestions) applyQualityRepairs(s, input.language, year)
+  const diversified = diversifySuggestions(suggestions)
+
   // Model failed or produced nothing usable → deterministic scan-derived ideas
   // so the user is never stuck with a bare error on a project that HAS a scan.
-  if (suggestions.length === 0) {
+  if (diversified.length === 0) {
     const fallback = deterministicFallback(digest, input.language, input.avoidTitles ?? [])
     debug.usedFallback = fallback.length > 0
     debug.rawSuggestionCount = fallback.length
@@ -374,6 +385,6 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     return { suggestions: [], meta: { reason: ok ? 'model_empty' : 'model_error', generated: 0, debug } }
   }
 
-  debug.rawSuggestionCount = suggestions.length
-  return { suggestions, meta: { generated: suggestions.length, debug } }
+  debug.rawSuggestionCount = diversified.length
+  return { suggestions: diversified, meta: { generated: diversified.length, debug } }
 }

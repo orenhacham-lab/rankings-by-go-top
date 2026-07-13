@@ -19,6 +19,7 @@ import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
+import { subjectKey, diversifySuggestions, currentYear, qualityGuidance, applyQualityRepairs } from './quality'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
@@ -192,6 +193,7 @@ function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string,
     businessCtx ? `Website context: ${businessCtx}.` : '',
     `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic.`,
     `Write ALL output in ${langLabel}.`,
+    qualityGuidance(langLabel, currentYear()),
     `Produce up to ${count} DISTINCT, specific, long-tail article ideas a real site in this area would publish — vary the angle: subtopics, regions, itineraries, comparisons, how-tos, costs/budgets, seasons, audiences (families/couples/first-timers), tips, and deep dives.`,
     `Each idea MUST be a concrete article (e.g. for seed "יפן": "מסלול ביפן ל-14 יום", "יפן עם ילדים", "קיוטו בפעם הראשונה", "אוכל רחוב ביפן", "עלויות טיול ביפן"), NOT a rephrasing of the seed.`,
     `Give each a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own.`,
@@ -206,6 +208,7 @@ function projectDataPrompt(project: ProjectRow, langLabel: string, count: number
     `You are an SEO content strategist finding CONTENT GAPS for a website.`,
     `Business: ${project.business_name || '(unknown)'} — domain: ${project.target_domain || '(unknown)'}.`,
     `Write ALL output in ${langLabel}.`,
+    qualityGuidance(langLabel, currentYear()),
     avoid.length ? `The site ALREADY covers these — do NOT repeat or closely overlap them:\n${avoid.slice(0, 40).map((t) => `- ${t}`).join('\n')}` : '',
     `Suggest up to ${count} NEW article ideas that fill real gaps: missing adjacent topics, deeper sub-topics of what already exists, supporting/comparison/how-to articles, and audience- or season-specific angles. Each must be specific and genuinely useful — not a variant of the existing list.`,
     `Give each a SPECIFIC long-tail primaryKeyword.`,
@@ -251,9 +254,11 @@ async function accumulate(
   corpus: ExistingCorpus,
   existingTitles: string[],
   target: number,
+  language: 'he' | 'en' = 'he',
 ): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string }> {
   const acc: TopicSuggestion[] = []
   const seenTitles = new Set<string>()
+  const year = currentYear()
   let raw = 0
   let dupes = 0
   let attempts = 0
@@ -273,14 +278,23 @@ async function accumulate(
     if (items.length === 0) break // genuine empty response → stop looping
     raw += items.length
     for (const s of items) {
+      applyQualityRepairs(s, language, year)
       const key = s.title.trim().toLowerCase()
       if (!key || seenTitles.has(key)) { dupes++; continue }
-      if (corpus.isDuplicate(s.title)) { dupes++; continue }
+      // Enhanced existing-content gap check: title near-dup OR the same core
+      // SUBJECT after stripping a generic/elaborative suffix (catches
+      // "X: the story behind it" vs an existing "X").
+      if (corpus.isDuplicate(s.title) || corpus.isDuplicate(subjectKey(s.title), 0.72)) { dupes++; continue }
       seenTitles.add(key)
       acc.push(s)
       if (acc.length >= target) break
     }
   }
+  // Deterministic diversification: collapse near-identical (entity+intent/subject)
+  // clusters + soft concentration penalty so one brand never dominates.
+  const diversified = diversifySuggestions(acc).slice(0, target)
+  acc.length = 0
+  acc.push(...diversified)
   const reason = acc.length > 0
     ? undefined
     : !hadSuccess && hadError
@@ -373,7 +387,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         const { ideas, ok } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid))
         return { items: ideas.map((g) => mapIdea(g, 'keyword', 0.7)).filter((x): x is TopicSuggestion => !!x), ok }
       },
-      corpus, existingTitles, TARGET_NEW,
+      corpus, existingTitles, TARGET_NEW, language,
     )
     suggestions = acc
     meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
@@ -391,7 +405,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         }).filter((x): x is TopicSuggestion => !!x)
         return { items, ok }
       },
-      corpus, existingTitles, TARGET_NEW,
+      corpus, existingTitles, TARGET_NEW, language,
     )
     suggestions = acc
     meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason }
