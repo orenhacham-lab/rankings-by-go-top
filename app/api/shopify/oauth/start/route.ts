@@ -14,6 +14,7 @@ import {
   getShopifyOAuthConfig, oauthRedirectUri, buildAuthorizeUrl, generateOAuthState, projectReturnUrl,
   signNonceCookie, OAUTH_NONCE_COOKIE, OAUTH_COOKIE_PATH,
 } from '@/lib/shopify/oauth'
+import { SHOPIFY_REQUIRED_SCOPES, SHOPIFY_PUBLISH_SCOPES } from '@/lib/shopify/constants'
 
 const STATE_TTL_MS = 10 * 60_000
 const STATE_TTL_SECONDS = STATE_TTL_MS / 1000
@@ -24,6 +25,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const projectId = url.searchParams.get('projectId')
   const shopRaw = url.searchParams.get('shop') || ''
+  // Phase 4F.2 — intent=publish requests the publishing scope set (adds
+  // write_content); default is the read-only set. No other scopes are requested.
+  const scopes = url.searchParams.get('intent') === 'publish' ? SHOPIFY_PUBLISH_SCOPES : SHOPIFY_REQUIRED_SCOPES
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
@@ -66,6 +70,7 @@ export async function GET(request: Request) {
     clientId: config.clientId,
     redirectUri: oauthRedirectUri(config.appUrl),
     state,
+    scopes,
   })
 
   // Signed browser nonce cookie carrying the SAME state — the callback requires

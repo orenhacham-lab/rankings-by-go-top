@@ -6,7 +6,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { decryptCredential, CredentialsCryptoError } from '@/lib/security/credentials-crypto'
-import { SHOPIFY_API_VERSION } from './constants'
+import { SHOPIFY_API_VERSION, hasWriteContent } from './constants'
 import type { ShopifyCredentials } from './types'
 
 export type ShopifyConnectionRow = {
@@ -21,6 +21,8 @@ export type ShopifyConnectionRow = {
   last_tested_at: string | null
   last_synced_at: string | null
   last_error: string | null
+  // Phase 4F.2 — project-level default publishing Blog GID (nullable).
+  default_blog_id: string | null
   // Phase 4F.1 OAuth — scopes the merchant approved + how the token was obtained.
   granted_scopes: string[] | null
   auth_method: 'manual' | 'oauth'
@@ -82,6 +84,9 @@ export function sanitizeShopifyConnection(c: ShopifyConnectionRow) {
     last_error: c.last_error,
     granted_scopes: Array.isArray(c.granted_scopes) ? c.granted_scopes : [],
     auth_method: c.auth_method ?? 'oauth',
+    // Phase 4F.2 — true when write_content was granted (publishing is enabled).
+    can_publish: hasWriteContent(c.granted_scopes),
+    default_blog_id: c.default_blog_id ?? null,
     created_at: c.created_at,
     updated_at: c.updated_at,
   }

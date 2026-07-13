@@ -60,6 +60,36 @@ export async function POST() {
   )
 }
 
+// Phase 4F.2 — PATCH { projectId, defaultBlogId } sets the project-level default
+// publishing Blog (a Blog GID, or null to clear). No token is touched.
+export async function PATCH(request: Request) {
+  if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
+
+  let body: { projectId?: string; defaultBlogId?: string | null }
+  try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
+  const auth = await authContentProject(body.projectId)
+  if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  const raw = body.defaultBlogId
+  const defaultBlogId = raw == null || String(raw).trim() === '' ? null : String(raw).trim()
+  if (defaultBlogId && !/^gid:\/\/shopify\/Blog\//.test(defaultBlogId)) {
+    return Response.json({ error: 'invalid_blog', reason: 'invalid_blog' }, { status: 400 })
+  }
+
+  const { data, error } = await auth.admin
+    .from('shopify_connections')
+    .update({ default_blog_id: defaultBlogId, updated_at: new Date().toISOString() })
+    .eq('project_id', auth.project.id)
+    .select('id')
+    .maybeSingle()
+  if (error) {
+    console.error('[Shopify] default blog save failed:', error.message)
+    return Response.json({ error: 'save_failed', reason: 'save_failed' }, { status: 500 })
+  }
+  if (!data) return Response.json({ error: 'no_shopify_connection', reason: 'no_shopify_connection' }, { status: 400 })
+  return Response.json({ ok: true, default_blog_id: defaultBlogId })
+}
+
 export async function DELETE(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
   const projectId = new URL(request.url).searchParams.get('projectId')
