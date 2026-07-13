@@ -9,6 +9,8 @@ import { validateIdea, normalizeTitleKey, hasStaleCurrentYear, isHistoricalYear 
 import { recommendationGuidance, structuredOutputContract } from '../prompt-guidance'
 import { buildPrompt, completeSiteScanIdeas, type RawIdeaGen } from '../site-scan'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
+import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
+import { ExistingCorpus } from '../dedupe'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -157,6 +159,43 @@ async function main() {
       check('completion drops empty title', r.rejects.empty_title === 1)
       check('no application-side fallback templates injected', r.validIdeas.filter((g) => /טעויות נפוצות וטיפים/.test(g.title || '')).length === 0)
     }
+  }
+
+  console.log('H) cross-run dedup — pending suggestions in the avoid corpus + prompt list')
+  {
+    const corpus = new ExistingCorpus()
+    // Existing site content (unchanged behavior).
+    corpus.add('איך לאחסן בשמים בבית')
+    const existingTitles: string[] = ['איך לאחסן בשמים בבית']
+
+    // First-run PENDING cards the second run must avoid.
+    const pending: PendingRow[] = [
+      { title: 'איך לגרום לבושם להחזיק מעמד לאורך זמן?', primary_keyword: 'עמידות בושם' },
+      { title: 'מה זה בושם נישה? ההבדלים המהותיים בינו לבין בושם מעצבים', primary_keyword: 'בושם נישה מול מעצבים' },
+    ]
+    const before = pending.map((p) => p.title)
+    const added = absorbPendingIntoAvoid(pending, corpus, existingTitles)
+    check('all pending titles added to the avoid list', added === 2)
+    check('pending titles pushed into existingTitles (Gemini avoid)', existingTitles.includes(pending[0].title) && existingTitles.includes(pending[1].title))
+    check('pending title stored BYTE-IDENTICAL (no Hebrew mutation)', existingTitles[existingTitles.length - 1] === before[1])
+
+    // F.6/F.7: exact normalized pending title + keyword are duplicates now.
+    check('exact pending title is a duplicate', corpus.isDuplicate('איך לגרום לבושם להחזיק מעמד לאורך זמן?'))
+    check('exact pending primary keyword is a duplicate', corpus.isDuplicate('עמידות בושם'))
+    // High token-overlap near-dup of a pending title is caught by the EXISTING jaccard.
+    check('high-overlap near-dup of a pending title is caught', corpus.isDuplicate('איך לגרום לבושם להחזיק מעמד לאורך זמן'))
+    // F.8: existing-content dedup still works (article near-dup blocked).
+    check('existing article near-dup still blocked (unchanged)', corpus.isDuplicate('איך לאחסן בשמים בבית בקלות בקלות'.replace('בקלות בקלות', '')))
+    // F.9: a genuinely NEW distinct topic is NOT blocked (second run can add it).
+    check('distinct new topic survives (not a duplicate)', !corpus.isDuplicate('השוואת תווי ראש בין וניל למוסק בבשמים'))
+    check('pending keyword null is tolerated', absorbPendingIntoAvoid([{ title: 'נושא חדש לגמרי על אוד', primary_keyword: null }], corpus, existingTitles) === 1)
+
+    // The prompt itself instructs the model NOT to paraphrase the avoid list.
+    const g = recommendationGuidance('Hebrew', YEAR, 20)
+    void g
+    const kwPromptHasAvoid = buildPrompt('Hebrew', 'ctx', 'digest', [], 20, [pending[0].title])
+      .includes('do NOT repeat or paraphrase')
+    check('prompt tells the model not to paraphrase pending/existing titles', kwPromptHasAvoid)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

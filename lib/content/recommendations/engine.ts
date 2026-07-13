@@ -18,6 +18,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
+import { absorbPendingIntoAvoid, type PendingRow } from './pending-avoid'
 import { generateRecommendationJSON } from './model'
 import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
 import { validateIdea } from './validate'
@@ -323,6 +324,20 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     corpus.add(a.title); corpus.add(a.slug)
     if (a.title) existingTitles.push(a.title)
   }
+  // Phase (PR #23) — CROSS-RUN dedup: the project's currently PENDING recommendation
+  // cards must also be in the avoid corpus + the Gemini avoid list, so a second
+  // "find more" click does not re-propose (or near-duplicate) the first run's ideas.
+  // Reuses ExistingCorpus (exact + the existing jaccard near-dup) — no new fuzzy
+  // rules, no schema change. Table is optional (pre-migration → skipped).
+  let pendingAvoidCount = 0
+  try {
+    const { data: pendingRows } = await admin
+      .from('content_topic_ideas')
+      .select('title, primary_keyword')
+      .eq('project_id', input.projectId)
+      .eq('status', 'pending')
+    pendingAvoidCount = absorbPendingIntoAvoid((pendingRows ?? []) as PendingRow[], corpus, existingTitles)
+  } catch { /* content_topic_ideas optional (migration not applied) → skip */ }
 
   // 3) Internal-link candidates (for "suggested internal links" enrichment).
   let linkCandidates: { url: string; title: string; keyword: string | null; historicalAnchors: string[] }[] = []
@@ -395,7 +410,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects } : undefined }
+    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount } : undefined }
   } else if (input.source === 'project_data') {
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
@@ -414,7 +429,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       corpus, existingTitles, TARGET_NEW,
     )
     suggestions = acc
-    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects } : undefined }
+    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount } : undefined }
   } else if (input.source === 'site_scan') {
     // From the CACHED site scan — content-gap ideas, then dedupe. Never rescans.
     // Phase 3H.4 — pass rotation memory: existing titles + PENDING idea titles/
@@ -483,6 +498,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         generated_count: d.generatedCount ?? res.meta.generated,
         valid_count: d.validCount ?? res.meta.generated,
         already_existing_count: dupes,
+        already_pending_in_avoid_count: pendingAvoidCount,
         newly_saved_count: suggestions.length,
         shortfall_count: d.shortfall ?? 0,
       } : undefined,
