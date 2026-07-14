@@ -333,8 +333,11 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         setMessage({ text: e.wpAlreadyExported, ok: false })
         return
       }
+      // Part 2 — prefer the route's typed, safe Hebrew message (never a generic
+      // browser 500). Fall back to the local reason map for legacy reasons.
       const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
-      setMessage({ text: (e.wpErrors as Record<string, string>)[reason] || e.wpFailed, ok: false })
+      const typedMessage = typeof data.message === 'string' && data.message.trim() ? data.message : null
+      setMessage({ text: typedMessage || (e.wpErrors as Record<string, string>)[reason] || e.wpFailed, ok: false })
     } catch {
       setMessage({ text: e.wpFailed, ok: false })
     } finally {

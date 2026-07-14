@@ -16,87 +16,150 @@
  * decrypted server-side and never logged or returned.
  */
 
+import { randomUUID } from 'crypto'
 import { authContentProject, isContentModuleEnabled, loadWordPressCredentials } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { writeVerifiedSeoMeta, WordPressClientError, type WordPressPostStatus } from '@/lib/wordpress/client'
+import { writeVerifiedSeoMeta, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
+import { classifyWordPressError, hebrewMessageFor, httpStatusFor, safeRemoteDiagnostics, type WpFailureStage, type WpPublishErrorCode } from '@/lib/content/wordpress-error'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
   const { id } = await params
 
-  let body: { status?: string; force?: boolean; update?: boolean }
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
-  // Explicit status only; reject anything else server-side. Default is the safe 'draft'.
-  const raw = body.status === undefined ? 'draft' : body.status
-  if (raw !== 'draft' && raw !== 'publish') {
-    return Response.json({ error: 'invalid_status', reason: 'invalid_status' }, { status: 400 })
-  }
-  const status: WordPressPostStatus = raw
-  const force = body.force === true
-  const wantUpdate = body.update === true
+  // Part 2 — every failure carries a correlation id and a typed, safe Hebrew
+  // message. Nothing below logs or returns credentials, headers, cookies, tokens,
+  // full article HTML or raw remote bodies.
+  const diagnosticId = randomUUID()
+  const startedAt = Date.now()
+  let stage: WpFailureStage = 'article_load'
+  let projectId: string | null = null
+  let connId: string | number | null = null
+  let remoteHost: string | null = null
+  let postStatusForLog: string | null = null
+  let categoryIdForLog: number | null = null
+  let featuredMediaForLog: number | null = null
+  let payloadByteLength = 0
 
-  const admin = createAdminClient()
-  const { data: article, error } = await admin
-    .from('generated_articles')
-    .select('id, project_id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, status, featured_image_url, featured_image_storage_path, wp_post_id, wp_post_url, wp_featured_media_id, wp_primary_category_id, wp_category_ids, wp_tag_ids')
-    .eq('id', id)
-    .maybeSingle()
-  if (error) {
-    if ((error as { code?: string }).code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
-    return Response.json({ error: 'Failed to load article' }, { status: 500 })
-  }
-  if (!article) return Response.json({ error: 'Article not found' }, { status: 404 })
-
-  const a = article as Record<string, unknown>
-  const auth = await authContentProject(a.project_id as string)
-  if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
-
-  // Duplicate protection. Once exported (wp_post_id present) a plain re-export is
-  // ambiguous, so require an explicit intent:
-  //   - update:true → UPDATE the same post in place (idempotent; no new post),
-  //   - force:true  → create a NEW separate post (legacy escape hatch),
-  //   - neither     → 409 already_exported (unchanged).
-  if (a.wp_post_id && !force && !wantUpdate) {
+  /** Structured server log + typed, safe response for a publish failure. */
+  const fail = (
+    code: WpPublishErrorCode,
+    opts?: { stage?: WpFailureStage; meta?: WordPressErrorMeta; httpStatus?: number },
+  ): Response => {
+    const st = opts?.stage ?? stage
+    const diag = safeRemoteDiagnostics(opts?.meta)
+    console.error('[content-wp-export] publish failed', {
+      diagnosticId,
+      articleId: id,
+      projectId,
+      connectionId: connId,
+      remoteHost,
+      endpointPath: st === 'media_upload' ? '/wp-json/wp/v2/media' : '/wp-json/wp/v2/posts',
+      failureStage: st,
+      localErrorType: code,
+      ...diag,
+      payloadByteLength,
+      durationMs: Date.now() - startedAt,
+      postStatus: postStatusForLog,
+      categoryId: categoryIdForLog,
+      authorId: null,
+      featuredMediaId: featuredMediaForLog,
+    })
     return Response.json(
-      { error: 'already_exported', reason: 'already_exported', wp_post_id: a.wp_post_id, wp_post_url: a.wp_post_url ?? null },
-      { status: 409 },
+      { ok: false, error: code, reason: code, message: hebrewMessageFor(code, diagnosticId), diagnosticId },
+      { status: opts?.httpStatus ?? httpStatusFor(code) },
     )
   }
-  // Update-in-place applies only when a post already exists and force wasn't asked.
-  const existing = a.wp_post_id && !force
-    ? { postId: Number(a.wp_post_id), featuredMediaId: typeof a.wp_featured_media_id === 'number' ? (a.wp_featured_media_id as number) : null }
-    : undefined
 
-  // WordPress connection (decrypted server-side).
-  const loaded = await loadWordPressCredentials(auth.admin, auth.project.id)
-  if ('error' in loaded) {
-    const reason = loaded.status === 404 ? 'no_wordpress_connection' : 'wordpress_connection_error'
-    return Response.json({ error: reason, reason }, { status: loaded.status === 404 ? 400 : loaded.status })
-  }
-  const connId = loaded.connection.id
-  const title = String(a.title || 'article')
-  const logBase = { articleId: id, projectId: auth.project.id, connId, status }
-
-  // Featured image + inline images + taxonomy + createPost/updatePost via the
-  // shared WordPress core (same behavior: publish blocks on image-upload failure;
-  // draft proceeds with a warning; taxonomy is a safe SET that never fails the
-  // post). `existing` → update the same post in place (idempotent re-export).
-  const created = await wpCreatePost(auth.admin, loaded.creds, a as never, { status, existing })
-  if (!created.ok) {
-    if (created.kind === 'media_upload_failed') {
-      console.warn('[content-wp-export] media upload failed', { ...logBase, step: 'media_upload' })
-      return Response.json({ error: 'wordpress_media_upload_failed', reason: 'wordpress_media_upload_failed', ...(created.detail ? { detail: created.detail } : {}) }, { status: 502 })
+  try {
+    let body: { status?: string; force?: boolean; update?: boolean }
+    try {
+      body = await request.json()
+    } catch {
+      body = {}
     }
-    console.log('[content-wp-export] post create failed', { ...logBase, step: 'post_create' })
-    return Response.json({ error: 'wordpress_post_failed', reason: 'wordpress_post_failed', ...(created.detail ? { detail: created.detail } : {}) }, { status: 502 })
-  }
-  const featuredMedia = created.featuredMediaId ?? undefined
+    // Explicit status only; reject anything else server-side. Default is the safe 'draft'.
+    const raw = body.status === undefined ? 'draft' : body.status
+    if (raw !== 'draft' && raw !== 'publish') {
+      return Response.json({ error: 'invalid_status', reason: 'invalid_status' }, { status: 400 })
+    }
+    const status: WordPressPostStatus = raw
+    const force = body.force === true
+    const wantUpdate = body.update === true
+    postStatusForLog = status
+
+    const admin = createAdminClient()
+    stage = 'article_load'
+    const { data: article, error } = await admin
+      .from('generated_articles')
+      .select('id, project_id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, status, featured_image_url, featured_image_storage_path, wp_post_id, wp_post_url, wp_featured_media_id, wp_primary_category_id, wp_category_ids, wp_tag_ids')
+      .eq('id', id)
+      .maybeSingle()
+    if (error) {
+      if ((error as { code?: string }).code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
+      return fail('unexpected_publish_error', { stage: 'article_load' })
+    }
+    if (!article) return Response.json({ error: 'Article not found' }, { status: 404 })
+
+    const a = article as Record<string, unknown>
+    payloadByteLength = Buffer.byteLength(String(a.content_html || ''), 'utf8')
+    categoryIdForLog = typeof a.wp_primary_category_id === 'number' ? (a.wp_primary_category_id as number) : null
+    stage = 'project_load'
+    const auth = await authContentProject(a.project_id as string)
+    if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+    projectId = auth.project.id
+
+    // Duplicate protection. Once exported (wp_post_id present) a plain re-export is
+    // ambiguous, so require an explicit intent:
+    //   - update:true → UPDATE the same post in place (idempotent; no new post),
+    //   - force:true  → create a NEW separate post (legacy escape hatch),
+    //   - neither     → 409 already_exported (unchanged).
+    if (a.wp_post_id && !force && !wantUpdate) {
+      return Response.json(
+        { error: 'already_exported', reason: 'already_exported', wp_post_id: a.wp_post_id, wp_post_url: a.wp_post_url ?? null },
+        { status: 409 },
+      )
+    }
+    // Update-in-place applies only when a post already exists and force wasn't asked.
+    const existing = a.wp_post_id && !force
+      ? { postId: Number(a.wp_post_id), featuredMediaId: typeof a.wp_featured_media_id === 'number' ? (a.wp_featured_media_id as number) : null }
+      : undefined
+
+    // WordPress connection (decrypted server-side).
+    stage = 'connection_load'
+    const loaded = await loadWordPressCredentials(auth.admin, auth.project.id)
+    if ('error' in loaded) {
+      if (loaded.status === 404) return fail('wordpress_connection_missing', { stage: 'connection_load' })
+      // loadWordPressCredentials returns status 500 for a credential DECRYPTION
+      // failure (never throws, never logs the secret) — surface it typed.
+      return fail('wordpress_credentials_decryption_failed', { stage: 'credential_decryption' })
+    }
+    const connIdLocal = loaded.connection.id
+    connId = connIdLocal
+    try { remoteHost = new URL(loaded.creds.siteUrl).hostname } catch { remoteHost = null }
+    const title = String(a.title || 'article')
+    const logBase = { articleId: id, projectId: auth.project.id, connId: connIdLocal, status }
+
+    // Featured image + inline images + taxonomy + createPost/updatePost via the
+    // shared WordPress core (same behavior: publish blocks on image-upload failure;
+    // draft proceeds with a warning; taxonomy is a safe SET that never fails the
+    // post). `existing` → update the same post in place (idempotent re-export).
+    stage = 'post_creation'
+    const created = await wpCreatePost(auth.admin, loaded.creds, a as never, { status, existing })
+    if (!created.ok) {
+      // Preserve the safe upstream signal (remote status / WP code / response
+      // format / timeout) instead of flattening every failure to one code.
+      const createdStage: WpFailureStage = created.stage === 'media_upload' ? 'media_upload'
+        : created.stage === 'taxonomy_resolution' ? 'taxonomy_resolution'
+        : created.stage === 'inline_image_reconciliation' ? 'inline_image_reconciliation'
+        : 'post_creation'
+      const synthetic = new WordPressClientError(created.detail || 'wordpress publish failed', created.wpErrorMeta || {})
+      const code = classifyWordPressError(synthetic, { stage: createdStage, meta: created.wpErrorMeta })
+      return fail(code, { stage: createdStage, meta: created.wpErrorMeta })
+    }
+    const featuredMedia = created.featuredMediaId ?? undefined
+    featuredMediaForLog = created.featuredMediaId ?? null
 
   // Phase 4E — SEO meta: detect the site's SEO plugin and write ONLY its keys,
   // then verify. Never fatal to the post; the exact status is surfaced so the UI
@@ -139,6 +202,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   if (typeof featuredMedia === 'number') update.wp_featured_media_id = featuredMedia
   if (status === 'publish') { update.status = 'published'; update.published_at = new Date().toISOString() }
+  stage = 'local_status_update'
   await auth.admin.from('generated_articles').update(update).eq('id', id)
 
   // Phase 3G.4 — when an article that ORIGINATED from a queue item is PUBLISHED here,
@@ -194,4 +258,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     keywordAdded,
     keyword: keywordAddedText,
   })
+  } catch {
+    // Top-level safe boundary — NO unexpected error becomes a bare Next.js 500.
+    // The message never carries the throw's text (which could embed upstream
+    // detail); only a stable code + safe Hebrew + the correlation id.
+    return fail('unexpected_publish_error', { stage: 'unexpected' })
+  }
 }

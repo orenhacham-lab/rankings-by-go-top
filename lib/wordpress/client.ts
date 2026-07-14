@@ -35,11 +35,96 @@ import { seoPluginFromNamespaces, seoMetaKeys, verifySeoMeta, type SeoPlugin, ty
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_RESPONSE_BYTES = 2_000_000
 
+/**
+ * Structured, SECRET-FREE diagnostic metadata attached to a WordPressClientError
+ * so the publish route can map a failure to a typed code + a safe Hebrew message
+ * WITHOUT parsing English message text. Populated only with data that is always
+ * safe to log/relay: remote HTTP status, WordPress REST error code, the response
+ * Content-Type, a coarse response-format sniff, a bounded/sanitized upstream
+ * message, the response body LENGTH (never its content), and a timeout flag.
+ * Never carries credentials, headers, cookies, tokens or raw remote HTML/body.
+ */
+export interface WordPressErrorMeta {
+  /** Remote HTTP status, when the failure came from an HTTP response. */
+  status?: number
+  /** The WordPress REST error `code` (e.g. rest_cannot_create), when JSON. */
+  wpCode?: string
+  /** The remote Content-Type header, when known. */
+  contentType?: string
+  /** Coarse response shape (never the body itself). */
+  responseFormat?: 'json' | 'html' | 'empty' | 'other'
+  /** Length of the remote body in chars (NEVER the body content). */
+  bodyLength?: number
+  /** A bounded, tag-stripped upstream message (safe to relay), when JSON. */
+  sanitizedMessage?: string
+  /** True when the failure was a request timeout / abort. */
+  timeout?: boolean
+}
+
 export class WordPressClientError extends Error {
-  constructor(message: string) {
+  readonly meta: WordPressErrorMeta
+  constructor(message: string, meta: WordPressErrorMeta = {}) {
     super(message)
     this.name = 'WordPressClientError'
+    this.meta = meta
   }
+}
+
+/** Coarse, secret-free response-shape sniff for diagnostics. */
+export function sniffResponseFormat(contentType: string | undefined, body: string | undefined): 'json' | 'html' | 'empty' | 'other' {
+  const b = (body || '').trim()
+  if (!b) return 'empty'
+  const ct = (contentType || '').toLowerCase()
+  if (ct.includes('application/json')) return 'json'
+  if (ct.includes('text/html') || ct.includes('application/xhtml') || /^<(?:!doctype|html|\?xml)/i.test(b)) return 'html'
+  try { JSON.parse(b); return 'json' } catch { /* not json */ }
+  if (/^<[a-z!?]/i.test(b)) return 'html'
+  return 'other'
+}
+
+/** Strip tags + collapse whitespace + bound length. Safe to relay/log. */
+function sanitizeUpstreamMessage(raw: unknown): string | undefined {
+  const s = typeof raw === 'string' ? raw : ''
+  const clean = s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!clean) return undefined
+  return clean.length > 200 ? `${clean.slice(0, 200)}…` : clean
+}
+
+/** Parse a WordPress REST error body ({code, message, data:{status}}) safely. */
+function parseWpRestError(body: string): { code?: string; message?: string } | null {
+  try {
+    const o = JSON.parse(body) as { code?: unknown; message?: unknown }
+    if (!o || typeof o !== 'object') return null
+    return {
+      code: typeof o.code === 'string' ? o.code.slice(0, 80) : undefined,
+      message: sanitizeUpstreamMessage(o.message),
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Build a diagnostic-rich error for a failed HTTP status (messages unchanged).
+ *  Exported for offline tests of the status/body → typed-meta mapping. */
+export function buildWordPressResponseError(status: number, contentType: string | undefined, body: string): WordPressClientError {
+  const format = sniffResponseFormat(contentType, body)
+  const wp = format === 'json' ? parseWpRestError(body) : null
+  const meta: WordPressErrorMeta = {
+    status,
+    contentType: contentType || undefined,
+    responseFormat: format,
+    bodyLength: body ? body.length : 0,
+    ...(wp?.code ? { wpCode: wp.code } : {}),
+    ...(wp?.message ? { sanitizedMessage: wp.message } : {}),
+  }
+  if (status === 401 || status === 403) return new WordPressClientError('Authentication failed. Check the username and Application Password.', meta)
+  if (status === 404) return new WordPressClientError('WordPress REST API not found at this URL. Is this a WordPress site?', meta)
+  return new WordPressClientError(`WordPress returned an error (HTTP ${status}).`, meta)
+}
+
+/** Meta for a 2xx body that failed to parse as JSON (HTML/non-JSON response). */
+function invalidJsonMeta(status: number, contentType: string | undefined, body: string): WordPressErrorMeta {
+  return { status, contentType: contentType || undefined, responseFormat: sniffResponseFormat(contentType, body), bodyLength: body ? body.length : 0 }
 }
 
 /**
@@ -184,7 +269,7 @@ function buildAuthHeader(creds: WordPressCredentials): string {
  * Low-level HTTPS GET with the SSRF connect-time guard, redirect rejection,
  * a hard timeout, and a response-size cap. Returns { status, body }.
  */
-function httpsGet(target: URL, authHeader?: string): Promise<{ status: number; body: string }> {
+function httpsGet(target: URL, authHeader?: string): Promise<{ status: number; body: string; contentType: string }> {
   return new Promise((resolve, reject) => {
     const req = https.request(
       {
@@ -209,11 +294,12 @@ function httpsGet(target: URL, authHeader?: string): Promise<{ status: number; b
       },
       (res: IncomingMessage) => {
         const status = res.statusCode ?? 0
+        const contentType = String(res.headers['content-type'] ?? '')
 
         // Reject redirects outright — a 3xx could bounce us to an internal host.
         if (status >= 300 && status < 400) {
           res.destroy()
-          reject(new WordPressClientError('Unexpected redirect from the site.'))
+          reject(new WordPressClientError('Unexpected redirect from the site.', { status }))
           return
         }
 
@@ -223,17 +309,17 @@ function httpsGet(target: URL, authHeader?: string): Promise<{ status: number; b
           size += chunk.length
           if (size > MAX_RESPONSE_BYTES) {
             req.destroy()
-            reject(new WordPressClientError('WordPress response was too large.'))
+            reject(new WordPressClientError('WordPress response was too large.', { status, contentType }))
             return
           }
           chunks.push(chunk)
         })
-        res.on('end', () => resolve({ status, body: Buffer.concat(chunks).toString('utf8') }))
+        res.on('end', () => resolve({ status, body: Buffer.concat(chunks).toString('utf8'), contentType }))
       }
     )
 
     req.on('timeout', () => {
-      req.destroy(new WordPressClientError('WordPress site did not respond in time.'))
+      req.destroy(new WordPressClientError('WordPress site did not respond in time.', { timeout: true }))
     })
     req.on('error', (err: Error) => {
       if (err instanceof WordPressClientError) return reject(err)
@@ -254,7 +340,7 @@ function httpsSend(
   authHeader: string,
   body: Buffer,
   extraHeaders: Record<string, string>
-): Promise<{ status: number; body: string }> {
+): Promise<{ status: number; body: string; contentType: string }> {
   return new Promise((resolve, reject) => {
     const req = https.request(
       {
@@ -276,9 +362,10 @@ function httpsSend(
       },
       (res: IncomingMessage) => {
         const status = res.statusCode ?? 0
+        const contentType = String(res.headers['content-type'] ?? '')
         if (status >= 300 && status < 400) {
           res.destroy()
-          reject(new WordPressClientError('Unexpected redirect from the site.'))
+          reject(new WordPressClientError('Unexpected redirect from the site.', { status }))
           return
         }
         const chunks: Buffer[] = []
@@ -287,15 +374,15 @@ function httpsSend(
           size += chunk.length
           if (size > MAX_RESPONSE_BYTES) {
             req.destroy()
-            reject(new WordPressClientError('WordPress response was too large.'))
+            reject(new WordPressClientError('WordPress response was too large.', { status, contentType }))
             return
           }
           chunks.push(chunk)
         })
-        res.on('end', () => resolve({ status, body: Buffer.concat(chunks).toString('utf8') }))
+        res.on('end', () => resolve({ status, body: Buffer.concat(chunks).toString('utf8'), contentType }))
       }
     )
-    req.on('timeout', () => { req.destroy(new WordPressClientError('WordPress site did not respond in time.')) })
+    req.on('timeout', () => { req.destroy(new WordPressClientError('WordPress site did not respond in time.', { timeout: true })) })
     req.on('error', (err: Error) => {
       if (err instanceof WordPressClientError) return reject(err)
       reject(new WordPressClientError('Could not reach the WordPress site. Check the URL.'))
@@ -305,10 +392,10 @@ function httpsSend(
   })
 }
 
-function assertOkStatus(status: number): void {
-  if (status === 401 || status === 403) throw new WordPressClientError('Authentication failed. Check the username and Application Password.')
-  if (status === 404) throw new WordPressClientError('WordPress REST API not found at this URL. Is this a WordPress site?')
-  if (status < 200 || status >= 300) throw new WordPressClientError(`WordPress returned an error (HTTP ${status}).`)
+function assertOkStatus(status: number, contentType?: string, body = ''): void {
+  // Messages are unchanged (other code branches still match on them); the
+  // structured meta is what the publish route maps to a typed error code.
+  if (status < 200 || status >= 300) throw buildWordPressResponseError(status, contentType, body)
 }
 
 /** Authenticated JSON POST to the WP REST API. */
@@ -316,12 +403,12 @@ async function wpPostJson<T>(creds: WordPressCredentials, path: string, payload:
   const origin = await assertSafeSiteUrl(creds.siteUrl)
   const target = new URL(`${origin}/wp-json/wp/v2${path}`)
   const body = Buffer.from(JSON.stringify(payload), 'utf8')
-  const { status, body: text } = await httpsSend(target, buildAuthHeader(creds), body, { 'Content-Type': 'application/json' })
-  assertOkStatus(status)
+  const { status, body: text, contentType } = await httpsSend(target, buildAuthHeader(creds), body, { 'Content-Type': 'application/json' })
+  assertOkStatus(status, contentType, text)
   try {
     return JSON.parse(text) as T
   } catch {
-    throw new WordPressClientError('WordPress returned an invalid response.')
+    throw new WordPressClientError('WordPress returned an invalid response.', invalidJsonMeta(status, contentType, text))
   }
 }
 
@@ -338,16 +425,16 @@ export async function uploadMedia(
   const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').slice(0, 100) || 'featured.png'
 
   const target = new URL(`${origin}/wp-json/wp/v2/media`)
-  const { status, body } = await httpsSend(target, buildAuthHeader(creds), file.data, {
+  const { status, body, contentType } = await httpsSend(target, buildAuthHeader(creds), file.data, {
     'Content-Type': file.mimeType,
     'Content-Disposition': `attachment; filename="${safeName}"`,
   })
-  assertOkStatus(status)
+  assertOkStatus(status, contentType, body)
   let media: { id?: number; source_url?: string }
   try {
     media = JSON.parse(body)
   } catch {
-    throw new WordPressClientError('WordPress returned an invalid media response.')
+    throw new WordPressClientError('WordPress returned an invalid media response.', invalidJsonMeta(status, contentType, body))
   }
   if (!media || typeof media.id !== 'number') throw new WordPressClientError('WordPress did not return a media id.')
 
@@ -500,26 +587,14 @@ async function wpGet<T>(creds: WordPressCredentials, path: string): Promise<T> {
   const origin = await assertSafeSiteUrl(creds.siteUrl)
   const target = new URL(`${origin}/wp-json/wp/v2${path}`)
 
-  const { status, body } = await httpsGet(target, buildAuthHeader(creds))
+  const { status, body, contentType } = await httpsGet(target, buildAuthHeader(creds))
 
-  if (status === 401 || status === 403) {
-    throw new WordPressClientError(
-      'Authentication failed. Check the username and Application Password.'
-    )
-  }
-  if (status === 404) {
-    throw new WordPressClientError(
-      'WordPress REST API not found at this URL. Is this a WordPress site?'
-    )
-  }
-  if (status < 200 || status >= 300) {
-    throw new WordPressClientError(`WordPress returned an error (HTTP ${status}).`)
-  }
+  assertOkStatus(status, contentType, body)
 
   try {
     return JSON.parse(body) as T
   } catch {
-    throw new WordPressClientError('WordPress returned an invalid response.')
+    throw new WordPressClientError('WordPress returned an invalid response.', invalidJsonMeta(status, contentType, body))
   }
 }
 
