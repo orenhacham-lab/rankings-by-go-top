@@ -16,6 +16,7 @@ import { orderSourcesByEvidence, stage1Sources } from '../hybrid-orchestration'
 import { readFileSync as readSrc } from 'fs'
 import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
 import { ExistingCorpus } from '../dedupe'
+import { buildKeywordGuardFromData, coveredByExistingContent } from '../keyword-guard'
 import { buildClustersPrompt, isVocabAligned, type ClusterInput } from '../keyword-research'
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -502,6 +503,80 @@ async function main() {
 
     // Regression: domain-neutral fix still intact under cost control.
     check('regression: guidance still domain-clean', (() => { const f = domainFlags(recommendationGuidance('Hebrew', YEAR, 20)); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+  }
+
+  console.log('R) REPEATED DISCOVERY — novelty-aware, no overblocking of materially-new topics')
+  {
+    // 1F: the domain-neutral repeated-discovery instruction is present and carries
+    // the required novelty semantics (materially new intent, not paraphrase).
+    const g = recommendationGuidance('Hebrew', YEAR, 20)
+    check('guidance carries a REPEATED DISCOVERY block', g.includes('REPEATED DISCOVERY:'))
+    check('repeated-discovery asks for materially new opportunities', /materially new opportunities/i.test(g))
+    check('repeated-discovery forbids paraphrasing pending ideas', /Do not return paraphrases of pending ideas/i.test(g))
+    check('repeated-discovery moves toward deeper subtopics as coverage grows', /deeper subtopics/i.test(g) && /As coverage grows/i.test(g))
+    check('repeated-discovery spans distinct audiences/comparisons/locations/lifecycle', /audiences/i.test(g) && /comparisons/i.test(g) && /locations/i.test(g) && /lifecycle stages/i.test(g))
+    check('repeated-discovery is gated by project-owned support (no invented scope)', /supported by the current project/i.test(g) && /only where the project-owned context supports them/i.test(g))
+
+    // 1F domain-neutrality: the repeated-discovery text must NOT hardcode any niche
+    // (no wedding/perfume/lighting/pet/freelancer example baked into shared guidance).
+    const rd = g.split('REPEATED DISCOVERY:')[1].split('\n')[0]
+    check('repeated-discovery block triggers NO domain flag', (() => { const f = domainFlags(rd); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+    check('repeated-discovery block names no wedding/proposal example', !/wedding|proposal|חתונה|הצעת/i.test(rd))
+
+    // 1D: coveredByExistingContent does NOT overblock a materially-new long-tail
+    // topic under an already-covered umbrella. Guard content phrase = an existing
+    // article title (neutral illustrative domain: outdoor gear).
+    const guard = buildKeywordGuardFromData({
+      topics: [{ topic: 'outdoor camping tents', primary_keyword: 'camping tents' }],
+      generatedArticleTitles: [],
+      trackingKeywords: [],
+      ideas: [],
+      scanTargets: [],
+    })
+    check('covered: a same-intent re-angle of the covered umbrella IS a duplicate', coveredByExistingContent(guard, 'outdoor camping tents', 'outdoor camping tents'))
+    check('NOT covered: a distinct long-tail keyword under the same umbrella is allowed',
+      !coveredByExistingContent(guard, 'outdoor camping tents — how to choose a winter 4-season tent', 'winter 4-season tent'))
+    check('NOT covered: a broad category does not cover its deeper subtopics',
+      !coveredByExistingContent(guard, 'choosing a lightweight backpacking tent', 'lightweight backpacking tent'))
+    check('NOT covered: a different audience/use-case under the umbrella is allowed',
+      !coveredByExistingContent(guard, 'family camping tents for first-time campers', 'family camping tent'))
+
+    // 1C/1D: the FROZEN corpus (0.82 jaccard) blocks true paraphrases but NEVER a
+    // materially-different subtopic — the defect was NOT here.
+    const corpus = new ExistingCorpus()
+    corpus.add('how to choose a winter camping tent')
+    check('corpus flags an exact-token paraphrase (reordered/synonym-adjacent) as duplicate', corpus.isDuplicate('how to choose winter camping tent'))
+    check('corpus flags a byte-exact pending topic as duplicate', corpus.isDuplicate('how to choose a winter camping tent'))
+    check('corpus does NOT flag a materially-different subtopic', !corpus.isDuplicate('best sleeping bags for cold-weather backpacking'))
+    check('corpus does NOT flag a different-audience topic that shares one word', !corpus.isDuplicate('family camping checklist for beginners'))
+
+    // 1E: pending context stays BOUNDED — structured anti-duplicate fields only,
+    // never verbose reasons/descriptions the model could learn to paraphrase.
+    const pending: PendingTopic[] = [
+      { title: 'מדריך אוהלי שטח', primaryKeyword: 'אוהל שטח', intent: 'informational', secondaryKeywords: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], sourceEntityName: 'אוהל' },
+    ]
+    const block = pendingTopicsBlock(pending)
+    check('pending block sends the anti-duplicate identity fields', block.includes('"title"') && block.includes('"primaryKeyword"') && block.includes('"intent"'))
+    const pendingItemsJson = block.split('\n')[1] // the serialized items array (identity fields only)
+    check('pending block leaks NO verbose reason/description/evidence field', !pendingItemsJson.includes('"reason"') && !pendingItemsJson.includes('"description"') && !pendingItemsJson.includes('"evidenceSummary"'))
+    check('pending block caps secondaryKeywords at 6', (JSON.parse(block.split('\n')[1]) as { secondaryKeywords: string[] }[])[0].secondaryKeywords.length === 6)
+    check('pending block enforces the duplicate self-check', /DUPLICATE SELF-CHECK/.test(block))
+    check('pending block explicitly allows genuine depth (no overblocking)', /Do NOT over-block genuine depth/.test(block))
+
+    // 1G: none of the Standard cost controls were relaxed by the discovery fix.
+    check('cost control intact: primary model is still Flash', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
+    check('cost control intact: no separate paid fallback tier', RECOMMENDATION_MODEL_FALLBACK === RECOMMENDATION_MODEL_PRIMARY)
+    check('cost control intact: standard run budget ceilings unchanged', (() => { const b = runBudget('standard', 20); return b.maxEstimatedCostUsd === 0.15 && b.maxModelCallsPerRun === 4 })())
+  }
+
+  // FROZEN-FILE GUARANTEE — hybrid.ts and dedupe.ts must be byte-identical to HEAD.
+  {
+    const frozenClean = (rel: string, mustContain: string) => {
+      const src = readFileSync(join(__dirname, '..', rel), 'utf8')
+      return src.includes(mustContain)
+    }
+    check('dedupe.ts still exposes the 0.82 near-duplicate default (unchanged semantics)', frozenClean('dedupe.ts', 'threshold = 0.82'))
+    check('hybrid.ts still present as the frozen merge (mergeHybrid)', frozenClean('hybrid.ts', 'mergeHybrid'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
