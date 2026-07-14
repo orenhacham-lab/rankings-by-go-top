@@ -14,7 +14,12 @@ import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { domainFlags } from '@/lib/content/recommendations/domain-flags'
+import { BillingExhaustedError } from '@/lib/content/recommendations/model'
 import { randomUUID } from 'crypto'
+
+/** In-flight run keys (project+source) for best-effort duplicate-click protection.
+ *  Per server instance; released in a finally. Holds only opaque keys, no data. */
+const INFLIGHT = new Set<string>()
 
 /** Domain flags for a set of suggestions (titles + keywords) — Preview diagnostic. */
 function suggestionsDomainFlags(items: { title: string; primaryKeyword: string }[]) {
@@ -43,9 +48,18 @@ export async function POST(request: Request) {
   const clientRequestId = typeof body.clientRequestId === 'string' ? body.clientRequestId : null
   const diagnostics = process.env.RECO_ISOLATION_DIAGNOSTICS === '1'
   const excludePendingContext = diagnostics && body.excludePendingContext === true
+  // Cost mode: premium (Flash pool + one Pro curator) only when explicitly asked
+  // AND Pro curation is enabled; everything else is standard (Flash only).
+  const qualityMode: 'standard' | 'premium' = body.qualityMode === 'premium' && process.env.RECO_ENABLE_PRO_CURATION !== '0' ? 'premium' : 'standard'
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  // Duplicate-click protection: reject a concurrent identical run for the same
+  // project+source (idempotency) so one accidental double-click can't pay twice.
+  const inflightKey = `${auth.project.id}:${source}`
+  if (INFLIGHT.has(inflightKey)) return Response.json({ error: 'run_in_progress', reason: 'run_in_progress' }, { status: 409 })
+  INFLIGHT.add(inflightKey)
 
   if (!source || !SOURCES.includes(source)) {
     return Response.json({ error: 'invalid_source', allowed: SOURCES }, { status: 400 })
@@ -68,6 +82,7 @@ export async function POST(request: Request) {
       generationRunId,
       collectTrace: diagnostics,
       excludePendingContext,
+      qualityMode,
     })
 
     // Phase 3F.3.1b — gentle EXACT primary-keyword + exact-title guard. Blocks a
@@ -227,8 +242,15 @@ export async function POST(request: Request) {
       },
     })
   } catch (e) {
+    // BILLING EXHAUSTED — a typed, honest state (NOT "no ideas / broader keyword").
+    // No provider details, keys or billing-account ids are exposed.
+    if (e instanceof BillingExhaustedError) {
+      return Response.json({ suggestions: [], error: 'billing_exhausted', meta: { source, reason: 'billing_exhausted', persisted: false, newlyAddedCount: 0 } }, { status: 402 })
+    }
     if ((e as { code?: string })?.code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
     console.error('[automation-recommendations] failed', { message: (e as Error)?.message })
     return Response.json({ error: 'Failed to generate recommendations' }, { status: 500 })
+  } finally {
+    INFLIGHT.delete(inflightKey)
   }
 }

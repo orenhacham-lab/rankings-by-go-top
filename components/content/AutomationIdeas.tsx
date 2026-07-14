@@ -216,6 +216,11 @@ export default function AutomationIdeas({
         // timeout / transient) must NOT read as "no ideas found".
         if (data?.error === 'keyword_required') {
           setMessage({ text: t.keywordPlaceholder, ok: false })
+        } else if (data?.error === 'billing_exhausted' || data?.meta?.reason === 'billing_exhausted') {
+          // HONEST billing state — never "try a broader keyword". No provider details.
+          setMessage({ text: 'יתרת Gemini API הסתיימה ולכן הסריקה לא בוצעה. יש להוסיף קרדיט בחשבון Google AI Studio ולנסות שוב.', ok: false })
+        } else if (data?.error === 'run_in_progress') {
+          // A duplicate click while a run is active — silently ignore.
         } else {
           setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error', newlyAdded: 0 })
         }

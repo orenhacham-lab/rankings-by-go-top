@@ -19,7 +19,8 @@ import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { absorbPendingIntoAvoid, type PendingRow } from './pending-avoid'
-import { generateRecommendationJSON } from './model'
+import { generateRecommendationJSON, outputBudgetFor, BillingExhaustedError } from './model'
+import { runBudget } from './reco-cost'
 import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
@@ -97,7 +98,9 @@ async function buildSiteVocabulary(admin: Admin, projectId: string, extras: stri
 }
 
 const TARGET_NEW = 15
-const MAX_ATTEMPTS = 4
+// Cost control: fewer generation rounds per source (was 4). Each round is a paid
+// model call; the global candidate budget + Flash generator keep cost bounded.
+const MAX_ATTEMPTS = 2
 const MAX_SUGGESTIONS = 30
 const BATCH_SIZE = 15
 
@@ -126,6 +129,12 @@ export interface GenerateInput {
    *  whether contaminated pending rows are the active feedback source). Never
    *  deletes rows; articles/generated/scan stay enabled. */
   excludePendingContext?: boolean
+  /** Cost mode: 'standard' = Flash only (default); 'premium' = Flash pool + one
+   *  Pro curator call. */
+  qualityMode?: 'standard' | 'premium'
+  /** Cost-aware Hybrid orchestration: the bounded raw-candidate quota this source
+   *  may generate (the global candidate budget divided across sources). */
+  sourceTargetOverride?: number
 }
 
 /** Raw idea shape returned by the Gemini prompts below. */
@@ -181,10 +190,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  * empty) from a transient failure (no client / thrown request / unparseable
  * output) so the caller can RETRY on failure instead of reporting "no ideas".
  */
-async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
-  // Centralized pinned Pro model (with explicit logged fallback); big token budget
-  // so a ~20-idea JSON response is never truncated mid-array.
-  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: 16384 })
+async function callGeminiIdeas(prompt: string, count: number): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
+  // Flash generator (cost-controlled); output budget proportional to the count so a
+  // small request never reserves the ceiling. Billing exhaustion throws (aborts).
+  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: outputBudgetFor(count) })
   if (!ok) return { ideas: [], ok: false, modelUsed }
   let parsed: { topics?: unknown }
   try {
@@ -406,6 +415,12 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     return true
   })
 
+  // Cost control — one request-level candidate budget (target + a small dedupe
+  // allowance), then a bounded per-source raw quota (from Hybrid or the budget).
+  const qualityMode = input.qualityMode === 'premium' ? 'premium' : 'standard'
+  const budget = runBudget(qualityMode, TARGET_NEW)
+  const srcTarget = Math.max(4, Math.min(input.sourceTargetOverride ?? TARGET_NEW, budget.maxRawCandidates))
+
   if (input.source === 'hybrid') {
     // Phase 4C — HYBRID orchestrator. Run every ELIGIBLE provider INDEPENDENTLY
     // (each is the existing single-source path, unchanged, and reuses its own
@@ -415,9 +430,17 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // 'keyword' provider is only eligible when a seed keyword was supplied.
     const eligible: RecommendationSource[] = ['site_scan', 'keyword_research_url', 'project_data']
     if ((input.keyword || '').trim()) eligible.unshift('keyword')
+    // COST-AWARE orchestration: each provider gets only a bounded slice of the
+    // global candidate budget (never the whole target), so total raw generation
+    // stays within target + ~30% instead of 3× over-generating. Providers run
+    // concurrently for latency; the budget cap — not fan-out — controls cost.
+    const perSourceTarget = Math.max(6, Math.ceil(budget.maxRawCandidates / eligible.length))
     const settled = await Promise.allSettled(
-      eligible.map((s) => generateRecommendations(admin, { ...input, source: s })),
+      eligible.map((s) => generateRecommendations(admin, { ...input, source: s, sourceTargetOverride: perSourceTarget, qualityMode })),
     )
+    // BILLING circuit breaker: a depleted-credit failure in ANY provider aborts the
+    // whole run (never continue with a partial paid result / another paid call).
+    for (const r of settled) if (r.status === 'rejected' && r.reason instanceof BillingExhaustedError) throw r.reason
     const runs = eligible.map((s, i) => {
       const r = settled[i]
       if (r.status === 'fulfilled') return { source: s, ok: true, reason: r.value.meta.reason, suggestions: r.value.suggestions }
@@ -446,18 +469,18 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const keyword = (input.keyword || '').trim()
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, BATCH_SIZE, avoid, pendingBlock, projectBlock))
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget)
         if (m) modelUsed = m
         return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok }
       },
-      corpus, existingTitles, TARGET_NEW,
+      corpus, existingTitles, srcTarget,
     )
     suggestions = acc
     meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'project_data') {
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(langLabel, BATCH_SIZE, avoid, pendingBlock, projectBlock))
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget)
         if (m) modelUsed = m
         const items = keepValid(ideas).map((g) => {
           const s = mapIdea(g, 'project_data', 0, modelUsed)
@@ -469,7 +492,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         }).filter((x): x is TopicSuggestion => !!x)
         return { items, ok }
       },
-      corpus, existingTitles, TARGET_NEW,
+      corpus, existingTitles, srcTarget,
     )
     suggestions = acc
     meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
@@ -506,6 +529,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const res = await recommendFromSiteScan(admin, {
       projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock, projectBlock,
       generationRunId: input.generationRunId, collectTrace: input.collectTrace, pendingContextCount: pendingTopics.length,
+      sourceTargetOverride: srcTarget,
     }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
@@ -578,6 +602,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       offerContext: scanSeeds,
       pendingBlock,
       projectBlock,
+      sourceTargetOverride: srcTarget,
     })
     const seenTitles = new Set<string>()
     let dupes = 0

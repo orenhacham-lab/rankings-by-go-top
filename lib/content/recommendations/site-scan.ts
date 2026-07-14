@@ -17,7 +17,7 @@ import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-conten
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
-import { generateRecommendationJSON } from './model'
+import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
 import { validateIdea } from './validate'
 import { domainFlags, fingerprint, type DomainFlags } from './domain-flags'
@@ -49,6 +49,8 @@ export interface SiteScanRecoInput {
   /** Diagnostic counts for the trace (pending context size + scan entity count). */
   pendingContextCount?: number
   scanEntityCount?: number
+  /** Cost-aware Hybrid orchestration: the bounded raw target for this source. */
+  sourceTargetOverride?: number
 }
 
 export type SiteScanReason = 'no_scan' | 'insufficient_data' | 'model_error' | 'model_empty'
@@ -257,8 +259,8 @@ export interface SiteScanModelCall {
  *  the prompt + response + parse/finish diagnostics. A truncated/unparseable
  *  response is reported as parseError with ZERO ideas — partial JSON is NEVER
  *  salvaged or partially persisted. */
-async function callModel(prompt: string): Promise<SiteScanModelCall> {
-  const r = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: 16384 })
+async function callModel(prompt: string, count = 20): Promise<SiteScanModelCall> {
+  const r = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: outputBudgetFor(count) })
   const base = { prompt, responseText: r.text, modelUsed: r.modelUsed, finishReason: r.finishReason, truncated: r.truncated, promptTokenCount: r.promptTokenCount, candidatesTokenCount: r.candidatesTokenCount, totalTokenCount: r.totalTokenCount }
   if (!r.ok) return { ...base, ideas: [], ok: false, parseError: 'model_error' }
   const ideas = extractIdeas(r.text)
@@ -437,16 +439,19 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   // built ONLY from this run's project context. Truncated/unparseable responses are
   // discarded and retried once (rebuilt from scope). NO deterministic fallback.
   const year = currentYear()
+  // Cost cap: never request more than this source's bounded quota.
+  const target = Math.max(4, Math.min(MAX_SITE_SCAN_IDEAS, input.sourceTargetOverride ?? MAX_SITE_SCAN_IDEAS))
   const scope: RunScope = { generationRunId: input.generationRunId ?? 'no-run-id', requestedProjectId: input.projectId, source: 'site_scan' }
   const pendingBlock = input.pendingBlock ?? ''
   const { validIdeas, rawCount, ok, modelUsed, retryUsed, rejects, shortfall, trace } = await completeSiteScanIdeas(
-    MAX_SITE_SCAN_IDEAS, input.avoidTitles ?? [], year,
+    target, input.avoidTitles ?? [], year,
     {
       scope,
       // The prompt is rebuilt for EACH call from THIS run's closure (digest,
       // businessCtx, pendingBlock, projectBlock, langLabel) — never from a prior
-      // response or module state. The parse-failure retry uses COMPACT mode.
-      runCall: (need, avoid, purpose) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, pendingBlock, input.projectBlock ?? '', purpose === 'retry_after_parse_failure')),
+      // response or module state. The parse-failure retry uses COMPACT mode. Output
+      // token budget is proportional to the remaining `need`.
+      runCall: (need, avoid, purpose) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, pendingBlock, input.projectBlock ?? '', purpose === 'retry_after_parse_failure'), need),
       collectTrace: !!input.collectTrace,
       traceContext: {
         pendingContextFingerprint: fingerprint(pendingBlock),

@@ -9,7 +9,8 @@ import { validateIdea, normalizeTitleKey, hasStaleCurrentYear, isHistoricalYear 
 import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from '../prompt-guidance'
 import { buildPrompt, completeSiteScanIdeas, type SiteScanModelCall, type RunScope } from '../site-scan'
 import { domainFlags, isCrossDomain, fingerprint } from '../domain-flags'
-import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
+import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_CURATOR, RECOMMENDATION_MODEL_VERSION, classifyModelError, BillingExhaustedError, outputBudgetFor } from '../model'
+import { estimateCallCostUsd, summarizeRunCost, runBudget, hasBudgetHeadroom, type CallUsage } from '../reco-cost'
 import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
 import { ExistingCorpus } from '../dedupe'
 import { buildClustersPrompt, isVocabAligned, type ClusterInput } from '../keyword-research'
@@ -105,7 +106,7 @@ async function main() {
 
   console.log('F) centralized pinned model config (no scattered strings, not flash-lite)')
   {
-    check('primary is a pinned Pro id', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-pro')
+    check('primary is the pinned Flash generator', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
     check('fallback is NOT flash-lite', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-flash-lite' && /flash|pro/.test(RECOMMENDATION_MODEL_FALLBACK))
     check('version tag present', typeof RECOMMENDATION_MODEL_VERSION === 'string' && RECOMMENDATION_MODEL_VERSION.length > 0)
   }
@@ -380,9 +381,61 @@ async function main() {
     const engineSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/engine.ts'), 'utf8')
     const siteSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/site-scan.ts'), 'utf8')
     const krSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/keyword-research.ts'), 'utf8')
-    check('engine reco call uses maxOutputTokens 16384', /maxOutputTokens: 16384/.test(engineSrc) && !/maxOutputTokens: 8192/.test(engineSrc))
-    check('site-scan reco call uses maxOutputTokens 16384', /maxOutputTokens: 16384/.test(siteSrc) && !/maxOutputTokens: 8192/.test(siteSrc))
-    check('keyword-research reco call uses maxOutputTokens 16384', /maxOutputTokens: 16384/.test(krSrc) && !/maxOutputTokens: 8192/.test(krSrc))
+    // Output budget is now PROPORTIONAL (outputBudgetFor) — no flat 8192/16384.
+    check('engine reco call uses proportional outputBudgetFor', /outputBudgetFor\(/.test(engineSrc) && !/maxOutputTokens: 16384|maxOutputTokens: 8192/.test(engineSrc))
+    check('site-scan reco call uses proportional outputBudgetFor', /outputBudgetFor\(/.test(siteSrc) && !/maxOutputTokens: 16384|maxOutputTokens: 8192/.test(siteSrc))
+    check('keyword-research reco call uses proportional outputBudgetFor', /outputBudgetFor\(/.test(krSrc) && !/maxOutputTokens: 16384|maxOutputTokens: 8192/.test(krSrc))
+  }
+
+  console.log('P) cost control — Flash default, Pro curator, billing breaker, budgets')
+  {
+    // M.1/M.2/M.3/M.4: routing — Flash generator, Pro curator (optional, ≤1).
+    check('default generation model is Gemini 2.5 Flash (not Pro/Flash-Lite)', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
+    check('transient fallback is NOT flash-lite', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-flash-lite')
+    check('optional curator is Gemini 2.5 Pro', RECOMMENDATION_MODEL_CURATOR === 'gemini-2.5-pro')
+    check('version tag reflects flash default', /flash/.test(RECOMMENDATION_MODEL_VERSION))
+
+    // M.9/M.10: billing-exhausted classification + typed error (hard abort).
+    check('billing message → billing_exhausted', classifyModelError('429 Your prepayment credits are depleted') === 'billing_exhausted')
+    check('payment-required → billing_exhausted', classifyModelError('402 payment required') === 'billing_exhausted')
+    check('plain 429 rate-limit → rate_limited (not billing)', classifyModelError('429 Too Many Requests: rate limit') === 'rate_limited')
+    check('other error → model_unavailable', classifyModelError('500 internal error') === 'model_unavailable')
+    const be = new BillingExhaustedError()
+    check('BillingExhaustedError is typed + instanceof', be instanceof BillingExhaustedError && be.category === 'billing_exhausted')
+
+    // F: proportional token budget (not a flat ceiling for a few ideas).
+    check('output budget scales with count', outputBudgetFor(4) < outputBudgetFor(20))
+    check('output budget for a few ideas is well under the ceiling', outputBudgetFor(4) < 8192)
+    check('output budget never exceeds 16384 ceiling', outputBudgetFor(200) === 16384)
+    check('output budget has a floor', outputBudgetFor(1) >= 2048)
+
+    // C: global candidate budget — a target of 20 does NOT allow 50 raw.
+    const b = runBudget('standard', 20)
+    check('maxRawCandidates ≈ target + ~30% (not 2-3×)', b.maxRawCandidates >= 24 && b.maxRawCandidates <= 27, `got ${b.maxRawCandidates}`)
+    check('standard cost ceiling default $0.15', b.maxEstimatedCostUsd === 0.15)
+    check('standard max model calls default 4', b.maxModelCallsPerRun === 4)
+    const bp = runBudget('premium', 20)
+    check('premium cost ceiling default $0.50', bp.maxEstimatedCostUsd === 0.50)
+
+    // I: usage → cost estimate + cost per persisted idea + circuit-breaker headroom.
+    const usage: CallUsage[] = [
+      { model: 'gemini-2.5-flash', source: 'site_scan', callPurpose: 'primary', inputTokens: 3000, outputTokens: 4000, success: true },
+      { model: 'gemini-2.5-flash', source: 'project_data', callPurpose: 'primary', inputTokens: 2500, outputTokens: 3000, success: true },
+    ]
+    check('Flash call cheaper than the equivalent Pro call', estimateCallCostUsd({ model: 'gemini-2.5-flash', inputTokens: 3000, outputTokens: 4000 }) < estimateCallCostUsd({ model: 'gemini-2.5-pro', inputTokens: 3000, outputTokens: 4000 }))
+    const summary = summarizeRunCost(usage)
+    check('run cost summary aggregates calls + tokens', summary.modelCalls === 2 && summary.totalOutputTokens === 7000 && summary.estimatedRunCostUsd > 0)
+    check('run cost has an ILS figure', summary.estimatedRunCostIls > 0)
+    const persisted = 30
+    const costPerIdea = summary.estimatedRunCostUsd / persisted
+    check('cost-per-persisted-idea computable', costPerIdea > 0 && costPerIdea < summary.estimatedRunCostUsd)
+    // J: circuit breaker stops when the call/cost ceiling is reached.
+    check('headroom true under the ceiling', hasBudgetHeadroom(summary, b))
+    check('headroom false at the call ceiling', !hasBudgetHeadroom({ ...summary, modelCalls: 4 }, b))
+    check('headroom false over the cost ceiling', !hasBudgetHeadroom({ ...summary, estimatedRunCostUsd: 0.20 }, b))
+
+    // M.19/M.20: the domain-neutral fix is INTACT (no cost change reintroduced perfume).
+    check('regression: guidance still domain-clean', (() => { const f = domainFlags(recommendationGuidance('Hebrew', YEAR, 20)); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

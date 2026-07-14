@@ -12,7 +12,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { generateRecommendationJSON } from './model'
+import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { recommendationGuidance } from './prompt-guidance'
 import { generateKeywordIdeas, type KeywordIdeaResult } from '@/lib/google-ads/keyword-ideas'
 import { GoogleAdsError } from '@/lib/google-ads/client'
@@ -183,6 +183,8 @@ export interface KeywordResearchInput {
   pendingBlock?: string
   /** Authoritative project-owned context block (the ONLY business-domain source). */
   projectBlock?: string
+  /** Cost-aware Hybrid orchestration: bounded max clusters to turn into topics. */
+  sourceTargetOverride?: number
 }
 
 export interface ClusterInput {
@@ -320,7 +322,7 @@ export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | '
 
 export async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = ''): Promise<ClustersToTopicsResult> {
   const prompt = buildClustersPrompt(clusters, language, businessCtx, offerContext, pendingBlock, projectBlock)
-  const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: 16384 })
+  const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: outputBudgetFor(clusters.length) })
   if (!ok) return { topics: [], rejected: [], ok: false }
   let parsed: { topics?: unknown; rejected?: unknown }
   try {
@@ -476,7 +478,7 @@ export async function recommendFromKeywordResearch(
 
   // 4) Take the next batch (highest-volume unused first). Attach light related
   // keywords as secondary context WITHOUT removing them from the inventory.
-  const batch = candidates.slice(0, TOPICS_PER_RUN)
+  const batch = candidates.slice(0, Math.max(4, Math.min(TOPICS_PER_RUN, input.sourceTargetOverride ?? TOPICS_PER_RUN)))
   const clusterInputs: ClusterInput[] = batch.map((c) => ({
     primaryKeyword: c.keyword,
     secondaryKeywords: relatedKeywords(c.keyword, cleaned, 4),
