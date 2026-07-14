@@ -19,8 +19,11 @@ import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { absorbPendingIntoAvoid, type PendingRow } from './pending-avoid'
-import { generateRecommendationJSON } from './model'
-import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, type PendingTopic } from './prompt-guidance'
+import { generateRecommendationJSON, outputBudgetFor, BillingExhaustedError, RecommendationModelUnavailableError, RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from './model'
+import { runBudget } from './reco-cost'
+import { RunCostController, newRunCostController } from './run-cost-controller'
+import { orderSourcesByEvidence, stage1Sources } from './hybrid-orchestration'
+import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
@@ -97,7 +100,9 @@ async function buildSiteVocabulary(admin: Admin, projectId: string, extras: stri
 }
 
 const TARGET_NEW = 15
-const MAX_ATTEMPTS = 4
+// Cost control: fewer generation rounds per source (was 4). Each round is a paid
+// model call; the global candidate budget + Flash generator keep cost bounded.
+const MAX_ATTEMPTS = 2
 const MAX_SUGGESTIONS = 30
 const BATCH_SIZE = 15
 
@@ -118,6 +123,24 @@ export interface GenerateInput {
   /** Phase 3F.3.1c — normalized keywords to skip (keyword-research clusters), so
    *  "find more" surfaces fresh clusters instead of re-emitting known ones. */
   avoidKeywords?: string[]
+  /** Isolation diagnostics — immutable per-request run id (server-generated). */
+  generationRunId?: string
+  /** Preview-only: collect the per-call Site Scan trace (fingerprints + flags). */
+  collectTrace?: boolean
+  /** Preview-only: exclude PENDING ideas from the prompt AND the corpus (to test
+   *  whether contaminated pending rows are the active feedback source). Never
+   *  deletes rows; articles/generated/scan stay enabled. */
+  excludePendingContext?: boolean
+  /** Cost mode: 'standard' = Flash only (default); 'premium' = Flash pool + one
+   *  Pro curator call. */
+  qualityMode?: 'standard' | 'premium'
+  /** Cost-aware Hybrid orchestration: the bounded raw-candidate quota this source
+   *  may generate (the global candidate budget divided across sources). */
+  sourceTargetOverride?: number
+  /** The ONE request-local cost controller shared by every model call in this user
+   *  action (Hybrid passes it to each source so budgets/billing are enforced across
+   *  sources, not per source). Created at the top when absent. */
+  controller?: RunCostController
 }
 
 /** Raw idea shape returned by the Gemini prompts below. */
@@ -173,29 +196,36 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  * empty) from a transient failure (no client / thrown request / unparseable
  * output) so the caller can RETRY on failure instead of reporting "no ideas".
  */
-async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
-  // Centralized pinned Pro model (with explicit logged fallback); big token budget
-  // so a ~20-idea JSON response is never truncated mid-array.
-  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: 8192 })
-  if (!ok) return { ideas: [], ok: false, modelUsed }
+async function callGeminiIdeas(prompt: string, count: number, controller?: RunCostController, source = 'keyword', callPurpose = 'primary'): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null; retryable: boolean; errorType?: string }> {
+  // Flash generator (cost-controlled); output budget proportional to the count so a
+  // small request never reserves the ceiling. Billing exhaustion throws (aborts).
+  // The shared controller gates + records this call. thinkingBudget:0 (in the model
+  // adapter) keeps the whole budget for the JSON body — no thinking→empty response.
+  const res = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: outputBudgetFor(count) }, controller, { source, callPurpose, requestedIdeaCount: count })
+  // A NON-ok response carries an explicit typed reason + whether an identical retry
+  // could resolve it (Part 3): gemini_max_tokens_empty / safety / empty_text are
+  // NOT retryable, so the loop stops instead of repeating the same failing call.
+  if (!res.ok) return { ideas: [], ok: false, modelUsed: res.modelUsed, retryable: res.retryable ?? false, errorType: res.errorType }
+  const text = res.text
   let parsed: { topics?: unknown }
   try {
     parsed = JSON.parse(text)
   } catch {
     const m = text.match(/\{[\s\S]*\}/)
-    if (!m) return { ideas: [], ok: false, modelUsed } // unparseable → treat as transient, retry
-    try { parsed = JSON.parse(m[0]) } catch { return { ideas: [], ok: false, modelUsed } }
+    // Malformed/partial JSON from a real (non-empty) response → one retry may help.
+    if (!m) return { ideas: [], ok: false, modelUsed: res.modelUsed, retryable: true, errorType: 'parse_failure' }
+    try { parsed = JSON.parse(m[0]) } catch { return { ideas: [], ok: false, modelUsed: res.modelUsed, retryable: true, errorType: 'parse_failure' } }
   }
-  return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : [], ok: true, modelUsed }
+  return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : [], ok: true, modelUsed: res.modelUsed, retryable: false }
 }
 
 /** Expand a BROAD seed keyword into many distinct long-tail article ideas. */
-function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string, count: number, avoid: string[], pendingBlock = ''): string {
+function keywordSeedPrompt(seed: string, langLabel: string, count: number, avoid: string[], pendingBlock = '', projectBlock = ''): string {
   const year = currentYear()
   return [
     `You generate specific SEO article ideas for a website. Today's year is ${year}.`,
-    businessCtx ? `Website context: ${businessCtx}.` : '',
-    `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic. Give each idea a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own.`,
+    projectBlock,
+    `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic. Give each idea a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own. Stay within the project-owned business domain above.`,
     avoid.length ? `EXISTING titles (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
     pendingBlock,
     recommendationGuidance(langLabel, year, count),
@@ -204,11 +234,11 @@ function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string,
 }
 
 /** Gap-based ideas from existing project context (missing / adjacent / deeper). */
-function projectDataPrompt(project: ProjectRow, langLabel: string, count: number, avoid: string[], pendingBlock = ''): string {
+function projectDataPrompt(langLabel: string, count: number, avoid: string[], pendingBlock = '', projectBlock = ''): string {
   const year = currentYear()
   return [
     `You are an SEO content strategist finding CONTENT GAPS for a website. Today's year is ${year}.`,
-    `Business: ${project.business_name || '(unknown)'} — domain: ${project.target_domain || '(unknown)'}.`,
+    projectBlock,
     avoid.length ? `EXISTING titles the site ALREADY covers (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
     pendingBlock,
     recommendationGuidance(langLabel, year, count),
@@ -228,7 +258,7 @@ function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number, mod
     id: `${source}:${slugKey(title)}`,
     title,
     primaryKeyword,
-    secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : [],
+    secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()).slice(0, 4) : [],
     searchIntent: g.intent || g.searchIntent || 'informational',
     recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000,
     angle: g.angle || '',
@@ -255,11 +285,11 @@ function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number, mod
  *   - 'model_empty'    → the model succeeded but returned no ideas
  */
 async function accumulate(
-  genBatch: (avoid: string[]) => Promise<{ items: TopicSuggestion[]; ok: boolean }>,
+  genBatch: (avoid: string[]) => Promise<{ items: TopicSuggestion[]; ok: boolean; retryable?: boolean; errorType?: string }>,
   corpus: ExistingCorpus,
   existingTitles: string[],
   target: number,
-): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string }> {
+): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string; lastErrorType?: string }> {
   const acc: TopicSuggestion[] = []
   const seenTitles = new Set<string>()
   let raw = 0
@@ -267,13 +297,18 @@ async function accumulate(
   let attempts = 0
   let hadSuccess = false
   let hadError = false
+  let lastErrorType: string | undefined
   while (acc.length < target && attempts < MAX_ATTEMPTS) {
     attempts++
     const avoid = [...existingTitles, ...acc.map((a) => a.title)]
-    const { items, ok } = await genBatch(avoid)
+    const { items, ok, retryable, errorType } = await genBatch(avoid)
     if (!ok) {
-      // Transient failure — back off and retry (do NOT report "no ideas").
       hadError = true
+      lastErrorType = errorType ?? lastErrorType
+      // Part 3 — only a GENUINELY transient failure is retried. A non-retryable
+      // outcome (gemini_max_tokens_empty / safety / empty text) stops immediately;
+      // repeating the identical call would just reproduce it.
+      if (retryable === false) break
       await sleep(300 * attempts)
       continue
     }
@@ -296,7 +331,7 @@ async function accumulate(
       : raw > 0
         ? 'all_duplicates'
         : 'model_empty'
-  return { acc, raw, dupes, attempts, reason }
+  return { acc, raw, dupes, attempts, reason, lastErrorType }
 }
 
 export async function generateRecommendations(admin: Admin, input: GenerateInput): Promise<RecommendationResult> {
@@ -333,7 +368,10 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   // rules, no schema change. Table is optional (pre-migration → skipped).
   let pendingAvoidCount = 0
   const pendingTopics: PendingTopic[] = []
+  // Preview diagnostic: skip ALL pending context (prompt + corpus) to test whether
+  // contaminated pending rows are the active feedback loop. Rows are never deleted.
   try {
+    if (input.excludePendingContext) throw new Error('__skip_pending__')
     const { data: pendingRows } = await admin
       .from('content_topic_ideas')
       .select('title, primary_keyword, secondary_keywords, search_intent')
@@ -358,6 +396,19 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   const pendingBlock = pendingTopicsBlock(pendingTopics)
   const pendingWithSecondary = pendingTopics.filter((p) => (p.secondaryKeywords?.length ?? 0) > 0).length
 
+  // 2b) AUTHORITATIVE project-owned context block — the ONLY source of the business
+  // domain in every prompt. Multi-signal (name + domain + owned categories + existing
+  // topics), never the name alone. ownedCategories come from the project's own cached
+  // scan taxonomy; existingTopics from its own article topics. Prevents the shared
+  // (now domain-neutral) instructions from being mistaken for the business domain.
+  const ownedCategories = await deriveScanSeedConcepts(admin, input.projectId)
+  const focus = deriveProjectFocus({ projectName: project.business_name, domain: project.target_domain, ownedCategories, existingTopics: existingTitles })
+  const projectBlock = projectContextBlock({
+    projectName: project.business_name, domain: project.target_domain, language,
+    primaryProjectFocus: focus.primaryProjectFocus, secondaryProjectAreas: focus.secondaryProjectAreas,
+    ownedCategories, existingTopics: existingTitles.slice(0, 15),
+  })
+
   // 3) Internal-link candidates (for "suggested internal links" enrichment).
   let linkCandidates: { url: string; title: string; keyword: string | null; historicalAnchors: string[] }[] = []
   try {
@@ -374,6 +425,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   const validateSeen = new Set<string>()
   const rejects: Record<string, number> = {}
   let modelUsed: string | null = null
+  // Part 2 — the explicit typed model outcome for the last failed call (e.g.
+  // gemini_max_tokens_empty), surfaced in runtimeDiag for zero-result diagnosis.
+  let modelErrorType: string | undefined
   /** Apply the minimal safe validation to raw model ideas, counting rejects.
    *  Items that pass are returned UNCHANGED (byte-identical title/reason). */
   const keepValid = (ideas: GeminiIdea[]): GeminiIdea[] => ideas.filter((g) => {
@@ -382,58 +436,113 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     return true
   })
 
+  // Cost control — one request-level candidate budget (target + a small dedupe
+  // allowance), then a bounded per-source raw quota (from Hybrid or the budget).
+  const qualityMode = input.qualityMode === 'premium' ? 'premium' : 'standard'
+  const budget = runBudget(qualityMode, TARGET_NEW)
+  const srcTarget = Math.max(4, Math.min(input.sourceTargetOverride ?? TARGET_NEW, budget.maxRawCandidates))
+  // ONE shared controller for the whole user action (created at the top; passed
+  // down to every source so the call/cost/billing gates are enforced ACROSS sources).
+  const controller = input.controller ?? newRunCostController(qualityMode, input.generationRunId ?? 'no-run-id', TARGET_NEW)
+
   if (input.source === 'hybrid') {
-    // Phase 4C — HYBRID orchestrator. Run every ELIGIBLE provider INDEPENDENTLY
-    // (each is the existing single-source path, unchanged, and reuses its own
-    // caches — site-scan index, keyword-research cache — since they key by
-    // project). Failures are isolated via allSettled; one dead provider never
-    // stops the others. Then merge + cluster + rank + attach provenance. The
-    // 'keyword' provider is only eligible when a seed keyword was supplied.
-    const eligible: RecommendationSource[] = ['site_scan', 'keyword_research_url', 'project_data']
-    if ((input.keyword || '').trim()) eligible.unshift('keyword')
-    const settled = await Promise.allSettled(
-      eligible.map((s) => generateRecommendations(admin, { ...input, source: s })),
-    )
-    const runs = eligible.map((s, i) => {
-      const r = settled[i]
-      if (r.status === 'fulfilled') return { source: s, ok: true, reason: r.value.meta.reason, suggestions: r.value.suggestions }
-      console.error('[recommendations] hybrid provider failed', { source: s, message: String(r.reason).slice(0, 200) })
-      return { source: s, ok: false, reason: 'provider_error', suggestions: [] as TopicSuggestion[] }
-    })
+    // Phase 4C + cost control — STAGED orchestration (NOT one big concurrent
+    // fan-out). Sources are ordered by cheap deterministic evidence signals; Stage 1
+    // runs the two strongest concurrently, then we STOP as soon as the fresh target
+    // is met — later sources run only for the exact remaining count, within the
+    // shared call/cost budget. hybrid.ts ranking is unchanged (mergeHybrid).
+    const eligibleAll: RecommendationSource[] = ['site_scan', 'keyword_research_url', 'project_data']
+    if ((input.keyword || '').trim()) eligibleAll.unshift('keyword')
+    // Evidence capacity signals (no model call): indexed entities, corpus/context,
+    // a seed keyword. Deterministic ordering — strongest first.
+    const signal: Record<string, number> = {
+      keyword: (input.keyword || '').trim() ? 100 : -1,
+      site_scan: ownedCategories.length * 3,
+      project_data: 6 + Math.min(existingTitles.length, 20) + (project.business_name ? 3 : 0),
+      keyword_research_url: 5,
+    }
+    const eligible = orderSourcesByEvidence(eligibleAll, signal)
+    const hybridTarget = TARGET_NEW
+    const executionOrder: { source: string; requested: number; remainingBefore: number }[] = []
+    const skippedSources: { source: string; reason: string }[] = []
+    const runs: { source: RecommendationSource; ok: boolean; reason?: string; suggestions: TopicSuggestion[] }[] = []
+    let billingHit = false
+
+    const runOne = async (s: RecommendationSource, remaining: number): Promise<void> => {
+      const requested = Math.max(4, Math.min(Math.ceil(budget.maxRawCandidates / Math.max(1, eligible.length)), remaining + 2))
+      executionOrder.push({ source: s, requested, remainingBefore: remaining })
+      try {
+        const r = await generateRecommendations(admin, { ...input, source: s, sourceTargetOverride: requested, qualityMode, controller })
+        runs.push({ source: s, ok: true, reason: r.meta.reason, suggestions: r.suggestions })
+      } catch (e) {
+        if (e instanceof BillingExhaustedError) { billingHit = true; return }
+        // A proven-unavailable model is a HARD config failure across ALL sources —
+        // propagate it so the route returns a typed error, never a 0-result banner.
+        if (e instanceof RecommendationModelUnavailableError) throw e
+        console.error('[recommendations] hybrid provider failed', { source: s, message: String(e).slice(0, 200) })
+        runs.push({ source: s, ok: false, reason: 'provider_error', suggestions: [] })
+      }
+    }
+    const freshCount = () => mergeHybrid(runs).suggestions.length
+    const canDoMore = () => !controller.billingExhausted && !billingHit && controller.summary().totalCalls < budget.maxModelCallsPerRun && controller.summary().estimatedRunCostUsd < budget.maxEstimatedCostUsd
+
+    // Stage 1 — the two strongest sources, concurrently.
+    const stage1 = stage1Sources(eligible)
+    await Promise.all(stage1.map((s) => runOne(s, hybridTarget)))
+    if (billingHit || controller.billingExhausted) throw new BillingExhaustedError()
+    // Stages 2..N — only when short AND budget remains; request the remaining count.
+    for (let i = 2; i < eligible.length; i++) {
+      const s = eligible[i]
+      const remaining = hybridTarget - freshCount()
+      if (remaining <= 0) { skippedSources.push({ source: s, reason: 'target_met' }); continue }
+      if (!canDoMore()) { skippedSources.push({ source: s, reason: controller.billingExhausted ? 'billing_exhausted' : 'budget_exhausted' }); continue }
+      await runOne(s, remaining)
+      if (billingHit || controller.billingExhausted) throw new BillingExhaustedError()
+    }
     const merged = mergeHybrid(runs)
     // Fold a language-aware "supported by…" summary into the reason so provenance
     // survives persistence; supportingSources drives the badges on the fresh run.
     suggestions = merged.suggestions.map((s) => ({ ...s, suggestionReason: hybridProvenanceReason(s.supportingSources ?? [], language, s.suggestionReason) }))
     const rawGenerated = runs.reduce((n, r) => n + r.suggestions.length, 0)
     const anyOk = runs.some((r) => r.ok)
+    const cost = controller.summary()
+    const recs = controller.records_()
+    const proCalls = recs.filter((r) => r.model === RECOMMENDATION_MODEL_CURATOR).length
+    const fallbackCalls = recs.filter((r) => r.model !== RECOMMENDATION_MODEL_PRIMARY && r.model !== RECOMMENDATION_MODEL_CURATOR).length
     meta = {
       source: 'hybrid',
       generated: rawGenerated,
       skippedDuplicates: merged.duplicatesRemoved,
       finalCount: suggestions.length,
       attempts: 1,
-      reason: suggestions.length > 0 ? undefined : (!anyOk ? 'model_error' : rawGenerated > 0 ? 'all_duplicates' : 'model_empty'),
+      reason: suggestions.length > 0
+        ? (cost.stopReason && suggestions.length < hybridTarget ? 'successful_with_shortfall' : undefined)
+        : (!anyOk ? 'model_error' : rawGenerated > 0 ? 'all_duplicates' : 'model_empty'),
       providers: merged.providerStatus,
-      debug: process.env.NODE_ENV !== 'production'
-        ? { providerStatus: merged.providerStatus, rawCount: merged.rawCount, clusterCount: merged.clusterCount, duplicatesRemoved: merged.duplicatesRemoved }
+      debug: input.collectTrace || process.env.NODE_ENV !== 'production'
+        ? { providerStatus: merged.providerStatus, rawCount: merged.rawCount, clusterCount: merged.clusterCount, duplicatesRemoved: merged.duplicatesRemoved,
+            qualityMode, effectiveModels: [RECOMMENDATION_MODEL_PRIMARY], proCalls, fallbackCalls,
+            sourceExecutionOrder: executionOrder, skippedSources, totalCalls: cost.totalCalls, stoppedByBudget: cost.stopReason ?? null,
+            billingExhausted: cost.billingExhausted, runCost: cost, callRecords: input.collectTrace ? controller.records_() : undefined }
         : undefined,
     }
   } else if (input.source === 'keyword') {
     const keyword = (input.keyword || '').trim()
-    const { acc, raw, dupes, attempts, reason } = await accumulate(
+    const { acc, raw, dupes, attempts, reason, lastErrorType } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid, pendingBlock))
+        const { ideas, ok, modelUsed: m, retryable, errorType } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'keyword')
         if (m) modelUsed = m
-        return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok }
+        return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok, retryable, errorType }
       },
-      corpus, existingTitles, TARGET_NEW,
+      corpus, existingTitles, srcTarget,
     )
     suggestions = acc
-    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
+    modelErrorType = lastErrorType
+    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, modelErrorType: lastErrorType, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'project_data') {
-    const { acc, raw, dupes, attempts, reason } = await accumulate(
+    const { acc, raw, dupes, attempts, reason, lastErrorType } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid, pendingBlock))
+        const { ideas, ok, modelUsed: m, retryable, errorType } = await callGeminiIdeas(projectDataPrompt(langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'project_data')
         if (m) modelUsed = m
         const items = keepValid(ideas).map((g) => {
           const s = mapIdea(g, 'project_data', 0, modelUsed)
@@ -443,12 +552,13 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
           if (!s.suggestionReason) s.suggestionReason = language === 'he' ? 'נושא משלים לפי נתוני האתר' : 'A supporting topic based on the site data'
           return s
         }).filter((x): x is TopicSuggestion => !!x)
-        return { items, ok }
+        return { items, ok, retryable, errorType }
       },
-      corpus, existingTitles, TARGET_NEW,
+      corpus, existingTitles, srcTarget,
     )
     suggestions = acc
-    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
+    modelErrorType = lastErrorType
+    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, modelErrorType: lastErrorType, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'site_scan') {
     // From the CACHED site scan — content-gap ideas, then dedupe. Never rescans.
     // Phase 3H.4 — pass rotation memory: existing titles + PENDING idea titles/
@@ -479,7 +589,11 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // primary_keyword_exists despite plenty of unused scan targets. The newest
     // idea rows are exactly what changed between runs, so they lead the list.
     const avoidTitles = Array.from(new Set([...pendingAvoid, ...existingTitles, ...(input.avoidKeywords ?? [])]))
-    const res = await recommendFromSiteScan(admin, { projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock }, businessCtx)
+    const res = await recommendFromSiteScan(admin, {
+      projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock, projectBlock,
+      generationRunId: input.generationRunId, collectTrace: input.collectTrace, pendingContextCount: pendingTopics.length,
+      sourceTargetOverride: srcTarget, controller,
+    }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
     for (const s of res.suggestions) {
@@ -550,6 +664,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       // anchors the model's interpretation, wrong-market skipping and rewriting.
       offerContext: scanSeeds,
       pendingBlock,
+      projectBlock,
+      sourceTargetOverride: srcTarget,
+      controller,
     })
     const seenTitles = new Set<string>()
     let dupes = 0
@@ -645,6 +762,41 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const byType: Record<string, number> = { category: 0, product: 0, post: 0, page: 0, tag: 0, unknown: 0 }
     for (const t of planTargets) byType[t.targetType] = (byType[t.targetType] ?? 0) + 1
     meta.debug = { ...meta.debug, linkTargetTypes: byType, eligibleLinkTargets: planTargets.filter((t) => t.eligibility === 'yes').length, productCategoryTargetCount: byType.category, productTargetCount: byType.product }
+  }
+
+  // Preview runtime diagnostics — ALWAYS populated when a trace is requested (not
+  // gated by NODE_ENV, so Preview — which runs as production — still gets them).
+  // Proves whether calls were made, what raw output they produced, the shared
+  // controller state, and that the repeated-discovery + project context reached
+  // the prompt. Safe counters/booleans only — never a prompt, secret or content.
+  if (input.collectTrace) {
+    const cs = controller.summary()
+    const guidanceText = recommendationGuidance(langLabel, year, srcTarget)
+    meta.runtimeDiag = {
+      // Controller state (I) — proves the first call is not budget-denied.
+      totalCalls: cs.totalCalls,
+      callsBySource: cs.callsBySource,
+      callsPreventedByBudget: cs.callsPreventedByBudget,
+      callsPreventedAfterBillingFailure: cs.callsPreventedAfterBillingFailure,
+      billingExhausted: cs.billingExhausted,
+      stopReason: cs.stopReason ?? null,
+      estimatedRunCostUsd: cs.estimatedRunCostUsd,
+      maxCalls: budget.maxModelCallsPerRun,
+      maxEstimatedCostUsd: budget.maxEstimatedCostUsd,
+      rawCandidateBudget: budget.maxRawCandidates,
+      targetFreshIdeas: TARGET_NEW,
+      requestedIdeaCount: srcTarget,
+      // Output funnel (G) — raw candidates vs engine-final.
+      rawCandidates: meta.generated,
+      engineFinalCount: meta.finalCount,
+      engineReason: meta.reason ?? null,
+      modelErrorType: modelErrorType ?? null,
+      // Guidance reach (H) — booleans/counts only, never the prompt text.
+      repeatedDiscoveryInstructionPresent: guidanceText.includes('REPEATED DISCOVERY:'),
+      authoritativeProjectContextPresent: projectBlock.length > 0,
+      primaryProjectFocusPresent: !!focus.primaryProjectFocus,
+      pendingContextCount: pendingTopics.length,
+    }
   }
 
   return { suggestions: enriched, meta }

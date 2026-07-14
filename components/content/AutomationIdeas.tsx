@@ -189,6 +189,11 @@ export default function AutomationIdeas({
   async function generate() {
     if (loading) return
     const reqId = ++reqRef.current
+    // Capture the request scope at click time. The response must echo the SAME
+    // projectId + clientRequestId or it is a stale response (e.g. the user switched
+    // projects mid-flight) and must NOT update this project's list.
+    const requestProjectId = projectId
+    const clientRequestId = (globalThis.crypto?.randomUUID?.() ?? `${reqId}-${Date.now()}`)
     // Do NOT clear the current list up-front — "find more" keeps existing pending
     // ideas visible and the response returns the combined active pending set.
     setLoading(true); setMessage(null); setMeta(null); setQueueSuccess(null)
@@ -196,15 +201,26 @@ export default function AutomationIdeas({
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, source, keyword: keyword.trim() }),
+        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId }),
       })
       const data = await res.json().catch(() => ({}))
       if (reqId !== reqRef.current) return // a newer request superseded this one
+      // Hard scope check: reject a response bound to a different project / request.
+      if (res.ok && ((data?.meta?.projectId && data.meta.projectId !== requestProjectId) ||
+                     (data?.meta?.clientRequestId && data.meta.clientRequestId !== clientRequestId) ||
+                     requestProjectId !== projectId)) {
+        return // stale/cross-project response — discard, never write another project's list
+      }
       if (!res.ok) {
         // keyword_required is a real validation error; anything else (5xx /
         // timeout / transient) must NOT read as "no ideas found".
         if (data?.error === 'keyword_required') {
           setMessage({ text: t.keywordPlaceholder, ok: false })
+        } else if (data?.error === 'billing_exhausted' || data?.meta?.reason === 'billing_exhausted') {
+          // HONEST billing state — never "try a broader keyword". No provider details.
+          setMessage({ text: 'יתרת Gemini API הסתיימה ולכן הסריקה לא בוצעה. יש להוסיף קרדיט בחשבון Google AI Studio ולנסות שוב.', ok: false })
+        } else if (data?.error === 'run_in_progress') {
+          // A duplicate click while a run is active — silently ignore.
         } else {
           setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error', newlyAdded: 0 })
         }

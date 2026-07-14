@@ -302,7 +302,15 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, ...(isUpdate ? { update: true } : {}) }),
       })
-      const data = await res.json().catch(() => ({}))
+      // F — read content-type + parse the JSON body EVEN on a non-ok response, so a
+      // typed { error, message, diagnosticId } is surfaced instead of a generic 500.
+      const contentType = res.headers.get('content-type') || ''
+      const hasJsonBody = contentType.includes('application/json')
+      const data = hasJsonBody ? await res.json().catch(() => ({})) : {}
+      if (!res.ok && process.env.NODE_ENV !== 'production') {
+        // Safe Preview browser log — never the raw response body.
+        console.warn('[content-wp-export] client failure', { status: res.status, contentType, errorCode: data.error ?? null, diagnosticId: data.diagnosticId ?? null, hasJsonBody })
+      }
       if (res.ok && data.wp_post_id) {
         setWpPostId(data.wp_post_id)
         setWpPostUrl(data.wp_post_url ?? null)
@@ -333,8 +341,15 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         setMessage({ text: e.wpAlreadyExported, ok: false })
         return
       }
+      // Part 2 — prefer the route's typed, safe Hebrew message (never a generic
+      // browser 500). Fall back to the local reason map for legacy reasons.
       const reason = typeof data.reason === 'string' ? data.reason : 'unknown'
-      setMessage({ text: (e.wpErrors as Record<string, string>)[reason] || e.wpFailed, ok: false })
+      const typedMessage = typeof data.message === 'string' && data.message.trim() ? data.message : null
+      const diagnosticId = typeof data.diagnosticId === 'string' ? data.diagnosticId : null
+      let text = typedMessage || (e.wpErrors as Record<string, string>)[reason] || e.wpFailed
+      // Show the diagnosticId when present and not already embedded in the message.
+      if (diagnosticId && !text.includes(diagnosticId)) text = `${text} (${diagnosticId})`
+      setMessage({ text, ok: false })
     } catch {
       setMessage({ text: e.wpFailed, ok: false })
     } finally {

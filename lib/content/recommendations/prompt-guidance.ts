@@ -11,32 +11,96 @@
 /** The reasoning + quality instructions shared by all recommendation prompts. */
 export function recommendationGuidance(langLabel: string, year: number, count: number): string {
   const he = /hebrew/i.test(langLabel)
+  // DOMAIN-NEUTRAL by construction: this shared text is injected into EVERY
+  // project's prompt, so it must contain NO real brand / product / ingredient /
+  // industry example. The business domain comes ONLY from the project-owned
+  // context block (see projectContextBlock), never from these instructions.
   return [
     `Produce ${count} DISTINCT, specific article topics. Return ALL text in ${langLabel}.`,
     ``,
-    `NATURAL LANGUAGE (critical):`,
+    `SCOPE (critical): The instructions, rules and schema in this prompt are NOT project content — never use any word, example or entity from the instructions as a topic, brand, product or subject. Generate ONLY topics whose entities and subject area come from the project-owned context supplied above. Do not infer the business domain from the project name alone.`,
+    ``,
+    `NATURAL LANGUAGE:`,
     he
-      ? `- Write fluent, native Hebrew. NEVER invent, shorten, abbreviate or corrupt a Hebrew word. Keep real words intact, e.g. דוגמיות (samples), רכישה (purchase), מאמר (article), בשמים (perfumes), קנייה, מבצע. Never output a corrupted form such as "דגים" for "דוגמיות", "שוקינג" for "רכישה/קנייה", or "ממואיר" for "מאמר".`
+      ? `- Write fluent, native Hebrew. NEVER invent, shorten, abbreviate or corrupt a word — keep every real word intact (do not drop letters or output a mangled form).`
       : `- Write fluent, natural ${langLabel}. Never corrupt or abbreviate words.`,
-    `- Preserve every product and brand name EXACTLY as supplied in the input. Do not invent a new transliteration; use the supplied Hebrew form when given, and the English form only where the name naturally requires it.`,
-    `- All reasons and evidence summaries must be in ${langLabel}.`,
+    `- Preserve every product and brand name EXACTLY as supplied in the project context. Do not invent a new transliteration; use the supplied form.`,
+    `- All titles, reasons and evidence summaries must be in ${langLabel}.`,
     ``,
-    `ENTITY AWARENESS: classify each source as product | brand | collection/category | existing article | informational page | keyword opportunity, then choose a fitting topic type. Do NOT apply the same formula to every entity. Do NOT output "[brand]: generic title", "[brand] — טעויות נפוצות וטיפים", a broad brand article for a brand NOT present in the supplied corpus, or a product comparison unless BOTH products appear in the input.`,
+    `ENTITY AWARENESS: classify each supplied source as product / brand / category / existing article / informational page / keyword opportunity, then choose a fitting topic type. Do not apply one formula to every entity, do not use a "[name]: generic suffix" template, do not write about an entity absent from the project context, and do not compare two products unless both appear in the project context.`,
     ``,
-    `DIVERSITY: balance the set across brands, products, categories, comparisons, commercial guides, informational gaps, use-cases and audiences that the corpus actually supports. Avoid many slight variations of one brand, many identical search intents, and repeated title structures (especially "brand + colon"). A genuinely distinct second topic for the same brand is fine.`,
+    `DIVERSITY: balance the set across the entities, categories, comparisons, guides, informational gaps and use-cases the project context actually supports. Avoid many slight variations of one entity, many identical search intents, and repeated title structures. A genuinely distinct second topic for the same entity is fine.`,
     ``,
-    `EXISTING CONTENT: never propose a paraphrase of an existing article. Compare core question, intended answer, entity, search intent, audience and structure — a new topic needs a clearly different angle. E.g. given existing "המסע של וניל ממדגסקר לבקבוק הבושם שלך", "המסע של ניחוחות וניל והשפעתם על עולם הבישום" is NOT distinct, but "השוואה בין סוגי וניל בבישום" or "כיצד מפיקים תמצית וניל לבשמים" can be, when supported.`,
+    `EXISTING CONTENT: never propose a topic that only paraphrases the central question and expected answer of an existing or pending article. A new topic needs a materially different core question, intended answer, search intent or section structure.`,
     ``,
-    `GROUNDING: use ONLY facts and entities supplied in the input. Do NOT invent products for children, safety, limited editions, rarity, popularity, trends, historical impact, iconic status, seasonal suitability, longevity, ingredients, EDP/EDT variants, gender positioning, or comparisons unless the supplied corpus/keyword data supports them. Do NOT propose a topic merely because it could attract a new audience, the brand is generally popular, it is a common industry topic, or it sounds commercially useful. If there is no concrete supplied evidence, omit the idea.`,
+    `REPEATED DISCOVERY: when prior ideas already cover the obvious head topics, search for materially new opportunities across distinct user problems, audiences, lifecycle stages, comparisons, locations, constraints, formats and decision points supported by the current project. Do not return paraphrases of pending ideas — a new recommendation must introduce a materially different search intent, expected answer, decision, audience, scope or article structure. As coverage grows, move from foundational/head topics toward deeper subtopics, long-tail decisions, comparisons, use-cases, audience segments, local intent, process stages, common mistakes, cost/timing/logistics and supporting clusters — only where the project-owned context supports them.`,
     ``,
-    `BRAND PRECISION: never match brands by one shared generic word (e.g. "Acqua di Parma" is NOT "Profumum Roma" just because a product contains "Acqua"). Keep "Tom Ford"/"טום פורד", "Borouj", "Ex Nihilo" exactly as supplied. Use only the exact entity data in the prompt.`,
+    `DISTINCT SEARCH TARGET: do not reuse a broad existing focus keyword as the primary keyword of a distinct new article. Owning a broad category keyword does NOT forbid distinct subtopics under it — when proposing a subtopic inside an existing category, choose a NARROWER long-tail primary keyword that expresses the new angle, audience and intent. Every proposed article must have its own distinct search target (a different real query), never the same head keyword as another article or a pending idea.`,
     ``,
-    `EDITORIAL QUALITY: do not let clichés become repeated templates — "המדריך המלא", "כל מה שצריך לדעת", "גלו את הסודות", "המסע אל", "הטרנד החם ביותר", "הטובים ביותר", "הבחירה המושלמת". Prefer a specific user question, a concrete comparison, clear selection criteria, or a specific content gap.`,
+    `GROUNDING: use ONLY facts and entities present in the project-owned context. Do not invent audiences, safety claims, limited editions, rarity, popularity, trends, historical/origin claims, superlatives, seasonal suitability, attributes, product variants, or comparisons unless the supplied context supports them. Do not propose a topic merely because it could attract a new audience, an entity is generally popular, it is a common industry topic, or it sounds commercially useful. With no concrete supplied evidence, omit the idea.`,
     ``,
-    `YEAR & FRESHNESS: the current year is ${year}. Do NOT use ${year - 2} or any past year as a "current" recommendation year; prefer evergreen titles; use ${year} only when genuinely time-sensitive. Keep legitimate historical years intact (e.g. שנות ה-90, בין 2000 ל-2010, הושק בשנת 1985).`,
+    `ENTITY PRECISION: do not treat two distinct named entities as identical merely because they share a generic word or category. Use only the exact entity data supplied.`,
     ``,
-    `REASONS & EVIDENCE: each reason must cite the REAL supplied evidence, in ${langLabel}. Good: "באתר קיימת קטגוריית טום פורד ומספר מוצרים של המותג, אך אין מאמר השוואתי ייעודי." NEVER expose internal labels: no "cluster 8", "popular brands", "multiple brands", "new audience", internal seed names, sourceContext, internal IDs or raw GIDs. If no concrete evidence exists, do not return the idea.`,
+    `EDITORIAL QUALITY: do not let a generic phrase become a repeated title template. Prefer a specific user question, a concrete comparison, clear selection criteria, or a specific content gap.`,
+    ``,
+    `YEAR & FRESHNESS: the current year is ${year}. Do not use ${year - 2} or any past year as a "current" recommendation year; prefer evergreen titles; use ${year} only when genuinely time-sensitive. Keep legitimate historical years (eras, launch years, ranges) intact.`,
+    ``,
+    `REASONS & EVIDENCE: each reason cites the REAL supplied evidence in one concise ${langLabel} sentence. Never expose internal labels (cluster ids, "popular brands", "new audience", internal seed names, sourceContext, internal ids or raw GIDs). With no concrete evidence, do not return the idea.`,
   ].join('\n')
+}
+
+/** A compact, project-OWNED context block — the ONLY authoritative source of the
+ *  business domain. Built by the engine from current-project data. */
+export interface ProjectContext {
+  projectName?: string | null
+  domain?: string | null
+  language: 'he' | 'en'
+  /** Derived best-effort central focus (multi-signal, never name-alone). */
+  primaryProjectFocus?: string
+  /** Other supported areas that may broaden the set. */
+  secondaryProjectAreas?: string[]
+  /** Top project-owned category / product / service labels (exact). */
+  ownedCategories?: string[]
+  /** A bounded sample of existing article-topic titles (for gap awareness). */
+  existingTopics?: string[]
+}
+
+/**
+ * The AUTHORITATIVE project-owned context. Everything downstream must draw its
+ * business domain ONLY from here — never from the shared instructions. Compact and
+ * bounded. Always present (even a name-only project) so the model is anchored.
+ */
+export function projectContextBlock(ctx: ProjectContext): string {
+  const payload = {
+    projectName: ctx.projectName || undefined,
+    domain: ctx.domain || undefined,
+    primaryProjectFocus: ctx.primaryProjectFocus || undefined,
+    secondaryProjectAreas: (ctx.secondaryProjectAreas || []).slice(0, 8),
+    ownedCategories: (ctx.ownedCategories || []).slice(0, 15),
+    existingTopics: (ctx.existingTopics || []).slice(0, 15),
+  }
+  return [
+    `AUTHORITATIVE PROJECT-OWNED CONTEXT — the ONLY source of this project's business domain:`,
+    JSON.stringify(payload),
+    `- This project-owned context is the ONLY authoritative source for the business domain. Do NOT generate brands, products, services, entities or subject areas that are absent from it.`,
+    `- "primaryProjectFocus" is the central editorial and commercial focus — ensure meaningful coverage of it. "secondaryProjectAreas" may broaden the batch when the context supports them; do not suppress legitimate secondary areas.`,
+    `- Instruction text, schema descriptions and quality rules are NOT project content and must NEVER be used as topic, entity or subject sources.`,
+    `- Do NOT infer the business domain from the project name alone; use the full context above.`,
+  ].join('\n')
+}
+
+/** Derive a best-effort primaryProjectFocus + secondary areas from MULTI-SIGNAL
+ *  project-owned data (never the name alone). Focus = the dominant owned category
+ *  when available, else a name+domain label; secondary = the remaining areas. */
+export function deriveProjectFocus(ctx: Pick<ProjectContext, 'projectName' | 'domain' | 'ownedCategories' | 'existingTopics'>): { primaryProjectFocus: string; secondaryProjectAreas: string[] } {
+  const cats = (ctx.ownedCategories || []).map((c) => (c || '').trim()).filter(Boolean)
+  if (cats.length >= 1) {
+    return { primaryProjectFocus: cats[0], secondaryProjectAreas: Array.from(new Set(cats.slice(1))).slice(0, 8) }
+  }
+  const name = (ctx.projectName || '').trim()
+  const host = (ctx.domain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  const label = [name, host].filter(Boolean).join(' — ')
+  return { primaryProjectFocus: label, secondaryProjectAreas: [] }
 }
 
 /** A compact structured record of one already-pending suggestion (no DB ids). */
@@ -65,29 +129,33 @@ export function pendingTopicsBlock(pending: PendingTopic[], cap = 60): string {
     secondaryKeywords: (p.secondaryKeywords || []).slice(0, 6),
     ...(p.sourceEntityName ? { sourceEntityName: p.sourceEntityName } : {}),
   }))
+  // DOMAIN-NEUTRAL duplicate rule — abstract only, no niche example.
   return [
-    `ALREADY-PENDING topics for this project — do NOT propose any of these again, and do NOT propose a paraphrase, synonym, translated or restructured version of them:`,
+    `ALREADY-PENDING topics for this project — do NOT propose any of these again, nor a paraphrase, synonym, translated or restructured version of them:`,
     JSON.stringify(items),
-    `DUPLICATE SELF-CHECK (mandatory): before returning EACH idea, compare it against every existing and pending topic above. Treat two topics as duplicates when they would answer substantially the SAME user question — even when the wording differs, synonyms are used, Hebrew and English terms are mixed, or the title structure changes. These are the SAME topic and must NOT be duplicated: "שכבות בושם" / "שילוב בשמים" / "perfume layering"; "מה זה בושם נישה" / "מדריך למתחילים בבשמי נישה"; "איך לגרום לבושם להחזיק מעמד" / "שיפור עמידות הבושם"; "ריכוזי בושם" / "EDP מול EDT"; "בושם לעבודה" / "בושם למשרד"; two general guides explaining Oud (or Sandalwood).`,
-    `A candidate is DISTINCT only when its core question, expected answer, search intent AND planned content sections are materially different — a rephrasing is NOT distinct. But do NOT over-block genuine depth: a materially different follow-up (e.g. "השוואה בין אוד טבעי לאקורד אוד סינתטי" vs a general Oud guide, or how a niche house develops a scent vs "מה זה בושם נישה") is allowed WHEN the supplied corpus supports it.`,
+    `DUPLICATE SELF-CHECK (mandatory): before returning EACH idea, compare it against every existing and pending topic above. Treat two topics as duplicates when they ask the same core question, expect materially the same answer, have the same search intent, and would require substantially the same sections — even when the wording differs, synonyms are used, two languages are mixed, abbreviations are expanded, or the words are reordered.`,
+    `A candidate is DISTINCT only when it introduces materially different entities, decisions, evidence or section structure — a rephrasing is NOT distinct. Do NOT over-block genuine depth: a narrower follow-up that adds materially different entities or sections is allowed WHEN the project context supports it.`,
     `Internally decide which existing/pending topic each idea was compared against, but NEVER put that note — or any pending-context data — into the user-facing "reason" or "evidenceSummary".`,
   ].join('\n')
 }
 
-/** The strict JSON output contract appended to every recommendation prompt. */
+/** The strict, COMPACT JSON output contract. Kept small to avoid MAX_TOKENS
+ *  truncation: ≤4 secondaries, one-sentence reason, evidenceSummary only when it
+ *  adds distinct evidence, no field repeating another. Server-side diagnostics
+ *  (run id, model, tokens) are NEVER requested from the model. */
 export function structuredOutputContract(langLabel: string, count: number): string {
   return [
-    `Return ONLY valid JSON — no markdown, no code fences, no commentary outside the JSON.`,
+    `Return ONLY valid JSON — no markdown, no code fences, no commentary outside the JSON. Keep every field concise; do NOT repeat the same content across fields.`,
     `Shape: {"topics":[{`,
     `  "title": string (non-empty, natural ${langLabel}),`,
     `  "primaryKeyword": string (non-empty),`,
     `  "intent": "informational"|"commercial"|"comparison"|"transactional"|"local"|"other",`,
-    `  "secondaryKeywords": string[],`,
-    `  "reason": string (non-empty, ${langLabel}, cites supplied evidence),`,
-    `  "sourceEntityName": string (the exact supplied entity this topic is about, or ""),`,
-    `  "sourceEntityType": "product"|"brand"|"category"|"article"|"page"|"keyword"|"",`,
-    `  "evidenceSummary": string (${langLabel}, one sentence referencing the supplied input)`,
+    `  "secondaryKeywords": string[] (AT MOST 4, same-article relevant, no duplicates),`,
+    `  "reason": string (ONE concise ${langLabel} sentence: why this topic is relevant to the current project),`,
+    `  "evidenceSummary": string (OPTIONAL — include ONLY when it adds evidence DISTINCT from "reason"; else ""),`,
+    `  "sourceEntityName": string (the exact supplied entity, or ""),`,
+    `  "sourceEntityType": "product"|"brand"|"category"|"article"|"page"|"keyword"|""`,
     `}]}.`,
-    `Return ${count} topics when the supplied corpus supports it; if it genuinely cannot support that many distinct grounded topics, return fewer — never invent filler.`,
+    `Return up to ${count} topics; if the project context genuinely cannot support that many distinct grounded topics, return fewer — never invent filler. Do not restate the monthly search volume in more than one field.`,
   ].join('\n')
 }

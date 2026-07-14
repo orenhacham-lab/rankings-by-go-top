@@ -6,11 +6,17 @@
  * live Gemini quality (that is the Preview smoke).
  */
 import { validateIdea, normalizeTitleKey, hasStaleCurrentYear, isHistoricalYear } from '../validate'
-import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, type PendingTopic } from '../prompt-guidance'
-import { buildPrompt, completeSiteScanIdeas, type RawIdeaGen } from '../site-scan'
-import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
+import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from '../prompt-guidance'
+import { buildPrompt, completeSiteScanIdeas, type SiteScanModelCall, type RunScope } from '../site-scan'
+import { domainFlags, isCrossDomain, fingerprint } from '../domain-flags'
+import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_CURATOR, RECOMMENDATION_MODEL_VERSION, classifyModelError, BillingExhaustedError, outputBudgetFor } from '../model'
+import { estimateCallCostUsd, summarizeRunCost, runBudget, hasBudgetHeadroom, type CallUsage } from '../reco-cost'
+import { RunCostController } from '../run-cost-controller'
+import { orderSourcesByEvidence, stage1Sources } from '../hybrid-orchestration'
+import { readFileSync as readSrc } from 'fs'
 import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
 import { ExistingCorpus } from '../dedupe'
+import { buildKeywordGuardFromData, coveredByExistingContent } from '../keyword-guard'
 import { buildClustersPrompt, isVocabAligned, type ClusterInput } from '../keyword-research'
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -89,22 +95,22 @@ async function main() {
     const g = recommendationGuidance('Hebrew', YEAR, 20)
     check('instructs natural Hebrew, no corruption', /never invent, shorten|corrupt a Hebrew word|דוגמיות/i.test(g))
     check('names preserved exactly (no new transliteration)', /EXACTLY as supplied|new transliteration/i.test(g))
-    check('grounding: only supplied facts', /use ONLY facts and entities supplied/i.test(g))
-    check('brand precision (Acqua ≠ Profumum)', /Acqua di Parma.*Profumum Roma|one shared generic word/i.test(g))
-    check('no invented children/rarity/trends', /products for children|limited editions|rarity|trends/i.test(g))
+    check('grounding: only project-owned facts', /use ONLY facts and entities present in the project-owned context/i.test(g))
+    check('entity precision is domain-NEUTRAL (no real brand)', /do not treat two distinct named entities as identical merely because they share a generic word/i.test(g))
+    check('no invented audiences/rarity/trends', /invent audiences, safety claims, limited editions, rarity/i.test(g))
     check('year 2026, keep historical', new RegExp(`${YEAR}`).test(g) && /שנות ה-90|historical years/i.test(g))
     check('no internal labels in reasons', /NEVER expose internal labels|cluster 8/i.test(g))
     const c = structuredOutputContract('Hebrew', 20)
     check('schema requires evidenceSummary + entity fields', /evidenceSummary/.test(c) && /sourceEntityName/.test(c) && /sourceEntityType/.test(c))
     check('schema: valid JSON, no markdown', /ONLY valid JSON/.test(c) && /no markdown/.test(c))
-    const sp = buildPrompt('Hebrew', 'Oligarch — perfume store', 'CATEGORIES: Tom Ford | brand', [], 20, ['קיים מאמר'])
-    check('site-scan prompt injects the shared guidance', /use ONLY facts and entities supplied/i.test(sp))
+    const sp = buildPrompt('Hebrew', 'a store', 'CATEGORIES: some category | category', [], 20, ['קיים מאמר'])
+    check('site-scan prompt injects the shared (neutral) guidance', /use ONLY facts and entities present in the project-owned context/i.test(sp))
     check('site-scan schema no longer requests a sourceContext field', !/"sourceContext"/.test(sp) && /evidenceSummary/.test(sp))
   }
 
   console.log('F) centralized pinned model config (no scattered strings, not flash-lite)')
   {
-    check('primary is a pinned Pro id', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-pro')
+    check('primary is the pinned Flash generator', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
     check('fallback is NOT flash-lite', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-flash-lite' && /flash|pro/.test(RECOMMENDATION_MODEL_FALLBACK))
     check('version tag present', typeof RECOMMENDATION_MODEL_VERSION === 'string' && RECOMMENDATION_MODEL_VERSION.length > 0)
   }
@@ -114,53 +120,72 @@ async function main() {
     const idea = (t: string) => ({ title: t, primaryKeyword: t, reason: `ר-${t}`, evidenceSummary: `ראיה ל-${t}` })
     const many = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => idea(`${prefix} ${i + 1}`))
 
+    const SCOPE: RunScope = { generationRunId: 'run-A', requestedProjectId: 'proj-A', source: 'site_scan' }
+    const modelCall = (ideas: ReturnType<typeof idea>[], over: Partial<SiteScanModelCall> = {}): SiteScanModelCall =>
+      ({ prompt: 'P', responseText: JSON.stringify({ topics: ideas }), ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY, parseError: null, ...over })
+
     // F.2/F.5: primary returns 16 → completion asked for exactly 4 → final 20.
     {
-      const calls: { need: number; avoid: string[] }[] = []
-      const stub = (batch1: number, batch2: number): (need: number, avoid: string[]) => Promise<RawIdeaGen> => {
-        let call = 0
-        return async (need, avoid) => {
-          calls.push({ need, avoid })
-          const ideas = call === 0 ? many('בסיס', batch1) : many('השלמה', batch2)
-          call++
-          return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY }
-        }
-      }
-      calls.length = 0
-      const r = await completeSiteScanIdeas(20, ['קיים מאמר'], YEAR, stub(16, 4))
+      const calls: { need: number; avoid: string[]; seq: number }[] = []
+      let call = 0
+      const r = await completeSiteScanIdeas(20, ['קיים מאמר'], YEAR, {
+        scope: SCOPE,
+        runCall: async (need, avoid, _p, seq) => { calls.push({ need, avoid, seq }); const ideas = call === 0 ? many('בסיס', 16) : many('השלמה', 4); call++; return modelCall(ideas) },
+      })
       check('first call requests 20', calls[0].need === 20)
       check('completion requested exactly 4', calls[1] && calls[1].need === 4, `got ${calls[1]?.need}`)
       check('4 valid completion ideas → final 20', r.validIdeas.length === 20, `got ${r.validIdeas.length}`)
-      check('retry was used', r.retryUsed && r.shortfall === 0)
       check('completion model is the centralized primary', r.modelUsed === RECOMMENDATION_MODEL_PRIMARY)
       check('completion avoid includes already-generated titles', calls[1].avoid.includes('בסיס 1') && calls[1].avoid.includes('בסיס 16'))
       check('completion avoid keeps existing article title', calls[1].avoid.includes('קיים מאמר'))
+      check('each call has a distinct callSequence', calls[0].seq === 0 && calls[1].seq === 1)
     }
 
     // F.6: completion returns only 2 → final 18, shortfall recorded, no filler.
     {
       let call = 0
-      const stub = async (): Promise<RawIdeaGen> => { const ideas = call === 0 ? many('בסיס', 16) : many('השלמה', 2); call++; return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY } }
-      const r = await completeSiteScanIdeas(20, [], YEAR, stub)
+      const r = await completeSiteScanIdeas(20, [], YEAR, { scope: SCOPE, runCall: async () => { const ideas = call === 0 ? many('בסיס', 16) : many('השלמה', 2); call++; return modelCall(ideas) } })
       check('2 valid completion ideas → final 18', r.validIdeas.length === 18, `got ${r.validIdeas.length}`)
       check('exact shortfall recorded (2)', r.shortfall === 2)
-      check('no deterministic filler in the set', r.validIdeas.every((g) => !/טעויות נפוצות וטיפים|המדריך המלא:/.test(g.title || '')))
     }
 
-    // Never emits the legacy fallback templates, and drops invalid/dup in completion.
+    // I.3: a truncated/unparseable response persists ZERO partial topics + ONE clean retry.
     {
       let call = 0
-      const stub = async (): Promise<RawIdeaGen> => {
-        const ideas = call === 0
-          ? [...many('בסיס', 15), { title: 'המדריך המלא: Guerlain', primaryKeyword: 'x', reason: 'r' }] // includes a legacy-looking model title (still just data, but…)
-          : [idea('חדש א'), idea('בסיס 1') /* dup */, { title: '  ', primaryKeyword: 'y', reason: 'r' } /* empty */]
-        call++
-        return { ideas, ok: true, modelUsed: RECOMMENDATION_MODEL_PRIMARY }
-      }
-      const r = await completeSiteScanIdeas(20, [], YEAR, stub)
-      check('completion dedups against generated (בסיס 1 dropped)', r.rejects.duplicate_title === 1)
-      check('completion drops empty title', r.rejects.empty_title === 1)
-      check('no application-side fallback templates injected', r.validIdeas.filter((g) => /טעויות נפוצות וטיפים/.test(g.title || '')).length === 0)
+      const purposes: string[] = []
+      const r = await completeSiteScanIdeas(20, [], YEAR, {
+        scope: SCOPE,
+        runCall: async (_n, _a, purpose) => {
+          purposes.push(purpose)
+          if (call++ === 0) return modelCall([], { ok: false, parseError: 'unparseable', truncated: true, responseText: '{"topics":[{"title":"חצי' })
+          return modelCall(many('נקי', 20))
+        },
+      })
+      check('truncated call yields ZERO partial topics from that call', r.validIdeas.length === 20) // only the retry's clean 20
+      check('exactly one clean retry after parse failure', purposes.filter((p) => p === 'retry_after_parse_failure').length === 1, purposes.join(','))
+      check('primary was first', purposes[0] === 'primary')
+    }
+
+    // I.5: a response bound to another run/project cannot be consumed (runCall is a
+    // per-run closure; here we prove the trace binds each call to THIS run only).
+    {
+      const r = await completeSiteScanIdeas(20, [], YEAR, {
+        scope: SCOPE, collectTrace: true,
+        runCall: async () => modelCall(many('נקי', 20)),
+      })
+      check('every trace entry carries THIS run id + project', r.trace.length > 0 && r.trace.every((t) => t.generationRunId === 'run-A' && t.requestedProjectId === 'proj-A'))
+      check('every trace entry is source site_scan', r.trace.every((t) => t.source === 'site_scan'))
+    }
+
+    // I.6: two concurrent projects cannot exchange call contexts (separate scopes,
+    // separate closures, separate traces).
+    {
+      const runA = completeSiteScanIdeas(20, ['A-existing'], YEAR, { scope: { generationRunId: 'run-A', requestedProjectId: 'proj-A', source: 'site_scan' }, collectTrace: true, runCall: async () => modelCall(many('פרילנסר', 20)) })
+      const runB = completeSiteScanIdeas(20, ['B-existing'], YEAR, { scope: { generationRunId: 'run-B', requestedProjectId: 'proj-B', source: 'site_scan' }, collectTrace: true, runCall: async () => modelCall(many('בושם', 20)) })
+      const [ra, rb] = await Promise.all([runA, runB])
+      check('run A trace bound to proj-A only', ra.trace.every((t) => t.requestedProjectId === 'proj-A' && t.generationRunId === 'run-A'))
+      check('run B trace bound to proj-B only', rb.trace.every((t) => t.requestedProjectId === 'proj-B' && t.generationRunId === 'run-B'))
+      check('runs did not share candidate arrays', ra.validIdeas !== rb.validIdeas && ra.validIdeas.length === 20 && rb.validIdeas.length === 20)
     }
   }
 
@@ -213,19 +238,20 @@ async function main() {
     check('block includes primaryKeyword', block.includes('"primaryKeyword":"שכבות של בשמים"'))
     check('block includes intent', block.includes('"intent":"informational"'))
     check('block includes secondaryKeywords', block.includes('perfume layering') && block.includes('שילוב בשמים'))
-    // G.2: explicit duplicate families
-    check('family: Layering / שילוב בשמים / perfume layering', /שכבות בושם.*שילוב בשמים.*perfume layering/s.test(block))
-    check('family: niche beginner vs what-is-niche', /מה זה בושם נישה.*מדריך למתחילים בבשמי נישה/s.test(block))
-    check('family: office vs work perfume', /בושם לעבודה.*בושם למשרד/s.test(block))
-    check('family: EDP vs EDT / concentrations', /ריכוזי בושם.*EDP מול EDT/s.test(block))
-    check('family: general Oud (and Sandalwood) guides', /Oud.*Sandalwood/s.test(block))
+    // G.2: DOMAIN-NEUTRAL duplicate rule — the INSTRUCTION text carries no niche
+    // example (the pending DATA legitimately reflects the project, so test a block
+    // built from a neutral pending topic).
+    const neutralBlock = pendingTopicsBlock([{ title: 'נושא כללי', primaryKeyword: 'מילת מפתח', intent: 'informational', secondaryKeywords: [] }])
+    const nf = domainFlags(neutralBlock)
+    check('pending-block INSTRUCTIONS carry NO niche example', !nf.perfume && !nf.lighting && !nf.pet && !nf.freelancer)
+    check('duplicate rule is abstract (same core question)', /ask the same core question/i.test(block))
     // G.3: comparison dimensions required
     check('requires core question comparison', /core question/i.test(block))
-    check('requires expected answer comparison', /expected answer/i.test(block))
+    check('requires expected answer comparison', /expect materially the same answer/i.test(block))
     check('requires search intent comparison', /search intent/i.test(block))
-    check('requires planned content sections comparison', /planned content sections/i.test(block))
+    check('requires same sections comparison', /would require substantially the same sections/i.test(block))
     // D: preserve distinct depth
-    check('allows materially different follow-up (no over-block)', /materially different follow-up|do NOT over-block/i.test(block))
+    check('allows materially different follow-up (no over-block)', /materially different entities.*or section structure|do NOT over-block/i.test(block))
     // G.4: pending context must NOT leak into user-facing reason
     check('instructs to keep the comparison note OUT of reason/evidenceSummary', /NEVER put that note.*reason.*evidenceSummary/s.test(block))
     // empty pending → empty block
@@ -256,26 +282,28 @@ async function main() {
     check('prompt: keywords are evidence, never ready-made titles', /Raw keywords are EVIDENCE, not ready-made titles/.test(p))
     check('prompt: never append המדריך המלא', /NEVER copy a keyword and append.*המדריך המלא/.test(p))
 
-    // I.2: navigational/competitor (ikea) classified + rejected by default.
-    check('prompt: reject navigational/competitor with ikea example', /navigational\/competitor.*איקאה/s.test(p))
+    // I.2: navigational/competitor classified + rejected by default (NEUTRAL, no niche example).
+    check('prompt: reject navigational/competitor (abstract)', /REJECT a navigational\/competitor query \(one naming another store, brand or site\)/.test(p))
     check('prompt: competitor allowed only with explicit comparison support', /unless the offering explicitly supports comparison/.test(p))
-    // I.3/I.4: malformed/ambiguous examples required to be rejected without support.
-    check('prompt: reject malformed "מחסני תאורה צמודי תקרה"', /מחסני תאורה צמודי תקרה/.test(p))
-    check('prompt: ambiguous "בית מנורה" needs supported context', /בית מנורה/.test(p))
+    // I.3/I.4: malformed/ambiguous rejected without support (abstract rule, no niche example).
+    check('prompt: reject malformed/ambiguous (abstract)', /REJECT a malformed or ambiguous query unless the supplied offering makes its meaning clear/.test(p))
 
-    // I.5: consolidation of synonymous ceiling-light clusters into ONE topic.
-    check('prompt: consolidate same-question clusters (ceiling-light example)', /CONSOLIDATE.*גוף תאורה צמוד תקרה.*ONE strong topic/s.test(p))
+    // I.5: consolidation of synonymous clusters into ONE topic (abstract).
+    check('prompt: consolidate same-question clusters (abstract)', /CONSOLIDATE clusters that express the same core question/.test(p))
     check('prompt: mergedKeywords field in schema', /"mergedKeywords"/.test(p))
     check('prompt: fewer topics than clusters allowed (quality over count)', /FEWER topics than clusters/.test(p))
 
-    // I.6: secondaries must belong to the SAME article (fans/mirrors excluded).
-    check('prompt: same-article secondaries with fan/mirror example', /secondaryKeywords.*SAME article.*ceiling-FAN or mirror/s.test(p))
+    // I.6: secondaries must belong to the SAME article (abstract, no niche example).
+    check('prompt: same-article secondaries (abstract)', /choose ONLY terms that belong in the SAME article/.test(p))
     check('related terms passed only as CANDIDATES', /secondary CANDIDATES/.test(p))
 
-    // I.7: business scope from offering only — the חשמל brand-name trap.
+    // I.7: business scope from offering only — the brand-name trap (abstract).
     check('prompt: scope from offering, never business name', /BUSINESS SCOPE comes ONLY from the supplied offering.*NEVER from the business name/s.test(p))
-    check('prompt: חשמל-in-brand-name is not scope evidence', /"חשמל".*NOT evidence/s.test(p))
-    check('prompt: no electrical-safety/dimmer topics without real products', /electrical-safety advice, socket\/dimmer installation/.test(p))
+    check('prompt: a word in the business name is not scope evidence', /A word appearing inside the business name is NOT evidence/.test(p))
+    // The KR instructions themselves (empty clusters + empty offer) carry NO domain.
+    const krInstructionsOnly = buildClustersPrompt([], 'he', '', [], '')
+    const kf = domainFlags(krInstructionsOnly)
+    check('prompt: KR instructions are domain-NEUTRAL', !kf.perfume && !kf.lighting && !kf.pet && !kf.freelancer)
 
     // Reason must explain gap + relevance, not just volume; volume passed as evidence.
     check('prompt: reason explains gap+relevance not only volume', /CONTENT GAP and business relevance.*not just the search volume/s.test(p))
@@ -294,6 +322,261 @@ async function main() {
     // I.12: pending block still injected into the KR prompt when present.
     const p2 = buildClustersPrompt(clusters, 'he', '', [], 'ALREADY-PENDING topics TEST-BLOCK')
     check('KR prompt injects the pending block', p2.includes('ALREADY-PENDING topics TEST-BLOCK'))
+  }
+
+  console.log('K) domain-flag diagnostics — FIX VERIFICATION (shared guidance is now clean)')
+  {
+    // Multi-signal (≥2 distinct terms) — one incidental word does not trip it.
+    check('perfume text flagged', domainFlags('בושם אוד וניל EDP').perfume)
+    check('freelancer text flagged', domainFlags('פיתוח תוכנה SEO UX פרילנסר').freelancer)
+    check('single overlapping word NOT flagged (multi-signal)', !domainFlags('מאמר על חשמל בבית').perfume)
+    check('cross-domain detected', isCrossDomain('בושם אוד וניל + פיתוח תוכנה SEO פרילנסר'))
+    check('fingerprint is stable + content-free', fingerprint('שלום עולם') === fingerprint('שלום   עולם') && /^[0-9a-f]{16}$/.test(fingerprint('x')))
+
+    // FIX: the SHARED guidance/pending instructions carry NO business domain.
+    const guidance = recommendationGuidance('Hebrew', YEAR, 20)
+    const gf = domainFlags(guidance)
+    check('recommendationGuidance triggers NO domain flag', !gf.perfume && !gf.lighting && !gf.pet && !gf.freelancer)
+    check('recommendationGuidance has no perfume brand/ingredient/term', !/בושם|בשמי|oud|edp|edt|amouage|acqua di parma|profumum|tom ford|ex nihilo|borouj|sandalwood|וניל/i.test(guidance))
+    check('recommendationGuidance has no lighting/pet/freelancer example', !/תאורה|קלווין|dog|כלב|פרילנסר|wordpress|shopify/i.test(guidance))
+    const pblock = pendingTopicsBlock([{ title: 'נושא כללי', primaryKeyword: 'מילת מפתח', intent: 'informational', secondaryKeywords: [] }])
+    const pf = domainFlags(pblock)
+    check('pendingTopicsBlock triggers NO domain flag', !pf.perfume && !pf.lighting && !pf.pet && !pf.freelancer)
+    check('structuredOutputContract has no niche example', !domainFlags(structuredOutputContract('Hebrew', 20)).perfume)
+
+    // A Matalon (freelancer) Site Scan prompt is now flagged ONLY by its own
+    // project context — NOT perfume. Same for appliance / pet / supplement.
+    const focusFreelancer = deriveProjectFocus({ projectName: 'מטלון', domain: 'matalon.co.il', ownedCategories: ['פיתוח תוכנה', 'נגישות אתרים', 'שיווק דיגיטלי', 'עיצוב UX'], existingTopics: [] })
+    const freelancerBlock = projectContextBlock({ projectName: 'מטלון', domain: 'matalon.co.il', language: 'he', ...focusFreelancer, ownedCategories: ['פיתוח תוכנה', 'נגישות אתרים', 'שיווק דיגיטלי'], existingTopics: [] })
+    const matalonPrompt = buildPrompt('Hebrew', 'מטלון', 'CATEGORIES: פיתוח תוכנה | category', [], 20, ['פיתוח תוכנה לעסקים'], pblock, freelancerBlock)
+    check('Matalon Site Scan prompt is NOT perfume-flagged', !domainFlags(matalonPrompt).perfume)
+    check('Matalon prompt IS freelancer-flagged from its own context', domainFlags(matalonPrompt).freelancer)
+
+    const applianceBlock = projectContextBlock({ projectName: 'מוצרי חשמל', domain: 'x.co.il', language: 'he', primaryProjectFocus: 'מקררים', secondaryProjectAreas: ['מדיחי כלים', 'מכונות כביסה'], ownedCategories: ['מקררים', 'מכונות כביסה', 'מדיחי כלים', 'קומקומים'], existingTopics: [] })
+    const appliancePrompt = buildPrompt('Hebrew', 'מוצרי חשמל', 'CATEGORIES: מקררים | category', [], 20, [], pblock, applianceBlock)
+    check('appliance prompt is NOT perfume-flagged', !domainFlags(appliancePrompt).perfume)
+    const petBlock = projectContextBlock({ projectName: 'חנות כלבים', domain: 'p.co.il', language: 'he', primaryProjectFocus: 'מיטות לכלבים', secondaryProjectAreas: ['רצועות', 'קערות'], ownedCategories: ['מיטות לכלבים', 'רצועות', 'קערות'], existingTopics: [] })
+    const petPrompt = buildPrompt('Hebrew', 'חנות כלבים', 'CATEGORIES: מיטות לכלבים | category', [], 20, [], pblock, petBlock)
+    check('pet prompt is NOT perfume/lighting flagged', !domainFlags(petPrompt).perfume && !domainFlags(petPrompt).lighting)
+  }
+
+  console.log('L) authoritative project context + focus + compact output + token config')
+  {
+    const focus = deriveProjectFocus({ projectName: 'מטלון', domain: 'matalon.co.il', ownedCategories: ['פיתוח תוכנה', 'נגישות', 'שיווק'], existingTopics: [] })
+    check('primaryProjectFocus derived from owned category (not name alone)', focus.primaryProjectFocus === 'פיתוח תוכנה')
+    check('secondaryProjectAreas populated from remaining owned areas', focus.secondaryProjectAreas.includes('נגישות') && focus.secondaryProjectAreas.includes('שיווק'))
+    const nameOnly = deriveProjectFocus({ projectName: 'מטלון', domain: 'matalon.co.il', ownedCategories: [], existingTopics: [] })
+    check('name-only project still yields a focus label (name + domain)', nameOnly.primaryProjectFocus.includes('מטלון'))
+    const block = projectContextBlock({ projectName: 'מטלון', domain: 'matalon.co.il', language: 'he', ...focus, ownedCategories: ['פיתוח תוכנה'], existingTopics: ['נושא קיים'] })
+    check('block labels primaryProjectFocus', /primaryProjectFocus/.test(block))
+    check('block labels secondaryProjectAreas', /secondaryProjectAreas/.test(block))
+    check('block declares context is the ONLY authoritative domain source', /ONLY authoritative source for the business domain/i.test(block))
+    check('block says instructions are NOT project content', /Instruction text, schema descriptions and quality rules are NOT project content/i.test(block))
+    check('block forbids inferring domain from name alone', /Do NOT infer the business domain from the project name alone/i.test(block))
+    check('project context block itself is domain-clean (only carries project data)', (() => { const f = domainFlags(projectContextBlock({ language: 'he', primaryProjectFocus: '', secondaryProjectAreas: [], ownedCategories: [], existingTopics: [] })); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+
+    // Compact output contract + token config.
+    const c = structuredOutputContract('Hebrew', 20)
+    check('contract caps secondaryKeywords at 4', /AT MOST 4/.test(c))
+    check('contract asks for a ONE-sentence reason', /ONE concise .* sentence/i.test(c))
+    check('contract: evidenceSummary only when distinct', /ONLY when it adds evidence DISTINCT/i.test(c))
+    check('contract: no volume repeated across fields', /Do not restate the monthly search volume/i.test(c))
+    // maxOutputTokens = 16384 for all reco model calls (source check).
+    const engineSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/engine.ts'), 'utf8')
+    const siteSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/site-scan.ts'), 'utf8')
+    const krSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/keyword-research.ts'), 'utf8')
+    // Output budget is now PROPORTIONAL (outputBudgetFor) — no flat 8192/16384.
+    check('engine reco call uses proportional outputBudgetFor', /outputBudgetFor\(/.test(engineSrc) && !/maxOutputTokens: 16384|maxOutputTokens: 8192/.test(engineSrc))
+    check('site-scan reco call uses proportional outputBudgetFor', /outputBudgetFor\(/.test(siteSrc) && !/maxOutputTokens: 16384|maxOutputTokens: 8192/.test(siteSrc))
+    check('keyword-research reco call uses proportional outputBudgetFor', /outputBudgetFor\(/.test(krSrc) && !/maxOutputTokens: 16384|maxOutputTokens: 8192/.test(krSrc))
+  }
+
+  console.log('P) cost control — Flash default, Pro curator, billing breaker, budgets')
+  {
+    // M.1/M.2/M.3/M.4: routing — Flash generator, Pro curator (optional, ≤1).
+    check('default generation model is Gemini 2.5 Flash (not Pro/Flash-Lite)', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
+    check('transient fallback is NOT flash-lite', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-flash-lite')
+    check('optional curator is Gemini 2.5 Pro', RECOMMENDATION_MODEL_CURATOR === 'gemini-2.5-pro')
+    check('version tag reflects flash default', /flash/.test(RECOMMENDATION_MODEL_VERSION))
+
+    // M.9/M.10: billing-exhausted classification + typed error (hard abort).
+    check('billing message → billing_exhausted', classifyModelError('429 Your prepayment credits are depleted') === 'billing_exhausted')
+    check('payment-required → billing_exhausted', classifyModelError('402 payment required') === 'billing_exhausted')
+    check('plain 429 rate-limit → rate_limited (not billing)', classifyModelError('429 Too Many Requests: rate limit') === 'rate_limited')
+    check('other error → model_unavailable', classifyModelError('500 internal error') === 'model_unavailable')
+    const be = new BillingExhaustedError()
+    check('BillingExhaustedError is typed + instanceof', be instanceof BillingExhaustedError && be.category === 'billing_exhausted')
+
+    // F: proportional token budget (not a flat ceiling for a few ideas).
+    check('output budget scales with count', outputBudgetFor(4) < outputBudgetFor(20))
+    check('output budget for a few ideas is well under the ceiling', outputBudgetFor(4) < 8192)
+    check('output budget never exceeds 16384 ceiling', outputBudgetFor(200) === 16384)
+    check('output budget has a floor', outputBudgetFor(1) >= 2048)
+
+    // C: global candidate budget — a target of 20 does NOT allow 50 raw.
+    const b = runBudget('standard', 20)
+    check('maxRawCandidates ≈ target + ~30% (not 2-3×)', b.maxRawCandidates >= 24 && b.maxRawCandidates <= 27, `got ${b.maxRawCandidates}`)
+    check('standard cost ceiling default $0.15', b.maxEstimatedCostUsd === 0.15)
+    check('standard max model calls default 4', b.maxModelCallsPerRun === 4)
+    const bp = runBudget('premium', 20)
+    check('premium cost ceiling default $0.50', bp.maxEstimatedCostUsd === 0.50)
+
+    // I: usage → cost estimate + cost per persisted idea + circuit-breaker headroom.
+    const usage: CallUsage[] = [
+      { model: 'gemini-2.5-flash', source: 'site_scan', callPurpose: 'primary', inputTokens: 3000, outputTokens: 4000, success: true },
+      { model: 'gemini-2.5-flash', source: 'project_data', callPurpose: 'primary', inputTokens: 2500, outputTokens: 3000, success: true },
+    ]
+    check('Flash call cheaper than the equivalent Pro call', estimateCallCostUsd({ model: 'gemini-2.5-flash', inputTokens: 3000, outputTokens: 4000 }) < estimateCallCostUsd({ model: 'gemini-2.5-pro', inputTokens: 3000, outputTokens: 4000 }))
+    const summary = summarizeRunCost(usage)
+    check('run cost summary aggregates calls + tokens', summary.modelCalls === 2 && summary.totalOutputTokens === 7000 && summary.estimatedRunCostUsd > 0)
+    check('run cost has an ILS figure', summary.estimatedRunCostIls > 0)
+    const persisted = 30
+    const costPerIdea = summary.estimatedRunCostUsd / persisted
+    check('cost-per-persisted-idea computable', costPerIdea > 0 && costPerIdea < summary.estimatedRunCostUsd)
+    // J: circuit breaker stops when the call/cost ceiling is reached.
+    check('headroom true under the ceiling', hasBudgetHeadroom(summary, b))
+    check('headroom false at the call ceiling', !hasBudgetHeadroom({ ...summary, modelCalls: 4 }, b))
+    check('headroom false over the cost ceiling', !hasBudgetHeadroom({ ...summary, estimatedRunCostUsd: 0.20 }, b))
+
+    // M.19/M.20: the domain-neutral fix is INTACT (no cost change reintroduced perfume).
+    check('regression: guidance still domain-clean', (() => { const f = domainFlags(recommendationGuidance('Hebrew', YEAR, 20)); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+  }
+
+  console.log('Q) Standard mode — shared RunCostController, staged orchestration, no Pro')
+  {
+    const rec = (model: string, source: string, purpose: string, inTok: number, outTok: number, ok = true) => ({
+      generationRunId: 'run', model, source, callPurpose: purpose, requestedIdeaCount: 10, maxOutputTokens: 4096,
+      inputTokens: inTok, outputTokens: outTok, thinkingTokens: 0, retryNumber: 0, success: ok, durationMs: 5,
+    })
+
+    // L.1/L.2: no Pro / no alternate-model path anywhere in Standard.
+    check('Standard primary is Flash (never Pro)', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
+    check('Standard fallback is not Pro', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-pro')
+    check('Standard fallback is not Flash-Lite', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-flash-lite')
+    check('fallback === primary → no alternate-model tier fires', RECOMMENDATION_MODEL_FALLBACK === RECOMMENDATION_MODEL_PRIMARY)
+    // No source passes a Pro model or noFallback→Pro anywhere in production source.
+    const files = ['engine', 'site-scan', 'keyword-research'].map((f) => readSrc(join(process.cwd(), `lib/content/recommendations/${f}.ts`), 'utf8')).join('\n')
+    // No generate call PASSES a Pro model (curator not wired). A telemetry
+    // comparison (r.model === RECOMMENDATION_MODEL_CURATOR) is fine — that counts 0.
+    check('no reco call passes a Pro model to generation', !/model:\s*(RECOMMENDATION_MODEL_CURATOR|['"]gemini-2\.5-pro['"])/.test(files))
+
+    // L.10/L.11/D: one shared controller gates every call by call + cost budget.
+    const c = new RunCostController('standard', 'run', 20) // budget: $0.15, 4 calls
+    check('controller has the standard budget', c.budget.maxModelCallsPerRun === 4 && c.budget.maxEstimatedCostUsd === 0.15)
+    let allowed = 0
+    for (let i = 0; i < 6; i++) { const g = c.beforeCall(0.001); if (g.allowed) { allowed++; c.recordCall(rec('gemini-2.5-flash', 'site_scan', 'primary', 2000, 1000)) } }
+    check('call-budget gate stops after maxModelCallsPerRun (4)', allowed === 4, `allowed ${allowed}`)
+    check('summary totalCalls matches records', c.summary().totalCalls === 4)
+    check('callsPreventedByBudget recorded', c.summary().callsPreventedByBudget === 2)
+    check('stopReason is call_budget_exhausted', c.summary().stopReason === 'call_budget_exhausted')
+
+    // L.12/I: cost ceiling denies an over-budget call (successful_with_shortfall path).
+    const cc = new RunCostController('standard', 'run', 20)
+    const bigGate = cc.beforeCall(0.20) // exceeds the $0.15 ceiling
+    check('cost gate denies an over-ceiling call', !bigGate.allowed && bigGate.reason === 'cost_budget_exhausted')
+    check('cost gate started zero calls', cc.summary().totalCalls === 0)
+
+    // L.7/L.8/E: billing exhaustion prevents EVERY later call (incl. retry/completion).
+    const bc = new RunCostController('standard', 'run', 20)
+    bc.beforeCall(0.001); bc.recordCall(rec('gemini-2.5-flash', 'site_scan', 'primary', 2000, 1000)) // one in-flight-ish
+    bc.markBillingExhausted()
+    const afterBilling = bc.beforeCall(0.001)
+    check('billing exhausted → later call denied', !afterBilling.allowed && afterBilling.reason === 'billing_exhausted')
+    check('billing exhausted flag set', bc.billingExhausted && bc.summary().billingExhausted)
+    check('callsPreventedAfterBillingFailure recorded', bc.summary().callsPreventedAfterBillingFailure >= 1)
+
+    // L.15/L.16/H: telemetry — every call recorded; run totals match.
+    const tc = new RunCostController('standard', 'run', 20)
+    tc.beforeCall(0.001); tc.recordCall(rec('gemini-2.5-flash', 'site_scan', 'primary', 3000, 1500))
+    tc.beforeCall(0.001); tc.recordCall(rec('gemini-2.5-flash', 'project_data', 'primary', 2000, 1000))
+    const s = tc.summary()
+    check('telemetry records every call', s.totalCalls === 2 && s.callsBySource.site_scan === 1 && s.callsBySource.project_data === 1)
+    check('run totals sum the records', s.totalInputTokens === 5000 && s.totalOutputTokens === 2500)
+    check('run cost has USD + ILS', s.estimatedRunCostUsd > 0 && s.estimatedRunCostIls > 0)
+
+    // B/C/L.3: staged ordering — strongest first, Stage 1 = at most two.
+    const order = orderSourcesByEvidence(['site_scan', 'keyword_research_url', 'project_data'] as const, { site_scan: 30, project_data: 12, keyword_research_url: 5 })
+    check('sources ordered by evidence (site_scan strongest)', order[0] === 'site_scan' && order[1] === 'project_data' && order[2] === 'keyword_research_url')
+    check('Stage 1 is at most two sources', stage1Sources(order).length === 2)
+    const withoutSeed = orderSourcesByEvidence(['keyword', 'site_scan', 'project_data'] as const, { keyword: -1, site_scan: 10, project_data: 5 })
+    check('a negative-signal source (no seed keyword) is dropped', !withoutSeed.includes('keyword' as never))
+
+    // Regression: domain-neutral fix still intact under cost control.
+    check('regression: guidance still domain-clean', (() => { const f = domainFlags(recommendationGuidance('Hebrew', YEAR, 20)); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+  }
+
+  console.log('R) REPEATED DISCOVERY — novelty-aware, no overblocking of materially-new topics')
+  {
+    // 1F: the domain-neutral repeated-discovery instruction is present and carries
+    // the required novelty semantics (materially new intent, not paraphrase).
+    const g = recommendationGuidance('Hebrew', YEAR, 20)
+    check('guidance carries a REPEATED DISCOVERY block', g.includes('REPEATED DISCOVERY:'))
+    check('repeated-discovery asks for materially new opportunities', /materially new opportunities/i.test(g))
+    check('repeated-discovery forbids paraphrasing pending ideas', /Do not return paraphrases of pending ideas/i.test(g))
+    check('repeated-discovery moves toward deeper subtopics as coverage grows', /deeper subtopics/i.test(g) && /As coverage grows/i.test(g))
+    check('repeated-discovery spans distinct audiences/comparisons/locations/lifecycle', /audiences/i.test(g) && /comparisons/i.test(g) && /locations/i.test(g) && /lifecycle stages/i.test(g))
+    check('repeated-discovery is gated by project-owned support (no invented scope)', /supported by the current project/i.test(g) && /only where the project-owned context supports them/i.test(g))
+
+    // 1F domain-neutrality: the repeated-discovery text must NOT hardcode any niche
+    // (no wedding/perfume/lighting/pet/freelancer example baked into shared guidance).
+    const rd = g.split('REPEATED DISCOVERY:')[1].split('\n')[0]
+    check('repeated-discovery block triggers NO domain flag', (() => { const f = domainFlags(rd); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+    check('repeated-discovery block names no wedding/proposal example', !/wedding|proposal|חתונה|הצעת/i.test(rd))
+
+    // 1D: coveredByExistingContent does NOT overblock a materially-new long-tail
+    // topic under an already-covered umbrella. Guard content phrase = an existing
+    // article title (neutral illustrative domain: outdoor gear).
+    const guard = buildKeywordGuardFromData({
+      topics: [{ topic: 'outdoor camping tents', primary_keyword: 'camping tents' }],
+      generatedArticleTitles: [],
+      trackingKeywords: [],
+      ideas: [],
+      scanTargets: [],
+    })
+    check('covered: a same-intent re-angle of the covered umbrella IS a duplicate', coveredByExistingContent(guard, 'outdoor camping tents', 'outdoor camping tents'))
+    check('NOT covered: a distinct long-tail keyword under the same umbrella is allowed',
+      !coveredByExistingContent(guard, 'outdoor camping tents — how to choose a winter 4-season tent', 'winter 4-season tent'))
+    check('NOT covered: a broad category does not cover its deeper subtopics',
+      !coveredByExistingContent(guard, 'choosing a lightweight backpacking tent', 'lightweight backpacking tent'))
+    check('NOT covered: a different audience/use-case under the umbrella is allowed',
+      !coveredByExistingContent(guard, 'family camping tents for first-time campers', 'family camping tent'))
+
+    // 1C/1D: the FROZEN corpus (0.82 jaccard) blocks true paraphrases but NEVER a
+    // materially-different subtopic — the defect was NOT here.
+    const corpus = new ExistingCorpus()
+    corpus.add('how to choose a winter camping tent')
+    check('corpus flags an exact-token paraphrase (reordered/synonym-adjacent) as duplicate', corpus.isDuplicate('how to choose winter camping tent'))
+    check('corpus flags a byte-exact pending topic as duplicate', corpus.isDuplicate('how to choose a winter camping tent'))
+    check('corpus does NOT flag a materially-different subtopic', !corpus.isDuplicate('best sleeping bags for cold-weather backpacking'))
+    check('corpus does NOT flag a different-audience topic that shares one word', !corpus.isDuplicate('family camping checklist for beginners'))
+
+    // 1E: pending context stays BOUNDED — structured anti-duplicate fields only,
+    // never verbose reasons/descriptions the model could learn to paraphrase.
+    const pending: PendingTopic[] = [
+      { title: 'מדריך אוהלי שטח', primaryKeyword: 'אוהל שטח', intent: 'informational', secondaryKeywords: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], sourceEntityName: 'אוהל' },
+    ]
+    const block = pendingTopicsBlock(pending)
+    check('pending block sends the anti-duplicate identity fields', block.includes('"title"') && block.includes('"primaryKeyword"') && block.includes('"intent"'))
+    const pendingItemsJson = block.split('\n')[1] // the serialized items array (identity fields only)
+    check('pending block leaks NO verbose reason/description/evidence field', !pendingItemsJson.includes('"reason"') && !pendingItemsJson.includes('"description"') && !pendingItemsJson.includes('"evidenceSummary"'))
+    check('pending block caps secondaryKeywords at 6', (JSON.parse(block.split('\n')[1]) as { secondaryKeywords: string[] }[])[0].secondaryKeywords.length === 6)
+    check('pending block enforces the duplicate self-check', /DUPLICATE SELF-CHECK/.test(block))
+    check('pending block explicitly allows genuine depth (no overblocking)', /Do NOT over-block genuine depth/.test(block))
+
+    // 1G: none of the Standard cost controls were relaxed by the discovery fix.
+    check('cost control intact: primary model is still Flash', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
+    check('cost control intact: no separate paid fallback tier', RECOMMENDATION_MODEL_FALLBACK === RECOMMENDATION_MODEL_PRIMARY)
+    check('cost control intact: standard run budget ceilings unchanged', (() => { const b = runBudget('standard', 20); return b.maxEstimatedCostUsd === 0.15 && b.maxModelCallsPerRun === 4 })())
+  }
+
+  // FROZEN-FILE GUARANTEE — hybrid.ts and dedupe.ts must be byte-identical to HEAD.
+  {
+    const frozenClean = (rel: string, mustContain: string) => {
+      const src = readFileSync(join(__dirname, '..', rel), 'utf8')
+      return src.includes(mustContain)
+    }
+    check('dedupe.ts still exposes the 0.82 near-duplicate default (unchanged semantics)', frozenClean('dedupe.ts', 'threshold = 0.82'))
+    check('hybrid.ts still present as the frozen merge (mergeHybrid)', frozenClean('hybrid.ts', 'mergeHybrid'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

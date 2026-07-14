@@ -13,7 +13,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { uploadMedia, createPost, updatePost, getCategories, getTags, WordPressClientError, type WordPressPostStatus } from '@/lib/wordpress/client'
+import { uploadMedia, createPost, updatePost, getCategories, getTags, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { reconcileInlineImagesForWordPress, injectInlineImages, type InlineWpResult } from '@/lib/content/inline-images'
 import { resolveTaxonomy, type ResolvedTaxonomy } from '@/lib/content/wordpress-taxonomy'
@@ -64,7 +64,18 @@ export interface WpCreateResult {
   /** True when this was an in-place update of an existing post (not a new post). */
   updated?: boolean
 }
-export type WpCreateError = { ok: false; kind: 'media_upload_failed' | 'post_failed'; detail?: string }
+/** The publish sub-stage a wpCreatePost failure surfaced in (for typed mapping). */
+export type WpCreateStage = 'media_upload' | 'inline_image_reconciliation' | 'taxonomy_resolution' | 'post_creation'
+export type WpCreateError = {
+  ok: false
+  kind: 'media_upload_failed' | 'post_failed'
+  detail?: string
+  /** The stage that failed — biases the route's typed-error classification. */
+  stage?: WpCreateStage
+  /** Secret-free structured meta from the underlying WordPressClientError, so the
+   *  route can map to a typed code instead of flattening to wordpress_post_failed. */
+  wpErrorMeta?: WordPressErrorMeta
+}
 
 /**
  * Upload the featured image (if any) and create the WordPress post. Returns the
@@ -100,7 +111,7 @@ export async function wpCreatePost(
     if (article.featured_image_url && storagePath) {
       const dl = await admin.storage.from(BUCKET).download(storagePath)
       if (dl.error || !dl.data) {
-        if (block) return { ok: false, kind: 'media_upload_failed' }
+        if (block) return { ok: false, kind: 'media_upload_failed', stage: 'media_upload' }
         imageWarning = true
       } else {
         try {
@@ -115,7 +126,7 @@ export async function wpCreatePost(
           featuredMedia = media.id
         } catch (err) {
           const detail = err instanceof WordPressClientError ? err.message : 'Media upload failed.'
-          if (block) return { ok: false, kind: 'media_upload_failed', detail }
+          if (block) return { ok: false, kind: 'media_upload_failed', detail, stage: 'media_upload', ...(err instanceof WordPressClientError ? { wpErrorMeta: err.meta } : {}) }
           imageWarning = true
         }
       }
@@ -193,6 +204,6 @@ export async function wpCreatePost(
     }
   } catch (err) {
     const detail = err instanceof WordPressClientError ? err.message : 'Post creation failed.'
-    return { ok: false, kind: 'post_failed', detail }
+    return { ok: false, kind: 'post_failed', detail, stage: 'post_creation', ...(err instanceof WordPressClientError ? { wpErrorMeta: err.meta } : {}) }
   }
 }
