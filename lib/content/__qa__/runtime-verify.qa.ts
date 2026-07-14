@@ -153,11 +153,11 @@ async function main() {
   {
     const src = read('../../../app/api/content/articles/[id]/wordpress/route.ts')
     // 8/9. article-load failures are typed, NOT unexpected_publish_error.
-    check('8. Supabase load error → article_load_failed (not unexpected)', /failArticle\('article_load_failed', 502, error\)/.test(src))
-    check('9. missing row → article_not_found', /failArticle\('article_not_found', 404\)/.test(src))
+    check('8. Supabase load error → article_load_failed (returned error path)', /failArticle\('article_load_failed', 502, \{ supabaseError: loadError \}\)/.test(src))
+    check('9. missing row → article_not_found', /failArticle\('article_not_found', 404, \{ dataWasNull: true \}\)/.test(src))
     check('article_project_missing + article_access_denied are typed', /failArticle\('article_project_missing'/.test(src) && /failArticle\('article_access_denied'/.test(src))
     // The proven defect fix: use select('*') like the working editor loader.
-    check('select uses * (matches the working editor loader; avoids 42703)', /\.from\('generated_articles'\)\s*\n\s*\.select\('\*'\)/.test(src))
+    check('select uses * (matches the working editor loader; avoids 42703)', /\.from\('generated_articles'\)\.select\('\*'\)\.eq\('id', id\)/.test(src))
     check('no explicit wp_primary_category_id column list in the load select', !/\.select\('id, project_id, topic_id[\s\S]*wp_tag_ids'\)/.test(src))
     // 10. article-load failures return BEFORE any WordPress work.
     const beforeWp = src.slice(0, src.indexOf("logStage('wp_create_post_started')"))
@@ -166,9 +166,19 @@ async function main() {
     // 7. params awaited correctly (Next.js 15 async params).
     check('7. route awaits params before using id', /const resolvedParams = await params/.test(src) && /id = resolvedParams\.id/.test(src))
     // Preview-only sanitized Supabase code/message; production public-only.
-    check('article-load Preview diagnostics carry sanitized supabase code/message', /isPreviewEnv\(\) && supabaseError \?[\s\S]{0,160}sanitizedSupabaseMessage: sanitizeTrace/.test(src))
+    check('article-load Preview diagnostics carry sanitized supabase message', /sanitizedSupabaseMessage: sanitizeTrace\(se\?\.message\)/.test(src))
     // 11. successful publishing path is unchanged (still calls wpCreatePost + typed WP errors).
     check('11. successful WordPress publish path unchanged (wpCreatePost + typed WP mapping)', /wpCreatePost\(auth\.admin, loaded\.creds/.test(src) && /classifyWordPressError/.test(src))
+    // Part 12 — a THROW in the load block (not just a returned error) is now caught.
+    check('P12. narrow try/catch around the article-load block', /try \{[\s\S]{0,320}\.from\('generated_articles'\)\.select\('\*'\)\.eq\('id', id\)\.maybeSingle\(\)[\s\S]{0,120}\} catch \(err\) \{[\s\S]{0,120}failArticle\('article_load_failed', 502, \{ thrown: err \}\)/.test(src))
+    check('P12. article_load_failed diagnostics include supabase code/details/hint + errorName + stack frame', /queryTable: 'generated_articles'/.test(src) && /queryMode: 'maybeSingle'/.test(src) && /sanitizedSupabaseDetails/.test(src) && /sanitizedSupabaseHint/.test(src) && /safeTopStackFrame: th \?/.test(src))
+    check('P12. article-load diagnostics are Preview-only (production public-only)', /const previewDiag = isPreviewEnv\(\) \? \{ diagnostics \} : \{\}/.test(src))
+    // Part 15 — the resolved id is guarded before reaching eq(), and eq uses `id`.
+    check('P15. empty id never reaches the query (guarded to article_not_found)', /if \(!id \|\| !id\.trim\(\)\) return failArticle\('article_not_found'/.test(src))
+    check('P15. the exact resolved id is the eq() filter value', /\.eq\('id', id\)/.test(src) && /id = resolvedParams\.id/.test(src))
+    // Part 14 — article load uses the service-role admin (same as the editor), so
+    // the query does not depend on a user session/RLS before ownership validation.
+    check('P14. load uses createAdminClient (service-role, editor-compatible)', /const admin = createAdminClient\(\)\n\s*const res = await admin\.from\('generated_articles'\)/.test(src))
   }
 
   console.log('G) Buy Buy trace sanitizers redact secrets (Part 11)')

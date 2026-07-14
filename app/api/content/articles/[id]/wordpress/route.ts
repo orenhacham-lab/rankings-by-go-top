@@ -130,22 +130,44 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 
-  /** Typed article-load failure (Part F) — never unexpected_publish_error. In
-   *  Preview, attaches the SANITIZED Supabase code/message so the defect is visible
-   *  in one response; production returns only the public typed fields. */
+  /** Typed article-load failure (Part F/12) — never unexpected_publish_error. In
+   *  Preview, attaches SANITIZED Supabase code/message/details/hint AND (for a
+   *  THROWN error) the error name + one stack frame, so the exact cause is visible
+   *  in one response. Production returns only the public typed fields. */
   const failArticle = (
     code: 'article_not_found' | 'article_load_failed' | 'article_access_denied' | 'article_project_missing',
     httpStatus: number,
-    supabaseError?: { code?: string; message?: string } | null,
+    opts?: {
+      supabaseError?: { code?: string; message?: string; details?: string; hint?: string } | null
+      thrown?: unknown
+      dataWasNull?: boolean
+    },
   ): Response => {
     const HE: Record<typeof code, string> = {
       article_not_found: 'המאמר לא נמצא.',
-      article_load_failed: 'טעינת המאמר נכשלה. יש לנסות שוב מאוחר יותר.',
+      article_load_failed: 'טעינת המאמר נכשלה.',
       article_access_denied: 'אין הרשאה לגשת למאמר זה.',
       article_project_missing: 'המאמר אינו משויך לפרויקט תקין.',
     }
-    console.error('[content-wp-export] article load failed', { diagnosticId, articleId: id, gitSha, vercelEnv, failureStage: stage, localErrorType: code, supabaseCode: supabaseError?.code ?? null, sanitizedSupabaseMessage: sanitizeTrace(supabaseError?.message) })
-    const previewDiag = isPreviewEnv() && supabaseError ? { diagnostics: { lastStage: stage, supabaseCode: supabaseError.code ?? null, sanitizedSupabaseMessage: sanitizeTrace(supabaseError.message), gitSha } } : {}
+    const se = opts?.supabaseError ?? null
+    const th = opts?.thrown as { name?: unknown; message?: unknown; stack?: unknown } | undefined
+    const diagnostics = {
+      articleId: id,
+      queryTable: 'generated_articles',
+      queryMode: 'maybeSingle' as const,
+      dataWasNull: opts?.dataWasNull ?? null,
+      errorWasPresent: !!se,
+      supabaseCode: se?.code ?? null,
+      sanitizedSupabaseMessage: sanitizeTrace(se?.message),
+      sanitizedSupabaseDetails: sanitizeTrace(se?.details),
+      sanitizedSupabaseHint: sanitizeTrace(se?.hint),
+      errorName: th ? (typeof th.name === 'string' ? th.name : (opts?.thrown instanceof Error ? opts.thrown.constructor.name : typeof opts?.thrown)) : null,
+      sanitizedErrorMessage: th ? sanitizeTrace(th.message) : null,
+      safeTopStackFrame: th ? safeTopStackFrame(th.stack) : null,
+      gitSha,
+    }
+    console.error('[content-wp-export] article load failed', { diagnosticId, vercelEnv, failureStage: stage, localErrorType: code, ...diagnostics })
+    const previewDiag = isPreviewEnv() ? { diagnostics } : {}
     return Response.json({ ok: false, error: code, reason: code, message: HE[code], diagnosticId, ...previewDiag }, { status: httpStatus })
   }
 
@@ -155,6 +177,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
     const resolvedParams = await params
     id = resolvedParams.id
+    // Part 15 — never let an empty/whitespace id reach the query's eq() filter.
+    if (!id || !id.trim()) return failArticle('article_not_found', 404, { dataWasNull: true })
 
     // Preview-ONLY forced-throw diagnostic: proves the deployed route actually runs
     // the top-level boundary. Production never honors it.
@@ -178,26 +202,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const wantUpdate = body.update === true
     postStatusForLog = status
 
-    const admin = createAdminClient()
     stage = 'article_load'
     logStage('article_load_started')
-    // Use select('*') — the SAME shape the article editor loads successfully. The
-    // prior explicit column list named optional taxonomy columns
-    // (wp_primary_category_id / wp_category_ids / wp_tag_ids); when a project's
-    // schema lacks one, Postgres returns 42703 "column does not exist" and the load
-    // failed here (projectId/connectionId null) — the proven Buy Buy cause. '*'
-    // returns whatever exists; missing columns are simply undefined (tolerated below).
-    const { data: article, error } = await admin
-      .from('generated_articles')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
-    if (error) {
-      if ((error as { code?: string }).code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
-      // Typed article-load failure (Part F) — NEVER unexpected_publish_error.
-      return failArticle('article_load_failed', 502, error)
+    // NARROW article-load boundary (Part 12): the prior code assumed the query
+    // RETURNS { error }, but on ac7339d it still failed here as
+    // unexpected_publish_error — i.e. a statement THREW (client creation or the
+    // awaited query rejecting), bypassing the `if (error)` mapping. This dedicated
+    // try/catch converts ANY throw here into a typed article_load_failed with safe
+    // Preview diagnostics. select('*') matches the working editor loader.
+    type SbError = { code?: string; message?: string; details?: string; hint?: string }
+    let article: unknown = null
+    let loadError: SbError | null = null
+    try {
+      const admin = createAdminClient()
+      const res = await admin.from('generated_articles').select('*').eq('id', id).maybeSingle()
+      article = res.data
+      loadError = (res.error as SbError | null) ?? null
+    } catch (err) {
+      return failArticle('article_load_failed', 502, { thrown: err })
     }
-    if (!article) return failArticle('article_not_found', 404)
+    if (loadError) {
+      if (loadError.code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
+      return failArticle('article_load_failed', 502, { supabaseError: loadError })
+    }
+    if (!article) return failArticle('article_not_found', 404, { dataWasNull: true })
 
     const a = article as Record<string, unknown>
     logStage('article_load_completed')
