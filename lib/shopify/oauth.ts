@@ -17,10 +17,22 @@ export interface ShopifyOAuthConfig {
   appUrl: string
 }
 
-/** Resolve the OAuth app credentials from server env. Never exposed to client. */
+/**
+ * Resolve the OAuth app credentials from server env. Never exposed to client.
+ *
+ * The PUBLIC app "Go Top SEO" is preferred when its credentials are present, so new
+ * installs authenticate with SHOPIFY_PUBLIC_CLIENT_ID/SECRET and the callback HMAC +
+ * token exchange use the public app secret. It falls back to the legacy custom-app
+ * SHOPIFY_CLIENT_ID/SECRET only when the public pair is unset (e.g. local/dev).
+ * Client ID + secret must come from the SAME app (never mixed). Stored access tokens
+ * are app-credential-independent bearer tokens, so existing connections keep working.
+ */
 export function getShopifyOAuthConfig(): ShopifyOAuthConfig | null {
-  const clientId = (process.env.SHOPIFY_CLIENT_ID || '').trim()
-  const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || '').trim()
+  const publicId = (process.env.SHOPIFY_PUBLIC_CLIENT_ID || '').trim()
+  const publicSecret = (process.env.SHOPIFY_PUBLIC_CLIENT_SECRET || '').trim()
+  const usePublic = !!publicId && !!publicSecret
+  const clientId = usePublic ? publicId : (process.env.SHOPIFY_CLIENT_ID || '').trim()
+  const clientSecret = usePublic ? publicSecret : (process.env.SHOPIFY_CLIENT_SECRET || '').trim()
   const appUrl = (process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
   if (!clientId || !clientSecret || !appUrl || !/^https:\/\//.test(appUrl)) return null
   return { clientId, clientSecret, appUrl }
