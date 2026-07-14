@@ -196,21 +196,27 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  * empty) from a transient failure (no client / thrown request / unparseable
  * output) so the caller can RETRY on failure instead of reporting "no ideas".
  */
-async function callGeminiIdeas(prompt: string, count: number, controller?: RunCostController, source = 'keyword', callPurpose = 'primary'): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
+async function callGeminiIdeas(prompt: string, count: number, controller?: RunCostController, source = 'keyword', callPurpose = 'primary'): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null; retryable: boolean; errorType?: string }> {
   // Flash generator (cost-controlled); output budget proportional to the count so a
   // small request never reserves the ceiling. Billing exhaustion throws (aborts).
-  // The shared controller gates + records this call.
-  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: outputBudgetFor(count) }, controller, { source, callPurpose, requestedIdeaCount: count })
-  if (!ok) return { ideas: [], ok: false, modelUsed }
+  // The shared controller gates + records this call. thinkingBudget:0 (in the model
+  // adapter) keeps the whole budget for the JSON body — no thinking→empty response.
+  const res = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: outputBudgetFor(count) }, controller, { source, callPurpose, requestedIdeaCount: count })
+  // A NON-ok response carries an explicit typed reason + whether an identical retry
+  // could resolve it (Part 3): gemini_max_tokens_empty / safety / empty_text are
+  // NOT retryable, so the loop stops instead of repeating the same failing call.
+  if (!res.ok) return { ideas: [], ok: false, modelUsed: res.modelUsed, retryable: res.retryable ?? false, errorType: res.errorType }
+  const text = res.text
   let parsed: { topics?: unknown }
   try {
     parsed = JSON.parse(text)
   } catch {
     const m = text.match(/\{[\s\S]*\}/)
-    if (!m) return { ideas: [], ok: false, modelUsed } // unparseable → treat as transient, retry
-    try { parsed = JSON.parse(m[0]) } catch { return { ideas: [], ok: false, modelUsed } }
+    // Malformed/partial JSON from a real (non-empty) response → one retry may help.
+    if (!m) return { ideas: [], ok: false, modelUsed: res.modelUsed, retryable: true, errorType: 'parse_failure' }
+    try { parsed = JSON.parse(m[0]) } catch { return { ideas: [], ok: false, modelUsed: res.modelUsed, retryable: true, errorType: 'parse_failure' } }
   }
-  return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : [], ok: true, modelUsed }
+  return { ideas: Array.isArray(parsed.topics) ? (parsed.topics as GeminiIdea[]) : [], ok: true, modelUsed: res.modelUsed, retryable: false }
 }
 
 /** Expand a BROAD seed keyword into many distinct long-tail article ideas. */
@@ -279,11 +285,11 @@ function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number, mod
  *   - 'model_empty'    → the model succeeded but returned no ideas
  */
 async function accumulate(
-  genBatch: (avoid: string[]) => Promise<{ items: TopicSuggestion[]; ok: boolean }>,
+  genBatch: (avoid: string[]) => Promise<{ items: TopicSuggestion[]; ok: boolean; retryable?: boolean; errorType?: string }>,
   corpus: ExistingCorpus,
   existingTitles: string[],
   target: number,
-): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string }> {
+): Promise<{ acc: TopicSuggestion[]; raw: number; dupes: number; attempts: number; reason?: string; lastErrorType?: string }> {
   const acc: TopicSuggestion[] = []
   const seenTitles = new Set<string>()
   let raw = 0
@@ -291,13 +297,18 @@ async function accumulate(
   let attempts = 0
   let hadSuccess = false
   let hadError = false
+  let lastErrorType: string | undefined
   while (acc.length < target && attempts < MAX_ATTEMPTS) {
     attempts++
     const avoid = [...existingTitles, ...acc.map((a) => a.title)]
-    const { items, ok } = await genBatch(avoid)
+    const { items, ok, retryable, errorType } = await genBatch(avoid)
     if (!ok) {
-      // Transient failure — back off and retry (do NOT report "no ideas").
       hadError = true
+      lastErrorType = errorType ?? lastErrorType
+      // Part 3 — only a GENUINELY transient failure is retried. A non-retryable
+      // outcome (gemini_max_tokens_empty / safety / empty text) stops immediately;
+      // repeating the identical call would just reproduce it.
+      if (retryable === false) break
       await sleep(300 * attempts)
       continue
     }
@@ -320,7 +331,7 @@ async function accumulate(
       : raw > 0
         ? 'all_duplicates'
         : 'model_empty'
-  return { acc, raw, dupes, attempts, reason }
+  return { acc, raw, dupes, attempts, reason, lastErrorType }
 }
 
 export async function generateRecommendations(admin: Admin, input: GenerateInput): Promise<RecommendationResult> {
@@ -414,6 +425,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   const validateSeen = new Set<string>()
   const rejects: Record<string, number> = {}
   let modelUsed: string | null = null
+  // Part 2 — the explicit typed model outcome for the last failed call (e.g.
+  // gemini_max_tokens_empty), surfaced in runtimeDiag for zero-result diagnosis.
+  let modelErrorType: string | undefined
   /** Apply the minimal safe validation to raw model ideas, counting rejects.
    *  Items that pass are returned UNCHANGED (byte-identical title/reason). */
   const keepValid = (ideas: GeminiIdea[]): GeminiIdea[] => ideas.filter((g) => {
@@ -511,20 +525,21 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     }
   } else if (input.source === 'keyword') {
     const keyword = (input.keyword || '').trim()
-    const { acc, raw, dupes, attempts, reason } = await accumulate(
+    const { acc, raw, dupes, attempts, reason, lastErrorType } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'keyword')
+        const { ideas, ok, modelUsed: m, retryable, errorType } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'keyword')
         if (m) modelUsed = m
-        return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok }
+        return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok, retryable, errorType }
       },
       corpus, existingTitles, srcTarget,
     )
     suggestions = acc
-    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
+    modelErrorType = lastErrorType
+    meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, modelErrorType: lastErrorType, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'project_data') {
-    const { acc, raw, dupes, attempts, reason } = await accumulate(
+    const { acc, raw, dupes, attempts, reason, lastErrorType } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'project_data')
+        const { ideas, ok, modelUsed: m, retryable, errorType } = await callGeminiIdeas(projectDataPrompt(langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'project_data')
         if (m) modelUsed = m
         const items = keepValid(ideas).map((g) => {
           const s = mapIdea(g, 'project_data', 0, modelUsed)
@@ -534,12 +549,13 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
           if (!s.suggestionReason) s.suggestionReason = language === 'he' ? 'נושא משלים לפי נתוני האתר' : 'A supporting topic based on the site data'
           return s
         }).filter((x): x is TopicSuggestion => !!x)
-        return { items, ok }
+        return { items, ok, retryable, errorType }
       },
       corpus, existingTitles, srcTarget,
     )
     suggestions = acc
-    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
+    modelErrorType = lastErrorType
+    meta = { source: 'project_data', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, modelErrorType: lastErrorType, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'site_scan') {
     // From the CACHED site scan — content-gap ideas, then dedupe. Never rescans.
     // Phase 3H.4 — pass rotation memory: existing titles + PENDING idea titles/
@@ -771,6 +787,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       rawCandidates: meta.generated,
       engineFinalCount: meta.finalCount,
       engineReason: meta.reason ?? null,
+      modelErrorType: modelErrorType ?? null,
       // Guidance reach (H) — booleans/counts only, never the prompt text.
       repeatedDiscoveryInstructionPresent: guidanceText.includes('REPEATED DISCOVERY:'),
       authoritativeProjectContextPresent: projectBlock.length > 0,

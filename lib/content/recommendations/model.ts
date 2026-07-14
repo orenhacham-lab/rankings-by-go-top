@@ -10,7 +10,7 @@
  * links: those keep their own model config.
  */
 
-import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { getRecoGenAiClient } from './genai-client'
 import type { RunCostController, CallStopReason } from './run-cost-controller'
 
 /** DEFAULT generation model — Gemini 2.5 Flash (NOT Flash-Lite, NOT Pro). */
@@ -24,6 +24,23 @@ export const RECOMMENDATION_MODEL_VERSION = process.env.RECOMMENDATION_MODEL_VER
 
 /** Typed model-error categories. billing_exhausted is a HARD stop (no fallback). */
 export type ModelErrorCategory = 'billing_exhausted' | 'rate_limited' | 'model_unavailable'
+
+/** Explicit recommendation-call outcomes (Part 2). A MAX_TOKENS/empty response is
+ *  NEVER silently collapsed into a generic model_error. */
+export type RecoErrorType =
+  | 'gemini_max_tokens_empty'
+  | 'gemini_empty_candidates'
+  | 'gemini_no_text_part'
+  | 'gemini_safety_block'
+  | 'gemini_timeout'
+  | 'gemini_empty_text'
+  | 'billing_exhausted'
+  | 'rate_limited'
+  | 'model_unavailable'
+
+/** Provider/response classification (Part 2). */
+export type RecoProviderStatus = 'ok' | 'empty' | 'blocked' | 'error'
+export type RecoParseStatus = 'json_ready' | 'empty' | 'not_attempted'
 
 /** Thrown on prepayment/credit exhaustion so the ENTIRE run aborts immediately —
  *  never caught into a Flash fallback or another paid call. */
@@ -65,12 +82,22 @@ export interface RecoGenResult {
   truncated?: boolean
   promptTokenCount?: number
   candidatesTokenCount?: number
+  thoughtsTokenCount?: number
   totalTokenCount?: number
   /** Output-only (candidates) token count used for cost/telemetry. */
   outputTokens?: number
   /** true when the shared cost controller PREVENTED this call (budget ceiling). */
   stopped?: boolean
   stopReason?: CallStopReason
+  // Part 2 — explicit response classification (never treat empty as success).
+  textPresent?: boolean
+  textLength?: number
+  providerStatus?: RecoProviderStatus
+  parseStatus?: RecoParseStatus
+  /** Explicit typed outcome (incl. gemini_max_tokens_empty). */
+  errorType?: RecoErrorType
+  /** Whether an IDENTICAL retry could plausibly resolve the failure (Part 3). */
+  retryable?: boolean
 }
 
 export interface RecoGenOptions {
@@ -97,55 +124,112 @@ export interface RecoCallInfo {
  * (unless noFallback); on total transient failure returns ok=false + errorCategory.
  * Never throws for non-billing failures.
  */
+/** Bad (blocking) finish reasons — a candidate here carries no usable JSON. */
+const BLOCKING_FINISH = new Set(['SAFETY', 'RECITATION', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII', 'LANGUAGE'])
+const GENAI_TIMEOUT_MS = 60_000
+
+export interface GenAiClassifyInput {
+  textPresent: boolean
+  finishReason?: string
+  hasCandidates: boolean
+  blocked: boolean
+}
+export interface GenAiClassifyResult {
+  ok: boolean
+  providerStatus: RecoProviderStatus
+  parseStatus: RecoParseStatus
+  errorType?: RecoErrorType
+  retryable: boolean
+}
+
+/**
+ * PURE classification of a Gemini response (Part 2). Empty text is NEVER treated
+ * as success. A MAX_TOKENS/empty body is the EXPLICIT gemini_max_tokens_empty and
+ * is NOT retryable (an identical call repeats it — Part 3). Order matters:
+ * MAX_TOKENS-empty → safety block → no candidates → no text part → usable JSON.
+ */
+export function classifyGenAiResponse(inp: GenAiClassifyInput): GenAiClassifyResult {
+  if (!inp.textPresent && inp.finishReason === 'MAX_TOKENS') return { ok: false, providerStatus: 'empty', parseStatus: 'empty', errorType: 'gemini_max_tokens_empty', retryable: false }
+  if (inp.blocked) return { ok: false, providerStatus: 'blocked', parseStatus: 'empty', errorType: 'gemini_safety_block', retryable: false }
+  if (!inp.hasCandidates) return { ok: false, providerStatus: 'empty', parseStatus: 'empty', errorType: 'gemini_empty_candidates', retryable: true }
+  if (!inp.textPresent) return { ok: false, providerStatus: 'empty', parseStatus: 'empty', errorType: 'gemini_empty_text', retryable: false }
+  return { ok: true, providerStatus: 'ok', parseStatus: 'json_ready', retryable: false }
+}
+
 export async function generateRecommendationJSON(prompt: string, opts: RecoGenOptions = {}, controller?: RunCostController, callInfo?: RecoCallInfo): Promise<RecoGenResult> {
-  const client = getGeminiClient()
-  if (!client) { console.warn('[reco-model] no gemini client (GEMINI_API_KEY unset)'); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable' } }
+  const client = getRecoGenAiClient()
+  if (!client) { console.warn('[reco-model] no gemini client (GEMINI_API_KEY unset)'); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable', errorType: 'model_unavailable', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: false } }
   const maxOutputTokens = opts.maxOutputTokens ?? outputBudgetFor(15)
-  const generationConfig = { responseMimeType: 'application/json', temperature: opts.temperature ?? 0.7, maxOutputTokens }
-  const primaryId = opts.model || RECOMMENDATION_MODEL_PRIMARY
-  const tiers: { tier: 'primary' | 'fallback'; id: string }[] = [{ tier: 'primary', id: primaryId }]
-  // Standard: RECOMMENDATION_MODEL_FALLBACK === primary (Flash) → fallback tier is
-  // skipped, so no alternate paid model is ever used. Only fires if explicitly set.
-  if (!opts.noFallback && RECOMMENDATION_MODEL_FALLBACK !== primaryId) tiers.push({ tier: 'fallback', id: RECOMMENDATION_MODEL_FALLBACK })
-  let lastCategory: ModelErrorCategory = 'model_unavailable'
+  // Flash-only generator. thinkingBudget:0 DISABLES dynamic thinking so the entire
+  // output budget is spent on the JSON answer (no thinking→empty MAX_TOKENS body).
+  const config = {
+    responseMimeType: 'application/json',
+    temperature: opts.temperature ?? 0.7,
+    maxOutputTokens,
+    thinkingConfig: { thinkingBudget: 0 },
+  }
+  const id = opts.model || RECOMMENDATION_MODEL_PRIMARY
   const source = callInfo?.source ?? 'unknown'
   const callPurpose = callInfo?.callPurpose ?? 'primary'
   const requestedIdeaCount = callInfo?.requestedIdeaCount ?? 0
   const retryNumber = callInfo?.retryNumber ?? 0
 
-  for (const { tier, id } of tiers) {
-    // ENFORCED pre-call gate — the shared controller decides whether this call may
-    // start (billing / call ceiling / cost ceiling). No controller → ungated.
-    if (controller) {
-      const est = controller.estimateNextCallUsd(id, prompt.length, maxOutputTokens)
-      const gate = controller.beforeCall(est)
-      if (!gate.allowed) return { text: '', ok: false, modelUsed: null, usedFallback: false, stopped: true, stopReason: gate.reason, errorCategory: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable' }
-    }
-    const startedAt = Date.now()
-    try {
-      const model = client.getGenerativeModel({ model: id, generationConfig })
-      const resp = (await model.generateContent(prompt)).response
-      const text = resp.text()
-      const finishReason = resp.candidates?.[0]?.finishReason
-      const usage = resp.usageMetadata
-      const outputTokens = usage?.candidatesTokenCount ?? 0
-      const thinkingTokens = (usage as { thoughtsTokenCount?: number } | undefined)?.thoughtsTokenCount ?? 0
-      controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: usage?.promptTokenCount ?? 0, outputTokens, thinkingTokens, finishReason, retryNumber, success: true, durationMs: Date.now() - startedAt })
-      if (tier === 'fallback') console.warn('[reco-model] primary failed → used transient fallback', { primary: primaryId, fallback: id })
-      return {
-        text, ok: true, modelUsed: id, usedFallback: tier === 'fallback',
-        finishReason, truncated: finishReason === 'MAX_TOKENS',
-        promptTokenCount: usage?.promptTokenCount, candidatesTokenCount: outputTokens, totalTokenCount: usage?.totalTokenCount, outputTokens,
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      const category = classifyModelError(message)
-      controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: 0, outputTokens: 0, thinkingTokens: 0, retryNumber, success: false, errorType: category, durationMs: Date.now() - startedAt })
-      // BILLING EXHAUSTED → trip the breaker + hard abort. Never a paid fallback.
-      if (category === 'billing_exhausted') { controller?.markBillingExhausted(); console.error('[reco-model] billing exhausted — aborting run', { model: id }); throw new BillingExhaustedError(message) }
-      lastCategory = category
-      console.error('[reco-model] generation error', { tier, model: id, category, message: message.slice(0, 200) })
-    }
+  // ENFORCED pre-call gate — the shared controller decides whether this call may
+  // start (billing / call ceiling / cost ceiling). No controller → ungated.
+  if (controller) {
+    const est = controller.estimateNextCallUsd(id, prompt.length, maxOutputTokens)
+    const gate = controller.beforeCall(est)
+    if (!gate.allowed) return { text: '', ok: false, modelUsed: null, usedFallback: false, stopped: true, stopReason: gate.reason, errorCategory: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable', errorType: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: false }
   }
-  return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: lastCategory }
+  const startedAt = Date.now()
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), GENAI_TIMEOUT_MS)
+  try {
+    const resp = await client.models.generateContent({ model: id, contents: prompt, config: { ...config, abortSignal: ac.signal } })
+    const candidate = resp.candidates?.[0]
+    const finishReason = candidate?.finishReason ? String(candidate.finishReason) : undefined
+    const usage = resp.usageMetadata
+    const promptTokenCount = usage?.promptTokenCount ?? 0
+    const outputTokens = usage?.candidatesTokenCount ?? 0
+    const thinkingTokens = usage?.thoughtsTokenCount ?? 0
+    const totalTokenCount = usage?.totalTokenCount ?? 0
+    const rawText = resp.text ?? ''
+    const text = typeof rawText === 'string' ? rawText : ''
+    const textPresent = text.trim().length > 0
+    const hasCandidates = (resp.candidates?.length ?? 0) > 0
+    const blocked = (finishReason && BLOCKING_FINISH.has(finishReason)) || !!resp.promptFeedback?.blockReason
+
+    controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: promptTokenCount, outputTokens, thinkingTokens, finishReason, retryNumber, success: textPresent, durationMs: Date.now() - startedAt })
+
+    const base = {
+      modelUsed: id, usedFallback: false, finishReason, truncated: finishReason === 'MAX_TOKENS',
+      promptTokenCount, candidatesTokenCount: outputTokens, thoughtsTokenCount: thinkingTokens, totalTokenCount, outputTokens,
+      textPresent, textLength: text.length,
+    }
+    const cls = classifyGenAiResponse({ textPresent, finishReason, hasCandidates, blocked })
+    if (cls.errorType === 'gemini_max_tokens_empty') {
+      console.error('[reco-model] MAX_TOKENS with empty text', { model: id, source, maxOutputTokens, outputTokens, thinkingTokens })
+    }
+    return {
+      ...base,
+      text: cls.ok ? text : '',
+      ok: cls.ok,
+      providerStatus: cls.providerStatus,
+      parseStatus: cls.parseStatus,
+      ...(cls.errorType ? { errorType: cls.errorType, errorCategory: 'model_unavailable' as ModelErrorCategory } : {}),
+      retryable: cls.retryable,
+    }
+  } catch (err) {
+    const aborted = ac.signal.aborted || (err as { name?: string })?.name === 'AbortError'
+    const message = err instanceof Error ? err.message : String(err)
+    const category = classifyModelError(message)
+    controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: 0, outputTokens: 0, thinkingTokens: 0, retryNumber, success: false, errorType: aborted ? 'gemini_timeout' : category, durationMs: Date.now() - startedAt })
+    // BILLING EXHAUSTED → trip the breaker + hard abort. Never a paid fallback.
+    if (!aborted && category === 'billing_exhausted') { controller?.markBillingExhausted(); console.error('[reco-model] billing exhausted — aborting run', { model: id }); throw new BillingExhaustedError(message) }
+    if (aborted) { console.error('[reco-model] generation timeout', { model: id, source, ms: GENAI_TIMEOUT_MS }); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable', errorType: 'gemini_timeout', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: true } }
+    console.error('[reco-model] generation error', { model: id, category, message: message.slice(0, 200) })
+    return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: category, errorType: category, providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: category === 'rate_limited' }
+  } finally {
+    clearTimeout(timer)
+  }
 }
