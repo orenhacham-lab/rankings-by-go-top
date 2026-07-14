@@ -271,7 +271,10 @@ export default function NewTopicsLinkPlanPanel({
       // link also keeps the panel open so the warning is actually seen.
       // Phase 3H — the success banner stays ~8s (dismissible earlier).
       if (queued) { setQueuedOk(true); if (r.droppedCount === 0) window.setTimeout(() => onClose(), 8000) }
-      else { setError(t.enqueueFailed) }
+      // The link plan was approved (runSave above) and the server approve-and-queue
+      // step promotes the topic before enqueue, so an enqueue failure here means the
+      // topic + links are approved but queueing failed (Part B truthful outcome).
+      else { setError(t.queueFailedAfterApproval) }
     } catch {
       setError(t.saveError)
     } finally {

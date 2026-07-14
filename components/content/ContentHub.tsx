@@ -150,7 +150,11 @@ export default function ContentHub() {
         const pd = await pr.json(); poolId = pd.pool?.id ?? null
       }
       if (!poolId) return false
-      const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
+      // Authoritative approve-then-enqueue: manual topics stay status='suggested'
+      // until this server operation promotes them (manual+suggested only) and adds
+      // them to the pool in one ownership-checked step. Auto topics are already
+      // approved, so this is a no-op promotion + normal enqueue for them.
+      const ir = await fetch(`/api/content/automation/pools/${poolId}/approve-and-queue`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topicIds }),
       })

@@ -415,6 +415,7 @@ export const dashboardEn = {
       queuedLinksSaved: 'The links you selected were saved to the article plan.',
       goToQueue: 'Go to queue',
       enqueueFailed: 'The links were saved, but adding to the queue failed. Please try again.',
+      queueFailedAfterApproval: 'The topic and links were approved, but adding to the queue failed.',
       close: 'Close',
       saveError: 'Failed to save plan',
       statusSuggested: 'Suggested',

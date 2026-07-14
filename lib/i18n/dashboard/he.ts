@@ -417,6 +417,7 @@ export const dashboardHe = {
       queuedLinksSaved: 'הקישורים שסימנת נשמרו לתכנון המאמר.',
       goToQueue: 'מעבר לתור',
       enqueueFailed: 'הקישורים נשמרו, אך ההוספה לתור נכשלה. נסה שוב.',
+      queueFailedAfterApproval: 'הנושא והקישורים אושרו, אך ההוספה לתור נכשלה',
       close: 'סגור',
       saveError: 'שמירת התכנון נכשלה',
       statusSuggested: 'הצעה',
