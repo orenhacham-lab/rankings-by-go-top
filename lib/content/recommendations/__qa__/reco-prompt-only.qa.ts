@@ -11,6 +11,9 @@ import { buildPrompt, completeSiteScanIdeas, type SiteScanModelCall, type RunSco
 import { domainFlags, isCrossDomain, fingerprint } from '../domain-flags'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_CURATOR, RECOMMENDATION_MODEL_VERSION, classifyModelError, BillingExhaustedError, outputBudgetFor } from '../model'
 import { estimateCallCostUsd, summarizeRunCost, runBudget, hasBudgetHeadroom, type CallUsage } from '../reco-cost'
+import { RunCostController } from '../run-cost-controller'
+import { orderSourcesByEvidence, stage1Sources } from '../hybrid-orchestration'
+import { readFileSync as readSrc } from 'fs'
 import { absorbPendingIntoAvoid, type PendingRow } from '../pending-avoid'
 import { ExistingCorpus } from '../dedupe'
 import { buildClustersPrompt, isVocabAligned, type ClusterInput } from '../keyword-research'
@@ -435,6 +438,69 @@ async function main() {
     check('headroom false over the cost ceiling', !hasBudgetHeadroom({ ...summary, estimatedRunCostUsd: 0.20 }, b))
 
     // M.19/M.20: the domain-neutral fix is INTACT (no cost change reintroduced perfume).
+    check('regression: guidance still domain-clean', (() => { const f = domainFlags(recommendationGuidance('Hebrew', YEAR, 20)); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+  }
+
+  console.log('Q) Standard mode — shared RunCostController, staged orchestration, no Pro')
+  {
+    const rec = (model: string, source: string, purpose: string, inTok: number, outTok: number, ok = true) => ({
+      generationRunId: 'run', model, source, callPurpose: purpose, requestedIdeaCount: 10, maxOutputTokens: 4096,
+      inputTokens: inTok, outputTokens: outTok, thinkingTokens: 0, retryNumber: 0, success: ok, durationMs: 5,
+    })
+
+    // L.1/L.2: no Pro / no alternate-model path anywhere in Standard.
+    check('Standard primary is Flash (never Pro)', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash')
+    check('Standard fallback is not Pro', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-pro')
+    check('Standard fallback is not Flash-Lite', RECOMMENDATION_MODEL_FALLBACK !== 'gemini-2.5-flash-lite')
+    check('fallback === primary → no alternate-model tier fires', RECOMMENDATION_MODEL_FALLBACK === RECOMMENDATION_MODEL_PRIMARY)
+    // No source passes a Pro model or noFallback→Pro anywhere in production source.
+    const files = ['engine', 'site-scan', 'keyword-research'].map((f) => readSrc(join(process.cwd(), `lib/content/recommendations/${f}.ts`), 'utf8')).join('\n')
+    // No generate call PASSES a Pro model (curator not wired). A telemetry
+    // comparison (r.model === RECOMMENDATION_MODEL_CURATOR) is fine — that counts 0.
+    check('no reco call passes a Pro model to generation', !/model:\s*(RECOMMENDATION_MODEL_CURATOR|['"]gemini-2\.5-pro['"])/.test(files))
+
+    // L.10/L.11/D: one shared controller gates every call by call + cost budget.
+    const c = new RunCostController('standard', 'run', 20) // budget: $0.15, 4 calls
+    check('controller has the standard budget', c.budget.maxModelCallsPerRun === 4 && c.budget.maxEstimatedCostUsd === 0.15)
+    let allowed = 0
+    for (let i = 0; i < 6; i++) { const g = c.beforeCall(0.001); if (g.allowed) { allowed++; c.recordCall(rec('gemini-2.5-flash', 'site_scan', 'primary', 2000, 1000)) } }
+    check('call-budget gate stops after maxModelCallsPerRun (4)', allowed === 4, `allowed ${allowed}`)
+    check('summary totalCalls matches records', c.summary().totalCalls === 4)
+    check('callsPreventedByBudget recorded', c.summary().callsPreventedByBudget === 2)
+    check('stopReason is call_budget_exhausted', c.summary().stopReason === 'call_budget_exhausted')
+
+    // L.12/I: cost ceiling denies an over-budget call (successful_with_shortfall path).
+    const cc = new RunCostController('standard', 'run', 20)
+    const bigGate = cc.beforeCall(0.20) // exceeds the $0.15 ceiling
+    check('cost gate denies an over-ceiling call', !bigGate.allowed && bigGate.reason === 'cost_budget_exhausted')
+    check('cost gate started zero calls', cc.summary().totalCalls === 0)
+
+    // L.7/L.8/E: billing exhaustion prevents EVERY later call (incl. retry/completion).
+    const bc = new RunCostController('standard', 'run', 20)
+    bc.beforeCall(0.001); bc.recordCall(rec('gemini-2.5-flash', 'site_scan', 'primary', 2000, 1000)) // one in-flight-ish
+    bc.markBillingExhausted()
+    const afterBilling = bc.beforeCall(0.001)
+    check('billing exhausted → later call denied', !afterBilling.allowed && afterBilling.reason === 'billing_exhausted')
+    check('billing exhausted flag set', bc.billingExhausted && bc.summary().billingExhausted)
+    check('callsPreventedAfterBillingFailure recorded', bc.summary().callsPreventedAfterBillingFailure >= 1)
+
+    // L.15/L.16/H: telemetry — every call recorded; run totals match.
+    const tc = new RunCostController('standard', 'run', 20)
+    tc.beforeCall(0.001); tc.recordCall(rec('gemini-2.5-flash', 'site_scan', 'primary', 3000, 1500))
+    tc.beforeCall(0.001); tc.recordCall(rec('gemini-2.5-flash', 'project_data', 'primary', 2000, 1000))
+    const s = tc.summary()
+    check('telemetry records every call', s.totalCalls === 2 && s.callsBySource.site_scan === 1 && s.callsBySource.project_data === 1)
+    check('run totals sum the records', s.totalInputTokens === 5000 && s.totalOutputTokens === 2500)
+    check('run cost has USD + ILS', s.estimatedRunCostUsd > 0 && s.estimatedRunCostIls > 0)
+
+    // B/C/L.3: staged ordering — strongest first, Stage 1 = at most two.
+    const order = orderSourcesByEvidence(['site_scan', 'keyword_research_url', 'project_data'] as const, { site_scan: 30, project_data: 12, keyword_research_url: 5 })
+    check('sources ordered by evidence (site_scan strongest)', order[0] === 'site_scan' && order[1] === 'project_data' && order[2] === 'keyword_research_url')
+    check('Stage 1 is at most two sources', stage1Sources(order).length === 2)
+    const withoutSeed = orderSourcesByEvidence(['keyword', 'site_scan', 'project_data'] as const, { keyword: -1, site_scan: 10, project_data: 5 })
+    check('a negative-signal source (no seed keyword) is dropped', !withoutSeed.includes('keyword' as never))
+
+    // Regression: domain-neutral fix still intact under cost control.
     check('regression: guidance still domain-clean', (() => { const f = domainFlags(recommendationGuidance('Hebrew', YEAR, 20)); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
   }
 

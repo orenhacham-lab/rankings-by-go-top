@@ -20,6 +20,17 @@ import { randomUUID } from 'crypto'
 /** In-flight run keys (project+source) for best-effort duplicate-click protection.
  *  Per server instance; released in a finally. Holds only opaque keys, no data. */
 const INFLIGHT = new Set<string>()
+/** Recently-completed idempotency keys (owner+project+source+clientRequestId) with
+ *  a short TTL, so an immediate duplicate replay of the SAME click doesn't run a
+ *  second time. Process-local (best-effort); a cross-instance guard needs a runs
+ *  table — see the report's production blocker. */
+const RECENT = new Map<string, number>()
+const RECENT_TTL_MS = 30_000
+function seenRecently(key: string): boolean {
+  const now = Date.now()
+  for (const [k, t] of RECENT) if (now - t > RECENT_TTL_MS) RECENT.delete(k)
+  return RECENT.has(key)
+}
 
 /** Domain flags for a set of suggestions (titles + keywords) — Preview diagnostic. */
 function suggestionsDomainFlags(items: { title: string; primaryKeyword: string }[]) {
@@ -48,17 +59,26 @@ export async function POST(request: Request) {
   const clientRequestId = typeof body.clientRequestId === 'string' ? body.clientRequestId : null
   const diagnostics = process.env.RECO_ISOLATION_DIAGNOSTICS === '1'
   const excludePendingContext = diagnostics && body.excludePendingContext === true
-  // Cost mode: premium (Flash pool + one Pro curator) only when explicitly asked
-  // AND Pro curation is enabled; everything else is standard (Flash only).
-  const qualityMode: 'standard' | 'premium' = body.qualityMode === 'premium' && process.env.RECO_ENABLE_PRO_CURATION !== '0' ? 'premium' : 'standard'
+  // Premium (Pro curator) is NOT implemented yet — a premium request is explicitly
+  // rejected (never silently downgraded to standard). Standard = Flash only.
+  if (body.qualityMode === 'premium') {
+    return Response.json({ suggestions: [], error: 'premium_not_available', meta: { source, reason: 'premium_not_available', qualityMode: 'premium', persisted: false, newlyAddedCount: 0 } }, { status: 400 })
+  }
+  const qualityMode: 'standard' = 'standard'
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
   // Duplicate-click protection: reject a concurrent identical run for the same
   // project+source (idempotency) so one accidental double-click can't pay twice.
-  const inflightKey = `${auth.project.id}:${source}`
-  if (INFLIGHT.has(inflightKey)) return Response.json({ error: 'run_in_progress', reason: 'run_in_progress' }, { status: 409 })
+  // Idempotency: owner + project + source + clientRequestId. Two identical
+  // requests (concurrent OR an immediate replay of the same click) must not both
+  // call Gemini. A distinct clientRequestId is a new intentional run and is allowed.
+  const idemKey = `${auth.user.id}:${auth.project.id}:${source}:${clientRequestId ?? 'none'}`
+  const inflightKey = clientRequestId ? idemKey : `${auth.project.id}:${source}`
+  if (INFLIGHT.has(inflightKey) || (clientRequestId && seenRecently(idemKey))) {
+    return Response.json({ error: 'run_in_progress', reason: 'run_in_progress' }, { status: 409 })
+  }
   INFLIGHT.add(inflightKey)
 
   if (!source || !SOURCES.includes(source)) {
@@ -252,5 +272,6 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Failed to generate recommendations' }, { status: 500 })
   } finally {
     INFLIGHT.delete(inflightKey)
+    if (clientRequestId) RECENT.set(idemKey, Date.now())
   }
 }

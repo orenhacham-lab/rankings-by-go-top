@@ -13,6 +13,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
+import type { RunCostController } from './run-cost-controller'
 import { recommendationGuidance } from './prompt-guidance'
 import { generateKeywordIdeas, type KeywordIdeaResult } from '@/lib/google-ads/keyword-ideas'
 import { GoogleAdsError } from '@/lib/google-ads/client'
@@ -185,6 +186,8 @@ export interface KeywordResearchInput {
   projectBlock?: string
   /** Cost-aware Hybrid orchestration: bounded max clusters to turn into topics. */
   sourceTargetOverride?: number
+  /** Shared request-level cost controller (gates + records the model call). */
+  controller?: RunCostController
 }
 
 export interface ClusterInput {
@@ -320,9 +323,9 @@ export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | '
   ].filter(Boolean).join('\n')
 }
 
-export async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = ''): Promise<ClustersToTopicsResult> {
+export async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = '', controller?: RunCostController): Promise<ClustersToTopicsResult> {
   const prompt = buildClustersPrompt(clusters, language, businessCtx, offerContext, pendingBlock, projectBlock)
-  const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: outputBudgetFor(clusters.length) })
+  const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: outputBudgetFor(clusters.length) }, controller, { source: 'keyword_research_url', callPurpose: 'primary', requestedIdeaCount: clusters.length })
   if (!ok) return { topics: [], rejected: [], ok: false }
   let parsed: { topics?: unknown; rejected?: unknown }
   try {
@@ -492,7 +495,7 @@ export async function recommendFromKeywordResearch(
   // deterministic "[keyword]: המדריך המלא" fallback (an unusable batch returns
   // fewer/none, with rejected classifications counted in diagnostics).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
-  const { topics: geminiTopics, rejected: rejectedByModel } = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '', input.projectBlock ?? '')
+  const { topics: geminiTopics, rejected: rejectedByModel } = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '', input.projectBlock ?? '', input.controller)
   const clusterByPrimary = new Map(clusterInputs.map((c) => [normalizeText(c.primaryKeyword), c]))
 
   const suggestions: TopicSuggestion[] = []

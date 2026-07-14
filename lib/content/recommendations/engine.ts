@@ -19,8 +19,10 @@ import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { absorbPendingIntoAvoid, type PendingRow } from './pending-avoid'
-import { generateRecommendationJSON, outputBudgetFor, BillingExhaustedError } from './model'
+import { generateRecommendationJSON, outputBudgetFor, BillingExhaustedError, RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from './model'
 import { runBudget } from './reco-cost'
+import { RunCostController, newRunCostController } from './run-cost-controller'
+import { orderSourcesByEvidence, stage1Sources } from './hybrid-orchestration'
 import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
@@ -135,6 +137,10 @@ export interface GenerateInput {
   /** Cost-aware Hybrid orchestration: the bounded raw-candidate quota this source
    *  may generate (the global candidate budget divided across sources). */
   sourceTargetOverride?: number
+  /** The ONE request-local cost controller shared by every model call in this user
+   *  action (Hybrid passes it to each source so budgets/billing are enforced across
+   *  sources, not per source). Created at the top when absent. */
+  controller?: RunCostController
 }
 
 /** Raw idea shape returned by the Gemini prompts below. */
@@ -190,10 +196,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  * empty) from a transient failure (no client / thrown request / unparseable
  * output) so the caller can RETRY on failure instead of reporting "no ideas".
  */
-async function callGeminiIdeas(prompt: string, count: number): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
+async function callGeminiIdeas(prompt: string, count: number, controller?: RunCostController, source = 'keyword', callPurpose = 'primary'): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
   // Flash generator (cost-controlled); output budget proportional to the count so a
   // small request never reserves the ceiling. Billing exhaustion throws (aborts).
-  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: outputBudgetFor(count) })
+  // The shared controller gates + records this call.
+  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: outputBudgetFor(count) }, controller, { source, callPurpose, requestedIdeaCount: count })
   if (!ok) return { ideas: [], ok: false, modelUsed }
   let parsed: { topics?: unknown }
   try {
@@ -420,56 +427,93 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   const qualityMode = input.qualityMode === 'premium' ? 'premium' : 'standard'
   const budget = runBudget(qualityMode, TARGET_NEW)
   const srcTarget = Math.max(4, Math.min(input.sourceTargetOverride ?? TARGET_NEW, budget.maxRawCandidates))
+  // ONE shared controller for the whole user action (created at the top; passed
+  // down to every source so the call/cost/billing gates are enforced ACROSS sources).
+  const controller = input.controller ?? newRunCostController(qualityMode, input.generationRunId ?? 'no-run-id', TARGET_NEW)
 
   if (input.source === 'hybrid') {
-    // Phase 4C — HYBRID orchestrator. Run every ELIGIBLE provider INDEPENDENTLY
-    // (each is the existing single-source path, unchanged, and reuses its own
-    // caches — site-scan index, keyword-research cache — since they key by
-    // project). Failures are isolated via allSettled; one dead provider never
-    // stops the others. Then merge + cluster + rank + attach provenance. The
-    // 'keyword' provider is only eligible when a seed keyword was supplied.
-    const eligible: RecommendationSource[] = ['site_scan', 'keyword_research_url', 'project_data']
-    if ((input.keyword || '').trim()) eligible.unshift('keyword')
-    // COST-AWARE orchestration: each provider gets only a bounded slice of the
-    // global candidate budget (never the whole target), so total raw generation
-    // stays within target + ~30% instead of 3× over-generating. Providers run
-    // concurrently for latency; the budget cap — not fan-out — controls cost.
-    const perSourceTarget = Math.max(6, Math.ceil(budget.maxRawCandidates / eligible.length))
-    const settled = await Promise.allSettled(
-      eligible.map((s) => generateRecommendations(admin, { ...input, source: s, sourceTargetOverride: perSourceTarget, qualityMode })),
-    )
-    // BILLING circuit breaker: a depleted-credit failure in ANY provider aborts the
-    // whole run (never continue with a partial paid result / another paid call).
-    for (const r of settled) if (r.status === 'rejected' && r.reason instanceof BillingExhaustedError) throw r.reason
-    const runs = eligible.map((s, i) => {
-      const r = settled[i]
-      if (r.status === 'fulfilled') return { source: s, ok: true, reason: r.value.meta.reason, suggestions: r.value.suggestions }
-      console.error('[recommendations] hybrid provider failed', { source: s, message: String(r.reason).slice(0, 200) })
-      return { source: s, ok: false, reason: 'provider_error', suggestions: [] as TopicSuggestion[] }
-    })
+    // Phase 4C + cost control — STAGED orchestration (NOT one big concurrent
+    // fan-out). Sources are ordered by cheap deterministic evidence signals; Stage 1
+    // runs the two strongest concurrently, then we STOP as soon as the fresh target
+    // is met — later sources run only for the exact remaining count, within the
+    // shared call/cost budget. hybrid.ts ranking is unchanged (mergeHybrid).
+    const eligibleAll: RecommendationSource[] = ['site_scan', 'keyword_research_url', 'project_data']
+    if ((input.keyword || '').trim()) eligibleAll.unshift('keyword')
+    // Evidence capacity signals (no model call): indexed entities, corpus/context,
+    // a seed keyword. Deterministic ordering — strongest first.
+    const signal: Record<string, number> = {
+      keyword: (input.keyword || '').trim() ? 100 : -1,
+      site_scan: ownedCategories.length * 3,
+      project_data: 6 + Math.min(existingTitles.length, 20) + (project.business_name ? 3 : 0),
+      keyword_research_url: 5,
+    }
+    const eligible = orderSourcesByEvidence(eligibleAll, signal)
+    const hybridTarget = TARGET_NEW
+    const executionOrder: { source: string; requested: number; remainingBefore: number }[] = []
+    const skippedSources: { source: string; reason: string }[] = []
+    const runs: { source: RecommendationSource; ok: boolean; reason?: string; suggestions: TopicSuggestion[] }[] = []
+    let billingHit = false
+
+    const runOne = async (s: RecommendationSource, remaining: number): Promise<void> => {
+      const requested = Math.max(4, Math.min(Math.ceil(budget.maxRawCandidates / Math.max(1, eligible.length)), remaining + 2))
+      executionOrder.push({ source: s, requested, remainingBefore: remaining })
+      try {
+        const r = await generateRecommendations(admin, { ...input, source: s, sourceTargetOverride: requested, qualityMode, controller })
+        runs.push({ source: s, ok: true, reason: r.meta.reason, suggestions: r.suggestions })
+      } catch (e) {
+        if (e instanceof BillingExhaustedError) { billingHit = true; return }
+        console.error('[recommendations] hybrid provider failed', { source: s, message: String(e).slice(0, 200) })
+        runs.push({ source: s, ok: false, reason: 'provider_error', suggestions: [] })
+      }
+    }
+    const freshCount = () => mergeHybrid(runs).suggestions.length
+    const canDoMore = () => !controller.billingExhausted && !billingHit && controller.summary().totalCalls < budget.maxModelCallsPerRun && controller.summary().estimatedRunCostUsd < budget.maxEstimatedCostUsd
+
+    // Stage 1 — the two strongest sources, concurrently.
+    const stage1 = stage1Sources(eligible)
+    await Promise.all(stage1.map((s) => runOne(s, hybridTarget)))
+    if (billingHit || controller.billingExhausted) throw new BillingExhaustedError()
+    // Stages 2..N — only when short AND budget remains; request the remaining count.
+    for (let i = 2; i < eligible.length; i++) {
+      const s = eligible[i]
+      const remaining = hybridTarget - freshCount()
+      if (remaining <= 0) { skippedSources.push({ source: s, reason: 'target_met' }); continue }
+      if (!canDoMore()) { skippedSources.push({ source: s, reason: controller.billingExhausted ? 'billing_exhausted' : 'budget_exhausted' }); continue }
+      await runOne(s, remaining)
+      if (billingHit || controller.billingExhausted) throw new BillingExhaustedError()
+    }
     const merged = mergeHybrid(runs)
     // Fold a language-aware "supported by…" summary into the reason so provenance
     // survives persistence; supportingSources drives the badges on the fresh run.
     suggestions = merged.suggestions.map((s) => ({ ...s, suggestionReason: hybridProvenanceReason(s.supportingSources ?? [], language, s.suggestionReason) }))
     const rawGenerated = runs.reduce((n, r) => n + r.suggestions.length, 0)
     const anyOk = runs.some((r) => r.ok)
+    const cost = controller.summary()
+    const recs = controller.records_()
+    const proCalls = recs.filter((r) => r.model === RECOMMENDATION_MODEL_CURATOR).length
+    const fallbackCalls = recs.filter((r) => r.model !== RECOMMENDATION_MODEL_PRIMARY && r.model !== RECOMMENDATION_MODEL_CURATOR).length
     meta = {
       source: 'hybrid',
       generated: rawGenerated,
       skippedDuplicates: merged.duplicatesRemoved,
       finalCount: suggestions.length,
       attempts: 1,
-      reason: suggestions.length > 0 ? undefined : (!anyOk ? 'model_error' : rawGenerated > 0 ? 'all_duplicates' : 'model_empty'),
+      reason: suggestions.length > 0
+        ? (cost.stopReason && suggestions.length < hybridTarget ? 'successful_with_shortfall' : undefined)
+        : (!anyOk ? 'model_error' : rawGenerated > 0 ? 'all_duplicates' : 'model_empty'),
       providers: merged.providerStatus,
-      debug: process.env.NODE_ENV !== 'production'
-        ? { providerStatus: merged.providerStatus, rawCount: merged.rawCount, clusterCount: merged.clusterCount, duplicatesRemoved: merged.duplicatesRemoved }
+      debug: input.collectTrace || process.env.NODE_ENV !== 'production'
+        ? { providerStatus: merged.providerStatus, rawCount: merged.rawCount, clusterCount: merged.clusterCount, duplicatesRemoved: merged.duplicatesRemoved,
+            qualityMode, effectiveModels: [RECOMMENDATION_MODEL_PRIMARY], proCalls, fallbackCalls,
+            sourceExecutionOrder: executionOrder, skippedSources, totalCalls: cost.totalCalls, stoppedByBudget: cost.stopReason ?? null,
+            billingExhausted: cost.billingExhausted, runCost: cost, callRecords: input.collectTrace ? controller.records_() : undefined }
         : undefined,
     }
   } else if (input.source === 'keyword') {
     const keyword = (input.keyword || '').trim()
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget)
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'keyword')
         if (m) modelUsed = m
         return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok }
       },
@@ -480,7 +524,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   } else if (input.source === 'project_data') {
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget)
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'project_data')
         if (m) modelUsed = m
         const items = keepValid(ideas).map((g) => {
           const s = mapIdea(g, 'project_data', 0, modelUsed)
@@ -529,7 +573,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const res = await recommendFromSiteScan(admin, {
       projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock, projectBlock,
       generationRunId: input.generationRunId, collectTrace: input.collectTrace, pendingContextCount: pendingTopics.length,
-      sourceTargetOverride: srcTarget,
+      sourceTargetOverride: srcTarget, controller,
     }, businessCtx)
     const seenTitles = new Set<string>()
     let dupes = 0
@@ -603,6 +647,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       pendingBlock,
       projectBlock,
       sourceTargetOverride: srcTarget,
+      controller,
     })
     const seenTitles = new Set<string>()
     let dupes = 0

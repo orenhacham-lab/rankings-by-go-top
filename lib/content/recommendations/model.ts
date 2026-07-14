@@ -11,6 +11,7 @@
  */
 
 import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import type { RunCostController, CallStopReason } from './run-cost-controller'
 
 /** DEFAULT generation model — Gemini 2.5 Flash (NOT Flash-Lite, NOT Pro). */
 export const RECOMMENDATION_MODEL_PRIMARY = process.env.RECOMMENDATION_MODEL_PRIMARY || 'gemini-2.5-flash'
@@ -67,6 +68,9 @@ export interface RecoGenResult {
   totalTokenCount?: number
   /** Output-only (candidates) token count used for cost/telemetry. */
   outputTokens?: number
+  /** true when the shared cost controller PREVENTED this call (budget ceiling). */
+  stopped?: boolean
+  stopReason?: CallStopReason
 }
 
 export interface RecoGenOptions {
@@ -78,6 +82,14 @@ export interface RecoGenOptions {
   noFallback?: boolean
 }
 
+/** Per-call telemetry context (source + purpose) for the shared controller. */
+export interface RecoCallInfo {
+  source: string
+  callPurpose: string
+  requestedIdeaCount: number
+  retryNumber?: number
+}
+
 /**
  * ONE JSON generation. Uses the Flash generator by default (or `opts.model`). On a
  * BILLING error it THROWS BillingExhaustedError (hard abort — NO fallback, no
@@ -85,40 +97,54 @@ export interface RecoGenOptions {
  * (unless noFallback); on total transient failure returns ok=false + errorCategory.
  * Never throws for non-billing failures.
  */
-export async function generateRecommendationJSON(prompt: string, opts: RecoGenOptions = {}): Promise<RecoGenResult> {
+export async function generateRecommendationJSON(prompt: string, opts: RecoGenOptions = {}, controller?: RunCostController, callInfo?: RecoCallInfo): Promise<RecoGenResult> {
   const client = getGeminiClient()
   if (!client) { console.warn('[reco-model] no gemini client (GEMINI_API_KEY unset)'); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable' } }
-  const generationConfig = {
-    responseMimeType: 'application/json',
-    temperature: opts.temperature ?? 0.7,
-    maxOutputTokens: opts.maxOutputTokens ?? outputBudgetFor(15),
-  }
+  const maxOutputTokens = opts.maxOutputTokens ?? outputBudgetFor(15)
+  const generationConfig = { responseMimeType: 'application/json', temperature: opts.temperature ?? 0.7, maxOutputTokens }
   const primaryId = opts.model || RECOMMENDATION_MODEL_PRIMARY
   const tiers: { tier: 'primary' | 'fallback'; id: string }[] = [{ tier: 'primary', id: primaryId }]
+  // Standard: RECOMMENDATION_MODEL_FALLBACK === primary (Flash) → fallback tier is
+  // skipped, so no alternate paid model is ever used. Only fires if explicitly set.
   if (!opts.noFallback && RECOMMENDATION_MODEL_FALLBACK !== primaryId) tiers.push({ tier: 'fallback', id: RECOMMENDATION_MODEL_FALLBACK })
   let lastCategory: ModelErrorCategory = 'model_unavailable'
+  const source = callInfo?.source ?? 'unknown'
+  const callPurpose = callInfo?.callPurpose ?? 'primary'
+  const requestedIdeaCount = callInfo?.requestedIdeaCount ?? 0
+  const retryNumber = callInfo?.retryNumber ?? 0
+
   for (const { tier, id } of tiers) {
+    // ENFORCED pre-call gate — the shared controller decides whether this call may
+    // start (billing / call ceiling / cost ceiling). No controller → ungated.
+    if (controller) {
+      const est = controller.estimateNextCallUsd(id, prompt.length, maxOutputTokens)
+      const gate = controller.beforeCall(est)
+      if (!gate.allowed) return { text: '', ok: false, modelUsed: null, usedFallback: false, stopped: true, stopReason: gate.reason, errorCategory: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable' }
+    }
+    const startedAt = Date.now()
     try {
       const model = client.getGenerativeModel({ model: id, generationConfig })
       const resp = (await model.generateContent(prompt)).response
       const text = resp.text()
       const finishReason = resp.candidates?.[0]?.finishReason
       const usage = resp.usageMetadata
+      const outputTokens = usage?.candidatesTokenCount ?? 0
+      const thinkingTokens = (usage as { thoughtsTokenCount?: number } | undefined)?.thoughtsTokenCount ?? 0
+      controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: usage?.promptTokenCount ?? 0, outputTokens, thinkingTokens, finishReason, retryNumber, success: true, durationMs: Date.now() - startedAt })
       if (tier === 'fallback') console.warn('[reco-model] primary failed → used transient fallback', { primary: primaryId, fallback: id })
       return {
         text, ok: true, modelUsed: id, usedFallback: tier === 'fallback',
         finishReason, truncated: finishReason === 'MAX_TOKENS',
-        promptTokenCount: usage?.promptTokenCount, candidatesTokenCount: usage?.candidatesTokenCount, totalTokenCount: usage?.totalTokenCount,
-        outputTokens: usage?.candidatesTokenCount,
+        promptTokenCount: usage?.promptTokenCount, candidatesTokenCount: outputTokens, totalTokenCount: usage?.totalTokenCount, outputTokens,
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       const category = classifyModelError(message)
-      // BILLING EXHAUSTED → hard abort. Never fall through to a paid fallback.
-      if (category === 'billing_exhausted') { console.error('[reco-model] billing exhausted — aborting run', { model: id }); throw new BillingExhaustedError(message) }
+      controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: 0, outputTokens: 0, thinkingTokens: 0, retryNumber, success: false, errorType: category, durationMs: Date.now() - startedAt })
+      // BILLING EXHAUSTED → trip the breaker + hard abort. Never a paid fallback.
+      if (category === 'billing_exhausted') { controller?.markBillingExhausted(); console.error('[reco-model] billing exhausted — aborting run', { model: id }); throw new BillingExhaustedError(message) }
       lastCategory = category
       console.error('[reco-model] generation error', { tier, model: id, category, message: message.slice(0, 200) })
-      // rate_limited / model_unavailable → try the single fallback, then give up.
     }
   }
   return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: lastCategory }

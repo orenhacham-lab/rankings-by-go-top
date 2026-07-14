@@ -18,6 +18,7 @@ import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
+import type { RunCostController } from './run-cost-controller'
 import { recommendationGuidance, structuredOutputContract } from './prompt-guidance'
 import { validateIdea } from './validate'
 import { domainFlags, fingerprint, type DomainFlags } from './domain-flags'
@@ -51,6 +52,8 @@ export interface SiteScanRecoInput {
   scanEntityCount?: number
   /** Cost-aware Hybrid orchestration: the bounded raw target for this source. */
   sourceTargetOverride?: number
+  /** Shared request-level cost controller (gates + records every model call). */
+  controller?: RunCostController
 }
 
 export type SiteScanReason = 'no_scan' | 'insufficient_data' | 'model_error' | 'model_empty'
@@ -259,8 +262,8 @@ export interface SiteScanModelCall {
  *  the prompt + response + parse/finish diagnostics. A truncated/unparseable
  *  response is reported as parseError with ZERO ideas — partial JSON is NEVER
  *  salvaged or partially persisted. */
-async function callModel(prompt: string, count = 20): Promise<SiteScanModelCall> {
-  const r = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: outputBudgetFor(count) })
+async function callModel(prompt: string, count = 20, controller?: RunCostController, callPurpose = 'primary'): Promise<SiteScanModelCall> {
+  const r = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: outputBudgetFor(count) }, controller, { source: 'site_scan', callPurpose, requestedIdeaCount: count })
   const base = { prompt, responseText: r.text, modelUsed: r.modelUsed, finishReason: r.finishReason, truncated: r.truncated, promptTokenCount: r.promptTokenCount, candidatesTokenCount: r.candidatesTokenCount, totalTokenCount: r.totalTokenCount }
   if (!r.ok) return { ...base, ideas: [], ok: false, parseError: 'model_error' }
   const ideas = extractIdeas(r.text)
@@ -451,7 +454,7 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
       // businessCtx, pendingBlock, projectBlock, langLabel) — never from a prior
       // response or module state. The parse-failure retry uses COMPACT mode. Output
       // token budget is proportional to the remaining `need`.
-      runCall: (need, avoid, purpose) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, pendingBlock, input.projectBlock ?? '', purpose === 'retry_after_parse_failure'), need),
+      runCall: (need, avoid, purpose) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, pendingBlock, input.projectBlock ?? '', purpose === 'retry_after_parse_failure'), need, input.controller, purpose),
       collectTrace: !!input.collectTrace,
       traceContext: {
         pendingContextFingerprint: fingerprint(pendingBlock),
