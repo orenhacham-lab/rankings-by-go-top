@@ -6,7 +6,7 @@
  * live Gemini quality (that is the Preview smoke).
  */
 import { validateIdea, normalizeTitleKey, hasStaleCurrentYear, isHistoricalYear } from '../validate'
-import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, type PendingTopic } from '../prompt-guidance'
+import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from '../prompt-guidance'
 import { buildPrompt, completeSiteScanIdeas, type SiteScanModelCall, type RunScope } from '../site-scan'
 import { domainFlags, isCrossDomain, fingerprint } from '../domain-flags'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_FALLBACK, RECOMMENDATION_MODEL_VERSION } from '../model'
@@ -90,16 +90,16 @@ async function main() {
     const g = recommendationGuidance('Hebrew', YEAR, 20)
     check('instructs natural Hebrew, no corruption', /never invent, shorten|corrupt a Hebrew word|דוגמיות/i.test(g))
     check('names preserved exactly (no new transliteration)', /EXACTLY as supplied|new transliteration/i.test(g))
-    check('grounding: only supplied facts', /use ONLY facts and entities supplied/i.test(g))
-    check('brand precision (Acqua ≠ Profumum)', /Acqua di Parma.*Profumum Roma|one shared generic word/i.test(g))
-    check('no invented children/rarity/trends', /products for children|limited editions|rarity|trends/i.test(g))
+    check('grounding: only project-owned facts', /use ONLY facts and entities present in the project-owned context/i.test(g))
+    check('entity precision is domain-NEUTRAL (no real brand)', /do not treat two distinct named entities as identical merely because they share a generic word/i.test(g))
+    check('no invented audiences/rarity/trends', /invent audiences, safety claims, limited editions, rarity/i.test(g))
     check('year 2026, keep historical', new RegExp(`${YEAR}`).test(g) && /שנות ה-90|historical years/i.test(g))
     check('no internal labels in reasons', /NEVER expose internal labels|cluster 8/i.test(g))
     const c = structuredOutputContract('Hebrew', 20)
     check('schema requires evidenceSummary + entity fields', /evidenceSummary/.test(c) && /sourceEntityName/.test(c) && /sourceEntityType/.test(c))
     check('schema: valid JSON, no markdown', /ONLY valid JSON/.test(c) && /no markdown/.test(c))
-    const sp = buildPrompt('Hebrew', 'Oligarch — perfume store', 'CATEGORIES: Tom Ford | brand', [], 20, ['קיים מאמר'])
-    check('site-scan prompt injects the shared guidance', /use ONLY facts and entities supplied/i.test(sp))
+    const sp = buildPrompt('Hebrew', 'a store', 'CATEGORIES: some category | category', [], 20, ['קיים מאמר'])
+    check('site-scan prompt injects the shared (neutral) guidance', /use ONLY facts and entities present in the project-owned context/i.test(sp))
     check('site-scan schema no longer requests a sourceContext field', !/"sourceContext"/.test(sp) && /evidenceSummary/.test(sp))
   }
 
@@ -233,19 +233,20 @@ async function main() {
     check('block includes primaryKeyword', block.includes('"primaryKeyword":"שכבות של בשמים"'))
     check('block includes intent', block.includes('"intent":"informational"'))
     check('block includes secondaryKeywords', block.includes('perfume layering') && block.includes('שילוב בשמים'))
-    // G.2: explicit duplicate families
-    check('family: Layering / שילוב בשמים / perfume layering', /שכבות בושם.*שילוב בשמים.*perfume layering/s.test(block))
-    check('family: niche beginner vs what-is-niche', /מה זה בושם נישה.*מדריך למתחילים בבשמי נישה/s.test(block))
-    check('family: office vs work perfume', /בושם לעבודה.*בושם למשרד/s.test(block))
-    check('family: EDP vs EDT / concentrations', /ריכוזי בושם.*EDP מול EDT/s.test(block))
-    check('family: general Oud (and Sandalwood) guides', /Oud.*Sandalwood/s.test(block))
+    // G.2: DOMAIN-NEUTRAL duplicate rule — the INSTRUCTION text carries no niche
+    // example (the pending DATA legitimately reflects the project, so test a block
+    // built from a neutral pending topic).
+    const neutralBlock = pendingTopicsBlock([{ title: 'נושא כללי', primaryKeyword: 'מילת מפתח', intent: 'informational', secondaryKeywords: [] }])
+    const nf = domainFlags(neutralBlock)
+    check('pending-block INSTRUCTIONS carry NO niche example', !nf.perfume && !nf.lighting && !nf.pet && !nf.freelancer)
+    check('duplicate rule is abstract (same core question)', /ask the same core question/i.test(block))
     // G.3: comparison dimensions required
     check('requires core question comparison', /core question/i.test(block))
-    check('requires expected answer comparison', /expected answer/i.test(block))
+    check('requires expected answer comparison', /expect materially the same answer/i.test(block))
     check('requires search intent comparison', /search intent/i.test(block))
-    check('requires planned content sections comparison', /planned content sections/i.test(block))
+    check('requires same sections comparison', /would require substantially the same sections/i.test(block))
     // D: preserve distinct depth
-    check('allows materially different follow-up (no over-block)', /materially different follow-up|do NOT over-block/i.test(block))
+    check('allows materially different follow-up (no over-block)', /materially different entities.*or section structure|do NOT over-block/i.test(block))
     // G.4: pending context must NOT leak into user-facing reason
     check('instructs to keep the comparison note OUT of reason/evidenceSummary', /NEVER put that note.*reason.*evidenceSummary/s.test(block))
     // empty pending → empty block
@@ -276,26 +277,28 @@ async function main() {
     check('prompt: keywords are evidence, never ready-made titles', /Raw keywords are EVIDENCE, not ready-made titles/.test(p))
     check('prompt: never append המדריך המלא', /NEVER copy a keyword and append.*המדריך המלא/.test(p))
 
-    // I.2: navigational/competitor (ikea) classified + rejected by default.
-    check('prompt: reject navigational/competitor with ikea example', /navigational\/competitor.*איקאה/s.test(p))
+    // I.2: navigational/competitor classified + rejected by default (NEUTRAL, no niche example).
+    check('prompt: reject navigational/competitor (abstract)', /REJECT a navigational\/competitor query \(one naming another store, brand or site\)/.test(p))
     check('prompt: competitor allowed only with explicit comparison support', /unless the offering explicitly supports comparison/.test(p))
-    // I.3/I.4: malformed/ambiguous examples required to be rejected without support.
-    check('prompt: reject malformed "מחסני תאורה צמודי תקרה"', /מחסני תאורה צמודי תקרה/.test(p))
-    check('prompt: ambiguous "בית מנורה" needs supported context', /בית מנורה/.test(p))
+    // I.3/I.4: malformed/ambiguous rejected without support (abstract rule, no niche example).
+    check('prompt: reject malformed/ambiguous (abstract)', /REJECT a malformed or ambiguous query unless the supplied offering makes its meaning clear/.test(p))
 
-    // I.5: consolidation of synonymous ceiling-light clusters into ONE topic.
-    check('prompt: consolidate same-question clusters (ceiling-light example)', /CONSOLIDATE.*גוף תאורה צמוד תקרה.*ONE strong topic/s.test(p))
+    // I.5: consolidation of synonymous clusters into ONE topic (abstract).
+    check('prompt: consolidate same-question clusters (abstract)', /CONSOLIDATE clusters that express the same core question/.test(p))
     check('prompt: mergedKeywords field in schema', /"mergedKeywords"/.test(p))
     check('prompt: fewer topics than clusters allowed (quality over count)', /FEWER topics than clusters/.test(p))
 
-    // I.6: secondaries must belong to the SAME article (fans/mirrors excluded).
-    check('prompt: same-article secondaries with fan/mirror example', /secondaryKeywords.*SAME article.*ceiling-FAN or mirror/s.test(p))
+    // I.6: secondaries must belong to the SAME article (abstract, no niche example).
+    check('prompt: same-article secondaries (abstract)', /choose ONLY terms that belong in the SAME article/.test(p))
     check('related terms passed only as CANDIDATES', /secondary CANDIDATES/.test(p))
 
-    // I.7: business scope from offering only — the חשמל brand-name trap.
+    // I.7: business scope from offering only — the brand-name trap (abstract).
     check('prompt: scope from offering, never business name', /BUSINESS SCOPE comes ONLY from the supplied offering.*NEVER from the business name/s.test(p))
-    check('prompt: חשמל-in-brand-name is not scope evidence', /"חשמל".*NOT evidence/s.test(p))
-    check('prompt: no electrical-safety/dimmer topics without real products', /electrical-safety advice, socket\/dimmer installation/.test(p))
+    check('prompt: a word in the business name is not scope evidence', /A word appearing inside the business name is NOT evidence/.test(p))
+    // The KR instructions themselves (empty clusters + empty offer) carry NO domain.
+    const krInstructionsOnly = buildClustersPrompt([], 'he', '', [], '')
+    const kf = domainFlags(krInstructionsOnly)
+    check('prompt: KR instructions are domain-NEUTRAL', !kf.perfume && !kf.lighting && !kf.pet && !kf.freelancer)
 
     // Reason must explain gap + relevance, not just volume; volume passed as evidence.
     check('prompt: reason explains gap+relevance not only volume', /CONTENT GAP and business relevance.*not just the search volume/s.test(p))
@@ -316,27 +319,70 @@ async function main() {
     check('KR prompt injects the pending block', p2.includes('ALREADY-PENDING topics TEST-BLOCK'))
   }
 
-  console.log('K) domain-flag diagnostics + ROOT-CAUSE proof (shared guidance is perfume-flagged)')
+  console.log('K) domain-flag diagnostics — FIX VERIFICATION (shared guidance is now clean)')
   {
     // Multi-signal (≥2 distinct terms) — one incidental word does not trip it.
     check('perfume text flagged', domainFlags('בושם אוד וניל EDP').perfume)
     check('freelancer text flagged', domainFlags('פיתוח תוכנה SEO UX פרילנסר').freelancer)
-    check('lighting text flagged', domainFlags('גוף תאורה נורות לד קלווין').lighting)
     check('single overlapping word NOT flagged (multi-signal)', !domainFlags('מאמר על חשמל בבית').perfume)
     check('cross-domain detected', isCrossDomain('בושם אוד וניל + פיתוח תוכנה SEO פרילנסר'))
     check('fingerprint is stable + content-free', fingerprint('שלום עולם') === fingerprint('שלום   עולם') && /^[0-9a-f]{16}$/.test(fingerprint('x')))
 
-    // THE ROOT CAUSE: the SHARED guidance injected into EVERY project's prompt is
-    // saturated with perfume-domain examples → a freelancer prompt carries perfume.
+    // FIX: the SHARED guidance/pending instructions carry NO business domain.
     const guidance = recommendationGuidance('Hebrew', YEAR, 20)
-    check('*** recommendationGuidance is PERFUME-flagged (root cause) ***', domainFlags(guidance).perfume)
-    const pblock = pendingTopicsBlock([{ title: 'נושא פרילנסר', primaryKeyword: 'פיתוח תוכנה', intent: 'informational', secondaryKeywords: [] }])
-    check('*** pendingTopicsBlock duplicate-families are PERFUME-flagged ***', domainFlags(pblock).perfume)
-    // Consequence: a Matalon (freelancer) Site Scan prompt is cross-domain even
-    // though the project digest is pure freelancer.
-    const freelancerDigest = 'CATEGORIES: פיתוח תוכנה | category ; נגישות אתרים | category ; שיווק דיגיטלי | category'
-    const matalonPrompt = buildPrompt('Hebrew', 'מטלון — freelancer platform', freelancerDigest, [], 20, ['פיתוח תוכנה לעסקים'], pblock)
-    check('*** Matalon Site Scan prompt is cross-domain (perfume enters via guidance) ***', domainFlags(matalonPrompt).perfume && domainFlags(matalonPrompt).freelancer)
+    const gf = domainFlags(guidance)
+    check('recommendationGuidance triggers NO domain flag', !gf.perfume && !gf.lighting && !gf.pet && !gf.freelancer)
+    check('recommendationGuidance has no perfume brand/ingredient/term', !/בושם|בשמי|oud|edp|edt|amouage|acqua di parma|profumum|tom ford|ex nihilo|borouj|sandalwood|וניל/i.test(guidance))
+    check('recommendationGuidance has no lighting/pet/freelancer example', !/תאורה|קלווין|dog|כלב|פרילנסר|wordpress|shopify/i.test(guidance))
+    const pblock = pendingTopicsBlock([{ title: 'נושא כללי', primaryKeyword: 'מילת מפתח', intent: 'informational', secondaryKeywords: [] }])
+    const pf = domainFlags(pblock)
+    check('pendingTopicsBlock triggers NO domain flag', !pf.perfume && !pf.lighting && !pf.pet && !pf.freelancer)
+    check('structuredOutputContract has no niche example', !domainFlags(structuredOutputContract('Hebrew', 20)).perfume)
+
+    // A Matalon (freelancer) Site Scan prompt is now flagged ONLY by its own
+    // project context — NOT perfume. Same for appliance / pet / supplement.
+    const focusFreelancer = deriveProjectFocus({ projectName: 'מטלון', domain: 'matalon.co.il', ownedCategories: ['פיתוח תוכנה', 'נגישות אתרים', 'שיווק דיגיטלי', 'עיצוב UX'], existingTopics: [] })
+    const freelancerBlock = projectContextBlock({ projectName: 'מטלון', domain: 'matalon.co.il', language: 'he', ...focusFreelancer, ownedCategories: ['פיתוח תוכנה', 'נגישות אתרים', 'שיווק דיגיטלי'], existingTopics: [] })
+    const matalonPrompt = buildPrompt('Hebrew', 'מטלון', 'CATEGORIES: פיתוח תוכנה | category', [], 20, ['פיתוח תוכנה לעסקים'], pblock, freelancerBlock)
+    check('Matalon Site Scan prompt is NOT perfume-flagged', !domainFlags(matalonPrompt).perfume)
+    check('Matalon prompt IS freelancer-flagged from its own context', domainFlags(matalonPrompt).freelancer)
+
+    const applianceBlock = projectContextBlock({ projectName: 'מוצרי חשמל', domain: 'x.co.il', language: 'he', primaryProjectFocus: 'מקררים', secondaryProjectAreas: ['מדיחי כלים', 'מכונות כביסה'], ownedCategories: ['מקררים', 'מכונות כביסה', 'מדיחי כלים', 'קומקומים'], existingTopics: [] })
+    const appliancePrompt = buildPrompt('Hebrew', 'מוצרי חשמל', 'CATEGORIES: מקררים | category', [], 20, [], pblock, applianceBlock)
+    check('appliance prompt is NOT perfume-flagged', !domainFlags(appliancePrompt).perfume)
+    const petBlock = projectContextBlock({ projectName: 'חנות כלבים', domain: 'p.co.il', language: 'he', primaryProjectFocus: 'מיטות לכלבים', secondaryProjectAreas: ['רצועות', 'קערות'], ownedCategories: ['מיטות לכלבים', 'רצועות', 'קערות'], existingTopics: [] })
+    const petPrompt = buildPrompt('Hebrew', 'חנות כלבים', 'CATEGORIES: מיטות לכלבים | category', [], 20, [], pblock, petBlock)
+    check('pet prompt is NOT perfume/lighting flagged', !domainFlags(petPrompt).perfume && !domainFlags(petPrompt).lighting)
+  }
+
+  console.log('L) authoritative project context + focus + compact output + token config')
+  {
+    const focus = deriveProjectFocus({ projectName: 'מטלון', domain: 'matalon.co.il', ownedCategories: ['פיתוח תוכנה', 'נגישות', 'שיווק'], existingTopics: [] })
+    check('primaryProjectFocus derived from owned category (not name alone)', focus.primaryProjectFocus === 'פיתוח תוכנה')
+    check('secondaryProjectAreas populated from remaining owned areas', focus.secondaryProjectAreas.includes('נגישות') && focus.secondaryProjectAreas.includes('שיווק'))
+    const nameOnly = deriveProjectFocus({ projectName: 'מטלון', domain: 'matalon.co.il', ownedCategories: [], existingTopics: [] })
+    check('name-only project still yields a focus label (name + domain)', nameOnly.primaryProjectFocus.includes('מטלון'))
+    const block = projectContextBlock({ projectName: 'מטלון', domain: 'matalon.co.il', language: 'he', ...focus, ownedCategories: ['פיתוח תוכנה'], existingTopics: ['נושא קיים'] })
+    check('block labels primaryProjectFocus', /primaryProjectFocus/.test(block))
+    check('block labels secondaryProjectAreas', /secondaryProjectAreas/.test(block))
+    check('block declares context is the ONLY authoritative domain source', /ONLY authoritative source for the business domain/i.test(block))
+    check('block says instructions are NOT project content', /Instruction text, schema descriptions and quality rules are NOT project content/i.test(block))
+    check('block forbids inferring domain from name alone', /Do NOT infer the business domain from the project name alone/i.test(block))
+    check('project context block itself is domain-clean (only carries project data)', (() => { const f = domainFlags(projectContextBlock({ language: 'he', primaryProjectFocus: '', secondaryProjectAreas: [], ownedCategories: [], existingTopics: [] })); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
+
+    // Compact output contract + token config.
+    const c = structuredOutputContract('Hebrew', 20)
+    check('contract caps secondaryKeywords at 4', /AT MOST 4/.test(c))
+    check('contract asks for a ONE-sentence reason', /ONE concise .* sentence/i.test(c))
+    check('contract: evidenceSummary only when distinct', /ONLY when it adds evidence DISTINCT/i.test(c))
+    check('contract: no volume repeated across fields', /Do not restate the monthly search volume/i.test(c))
+    // maxOutputTokens = 16384 for all reco model calls (source check).
+    const engineSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/engine.ts'), 'utf8')
+    const siteSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/site-scan.ts'), 'utf8')
+    const krSrc = readFileSync(join(process.cwd(), 'lib/content/recommendations/keyword-research.ts'), 'utf8')
+    check('engine reco call uses maxOutputTokens 16384', /maxOutputTokens: 16384/.test(engineSrc) && !/maxOutputTokens: 8192/.test(engineSrc))
+    check('site-scan reco call uses maxOutputTokens 16384', /maxOutputTokens: 16384/.test(siteSrc) && !/maxOutputTokens: 8192/.test(siteSrc))
+    check('keyword-research reco call uses maxOutputTokens 16384', /maxOutputTokens: 16384/.test(krSrc) && !/maxOutputTokens: 8192/.test(krSrc))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

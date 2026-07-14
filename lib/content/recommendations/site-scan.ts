@@ -39,6 +39,8 @@ export interface SiteScanRecoInput {
   /** PR #23 — the structured ALREADY-PENDING block + Gemini duplicate self-check
    *  (built by the engine via pendingTopicsBlock). Injected into the prompt. */
   pendingBlock?: string
+  /** Authoritative project-owned context block (the ONLY business-domain source). */
+  projectBlock?: string
   /** Isolation diagnostics — immutable per-request scope; each model call is bound
    *  to it so a response can never be consumed by another run/project. */
   generationRunId?: string
@@ -187,11 +189,13 @@ function sourceUrlList(d: ReturnType<typeof buildDigest>): { url: string; title:
 // engine loads (recent-first) plus existing titles. Exported for the harness.
 export const AVOID_PROMPT_CAP = 120
 
-export function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[], pendingBlock = ''): string {
+export function buildPrompt(langLabel: string, businessCtx: string, digestBlock: string, urlList: { url: string; title: string }[], count: number, avoidTitles: string[], pendingBlock = '', projectBlock = '', compact = false): string {
   const year = currentYear()
   return [
     `You are an SEO content strategist. Analyze a website's existing content (from a site scan) and propose NEW article topics that fill content gaps and strengthen the site's internal structure. Today's year is ${year}.`,
+    projectBlock,
     businessCtx ? `Website: ${businessCtx}.` : '',
+    compact ? `COMPACT MODE: return valid JSON only; keep every field short; at most ${Math.min(count, 12)} topics; no long explanations.` : '',
     // Phase 3H.4 — rotation memory: never re-emit what already exists or was
     // already suggested; move on to UNUSED entities/clusters/angles instead.
     avoidTitles.length ? `EXISTING/already-suggested titles (do NOT repeat or paraphrase these; rotate to UNUSED entities, categories, products and angles):\n${avoidTitles.slice(0, AVOID_PROMPT_CAP).map((t) => `- ${t}`).join('\n')}` : '',
@@ -254,7 +258,7 @@ export interface SiteScanModelCall {
  *  response is reported as parseError with ZERO ideas — partial JSON is NEVER
  *  salvaged or partially persisted. */
 async function callModel(prompt: string): Promise<SiteScanModelCall> {
-  const r = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: 8192 })
+  const r = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: 16384 })
   const base = { prompt, responseText: r.text, modelUsed: r.modelUsed, finishReason: r.finishReason, truncated: r.truncated, promptTokenCount: r.promptTokenCount, candidatesTokenCount: r.candidatesTokenCount, totalTokenCount: r.totalTokenCount }
   if (!r.ok) return { ...base, ideas: [], ok: false, parseError: 'model_error' }
   const ideas = extractIdeas(r.text)
@@ -440,9 +444,9 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
     {
       scope,
       // The prompt is rebuilt for EACH call from THIS run's closure (digest,
-      // businessCtx, pendingBlock, langLabel) — never from a prior response or
-      // module state.
-      runCall: (need, avoid) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, pendingBlock)),
+      // businessCtx, pendingBlock, projectBlock, langLabel) — never from a prior
+      // response or module state. The parse-failure retry uses COMPACT mode.
+      runCall: (need, avoid, purpose) => callModel(buildPrompt(input.langLabel, businessCtx, digestToPromptBlock(digest), urlList, need, avoid, pendingBlock, input.projectBlock ?? '', purpose === 'retry_after_parse_failure')),
       collectTrace: !!input.collectTrace,
       traceContext: {
         pendingContextFingerprint: fingerprint(pendingBlock),

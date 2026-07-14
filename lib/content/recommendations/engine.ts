@@ -20,7 +20,7 @@ import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidat
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { absorbPendingIntoAvoid, type PendingRow } from './pending-avoid'
 import { generateRecommendationJSON } from './model'
-import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, type PendingTopic } from './prompt-guidance'
+import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
 import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
@@ -184,7 +184,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; ok: boolean; modelUsed: string | null }> {
   // Centralized pinned Pro model (with explicit logged fallback); big token budget
   // so a ~20-idea JSON response is never truncated mid-array.
-  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: 8192 })
+  const { text, ok, modelUsed } = await generateRecommendationJSON(prompt, { temperature: 0.9, maxOutputTokens: 16384 })
   if (!ok) return { ideas: [], ok: false, modelUsed }
   let parsed: { topics?: unknown }
   try {
@@ -198,12 +198,12 @@ async function callGeminiIdeas(prompt: string): Promise<{ ideas: GeminiIdea[]; o
 }
 
 /** Expand a BROAD seed keyword into many distinct long-tail article ideas. */
-function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string, count: number, avoid: string[], pendingBlock = ''): string {
+function keywordSeedPrompt(seed: string, langLabel: string, count: number, avoid: string[], pendingBlock = '', projectBlock = ''): string {
   const year = currentYear()
   return [
     `You generate specific SEO article ideas for a website. Today's year is ${year}.`,
-    businessCtx ? `Website context: ${businessCtx}.` : '',
-    `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic. Give each idea a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own.`,
+    projectBlock,
+    `The seed keyword is "${seed}". Treat it as a BROAD SEED — an entire content area — NOT the whole article topic. Give each idea a SPECIFIC long-tail primaryKeyword — NEVER just "${seed}" on its own. Stay within the project-owned business domain above.`,
     avoid.length ? `EXISTING titles (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
     pendingBlock,
     recommendationGuidance(langLabel, year, count),
@@ -212,11 +212,11 @@ function keywordSeedPrompt(seed: string, langLabel: string, businessCtx: string,
 }
 
 /** Gap-based ideas from existing project context (missing / adjacent / deeper). */
-function projectDataPrompt(project: ProjectRow, langLabel: string, count: number, avoid: string[], pendingBlock = ''): string {
+function projectDataPrompt(langLabel: string, count: number, avoid: string[], pendingBlock = '', projectBlock = ''): string {
   const year = currentYear()
   return [
     `You are an SEO content strategist finding CONTENT GAPS for a website. Today's year is ${year}.`,
-    `Business: ${project.business_name || '(unknown)'} — domain: ${project.target_domain || '(unknown)'}.`,
+    projectBlock,
     avoid.length ? `EXISTING titles the site ALREADY covers (do NOT repeat or paraphrase these):\n${avoid.slice(0, 60).map((t) => `- ${t}`).join('\n')}` : '',
     pendingBlock,
     recommendationGuidance(langLabel, year, count),
@@ -236,7 +236,7 @@ function mapIdea(g: GeminiIdea, source: RecommendationSource, score: number, mod
     id: `${source}:${slugKey(title)}`,
     title,
     primaryKeyword,
-    secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : [],
+    secondaryKeywords: Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()).slice(0, 4) : [],
     searchIntent: g.intent || g.searchIntent || 'informational',
     recommendedWordCount: typeof g.recommendedWordCount === 'number' ? g.recommendedWordCount : 1000,
     angle: g.angle || '',
@@ -369,6 +369,19 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   const pendingBlock = pendingTopicsBlock(pendingTopics)
   const pendingWithSecondary = pendingTopics.filter((p) => (p.secondaryKeywords?.length ?? 0) > 0).length
 
+  // 2b) AUTHORITATIVE project-owned context block — the ONLY source of the business
+  // domain in every prompt. Multi-signal (name + domain + owned categories + existing
+  // topics), never the name alone. ownedCategories come from the project's own cached
+  // scan taxonomy; existingTopics from its own article topics. Prevents the shared
+  // (now domain-neutral) instructions from being mistaken for the business domain.
+  const ownedCategories = await deriveScanSeedConcepts(admin, input.projectId)
+  const focus = deriveProjectFocus({ projectName: project.business_name, domain: project.target_domain, ownedCategories, existingTopics: existingTitles })
+  const projectBlock = projectContextBlock({
+    projectName: project.business_name, domain: project.target_domain, language,
+    primaryProjectFocus: focus.primaryProjectFocus, secondaryProjectAreas: focus.secondaryProjectAreas,
+    ownedCategories, existingTopics: existingTitles.slice(0, 15),
+  })
+
   // 3) Internal-link candidates (for "suggested internal links" enrichment).
   let linkCandidates: { url: string; title: string; keyword: string | null; historicalAnchors: string[] }[] = []
   try {
@@ -433,7 +446,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     const keyword = (input.keyword || '').trim()
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, businessCtx, BATCH_SIZE, avoid, pendingBlock))
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(keywordSeedPrompt(keyword, langLabel, BATCH_SIZE, avoid, pendingBlock, projectBlock))
         if (m) modelUsed = m
         return { items: keepValid(ideas).map((g) => mapIdea(g, 'keyword', 0.7, modelUsed)).filter((x): x is TopicSuggestion => !!x), ok }
       },
@@ -444,7 +457,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
   } else if (input.source === 'project_data') {
     const { acc, raw, dupes, attempts, reason } = await accumulate(
       async (avoid) => {
-        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(project, langLabel, BATCH_SIZE, avoid, pendingBlock))
+        const { ideas, ok, modelUsed: m } = await callGeminiIdeas(projectDataPrompt(langLabel, BATCH_SIZE, avoid, pendingBlock, projectBlock))
         if (m) modelUsed = m
         const items = keepValid(ideas).map((g) => {
           const s = mapIdea(g, 'project_data', 0, modelUsed)
@@ -491,7 +504,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // idea rows are exactly what changed between runs, so they lead the list.
     const avoidTitles = Array.from(new Set([...pendingAvoid, ...existingTitles, ...(input.avoidKeywords ?? [])]))
     const res = await recommendFromSiteScan(admin, {
-      projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock,
+      projectId: input.projectId, language, langLabel, avoidTitles, pendingBlock, projectBlock,
       generationRunId: input.generationRunId, collectTrace: input.collectTrace, pendingContextCount: pendingTopics.length,
     }, businessCtx)
     const seenTitles = new Set<string>()
@@ -564,6 +577,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       // anchors the model's interpretation, wrong-market skipping and rewriting.
       offerContext: scanSeeds,
       pendingBlock,
+      projectBlock,
     })
     const seenTitles = new Set<string>()
     let dupes = 0

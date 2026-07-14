@@ -181,6 +181,8 @@ export interface KeywordResearchInput {
   /** PR #23 — structured ALREADY-PENDING block + duplicate self-check (from the
    *  engine's pendingTopicsBlock). Injected into the cluster→topic prompt. */
   pendingBlock?: string
+  /** Authoritative project-owned context block (the ONLY business-domain source). */
+  projectBlock?: string
 }
 
 export interface ClusterInput {
@@ -285,22 +287,25 @@ export interface ClustersToTopicsResult { topics: GeminiClusterTopic[]; rejected
  */
 /** Pure prompt builder (exported for snapshot tests — proves the instructions
  *  are actually present in the request). */
-export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = ''): string {
+export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = ''): string {
   const langLabel = language === 'he' ? 'Hebrew' : 'English'
   const year = new Date().getFullYear()
   return [
     `You are an SEO editor turning RAW Google keyword data into a small set of high-quality article topics for a website. Today's year is ${year}.`,
+    projectBlock,
     businessCtx ? `Business context: ${businessCtx}` : '',
     // Phase 3H.2 — the site's actual OFFERING anchors interpretation. Generic:
     // the list comes from the site's own scan.
     offerContext.length ? `The site's ACTUAL offering (its own categories/products/services — this is the ONLY business-scope evidence): ${offerContext.slice(0, 20).join(' ; ')}.` : '',
     offerContext.length ? `Interpret EVERY keyword in the context of this offering — a keyword matching a product/category name is about that PRODUCT/CATEGORY (never an unrelated organization, brand, TV franchise, or service with a similar name).` : '',
     `KEYWORD-RESEARCH RULES (critical):`,
-    `- Raw keywords are EVIDENCE, not ready-made titles. NEVER copy a keyword and append a generic suffix like "המדריך המלא" or "כל מה שצריך לדעת" — write a natural, editorial ${langLabel} title that answers the query's real intent.`,
-    `- Do NOT create one topic per cluster automatically. CONSOLIDATE clusters that express the same core question (e.g. "גוף תאורה צמוד תקרה" / "גופי תאורה צמודי תקרה" / "תאורה צמודת תקרה" → ONE strong topic); list the absorbed primaries in "mergedKeywords".`,
-    `- Classify each query's intent first: informational | commercial | comparison | transactional | navigational/competitor | ambiguous | malformed. REJECT navigational/competitor queries (e.g. a keyword naming another store or brand like "מראה עם תאורה איקאה") unless the offering explicitly supports comparison content. REJECT malformed or ambiguous queries (e.g. "מחסני תאורה צמודי תקרה", "בית מנורה") unless the supplied offering makes their meaning clear and supported.`,
-    `- BUSINESS SCOPE comes ONLY from the supplied offering/categories/existing content — NEVER from the business name. A word inside the brand name (e.g. "חשמל") is NOT evidence the business provides electrical-safety advice, socket/dimmer installation or electrician services; do NOT generate such topics unless real products/services above support them.`,
-    `- "secondaryKeywords": choose ONLY terms that belong in the SAME article (same intent, same expected answer). Do NOT include a nearby export term that belongs to a different article (e.g. ceiling-FAN or mirror terms on a ceiling-LIGHT topic).`,
+    // DOMAIN-NEUTRAL rules — no niche example (business domain comes only from the
+    // supplied offering above, never from these instructions).
+    `- Raw keywords are EVIDENCE, not ready-made titles. NEVER copy a keyword and append a generic suffix (e.g. "המדריך המלא" / "כל מה שצריך לדעת") — write a natural, editorial ${langLabel} title that answers the query's real intent.`,
+    `- Do NOT create one topic per cluster automatically. CONSOLIDATE clusters that express the same core question (singular/plural, reordered or synonymous phrasings) into ONE strong topic; list the absorbed primaries in "mergedKeywords".`,
+    `- Classify each query's intent first: informational | commercial | comparison | transactional | navigational/competitor | ambiguous | malformed. REJECT a navigational/competitor query (one naming another store, brand or site) unless the offering explicitly supports comparison content. REJECT a malformed or ambiguous query unless the supplied offering makes its meaning clear and supported.`,
+    `- BUSINESS SCOPE comes ONLY from the supplied offering/categories/existing content — NEVER from the business name. A word appearing inside the business name is NOT evidence the business provides a related service; do NOT generate such topics unless real products/services above support them.`,
+    `- "secondaryKeywords": choose ONLY terms that belong in the SAME article (same intent, same expected answer). Do NOT include a nearby export term that belongs to a different article.`,
     `- The "reason" must explain the CONTENT GAP and business relevance in ${langLabel} — not just the search volume.`,
     pendingBlock,
     recommendationGuidance(langLabel, year, clusters.length),
@@ -313,9 +318,9 @@ export function buildClustersPrompt(clusters: ClusterInput[], language: 'he' | '
   ].filter(Boolean).join('\n')
 }
 
-export async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = ''): Promise<ClustersToTopicsResult> {
-  const prompt = buildClustersPrompt(clusters, language, businessCtx, offerContext, pendingBlock)
-  const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: 8192 })
+export async function clustersToTopics(clusters: ClusterInput[], language: 'he' | 'en', businessCtx: string, offerContext: string[], pendingBlock = '', projectBlock = ''): Promise<ClustersToTopicsResult> {
+  const prompt = buildClustersPrompt(clusters, language, businessCtx, offerContext, pendingBlock, projectBlock)
+  const { text, ok } = await generateRecommendationJSON(prompt, { temperature: 0.8, maxOutputTokens: 16384 })
   if (!ok) return { topics: [], rejected: [], ok: false }
   let parsed: { topics?: unknown; rejected?: unknown }
   try {
@@ -485,7 +490,7 @@ export async function recommendFromKeywordResearch(
   // deterministic "[keyword]: המדריך המלא" fallback (an unusable batch returns
   // fewer/none, with rejected classifications counted in diagnostics).
   const businessCtx = [input.businessName, input.category].filter(Boolean).join(' — ')
-  const { topics: geminiTopics, rejected: rejectedByModel } = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '')
+  const { topics: geminiTopics, rejected: rejectedByModel } = await clustersToTopics(clusterInputs, language, businessCtx, input.offerContext ?? [], input.pendingBlock ?? '', input.projectBlock ?? '')
   const clusterByPrimary = new Map(clusterInputs.map((c) => [normalizeText(c.primaryKeyword), c]))
 
   const suggestions: TopicSuggestion[] = []
@@ -507,7 +512,7 @@ export async function recommendFromKeywordResearch(
     const secondaryKeywords = Array.from(new Set([
       ...(Array.isArray(g.secondaryKeywords) ? g.secondaryKeywords.filter((s) => typeof s === 'string' && s.trim()) : []),
       ...merged.map((c) => c.primaryKeyword),
-    ]))
+    ])).slice(0, 4)
     const reasonBase = language === 'he'
       ? `נמצא בנתוני חיפוש עם כ-${volume.toLocaleString('he-IL')} חיפושים חודשיים`
       : `Found in search data with ~${volume.toLocaleString('en-US')} monthly searches`

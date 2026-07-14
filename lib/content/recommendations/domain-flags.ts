@@ -22,11 +22,26 @@ const DOMAIN_VOCAB: Record<Domain, string[]> = {
   freelancer: ['פרילנסר', 'freelancer', 'מתכנת', 'פיתוח תוכנה', 'software', 'developer', 'seo', 'ux', 'שיווק דיגיטלי', 'digital marketing', 'קידום אתרים', 'נגישות', 'accessibility', 'wordpress', 'shopify', 'woocommerce', 'core web vitals', 'עצמאי', 'משווק'],
 }
 
-/** Count of DISTINCT domain terms present in the text. */
+const isLatin = (s: string) => /^[a-z0-9' .-]+$/.test(s)
+
+/**
+ * Count of DISTINCT domain terms present in the text. Latin single-word terms
+ * match as WHOLE tokens (so "ip"/"cat"/"pet"/"cri" never match inside
+ * "description"/"category"/"competitor"); multi-word latin phrases and Hebrew
+ * terms use substring (Hebrew tokens carry inseparable prefixes like ל/ב/ה).
+ */
 function domainHits(text: string, domain: Domain): number {
   const hay = (text || '').toLowerCase()
+  const tokenSet = new Set(hay.split(/[^a-z0-9֐-׿]+/).filter(Boolean))
   let n = 0
-  for (const term of DOMAIN_VOCAB[domain]) if (hay.includes(term.toLowerCase())) n++
+  for (const raw of DOMAIN_VOCAB[domain]) {
+    const term = raw.toLowerCase()
+    const multiWord = /\s/.test(term)
+    if (multiWord) { if (hay.includes(term)) n++; continue }
+    if (isLatin(term)) { if (tokenSet.has(term)) n++; continue }
+    // Hebrew single term — substring (matches prefixed forms).
+    if (hay.includes(term)) n++
+  }
   return n
 }
 
