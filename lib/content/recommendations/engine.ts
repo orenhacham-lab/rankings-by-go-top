@@ -19,7 +19,7 @@ import { assessProjectKeywordFit } from '@/lib/content/gemini-topics'
 import { loadInternalLinkCandidates } from '@/lib/content/internal-link-candidates'
 import { ExistingCorpus, tokens, jaccard, slugKey } from './dedupe'
 import { absorbPendingIntoAvoid, type PendingRow } from './pending-avoid'
-import { generateRecommendationJSON, outputBudgetFor, BillingExhaustedError, RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from './model'
+import { generateRecommendationJSON, outputBudgetFor, BillingExhaustedError, RecommendationModelUnavailableError, RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from './model'
 import { runBudget } from './reco-cost'
 import { RunCostController, newRunCostController } from './run-cost-controller'
 import { orderSourcesByEvidence, stage1Sources } from './hybrid-orchestration'
@@ -476,6 +476,9 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         runs.push({ source: s, ok: true, reason: r.meta.reason, suggestions: r.suggestions })
       } catch (e) {
         if (e instanceof BillingExhaustedError) { billingHit = true; return }
+        // A proven-unavailable model is a HARD config failure across ALL sources —
+        // propagate it so the route returns a typed error, never a 0-result banner.
+        if (e instanceof RecommendationModelUnavailableError) throw e
         console.error('[recommendations] hybrid provider failed', { source: s, message: String(e).slice(0, 200) })
         runs.push({ source: s, ok: false, reason: 'provider_error', suggestions: [] })
       }

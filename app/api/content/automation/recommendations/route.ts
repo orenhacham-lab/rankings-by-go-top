@@ -14,7 +14,7 @@ import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { domainFlags } from '@/lib/content/recommendations/domain-flags'
-import { BillingExhaustedError } from '@/lib/content/recommendations/model'
+import { BillingExhaustedError, RecommendationModelUnavailableError } from '@/lib/content/recommendations/model'
 import { classifyRecoRun } from '@/lib/content/recommendations/run-classify'
 import { runtimeInfo } from '@/lib/runtime-info'
 import { randomUUID } from 'crypto'
@@ -113,6 +113,20 @@ export async function POST(request: Request) {
       excludePendingContext,
       qualityMode,
     })
+
+    // Part C — a run where EVERY attempted source failed at the provider (no raw
+    // candidates were generated) is a typed PROVIDER error, never a successful
+    // "0 new ideas" banner. A genuine empty (model_empty / all_duplicates / dedupe)
+    // still returns normally, because reason is only 'model_error' when the calls
+    // themselves failed. (Model-unavailable already threw a typed 503 above.)
+    if (result.meta.reason === 'model_error' && (result.meta.generated ?? 0) === 0) {
+      const { gitSha, vercelEnv } = runtimeInfo()
+      console.error('[automation-recommendations] provider failure — all calls failed', { source, gitSha })
+      return Response.json(
+        { suggestions: [], ok: false, error: 'recommendation_provider_error', reason: 'recommendation_provider_error', message: 'שירות יצירת ההמלצות נכשל זמנית. יש לנסות שוב בעוד רגע.', meta: { source, reason: 'recommendation_provider_error', persisted: false, newlyAddedCount: 0, ...(diagnostics ? { isolationDebug: { gitSha, vercelEnv, generationRunId, runtimeClass: 'CALLS_FAILED', runtimeDiag: result.meta.runtimeDiag ?? null } } : {}) } },
+        { status: 502 },
+      )
+    }
 
     // Phase 3F.3.1b — gentle EXACT primary-keyword + exact-title guard. Blocks a
     // suggestion whose normalized primary keyword already exists (project keyword,
@@ -299,6 +313,15 @@ export async function POST(request: Request) {
     // No provider details, keys or billing-account ids are exposed.
     if (e instanceof BillingExhaustedError) {
       return Response.json({ suggestions: [], error: 'billing_exhausted', meta: { source, reason: 'billing_exhausted', persisted: false, newlyAddedCount: 0 } }, { status: 402 })
+    }
+    // MODEL UNAVAILABLE (Part B/C) — the configured Gemini model is not offered to
+    // the active key. A typed non-success — NEVER a 200 with a false 0-new result.
+    if (e instanceof RecommendationModelUnavailableError) {
+      console.error('[automation-recommendations] model unavailable', { source })
+      return Response.json(
+        { suggestions: [], ok: false, error: 'recommendation_model_unavailable', reason: 'recommendation_model_unavailable', message: 'מודל יצירת ההמלצות אינו זמין כרגע. יש לעדכן את הגדרת מודל Gemini.', meta: { source, reason: 'recommendation_model_unavailable', persisted: false, newlyAddedCount: 0 } },
+        { status: 503 },
+      )
     }
     if ((e as { code?: string })?.code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
     console.error('[automation-recommendations] failed', { message: (e as Error)?.message })

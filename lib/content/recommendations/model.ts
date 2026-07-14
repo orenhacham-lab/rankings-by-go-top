@@ -11,6 +11,7 @@
  */
 
 import { getRecoGenAiClient } from './genai-client'
+import { resolveAvailableRecommendationModel } from './model-availability'
 import type { RunCostController, CallStopReason } from './run-cost-controller'
 
 /** DEFAULT generation model — Gemini 2.5 Flash (NOT Flash-Lite, NOT Pro). */
@@ -47,6 +48,24 @@ export type RecoParseStatus = 'json_ready' | 'empty' | 'not_attempted'
 export class BillingExhaustedError extends Error {
   readonly category = 'billing_exhausted' as const
   constructor(message = 'Gemini prepayment credits are depleted') { super(message); this.name = 'BillingExhaustedError' }
+}
+
+/** Thrown when the configured/available Gemini model is not offered to the active
+ *  API key (the live 404 "no longer available"). A HARD config failure — the whole
+ *  run aborts and the route returns a typed recommendation_model_unavailable. */
+export class RecommendationModelUnavailableError extends Error {
+  readonly category = 'model_unavailable' as const
+  readonly modelId: string | null
+  constructor(modelId: string | null, message = 'The configured Gemini model is not available for this API key') {
+    super(message); this.name = 'RecommendationModelUnavailableError'; this.modelId = modelId
+  }
+}
+
+/** True for a provider error message that means the MODEL itself is unavailable
+ *  (404 / "no longer available" / "not found"), as opposed to a transient error. */
+export function isModelUnavailableMessage(message: string): boolean {
+  const m = (message || '').toLowerCase()
+  return /no longer available|is not found|not found for api version|models\/[\w.-]+ is not|404.*model|model.*not.*(found|available)/.test(m)
 }
 
 /** Classify a provider error message into a typed category. */
@@ -168,11 +187,28 @@ export async function generateRecommendationJSON(prompt: string, opts: RecoGenOp
     maxOutputTokens,
     thinkingConfig: { thinkingBudget: 0 },
   }
-  const id = opts.model || RECOMMENDATION_MODEL_PRIMARY
   const source = callInfo?.source ?? 'unknown'
   const callPurpose = callInfo?.callPurpose ?? 'primary'
   const requestedIdeaCount = callInfo?.requestedIdeaCount ?? 0
   const retryNumber = callInfo?.retryNumber ?? 0
+
+  // Part A/B — resolve a model PROVEN available to the active key BEFORE any paid
+  // call. An explicit opts.model (e.g. a curator id) is respected; otherwise the
+  // resolver picks an available Flash-class model (env override or discovery). A
+  // proven-unavailable model is a HARD, typed failure (no silent Pro fallback).
+  let id = opts.model || RECOMMENDATION_MODEL_PRIMARY
+  if (!opts.model) {
+    const resolved = await resolveAvailableRecommendationModel()
+    if (resolved.ok) {
+      id = resolved.model
+    } else if (resolved.reason === 'model_unavailable') {
+      console.error('[reco-model] no available Flash-class model for this API key')
+      throw new RecommendationModelUnavailableError(id)
+    } else if (resolved.reason === 'no_client') {
+      return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable', errorType: 'model_unavailable', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: false }
+    }
+    // list_failed → keep the configured id and let the call surface a typed error.
+  }
 
   // ENFORCED pre-call gate — the shared controller decides whether this call may
   // start (billing / call ceiling / cost ceiling). No controller → ungated.
@@ -226,6 +262,9 @@ export async function generateRecommendationJSON(prompt: string, opts: RecoGenOp
     controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: 0, outputTokens: 0, thinkingTokens: 0, retryNumber, success: false, errorType: aborted ? 'gemini_timeout' : category, durationMs: Date.now() - startedAt })
     // BILLING EXHAUSTED → trip the breaker + hard abort. Never a paid fallback.
     if (!aborted && category === 'billing_exhausted') { controller?.markBillingExhausted(); console.error('[reco-model] billing exhausted — aborting run', { model: id }); throw new BillingExhaustedError(message) }
+    // MODEL UNAVAILABLE (404 / "no longer available") → HARD typed abort so the run
+    // never renders a provider 404 as a successful zero-result (Part C).
+    if (!aborted && isModelUnavailableMessage(message)) { console.error('[reco-model] model unavailable (404) — aborting run', { model: id }); throw new RecommendationModelUnavailableError(id, message) }
     if (aborted) { console.error('[reco-model] generation timeout', { model: id, source, ms: GENAI_TIMEOUT_MS }); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable', errorType: 'gemini_timeout', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: true } }
     console.error('[reco-model] generation error', { model: id, category, message: message.slice(0, 200) })
     return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: category, errorType: category, providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: category === 'rate_limited' }

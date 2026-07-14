@@ -7,7 +7,8 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { classifyGenAiResponse, RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from '../recommendations/model'
+import { classifyGenAiResponse, isModelUnavailableMessage, RecommendationModelUnavailableError, RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from '../recommendations/model'
+import { configuredRecommendationModel } from '../recommendations/model-availability'
 import { runBudget } from '../recommendations/reco-cost'
 import { classifyRecoRun } from '../recommendations/run-classify'
 
@@ -78,6 +79,35 @@ async function main() {
     check('MAX_TOKENS-empty run → CALLS_FAILED (not dedupe)', classifyRecoRun({ totalCalls: 1, rawCandidates: 0, freshPersisted: 0, reason: 'model_error' }) === 'CALLS_FAILED')
     check('healthy generation → PRODUCED_NEW', classifyRecoRun({ totalCalls: 2, rawCandidates: 18, freshPersisted: 7 }) === 'PRODUCED_NEW')
     check('15. dedupe/pending protections still run in the route (unchanged path)', /coveredByExistingContent/.test(read('../../../app/api/content/automation/recommendations/route.ts')))
+  }
+
+  console.log('F) model availability — the exact live 404 is handled, not shown as 0-new')
+  {
+    // 1/3. The EXACT live 404 message must be recognized as model-unavailable.
+    const live404 = 'This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.'
+    check('1. live 404 "no longer available" → isModelUnavailableMessage', isModelUnavailableMessage(live404))
+    check('1. "is not found for API version" → model unavailable', isModelUnavailableMessage('models/foo is not found for API version v1beta'))
+    check('a normal rate-limit message is NOT model-unavailable', !isModelUnavailableMessage('429 too many requests, quota exceeded'))
+    check('1. typed error class carries the model id', new RecommendationModelUnavailableError('gemini-2.5-flash').modelId === 'gemini-2.5-flash' && new RecommendationModelUnavailableError(null).name === 'RecommendationModelUnavailableError')
+
+    // 4. model is configurable via GEMINI_RECOMMENDATION_MODEL (discovery otherwise).
+    const save = process.env.GEMINI_RECOMMENDATION_MODEL
+    process.env.GEMINI_RECOMMENDATION_MODEL = 'gemini-flash-latest'
+    check('4. GEMINI_RECOMMENDATION_MODEL overrides the configured model', configuredRecommendationModel() === 'gemini-flash-latest')
+    if (save === undefined) delete process.env.GEMINI_RECOMMENDATION_MODEL; else process.env.GEMINI_RECOMMENDATION_MODEL = save
+
+    // 2. the adapter THROWS the typed error before/instead of returning ok:true.
+    check('2. model.ts resolves availability before paid calls + throws typed error', /resolveAvailableRecommendationModel\(\)/.test(modelSrc) && /throw new RecommendationModelUnavailableError/.test(modelSrc))
+    check('2. a 404 during generation aborts (isModelUnavailableMessage → throw)', /isModelUnavailableMessage\(message\)\) \{[\s\S]{0,120}throw new RecommendationModelUnavailableError/.test(modelSrc))
+
+    // 2/3. the route maps the typed error to a NON-200 with the exact Hebrew.
+    const recoRouteSrc = read('../../../app/api/content/automation/recommendations/route.ts')
+    check('2. route returns recommendation_model_unavailable (503), not 200/0-new', /RecommendationModelUnavailableError/.test(recoRouteSrc) && /recommendation_model_unavailable/.test(recoRouteSrc) && /status: 503/.test(recoRouteSrc))
+    check('2. route carries the exact Hebrew model-unavailable message', recoRouteSrc.includes('מודל יצירת ההמלצות אינו זמין כרגע. יש לעדכן את הגדרת מודל Gemini.'))
+    // Part C — an all-calls-failed run is a typed provider error, never 0-new success.
+    check('C. all-provider-failed run → recommendation_provider_error (502)', /recommendation_provider_error/.test(recoRouteSrc) && /reason === 'model_error' && \(result\.meta\.generated/.test(recoRouteSrc))
+    check('5. no Pro fallback introduced by availability handling', RECOMMENDATION_MODEL_CURATOR === 'gemini-2.5-pro' && !/RECOMMENDATION_MODEL_CURATOR/.test(read('../recommendations/model-availability.ts')))
+    check('discovery selects a Flash-class, never Pro', /isFlashClass/.test(read('../recommendations/model-availability.ts')) && /!n\.includes\('pro'\)/.test(read('../recommendations/model-availability.ts')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
