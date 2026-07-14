@@ -31,6 +31,34 @@ import { currentGitSha, isPreviewEnv } from '@/lib/runtime-info'
 // as an opaque Next.js 500 the in-POST try/catch cannot catch).
 export const runtime = 'nodejs'
 
+/**
+ * Sanitize an error message for the trace log: strip HTML tags, collapse
+ * whitespace, redact anything token/secret-shaped, and bound the length. NEVER
+ * emits credentials, Authorization values, cookies, application passwords, tokens,
+ * article HTML, raw remote bodies or complete prompts.
+ */
+export function sanitizeTrace(raw: unknown): string | null {
+  let s = typeof raw === 'string' ? raw : ''
+  if (!s) return null
+  s = s.replace(/<[^>]*>/g, ' ')
+  // Redact secret-shaped substrings (bearer tokens, long base64/hex runs, kv secrets).
+  s = s.replace(/\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [redacted]')
+  s = s.replace(/\b[A-Fa-f0-9]{32,}\b/g, '[redacted]')
+  s = s.replace(/\b[A-Za-z0-9+/]{40,}={0,2}\b/g, '[redacted]')
+  s = s.replace(/((?:password|authorization|api[_-]?key|secret|token|cookie)\s*[:=]\s*)\S+/gi, '$1[redacted]')
+  s = s.replace(/\s+/g, ' ').trim()
+  return s.length > 300 ? `${s.slice(0, 300)}…` : s
+}
+
+/** The FIRST stack frame only (never the full stack), sanitized + bounded. */
+export function safeTopStackFrame(stack: unknown): string | null {
+  if (typeof stack !== 'string' || !stack) return null
+  const frame = stack.split('\n').map((l) => l.trim()).find((l) => l.startsWith('at '))
+  if (!frame) return null
+  const clean = sanitizeTrace(frame)
+  return clean && clean.length > 200 ? `${clean.slice(0, 200)}…` : clean
+}
+
 /** Safe route-execution stages (server log only; distinct from failureStage). */
 type RouteStage =
   | 'route_entered' | 'auth_started' | 'auth_completed'
@@ -310,11 +338,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     keywordAdded,
     keyword: keywordAddedText,
   })
-  } catch {
+  } catch (err) {
     // Top-level safe boundary — NO unexpected error becomes a bare Next.js 500.
-    // The message never carries the throw's text (which could embed upstream
-    // detail); only a stable code + safe Hebrew + the correlation id.
     logStage('top_level_catch_entered')
+    // Part 11 — the ORIGINAL exception was previously discarded (bare catch), which
+    // is why Buy Buy stayed opaque. Capture it SAFELY (no secrets / HTML / body /
+    // prompt / stack dump — just name, sanitized message, cause, one stack frame)
+    // so the next publish attempt reveals the real cause + the exact last stage.
+    const e = err as { name?: unknown; message?: unknown; stack?: unknown; cause?: unknown }
+    const cause = (e && typeof e === 'object' ? e.cause : null) as { name?: unknown; message?: unknown } | null
+    console.error('[content-wp-export] unexpected exception', {
+      diagnosticId,
+      lastStage: stage,
+      errorName: typeof e?.name === 'string' ? e.name : (err instanceof Error ? err.constructor.name : typeof err),
+      sanitizedErrorMessage: sanitizeTrace(e?.message),
+      safeCauseName: cause && typeof cause.name === 'string' ? cause.name : null,
+      safeCauseMessage: cause ? sanitizeTrace(cause.message) : null,
+      safeTopStackFrame: safeTopStackFrame(e?.stack),
+      gitSha,
+      vercelEnv,
+    })
+    // The user-facing response is unchanged: a stable code + safe Hebrew + the id.
     return fail('unexpected_publish_error', { stage: 'unexpected' })
   }
 }

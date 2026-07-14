@@ -8,6 +8,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { runtimeInfo, isPreviewEnv } from '../../runtime-info'
+import { sanitizeTrace, safeTopStackFrame } from '../../../app/api/content/articles/[id]/wordpress/route'
 import { classifyRecoRun, reconcileWithUi } from '../recommendations/run-classify'
 import { RunCostController } from '../recommendations/run-cost-controller'
 
@@ -46,8 +47,13 @@ async function main() {
     process.env.ENABLE_CONTENT = 'true'
     process.env.VERCEL_ENV = 'preview'
     const { POST } = await import('../../../app/api/content/articles/[id]/wordpress/route')
+    // Capture the safe [content-wp-export] unexpected exception trace log.
+    const unexpectedLogs: Record<string, unknown>[] = []
+    const origErr = console.error
+    console.error = (...args: unknown[]) => { if (args[0] === '[content-wp-export] unexpected exception' && args[1] && typeof args[1] === 'object') unexpectedLogs.push(args[1] as Record<string, unknown>) }
     const req = new Request('https://x.test/api/content/articles/abc/wordpress?diagnosticTest=throw', { method: 'POST', body: '{}' })
     const res = await POST(req, { params: Promise.resolve({ id: 'abc' }) })
+    console.error = origErr
     check('2. forced throw returns 500 (typed, not a bare crash)', res.status === 500)
     const body = await res.json()
     check('2. body.ok === false', body.ok === false)
@@ -56,6 +62,13 @@ async function main() {
     check('2. body.diagnosticId present', typeof body.diagnosticId === 'string' && body.diagnosticId.length > 0)
     check('2. diagnosticId interpolated into the message', body.message.includes(body.diagnosticId))
     check('response body carries NO stack/credential keys', !('stack' in body) && !('password' in body) && !('authorization' in body))
+    check('10. forced throw emitted [content-wp-export] unexpected exception', unexpectedLogs.length >= 1)
+    if (unexpectedLogs.length) {
+      const log = unexpectedLogs[unexpectedLogs.length - 1]
+      check('10. unexpected-exception log carries errorName + lastStage + gitSha', typeof log.errorName === 'string' && 'lastStage' in log && 'gitSha' in log)
+      check('10. unexpected-exception log has a sanitized message (not the raw throw only)', 'sanitizedErrorMessage' in log && 'safeTopStackFrame' in log)
+      check('10./12. unexpected-exception log has no secret-shaped keys', !JSON.stringify(log).match(/authorization|password|cookie|application_?password|apikey|api_key/i))
+    }
     // Production must NOT honor diagnosticTest: the forced-throw branch is gated by
     // isPreviewEnv() (proven here + statically), so it can only fire on Preview.
     process.env.VERCEL_ENV = 'production'
@@ -78,7 +91,10 @@ async function main() {
     check('3. no DB query before try', !/\bfrom\('generated_articles'\)/.test(head))
     check('route logs [content-wp-export] route stage with gitSha', /\[content-wp-export\] route stage/.test(src) && /gitSha/.test(src))
     check('route emits top_level_catch_entered', /top_level_catch_entered/.test(src))
-    check('12. stage logs never include Authorization/password/cookie', !/authorization|application_?password|\bcookie\b/i.test(src))
+    check('route captures the original exception (catch is no longer bare)', /\} catch \(err\) \{/.test(src) && /\[content-wp-export\] unexpected exception/.test(src))
+    // 12. No credential VARIABLE is ever logged (the words appear only inside the
+    // sanitizer's redaction pattern, which is the opposite of leaking them).
+    check('12. no credential variable is logged (creds/applicationPassword/auth header)', !/console\.(?:log|error|warn)\([^)]*(?:applicationPassword|creds\.|\.wp_application_password|authHeader)/.test(src))
   }
 
   console.log('D) recommendation runtime classification (ZERO_CALLS vs REJECTED)')
@@ -118,6 +134,20 @@ async function main() {
     check('6. client reads content-type + parses JSON error body', /res\.headers\.get\('content-type'\)/.test(pageSrc) && /hasJsonBody \? await res\.json/.test(pageSrc))
     check('7. client surfaces message + diagnosticId', /data\.message/.test(pageSrc) && /data\.diagnosticId/.test(pageSrc))
     check('client failure log never dumps the raw body', /\[content-wp-export\] client failure/.test(pageSrc) && !/body: (?:await )?res\.text/.test(pageSrc))
+  }
+
+  console.log('G) Buy Buy trace sanitizers redact secrets (Part 11)')
+  {
+    check('10. sanitizeTrace strips HTML tags', sanitizeTrace('<b>boom</b> at line') === 'boom at line')
+    check('10. sanitizeTrace redacts a Bearer token', /\[redacted\]/.test(sanitizeTrace('failed: Authorization: Bearer abcDEF123456789tokenvalue') || '') && !/abcDEF123456789tokenvalue/.test(sanitizeTrace('Authorization: Bearer abcDEF123456789tokenvalue') || ''))
+    check('10. sanitizeTrace redacts a long hex/base64 secret', !/deadbeefdeadbeefdeadbeefdeadbeef01/.test(sanitizeTrace('key deadbeefdeadbeefdeadbeefdeadbeef01 leaked') || ''))
+    check('10. sanitizeTrace redacts password=… pairs', /password[:=] ?\[redacted\]/i.test(sanitizeTrace('db error password=hunter2secret') || ''))
+    check('10. sanitizeTrace bounds length to ~300', (sanitizeTrace('x'.repeat(500)) || '').length <= 301)
+    check('10. sanitizeTrace returns null for empty', sanitizeTrace('') === null && sanitizeTrace(undefined) === null)
+    const stack = 'Error: boom\n    at wpCreatePost (/app/lib/content/wordpress-publish.ts:133:9)\n    at POST (/app/route.ts:1:1)'
+    const frame = safeTopStackFrame(stack)
+    check('10. safeTopStackFrame returns ONLY the first frame', !!frame && /wpCreatePost/.test(frame!) && !/POST \(/.test(frame!))
+    check('10. safeTopStackFrame is null without a stack', safeTopStackFrame(undefined) === null)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

@@ -117,7 +117,9 @@ async function main() {
     check('route emits the [content-wp-export] publish failed structured log', /\[content-wp-export\] publish failed/.test(routeSrc))
     check('route log includes failureStage', /failureStage/.test(routeSrc))
     check('10./11. route NEVER references content_automation_alerts (independent)', !/content_automation_alerts/.test(routeSrc))
-    check('route never logs Authorization/application password/cookie', !/authorization|application_password|applicationPassword|\bcookie\b/i.test(routeSrc))
+    // The words appear ONLY inside the trace sanitizer's redaction pattern (which
+    // strips them), never as a logged value — assert no credential VARIABLE is logged.
+    check('route never logs a credential variable (creds/applicationPassword/authHeader)', !/console\.(?:log|error|warn)\([^)]*(?:applicationPassword|creds\.|\.wp_application_password|authHeader)/.test(routeSrc))
     check('publish core threads stage + secret-free wpErrorMeta (no flattening)', /stage:\s*'post_creation'/.test(publishSrc) && /wpErrorMeta/.test(publishSrc))
     check('publish core no longer emits only wordpress_post_failed', !/wordpress_post_failed/.test(routeSrc))
   }
