@@ -13,6 +13,8 @@ import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
+import { salvageLongTailKeyword } from '@/lib/content/recommendations/keyword-salvage'
+import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
 import { domainFlags } from '@/lib/content/recommendations/domain-flags'
 import { BillingExhaustedError, RecommendationModelUnavailableError } from '@/lib/content/recommendations/model'
 import { classifyRecoRun } from '@/lib/content/recommendations/run-classify'
@@ -136,6 +138,23 @@ export async function POST(request: Request) {
     let filteredPrimaryKeywordExists = 0
     let filteredTitleExists = 0
     let filteredCoveredByContent = 0
+    // Part 5 — keyword-collision classification (bare keyword equality is no longer
+    // a permanent rejection; it is salvaged to a narrower long-tail when possible).
+    let exactTopicDuplicates = 0
+    let trueContentCoverage = 0
+    let keywordCollisionCandidates = 0
+    let keywordCollisionSalvaged = 0
+    let keywordCollisionStillRejected = 0
+    const salvagedExamples: { title: string; from: string; to: string }[] = []
+    // A frozen-corpus semantic guard over OWNED keywords so a salvaged keyword can
+    // never bypass semantic dedupe (Part 4.3 / Part 8.7).
+    const ownedKeywordCorpus = new ExistingCorpus()
+    for (const k of guard.keywords) ownedKeywordCorpus.add(k)
+    const salvageChecks = {
+      isOwnedKeyword: (nk: string) => guard.keywords.has(nk),
+      isSemanticKeywordDup: (kw: string) => ownedKeywordCorpus.isDuplicate(kw),
+      isCoveredByContent: (title: string, kw: string) => coveredByExistingContent(guard, title, kw),
+    }
     const filteredExamples: { title: string; primaryKeyword: string; reason: string; sources: string[] }[] = []
     // Phase 3I.6 — PRODUCTION evidence for primary_keyword_exists rejections:
     // for each blocked idea, the exact originating row(s) of the blocking
@@ -155,33 +174,54 @@ export async function POST(request: Request) {
     }[] = []
     const fresh = result.suggestions.filter((s) => {
       const nt = normalizeText(s.title)
-      const nk = normalizeText(s.primaryKeyword)
+      let nk = normalizeText(s.primaryKeyword)
       const pushEx = (reason: string) => { if (filteredExamples.length < 10) filteredExamples.push({ title: s.title, primaryKeyword: s.primaryKeyword, reason, sources: keywordSourcesOf(guard, s.primaryKeyword) }) }
+      // 1) EXACT_TOPIC_DUPLICATE — the same title already exists/pending. Permanent.
+      if (nt && guard.titles.has(nt)) { exactTopicDuplicates++; filteredTitleExists++; pushEx('title_exists'); return false }
+      // 2) TRUE_CONTENT_COVERAGE — an existing PUBLISHED page already satisfies this
+      //    query (same main phrase / owned content phrase). Permanent. Catches the
+      //    real cannibalization cases (e.g. re-titled duplicate of an existing article).
+      if (coveredByExistingContent(guard, s.title, s.primaryKeyword)) { trueContentCoverage++; filteredCoveredByContent++; pushEx('covered_by_existing_content'); return false }
+      // 2b) The exact keyword is already owned by PUBLISHED content (a project /
+      //    topic / tracked / scan focus keyword — NOT a mere pending idea). A second
+      //    article on a keyword the site already targets cannibalizes it → true
+      //    coverage, permanent. (Pending-idea ownership falls through to salvage.)
+      if (nk && guard.contentKeywords.has(nk)) { trueContentCoverage++; filteredCoveredByContent++; pushEx('content_keyword_owned'); return false }
+      // 3) KEYWORD_COLLISION — the primaryKeyword is owned ONLY by another pending
+      //    idea (often a BROAD category keyword). This is NOT topic ownership: salvage
+      //    a narrower long-tail primary keyword from the candidate's own data and
+      //    re-validate. Only when salvage fails is the candidate rejected.
       if (nk && guard.keywords.has(nk)) {
-        filteredPrimaryKeywordExists++
-        pushEx('primary_keyword_exists')
-        if (primaryKeywordMatches.length < 20) {
-          const origins = keywordOriginsOf(guard, s.primaryKeyword)
-          primaryKeywordMatches.push({
-            ideaTitle: s.title,
-            ideaPrimaryKeyword: s.primaryKeyword,
-            normalizedPrimaryKeyword: nk,
-            ideaSourceContext: s.suggestionReason || '',
-            ideaSuggestedUrl: s.suggestedInternalLinks[0]?.url ?? null,
-            rule: 'exact_normalized_primary_keyword',
-            // No recorded origin ⇒ the keyword was added by THIS run's intra-batch
-            // dedupe below (an earlier idea in the same batch used the same keyword).
-            matches: origins.length ? origins : [{ source: 'idea_keyword', original: s.primaryKeyword, status: 'intra_batch_earlier_idea', detail: '' }],
-          })
+        keywordCollisionCandidates++
+        const salv = salvageLongTailKeyword(
+          { title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords },
+          salvageChecks,
+        )
+        if (salv.ok && salv.keyword) {
+          keywordCollisionSalvaged++
+          if (salvagedExamples.length < 10) salvagedExamples.push({ title: s.title, from: s.primaryKeyword, to: salv.keyword })
+          s.primaryKeyword = salv.keyword // reassign; title/angle/intent/reason preserved
+          nk = normalizeText(salv.keyword)
+        } else {
+          keywordCollisionStillRejected++
+          filteredPrimaryKeywordExists++
+          pushEx('primary_keyword_exists')
+          if (primaryKeywordMatches.length < 20) {
+            const origins = keywordOriginsOf(guard, s.primaryKeyword)
+            primaryKeywordMatches.push({
+              ideaTitle: s.title,
+              ideaPrimaryKeyword: s.primaryKeyword,
+              normalizedPrimaryKeyword: normalizeText(s.primaryKeyword),
+              ideaSourceContext: s.suggestionReason || '',
+              ideaSuggestedUrl: s.suggestedInternalLinks[0]?.url ?? null,
+              rule: 'exact_normalized_primary_keyword',
+              matches: origins.length ? origins : [{ source: 'idea_keyword', original: s.primaryKeyword, status: 'intra_batch_earlier_idea', detail: '' }],
+            })
+          }
+          return false
         }
-        return false
       }
-      if (nt && guard.titles.has(nt)) { filteredTitleExists++; pushEx('title_exists'); return false }
-      // Phase 3G.7 — re-angled duplicate of an EXISTING SITE ARTICLE (same main
-      // phrase, different suffix — e.g. "מנורות לילה לשבת: …" vs the site's
-      // "מנורות לילה לשבת – …"): already covered, never suggested again.
-      if (coveredByExistingContent(guard, s.title, s.primaryKeyword)) { filteredCoveredByContent++; pushEx('covered_by_existing_content'); return false }
-      if (nk) guard.keywords.add(nk) // avoid intra-batch primary-keyword dupes
+      if (nk) { guard.keywords.add(nk); ownedKeywordCorpus.add(nk) } // avoid intra-batch dupes
       if (nt) guard.titles.add(nt)
       // Phase 3H.1 — NO intra-batch PHRASE dedupe: many legitimate ideas for one
       // seed share the "<core phrase>: <angle>" title pattern; adding the first
@@ -190,6 +230,17 @@ export async function POST(request: Request) {
       // still prevents true intra-batch duplicates.
       return true
     })
+
+    // Part 5 — rejection classification (only exactTopicDuplicates + trueContentCoverage
+    // are PERMANENT). Surfaced in Preview diagnostics so a run is never opaque.
+    const rejectionClassification = {
+      exactTopicDuplicates,
+      trueContentCoverage,
+      keywordCollisionCandidates,
+      keywordCollisionSalvaged,
+      keywordCollisionStillRejected,
+      salvagedExamples,
+    }
 
     await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
 
@@ -222,7 +273,7 @@ export async function POST(request: Request) {
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false } : undefined,
+        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
 
@@ -275,6 +326,7 @@ export async function POST(request: Request) {
       accumulatedPendingCount: suggestions.length,
       accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
       persistedCurrentRunCount: fresh.length,
+      rejectionClassification,
       // Idempotency (J) — this run actually executed generation (not a replay).
       inFlightHit: false,
       recentReplayHit: false,
