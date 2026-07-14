@@ -14,6 +14,7 @@ import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { salvageLongTailKeyword } from '@/lib/content/recommendations/keyword-salvage'
+import { dedupeIntraRunSemantic } from '@/lib/content/recommendations/intra-run-dedupe'
 import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
 import { domainFlags } from '@/lib/content/recommendations/domain-flags'
 import { BillingExhaustedError, RecommendationModelUnavailableError } from '@/lib/content/recommendations/model'
@@ -172,7 +173,7 @@ export async function POST(request: Request) {
       rule: 'exact_normalized_primary_keyword'
       matches: KeywordOriginEntry[]
     }[] = []
-    const fresh = result.suggestions.filter((s) => {
+    let fresh = result.suggestions.filter((s) => {
       const nt = normalizeText(s.title)
       let nk = normalizeText(s.primaryKeyword)
       const pushEx = (reason: string) => { if (filteredExamples.length < 10) filteredExamples.push({ title: s.title, primaryKeyword: s.primaryKeyword, reason, sources: keywordSourcesOf(guard, s.primaryKeyword) }) }
@@ -231,6 +232,14 @@ export async function POST(request: Request) {
       return true
     })
 
+    // FINAL intra-run semantic dedupe (after keyword salvage, before persistence):
+    // collapse same-topic candidates from THIS run — incl. cross-source pairs whose
+    // primary keywords were changed/salvaged — to one deterministic winner, merging
+    // safe metadata. Distinct subtopics (different intent/location/lifecycle) are
+    // preserved. No model call, no filler.
+    const intraRun = dedupeIntraRunSemantic(fresh)
+    fresh = intraRun.survivors
+
     // Part 5 — rejection classification (only exactTopicDuplicates + trueContentCoverage
     // are PERMANENT). Surfaced in Preview diagnostics so a run is never opaque.
     const rejectionClassification = {
@@ -240,6 +249,11 @@ export async function POST(request: Request) {
       keywordCollisionSalvaged,
       keywordCollisionStillRejected,
       salvagedExamples,
+      // Part D — intra-run semantic collision outcome.
+      intraRunSemanticCollisions: intraRun.collisions.length,
+      intraRunCandidatesRemoved: intraRun.removed,
+      intraRunCandidatesMerged: intraRun.merged,
+      intraRunCollisions: intraRun.collisions.slice(0, 10),
     }
 
     await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
