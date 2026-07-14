@@ -1,0 +1,44 @@
+# Shopify public app configuration — "Go Top SEO".
+#
+# client_id is populated by `shopify app config link` (links this file to the
+# "Go Top SEO" app whose credentials are SHOPIFY_PUBLIC_CLIENT_ID /
+# SHOPIFY_PUBLIC_CLIENT_SECRET in Vercel). It is the app's PUBLIC API key — never a
+# secret. Do NOT link/deploy over the old custom app.
+#
+# Scopes are minimal: only what publishing needs (read products/content + write
+# content). NO customer / order / staff / contributor scopes are requested — the
+# mandatory GDPR compliance webhooks require no scopes.
+
+name = "Go Top SEO"
+client_id = "" # set by: shopify app config link  (→ SHOPIFY_PUBLIC_CLIENT_ID)
+application_url = "https://www.gotopseo.com"
+embedded = false
+
+[access_scopes]
+scopes = "read_products,read_content,write_content"
+
+[auth]
+redirect_urls = [
+  "https://www.gotopseo.com/api/shopify/oauth/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+# Mandatory GDPR / compliance webhooks (HMAC-verified with the public app secret).
+[[webhooks.subscriptions]]
+compliance_topics = [
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact"
+]
+uri = "https://www.gotopseo.com/api/shopify/webhooks/compliance"
+
+# Normal webhook (NOT a compliance topic): clean up the token when a merchant
+# uninstalls. Kept as a separate subscription from the compliance topics above.
+[[webhooks.subscriptions]]
+topics = [ "app/uninstalled" ]
+uri = "https://www.gotopseo.com/api/shopify/webhooks/app-uninstalled"
+
+[pos]
+embedded = false
