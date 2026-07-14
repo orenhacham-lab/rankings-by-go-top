@@ -97,7 +97,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   /** Structured server log + typed, safe response for a publish failure. */
   const fail = (
     code: WpPublishErrorCode,
-    opts?: { stage?: WpFailureStage; meta?: WordPressErrorMeta; httpStatus?: number },
+    opts?: { stage?: WpFailureStage; meta?: WordPressErrorMeta; httpStatus?: number; previewDiagnostics?: Record<string, unknown> },
   ): Response => {
     const st = opts?.stage ?? stage
     const diag = safeRemoteDiagnostics(opts?.meta)
@@ -120,8 +120,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       authorId: null,
       featuredMediaId: featuredMediaForLog,
     })
+    // Part 5 — in PREVIEW ONLY, attach the SAFE diagnostics to the response body so
+    // the real cause is visible from one Network response (no Vercel log access
+    // needed). Production returns only the public fields. Fields are pre-sanitized.
+    const previewDiag = isPreviewEnv() && opts?.previewDiagnostics ? { diagnostics: opts.previewDiagnostics } : {}
     return Response.json(
-      { ok: false, error: code, reason: code, message: hebrewMessageFor(code, diagnosticId), diagnosticId },
+      { ok: false, error: code, reason: code, message: hebrewMessageFor(code, diagnosticId), diagnosticId, ...previewDiag },
       { status: opts?.httpStatus ?? httpStatusFor(code) },
     )
   }
@@ -347,8 +351,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // so the next publish attempt reveals the real cause + the exact last stage.
     const e = err as { name?: unknown; message?: unknown; stack?: unknown; cause?: unknown }
     const cause = (e && typeof e === 'object' ? e.cause : null) as { name?: unknown; message?: unknown } | null
-    console.error('[content-wp-export] unexpected exception', {
-      diagnosticId,
+    // Compute the SAFE (pre-sanitized) diagnostic fields ONCE — used both for the
+    // server log and the Preview-only response body (Part 5). No secrets/HTML/body.
+    const safeDiagnostics = {
       lastStage: stage,
       errorName: typeof e?.name === 'string' ? e.name : (err instanceof Error ? err.constructor.name : typeof err),
       sanitizedErrorMessage: sanitizeTrace(e?.message),
@@ -356,9 +361,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       safeCauseMessage: cause ? sanitizeTrace(cause.message) : null,
       safeTopStackFrame: safeTopStackFrame(e?.stack),
       gitSha,
-      vercelEnv,
-    })
-    // The user-facing response is unchanged: a stable code + safe Hebrew + the id.
-    return fail('unexpected_publish_error', { stage: 'unexpected' })
+    }
+    console.error('[content-wp-export] unexpected exception', { diagnosticId, vercelEnv, ...safeDiagnostics })
+    // Public response is unchanged (code + safe Hebrew + id); Preview additionally
+    // returns `diagnostics` so the real cause is visible in one Network response.
+    return fail('unexpected_publish_error', { stage: 'unexpected', previewDiagnostics: safeDiagnostics })
   }
 }

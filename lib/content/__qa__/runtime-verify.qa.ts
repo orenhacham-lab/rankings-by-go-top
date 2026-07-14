@@ -69,12 +69,25 @@ async function main() {
       check('10. unexpected-exception log has a sanitized message (not the raw throw only)', 'sanitizedErrorMessage' in log && 'safeTopStackFrame' in log)
       check('10./12. unexpected-exception log has no secret-shaped keys', !JSON.stringify(log).match(/authorization|password|cookie|application_?password|apikey|api_key/i))
     }
+    // Part 5 — PREVIEW response includes the safe diagnostics object.
+    check('Part5. preview response includes diagnostics', body.diagnostics && typeof body.diagnostics === 'object')
+    if (body.diagnostics) {
+      const d = body.diagnostics
+      check('Part5. diagnostics has lastStage/errorName/sanitizedErrorMessage/gitSha', 'lastStage' in d && 'errorName' in d && 'sanitizedErrorMessage' in d && 'gitSha' in d)
+      check('Part5. diagnostics has safeCauseName/safeCauseMessage/safeTopStackFrame', 'safeCauseName' in d && 'safeCauseMessage' in d && 'safeTopStackFrame' in d)
+      check('Part5. diagnostics carry NO secret-shaped values', !JSON.stringify(d).match(/authorization|password|cookie|application_?password|bearer\s+\S|api_key/i))
+    }
     // Production must NOT honor diagnosticTest: the forced-throw branch is gated by
     // isPreviewEnv() (proven here + statically), so it can only fire on Preview.
     process.env.VERCEL_ENV = 'production'
     check('isPreviewEnv() is false off Preview (gate closed in production)', isPreviewEnv() === false)
     const routeSrc = read('../../../app/api/content/articles/[id]/wordpress/route.ts')
     check('forced throw is guarded by isPreviewEnv()', /isPreviewEnv\(\) && new URL\(request\.url\)\.searchParams\.get\('diagnosticTest'\) === 'throw'/.test(routeSrc))
+    // Part 5 — PRODUCTION never leaks the diagnostics object (an unexpected throw
+    // downstream still returns only the public typed fields).
+    const prodRes = await POST(new Request('https://x.test/api/content/articles/abc/wordpress', { method: 'POST', body: '{}' }), { params: Promise.resolve({ id: 'abc' }) })
+    const prodBody = await prodRes.json().catch(() => ({}))
+    check('Part5. production response has NO diagnostics object', !('diagnostics' in prodBody))
     process.env.ENABLE_CONTENT = saveEnv.content; process.env.VERCEL_ENV = saveEnv.venv
   }
 
