@@ -130,6 +130,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 
+  /** Typed article-load failure (Part F) — never unexpected_publish_error. In
+   *  Preview, attaches the SANITIZED Supabase code/message so the defect is visible
+   *  in one response; production returns only the public typed fields. */
+  const failArticle = (
+    code: 'article_not_found' | 'article_load_failed' | 'article_access_denied' | 'article_project_missing',
+    httpStatus: number,
+    supabaseError?: { code?: string; message?: string } | null,
+  ): Response => {
+    const HE: Record<typeof code, string> = {
+      article_not_found: 'המאמר לא נמצא.',
+      article_load_failed: 'טעינת המאמר נכשלה. יש לנסות שוב מאוחר יותר.',
+      article_access_denied: 'אין הרשאה לגשת למאמר זה.',
+      article_project_missing: 'המאמר אינו משויך לפרויקט תקין.',
+    }
+    console.error('[content-wp-export] article load failed', { diagnosticId, articleId: id, gitSha, vercelEnv, failureStage: stage, localErrorType: code, supabaseCode: supabaseError?.code ?? null, sanitizedSupabaseMessage: sanitizeTrace(supabaseError?.message) })
+    const previewDiag = isPreviewEnv() && supabaseError ? { diagnostics: { lastStage: stage, supabaseCode: supabaseError.code ?? null, sanitizedSupabaseMessage: sanitizeTrace(supabaseError.message), gitSha } } : {}
+    return Response.json({ ok: false, error: code, reason: code, message: HE[code], diagnosticId, ...previewDiag }, { status: httpStatus })
+  }
+
   try {
     diagnosticId = randomUUID()
     logStage('route_entered')
@@ -162,25 +181,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const admin = createAdminClient()
     stage = 'article_load'
     logStage('article_load_started')
+    // Use select('*') — the SAME shape the article editor loads successfully. The
+    // prior explicit column list named optional taxonomy columns
+    // (wp_primary_category_id / wp_category_ids / wp_tag_ids); when a project's
+    // schema lacks one, Postgres returns 42703 "column does not exist" and the load
+    // failed here (projectId/connectionId null) — the proven Buy Buy cause. '*'
+    // returns whatever exists; missing columns are simply undefined (tolerated below).
     const { data: article, error } = await admin
       .from('generated_articles')
-      .select('id, project_id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, status, featured_image_url, featured_image_storage_path, wp_post_id, wp_post_url, wp_featured_media_id, wp_primary_category_id, wp_category_ids, wp_tag_ids')
+      .select('*')
       .eq('id', id)
       .maybeSingle()
     if (error) {
       if ((error as { code?: string }).code === '42P01') return Response.json({ error: 'Content module not initialized' }, { status: 404 })
-      return fail('unexpected_publish_error', { stage: 'article_load' })
+      // Typed article-load failure (Part F) — NEVER unexpected_publish_error.
+      return failArticle('article_load_failed', 502, error)
     }
-    if (!article) return Response.json({ error: 'Article not found' }, { status: 404 })
+    if (!article) return failArticle('article_not_found', 404)
 
     const a = article as Record<string, unknown>
     logStage('article_load_completed')
     payloadByteLength = Buffer.byteLength(String(a.content_html || ''), 'utf8')
     categoryIdForLog = typeof a.wp_primary_category_id === 'number' ? (a.wp_primary_category_id as number) : null
+    if (!a.project_id || typeof a.project_id !== 'string') return failArticle('article_project_missing', 422)
     stage = 'project_load'
     logStage('auth_started')
     const auth = await authContentProject(a.project_id as string)
-    if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+    if ('error' in auth) return failArticle('article_access_denied', auth.status === 404 ? 404 : 403)
     projectId = auth.project.id
     logStage('auth_completed')
     logStage('ownership_validated')

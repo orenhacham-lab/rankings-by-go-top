@@ -149,6 +149,28 @@ async function main() {
     check('client failure log never dumps the raw body', /\[content-wp-export\] client failure/.test(pageSrc) && !/body: (?:await )?res\.text/.test(pageSrc))
   }
 
+  console.log('H) WordPress article-load fix — typed errors, select(*), no remote call')
+  {
+    const src = read('../../../app/api/content/articles/[id]/wordpress/route.ts')
+    // 8/9. article-load failures are typed, NOT unexpected_publish_error.
+    check('8. Supabase load error → article_load_failed (not unexpected)', /failArticle\('article_load_failed', 502, error\)/.test(src))
+    check('9. missing row → article_not_found', /failArticle\('article_not_found', 404\)/.test(src))
+    check('article_project_missing + article_access_denied are typed', /failArticle\('article_project_missing'/.test(src) && /failArticle\('article_access_denied'/.test(src))
+    // The proven defect fix: use select('*') like the working editor loader.
+    check('select uses * (matches the working editor loader; avoids 42703)', /\.from\('generated_articles'\)\s*\n\s*\.select\('\*'\)/.test(src))
+    check('no explicit wp_primary_category_id column list in the load select', !/\.select\('id, project_id, topic_id[\s\S]*wp_tag_ids'\)/.test(src))
+    // 10. article-load failures return BEFORE any WordPress work.
+    const beforeWp = src.slice(0, src.indexOf("logStage('wp_create_post_started')"))
+    check('10. failArticle is reached before wp_create_post_started', /failArticle\(/.test(beforeWp))
+    check('10. no wpCreatePost call before the article-load guards', beforeWp.indexOf('wpCreatePost(') === -1)
+    // 7. params awaited correctly (Next.js 15 async params).
+    check('7. route awaits params before using id', /const resolvedParams = await params/.test(src) && /id = resolvedParams\.id/.test(src))
+    // Preview-only sanitized Supabase code/message; production public-only.
+    check('article-load Preview diagnostics carry sanitized supabase code/message', /isPreviewEnv\(\) && supabaseError \?[\s\S]{0,160}sanitizedSupabaseMessage: sanitizeTrace/.test(src))
+    // 11. successful publishing path is unchanged (still calls wpCreatePost + typed WP errors).
+    check('11. successful WordPress publish path unchanged (wpCreatePost + typed WP mapping)', /wpCreatePost\(auth\.admin, loaded\.creds/.test(src) && /classifyWordPressError/.test(src))
+  }
+
   console.log('G) Buy Buy trace sanitizers redact secrets (Part 11)')
   {
     check('10. sanitizeTrace strips HTML tags', sanitizeTrace('<b>boom</b> at line') === 'boom at line')
