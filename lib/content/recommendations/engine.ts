@@ -745,5 +745,39 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     meta.debug = { ...meta.debug, linkTargetTypes: byType, eligibleLinkTargets: planTargets.filter((t) => t.eligibility === 'yes').length, productCategoryTargetCount: byType.category, productTargetCount: byType.product }
   }
 
+  // Preview runtime diagnostics — ALWAYS populated when a trace is requested (not
+  // gated by NODE_ENV, so Preview — which runs as production — still gets them).
+  // Proves whether calls were made, what raw output they produced, the shared
+  // controller state, and that the repeated-discovery + project context reached
+  // the prompt. Safe counters/booleans only — never a prompt, secret or content.
+  if (input.collectTrace) {
+    const cs = controller.summary()
+    const guidanceText = recommendationGuidance(langLabel, year, srcTarget)
+    meta.runtimeDiag = {
+      // Controller state (I) — proves the first call is not budget-denied.
+      totalCalls: cs.totalCalls,
+      callsBySource: cs.callsBySource,
+      callsPreventedByBudget: cs.callsPreventedByBudget,
+      callsPreventedAfterBillingFailure: cs.callsPreventedAfterBillingFailure,
+      billingExhausted: cs.billingExhausted,
+      stopReason: cs.stopReason ?? null,
+      estimatedRunCostUsd: cs.estimatedRunCostUsd,
+      maxCalls: budget.maxModelCallsPerRun,
+      maxEstimatedCostUsd: budget.maxEstimatedCostUsd,
+      rawCandidateBudget: budget.maxRawCandidates,
+      targetFreshIdeas: TARGET_NEW,
+      requestedIdeaCount: srcTarget,
+      // Output funnel (G) — raw candidates vs engine-final.
+      rawCandidates: meta.generated,
+      engineFinalCount: meta.finalCount,
+      engineReason: meta.reason ?? null,
+      // Guidance reach (H) — booleans/counts only, never the prompt text.
+      repeatedDiscoveryInstructionPresent: guidanceText.includes('REPEATED DISCOVERY:'),
+      authoritativeProjectContextPresent: projectBlock.length > 0,
+      primaryProjectFocusPresent: !!focus.primaryProjectFocus,
+      pendingContextCount: pendingTopics.length,
+    }
+  }
+
   return { suggestions: enriched, meta }
 }

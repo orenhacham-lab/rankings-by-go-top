@@ -15,7 +15,12 @@ import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, 
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { domainFlags } from '@/lib/content/recommendations/domain-flags'
 import { BillingExhaustedError } from '@/lib/content/recommendations/model'
+import { classifyRecoRun } from '@/lib/content/recommendations/run-classify'
+import { runtimeInfo } from '@/lib/runtime-info'
 import { randomUUID } from 'crypto'
+
+// Node runtime (uses node:crypto for run ids + SHA-256 domain fingerprints).
+export const runtime = 'nodejs'
 
 /** In-flight run keys (project+source) for best-effort duplicate-click protection.
  *  Per server instance; released in a finally. Holds only opaque keys, no data. */
@@ -76,8 +81,12 @@ export async function POST(request: Request) {
   // call Gemini. A distinct clientRequestId is a new intentional run and is allowed.
   const idemKey = `${auth.user.id}:${auth.project.id}:${source}:${clientRequestId ?? 'none'}`
   const inflightKey = clientRequestId ? idemKey : `${auth.project.id}:${source}`
-  if (INFLIGHT.has(inflightKey) || (clientRequestId && seenRecently(idemKey))) {
-    return Response.json({ error: 'run_in_progress', reason: 'run_in_progress' }, { status: 409 })
+  const inFlightHit = INFLIGHT.has(inflightKey)
+  const recentReplayHit = !!clientRequestId && seenRecently(idemKey)
+  if (inFlightHit || recentReplayHit) {
+    // J — an idempotency short-circuit is a DISTINCT typed 409 (never rendered as a
+    // successful 0-new result). Echo which guard fired so a replay is diagnosable.
+    return Response.json({ error: 'run_in_progress', reason: 'run_in_progress', inFlightHit, recentReplayHit, clientRequestId }, { status: 409 })
   }
   INFLIGHT.add(inflightKey)
 
@@ -178,6 +187,19 @@ export async function POST(request: Request) {
       ? { ...guard.counts, scanKeywordSamples: guard.scanSamples, modelSuggestions: result.suggestions.length, filteredPrimaryKeywordExistsCount: filteredPrimaryKeywordExists, filteredTitleExistsCount: filteredTitleExists, filteredCoveredByContentCount: filteredCoveredByContent, filteredExamples, primaryKeywordMatches, kr: (result.meta as { debug?: unknown }).debug, ...extra }
       : (fresh.length === 0 && primaryKeywordMatches.length > 0 ? { primaryKeywordMatches } : undefined)
 
+    // Runtime classification (G) — always computable from the engine's controller
+    // totals + raw candidates + this run's fresh count. Proven, not assumed.
+    const rtDiag = (result.meta.runtimeDiag ?? {}) as Record<string, number | boolean | undefined>
+    const runtimeClass = classifyRecoRun({
+      totalCalls: Number(rtDiag.totalCalls ?? 0),
+      rawCandidates: Number(rtDiag.rawCandidates ?? result.meta.generated ?? 0),
+      freshPersisted: fresh.length,
+      reason: result.meta.reason ?? null,
+      billingExhausted: !!rtDiag.billingExhausted,
+      callsPreventedByBudget: Number(rtDiag.callsPreventedByBudget ?? 0),
+    })
+    const rtInfo = runtimeInfo()
+
     const pending = await loadPendingIdeas(auth.admin, auth.project.id)
     // No ideas table yet (migration not applied): still return the GUARD-FILTERED
     // list session-only, so the keyword guard works even before persistence.
@@ -186,6 +208,7 @@ export async function POST(request: Request) {
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
 
@@ -223,14 +246,24 @@ export async function POST(request: Request) {
     }
     // Preview-only isolation diagnostics: current-run flags vs the accumulated
     // pending list (the UI shows the full pending set) + the Site Scan call trace.
+    // Runtime classification computed above (reused here) — distinguishes
+    // ZERO_CALLS from CALLS_FAILED / CALLS_SUCCEEDED_ZERO_OUTPUT /
+    // CANDIDATES_REJECTED, so a 0-new run is proven, not assumed to be dedupe.
     const isolationDebug = diagnostics ? {
+      gitSha: rtInfo.gitSha,
+      vercelEnv: rtInfo.vercelEnv,
       generationRunId,
       clientRequestId,
+      runtimeClass,
+      runtimeDiag: result.meta.runtimeDiag ?? null,
       freshCurrentRunCount: fresh.length,
       freshCurrentRunDomainFlags: suggestionsDomainFlags(fresh),
       accumulatedPendingCount: suggestions.length,
       accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
       persistedCurrentRunCount: fresh.length,
+      // Idempotency (J) — this run actually executed generation (not a replay).
+      inFlightHit: false,
+      recentReplayHit: false,
       excludePendingContext,
       siteScanTrace: (result.meta as { debug?: { siteScanCallTrace?: unknown } }).debug?.siteScanCallTrace ?? null,
     } : undefined

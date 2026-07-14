@@ -73,6 +73,10 @@ export interface RecommendationMeta {
   providers?: { source: RecommendationSource; ok: boolean; count: number; reason?: string }[]
   /** Non-production diagnostics (Phase 3F.1) — safe counters, no secrets. */
   debug?: Record<string, unknown>
+  /** Preview runtime diagnostics (always populated when collectTrace) — proves
+   *  whether calls were made, produced raw candidates, and the controller state,
+   *  so a zero result is classifiable (ZERO_CALLS vs rejected). Safe counters only. */
+  runtimeDiag?: Record<string, unknown>
 }
 
 export interface RecommendationResult {

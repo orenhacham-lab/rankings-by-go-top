@@ -23,16 +23,33 @@ import { writeVerifiedSeoMeta, WordPressClientError, type WordPressPostStatus, t
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { classifyWordPressError, hebrewMessageFor, httpStatusFor, safeRemoteDiagnostics, type WpFailureStage, type WpPublishErrorCode } from '@/lib/content/wordpress-error'
+import { currentGitSha, isPreviewEnv } from '@/lib/runtime-info'
+
+// This route uses Node-only APIs (node:https / node:dns / node:crypto via the
+// WordPress client + credential decryption). Pin the Node runtime EXPLICITLY so a
+// runtime mismatch can never make the module fail to import (which would surface
+// as an opaque Next.js 500 the in-POST try/catch cannot catch).
+export const runtime = 'nodejs'
+
+/** Safe route-execution stages (server log only; distinct from failureStage). */
+type RouteStage =
+  | 'route_entered' | 'auth_started' | 'auth_completed'
+  | 'article_load_started' | 'article_load_completed' | 'ownership_validated'
+  | 'connection_load_started' | 'connection_load_completed'
+  | 'credential_decryption_started' | 'credential_decryption_completed'
+  | 'wp_create_post_started' | 'wp_create_post_completed'
+  | 'local_status_update_started' | 'local_status_update_completed'
+  | 'response_returned' | 'top_level_catch_entered'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
-  const { id } = await params
-
-  // Part 2 — every failure carries a correlation id and a typed, safe Hebrew
-  // message. Nothing below logs or returns credentials, headers, cookies, tokens,
-  // full article HTML or raw remote bodies.
-  const diagnosticId = randomUUID()
+  // Only NON-throwing initializers may appear before the try. Everything that can
+  // throw (param await, uuid, supabase client, auth, WP calls, serialization) is
+  // INSIDE the boundary so no unexpected error escapes as a bare Next.js 500.
   const startedAt = Date.now()
+  const gitSha = currentGitSha()
+  const vercelEnv = process.env.VERCEL_ENV ?? null
+  let diagnosticId = ''
+  let id = ''
   let stage: WpFailureStage = 'article_load'
   let projectId: string | null = null
   let connId: string | number | null = null
@@ -41,6 +58,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let categoryIdForLog: number | null = null
   let featuredMediaForLog: number | null = null
   let payloadByteLength = 0
+
+  /** Safe per-stage runtime log — proves how far the deployed route executed. */
+  const logStage = (s: RouteStage): void => {
+    console.log('[content-wp-export] route stage', {
+      diagnosticId, articleId: id, projectId, connectionId: connId, gitSha, vercelEnv, stage: s, elapsedMs: Date.now() - startedAt,
+    })
+  }
 
   /** Structured server log + typed, safe response for a publish failure. */
   const fail = (
@@ -55,6 +79,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       projectId,
       connectionId: connId,
       remoteHost,
+      gitSha,
+      vercelEnv,
       endpointPath: st === 'media_upload' ? '/wp-json/wp/v2/media' : '/wp-json/wp/v2/posts',
       failureStage: st,
       localErrorType: code,
@@ -73,6 +99,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
+    diagnosticId = randomUUID()
+    logStage('route_entered')
+    if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
+    const resolvedParams = await params
+    id = resolvedParams.id
+
+    // Preview-ONLY forced-throw diagnostic: proves the deployed route actually runs
+    // the top-level boundary. Production never honors it.
+    if (isPreviewEnv() && new URL(request.url).searchParams.get('diagnosticTest') === 'throw') {
+      throw new Error('forced diagnostic throw (preview)')
+    }
+
     let body: { status?: string; force?: boolean; update?: boolean }
     try {
       body = await request.json()
@@ -91,6 +129,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const admin = createAdminClient()
     stage = 'article_load'
+    logStage('article_load_started')
     const { data: article, error } = await admin
       .from('generated_articles')
       .select('id, project_id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, status, featured_image_url, featured_image_storage_path, wp_post_id, wp_post_url, wp_featured_media_id, wp_primary_category_id, wp_category_ids, wp_tag_ids')
@@ -103,12 +142,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!article) return Response.json({ error: 'Article not found' }, { status: 404 })
 
     const a = article as Record<string, unknown>
+    logStage('article_load_completed')
     payloadByteLength = Buffer.byteLength(String(a.content_html || ''), 'utf8')
     categoryIdForLog = typeof a.wp_primary_category_id === 'number' ? (a.wp_primary_category_id as number) : null
     stage = 'project_load'
+    logStage('auth_started')
     const auth = await authContentProject(a.project_id as string)
     if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
     projectId = auth.project.id
+    logStage('auth_completed')
+    logStage('ownership_validated')
 
     // Duplicate protection. Once exported (wp_post_id present) a plain re-export is
     // ambiguous, so require an explicit intent:
@@ -128,6 +171,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     // WordPress connection (decrypted server-side).
     stage = 'connection_load'
+    logStage('connection_load_started')
+    logStage('credential_decryption_started')
     const loaded = await loadWordPressCredentials(auth.admin, auth.project.id)
     if ('error' in loaded) {
       if (loaded.status === 404) return fail('wordpress_connection_missing', { stage: 'connection_load' })
@@ -137,6 +182,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     const connIdLocal = loaded.connection.id
     connId = connIdLocal
+    logStage('connection_load_completed')
+    logStage('credential_decryption_completed')
     try { remoteHost = new URL(loaded.creds.siteUrl).hostname } catch { remoteHost = null }
     const title = String(a.title || 'article')
     const logBase = { articleId: id, projectId: auth.project.id, connId: connIdLocal, status }
@@ -146,6 +193,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // draft proceeds with a warning; taxonomy is a safe SET that never fails the
     // post). `existing` → update the same post in place (idempotent re-export).
     stage = 'post_creation'
+    logStage('wp_create_post_started')
     const created = await wpCreatePost(auth.admin, loaded.creds, a as never, { status, existing })
     if (!created.ok) {
       // Preserve the safe upstream signal (remote status / WP code / response
@@ -158,6 +206,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const code = classifyWordPressError(synthetic, { stage: createdStage, meta: created.wpErrorMeta })
       return fail(code, { stage: createdStage, meta: created.wpErrorMeta })
     }
+    logStage('wp_create_post_completed')
     const featuredMedia = created.featuredMediaId ?? undefined
     featuredMediaForLog = created.featuredMediaId ?? null
 
@@ -203,7 +252,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (typeof featuredMedia === 'number') update.wp_featured_media_id = featuredMedia
   if (status === 'publish') { update.status = 'published'; update.published_at = new Date().toISOString() }
   stage = 'local_status_update'
+  logStage('local_status_update_started')
   await auth.admin.from('generated_articles').update(update).eq('id', id)
+  logStage('local_status_update_completed')
 
   // Phase 3G.4 — when an article that ORIGINATED from a queue item is PUBLISHED here,
   // mark that queue item published so it leaves the actionable queue. Matched EXACTLY
@@ -234,6 +285,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   console.log('[content-wp-export] done', { ...logBase, step: 'post_create', wpPostId: created.wpPostId, updated: created.updated, imageWarning: created.imageWarning, taxonomyWarning: created.taxonomyWarning, seoPlugin, seoStatus, keywordAdded })
+  logStage('response_returned')
   return Response.json({
     wp_post_id: created.wpPostId,
     wp_post_url: created.wpPostUrl,
@@ -262,6 +314,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // Top-level safe boundary — NO unexpected error becomes a bare Next.js 500.
     // The message never carries the throw's text (which could embed upstream
     // detail); only a stable code + safe Hebrew + the correlation id.
+    logStage('top_level_catch_entered')
     return fail('unexpected_publish_error', { stage: 'unexpected' })
   }
 }
