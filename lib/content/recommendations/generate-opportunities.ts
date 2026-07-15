@@ -1,24 +1,30 @@
 /**
- * PRODUCTION opportunity-first generation path (A).
+ * PRODUCTION opportunity-first generation path (P0) with quality-preserving
+ * RECOVERY TIERS.
  *
  *   load all project evidence → normalize ownership/coverage → build cross-source
- *   clusters → rank → select within the cost ceiling → ONE synthesis model call →
- *   deterministic worthiness/cannibalization validation → internal-link role mapping
- *   → return opportunities + a full safe diagnostics funnel.
+ *   clusters → rank globally → Tier 1 (strict, high confidence) → Tier 2 (broadened,
+ *   medium confidence) → Tier 3 (controlled discovery) → deterministic worthiness/
+ *   cannibalization on EVERY tier → internal-link role mapping → typed suggestions +
+ *   a full safe diagnostics funnel that proves the exact path used.
  *
- * This REPLACES source-first fan-out as the primary architecture. Site entities are
- * ownership/coverage/link signals, not article seeds. Uses the existing shared
- * RunCostController + Flash generator — NO new model-call or cost ceilings.
+ * There is NO silent legacy fallback here: the route runs the legacy source-first
+ * engine ONLY when RECO_LEGACY_PATH=1. Zero after a strict pass triggers the recovery
+ * tiers, never the old product-derived generator. Site entities are ownership/coverage
+ * /link-target signals, never article seeds. The same shared RunCostController +
+ * Flash generator are used — NO new model-call or cost ceilings (≤3 tier calls, well
+ * under the frozen 4-call / $0.15 ceiling).
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
-import { buildEvidenceClusters, rankClusters, selectClustersWithinBudget, type EvidenceInput, type EntityNode, type EvidenceCluster } from './evidence-cluster'
-import { buildOpportunityPrompt, parseOpportunities } from './opportunity-synthesis'
+import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, type EvidenceInput, type EntityNode } from './evidence-cluster'
+import { buildOpportunityPrompt, buildDiscoveryPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity } from './opportunity-synthesis'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, orderedLinksForOpportunity, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
+import { runRecoveryTiers, type TierPlan, type RecoveryTier, type ConfidenceLevel, type FallbackReason } from './recovery-tiers'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
 import { slugKey } from './dedupe'
@@ -28,17 +34,57 @@ import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-export interface OpportunityDiagnostics {
-  evidence_inventory: { keyword_research: number; tracked_keywords: number; entities: number; existing_coverage: number; pending: number }
-  clusters_built: number
-  clusters_by_source: Record<string, number>
-  ranked_clusters: { id: string; theme: string; source_label: string; score: number; demand: number; missing_coverage: boolean }[]
+/** Defensible-suggestion floor: once this many accumulate across tiers, stop. Bottom
+ *  of the 5–15 product target — enough to be useful without padding with weak ideas. */
+const TARGET_FLOOR = 5
+
+export interface TierDiagnostics {
+  tier: RecoveryTier
+  confidence_level: ConfidenceLevel
+  clusters_available: number
   clusters_sent_to_model: number
   model_calls: number
-  generated_opportunities: number
+  raw_candidates: number
+  parse_ok: boolean
+  mapped_opportunities: number
   rejected_by_reason: Record<string, number>
   persisted: number
+}
+
+export interface OpportunityDiagnostics {
+  generationPath: 'opportunity_first'
+  legacyUsed: false
+  recoveryTierUsed: RecoveryTier | null
+  discoveryUsed: boolean
+  fallbackReason: FallbackReason
+  finalCount: number
+  evidence_inventory: {
+    project_focus_terms: number
+    tracked_keywords: number
+    keyword_research_cache_rows: number
+    keyword_research_queries: number
+    search_volume_values: number
+    site_scan_entities: number
+    shopify_entities: number
+    existing_informational_coverage: number
+    existing_commercial_ownership: number
+    pending_topics: number
+    generated_articles: number
+  }
+  clusters_built: number
+  clusters_rejected_before_ranking: number
+  entity_only_rejected: number
+  clusters_by_source: Record<string, number>
+  clusters_by_tier: { high: number; medium: number }
+  ranked_clusters: { id: string; theme: string; source_label: string; tier: string; score: number; demand: number; missing_coverage: boolean }[]
+  tiers: TierDiagnostics[]
+  rejected_by_reason: Record<string, number>
+  persisted_by_confidence: Record<string, number>
   target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[] }[]
+  // Rollups kept for the route's runtimeDiag.
+  model_calls: number
+  generated_opportunities: number
+  persisted: number
   cost: { estimatedRunCostUsd: number; totalCalls: number }
 }
 
@@ -47,7 +93,8 @@ const PAGE_TYPE = (t: string | null | undefined): EntityPageType => {
   return (['product', 'category', 'service', 'page', 'post', 'article'] as EntityPageType[]).includes(s as EntityPageType) ? (s as EntityPageType) : 'unknown'
 }
 
-/** Run the production opportunity path. Returns [] with diagnostics on a soft miss. */
+/** Run the production opportunity path with recovery tiers. Returns [] with full
+ *  diagnostics only when NO safe opportunity exists after all tiers. */
 export async function generateOpportunities(
   admin: Admin,
   input: { projectId: string; targetCount: number; maxClusters: number },
@@ -65,27 +112,31 @@ export async function generateOpportunities(
   try { const { data } = await admin.from('tracking_targets').select('keyword').eq('project_id', input.projectId); for (const r of (data ?? []) as { keyword: string }[]) if (r.keyword) tracked.push(r.keyword) } catch { /* optional */ }
 
   const keywordResearch: { query: string; volume?: number | null }[] = []
+  let krCacheRows = 0
   try {
     const { data } = await admin.from('keyword_research_cache').select('results_json').eq('project_id', input.projectId).limit(20)
-    for (const row of (data ?? []) as { results_json: unknown }[]) {
-      const arr = Array.isArray(row.results_json) ? row.results_json : []
-      for (const kw of arr as { keyword?: string; avgMonthlySearches?: number | null }[]) if (kw?.keyword) keywordResearch.push({ query: kw.keyword, volume: kw.avgMonthlySearches ?? null })
-    }
+    const rows = (data ?? []) as { results_json: unknown }[]
+    krCacheRows = rows.length
+    keywordResearch.push(...flattenKeywordResearchCache(rows))
   } catch { /* optional */ }
+  const searchVolumeValues = keywordResearch.filter((k) => (k.volume ?? 0) > 0).length
 
   const entities: EntityNode[] = []
+  let siteScanEntities = 0
   try {
     const cacheRow = await getCachedIndex(admin, input.projectId)
     const targets = cacheRow ? ((reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]) : []
-    for (const t of targets) if (t.targetTitle) entities.push({ name: t.targetTitle, url: t.targetUrl, type: PAGE_TYPE(t.targetType) })
+    for (const t of targets) if (t.targetTitle) { entities.push({ name: t.targetTitle, url: t.targetUrl, type: PAGE_TYPE(t.targetType) }); siteScanEntities++ }
   } catch { /* optional */ }
+  let shopifyEntities = 0
   try {
     const { data } = await admin.from('shopify_entities').select('title, handle, entity_type, canonical_url').eq('project_id', input.projectId).eq('is_active', true)
-    for (const e of (data ?? []) as { title: string | null; canonical_url: string | null; entity_type: string | null }[]) if (e.title) entities.push({ name: e.title, url: e.canonical_url, type: PAGE_TYPE(e.entity_type) })
+    for (const e of (data ?? []) as { title: string | null; canonical_url: string | null; entity_type: string | null }[]) if (e.title) { entities.push({ name: e.title, url: e.canonical_url, type: PAGE_TYPE(e.entity_type) }); shopifyEntities++ }
   } catch { /* optional */ }
 
   const existingCoverage: { title: string; kind: 'article' | 'topic' | 'pending' }[] = []
-  try { const { data } = await admin.from('generated_articles').select('title').eq('project_id', input.projectId); for (const r of (data ?? []) as { title: string | null }[]) if (r.title) existingCoverage.push({ title: r.title, kind: 'article' }) } catch { /* optional */ }
+  let generatedArticles = 0
+  try { const { data } = await admin.from('generated_articles').select('title').eq('project_id', input.projectId); for (const r of (data ?? []) as { title: string | null }[]) if (r.title) { existingCoverage.push({ title: r.title, kind: 'article' }); generatedArticles++ } } catch { /* optional */ }
   try { const { data } = await admin.from('article_topics').select('topic').eq('project_id', input.projectId); for (const r of (data ?? []) as { topic: string | null }[]) if (r.topic) existingCoverage.push({ title: r.topic, kind: 'topic' }) } catch { /* optional */ }
   let pendingCount = 0
   try { const { data } = await admin.from('content_topic_ideas').select('title').eq('project_id', input.projectId).eq('status', 'pending'); for (const r of (data ?? []) as { title: string | null }[]) if (r.title) { existingCoverage.push({ title: r.title, kind: 'pending' }); pendingCount++ } } catch { /* optional */ }
@@ -93,68 +144,124 @@ export async function generateOpportunities(
   const focus = deriveProjectFocus({ projectName: p.business_name, domain: p.target_domain, ownedCategories: entities.map((e) => e.name), existingTopics: existingCoverage.map((c) => c.title) })
   const projectFocus = [focus.primaryProjectFocus, ...focus.secondaryProjectAreas].filter(Boolean)
 
-  // 2) Build + rank clusters, select within budget.
+  // 2) Build + rank clusters ONCE (both cluster tiers reuse the graph).
   const evidence: EvidenceInput = { keywordResearch, trackedKeywords: tracked, projectFocus, entities, existingCoverage }
-  const clusters = buildEvidenceClusters(evidence)
-  const ranked = rankClusters(clusters)
-  const selected = selectClustersWithinBudget(ranked, input.maxClusters)
+  const built = buildEvidenceClustersWithDiag(evidence)
+  const clusters = built.clusters
 
   const clustersBySource: Record<string, number> = {}
   for (const c of clusters) clustersBySource[c.source_label] = (clustersBySource[c.source_label] ?? 0) + 1
+  const clustersByTier = { high: clusters.filter((c) => c.tier_class === 'high').length, medium: clusters.filter((c) => c.tier_class === 'medium').length }
 
-  const rejected_by_reason: Record<string, number> = {}
-  const bump = (r: string) => { rejected_by_reason[r] = (rejected_by_reason[r] ?? 0) + 1 }
+  // Shared safety context (identical HARD gates across ALL tiers).
   const existingPages: ExistingPageSignal[] = Array.from(guard.entityOwners).map((n) => ({ name: n, pageType: 'unknown' as const }))
   const coveredKeys = new Set<string>([...guard.keywords, ...guard.contentKeywords].map((k) => normalizeText(k)))
   const linkCandidates: LinkCandidateEntity[] = entities.filter((e) => e.url).map((e) => ({ url: e.url as string, title: e.name, type: e.type }))
   const target_role_mappings: OpportunityDiagnostics['target_role_mappings'] = []
-
-  const baseDiag = (): OpportunityDiagnostics => ({
-    evidence_inventory: { keyword_research: keywordResearch.length, tracked_keywords: tracked.length, entities: entities.length, existing_coverage: existingCoverage.length - pendingCount, pending: pendingCount },
-    clusters_built: clusters.length, clusters_by_source: clustersBySource,
-    ranked_clusters: ranked.slice(0, 20).map((c) => ({ id: c.cluster_id, theme: c.canonical_topic, source_label: c.source_label, score: c.score, demand: c.demand_volume, missing_coverage: c.missing_coverage })),
-    clusters_sent_to_model: selected.length, model_calls: 0, generated_opportunities: 0,
-    rejected_by_reason, persisted: 0, target_role_mappings, cost: { estimatedRunCostUsd: 0, totalCalls: 0 },
-  })
-
-  if (selected.length === 0) {
-    const d = baseDiag(); const cs = controller.summary(); d.cost = { estimatedRunCostUsd: cs.estimatedRunCostUsd, totalCalls: cs.totalCalls }; d.model_calls = cs.totalCalls
-    return { suggestions: [], diagnostics: d }
-  }
-
-  // 3) ONE cluster-first synthesis model call (Flash, cost-controlled).
   const ctx: ProjectContext = { projectName: p.business_name, domain: p.target_domain, language, primaryProjectFocus: focus.primaryProjectFocus, secondaryProjectAreas: focus.secondaryProjectAreas, ownedCategories: entities.map((e) => e.name).slice(0, 15), existingTopics: existingCoverage.map((c) => c.title).slice(0, 15) }
-  const prompt = buildOpportunityPrompt(selected, ctx, langLabel, new Date().getFullYear(), input.targetCount)
-  const res = await generateRecommendationJSON(prompt, { temperature: 0.85, maxOutputTokens: outputBudgetFor(input.targetCount) }, controller, { source: 'opportunity_synthesis', callPurpose: 'primary', requestedIdeaCount: input.targetCount })
+  const year = new Date().getFullYear()
+  const tierDiags: TierDiagnostics[] = []
 
-  const opportunities = res.ok ? parseOpportunities(res.text) : []
-
-  // 4) Deterministic worthiness/cannibalization + 5) link-role mapping.
-  const suggestions: TopicSuggestion[] = []
-  const seenKw = new Set<string>()
-  for (const o of opportunities) {
-    const nk = normalizeText(o.primaryKeyword)
-    if (!nk || seenKw.has(nk)) { bump('duplicate_pending_topic'); continue }
-    const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent: (o.intent as SearchIntent) || 'informational', existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
-    if (!w.ok) { bump((w.rejection_reason as RejectionReason) || 'insufficient_independent_need'); continue }
-    seenKw.add(nk)
-    const mapped = mapLinkRoles(o.primaryKeyword, o.title, linkCandidates)
-    const ordered = orderedLinksForOpportunity(mapped)
-    if (target_role_mappings.length < 20) target_role_mappings.push({ keyword: o.primaryKeyword, primaryTarget: mapped.primaryTarget?.url ?? null, roles: mapped.assignments.slice(0, 5).map((a) => ({ url: a.url, role: a.role, score: a.score })) })
-    suggestions.push({
-      id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword: o.primaryKeyword,
-      secondaryKeywords: o.secondaryKeywords, searchIntent: o.intent || 'informational', recommendedWordCount: 1000, angle: '',
-      suggestedInternalLinks: ordered.map((l) => ({ url: l.url, anchor: l.anchor })),
-      moneyTargetUrl: mapped.primaryTarget?.url ?? null,
-      source: 'hybrid', suggestionReason: o.reason || '', suggestionScore: Number((w.distinctiveness_score * 0.5 + 0.5).toFixed(2)),
-    })
+  // Synthesize + deterministically validate one tier's candidates. IDENTICAL
+  // worthiness + cannibalization + link-role gates for every tier — only the prompt
+  // (which clusters/evidence) and the confidence label differ.
+  const synthAndValidate = async (prompt: string, plan: TierPlan, td: TierDiagnostics): Promise<TopicSuggestion[]> => {
+    const res = await generateRecommendationJSON(prompt, { temperature: plan.discovery ? 0.95 : 0.85, maxOutputTokens: outputBudgetFor(input.targetCount) }, controller, { source: 'opportunity_synthesis', callPurpose: plan.tier === 1 ? 'primary' : 'salvage', requestedIdeaCount: input.targetCount })
+    td.model_calls += 1
+    const opportunities: SynthOpportunity[] = res.ok ? parseOpportunities(res.text) : []
+    td.parse_ok = res.ok
+    td.raw_candidates += opportunities.length
+    const out: TopicSuggestion[] = []
+    for (const o of opportunities) {
+      const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent: (o.intent as SearchIntent) || 'informational', existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
+      if (!w.ok) { const r = (w.rejection_reason as RejectionReason) || 'insufficient_independent_need'; td.rejected_by_reason[r] = (td.rejected_by_reason[r] ?? 0) + 1; continue }
+      const mapped = mapLinkRoles(o.primaryKeyword, o.title, linkCandidates)
+      const ordered = orderedLinksForOpportunity(mapped)
+      if (target_role_mappings.length < 25) target_role_mappings.push({ keyword: o.primaryKeyword, primaryTarget: mapped.primaryTarget?.url ?? null, roles: mapped.assignments.slice(0, 5).map((a) => ({ url: a.url, role: a.role, score: a.score })) })
+      out.push({
+        id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword: o.primaryKeyword,
+        secondaryKeywords: o.secondaryKeywords, searchIntent: o.intent || 'informational', recommendedWordCount: 1000, angle: '',
+        suggestedInternalLinks: ordered.map((l) => ({ url: l.url, anchor: l.anchor })),
+        moneyTargetUrl: mapped.primaryTarget?.url ?? null,
+        source: 'hybrid', suggestionReason: o.reason || '', suggestionScore: Number((w.distinctiveness_score * 0.5 + 0.5).toFixed(2)),
+        confidenceLevel: plan.confidenceLevel, discoveryGenerated: plan.discovery,
+      })
+    }
+    td.mapped_opportunities += out.length
+    td.persisted += out.length
+    return out
   }
 
-  const d = baseDiag()
-  d.generated_opportunities = opportunities.length
-  d.persisted = suggestions.length
+  const runTier = async (plan: TierPlan): Promise<TopicSuggestion[]> => {
+    const td: TierDiagnostics = { tier: plan.tier, confidence_level: plan.confidenceLevel, clusters_available: 0, clusters_sent_to_model: 0, model_calls: 0, raw_candidates: 0, parse_ok: false, mapped_opportunities: 0, rejected_by_reason: {}, persisted: 0 }
+    tierDiags.push(td)
+
+    if (plan.tier === 1 || plan.tier === 2) {
+      const eligible = clustersForTier(clusters, plan.tier)
+      td.clusters_available = eligible.length
+      const selected = selectClustersWithinBudget(rankClusters(eligible), input.maxClusters)
+      td.clusters_sent_to_model = selected.length
+      if (selected.length === 0) return [] // no clusters → no model call; recover in the next tier
+      return synthAndValidate(buildOpportunityPrompt(selected, ctx, langLabel, year, input.targetCount), plan, td)
+    }
+
+    // Tier 3 — controlled discovery from combined evidence (no clusters required).
+    const ev: DiscoveryEvidence = {
+      projectFocus, trackedKeywords: tracked,
+      demandQueries: keywordResearch.map((k) => ({ q: k.query, v: k.volume ?? null })),
+      commercialEntities: entities.map((e) => ({ name: e.name, type: e.type ?? 'unknown' })),
+      existingCoverage: existingCoverage.map((c) => c.title),
+    }
+    const hasAnyEvidence = projectFocus.length + tracked.length + keywordResearch.length + entities.length > 0
+    if (!hasAnyEvidence) return [] // truly nothing to synthesize from
+    return synthAndValidate(buildDiscoveryPrompt(ev, ctx, langLabel, year, input.targetCount), plan, td)
+  }
+
+  const outcome = await runRecoveryTiers({ targetFloor: TARGET_FLOOR, keyKey: (s) => normalizeText(s.primaryKeyword), runTier })
+
+  // 3) Assemble diagnostics.
+  const ranked = rankClusters(clusters)
+  const rejected_by_reason: Record<string, number> = {}
+  for (const td of tierDiags) for (const [r, n] of Object.entries(td.rejected_by_reason)) rejected_by_reason[r] = (rejected_by_reason[r] ?? 0) + n
+  const persisted_by_confidence: Record<string, number> = {}
+  for (const s of outcome.suggestions) { const c = s.confidenceLevel ?? 'high_confidence'; persisted_by_confidence[c] = (persisted_by_confidence[c] ?? 0) + 1 }
   const cs = controller.summary()
-  d.model_calls = cs.totalCalls
-  d.cost = { estimatedRunCostUsd: cs.estimatedRunCostUsd, totalCalls: cs.totalCalls }
-  return { suggestions, diagnostics: d }
+
+  const diagnostics: OpportunityDiagnostics = {
+    generationPath: 'opportunity_first',
+    legacyUsed: false,
+    recoveryTierUsed: outcome.recoveryTierUsed,
+    discoveryUsed: outcome.discoveryUsed,
+    fallbackReason: outcome.fallbackReason,
+    finalCount: outcome.suggestions.length,
+    evidence_inventory: {
+      project_focus_terms: projectFocus.length,
+      tracked_keywords: tracked.length,
+      keyword_research_cache_rows: krCacheRows,
+      keyword_research_queries: keywordResearch.length,
+      search_volume_values: searchVolumeValues,
+      site_scan_entities: siteScanEntities,
+      shopify_entities: shopifyEntities,
+      existing_informational_coverage: existingCoverage.filter((c) => c.kind !== 'pending').length,
+      existing_commercial_ownership: guard.entityOwners.size,
+      pending_topics: pendingCount,
+      generated_articles: generatedArticles,
+    },
+    clusters_built: clusters.length,
+    clusters_rejected_before_ranking: built.rejected_themes,
+    entity_only_rejected: built.entity_only_rejected,
+    clusters_by_source: clustersBySource,
+    clusters_by_tier: clustersByTier,
+    ranked_clusters: ranked.slice(0, 20).map((c) => ({ id: c.cluster_id, theme: c.canonical_topic, source_label: c.source_label, tier: c.tier_class, score: c.score, demand: c.demand_volume, missing_coverage: c.missing_coverage })),
+    tiers: tierDiags,
+    rejected_by_reason,
+    persisted_by_confidence,
+    target_role_mappings,
+    model_calls: cs.totalCalls,
+    generated_opportunities: tierDiags.reduce((s, t) => s + t.raw_candidates, 0),
+    persisted: outcome.suggestions.length,
+    cost: { estimatedRunCostUsd: cs.estimatedRunCostUsd, totalCalls: cs.totalCalls },
+  }
+
+  return { suggestions: outcome.suggestions, diagnostics }
 }

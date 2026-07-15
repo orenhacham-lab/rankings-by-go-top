@@ -45,13 +45,40 @@ export interface EvidenceCluster {
   score: number
   /** UI label reflecting the DOMINANT evidence, not a generation quota. */
   source_label: 'keyword_research' | 'project_data' | 'site_scan' | 'combined'
+  /** Recovery-tier band this cluster qualifies for. 'high' = Tier 1 (proven demand
+   *  or multi-source with project relevance); 'medium' = Tier 2 (weaker but still
+   *  project-relevant, e.g. zero/unknown volume or a single dominant source). */
+  tier_class: 'high' | 'medium'
 }
 
 const STOP = new Set<string>(
   ['the', 'a', 'an', 'of', 'for', 'and', 'or', 'with', 'in', 'to', 'best', 'guide', 'price', 'buy', 'online',
    'של', 'עם', 'את', 'על', 'לפי', 'או', 'ל', 'ב', 'ה', 'ו', 'איך', 'מה', 'למה', 'כיצד'].map((t) => normalizePhrase(t)).filter(Boolean),
 )
-const contentToks = (s: string): string[] => Array.from(tokens(normalizePhrase(s || ''))).filter((t) => t.length > 1 && !STOP.has(t))
+
+// Hebrew single-letter proclitics that attach to a following word (ו/ה/ב/ל/מ/ש/כ).
+// "לחתונה" and "חתונה" are the SAME theme but tokenize differently; without stripping
+// them, Hebrew evidence from different sources never joins into one cluster. We EMIT
+// BOTH the surface token and its de-prefixed base (never replace), so joining is only
+// ever ADDED — genuinely different words keep their own surface token and never merge.
+const HE = /[א-ת]/
+const HE_PREFIXES = new Set(['ו', 'ה', 'ב', 'ל', 'מ', 'ש', 'כ'])
+/** Surface token → [surface, deprefixed-base?] (base only when it is a safe Hebrew
+ *  proclitic strip leaving a real word: all-Hebrew, remaining length >= 3). */
+function expandHebrew(tok: string): string[] {
+  if (tok.length >= 4 && HE.test(tok[0]) && HE_PREFIXES.has(tok[0])) {
+    const base = tok.slice(1)
+    if (base.length >= 3 && Array.from(base).every((c) => HE.test(c))) return [tok, base]
+  }
+  return [tok]
+}
+const contentToks = (s: string): string[] => {
+  const out: string[] = []
+  for (const t of Array.from(tokens(normalizePhrase(s || ''))).filter((t) => t.length > 1 && !STOP.has(t))) {
+    for (const e of expandHebrew(t)) if (!STOP.has(e)) out.push(e)
+  }
+  return Array.from(new Set(out))
+}
 
 /**
  * Build cross-source clusters keyed by a shared theme token. Every evidence node
@@ -61,6 +88,21 @@ const contentToks = (s: string): string[] => Array.from(tokens(normalizePhrase(s
  * a cluster naturally combines keyword research + a category entity + a coverage gap.
  */
 export function buildEvidenceClusters(input: EvidenceInput): EvidenceCluster[] {
+  return buildEvidenceClustersWithDiag(input).clusters
+}
+
+export interface ClusterBuildDiag {
+  clusters: EvidenceCluster[]
+  /** Distinct shared-token themes that did NOT become a cluster (all nodes already
+   *  consumed by a stronger theme, or entities-only with no demand/project signal). */
+  rejected_themes: number
+  /** Themes dropped specifically because they carried entities but no demand/project
+   *  signal (would have been one-article-per-entity). */
+  entity_only_rejected: number
+}
+
+/** Build clusters AND return why themes were rejected (Part B funnel evidence). */
+export function buildEvidenceClustersWithDiag(input: EvidenceInput): ClusterBuildDiag {
   type Node = { text: string; kind: EvidenceSourceKind; toks: string[]; kr?: KeywordResearchNode; ent?: EntityNode; cov?: CoverageNode }
   const nodes: Node[] = []
   for (const k of input.keywordResearch) if (k.query?.trim()) nodes.push({ text: k.query, kind: 'keyword_research', toks: contentToks(k.query), kr: k })
@@ -77,14 +119,17 @@ export function buildEvidenceClusters(input: EvidenceInput): EvidenceCluster[] {
 
   const used = new Set<number>()
   const clusters: EvidenceCluster[] = []
+  let rejected_themes = 0
+  let entity_only_rejected = 0
   let n = 0
   for (const [token, idxs] of themes) {
     const free = idxs.filter((i) => !used.has(i))
-    if (free.length < 2) continue
+    if (free.length < 2) { rejected_themes++; continue }
     const members = free.map((i) => nodes[i])
-    // A cluster must carry a real demand OR project signal — not entities alone.
+    // A cluster must carry a real demand OR project signal — not entities alone (that
+    // would be one-article-per-product). This holds across ALL recovery tiers.
     const hasDemandOrProject = members.some((m) => m.kind === 'keyword_research' || m.kind === 'project_data')
-    if (!hasDemandOrProject) continue
+    if (!hasDemandOrProject) { rejected_themes++; entity_only_rejected++; continue }
     free.forEach((i) => used.add(i))
     n++
     const kr = members.filter((m) => m.kr).map((m) => m.kr!) as KeywordResearchNode[]
@@ -104,15 +149,27 @@ export function buildEvidenceClusters(input: EvidenceInput): EvidenceCluster[] {
       (missing ? 0.2 : 0) +                              // coverage gap
       Math.min(1, comp.length / 3) * 0.15                // source diversity
     ).toFixed(4))
+    // Tier band: proven demand OR a multi-source cluster with real project relevance
+    // is Tier-1 'high'; everything else (zero/unknown volume, single dominant source)
+    // is Tier-2 'medium'. Never entities-only (rejected above).
+    const tier_class: EvidenceCluster['tier_class'] = (demand > 0 || (comp.length >= 2 && projectRelevance >= 0.34)) ? 'high' : 'medium'
     clusters.push({
       cluster_id: `c${n}`, canonical_topic: token, theme_tokens: [token],
       keyword_research_queries: kr, tracked_keywords: tracked, project_focus: input.projectFocus.filter((f) => contentToks(f).includes(token)),
       commercial_entities: entities, existing_coverage: coverage, missing_coverage: missing,
       demand_volume: demand, source_composition: comp, project_relevance: Number(projectRelevance.toFixed(2)),
-      confidence, score, source_label,
+      confidence, score, source_label, tier_class,
     })
   }
-  return clusters
+  return { clusters, rejected_themes, entity_only_rejected }
+}
+
+/** Clusters eligible for a recovery tier. Tier 1 uses only 'high' bands; Tier 2
+ *  broadens to include the 'medium' bands too (still project-relevant, never
+ *  entities-only). Tier 3 (discovery) does not use clusters — it synthesizes from
+ *  the combined evidence directly. */
+export function clustersForTier(clusters: EvidenceCluster[], tier: 1 | 2): EvidenceCluster[] {
+  return tier === 1 ? clusters.filter((c) => c.tier_class === 'high') : clusters.slice()
 }
 
 /** Rank clusters strongest-first (score desc, then demand, stable by id). */
@@ -123,4 +180,21 @@ export function rankClusters(clusters: EvidenceCluster[]): EvidenceCluster[] {
 /** Select the strongest clusters to send to the model, bounded by the budget. */
 export function selectClustersWithinBudget(ranked: EvidenceCluster[], maxClusters: number): EvidenceCluster[] {
   return ranked.slice(0, Math.max(0, maxClusters))
+}
+
+/**
+ * Flatten the REAL keyword_research_cache shape (each row's `results_json` is a
+ * Google-Ads `KeywordIdeaResult[]` = `{ keyword, avgMonthlySearches }[]`) into demand
+ * nodes. Never fabricates volume — a missing/absent value stays null. Domain-neutral
+ * + pure so the exact production parse is offline-testable (Part I).
+ */
+export function flattenKeywordResearchCache(rows: { results_json: unknown }[]): KeywordResearchNode[] {
+  const out: KeywordResearchNode[] = []
+  for (const row of rows) {
+    const arr = Array.isArray(row?.results_json) ? row.results_json : []
+    for (const kw of arr as { keyword?: string; avgMonthlySearches?: number | null }[]) {
+      if (kw?.keyword?.trim()) out.push({ query: kw.keyword, volume: kw.avgMonthlySearches ?? null })
+    }
+  }
+  return out
 }

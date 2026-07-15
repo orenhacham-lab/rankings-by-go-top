@@ -48,6 +48,14 @@ export interface TopicSuggestion {
   /** Internal diagnostic — which Gemini model produced this idea (primary or
    *  fallback id). Response/diagnostic-only; NEVER rendered on the idea card. */
   modelUsed?: string
+  /** P0 recovery tiers — the confidence band the opportunity was generated in:
+   *  'high_confidence' (Tier 1, strong multi-source evidence), 'medium_confidence'
+   *  (Tier 2, broadened single-strong-source), 'discovery' (Tier 3, controlled
+   *  synthesis from combined evidence). Response-only; additive. */
+  confidenceLevel?: 'high_confidence' | 'medium_confidence' | 'discovery'
+  /** True when produced by the Tier 3 controlled-discovery step (never claims
+   *  fabricated demand). Response-only; additive. */
+  discoveryGenerated?: boolean
 }
 
 export interface RecommendationMeta {

@@ -44,6 +44,44 @@ export function buildOpportunityPrompt(clusters: EvidenceCluster[], ctx: Project
   ].filter(Boolean).join('\n')
 }
 
+/** Compact, safe combined-evidence payload for Tier 3 controlled discovery. */
+export interface DiscoveryEvidence {
+  projectFocus: string[]
+  trackedKeywords: string[]
+  demandQueries: { q: string; v: number | null }[]
+  commercialEntities: { name: string; type: string }[]
+  existingCoverage: string[]
+}
+
+/**
+ * Tier 3 — CONTROLLED DISCOVERY prompt. Runs only when Tiers 1–2 cannot supply
+ * enough defensible opportunities. ONE synthesis step over the COMBINED project
+ * evidence that identifies broad, domain-relevant user needs (questions, comparisons,
+ * selection criteria, troubleshooting, care, mistakes, audiences, scenarios, seasonal
+ * needs, category guides, educational topics, content-cluster gaps). Product/service/
+ * category names are context + commercial targets ONLY — never the primary keyword or
+ * article subject. Demand must never be claimed unless real volume is present.
+ */
+export function buildDiscoveryPrompt(ev: DiscoveryEvidence, ctx: ProjectContext, langLabel: string, year: number, count: number): string {
+  const withVol = ev.demandQueries.filter((d) => (d.v ?? 0) > 0)
+  return [
+    `You are an SEO content strategist doing CONTROLLED DISCOVERY. Today's year is ${year}. Return ALL text in ${langLabel}.`,
+    projectContextBlock(ctx),
+    ``,
+    `COMBINED PROJECT EVIDENCE (use as context — do NOT turn any single item into an article by itself):`,
+    `- Project focus: ${JSON.stringify(ev.projectFocus.slice(0, 8))}`,
+    `- Tracked keywords: ${JSON.stringify(ev.trackedKeywords.slice(0, 12))}`,
+    `- Keyword-research queries WITH real demand: ${JSON.stringify(withVol.slice(0, 15).map((d) => ({ q: d.q, v: d.v })))}`,
+    `- Keyword-research queries with unknown/zero demand (context only, do NOT claim volume): ${JSON.stringify(ev.demandQueries.filter((d) => !((d.v ?? 0) > 0)).slice(0, 15).map((d) => d.q))}`,
+    `- Commercial entities (LINK TARGETS / examples of available solutions — never a primary keyword): ${JSON.stringify(ev.commercialEntities.slice(0, 20))}`,
+    `- Already-covered titles (do NOT duplicate): ${JSON.stringify(ev.existingCoverage.slice(0, 20))}`,
+    ``,
+    `Propose up to ${count} BROAD, domain-relevant CONTENT OPPORTUNITIES grounded in this project's actual subject matter: questions, comparisons, selection criteria, troubleshooting, care & maintenance, common mistakes, audience-specific needs, scenarios, seasonal needs, category guides, educational explainers, or content-cluster gaps. Each must be a real independent user need with a distinct expected answer. NEVER use a commercial entity's bare name (or entity + a weak location/use/occasion modifier) as the primaryKeyword. Do not fabricate search demand — only reference demand that appears in the real-demand list above. Skip anything an existing title already answers.`,
+    recommendationGuidance(langLabel, year, count),
+    structuredOutputContract(langLabel, count),
+  ].filter(Boolean).join('\n')
+}
+
 export interface SynthOpportunity {
   title: string
   primaryKeyword: string

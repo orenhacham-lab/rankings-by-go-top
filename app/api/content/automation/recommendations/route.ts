@@ -108,29 +108,40 @@ export async function POST(request: Request) {
     // already-known clusters (avoidKeywords) — repeat runs surface fresh ones.
     const guard = await buildKeywordGuard(auth.admin, auth.project.id)
 
-    // PRIMARY PATH — opportunity-first: build cross-source evidence clusters, rank,
-    // send the strongest to ONE synthesis call, validate deterministically, map
-    // links. Site entities are ownership/target signals, not article seeds. Uses the
-    // shared cost controller (no new call/cost ceilings). The legacy source-first
-    // engine is an explicitly-gated fallback (RECO_LEGACY_PATH=1, or when the
-    // opportunity path yields nothing so a run is never silently empty).
-    let opportunityDiagnostics: unknown = undefined
+    // PRIMARY PATH — opportunity-first with quality-preserving RECOVERY TIERS: build
+    // cross-source evidence clusters → Tier 1 (strict) → Tier 2 (broadened) → Tier 3
+    // (controlled discovery), each validated deterministically with the SAME hard
+    // gates, links role-mapped. Site entities are ownership/target signals, not article
+    // seeds. Shared cost controller (no new call/cost ceilings; ≤3 tier calls).
+    //
+    // There is NO silent legacy fallback. The legacy source-first engine runs ONLY as
+    // an explicit operational rollback (RECO_LEGACY_PATH=1). When it is not enabled a
+    // zero result is a TYPED no_safe_opportunities returned inside the opportunity-first
+    // architecture — legacy product-derived suggestions never reach the response.
+    let opportunityDiagnostics: import('@/lib/content/recommendations/generate-opportunities').OpportunityDiagnostics | null = null
+    let generationPath: 'opportunity_first' | 'legacy_explicit' = 'opportunity_first'
+    let legacyUsed = false
+    let recoveryTierUsed: number | null = null
+    let discoveryUsed = false
+    let fallbackReason: string | null = null
     let result: Awaited<ReturnType<typeof generateRecommendations>>
     const useLegacy = process.env.RECO_LEGACY_PATH === '1'
-    if (!useLegacy) {
+    if (useLegacy) {
+      // EXPLICIT operational rollback ONLY.
+      generationPath = 'legacy_explicit'; legacyUsed = true; fallbackReason = 'explicit_legacy_mode'
+      result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
+    } else {
       const controller = newRunCostController(qualityMode, generationRunId, 15)
       const opp = await generateOpportunities(auth.admin, { projectId: auth.project.id, targetCount: 15, maxClusters: 12 }, controller)
       opportunityDiagnostics = opp.diagnostics
-      if (opp.suggestions.length > 0) {
-        result = { suggestions: opp.suggestions, meta: { source, generated: opp.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: opp.suggestions.length, attempts: 1, runtimeDiag: diagnostics ? { totalCalls: opp.diagnostics.model_calls, rawCandidates: opp.diagnostics.generated_opportunities, path: 'opportunity_first' } : undefined } }
-      } else {
-        // Opportunity path found no defensible opportunity → fall back so the run is
-        // diagnosed, not silently empty. The old path stays available for safety.
-        result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
-      }
-    } else {
-      result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
+      recoveryTierUsed = opp.diagnostics.recoveryTierUsed
+      discoveryUsed = opp.diagnostics.discoveryUsed
+      fallbackReason = opp.diagnostics.fallbackReason
+      // ALWAYS use the opportunity-first result — even zero. NEVER call legacy here.
+      result = { suggestions: opp.suggestions, meta: { source, generated: opp.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: opp.suggestions.length, attempts: opp.diagnostics.tiers.length, reason: opp.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: opp.diagnostics.model_calls, rawCandidates: opp.diagnostics.generated_opportunities, path: 'opportunity_first', recoveryTierUsed, discoveryUsed, fallbackReason } : undefined } }
     }
+    // The authoritative generation-path contract exposed on every response (E).
+    const pathContract = { generationPath, legacyUsed, recoveryTierUsed, discoveryUsed, fallbackReason }
 
     // Part C — a run where EVERY attempted source failed at the provider (no raw
     // candidates were generated) is a typed PROVIDER error, never a successful
@@ -335,11 +346,11 @@ export async function POST(request: Request) {
     // No ideas table yet (migration not applied): still return the GUARD-FILTERED
     // list session-only, so the keyword guard works even before persistence.
     if (pending === null) {
-      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, projectId: auth.project.id, generationRunId, clientRequestId, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
+      return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, ...pathContract, projectId: auth.project.id, generationRunId, clientRequestId, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification } : undefined,
+        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
 
@@ -393,7 +404,10 @@ export async function POST(request: Request) {
       accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
       persistedCurrentRunCount: fresh.length,
       rejectionClassification,
-      // Opportunity-first pipeline funnel (evidence → clusters → synthesis →
+      // Authoritative generation-path contract (E) — proves whether opportunity-first
+      // or explicit legacy produced the visible suggestions, and which recovery tier.
+      ...pathContract,
+      // Opportunity-first pipeline funnel (evidence → clusters → tiers → synthesis →
       // worthiness → link-roles). Full safe funnel so live validation needs no DB.
       opportunityDiagnostics: opportunityDiagnostics ?? null,
       // Idempotency (J) — this run actually executed generation (not a replay).
@@ -408,6 +422,9 @@ export async function POST(request: Request) {
         ...result.meta,
         persisted: true,
         source,
+        // Authoritative generation-path contract (E) — always on the response so the
+        // UI/diagnostics never imply opportunity-first when legacy actually ran.
+        ...pathContract,
         // Scope echo — the client verifies these before applying the response.
         projectId: auth.project.id,
         generationRunId,
