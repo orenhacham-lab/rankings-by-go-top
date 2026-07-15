@@ -43,6 +43,48 @@ export function deriveCorpusTypeWords(docs: string[], opts?: { minDocs?: number;
   return out
 }
 
+/**
+ * Descriptive-ATTRIBUTE tokens (colours, sizes, quantities, occasion/quality
+ * modifiers) derived from the project corpus, domain-neutral: an attribute MODIFIES
+ * many different product heads, so it co-occurs with many DISTINCT other tokens. A
+ * token appearing in >= minCount names AND co-occurring with >= minSpread distinct
+ * other tokens is an attribute (e.g. a colour "לבן" across many bouquets). A specific
+ * subject (a flower variety) co-occurs with few → not an attribute.
+ */
+export function deriveAttributeTokens(names: string[], opts?: { minCount?: number; minSpread?: number }): Set<string> {
+  const minCount = opts?.minCount ?? 3
+  const minSpread = opts?.minSpread ?? 4
+  const count = new Map<string, number>()
+  const coOcc = new Map<string, Set<string>>()
+  for (const n of names) {
+    const ts = Array.from(new Set(toks(n)))
+    for (const t of ts) {
+      count.set(t, (count.get(t) ?? 0) + 1)
+      const s = coOcc.get(t) ?? new Set<string>()
+      for (const u of ts) if (u !== t) s.add(u)
+      coOcc.set(t, s)
+    }
+  }
+  const out = new Set<string>()
+  for (const [t, c] of count) if (c >= minCount && (coOcc.get(t)?.size ?? 0) >= minSpread) out.add(t)
+  return out
+}
+
+// Explicit deterministic title→intent signals (function words, not domain content).
+const CMP_TITLE = /(?:^|\s)(?:לעומת|מול|השוואה|הבדל\s+בין|vs\.?|versus)(?:\s|$)/i
+const HOWTO_TITLE = /(?:^|\s)(?:איך|כיצד|מדריך|טיפול|טיפוח|how\s+to|guide)(?:\s|$)/i
+const LOCAL_COMM_TITLE = /(?:^|\s)(?:משלוח|חנות|מחיר|קנייה|קניה|לקנות|delivery|shop|store|buy|price)(?:\s|$)/i
+
+/** Force an intent from an EXPLICIT title signal, overriding the model. Comparison
+ *  wins over everything; then how-to→informational; then a local/commercial marker. */
+export function deriveIntentFromTitle(title: string, modelIntent: SearchIntent): SearchIntent {
+  const t = title || ''
+  if (CMP_TITLE.test(t)) return 'comparison'
+  if (HOWTO_TITLE.test(t)) return 'informational'
+  if (LOCAL_COMM_TITLE.test(t)) return modelIntent === 'transactional' ? 'transactional' : 'local'
+  return modelIntent
+}
+
 // ── C. title–keyword–intent consistency ──────────────────────────────────────
 export interface IntentConsistencyResult { ok: boolean; repairedKeyword?: string; reason?: 'intent_keyword_mismatch' }
 const INFORMATIONAL_INTENTS = new Set<SearchIntent>(['informational', 'comparison', 'other'])
@@ -145,9 +187,11 @@ export function validatePrimaryKeywordQuality(
 }
 
 // ── H. deterministic demand language ──────────────────────────────────────────
-// Unsupported demand-claim FUNCTION phrases (explicitly listed by the spec) that must
-// be stripped when there is no verified volume. Not industry/product content.
-const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:ביקוש\s+(?:גבוה\s+מאוד|גבוה|רב|גדול)|חיפושים\s+נפוצים|נפח\s+חיפוש(?:ים)?\s+גבוה(?:\s+מאוד)?|נפח\s+גבוה\s+מאוד|very\s+high\s+search\s+volume|high\s+search\s+volume|high\s+demand|commonly\s+searched)\s*/gi
+// Unsupported / hyperbolic demand-claim FUNCTION phrases (explicitly listed by the
+// spec) — stripped ALWAYS (even when a real number exists, the subjective adjective
+// must not survive; the factual clause is generated deterministically). Not
+// industry/product content.
+const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:ביקוש\s+(?:גבוה\s+מאוד|גבוה|רב|גדול|עצום|משמעותי)|חיפושים\s+נפוצים|חיפושים\s+רבים|נפח\s+חיפוש(?:ים)?\s+(?:גבוה\s+מאוד|גבוה|עצום|משמעותי)|נפח\s+(?:גבוה\s+מאוד|עצום|משמעותי)|very\s+high\s+search\s+volume|high\s+search\s+volume|huge\s+(?:search\s+)?(?:volume|demand)|extremely\s+high(?:\s+demand)?|high\s+demand|commonly\s+searched)\s*/gi
 
 /**
  * Produce the FINAL user-visible reason with deterministic demand wording. When real
@@ -173,20 +217,26 @@ export function sanitizeDemandLanguage(
 
 // Malformed markers: a dangling connective at the end, or a broken comparison
 // fragment (a connective immediately followed by another connective, e.g. "בעל לבין").
-const DANGLING_END_RE = /(?:^|\s)(?:בין|לבין|בעל|בעלת|של|עם|או|ו|כי|עבור|לפי|and|or|of|for|the|with|to|vs)\s*$/i
+const DANGLING_END_RE = /(?:^|\s)(?:בין|לבין|בעל|בעלת|של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|the|with|to|vs)\s*$/i
 // No \b — JS word boundaries do not apply around Hebrew letters.
 const BROKEN_FRAGMENT_RE = /(?:^|\s)(?:בעל|בין)\s+(?:לבין|בין|בעל|של)(?:\s|$)|(?:^|\s)בין\s+\S{1,3}\s+לבין(?:\s|$)/
+// Two adjacent Hebrew prepositions with no noun between (e.g. "עונה על של לקוחות") —
+// a missing-noun / broken clause.
+const PREP = '(?:על|של|אל|עם|את|בין|כדי|לפי|עבור|ל|ב|מ)'
+const ADJ_PREPOSITION_RE = new RegExp(`(?:^|\\s)${PREP}\\s+${PREP}(?:\\s|$)`)
 
 /** True when the reason reads as truncated/malformed (dangling connective or a broken
  *  comparison fragment) and should be replaced with a neutral fallback. */
 export function isMalformedReason(reason: string): boolean {
   const t = (reason || '').trim()
   if (t.split(/\s+/).filter(Boolean).length < 3) return true
-  return DANGLING_END_RE.test(t) || BROKEN_FRAGMENT_RE.test(t)
+  return DANGLING_END_RE.test(t) || BROKEN_FRAGMENT_RE.test(t) || ADJ_PREPOSITION_RE.test(t)
 }
 
 function neutralReason(language: 'he' | 'en'): string {
-  return language === 'he' ? 'נושא תוכן רלוונטי לתחום העסק.' : 'A content topic relevant to the business.'
+  return language === 'he'
+    ? 'הנושא רלוונטי לתחום הפעילות של העסק ולביטויי החיפוש שנמצאו במחקר.'
+    : 'The topic is relevant to the business and to the search terms found in research.'
 }
 
 /**
@@ -228,8 +278,12 @@ export function classifyRecommendedPageType(
 ): RecommendedPageType {
   if (!COMMERCIAL_INTENTS.has(o.intent)) return 'article'
   if (signals.keywordEqualsProduct) return 'product_page_improvement'
-  if (signals.primaryTargetType === 'category') return 'category_page'
   if (signals.primaryTargetType === 'service') return 'service_page'
+  // A LOCAL query (store / service-area) is a commercial landing page, NOT a category
+  // — a category_page only when the target is genuinely a product collection AND the
+  // intent is a (non-local) commercial/transactional catalogue query.
+  if (o.intent === 'local') return 'commercial_landing_page'
+  if (signals.primaryTargetType === 'category') return 'category_page'
   return 'commercial_landing_page'
 }
 
@@ -297,6 +351,9 @@ export function filterSecondaryKeywords(primaryKeyword: string, title: string, s
   const primSet = new Set(toks(primaryKeyword))
   const onTopic = new Set<string>([...primSet, ...toks(title)])
   const typeWords = corpusTypeWords ?? new Set<string>()
+  // The primary's DISTINCTIVE subject (minus generic + domain type/attribute words):
+  // a secondary must retain at least one of these, else it is broader than the topic.
+  const primaryDistinct = new Set([...primSet].filter((t) => !GENERIC_TOKENS.has(t) && !typeWords.has(t)))
   const informational = !!intent && INFORMATIONAL_INTENTS.has(intent)
   const kept: string[] = []
   const rejected: { keyword: string; reason: string }[] = []
@@ -316,14 +373,18 @@ export function filterSecondaryKeywords(primaryKeyword: string, title: string, s
     // (e.g. "זר פרח") with no distinctive subject is not a real search phrase.
     if (st.every((t) => GENERIC_TOKENS.has(t) || typeWords.has(t))) { rejected.push({ keyword: s, reason: 'generic_type_word_combo' }); continue }
     if (informational && st.some((t) => COMMERCIAL_MODIFIERS.has(t))) { rejected.push({ keyword: s, reason: 'intent_conflicting' }); continue }
+    // Completely unrelated (shares nothing with the topic at all) → off_topic.
     if (!st.some((t) => onTopic.has(t))) { rejected.push({ keyword: s, reason: 'off_topic' }); continue }
+    // F — on the general topic but broader: shares only attribute/type/generic tokens,
+    // no distinctive subject (e.g. "פרח בצבע לבן" for a specific lily comparison).
+    if (primaryDistinct.size > 0 && !st.some((t) => primaryDistinct.has(t))) { rejected.push({ keyword: s, reason: 'secondary_too_broad' }); continue }
     kept.push(s)
   }
   return { kept, rejected }
 }
 
 // ── G. business relevance ─────────────────────────────────────────────────────
-export interface BusinessRelevanceResult { ok: boolean; score: number; relatedCommercialEntities: string[]; reason?: 'low_business_relevance' }
+export interface BusinessRelevanceResult { ok: boolean; score: number; relatedCommercialEntities: string[]; reason?: 'low_business_relevance' | 'unsupported_local_service_area' }
 
 /**
  * A topic may be top-of-funnel but must have a defensible connection to the business.
@@ -337,6 +398,7 @@ export function assessBusinessRelevance(
   businessEvidenceTokens: Set<string>,
   corpusTypeWords: Set<string>,
   entities: { name: string }[],
+  intent?: SearchIntent,
 ): BusinessRelevanceResult {
   const subjAll = [...toks(o.primaryKeyword), ...toks(o.title)].filter((t) => !GENERIC_TOKENS.has(t))
   const distinctive = subjAll.filter((t) => !corpusTypeWords.has(t))
@@ -344,6 +406,13 @@ export function assessBusinessRelevance(
   const covered = pool.filter((t) => businessEvidenceTokens.has(t))
   const related = entities.filter((e) => toks(e.name).some((t) => pool.includes(t))).map((e) => e.name).slice(0, 8)
   const score = pool.length ? Number((covered.length / pool.length).toFixed(2)) : 0
+  const local = intent === 'local' || intent === 'transactional'
+  // E — a LOCAL opportunity whose distinctive subject+location is mostly NOT in project
+  // evidence is an unsupported service area (a location the business does not
+  // demonstrably serve). Model claims that an area is central/prestigious/popular are
+  // NOT business evidence. Majority coverage (>= 0.5) avoids over-rejecting on
+  // tokenizer noise while still catching an unsupported location.
+  if (local && score < 0.5) return { ok: false, score, relatedCommercialEntities: related, reason: 'unsupported_local_service_area' }
   if (covered.length === 0) return { ok: false, score, relatedCommercialEntities: related, reason: 'low_business_relevance' }
   return { ok: true, score, relatedCommercialEntities: related }
 }

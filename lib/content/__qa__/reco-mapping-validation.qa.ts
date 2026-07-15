@@ -12,8 +12,9 @@
  *  G. a topic disconnected from all business evidence is low_business_relevance.
  */
 import { mapLinkRoles, orderedLinksForOpportunity, type LinkCandidateEntity } from '../recommendations/link-role-mapper'
-import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from '../recommendations/opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntentFromTitle } from '../recommendations/opportunity-validation'
 import { contentTokens } from '../recommendations/evidence-cluster'
+import { normalizePhrase } from '../recommendations/keyword-guard'
 import { blockedNonArticle, classifyTopicOutcome, summarizeBatch, type TopicStageOutcomes } from '../automation/approve-link-queue'
 
 let pass = 0, fail = 0
@@ -73,7 +74,8 @@ async function main() {
   console.log('D) recommended page type + non-article never auto-enqueued')
   {
     check('D. informational → article', classifyRecommendedPageType({ intent: 'informational' }, { primaryTargetType: null, keywordEqualsProduct: false }) === 'article')
-    check('D. local commercial with a category target → category_page', classifyRecommendedPageType({ intent: 'local' }, { primaryTargetType: 'category', keywordEqualsProduct: false }) === 'category_page')
+    check('D. local store/service-area query → commercial_landing_page (NOT category)', classifyRecommendedPageType({ intent: 'local' }, { primaryTargetType: 'category', keywordEqualsProduct: false }) === 'commercial_landing_page')
+    check('D. a (non-local) commercial catalogue query with a category target → category_page', classifyRecommendedPageType({ intent: 'commercial' }, { primaryTargetType: 'category', keywordEqualsProduct: false }) === 'category_page')
     check('D. transactional, no target → commercial_landing_page', classifyRecommendedPageType({ intent: 'transactional' }, { primaryTargetType: null, keywordEqualsProduct: false }) === 'commercial_landing_page')
     check('D. exact product need → product_page_improvement', classifyRecommendedPageType({ intent: 'commercial' }, { primaryTargetType: 'product', keywordEqualsProduct: true }) === 'product_page_improvement')
     // Endpoint enforcement: a non-article is blocked (not a failure), article enqueues.
@@ -219,8 +221,55 @@ async function main() {
     // E — malformed reason → deterministic neutral fallback.
     check('E. malformed comparison fragment detected as malformed', isMalformedReason('השוואה בין פרח שושן צחור בעל לבין ורדים לבנים'))
     const repaired = finalizeReason('השוואה בין פרח שושן צחור בעל לבין ורדים לבנים', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none', demandMatchType: 'none' }, 'he')
-    check('E. malformed reason replaced with a neutral deterministic fallback', repaired === 'נושא תוכן רלוונטי לתחום העסק.')
+    check('E. malformed reason replaced with a neutral deterministic fallback', repaired === 'הנושא רלוונטי לתחום הפעילות של העסק ולביטויי החיפוש שנמצאו במחקר.')
     check('E. a clean reason is kept as-is', finalizeReason('מדריך בחירת זר לחתונה עם דגש על עונתיות', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none', demandMatchType: 'none' }, 'he') === 'מדריך בחירת זר לחתונה עם דגש על עונתיות')
+  }
+
+  console.log('A/B/C-links) no forced target, local mismatch, attribute-only rejected')
+  {
+    const domainTypeWords = deriveCorpusTypeWords(['זר אהבה בלבן', 'זר אושר לבן', 'זר שדה לבן', 'זר ורוד', 'מארז יוקרתי'], { minDocs: 3, minFraction: 0.25 })
+    for (const t of deriveAttributeTokens(['זר אהבה בלבן', 'זר אושר לבן', 'זר שדה לבן', 'מארז אורכידאה יוקרתית', 'מארז דואט כחול', 'מארז קרינה'], { minCount: 2, minSpread: 2 })) domainTypeWords.add(t)
+
+    // A/B — a local flower-shop query must NOT force a random product bundle as primary.
+    const localMap = mapLinkRoles('חנות פרחים בעמק רפאים', 'חנות פרחים בעמק רפאים: שירות אישי', [
+      { url: '/p/bundle1', title: 'מארז אורכידאה יוקרתית', type: 'product' },
+      { url: '/p/bundle2', title: 'מארז דואט כחול', type: 'product' },
+    ], { corpusTypeWords: domainTypeWords, intent: 'local' })
+    check('A. no valid local target → primaryCommercialTarget is null (not forced)', localMap.primaryTarget === null)
+    check('B. the unrelated bundle is typed local_intent_target_mismatch or attribute-only', localMap.debug.every((a) => a.role === 'unrelated'))
+
+    // C — white-colour-only bouquets are NOT targets for a lily comparison.
+    const lilyMap = mapLinkRoles('שושן צחור לעומת פרחים לבנים אחרים', 'שושן צחור לעומת פרחים לבנים אחרים', [
+      { url: '/p/love-white', title: 'זר אהבה בלבן', type: 'product' },
+      { url: '/p/joy-white', title: 'זר אושר לבן', type: 'product' },
+    ], { corpusTypeWords: domainTypeWords, intent: 'comparison' })
+    check('C. colour-only ("לבן") bouquets are not commercial targets', lilyMap.primaryTarget === null && !lilyMap.assignments.length)
+    check('C. colour-only candidates carry the typed attribute_only_match reason', lilyMap.debug.some((a) => a.reason === 'attribute_only_match'))
+    check('C. deriveAttributeTokens flags the colour "לבן" as an attribute', deriveAttributeTokens(['זר אהבה בלבן', 'זר אושר לבן', 'זר שדה לבן', 'זר קלאסי אדום'], { minCount: 2, minSpread: 2 }).has(normalizePhrase('לבן')))
+  }
+
+  console.log('E/I) unsupported local service area; explicit comparison title → comparison')
+  {
+    // E — a local topic whose location is NOT in business evidence is rejected.
+    const evidence = tokSet(['משלוח פרחים בירושלים', 'זר ורדים', 'עציץ קאלות'])
+    const typeWords = deriveCorpusTypeWords(['זר ורדים', 'זר קאלות', 'זר פרחים', 'משלוח פרחים'], { minDocs: 2, minFraction: 0.3 })
+    const badArea = assessBusinessRelevance({ primaryKeyword: 'חנות פרחים בעמק רפאים', title: 'חנות פרחים בעמק רפאים' }, evidence, typeWords, [], 'local')
+    check('E. unsupported local service area (עמק רפאים not in evidence) → rejected', !badArea.ok && badArea.reason === 'unsupported_local_service_area')
+    const okArea = assessBusinessRelevance({ primaryKeyword: 'משלוח פרחים בירושלים', title: 'משלוח פרחים בירושלים' }, evidence, typeWords, [], 'local')
+    check('E. a supported location (ירושלים in evidence) passes', okArea.ok)
+
+    // I — an explicit comparison title forces comparison intent over the model.
+    check('I. "לעומת" title → comparison intent (overrides model informational)', deriveIntentFromTitle('שושן צחור לעומת פרחים לבנים אחרים', 'informational') === 'comparison')
+    check('I. "מדריך/איך" title → informational', deriveIntentFromTitle('מדריך טיפוח ורדים בבית', 'commercial') === 'informational')
+    check('I. "משלוח/חנות" title → local', deriveIntentFromTitle('משלוח פרחים בירושלים', 'informational') === 'local')
+    check('I. no explicit signal → model intent kept', deriveIntentFromTitle('רעיונות לזר כלה', 'commercial') === 'commercial')
+  }
+
+  console.log('H-hype) verified volume keeps ONLY factual wording, no model hype')
+  {
+    const withVol = finalizeReason('המאמר עונה על נפח חיפוש עצום ומספק ערך', { demandEvidenceAvailable: true, demandQuery: 'שושן צחור', avgMonthlySearches: 5400, demandConfidence: 'high', demandMatchType: 'exact' }, 'he')
+    check('H. hyperbole ("נפח חיפוש עצום") stripped even with verified volume', !/עצום|גבוה מאוד|ביקוש רב/.test(withVol) && withVol.includes('5400') && withVol.includes('חיפושים חודשיים'))
+    check('G. adjacent-preposition fragment ("על של") detected as malformed', isMalformedReason('נושא זה עונה על של לקוחות המחפשים'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

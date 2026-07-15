@@ -24,7 +24,7 @@ import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget
 import { buildOpportunityPrompt, buildDiscoveryPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity } from './opportunity-synthesis'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
-import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from './opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntentFromTitle } from './opportunity-validation'
 import { runRecoveryTiers, type TierPlan, type RecoveryTier, type ConfidenceLevel, type FallbackReason } from './recovery-tiers'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -177,6 +177,10 @@ export async function generateOpportunities(
     { minDocs: 6, minFraction: 0.3 },
   )
   for (const t of corpusTypeWords) domainTypeWords.add(t)
+  // Descriptive-ATTRIBUTE tokens (colours/sizes/quantities/occasion modifiers) — a
+  // token that modifies many different product heads. Folded in so a shared attribute
+  // (e.g. a colour "לבן") is never a distinctive subject for a link or a keyword.
+  for (const t of deriveAttributeTokens(entities.map((e) => e.name))) domainTypeWords.add(t)
   const commercialEntityTokens = new Set<string>()
   for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
@@ -199,7 +203,9 @@ export async function generateOpportunities(
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
-      const intent = ((o.intent as SearchIntent) || 'informational')
+      // I — an EXPLICIT title signal (לעומת/מול/השוואה → comparison; איך/מדריך →
+      // informational; משלוח/חנות → local) deterministically overrides the model intent.
+      const intent = deriveIntentFromTitle(o.title, (o.intent as SearchIntent) || 'informational')
       const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent, existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
       if (!w.ok) { bump(td, (w.rejection_reason as RejectionReason) || 'insufficient_independent_need'); continue }
 
@@ -217,9 +223,10 @@ export async function generateOpportunities(
       if (!quality.ok) { bump(td, 'invalid_primary_keyword'); continue }
       if (quality.repairedKeyword) primaryKeyword = quality.repairedKeyword
 
-      // G — business relevance: reject a topic fully disconnected from business evidence.
-      const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, corpusTypeWords, entities.map((e) => ({ name: e.name })))
-      if (!relevance.ok) { bump(td, 'low_business_relevance'); continue }
+      // E/G — business relevance: reject a topic disconnected from business evidence,
+      // and (local intent) an unsupported local service area (location not in evidence).
+      const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, domainTypeWords, entities.map((e) => ({ name: e.name })), intent)
+      if (!relevance.ok) { bump(td, relevance.reason ?? 'low_business_relevance'); continue }
 
       // B/F/H — secondary-keyword quality against the FINAL primary (drops duplicate-
       // of-primary, malformed, generic, generic-type-word combos, off-topic,
@@ -229,7 +236,7 @@ export async function generateOpportunities(
 
       // A/B/C/D — internal-link role mapping → CANONICAL LinkPlan (colour/type-only
       // matches suppressed via project-derived domain type words).
-      const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates, { corpusTypeWords: domainTypeWords })
+      const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates, { corpusTypeWords: domainTypeWords, intent })
       const linkPlan = buildLinkPlan(mapped)
       const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null
       if (target_role_mappings.length < 25) target_role_mappings.push({

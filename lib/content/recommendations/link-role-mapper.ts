@@ -65,13 +65,16 @@ export function mapLinkRoles(
   opportunityKeyword: string,
   opportunityTitle: string,
   candidates: LinkCandidateEntity[],
-  opts?: { corpusTypeWords?: Set<string> },
+  opts?: { corpusTypeWords?: Set<string>; intent?: string },
 ): { primaryTarget: RoleAssignment | null; assignments: RoleAssignment[]; debug: RoleAssignment[] } {
   const oppToks = new Set(linkToks(`${opportunityKeyword} ${opportunityTitle}`))
   // Project-derived domain type/descriptor words (colours, sizes, ubiquitous product
   // types) computed from ALL entity names upstream — broader + more reliable than the
   // per-call candidate DF, so a shared colour/type token alone never qualifies a link.
   const corpusTypeWords = opts?.corpusTypeWords ?? new Set<string>()
+  // Local intent: a commercial target must align with the LOCAL/service need (share the
+  // article's subject head), not merely be a product sharing an attribute token.
+  const localIntent = opts?.intent === 'local' || opts?.intent === 'transactional'
 
   const seen = new Set<string>()
   const prepared: { c: LinkCandidateEntity; toks: string[] }[] = []
@@ -119,7 +122,13 @@ export function mapLinkRoles(
 
     let a: RoleAssignment
     if (distinctive.length === 0) {
-      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: shared.length ? 'generic_or_type_word_only' : 'no_topical_overlap', score, distinctiveTokens: [] }
+      // Shares only attribute/type words (colour/size/generic type) or nothing.
+      const reason = shared.some((t) => isTypeWord(t)) ? 'attribute_only_match' : shared.length ? 'generic_or_type_word_only' : 'no_topical_overlap'
+      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason, score, distinctiveTokens: [] }
+    } else if (isCommercial && localIntent && !sharesHead) {
+      // A — local commercial query: a product sharing a distinctive token that is NOT
+      // the subject head (e.g. a random bundle) is not a valid local target → null-able.
+      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: 'local_intent_target_mismatch', score, distinctiveTokens: distinctive }
     } else if (isCommercial) {
       // Role-specific: a distinctive commercial match is a target regardless of the
       // informational bar. Final primary/secondary decided after ranking.
