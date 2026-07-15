@@ -13,6 +13,7 @@ import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, ownedByExistingEntity, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
+import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent } from '@/lib/content/recommendations/opportunity'
 import { salvageLongTailKeyword } from '@/lib/content/recommendations/keyword-salvage'
 import { dedupeIntraRunSemantic } from '@/lib/content/recommendations/intra-run-dedupe'
 import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
@@ -144,6 +145,14 @@ export async function POST(request: Request) {
     let exactTopicDuplicates = 0
     let trueContentCoverage = 0
     let exactExistingKeywordOwner = 0
+    // Opportunity-model deterministic layer (domain-neutral): an entity re-expressed
+    // with no independent need added is a source-only expansion, not an opportunity.
+    let sourceOnlyEntityExpansion = 0
+    let cannibalizationReviews = 0
+    // Existing indexed commercial-entity NAME signals (from the keyword guard's
+    // entityOwners: scan product/category/page + Shopify entities). Used by the
+    // article-worthiness gate for multi-signal cannibalization + expansion checks.
+    const existingPages: ExistingPageSignal[] = Array.from(guard.entityOwners).map((n) => ({ name: n, pageType: 'unknown' as const }))
     let keywordCollisionCandidates = 0
     let keywordCollisionSalvaged = 0
     let keywordCollisionStillRejected = 0
@@ -189,6 +198,22 @@ export async function POST(request: Request) {
       //    (never salvaged), regardless of the model's declared intent or a longer
       //    article title. EXACT match only, so genuine long-tails are unaffected.
       if (ownedByExistingEntity(guard, s.primaryKeyword)) { exactExistingKeywordOwner++; pushEx('exact_existing_keyword_owner'); return false }
+      // 1c) OPPORTUNITY GATE (deterministic, domain-neutral): reject a candidate that
+      //    only re-expresses existing entity names (every token belongs to an entity
+      //    or is a generic modifier) — a source-only expansion, not an independent
+      //    need. Ambiguous commercial-overlap cases are counted for REVIEW but not
+      //    dropped (the model/prompt handled the nuance). No cost/model calls.
+      if (existingPages.length > 0) {
+        const w = evaluateArticleWorthiness({
+          primaryKeyword: s.primaryKeyword, title: s.title, secondaryKeywords: s.secondaryKeywords,
+          intent: (s.searchIntent as SearchIntent) || 'informational', existingPages,
+          hasEvidence: true, businessRelevant: true, // scoring-only here; not hard gates in the route
+        })
+        if (!w.ok && (w.rejection_reason === 'source_only_entity_expansion' || w.rejection_reason === 'weak_entity_modifier')) {
+          sourceOnlyEntityExpansion++; pushEx(w.rejection_reason); return false
+        }
+        if (w.cannibalization.outcome === 'review') cannibalizationReviews++
+      }
       // 2) TRUE_CONTENT_COVERAGE — an existing PUBLISHED page already satisfies this
       //    query (same main phrase / owned content phrase). Permanent. Catches the
       //    real cannibalization cases (e.g. re-titled duplicate of an existing article).
@@ -256,6 +281,8 @@ export async function POST(request: Request) {
       exactTopicDuplicates,
       trueContentCoverage,
       exactExistingKeywordOwner,
+      sourceOnlyEntityExpansion,
+      cannibalizationReviews,
       keywordCollisionCandidates,
       keywordCollisionSalvaged,
       keywordCollisionStillRejected,
