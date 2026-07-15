@@ -745,7 +745,14 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       const structured = planTargets.length
         ? previewStructuredLinks({ id: 'preview', title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords }, planTargets, planHosts, 4, devDebug)
         : { moneyTarget: null, supportingLinks: [] as { url: string; anchor: string; title: string }[], moneyTargetMatchType: 'no_match', reason: 'stale_index' as const }
-      const ordered = [...(structured.moneyTarget ? [structured.moneyTarget] : []), ...structured.supportingLinks].map(({ url, anchor }) => ({ url, anchor }))
+      // Money target first, then supporting links; the planner already excludes the
+      // money-target URL from supporting, and we defensively drop any duplicate URL
+      // (F.4) so an existing commercial page is never both the primary target and a
+      // supporting link.
+      const seenLinkUrls = new Set<string>()
+      const ordered = [...(structured.moneyTarget ? [structured.moneyTarget] : []), ...structured.supportingLinks]
+        .map(({ url, anchor }) => ({ url, anchor }))
+        .filter((l) => { const k = (l.url || '').trim().toLowerCase(); if (!k || seenLinkUrls.has(k)) return false; seenLinkUrls.add(k); return true })
       if (ordered.length) {
         return { ...s, suggestedInternalLinks: ordered, moneyTargetUrl: structured.moneyTarget?.url ?? null, moneyTargetMatchType: structured.moneyTargetMatchType }
       }

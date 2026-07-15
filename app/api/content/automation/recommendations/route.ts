@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled } from '@/lib/content/ap
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
-import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
+import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, ownedByExistingEntity, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { salvageLongTailKeyword } from '@/lib/content/recommendations/keyword-salvage'
 import { dedupeIntraRunSemantic } from '@/lib/content/recommendations/intra-run-dedupe'
 import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
@@ -143,6 +143,7 @@ export async function POST(request: Request) {
     // a permanent rejection; it is salvaged to a narrower long-tail when possible).
     let exactTopicDuplicates = 0
     let trueContentCoverage = 0
+    let exactExistingKeywordOwner = 0
     let keywordCollisionCandidates = 0
     let keywordCollisionSalvaged = 0
     let keywordCollisionStillRejected = 0
@@ -154,7 +155,9 @@ export async function POST(request: Request) {
     const salvageChecks = {
       isOwnedKeyword: (nk: string) => guard.keywords.has(nk),
       isSemanticKeywordDup: (kw: string) => ownedKeywordCorpus.isDuplicate(kw),
-      isCoveredByContent: (title: string, kw: string) => coveredByExistingContent(guard, title, kw),
+      // A salvaged long-tail must ALSO not collide with an existing content phrase
+      // OR the exact name of an existing indexed commercial entity (cannibalization).
+      isCoveredByContent: (title: string, kw: string) => coveredByExistingContent(guard, title, kw) || ownedByExistingEntity(guard, kw),
     }
     const filteredExamples: { title: string; primaryKeyword: string; reason: string; sources: string[] }[] = []
     // Phase 3I.6 — PRODUCTION evidence for primary_keyword_exists rejections:
@@ -179,6 +182,13 @@ export async function POST(request: Request) {
       const pushEx = (reason: string) => { if (filteredExamples.length < 10) filteredExamples.push({ title: s.title, primaryKeyword: s.primaryKeyword, reason, sources: keywordSourcesOf(guard, s.primaryKeyword) }) }
       // 1) EXACT_TOPIC_DUPLICATE — the same title already exists/pending. Permanent.
       if (nt && guard.titles.has(nt)) { exactTopicDuplicates++; filteredTitleExists++; pushEx('title_exists'); return false }
+      // 1b) EXACT_EXISTING_KEYWORD_OWNER — the primary keyword EXACTLY equals the
+      //    name of an existing indexed commercial entity (product / category / page /
+      //    Shopify entity). That page already owns this exact query → a new article
+      //    on it is direct keyword+intent cannibalization. HARD permanent rejection
+      //    (never salvaged), regardless of the model's declared intent or a longer
+      //    article title. EXACT match only, so genuine long-tails are unaffected.
+      if (ownedByExistingEntity(guard, s.primaryKeyword)) { exactExistingKeywordOwner++; pushEx('exact_existing_keyword_owner'); return false }
       // 2) TRUE_CONTENT_COVERAGE — an existing PUBLISHED page already satisfies this
       //    query (same main phrase / owned content phrase). Permanent. Catches the
       //    real cannibalization cases (e.g. re-titled duplicate of an existing article).
@@ -245,6 +255,7 @@ export async function POST(request: Request) {
     const rejectionClassification = {
       exactTopicDuplicates,
       trueContentCoverage,
+      exactExistingKeywordOwner,
       keywordCollisionCandidates,
       keywordCollisionSalvaged,
       keywordCollisionStillRejected,
