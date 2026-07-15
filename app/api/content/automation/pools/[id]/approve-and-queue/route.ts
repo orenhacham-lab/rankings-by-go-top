@@ -57,6 +57,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const rows = (topicRows ?? []) as { id: string; status: string; source: string | null }[]
   const byId = new Map(rows.map((r) => [r.id, r]))
 
+  // Part F — AUTHORITATIVE recommendedPageType from the idea's persisted link_plan
+  // (by approved_topic_id), so a non-article opportunity cannot silently enter the
+  // ARTICLE queue regardless of what the client sends. Resilient to a pre-migration
+  // link_plan column (falls back to the request value / 'article').
+  const serverPageType = new Map<string, string>()
+  try {
+    const { data: ideaRows } = await auth.admin
+      .from('content_topic_ideas').select('approved_topic_id, link_plan')
+      .eq('project_id', pool.project_id).in('approved_topic_id', topics.map((t) => t.topicId))
+    for (const r of (ideaRows ?? []) as { approved_topic_id: string | null; link_plan: unknown }[]) {
+      const pt = (r.link_plan && typeof r.link_plan === 'object') ? (r.link_plan as { recommendedPageType?: string }).recommendedPageType : undefined
+      if (r.approved_topic_id && typeof pt === 'string') serverPageType.set(r.approved_topic_id, pt)
+    }
+  } catch { /* pre-migration / column missing → rely on the request value */ }
+
   // Existing pool items for idempotent enqueue.
   const { data: existing } = await auth.admin.from('article_pool_items').select('topic_id, position').eq('pool_id', pool.id)
   const existingRows = (existing ?? []) as { topic_id: string | null; position: number }[]
@@ -68,8 +83,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   for (const t of topics) {
     const row = byId.get(t.topicId)
     const outcome: TopicStageOutcomes = { validated: false, linkPlanRequested: t.expectsLinks, linkPlanSaved: false, approved: false, enqueued: false, alreadyQueued: false }
-    // 0) Part D — a non-article recommendation is never auto-enqueued as an article.
-    if (t.recommendedPageType !== 'article' && !t.allowNonArticle) { results.push(blockedNonArticle(t.topicId)); continue }
+    // 0) Part D/F — a non-article recommendation is never auto-enqueued as an article.
+    // The persisted (server-side) page type wins over the request; a deliberate
+    // allowNonArticle override is still required to convert it to an article.
+    const effectivePageType = serverPageType.get(t.topicId) ?? t.recommendedPageType
+    if (effectivePageType !== 'article' && !t.allowNonArticle) { results.push(blockedNonArticle(t.topicId)); continue }
     // 1) validate.
     if (!row) { results.push(classifyTopicOutcome(t.topicId, outcome)); continue }
     outcome.validated = true

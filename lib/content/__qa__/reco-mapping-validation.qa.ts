@@ -12,7 +12,7 @@
  *  G. a topic disconnected from all business evidence is low_business_relevance.
  */
 import { mapLinkRoles, orderedLinksForOpportunity, type LinkCandidateEntity } from '../recommendations/link-role-mapper'
-import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, sanitizeDemandLanguage, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from '../recommendations/opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from '../recommendations/opportunity-validation'
 import { contentTokens } from '../recommendations/evidence-cluster'
 import { blockedNonArticle, classifyTopicOutcome, summarizeBatch, type TopicStageOutcomes } from '../automation/approve-link-queue'
 
@@ -83,15 +83,19 @@ async function main() {
     check('D. a blocked non-article does not make the batch fail', batch.ok === true && batch.added === 1 && batch.failed === 0)
   }
 
-  console.log('E) demand-claim integrity (verified volume only)')
+  console.log('A/E) demand alignment — typed match, only aligned volume is factual')
   {
-    const kr = [{ query: 'משלוח פרחים בירושלים', volume: 880 }, { query: 'עציץ קאלות', volume: null }]
-    const withVol = computeDemandEvidence('משלוח פרחים בירושלים', [], kr)
-    check('E. verified volume is exposed with the exact query + confidence', withVol.demandEvidenceAvailable && withVol.avgMonthlySearches === 880 && withVol.demandConfidence === 'high')
-    const noVol = computeDemandEvidence('שזירת פרחים לאירועים', [], kr)
-    check('E. no matching demand → demandConfidence none, no fabricated volume', !noVol.demandEvidenceAvailable && noVol.avgMonthlySearches === null && noVol.demandConfidence === 'none')
-    const nullVol = computeDemandEvidence('עציץ קאלות', [], kr)
-    check('E. a matching query with null volume is NOT claimed as demand', nullVol.demandConfidence === 'none')
+    const typeWords = deriveCorpusTypeWords(['זר ורדים', 'זר קאלות', 'זר שמפנייה', 'זר פרחים', 'פרח יפה'], { minDocs: 3, minFraction: 0.3 })
+    const kr = [{ query: 'משלוח פרחים בירושלים', volume: 880 }, { query: 'עציץ קאלות', volume: null }, { query: 'זר פרח', volume: 5400 }]
+    const exact = computeDemandEvidence('משלוח פרחים בירושלים', [], kr, typeWords)
+    check('E. exact query → factual volume + demandMatchType exact', exact.demandEvidenceAvailable && exact.avgMonthlySearches === 880 && exact.demandMatchType === 'exact')
+    // A — the live bug: a broad "זר פרח" (5400) must NOT be attributed to a narrower,
+    // different opportunity. Its distinctive tokens (זר/פרח are domain type words) do
+    // not align with the bunches subject → NOT available, not described as demand.
+    const bunches = computeDemandEvidence('משלוח באנצ\'ים ופרחים בתפזורת', ['זר פרחים'], kr, typeWords)
+    check('A. broad "זר פרח" is NOT claimed as demand for the bunches opportunity', !bunches.demandEvidenceAvailable && bunches.demandMatchType !== 'exact' && bunches.demandMatchType !== 'close_intent')
+    const nullVol = computeDemandEvidence('עציץ קאלות', [], kr, typeWords)
+    check('E. a matching query with null volume is NOT claimed as demand', !nullVol.demandEvidenceAvailable && nullVol.demandConfidence === 'none')
   }
 
   console.log('F) secondary-keyword quality')
@@ -165,6 +169,40 @@ async function main() {
     check('H. a genuinely complementary comparison secondary is kept', sec.kept.includes('הבדל בין ורדים לבנים לאדומים'))
   }
 
+  console.log('C/D-links) domain-type suppression: color-only + delivery-only excluded')
+  {
+    // Project-derived domain type words (color "ורוד", delivery "משלוח", city
+    // "ירושלים", flower "פרח") from the broad corpus — a shared one of these alone
+    // must not create a link.
+    const domainTypeWords = deriveCorpusTypeWords(
+      ['אנטוריום ורוד', 'סחלב ורוד', 'זר ורוד', 'משלוח פרחים ירושלים', 'משלוח פרחים רחביה', 'משלוח פרחים גילה', 'פרח לבן', 'זר פרחים'],
+      { minDocs: 3, minFraction: 0.3 },
+    )
+    // D — a pink anthurium shares ONLY the color with a pink-rose topic → not a target.
+    const dMap = mapLinkRoles('ורדים ורודים לחתונה', 'זר ורדים ורודים לחתונה', [
+      { url: '/p/anthurium', title: 'אנטוריום ורוד', type: 'product' },
+      { url: '/p/rose', title: 'זר ורדים בצבעים שונים', type: 'product' },
+    ], { corpusTypeWords: domainTypeWords })
+    check('D. color-only commercial match (pink anthurium) is NOT a secondary target', !dMap.assignments.some((a) => a.url === '/p/anthurium'))
+    check('D. the real rose product IS the commercial target', dMap.primaryTarget?.url === '/p/rose')
+    // C — a DIY bunches topic must not pull local flower-delivery articles.
+    const cMap = mapLinkRoles('משלוח באנצ\'ים ופרחים בתפזורת', 'הדרך לשזור בעצמכם באנצ\'ים בבית', [
+      { url: '/blog/rehavia', title: 'משלוח פרחים ברחביה', type: 'post' },
+      { url: '/blog/gilo', title: 'חנות פרחים בגילה', type: 'post' },
+      { url: '/blog/bunch-diy', title: 'שזירת באנצ\'ים עצמאית מדריך', type: 'post' },
+    ], { corpusTypeWords: domainTypeWords })
+    check('C. local delivery/shop articles (generic פרח/משלוח/city overlap) excluded', !cMap.assignments.some((a) => a.url === '/blog/rehavia' || a.url === '/blog/gilo'))
+    check('C. a genuinely complementary DIY-bunches article is kept', cMap.assignments.some((a) => a.url === '/blog/bunch-diy' && a.role === 'supporting_informational_link'))
+  }
+
+  console.log('B-secondary) generic type-word combo secondary removed')
+  {
+    const domainTypeWords = deriveCorpusTypeWords(['זר פרחים', 'פרח לבן', 'פרח ורוד', 'זר פרח יפה', 'זר ורדים'], { minDocs: 3, minFraction: 0.3 })
+    const r = filterSecondaryKeywords('שזירת באנצ\'ים בבית', 'מדריך שזירת באנצ\'ים בבית', ['זר פרח', 'שזירת באנצ\'ים יצירתית'], 'informational', domainTypeWords)
+    check('B. "זר פרח" (generic type-word combo) removed from secondaries', r.rejected.some((x) => x.keyword === 'זר פרח' && x.reason === 'generic_type_word_combo'))
+    check('B. a specific on-topic secondary is kept', r.kept.includes('שזירת באנצ\'ים יצירתית'))
+  }
+
   console.log('G-quality) final primary-keyword quality gate; H demand language')
   {
     const typeWords = deriveCorpusTypeWords(['זר ורדים', 'זר קאלות', 'זר שמפנייה', 'זר כפרי', 'פרח יפה'])
@@ -174,10 +212,15 @@ async function main() {
     const good = validatePrimaryKeywordQuality('שושן צחור לבן', 'שושן צחור: מדריך גידול', typeWords)
     check('G. a keyword carrying the distinctive subject passes unchanged', good.ok && !good.repairedKeyword)
     // H — verified volume → factual wording; none → strip unsupported demand claims.
-    const withVol = sanitizeDemandLanguage('זר קאלות נהנה מביקוש גבוה מאוד של מחפשים ומתאים לחתונות', { demandEvidenceAvailable: true, demandQuery: 'זר קאלות', avgMonthlySearches: 480, demandConfidence: 'high' }, 'he')
+    const withVol = finalizeReason('זר קאלות נהנה מביקוש גבוה מאוד של מחפשים ומתאים לחתונות', { demandEvidenceAvailable: true, demandQuery: 'זר קאלות', avgMonthlySearches: 480, demandConfidence: 'high', demandMatchType: 'exact' }, 'he')
     check('H. verified volume → factual monthly-searches wording added', withVol.includes('480') && withVol.includes('חיפושים חודשיים'))
-    const noVol = sanitizeDemandLanguage('הנושא נהנה מביקוש גבוה מאוד וגם חיפושים נפוצים ומתאים לעונה', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none' }, 'he')
-    check('H. no verified volume → unsupported demand claims stripped', !/ביקוש גבוה|חיפושים נפוצים/.test(noVol) && noVol.includes('מתאים לעונה'))
+    const noVol = finalizeReason('הנושא נהנה מביקוש גבוה מאוד וגם חיפושים נפוצים ומתאים מאוד לעונת הקיץ', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none', demandMatchType: 'none' }, 'he')
+    check('H. no verified volume → unsupported demand claims stripped', !/ביקוש גבוה|חיפושים נפוצים/.test(noVol) && noVol.includes('לעונת הקיץ'))
+    // E — malformed reason → deterministic neutral fallback.
+    check('E. malformed comparison fragment detected as malformed', isMalformedReason('השוואה בין פרח שושן צחור בעל לבין ורדים לבנים'))
+    const repaired = finalizeReason('השוואה בין פרח שושן צחור בעל לבין ורדים לבנים', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none', demandMatchType: 'none' }, 'he')
+    check('E. malformed reason replaced with a neutral deterministic fallback', repaired === 'נושא תוכן רלוונטי לתחום העסק.')
+    check('E. a clean reason is kept as-is', finalizeReason('מדריך בחירת זר לחתונה עם דגש על עונתיות', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none', demandMatchType: 'none' }, 'he') === 'מדריך בחירת זר לחתונה עם דגש על עונתיות')
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

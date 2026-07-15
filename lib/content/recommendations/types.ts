@@ -81,7 +81,7 @@ export interface TopicSuggestion {
   recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement'
   /** P0 demand-claim integrity — verified demand evidence (from keyword research);
    *  demandConfidence 'none' means NO verified volume (use neutral language). */
-  demandEvidence?: { demandEvidenceAvailable: boolean; demandQuery: string | null; avgMonthlySearches: number | null; demandConfidence: 'high' | 'low' | 'none' }
+  demandEvidence?: { demandEvidenceAvailable: boolean; demandQuery: string | null; avgMonthlySearches: number | null; demandConfidence: 'high' | 'low' | 'none'; demandMatchType?: 'exact' | 'close_intent' | 'supporting_only' | 'none' }
   /** P0 business relevance — 0..1 coverage of the topic's subject by business
    *  evidence + the related commercial entities that support it. Response-only. */
   businessRelevance?: { score: number; relatedCommercialEntities: string[] }

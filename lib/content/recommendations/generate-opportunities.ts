@@ -24,7 +24,7 @@ import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget
 import { buildOpportunityPrompt, buildDiscoveryPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity } from './opportunity-synthesis'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
-import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, sanitizeDemandLanguage, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from './opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from './opportunity-validation'
 import { runRecoveryTiers, type TierPlan, type RecoveryTier, type ConfidenceLevel, type FallbackReason } from './recovery-tiers'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -168,6 +168,15 @@ export async function generateOpportunities(
   // Validation evidence sets (domain-neutral, derived from THIS project's data).
   const urlTypeMap = new Map<string, EntityPageType>(linkCandidates.map((c) => [c.url.trim().toLowerCase().replace(/\/+$/, ''), c.type ?? 'unknown']))
   const corpusTypeWords = deriveCorpusTypeWords(entities.map((e) => e.name))
+  // Broader DOMAIN type/descriptor words (colours, sizes, ubiquitous flower/city/
+  // delivery tokens) for link matching + demand alignment — derived across ALL project
+  // documents so a shared colour/type/location token alone never qualifies a link or a
+  // demand claim. Lower thresholds because the corpus is larger + more diverse.
+  const domainTypeWords = deriveCorpusTypeWords(
+    [...entities.map((e) => e.name), ...existingCoverage.map((c) => c.title), ...keywordResearch.map((k) => k.query), ...tracked, ...projectFocus],
+    { minDocs: 6, minFraction: 0.3 },
+  )
+  for (const t of corpusTypeWords) domainTypeWords.add(t)
   const commercialEntityTokens = new Set<string>()
   for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
@@ -212,13 +221,15 @@ export async function generateOpportunities(
       const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, corpusTypeWords, entities.map((e) => ({ name: e.name })))
       if (!relevance.ok) { bump(td, 'low_business_relevance'); continue }
 
-      // F/H — secondary-keyword quality (intent-aware; drops duplicate-of-primary,
-      // malformed, generic, off-topic, intent-conflicting).
-      const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords, intent)
+      // B/F/H — secondary-keyword quality against the FINAL primary (drops duplicate-
+      // of-primary, malformed, generic, generic-type-word combos, off-topic,
+      // intent-conflicting).
+      const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords, intent, domainTypeWords)
       secondaryKeywordsFiltered += sec.rejected.length
 
-      // A/B — internal-link role mapping → CANONICAL role-aware LinkPlan.
-      const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates)
+      // A/B/C/D — internal-link role mapping → CANONICAL LinkPlan (colour/type-only
+      // matches suppressed via project-derived domain type words).
+      const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates, { corpusTypeWords: domainTypeWords })
       const linkPlan = buildLinkPlan(mapped)
       const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null
       if (target_role_mappings.length < 25) target_role_mappings.push({
@@ -232,9 +243,11 @@ export async function generateOpportunities(
       const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))
       const recommendedPageType = classifyRecommendedPageType({ intent }, { primaryTargetType, keywordEqualsProduct })
 
-      // E/H — verified demand evidence + deterministic demand wording (no fabrication).
-      const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, keywordResearch)
-      const suggestionReason = sanitizeDemandLanguage(o.reason || '', demandEvidence, language)
+      // A/E/H — demand evidence ALIGNED to this opportunity (typed match) + final
+      // reason validation (strip unsupported claims, repair malformed text, factual
+      // demand wording only for exact/close_intent).
+      const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, keywordResearch, domainTypeWords)
+      const suggestionReason = finalizeReason(o.reason || '', demandEvidence, language)
 
       out.push({
         id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword,

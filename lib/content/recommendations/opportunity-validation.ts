@@ -28,14 +28,18 @@ const COMPARISON_CONNECTORS = new Set<string>(['vs', 'versus', 'לעומת', 'מ
  *  shared generic set; used to flag intent-conflicting secondary keywords. */
 const COMMERCIAL_MODIFIERS = new Set<string>(['price', 'buy', 'cheap', 'discount', 'sale', 'מחיר', 'מחירים', 'זול', 'זולה', 'לקנות', 'קניה', 'קנייה', 'מבצע', 'בזול'].map((t) => normalizePhrase(t)).filter(Boolean))
 
-/** Product-TYPE words are data-derived: tokens appearing across many entity names.
- *  (>= 4 entities AND >= 50% of them). Domain-neutral, not a hardcoded list. */
-export function deriveCorpusTypeWords(entityNames: string[]): Set<string> {
+/** Product-TYPE / domain-descriptor words are data-derived: tokens appearing across
+ *  many documents (default: >= 4 docs AND >= 50% of them). Domain-neutral, not a
+ *  hardcoded list. Pass a broader corpus + lower thresholds to also catch ubiquitous
+ *  domain words (a dominant flower/colour/city token) for link matching. */
+export function deriveCorpusTypeWords(docs: string[], opts?: { minDocs?: number; minFraction?: number }): Set<string> {
+  const minDocs = opts?.minDocs ?? 4
+  const minFraction = opts?.minFraction ?? 0.5
   const df = new Map<string, number>()
-  for (const n of entityNames) for (const t of new Set(toks(n))) df.set(t, (df.get(t) ?? 0) + 1)
-  const N = entityNames.length
+  for (const n of docs) for (const t of new Set(toks(n))) df.set(t, (df.get(t) ?? 0) + 1)
+  const N = docs.length
   const out = new Set<string>()
-  for (const [t, d] of df) if (d >= 4 && d / Math.max(1, N) >= 0.5) out.add(t)
+  for (const [t, d] of df) if (d >= minDocs && d / Math.max(1, N) >= minFraction) out.add(t)
   return out
 }
 
@@ -167,6 +171,46 @@ export function sanitizeDemandLanguage(
   return base
 }
 
+// Malformed markers: a dangling connective at the end, or a broken comparison
+// fragment (a connective immediately followed by another connective, e.g. "בעל לבין").
+const DANGLING_END_RE = /(?:^|\s)(?:בין|לבין|בעל|בעלת|של|עם|או|ו|כי|עבור|לפי|and|or|of|for|the|with|to|vs)\s*$/i
+// No \b — JS word boundaries do not apply around Hebrew letters.
+const BROKEN_FRAGMENT_RE = /(?:^|\s)(?:בעל|בין)\s+(?:לבין|בין|בעל|של)(?:\s|$)|(?:^|\s)בין\s+\S{1,3}\s+לבין(?:\s|$)/
+
+/** True when the reason reads as truncated/malformed (dangling connective or a broken
+ *  comparison fragment) and should be replaced with a neutral fallback. */
+export function isMalformedReason(reason: string): boolean {
+  const t = (reason || '').trim()
+  if (t.split(/\s+/).filter(Boolean).length < 3) return true
+  return DANGLING_END_RE.test(t) || BROKEN_FRAGMENT_RE.test(t)
+}
+
+function neutralReason(language: 'he' | 'en'): string {
+  return language === 'he' ? 'נושא תוכן רלוונטי לתחום העסק.' : 'A content topic relevant to the business.'
+}
+
+/**
+ * FINAL user-visible reason (E): strip unsupported demand claims, replace a malformed/
+ * truncated reason with a deterministic neutral fallback, then append factual demand
+ * wording ONLY when the demand query is aligned (exact/close_intent) with real volume.
+ */
+export function finalizeReason(
+  modelReason: string,
+  demand: DemandEvidence,
+  language: 'he' | 'en',
+): string {
+  const stripped = (modelReason || '').replace(DEMAND_CLAIM_RE, ' ').replace(/\s{2,}/g, ' ').replace(/\s+([.,;])/g, '$1').trim()
+  const base = isMalformedReason(stripped) ? neutralReason(language) : stripped
+  if (demand.demandEvidenceAvailable && (demand.avgMonthlySearches ?? 0) > 0) {
+    const v = demand.avgMonthlySearches as number
+    const factual = language === 'he'
+      ? `לפי מחקר מילות מפתח, ל"${demand.demandQuery}" יש כ־${v} חיפושים חודשיים.`
+      : `Keyword research shows ~${v} monthly searches for "${demand.demandQuery}".`
+    return `${base} ${factual}`
+  }
+  return base
+}
+
 // ── D. recommended page type ──────────────────────────────────────────────────
 export type RecommendedPageType = 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement'
 const COMMERCIAL_INTENTS = new Set<SearchIntent>(['commercial', 'transactional', 'local'])
@@ -190,34 +234,55 @@ export function classifyRecommendedPageType(
 }
 
 // ── E. demand-claim integrity ─────────────────────────────────────────────────
+export type DemandMatchType = 'exact' | 'close_intent' | 'supporting_only' | 'none'
 export interface DemandEvidence {
   demandEvidenceAvailable: boolean
   demandQuery: string | null
   avgMonthlySearches: number | null
   demandConfidence: 'high' | 'low' | 'none'
+  /** How well the demand query aligns with THIS opportunity's primary keyword. Only
+   *  'exact' / 'close_intent' may drive factual demand language. */
+  demandMatchType: DemandMatchType
 }
 
 /**
- * Structured, verifiable demand — a demand claim is only legitimate when a
- * keyword-research query the opportunity actually covers has real volume. Volume is
- * never fabricated: no matching query → demandConfidence 'none'.
+ * Structured, verifiable demand ALIGNED to the opportunity. A broad/generic query
+ * that merely shares a token (or lives in the same cluster) must NOT claim demand for
+ * a narrower opportunity. The query is matched against the FINAL primary keyword's
+ * DISTINCTIVE subject (generic + domain type words removed); the alignment is typed.
+ * Only 'exact' / 'close_intent' produce factual volume language; 'supporting_only'
+ * stays in diagnostics but is never described as demand. Volume is never fabricated.
  */
 export function computeDemandEvidence(
   primaryKeyword: string,
   secondaryKeywords: string[],
   keywordResearch: { query: string; volume?: number | null }[],
+  corpusTypeWords?: Set<string>,
 ): DemandEvidence {
-  const kwSet = new Set<string>([...toks(primaryKeyword), ...secondaryKeywords.flatMap((s) => toks(s))])
-  let best: { query: string; volume: number } | null = null
+  const typeWords = corpusTypeWords ?? new Set<string>()
+  const distinctOf = (s: string) => toks(s).filter((t) => !GENERIC_TOKENS.has(t) && !typeWords.has(t))
+  const primaryDistinct = new Set(distinctOf(primaryKeyword))
+  const primNorm = normalizePhrase(primaryKeyword)
+
+  let aligned: { query: string; volume: number; match: 'exact' | 'close_intent' } | null = null
+  let supporting: { query: string; volume: number } | null = null
   for (const q of keywordResearch) {
-    const qt = toks(q.query)
-    if (qt.length === 0) continue
-    const cov = qt.filter((t) => kwSet.has(t)).length / qt.length
     const vol = q.volume ?? 0
-    if (cov >= 0.6 && vol > 0 && (!best || vol > best.volume)) best = { query: q.query, volume: vol }
+    if (vol <= 0 || !q.query?.trim()) continue
+    const qDistinct = distinctOf(q.query)
+    if (normalizePhrase(q.query) === primNorm) { if (!aligned || vol > aligned.volume) aligned = { query: q.query, volume: vol, match: 'exact' }; continue }
+    if (qDistinct.length === 0 || primaryDistinct.size === 0) continue
+    const shared = qDistinct.filter((t) => primaryDistinct.has(t))
+    if (shared.length === 0) continue
+    const covQuery = shared.length / qDistinct.length
+    const covPrimary = shared.length / primaryDistinct.size
+    if (covQuery >= 0.6 && covPrimary >= 0.5) { if (!aligned || (aligned.match !== 'exact' && vol > aligned.volume)) aligned = { query: q.query, volume: vol, match: 'close_intent' } }
+    else if (!supporting || vol > supporting.volume) supporting = { query: q.query, volume: vol }
   }
-  if (best) return { demandEvidenceAvailable: true, demandQuery: best.query, avgMonthlySearches: best.volume, demandConfidence: best.volume >= 100 ? 'high' : 'low' }
-  return { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none' }
+
+  if (aligned) return { demandEvidenceAvailable: true, demandQuery: aligned.query, avgMonthlySearches: aligned.volume, demandConfidence: aligned.volume >= 100 ? 'high' : 'low', demandMatchType: aligned.match }
+  if (supporting) return { demandEvidenceAvailable: false, demandQuery: supporting.query, avgMonthlySearches: supporting.volume, demandConfidence: 'none', demandMatchType: 'supporting_only' }
+  return { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none', demandMatchType: 'none' }
 }
 
 // ── F. secondary-keyword quality ──────────────────────────────────────────────
@@ -227,10 +292,11 @@ export interface SecondaryFilterResult { kept: string[]; rejected: { keyword: st
  *  of the primary, purely generic modifiers, malformed, off-topic (no overlap with the
  *  primary/title), or intent-conflicting (a commercial price/buy modifier inside an
  *  informational/comparison topic). Typed reasons. */
-export function filterSecondaryKeywords(primaryKeyword: string, title: string, secondaries: string[], intent?: SearchIntent): SecondaryFilterResult {
+export function filterSecondaryKeywords(primaryKeyword: string, title: string, secondaries: string[], intent?: SearchIntent, corpusTypeWords?: Set<string>): SecondaryFilterResult {
   const primNorm = normalizePhrase(primaryKeyword)
   const primSet = new Set(toks(primaryKeyword))
   const onTopic = new Set<string>([...primSet, ...toks(title)])
+  const typeWords = corpusTypeWords ?? new Set<string>()
   const informational = !!intent && INFORMATIONAL_INTENTS.has(intent)
   const kept: string[] = []
   const rejected: { keyword: string; reason: string }[] = []
@@ -246,6 +312,9 @@ export function filterSecondaryKeywords(primaryKeyword: string, title: string, s
     if (st.length <= 1) { rejected.push({ keyword: s, reason: 'too_short' }); continue }
     if (st.every((t) => primSet.has(t))) { rejected.push({ keyword: s, reason: 'subset_of_primary' }); continue }
     if (st.every((t) => GENERIC_TOKENS.has(t))) { rejected.push({ keyword: s, reason: 'generic_modifier_only' }); continue }
+    // B — apply the primary-keyword quality bar: a generic TYPE-word-only combination
+    // (e.g. "זר פרח") with no distinctive subject is not a real search phrase.
+    if (st.every((t) => GENERIC_TOKENS.has(t) || typeWords.has(t))) { rejected.push({ keyword: s, reason: 'generic_type_word_combo' }); continue }
     if (informational && st.some((t) => COMMERCIAL_MODIFIERS.has(t))) { rejected.push({ keyword: s, reason: 'intent_conflicting' }); continue }
     if (!st.some((t) => onTopic.has(t))) { rejected.push({ keyword: s, reason: 'off_topic' }); continue }
     kept.push(s)

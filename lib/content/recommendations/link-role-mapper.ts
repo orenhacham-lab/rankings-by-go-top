@@ -65,8 +65,13 @@ export function mapLinkRoles(
   opportunityKeyword: string,
   opportunityTitle: string,
   candidates: LinkCandidateEntity[],
+  opts?: { corpusTypeWords?: Set<string> },
 ): { primaryTarget: RoleAssignment | null; assignments: RoleAssignment[]; debug: RoleAssignment[] } {
   const oppToks = new Set(linkToks(`${opportunityKeyword} ${opportunityTitle}`))
+  // Project-derived domain type/descriptor words (colours, sizes, ubiquitous product
+  // types) computed from ALL entity names upstream — broader + more reliable than the
+  // per-call candidate DF, so a shared colour/type token alone never qualifies a link.
+  const corpusTypeWords = opts?.corpusTypeWords ?? new Set<string>()
 
   const seen = new Set<string>()
   const prepared: { c: LinkCandidateEntity; toks: string[] }[] = []
@@ -84,7 +89,7 @@ export function mapLinkRoles(
   const df = new Map<string, number>()
   for (const { toks } of prepared) for (const t of new Set(toks)) df.set(t, (df.get(t) ?? 0) + 1)
   const N = prepared.length
-  const isTypeWord = (t: string) => { const d = df.get(t) ?? 0; return d >= 4 && d / Math.max(1, N) >= 0.6 }
+  const isTypeWord = (t: string) => corpusTypeWords.has(t) || (() => { const d = df.get(t) ?? 0; return d >= 4 && d / Math.max(1, N) >= 0.6 })()
   const weight = (t: string) => (GENERIC_TOKENS.has(t) ? 0 : isTypeWord(t) ? TYPE_WORD_WEIGHT : 1)
 
   // Opportunity SUBJECT head: distinctive tokens of the primary KEYWORD (not the full
