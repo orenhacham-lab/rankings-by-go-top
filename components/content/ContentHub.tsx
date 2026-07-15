@@ -150,16 +150,20 @@ export default function ContentHub() {
         const pd = await pr.json(); poolId = pd.pool?.id ?? null
       }
       if (!poolId) return false
-      const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
+      // ONE authoritative call (Part G): validate + verify saved link plan + approve
+      // + enqueue per topic, with typed per-topic results. Never reports full success
+      // when a topic's links did not persist. expectsLinks=true → the server confirms
+      // the review-panel's saved link plan (a zero-link topic still has a batch).
+      const ir = await fetch(`/api/content/automation/pools/${poolId}/approve-and-queue`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicIds }),
+        body: JSON.stringify({ topics: topicIds.map((topicId) => ({ topicId, expectsLinks: true })) }),
       })
-      if (!ir.ok) return false
-      // Truthful success: only when something was actually queued or already queued.
+      if (!ir.ok && ir.status !== 207) return false
       const d = await ir.json().catch(() => ({}))
       const added = typeof d.added === 'number' ? d.added : 0
-      const alreadyQueued = Array.isArray(d.alreadyQueued) ? d.alreadyQueued.length : 0
-      if (added <= 0 && alreadyQueued <= 0) return false
+      const alreadyQueued = typeof d.alreadyQueued === 'number' ? d.alreadyQueued : 0
+      // Truthful: full success requires EVERY topic to be added/queued (no partial).
+      if (d.ok !== true || (added <= 0 && alreadyQueued <= 0)) return false
       handleScheduled()
       // Surface the success in the Automatic Ideas section (drawer/panel path).
       setIdeasSuccessSignal((prev) => ({ n: (prev?.n ?? 0) + 1, count: topicIds.length }))

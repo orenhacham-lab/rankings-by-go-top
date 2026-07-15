@@ -10,6 +10,8 @@
 
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
+import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
+import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, ownedByExistingEntity, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
@@ -106,17 +108,29 @@ export async function POST(request: Request) {
     // already-known clusters (avoidKeywords) — repeat runs surface fresh ones.
     const guard = await buildKeywordGuard(auth.admin, auth.project.id)
 
-    const result = await generateRecommendations(auth.admin, {
-      userId: auth.user.id,
-      projectId: auth.project.id,
-      source,
-      keyword,
-      avoidKeywords: Array.from(guard.keywords),
-      generationRunId,
-      collectTrace: diagnostics,
-      excludePendingContext,
-      qualityMode,
-    })
+    // PRIMARY PATH — opportunity-first: build cross-source evidence clusters, rank,
+    // send the strongest to ONE synthesis call, validate deterministically, map
+    // links. Site entities are ownership/target signals, not article seeds. Uses the
+    // shared cost controller (no new call/cost ceilings). The legacy source-first
+    // engine is an explicitly-gated fallback (RECO_LEGACY_PATH=1, or when the
+    // opportunity path yields nothing so a run is never silently empty).
+    let opportunityDiagnostics: unknown = undefined
+    let result: Awaited<ReturnType<typeof generateRecommendations>>
+    const useLegacy = process.env.RECO_LEGACY_PATH === '1'
+    if (!useLegacy) {
+      const controller = newRunCostController(qualityMode, generationRunId, 15)
+      const opp = await generateOpportunities(auth.admin, { projectId: auth.project.id, targetCount: 15, maxClusters: 12 }, controller)
+      opportunityDiagnostics = opp.diagnostics
+      if (opp.suggestions.length > 0) {
+        result = { suggestions: opp.suggestions, meta: { source, generated: opp.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: opp.suggestions.length, attempts: 1, runtimeDiag: diagnostics ? { totalCalls: opp.diagnostics.model_calls, rawCandidates: opp.diagnostics.generated_opportunities, path: 'opportunity_first' } : undefined } }
+      } else {
+        // Opportunity path found no defensible opportunity → fall back so the run is
+        // diagnosed, not silently empty. The old path stays available for safety.
+        result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
+      }
+    } else {
+      result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
+    }
 
     // Part C — a run where EVERY attempted source failed at the provider (no raw
     // candidates were generated) is a typed PROVIDER error, never a successful
@@ -379,6 +393,9 @@ export async function POST(request: Request) {
       accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
       persistedCurrentRunCount: fresh.length,
       rejectionClassification,
+      // Opportunity-first pipeline funnel (evidence → clusters → synthesis →
+      // worthiness → link-roles). Full safe funnel so live validation needs no DB.
+      opportunityDiagnostics: opportunityDiagnostics ?? null,
       // Idempotency (J) — this run actually executed generation (not a replay).
       inFlightHit: false,
       recentReplayHit: false,
