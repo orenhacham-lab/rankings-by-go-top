@@ -26,6 +26,7 @@ import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, 
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, filterSecondaryKeywords, assessBusinessRelevance, assessCommercialFit, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType } from './opportunity-validation'
 import { runRecoveryTiers, type TierPlan, type RecoveryTier, type ConfidenceLevel, type FallbackReason } from './recovery-tiers'
+import { buildBrandSafety, parseCompetitorList, classifyKeywordEntity, containsCompetitorTerm, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
 import { slugKey } from './dedupe'
@@ -71,6 +72,8 @@ export interface OpportunityDiagnostics {
     existing_commercial_ownership: number
     pending_topics: number
     generated_articles: number
+    competitor_terms_configured: number
+    competitor_queries_filtered: number
   }
   clusters_built: number
   clusters_rejected_before_ranking: number
@@ -114,6 +117,17 @@ export async function generateOpportunities(
   const language: 'he' | 'en' = String(p.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
   const langLabel = language === 'he' ? 'Hebrew' : 'English'
 
+  // P0 brand safety — user-maintained competitor/forbidden terms (project field + env);
+  // NEVER hardcoded. Graceful when the additive projects.competitor_terms column is
+  // not applied yet.
+  let competitorTermsList = parseCompetitorList(process.env.RECO_COMPETITOR_TERMS)
+  try {
+    const { data } = await admin.from('projects').select('competitor_terms').eq('id', input.projectId).maybeSingle()
+    const ct = (data as { competitor_terms?: unknown } | null)?.competitor_terms
+    if (Array.isArray(ct)) competitorTermsList = [...competitorTermsList, ...ct.filter((x): x is string => typeof x === 'string')]
+    else if (typeof ct === 'string') competitorTermsList = [...competitorTermsList, ...parseCompetitorList(ct)]
+  } catch { /* column may not exist pre-migration */ }
+
   const guard = await buildKeywordGuard(admin, input.projectId)
 
   const tracked: string[] = []
@@ -151,6 +165,18 @@ export async function generateOpportunities(
 
   const focus = deriveProjectFocus({ projectName: p.business_name, domain: p.target_domain, ownedCategories: entities.map((e) => e.name), existingTopics: existingCoverage.map((c) => c.title) })
   const projectFocus = [focus.primaryProjectFocus, ...focus.secondaryProjectAreas].filter(Boolean)
+
+  // Brand safety context: own brand + a generic business vocabulary (entities + focus +
+  // tracked — NOT keyword research, which may itself contain competitor names).
+  const brandVocab = new Set<string>()
+  for (const s of [...entities.map((e) => e.name), ...projectFocus, ...tracked]) for (const t of contentTokens(s)) brandVocab.add(t)
+  const brandSafety: BrandSafety = buildBrandSafety({ businessName: p.business_name, competitorTerms: competitorTermsList, genericVocab: brandVocab })
+  // Competitor-classified keyword-research queries never seed clusters/demand/type words.
+  let competitorQueriesFiltered = 0
+  for (let i = keywordResearch.length - 1; i >= 0; i--) {
+    const cls = classifyKeywordEntity(keywordResearch[i].query, brandSafety)
+    if (cls === 'competitor_brand' || cls === 'unknown_business_name') { keywordResearch.splice(i, 1); competitorQueriesFiltered++ }
+  }
 
   // 2) Build + rank clusters ONCE (both cluster tiers reuse the graph).
   const evidence: EvidenceInput = { keywordResearch, trackedKeywords: tracked, projectFocus, entities, existingCoverage }
@@ -207,6 +233,16 @@ export async function generateOpportunities(
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
+      // P0 BRAND SAFETY (early) — reject a competitor/business-name contaminated
+      // candidate WHOLE (never partially cleaned). Own-brand queries are allowed.
+      const kwClass = classifyKeywordEntity(o.primaryKeyword, brandSafety)
+      if (kwClass === 'competitor_brand' || kwClass === 'unknown_business_name'
+        || containsCompetitorTerm(o.title, brandSafety)
+        || containsCompetitorTerm(o.reason || '', brandSafety)
+        || (o.secondaryKeywords ?? []).some((k) => containsCompetitorTerm(k, brandSafety))) {
+        bump(td, 'competitor_brand_leakage'); continue
+      }
+
       // I/B/F — final intent from the PRIMARY KEYWORD + title (a local-commercial
       // keyword like חנויות/משלוח WINS over an "איך לבחור" title phrase); explicit
       // comparison/how-to title signals otherwise override the model intent.
@@ -227,6 +263,10 @@ export async function generateOpportunities(
       const quality = validatePrimaryKeywordQuality(primaryKeyword, o.title, corpusTypeWords)
       if (!quality.ok) { bump(td, 'invalid_primary_keyword'); continue }
       if (quality.repairedKeyword) primaryKeyword = quality.repairedKeyword
+
+      // C — a final keyword must not introduce a named entity absent from the title via
+      // a small edit (title "פרחי אביב" → keyword "פרחי אביה"). Do NOT auto-repair.
+      if (detectUnsafeNamedEntityMutation(o.title, primaryKeyword, brandSafety) || containsCompetitorTerm(primaryKeyword, brandSafety)) { bump(td, 'unsafe_named_entity_mutation'); continue }
 
       // E/G — business relevance: reject a topic disconnected from business evidence,
       // and (local intent) an unsupported local service area (location not in evidence).
@@ -277,6 +317,13 @@ export async function generateOpportunities(
       // demand wording only for exact/close_intent).
       const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, keywordResearch, domainTypeWords)
       const suggestionReason = finalizeReason(o.reason || '', demandEvidence, language)
+
+      // G — FINAL brand-safety scan over the whole user-visible suggestion (title,
+      // keyword, secondaries, reason, link anchors, target titles) before persistence.
+      const orderedLinks = linkPlanToOrdered(linkPlan)
+      const targetTitles = [linkPlan.primaryCommercialTarget?.title, ...linkPlan.secondaryCommercialTargets.map((tt) => tt.title), ...linkPlan.supportingInformationalLinks.map((tt) => tt.title)].filter((x): x is string => !!x)
+      const scan = scanSuggestionBrandSafety({ title: o.title, primaryKeyword, secondaryKeywords: sec.kept, suggestionReason, anchors: orderedLinks.map((l) => l.anchor), targetTitles }, brandSafety)
+      if (!scan.safe) { bump(td, 'competitor_brand_leakage'); continue }
 
       out.push({
         id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword,
@@ -350,6 +397,8 @@ export async function generateOpportunities(
       existing_commercial_ownership: guard.entityOwners.size,
       pending_topics: pendingCount,
       generated_articles: generatedArticles,
+      competitor_terms_configured: competitorTermsList.length,
+      competitor_queries_filtered: competitorQueriesFiltered,
     },
     clusters_built: clusters.length,
     clusters_rejected_before_ranking: built.rejected_themes,
