@@ -83,7 +83,7 @@ export interface OpportunityDiagnostics {
   persisted_by_confidence: Record<string, number>
   persisted_by_page_type: Record<string, number>
   secondary_keywords_filtered: number
-  target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[] }[]
+  target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[]; trace?: { url: string; type: string; role: string; reason: string; score: number; distinctive: string[] }[] }[]
   // Rollups kept for the route's runtimeDiag.
   model_calls: number
   generated_opportunities: number
@@ -205,8 +205,9 @@ export async function generateOpportunities(
       const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, corpusTypeWords, entities.map((e) => ({ name: e.name })))
       if (!relevance.ok) { bump(td, 'low_business_relevance'); continue }
 
-      // F — secondary-keyword quality.
-      const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords)
+      // F/H — secondary-keyword quality (intent-aware; drops duplicate-of-primary,
+      // malformed, generic, off-topic, intent-conflicting).
+      const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords, intent)
       secondaryKeywordsFiltered += sec.rejected.length
 
       // A/B — internal-link role mapping (specificity-weighted, Hebrew-aware).
@@ -214,7 +215,12 @@ export async function generateOpportunities(
       const ordered = orderedLinksForOpportunity(mapped)
       const primaryTargetUrlKey = mapped.primaryTarget ? mapped.primaryTarget.url.trim().toLowerCase().replace(/\/+$/, '') : null
       const primaryTargetType = primaryTargetUrlKey ? (urlTypeMap.get(primaryTargetUrlKey) ?? null) : null
-      if (target_role_mappings.length < 25) target_role_mappings.push({ keyword: primaryKeyword, primaryTarget: mapped.primaryTarget?.url ?? null, roles: mapped.assignments.slice(0, 5).map((a) => ({ url: a.url, role: a.role, score: a.score })) })
+      if (target_role_mappings.length < 25) target_role_mappings.push({
+        keyword: primaryKeyword, primaryTarget: mapped.primaryTarget?.url ?? null,
+        roles: mapped.assignments.slice(0, 7).map((a) => ({ url: a.url, role: a.role, score: a.score })),
+        // Part A trace — every scored candidate incl. rejected, with reason + score.
+        trace: mapped.debug.slice(0, 20).map((a) => ({ url: a.url, type: a.title, role: a.role, reason: a.reason, score: a.score, distinctive: a.distinctiveTokens })),
+      })
 
       // D — recommended page type (only 'article' is auto-enqueued downstream).
       const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))

@@ -16,10 +16,17 @@
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
 import { normalizePhrase } from './keyword-guard'
-import type { EntityPageType } from './link-role-mapper'
+import { subjectTokens, type EntityPageType } from './link-role-mapper'
 import type { SearchIntent } from './opportunity'
 
-const toks = (s: string) => contentTokens(s)
+const toks = (s: string) => subjectTokens(s)
+
+/** Comparison FUNCTION words (grammatical, not industry/product/location). A
+ *  comparison keyword should carry one of these or both compared sides. */
+const COMPARISON_CONNECTORS = new Set<string>(['vs', 'versus', 'לעומת', 'מול'].map((t) => normalizePhrase(t)).filter(Boolean))
+/** Commercial-intent modifier function words (price/buy/cheap …). Reused from the
+ *  shared generic set; used to flag intent-conflicting secondary keywords. */
+const COMMERCIAL_MODIFIERS = new Set<string>(['price', 'buy', 'cheap', 'discount', 'sale', 'מחיר', 'מחירים', 'זול', 'זולה', 'לקנות', 'קניה', 'קנייה', 'מבצע', 'בזול'].map((t) => normalizePhrase(t)).filter(Boolean))
 
 /** Product-TYPE words are data-derived: tokens appearing across many entity names.
  *  (>= 4 entities AND >= 50% of them). Domain-neutral, not a hardcoded list. */
@@ -36,11 +43,14 @@ export function deriveCorpusTypeWords(entityNames: string[]): Set<string> {
 export interface IntentConsistencyResult { ok: boolean; repairedKeyword?: string; reason?: 'intent_keyword_mismatch' }
 const INFORMATIONAL_INTENTS = new Set<SearchIntent>(['informational', 'comparison', 'other'])
 
-/** Rebuild a readable primary keyword from the title's own words, dropping generic
- *  modifiers and any `drop` tokens (e.g. a commercial term the informational title
- *  never used). Keeps original surface words (Hebrew-safe), capped. */
-function repairKeywordFromTitle(title: string, drop: Set<string>): string {
-  const kept = title.split(/\s+/).filter(Boolean).filter((w) => { const n = normalizePhrase(w); return n && !GENERIC_TOKENS.has(n) && !drop.has(n) })
+/** Rebuild a readable primary keyword from the title's own words (main clause before a
+ *  ":"/"—" subtitle), dropping the `drop` tokens (e.g. a commercial term the
+ *  informational title never used) and — unless keepGeneric — generic modifiers. Keeps
+ *  original surface words (Hebrew-safe), capped. keepGeneric preserves delivery/location
+ *  intent words (e.g. משלוח) for local/transactional repairs. */
+function repairKeywordFromTitle(title: string, drop: Set<string>, keepGeneric = false): string {
+  const main = title.split(/[:—–]|(?:\s-\s)/)[0] || title
+  const kept = main.split(/\s+/).filter(Boolean).filter((w) => { const n = normalizePhrase(w); return n && !drop.has(n) && (keepGeneric || !GENERIC_TOKENS.has(n)) })
   return kept.slice(0, 6).join(' ').trim()
 }
 
@@ -57,26 +67,47 @@ export function validateIntentKeywordConsistency(
 ): IntentConsistencyResult {
   const kw = toks(o.primaryKeyword)
   if (kw.length === 0) return { ok: false, reason: 'intent_keyword_mismatch' }
-  const titleSet = new Set(toks(o.title))
+  const kwSet = new Set(kw)
+  const titleToks = toks(o.title)
+  const titleSet = new Set(titleToks)
   const informational = INFORMATIONAL_INTENTS.has(o.intent)
+  const titleDistinctive = titleToks.filter((t) => !GENERIC_TOKENS.has(t))
+
+  const local = o.intent === 'local' || o.intent === 'transactional'
+  const repairOr = (drop: Set<string>): IntentConsistencyResult => {
+    const repaired = repairKeywordFromTitle(o.title, drop, local)
+    if (toks(repaired).length >= 2 && normalizePhrase(repaired) !== normalizePhrase(o.primaryKeyword)) return { ok: true, repairedKeyword: repaired }
+    return { ok: false, reason: 'intent_keyword_mismatch' }
+  }
 
   // Commercial drift: informational topic whose keyword injects a commercial-entity
   // token the title never uses (a keyword that would compete with a product page).
   const drift = kw.filter((t) => !titleSet.has(t) && commercialEntityTokens.has(t) && !GENERIC_TOKENS.has(t))
-  if (informational && drift.length > 0) {
-    const repaired = repairKeywordFromTitle(o.title, new Set(drift))
-    const repairedToks = toks(repaired)
-    if (repairedToks.length >= 2 && normalizePhrase(repaired) !== normalizePhrase(o.primaryKeyword)) return { ok: true, repairedKeyword: repaired }
-    return { ok: false, reason: 'intent_keyword_mismatch' }
+  if (informational && drift.length > 0) return repairOr(new Set(drift))
+
+  // Comparison intent → the keyword must carry a comparison connector OR both compared
+  // sides. If the TITLE expresses the comparison but the keyword does not, repair from
+  // the title (which contains the connector + both sides).
+  if (o.intent === 'comparison') {
+    const kwHasConnector = kw.some((t) => COMPARISON_CONNECTORS.has(t))
+    const titleHasConnector = titleToks.some((t) => COMPARISON_CONNECTORS.has(t))
+    if (!kwHasConnector) {
+      if (titleHasConnector) return repairOr(new Set())
+      return { ok: false, reason: 'intent_keyword_mismatch' }
+    }
+  }
+
+  // Local/transactional intent → the keyword must RETAIN the title's distinctive
+  // tokens (e.g. the location). If it dropped any distinctive title token, repair from
+  // the title so the location/offer is preserved.
+  if (o.intent === 'local' || o.intent === 'transactional') {
+    const missing = titleDistinctive.filter((t) => !kwSet.has(t))
+    if (missing.length > 0 && titleDistinctive.length >= 2) return repairOr(new Set())
   }
 
   // General: the keyword should overlap the title (describe the same subject).
   const overlap = kw.filter((t) => titleSet.has(t)).length / kw.length
-  if (overlap < 0.34) {
-    const repaired = repairKeywordFromTitle(o.title, new Set())
-    if (toks(repaired).length >= 2) return { ok: true, repairedKeyword: repaired }
-    return { ok: false, reason: 'intent_keyword_mismatch' }
-  }
+  if (overlap < 0.34) return repairOr(new Set())
   return { ok: true }
 }
 
@@ -136,11 +167,15 @@ export function computeDemandEvidence(
 // ── F. secondary-keyword quality ──────────────────────────────────────────────
 export interface SecondaryFilterResult { kept: string[]; rejected: { keyword: string; reason: string }[] }
 
-/** Drop weak secondary keywords: single-token, subset of the primary, purely generic
- *  modifiers, or off-topic (no overlap with the primary/title). Typed reasons. */
-export function filterSecondaryKeywords(primaryKeyword: string, title: string, secondaries: string[]): SecondaryFilterResult {
+/** Drop weak secondary keywords: exact-duplicate of the primary, single-token, subset
+ *  of the primary, purely generic modifiers, malformed, off-topic (no overlap with the
+ *  primary/title), or intent-conflicting (a commercial price/buy modifier inside an
+ *  informational/comparison topic). Typed reasons. */
+export function filterSecondaryKeywords(primaryKeyword: string, title: string, secondaries: string[], intent?: SearchIntent): SecondaryFilterResult {
+  const primNorm = normalizePhrase(primaryKeyword)
   const primSet = new Set(toks(primaryKeyword))
   const onTopic = new Set<string>([...primSet, ...toks(title)])
+  const informational = !!intent && INFORMATIONAL_INTENTS.has(intent)
   const kept: string[] = []
   const rejected: { keyword: string; reason: string }[] = []
   const seen = new Set<string>()
@@ -148,10 +183,14 @@ export function filterSecondaryKeywords(primaryKeyword: string, title: string, s
     const n = normalizePhrase(s)
     if (!n || seen.has(n)) { if (n) rejected.push({ keyword: s, reason: 'duplicate' }); continue }
     seen.add(n)
+    if (n === primNorm) { rejected.push({ keyword: s, reason: 'duplicate_of_primary' }); continue }
+    // Malformed: too long, or almost no real content tokens.
+    if (n.split(' ').length > 8) { rejected.push({ keyword: s, reason: 'malformed' }); continue }
     const st = toks(s)
     if (st.length <= 1) { rejected.push({ keyword: s, reason: 'too_short' }); continue }
     if (st.every((t) => primSet.has(t))) { rejected.push({ keyword: s, reason: 'subset_of_primary' }); continue }
     if (st.every((t) => GENERIC_TOKENS.has(t))) { rejected.push({ keyword: s, reason: 'generic_modifier_only' }); continue }
+    if (informational && st.some((t) => COMMERCIAL_MODIFIERS.has(t))) { rejected.push({ keyword: s, reason: 'intent_conflicting' }); continue }
     if (!st.some((t) => onTopic.has(t))) { rejected.push({ keyword: s, reason: 'off_topic' }); continue }
     kept.push(s)
   }
