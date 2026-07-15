@@ -22,6 +22,7 @@
 
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
+import { normalizePhrase } from './keyword-guard'
 import type { LinkPlan, LinkTarget, InternalLinkRole } from './types'
 
 export type LinkRole = 'primary_commercial_target' | 'secondary_commercial_target' | 'supporting_informational_link' | 'source_reference' | 'unrelated'
@@ -76,11 +77,17 @@ export function mapLinkRoles(
   // article's subject head), not merely be a product sharing an attribute token.
   const localIntent = opts?.intent === 'local' || opts?.intent === 'transactional'
 
+  // J.3 — a topic must never be its own supporting link. Exclude an INFORMATIONAL page
+  // (post/article/page — the article itself) whose title matches the opportunity. A
+  // COMMERCIAL page (product/category) with the same name is a legitimate target, not a
+  // self-link, so it is NOT excluded here.
+  const selfKeys = new Set([normalizePhrase(opportunityKeyword), normalizePhrase(opportunityTitle)].filter(Boolean))
   const seen = new Set<string>()
   const prepared: { c: LinkCandidateEntity; toks: string[] }[] = []
   for (const c of candidates) {
     const k = urlKey(c.url)
     if (!k || seen.has(k)) continue
+    if (INFORMATIONAL_TYPES.has(c.type ?? 'unknown') && selfKeys.has(normalizePhrase(c.title))) continue // self-link
     seen.add(k)
     prepared.push({ c, toks: linkToks(c.title) })
   }

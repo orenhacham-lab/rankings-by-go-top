@@ -59,9 +59,14 @@ export class RunCostController {
   private _inFlight = 0
   private _stopReason?: CallStopReason
 
-  constructor(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number) {
+  constructor(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number, budgetOverride?: { maxModelCallsPerRun?: number; maxEstimatedCostUsd?: number }) {
     this.generationRunId = generationRunId
-    this.budget = runBudget(mode, targetFreshIdeas)
+    const base = runBudget(mode, targetFreshIdeas)
+    // ADDITIVE: mode-specific content-plan ceilings (H). Without an override the budget
+    // is IDENTICAL to before — the single-scan behavior is unchanged.
+    this.budget = budgetOverride
+      ? { ...base, maxModelCallsPerRun: budgetOverride.maxModelCallsPerRun ?? base.maxModelCallsPerRun, maxEstimatedCostUsd: budgetOverride.maxEstimatedCostUsd ?? base.maxEstimatedCostUsd }
+      : base
   }
 
   get billingExhausted(): boolean { return this._billingExhausted }
@@ -128,8 +133,8 @@ export class RunCostController {
 }
 
 /** Convenience — build a controller for a run. */
-export function newRunCostController(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number): RunCostController {
-  return new RunCostController(mode, generationRunId, targetFreshIdeas)
+export function newRunCostController(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number, budgetOverride?: { maxModelCallsPerRun?: number; maxEstimatedCostUsd?: number }): RunCostController {
+  return new RunCostController(mode, generationRunId, targetFreshIdeas, budgetOverride)
 }
 
 export type { CallUsage }

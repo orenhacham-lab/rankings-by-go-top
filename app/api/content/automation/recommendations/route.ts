@@ -11,6 +11,7 @@
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
+import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
     // zero result is a TYPED no_safe_opportunities returned inside the opportunity-first
     // architecture — legacy product-derived suggestions never reach the response.
     let opportunityDiagnostics: import('@/lib/content/recommendations/generate-opportunities').OpportunityDiagnostics | null = null
+    let contentPlan: import('@/lib/content/recommendations/content-plan').ContentPlanResult['plan'] | null = null
     let generationPath: 'opportunity_first' | 'legacy_explicit' = 'opportunity_first'
     let legacyUsed = false
     let recoveryTierUsed: number | null = null
@@ -126,10 +128,23 @@ export async function POST(request: Request) {
     let fallbackReason: string | null = null
     let result: Awaited<ReturnType<typeof generateRecommendations>>
     const useLegacy = process.env.RECO_LEGACY_PATH === '1'
+    // Batched CONTENT-PLAN mode (C) — one operation returns a whole calendar. Evidence
+    // is collected once and reused across a few family-scoped batched calls.
+    const planModeReq = typeof body.mode === 'string' ? body.mode : null
+    const requestedCount = typeof body.requestedCount === 'number' ? body.requestedCount : null
+    const isPlanMode = !useLegacy && (['plan', 'plan_25', 'full_calendar', 'full_calendar_50', 'calendar'].includes((planModeReq ?? '').toLowerCase()) || (requestedCount ?? 0) >= 20)
     if (useLegacy) {
       // EXPLICIT operational rollback ONLY.
       generationPath = 'legacy_explicit'; legacyUsed = true; fallbackReason = 'explicit_legacy_mode'
       result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
+    } else if (isPlanMode) {
+      const plan = await generateContentPlan(auth.admin, { projectId: auth.project.id, mode: planModeReq, requestedCount, generationRunId })
+      opportunityDiagnostics = plan.opportunityDiagnostics
+      contentPlan = plan.plan
+      recoveryTierUsed = plan.opportunityDiagnostics.recoveryTierUsed
+      discoveryUsed = plan.opportunityDiagnostics.discoveryUsed
+      fallbackReason = plan.plan.shortfall_reason
+      result = { suggestions: plan.suggestions, meta: { source, generated: plan.plan.candidate_count, skippedDuplicates: 0, finalCount: plan.suggestions.length, attempts: 1, reason: plan.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: plan.plan.actual_calls, rawCandidates: plan.plan.candidate_count, path: 'opportunity_first', contentPlanMode: plan.plan.mode } : undefined } }
     } else {
       const controller = newRunCostController(qualityMode, generationRunId, 15)
       const opp = await generateOpportunities(auth.admin, { projectId: auth.project.id, targetCount: 15, maxClusters: 12 }, controller)
@@ -140,8 +155,9 @@ export async function POST(request: Request) {
       // ALWAYS use the opportunity-first result — even zero. NEVER call legacy here.
       result = { suggestions: opp.suggestions, meta: { source, generated: opp.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: opp.suggestions.length, attempts: opp.diagnostics.tiers.length, reason: opp.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: opp.diagnostics.model_calls, rawCandidates: opp.diagnostics.generated_opportunities, path: 'opportunity_first', recoveryTierUsed, discoveryUsed, fallbackReason } : undefined } }
     }
-    // The authoritative generation-path contract exposed on every response (E).
-    const pathContract = { generationPath, legacyUsed, recoveryTierUsed, discoveryUsed, fallbackReason }
+    // The authoritative generation-path contract exposed on every response (E). In
+    // plan mode it also carries the content-plan funnel + cost + shortfall contract.
+    const pathContract = { generationPath, legacyUsed, recoveryTierUsed, discoveryUsed, fallbackReason, contentPlan: contentPlan ?? null }
 
     // Part C — a run where EVERY attempted source failed at the provider (no raw
     // candidates were generated) is a typed PROVIDER error, never a successful

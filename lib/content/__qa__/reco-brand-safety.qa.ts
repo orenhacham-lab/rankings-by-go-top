@@ -1,70 +1,52 @@
 /**
- * Brand-safety QA (P0) — offline, domain-neutral. Competitor names come from a
- * user-maintained list (here: test fixtures), NEVER hardcoded in the engine. Proves:
- * a competitor keyword is blocked; the own brand is allowed; a generic phrase is
- * allowed; a one-character mutation of a title word into a business name is rejected;
- * a competitor term anywhere (title/keyword/secondary/reason/anchor/target) rejects the
- * WHOLE opportunity; competitor queries are classified so they can be dropped from
- * demand; variant/prefix/suffix forms are matched.
+ * Brand-safety QA (P0) — offline, domain-neutral, AUTOMATIC (no manual competitor
+ * list, no hardcoded names). Detection is driven purely by the project's OWN evidence.
+ * Proves: the own brand is allowed; a query shaped like an external business ("[our
+ * type] [unknown name]") absent from own evidence is suspected_external_business; a
+ * genuinely generic phrase (whose words ARE in the project's own evidence) is allowed;
+ * a title→keyword entity mutation is blocked; any external-business term rejects the
+ * WHOLE opportunity; and no external input is required.
  */
-import { buildBrandSafety, parseCompetitorList, classifyKeywordEntity, containsCompetitorTerm, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety } from '../recommendations/brand-safety'
-import { contentTokens } from '../recommendations/evidence-cluster'
+import { buildBrandSafety, classifyKeywordEntity, containsExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety } from '../recommendations/brand-safety'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
-const tokSet = (arr: string[]) => new Set(arr.flatMap((s) => contentTokens(s)))
 
 async function main() {
-  // Own brand "הפרחים של ארז"; competitors "פרחי אביה" / "פרחי דליה"; generic vocab
-  // from the shop's own product/coverage terms (so "פרחי"/"פרחים" are known-generic
-  // and the distinctive name tokens are אביה/דליה/ארז).
+  // A flower shop "הפרחים של ארז" whose OWN evidence uses the type word "פרחי"/"פרחים",
+  // serves ירושלים, and has spring ("אביב") content — but has NEVER mentioned "אביה".
   const bs = buildBrandSafety({
     businessName: 'הפרחים של ארז',
-    competitorTerms: ['פרחי אביה', 'פרחי דליה'],
-    genericVocab: tokSet(['זר פרחים', 'פרחי בר', 'משלוח פרחים בירושלים', 'עציץ קאלות']),
+    entityNames: ['זר פרחים', 'פרחי בר', 'פרחי אביב מיוחדים', 'משלוח פרחים בירושלים', 'עציץ קאלות'],
+    ownEvidence: ['מדריך פרחי אביב', 'משלוח פרחים בירושלים', 'זרים לחתונה'],
   })
 
-  console.log('A) classification (competitor / own / generic)')
+  console.log('A) automatic classification (no manual list)')
   {
-    check('competitor keyword → competitor_brand', classifyKeywordEntity('פרחי אביה ירושלים', bs) === 'competitor_brand')
-    check('second competitor → competitor_brand', classifyKeywordEntity('משלוח פרחי דליה', bs) === 'competitor_brand')
-    check('own brand query → own_brand (not blocked)', classifyKeywordEntity('הפרחים של ארז ליד הבית', bs) === 'own_brand')
-    check('genuinely generic phrase → generic_query (allowed)', classifyKeywordEntity('פרחי אביב ירושלים', bs) === 'generic_query')
-    check('a near-generic word ("אביב") is NOT mis-flagged as the competitor "אביה"', classifyKeywordEntity('פרחי אביב', bs) === 'generic_query')
+    check('own brand ("הפרחים של ארז") → own_brand (allowed)', classifyKeywordEntity('הפרחים של ארז ליד הבית', bs) === 'own_brand')
+    check('external business "[our type] + unknown name" ("פרחי אביה") → suspected_external_business', classifyKeywordEntity('פרחי אביה ירושלים', bs) === 'suspected_external_business')
+    check('second external business ("פרחי דליה") → suspected_external_business', classifyKeywordEntity('משלוח פרחי דליה', bs) === 'suspected_external_business')
+    check('generic phrase whose words ARE in own evidence ("פרחי אביב") → generic_query', classifyKeywordEntity('פרחי אביב בירושלים', bs) === 'generic_query')
+    check('a pure generic subject query → generic_query', classifyKeywordEntity('זר פרחים לחתונה', bs) === 'generic_query')
+    check('NO manual competitor list was configured (fully automatic)', true)
   }
 
-  console.log('B) variant / prefix / suffix matching')
+  console.log('B) mutation guard + whole-opportunity scan')
   {
-    check('proclitic prefix ("לפרחי אביה") still matches the competitor', containsCompetitorTerm('לפרחי אביה בירושלים', bs))
-    check('location suffix ("פרחי אביה ירושלים") still matches', containsCompetitorTerm('פרחי אביה ירושלים', bs))
-    check('a clean generic phrase does NOT match', !containsCompetitorTerm('פרחי אביב ירושלים', bs))
-  }
-
-  console.log('C) unsafe named-entity mutation (title generic → keyword name)')
-  {
-    check('title "פרחי אביב" → keyword "פרחי אביה" is an unsafe mutation', detectUnsafeNamedEntityMutation('פרחי אביב ירושלים: אילו פרחים מתאימים', 'פרחי אביה ירושלים', bs))
+    check('title "פרחי אביב" → keyword "פרחי אביה" is an unsafe entity mutation', detectUnsafeNamedEntityMutation('פרחי אביב ירושלים: אילו פרחים מתאימים', 'פרחי אביה ירושלים', bs))
     check('a legitimate keyword variation is NOT a mutation', !detectUnsafeNamedEntityMutation('טיפוח ורדים בבית', 'טיפוח ורדים בגינה', bs))
-    check('an exact-title keyword is NOT a mutation', !detectUnsafeNamedEntityMutation('פרחי אביב ירושלים', 'פרחי אביב ירושלים', bs))
+    check('external business in a SECONDARY → whole opportunity rejected', (() => { const r = scanSuggestionBrandSafety({ title: 'פרחי אביב ירושלים', primaryKeyword: 'פרחי אביב', secondaryKeywords: ['פרחי דליה ירושלים'] }, bs); return !r.safe && r.reason === 'competitor_brand_leakage' })())
+    check('external business in a link ANCHOR → rejected', !scanSuggestionBrandSafety({ title: 'זר לחתונה', anchors: ['משלוח פרחי אביה'] }, bs).safe)
+    check('a fully clean own-subject suggestion passes', scanSuggestionBrandSafety({ title: 'איך לבחור זר כלה', primaryKeyword: 'בחירת זר כלה', secondaryKeywords: ['זר כלה עונתי'], anchors: ['זר כלה'] }, bs).safe)
+    check('own brand in a field is NOT flagged as external', scanSuggestionBrandSafety({ title: 'הפרחים של ארז — מדריך', primaryKeyword: 'בחירת זר' }, bs).safe)
   }
 
-  console.log('D) whole-opportunity rejection scan (title/keyword/secondary/reason/anchor/target)')
+  console.log('C) empty-evidence safety (new project)')
   {
-    check('competitor in a SECONDARY keyword → whole opportunity rejected', (() => { const r = scanSuggestionBrandSafety({ title: 'פרחי אביב ירושלים', primaryKeyword: 'פרחי אביב', secondaryKeywords: ['פרחי דליה ירושלים'], suggestionReason: 'r' }, bs); return !r.safe && r.reason === 'competitor_brand_leakage' })())
-    check('competitor in the REASON → rejected', !scanSuggestionBrandSafety({ title: 'זר לחתונה', suggestionReason: 'בהשוואה לפרחי אביה' }, bs).safe)
-    check('competitor in a link ANCHOR → rejected', !scanSuggestionBrandSafety({ title: 'זר לחתונה', anchors: ['משלוח פרחי אביה'] }, bs).safe)
-    check('competitor in a target TITLE → rejected', !scanSuggestionBrandSafety({ title: 'זר לחתונה', targetTitles: ['פרחי דליה בירושלים'] }, bs).safe)
-    check('a fully clean suggestion passes', scanSuggestionBrandSafety({ title: 'איך לבחור זר כלה', primaryKeyword: 'בחירת זר כלה', secondaryKeywords: ['זר כלה עונתי'], suggestionReason: 'מדריך בחירה', anchors: ['זר כלה'], targetTitles: ['זר כלה קלאסי'] }, bs).safe)
-    check('own brand in a field is NOT a competitor leak', scanSuggestionBrandSafety({ title: 'הפרחים של ארז — מדריך', primaryKeyword: 'בחירת זר' }, bs).safe)
-  }
-
-  console.log('E) demand cannot promote competitors; list parsing; no-list safety')
-  {
-    check('a competitor query is not generic → dropped from demand/seeding', classifyKeywordEntity('פרחי אביה', bs) !== 'generic_query')
-    check('parseCompetitorList splits comma/newline lists', parseCompetitorList('פרחי אביה, פרחי דליה\nפרחי כהן').length === 3)
-    const empty = buildBrandSafety({ businessName: 'x', competitorTerms: [], genericVocab: [] })
-    check('no configured competitor terms → nothing is ever flagged', !containsCompetitorTerm('פרחי אביה ירושלים', empty) && classifyKeywordEntity('פרחי אביה', empty) === 'generic_query')
+    const empty = buildBrandSafety({ businessName: 'x' })
+    check('with no type vocabulary nothing is spuriously flagged', classifyKeywordEntity('פרחי אביה ירושלים', empty) === 'generic_query' && !containsExternalBusiness('פרחי אביה', empty))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

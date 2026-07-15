@@ -182,11 +182,21 @@ export interface PrimaryKeywordQualityResult { ok: boolean; repairedKeyword?: st
  * distinctive subject. Repairs from the title's distinctive subject when possible,
  * else rejects. corpusTypeWords is the project-derived ubiquitous-type-word set.
  */
+// A keyword truncated mid-thought — ends with a dangling conjunction / question word
+// ("… בשמים מתוקים ואיך"). Domain-neutral function words, not content.
+const TRUNCATED_KW_RE = /(?:^|\s)(?:ואיך|וכיצד|ומה|ולמה|ואיפה|ומתי|ו|של|עם|או|כי|and|or|how|why|the|of|for|with)$/i
+
 export function validatePrimaryKeywordQuality(
   primaryKeyword: string,
   title: string,
   corpusTypeWords: Set<string>,
 ): PrimaryKeywordQualityResult {
+  // J.1 — a truncated/malformed keyword is repaired from the title or rejected.
+  if (TRUNCATED_KW_RE.test((primaryKeyword || '').trim())) {
+    const repaired = repairKeywordFromTitle(title, new Set(), false)
+    if (toks(repaired).length >= 2 && !TRUNCATED_KW_RE.test(repaired)) return { ok: true, repairedKeyword: repaired }
+    return { ok: false, reason: 'invalid_primary_keyword' }
+  }
   const kw = toks(primaryKeyword)
   const distinctive = kw.filter((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t))
   const titleDistinctive = toks(title).filter((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t))
@@ -207,7 +217,7 @@ export function validatePrimaryKeywordQuality(
 // spec) — stripped ALWAYS (even when a real number exists, the subjective adjective
 // must not survive; the factual clause is generated deterministically). Not
 // industry/product content.
-const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:ביקוש\s+(?:גבוה\s+מאוד|גבוה|רב|גדול|עצום|משמעותי)|חיפושים\s+נפוצים|חיפושים\s+רבים|נפח\s+חיפוש(?:ים)?\s+(?:גבוה\s+מאוד|גבוה|עצום|משמעותי)|נפח\s+(?:גבוה\s+מאוד|עצום|משמעותי)|very\s+high\s+search\s+volume|high\s+search\s+volume|huge\s+(?:search\s+)?(?:volume|demand)|extremely\s+high(?:\s+demand)?|high\s+demand|commonly\s+searched)\s*/gi
+const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:(?:ביקוש|נפח)\s+(?:חיפוש(?:ים)?\s+)?(?:גבוה\s+מאוד|גבוה|רב|גדול|עצום|משמעותי|מאוד)|חיפושים\s+(?:נפוצים|רבים)|very\s+high\s+search\s+volume|high\s+search\s+volume|huge\s+(?:search\s+)?(?:volume|demand)|extremely\s+high(?:\s+demand)?|high\s+demand|commonly\s+searched)\s*/gi
 
 /**
  * Produce the FINAL user-visible reason with deterministic demand wording. When real
@@ -396,7 +406,9 @@ export function computeDemandEvidence(
   corpusTypeWords?: Set<string>,
 ): DemandEvidence {
   const typeWords = corpusTypeWords ?? new Set<string>()
-  const distinctOf = (s: string) => toks(s).filter((t) => !GENERIC_TOKENS.has(t) && !typeWords.has(t))
+  // Concept-level tokens (NO plural expansion) so a plural/singular pair is not double-
+  // counted — otherwise a missing distinctive ACTION word (e.g. "תיקון") gets diluted.
+  const distinctOf = (s: string) => contentTokens(s).filter((t) => !GENERIC_TOKENS.has(t) && !typeWords.has(t))
   const primaryDistinct = new Set(distinctOf(primaryKeyword))
   const primNorm = normalizePhrase(primaryKeyword)
 
@@ -412,7 +424,9 @@ export function computeDemandEvidence(
     if (shared.length === 0) continue
     const covQuery = shared.length / qDistinct.length
     const covPrimary = shared.length / primaryDistinct.size
-    if (covQuery >= 0.6 && covPrimary >= 0.5) { if (!aligned || (aligned.match !== 'exact' && vol > aligned.volume)) aligned = { query: q.query, volume: vol, match: 'close_intent' } }
+    // covPrimary >= 0.7 so a query that omits the topic's distinctive ACTION/service
+    // token (product "אסלות סמויות" vs topic "תיקון אסלות סמויות") is NOT aligned demand.
+    if (covQuery >= 0.6 && covPrimary >= 0.7) { if (!aligned || (aligned.match !== 'exact' && vol > aligned.volume)) aligned = { query: q.query, volume: vol, match: 'close_intent' } }
     else if (!supporting || vol > supporting.volume) supporting = { query: q.query, volume: vol }
   }
 

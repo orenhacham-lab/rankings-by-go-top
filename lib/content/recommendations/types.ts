@@ -88,6 +88,9 @@ export interface TopicSuggestion {
   /** P0 canonical role-aware internal-link plan (see LinkPlan). Carried end-to-end;
    *  the UI renders sections from THIS and never re-infers roles. */
   linkPlan?: LinkPlan
+  /** P0 content-plan — the opportunity family this topic was generated in
+   *  (informational / comparison / commercial). Used for diversity allocation. */
+  opportunityFamily?: string
 }
 
 export interface RecommendationMeta {

@@ -1,91 +1,97 @@
 /**
- * Brand-safety guard (P0) — PURE, domain-neutral. Prevents competitor/business names
- * from leaking into any generated content field. Competitor terms are NEVER hardcoded:
- * they come from project-level data (a user-maintained exclusion list) + the project's
- * own brand + a generic business vocabulary. This module only classifies and matches;
- * the caller rejects the whole contaminated opportunity.
+ * Brand-safety guard (P0) — PURE, domain-neutral, AUTOMATIC. No manual competitor list
+ * and no hardcoded names: detection is driven entirely by the PROJECT'S OWN evidence
+ * (business name + indexed pages + entities + existing content + focus). This is a
+ * self-service product — customers never pre-enter competitors.
  *
- *   keywordEntityType: generic_query | own_brand | competitor_brand | unknown_business_name
+ *   keywordEntityType: generic_query | own_brand | suspected_external_business
  *
- * Matching is variant/prefix/suffix tolerant (Hebrew-aware tokens): a competitor term
- * matches when its DISTINCTIVE tokens (the name part, not the generic industry word)
- * are present — so "פרחי אביה" matches "פרחי אביה ירושלים", "לפרחי אביה", etc.
+ * A query shaped like "[our business type] + [proper name absent from our own
+ * evidence]" (e.g. another flower shop "פרחי אביה") is a suspected external business:
+ * it can never seed a title, keyword, secondary, reason, demand, link or article input.
+ * The project's own brand is always allowed. Generic terms are allowed. A title→keyword
+ * entity MUTATION into a name is blocked separately (detectUnsafeNamedEntityMutation).
  */
 
 import { normalizePhrase } from './keyword-guard'
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
 
-export type KeywordEntityType = 'generic_query' | 'own_brand' | 'competitor_brand' | 'unknown_business_name'
+export type KeywordEntityType = 'generic_query' | 'own_brand' | 'suspected_external_business'
 
 const toks = (s: string) => contentTokens(s)
 
 export interface BrandSafety {
-  competitorTerms: string[][]  // each exclusion term as its normalized token list
-  ownBrandTerms: string[][]
+  ownBrandTerms: string[][]  // business name (+ own site names) token lists
   ownBrandTokens: Set<string>
-  /** Known-generic business vocabulary (entities + focus + tracked) — NOT keyword
-   *  research (which may itself contain competitor names). Used to isolate the
-   *  distinctive "name" token of a term and to whitelist safe keyword tokens. */
-  genericVocab: Set<string>
+  /** Every token in the project's OWN evidence (entities + coverage + focus + tracked
+   *  + brand). A token NOT here is "unknown" to this project. Built WITHOUT keyword
+   *  research (which may itself surface external names). */
+  ownVocab: Set<string>
+  /** Business-TYPE tokens the project's own entities repeatedly use (e.g. פרחי/פרחים):
+   *  the "[type] + [unknown name]" shape is what marks an external business. */
+  typeVocab: Set<string>
 }
 
-/** Build the brand-safety context from project data. competitorTerms is the
- *  user-maintained exclusion list (project field / env) — never hardcoded. */
+/** Build brand safety purely from project-owned evidence — no external input. */
 export function buildBrandSafety(input: {
   businessName?: string | null
   ownSiteNames?: string[]
-  competitorTerms?: string[]
-  genericVocab?: Iterable<string>
+  entityNames?: string[]
+  ownEvidence?: string[]
 }): BrandSafety {
   const own = [input.businessName ?? '', ...(input.ownSiteNames ?? [])].filter((s) => s && s.trim())
   const ownBrandTerms = own.map(toks).filter((a) => a.length)
-  return {
-    competitorTerms: (input.competitorTerms ?? []).map(toks).filter((a) => a.length),
-    ownBrandTerms,
-    ownBrandTokens: new Set(ownBrandTerms.flat()),
-    genericVocab: new Set(input.genericVocab ?? []),
-  }
+  const ownBrandTokens = new Set(ownBrandTerms.flat())
+  const entityNames = input.entityNames ?? []
+  const ownVocab = new Set<string>(ownBrandTokens)
+  for (const s of [...entityNames, ...(input.ownEvidence ?? [])]) for (const t of toks(s)) ownVocab.add(t)
+  // Type vocabulary: tokens used across >= 2 of the project's own entity names.
+  const df = new Map<string, number>()
+  for (const n of entityNames) for (const t of new Set(toks(n))) df.set(t, (df.get(t) ?? 0) + 1)
+  const typeVocab = new Set<string>()
+  for (const [t, d] of df) if (d >= 2 && !GENERIC_TOKENS.has(t)) typeVocab.add(t)
+  return { ownBrandTerms, ownBrandTokens, ownVocab, typeVocab }
 }
 
-/** Parse a raw competitor-list string (comma / newline separated) into terms. */
-export function parseCompetitorList(raw: string | null | undefined): string[] {
-  return (raw ?? '').split(/[,\n;|]+/).map((s) => s.trim()).filter(Boolean)
+function ownBrandPresent(textToks: Set<string>, bs: BrandSafety): boolean {
+  // The distinctive own-brand tokens (not generic, not the shared type words) present.
+  return bs.ownBrandTerms.some((term) => {
+    const d = term.filter((t) => !GENERIC_TOKENS.has(t) && !bs.typeVocab.has(t))
+    const pool = d.length ? d : term
+    return pool.length > 0 && pool.every((t) => textToks.has(t))
+  })
 }
 
-/** The distinctive (name) tokens of a term: those not generic + not in the business
- *  vocabulary + not the own brand. Falls back to all tokens when none are distinctive. */
-function distinctiveOf(term: string[], bs: BrandSafety): string[] {
-  const d = term.filter((t) => !GENERIC_TOKENS.has(t) && !bs.genericVocab.has(t) && !bs.ownBrandTokens.has(t))
-  return d.length ? d : term
+/** Tokens in the text that are UNKNOWN to the project (not generic, not in own vocab). */
+function unknownTokens(textToks: Iterable<string>, bs: BrandSafety): string[] {
+  const out: string[] = []
+  for (const t of textToks) if (!GENERIC_TOKENS.has(t) && !bs.ownVocab.has(t) && t.length >= 3) out.push(t)
+  return out
 }
 
-/** All of a term's distinctive (name) tokens present → the term is in the text. Exact
- *  on tokens (NOT fuzzy) so a legitimate near-generic word (e.g. the season "אביב",
- *  one edit from a competitor "אביה") is never mis-flagged — a genuine typo/mutation
- *  of a title word into a name is caught separately by detectUnsafeNamedEntityMutation. */
-function termPresent(term: string[], textToks: Set<string>, bs: BrandSafety): boolean {
-  const d = distinctiveOf(term, bs)
-  return d.length > 0 && d.every((t) => textToks.has(t))
-}
-
-/** True if ANY competitor term is present (variant/prefix/suffix tolerant via
- *  Hebrew-aware tokens). Used by the final scan — any hit rejects the opportunity. */
-export function containsCompetitorTerm(text: string, bs: BrandSafety): boolean {
-  if (!text || bs.competitorTerms.length === 0) return false
-  const tt = new Set(toks(text))
-  return bs.competitorTerms.some((term) => termPresent(term, tt, bs))
-}
-
-/** Classify a keyword-research query / keyword before it can influence generation. */
+/**
+ * Classify a keyword query BEFORE it can influence generation. own_brand (allowed);
+ * suspected_external_business when the query pairs a project business-TYPE token with an
+ * unknown proper token (a "[our type] [someone-else's name]" shape); else generic.
+ */
 export function classifyKeywordEntity(query: string, bs: BrandSafety): KeywordEntityType {
   const tt = new Set(toks(query))
-  if (bs.competitorTerms.some((term) => termPresent(term, tt, bs))) return 'competitor_brand'
-  if (bs.ownBrandTerms.some((term) => termPresent(term, tt, bs))) return 'own_brand'
+  if (ownBrandPresent(tt, bs)) return 'own_brand'
+  const unknown = unknownTokens(tt, bs)
+  const hasType = [...tt].some((t) => bs.typeVocab.has(t))
+  if (unknown.length > 0 && hasType) return 'suspected_external_business'
   return 'generic_query'
 }
 
-// ── C. unsafe named-entity mutation ───────────────────────────────────────────
+/** True if the text looks like an external business (for the final whole-suggestion
+ *  scan). Any hit rejects the entire opportunity — never a partial clean. */
+export function containsExternalBusiness(text: string, bs: BrandSafety): boolean {
+  if (!text) return false
+  return classifyKeywordEntity(text, bs) === 'suspected_external_business'
+}
+
+// ── unsafe named-entity mutation ──────────────────────────────────────────────
 function editDistance(a: string, b: string): number {
   const m = a.length, n = b.length
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
@@ -97,17 +103,15 @@ function editDistance(a: string, b: string): number {
 
 /**
  * True when the keyword introduces a NAMED-ENTITY token that (a) is absent from the
- * title, (b) is not a known business-vocab / own-brand word, and (c) is a tiny edit of
- * a title token — i.e. a generic word mutated into a possible brand/business name
- * (title "פרחי אביב" → keyword "פרחי אביה"). The caller must NOT auto-repair such a
- * keyword; it rejects the opportunity.
+ * title, (b) is unknown to the project, and (c) is a tiny edit of a title token —
+ * a generic word mutated into a possible business name (title "פרחי אביב" → keyword
+ * "פרחי אביה"). The caller must NOT auto-repair; it rejects the opportunity.
  */
 export function detectUnsafeNamedEntityMutation(title: string, primaryKeyword: string, bs: BrandSafety): boolean {
   const titleToks = toks(title)
   const titleSet = new Set(titleToks)
   for (const k of toks(primaryKeyword)) {
-    if (titleSet.has(k) || bs.ownBrandTokens.has(k) || bs.genericVocab.has(k) || GENERIC_TOKENS.has(k)) continue
-    if (k.length < 3) continue
+    if (titleSet.has(k) || bs.ownVocab.has(k) || GENERIC_TOKENS.has(k) || k.length < 3) continue
     for (const s of titleToks) {
       if (s.length >= 3 && Math.abs(s.length - k.length) <= 1 && editDistance(s, k) <= 1) return true
     }
@@ -115,11 +119,11 @@ export function detectUnsafeNamedEntityMutation(title: string, primaryKeyword: s
   return false
 }
 
-// ── G. final output brand-safety scan ─────────────────────────────────────────
+// ── final output brand-safety scan ────────────────────────────────────────────
 export interface BrandScanResult { safe: boolean; reason?: 'competitor_brand_leakage'; field?: string }
 
-/** Scan the COMPLETE user-visible suggestion for any competitor term. Any hit rejects
- *  the entire opportunity (never a partial clean). */
+/** Scan the COMPLETE user-visible suggestion for any suspected external business.
+ *  Any hit rejects the whole opportunity (never a partial clean). */
 export function scanSuggestionBrandSafety(
   s: { title?: string; primaryKeyword?: string; secondaryKeywords?: string[]; suggestionReason?: string; anchors?: string[]; targetTitles?: string[] },
   bs: BrandSafety,
@@ -130,6 +134,6 @@ export function scanSuggestionBrandSafety(
     ...(s.anchors ?? []).map((a, i): [string, string] => [`anchor[${i}]`, a]),
     ...(s.targetTitles ?? []).map((t, i): [string, string] => [`targetTitle[${i}]`, t]),
   ]
-  for (const [field, val] of fields) if (val && containsCompetitorTerm(val, bs)) return { safe: false, reason: 'competitor_brand_leakage', field }
+  for (const [field, val] of fields) if (val && containsExternalBusiness(val, bs)) return { safe: false, reason: 'competitor_brand_leakage', field }
   return { safe: true }
 }

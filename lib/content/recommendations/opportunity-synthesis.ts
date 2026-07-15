@@ -82,6 +82,22 @@ export function buildDiscoveryPrompt(ev: DiscoveryEvidence, ctx: ProjectContext,
   ].filter(Boolean).join('\n')
 }
 
+/** Opportunity FAMILIES (D) — generation is divided by family so a large candidate
+ *  pool spans genuinely different need types, not 50 variations of one subject. */
+export type OpportunityFamily = 'informational' | 'comparison' | 'commercial'
+export const OPPORTUNITY_FAMILIES: { family: OpportunityFamily; instruction: string }[] = [
+  { family: 'informational', instruction: 'Focus ONLY on informational needs: questions, how-to, care & maintenance, problem-solving, troubleshooting, mistakes, terminology and educational explainers.' },
+  { family: 'comparison', instruction: 'Focus ONLY on comparison / decision needs: comparisons, "A vs B", selection criteria, alternatives, buying decisions and "how to choose" guides.' },
+  { family: 'commercial', instruction: 'Focus ONLY on commercial / local / service needs: local service-area queries, delivery, occasion landing needs, category guides and existing-page improvements. Entities are link targets / context, never article keywords.' },
+]
+
+/** A cluster-first synthesis prompt scoped to ONE opportunity family. */
+export function buildFamilyPrompt(clusters: EvidenceCluster[], ctx: ProjectContext, langLabel: string, year: number, count: number, family: OpportunityFamily): string {
+  const fam = OPPORTUNITY_FAMILIES.find((f) => f.family === family)
+  const base = buildOpportunityPrompt(clusters, ctx, langLabel, year, count)
+  return `${base}\n\nGENERATION FAMILY — ${family}: ${fam?.instruction ?? ''} Propose ONLY opportunities of this family; skip needs that belong to another family.`
+}
+
 export interface SynthOpportunity {
   title: string
   primaryKeyword: string
