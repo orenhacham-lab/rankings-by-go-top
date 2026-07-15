@@ -93,6 +93,13 @@ export interface KeywordGuard {
    *  short titles, Hebrew slugs, keywords) incl. scanned site posts/pages, so a
    *  re-angled duplicate of an existing article is caught. Content-only. */
   contentPhrases: Set<string>
+  /** Exact normalized NAMES of existing indexed COMMERCIAL entities that OWN a
+   *  keyword-intent pair: product / category / page scan targets + Shopify
+   *  entities (title + handle). An entity SEEDS long-tail ideas but OWNS its exact
+   *  query — a candidate whose primary keyword equals one of these is direct
+   *  cannibalization and is hard-rejected (see ownedByExistingEntity). EXACT match
+   *  only (never a phrase-prefix), so genuine long-tails are unaffected. */
+  entityOwners: Set<string>
   /** Per-source sets for diagnostics/classification (server-side only). */
   sources: {
     tracking: Set<string>
@@ -119,6 +126,9 @@ export interface KeywordGuardData {
   trackingKeywords: string[]
   ideas: { title: string; primary_keyword: string | null; fingerprint: string; status?: string | null }[]
   scanTargets: Pick<ScannedTarget, 'targetTitle' | 'targetUrl' | 'targetType' | 'keywordAvailable' | 'primaryKeywordCandidate'>[]
+  /** Indexed Shopify entities (products/collections/pages/…) — title + handle.
+   *  Their exact names become keyword owners (domain-neutral). Optional. */
+  shopifyEntities?: { title: string | null; handle: string | null; entity_type?: string | null }[]
 }
 
 /** Pure guard construction from already-loaded project data. */
@@ -128,6 +138,7 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
   const contentKeywords = new Set<string>()
   const contentTitles = new Set<string>()
   const contentPhrases = new Set<string>()
+  const entityOwners = new Set<string>()
   const sources = { tracking: new Set<string>(), topics: new Set<string>(), ideas: new Set<string>(), scan: new Set<string>() }
   const origins = new Map<string, KeywordOriginEntry[]>()
   const scanSamples: string[] = []
@@ -202,6 +213,15 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
       addKeyword(tg.primaryKeywordCandidate, { content: true, sourceSet: sources.scan, bump: () => counts.existingScanKeywordCount++, origin: { source: 'scan_focus_keyword', original: tg.primaryKeywordCandidate, status: null, detail: `${tg.targetType} ${tg.targetUrl}` } })
       if (sources.scan.size > before && scanSamples.length < 10) scanSamples.push(tg.primaryKeywordCandidate.trim())
     }
+    // EXACT keyword ownership for EVERY indexed entity (product / category / page /
+    // post): the entity name may seed long-tail ideas but OWNS its exact query. A
+    // Hebrew slug phrase is added too. This blocks only an EXACT primary-keyword
+    // collision, never a longer long-tail. Also add the entity's focus keyword.
+    const entName = normalizePhrase(tg.targetTitle)
+    if (entName) entityOwners.add(entName)
+    const entSlug = slugFromUrl(tg.targetUrl)
+    if (/[֐-׿]/.test(entSlug)) { const v = normalizePhrase(entSlug); if (v) entityOwners.add(v) }
+    if (tg.keywordAvailable && tg.primaryKeywordCandidate) { const k = normalizePhrase(tg.primaryKeywordCandidate); if (k) entityOwners.add(k) }
     // Phase 3G.7 / 3H.3 — only existing site ARTICLES ('post') cover their
     // title's main phrase. 'page' targets are deliberately EXCLUDED: on
     // ecommerce/service sites, WP pages are commonly entity/landing pages
@@ -220,8 +240,52 @@ export function buildKeywordGuardFromData(data: KeywordGuardData): KeywordGuard 
     }
   }
 
-  return { titles, keywords, contentKeywords, contentTitles, contentPhrases, sources, origins, scanSamples, counts }
+  // Shopify indexed entities own their exact names too (product/collection/page/…).
+  for (const e of data.shopifyEntities ?? []) {
+    const t = normalizePhrase(e.title)
+    if (t) entityOwners.add(t)
+    const h = normalizePhrase((e.handle || '').replace(/-/g, ' '))
+    if (h) entityOwners.add(h)
+  }
+
+  return { titles, keywords, contentKeywords, contentTitles, contentPhrases, entityOwners, sources, origins, scanSamples, counts }
 }
+
+/**
+ * HARD exact-match rule (domain-neutral): true when the candidate's primary
+ * keyword is EXACTLY (after canonical normalization) the name of an existing
+ * indexed commercial entity/page — i.e. that page already owns this exact query.
+ * EXACT equality only, so a longer long-tail keyword ("… לאורך זמן") is never
+ * blocked by it.
+ */
+export function ownedByExistingEntity(guard: KeywordGuard, primaryKeyword: string | null | undefined): boolean {
+  const k = normalizePhrase(primaryKeyword)
+  if (!k) return false
+  if (guard.entityOwners.has(k)) return true
+  // D.4 — a bare entity name + only GENERIC modifier words (guide/recommended/price/
+  // shipping/best/…) does not create a distinct search need: if removing ONLY those
+  // generic tokens yields the exact entity name, it still cannibalizes. Domain-neutral.
+  const toks = k.split(' ').filter(Boolean)
+  const kept = toks.filter((t) => !GENERIC_MODIFIER_TOKENS.has(t))
+  if (kept.length > 0 && kept.length < toks.length) {
+    const stripped = kept.join(' ')
+    if (stripped !== k && guard.entityOwners.has(stripped)) return true
+  }
+  return false
+}
+
+/** Generic modifier words that do NOT create a distinct content need (D.4). Purely
+ *  generic commercial/quality/logistics terms — NOT topic-bearing modifiers. Stored
+ *  in canonical (normalizePhrase) form so final-letter/casing variants still match. */
+const GENERIC_MODIFIER_TOKENS = new Set<string>(
+  [
+    // Hebrew
+    'מדריך', 'מומלץ', 'מומלצת', 'מומלצים', 'איכותי', 'איכותית', 'מחיר', 'מחירים', 'משלוח',
+    'הטוב', 'ביותר', 'הכי', 'טוב', 'טובה', 'זול', 'זולה', 'לקנות', 'קניה', 'קנייה', 'אונליין',
+    // English
+    'best', 'guide', 'price', 'buy', 'cheap', 'top', 'online', 'review', 'reviews',
+  ].map((t) => normalizePhrase(t)).filter(Boolean),
+)
 
 /** Load the project's guard data and build the guard. Never throws. */
 export async function buildKeywordGuard(admin: Admin, projectId: string): Promise<KeywordGuard> {
@@ -246,6 +310,11 @@ export async function buildKeywordGuard(admin: Admin, projectId: string): Promis
     const cacheRow = await getCachedIndex(admin, projectId)
     if (cacheRow) data.scanTargets = (reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]
   } catch { /* scan cache optional */ }
+  try {
+    // Indexed Shopify entities own their exact names (products/collections/pages).
+    const { data: rows } = await admin.from('shopify_entities').select('title, handle, entity_type').eq('project_id', projectId).eq('is_active', true)
+    data.shopifyEntities = (rows ?? []) as KeywordGuardData['shopifyEntities']
+  } catch { /* shopify entities optional */ }
   return buildKeywordGuardFromData(data)
 }
 
