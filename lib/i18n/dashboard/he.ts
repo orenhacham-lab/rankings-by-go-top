@@ -68,6 +68,7 @@ export const dashboardHe = {
       pageTypeCategory: 'עמוד קטגוריה',
       pageTypeService: 'עמוד שירות',
       pageTypeProductImprovement: 'שיפור עמוד מוצר',
+      pageTypeExistingImprovement: 'שיפור עמוד קיים',
       noPreciseLink: 'לא נמצא קישור פנימי מספיק מדויק לנושא הזה.',
       reviewEditHelper: 'אפשר לערוך קישורים לפני ההוספה לתור. בסיום לחץ ״הוסף לתור הפרסום״.',
       approvedReady: 'הנושאים אושרו ונוספו לרשימת הנושאים המוכנים לפרסום. כדי להכניס אותם לתור העבודה האוטומטי, לחץ על ״הוסף לתור הפרסום״.',

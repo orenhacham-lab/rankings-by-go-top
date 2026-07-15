@@ -58,7 +58,7 @@ interface Suggestion {
     sourceReferences: { url: string; title: string; pageType: string }[]
   }
   /** P0 — recommended destination type; badge shown on the card. */
-  recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement'
+  recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
 }
 
 export default function AutomationIdeas({
@@ -783,7 +783,8 @@ export default function AutomationIdeas({
                             : s.recommendedPageType === 'commercial_landing_page' ? t.pageTypeCommercialLanding
                               : s.recommendedPageType === 'category_page' ? t.pageTypeCategory
                                 : s.recommendedPageType === 'service_page' ? t.pageTypeService
-                                  : t.pageTypeProductImprovement}
+                                  : s.recommendedPageType === 'existing_page_improvement' ? t.pageTypeExistingImprovement
+                                    : t.pageTypeProductImprovement}
                         </Badge>
                       )}
                       {/* Phase 4C — hybrid provenance: show each supporting source

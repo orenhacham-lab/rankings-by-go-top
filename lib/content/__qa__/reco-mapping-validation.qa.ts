@@ -12,7 +12,7 @@
  *  G. a topic disconnected from all business evidence is low_business_relevance.
  */
 import { mapLinkRoles, orderedLinksForOpportunity, type LinkCandidateEntity } from '../recommendations/link-role-mapper'
-import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntentFromTitle } from '../recommendations/opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessCommercialFit, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntentFromTitle, deriveIntent } from '../recommendations/opportunity-validation'
 import { contentTokens } from '../recommendations/evidence-cluster'
 import { normalizePhrase } from '../recommendations/keyword-guard'
 import { blockedNonArticle, classifyTopicOutcome, summarizeBatch, type TopicStageOutcomes } from '../automation/approve-link-queue'
@@ -270,6 +270,41 @@ async function main() {
     const withVol = finalizeReason('המאמר עונה על נפח חיפוש עצום ומספק ערך', { demandEvidenceAvailable: true, demandQuery: 'שושן צחור', avgMonthlySearches: 5400, demandConfidence: 'high', demandMatchType: 'exact' }, 'he')
     check('H. hyperbole ("נפח חיפוש עצום") stripped even with verified volume', !/עצום|גבוה מאוד|ביקוש רב/.test(withVol) && withVol.includes('5400') && withVol.includes('חיפושים חודשיים'))
     check('G. adjacent-preposition fragment ("על של") detected as malformed', isMalformedReason('נושא זה עונה על של לקוחות המחפשים'))
+  }
+
+  console.log('A2/B2) Hebrew grammar chains; local keyword overrides informational title')
+  {
+    // A — general preposition-chain fallback (not a literal blacklist).
+    check('A. "עונה על למילה" (prep + ל-word) → malformed', isMalformedReason('עונה על למילה שושן צחור ומשלב השוואה'))
+    check('A. "מתאים עבור ל..." → malformed', isMalformedReason('המאמר מתאים עבור לבחירת זר מתאים'))
+    check('A. "על של" → malformed', isMalformedReason('נושא זה עונה על של לקוחות'))
+    check('A. a grammatical reason is NOT flagged', !isMalformedReason('המאמר עונה על שאלה נפוצה של לקוחות רבים'))
+    const fb = finalizeReason('עונה על למילה שושן צחור', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none', demandMatchType: 'none' }, 'he')
+    check('A. malformed chain → full neutral fallback (no partial repair)', fb === 'הנושא רלוונטי לתחום הפעילות של העסק ולביטויי החיפוש שנמצאו במחקר.')
+    // B — a local-commercial KEYWORD wins over an "איך לבחור" informational title.
+    check('B. store keyword ("חנויות … מבשרת ציון") → local despite "איך" title', deriveIntent('חנויות פרחים במבשרת ציון', 'משלוח פרחים במבשרת ציון: איך לבחור חנות פרחים', 'informational') === 'local')
+    check('B. local keyword → NOT article page type', classifyRecommendedPageType({ intent: deriveIntent('חנויות פרחים במבשרת ציון', 'איך לבחור חנות', 'informational') }, { primaryTargetType: null, keywordEqualsProduct: false }) !== 'article')
+    check('B. a genuine how-to keyword+title stays informational', deriveIntent('טיפוח ורדים בבית', 'איך לטפח ורדים בבית', 'commercial') === 'informational')
+  }
+
+  console.log('C/D/E) local-page ownership, commercial fit, supporting cannot manufacture fit')
+  {
+    const typeWords = deriveCorpusTypeWords(['זר ורדים', 'זר קאלות', 'זר פרחים', 'משלוח פרחים'], { minDocs: 2, minFraction: 0.3 })
+    // C — an existing page already owning the local intent blocks a new article.
+    const owns = assessExistingLocalOwnership('חנויות פרחים במבשרת ציון', 'חנויות פרחים במבשרת ציון', ['משלוח פרחים במבשרת ציון', 'זר ורדים'], typeWords)
+    check('C. existing local page that owns the intent → outcome owns (block/cannibalize)', owns.outcome === 'owns')
+    const improve = assessExistingLocalOwnership('חנות פרחים במבשרת ציון עם משלוח מהיר', 'מדריך', ['פרחים במבשרת ציון'], typeWords)
+    check('C. a close-but-weak existing page → outcome improve (existing-page improvement)', improve.outcome === 'improve' || improve.outcome === 'owns')
+    check('C. a truly distinct topic → outcome distinct', assessExistingLocalOwnership('טיפוח ורדים בבית', 'מדריך', ['משלוח פרחים בירושלים'], typeWords).outcome === 'distinct')
+
+    // D/E — commercial fit: entities/focus establish fit; KR volume/supporting do not.
+    const commercialTokens = tokSet(['זר ורדים', 'עציץ קאלות', 'זר כלה'])
+    const focusTokens = tokSet(['פרחים', 'זרים', 'חתונות'])
+    const noFit = assessCommercialFit('מתנה לילדים לסוף שנה', 'איך לבחור מתנה לילדים לסוף שנה', commercialTokens, focusTokens, typeWords)
+    check('D. adjacent seasonal topic with no matching offering → unsupported_commercial_fit', !noFit.ok && noFit.reason === 'unsupported_commercial_fit')
+    check('E. search volume / supporting content cannot create fit (only entities/focus do)', !assessCommercialFit('מתנה לילדים לסוף שנה', 'מתנה', commercialTokens, focusTokens, typeWords).ok)
+    const fit = assessCommercialFit('זר כלה לחתונה', 'מדריך בחירת זר כלה', commercialTokens, focusTokens, typeWords)
+    check('D. a topic matching a real product/category (זר כלה) → fit ok', fit.ok && fit.matched.length >= 1)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

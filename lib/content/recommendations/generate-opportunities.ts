@@ -24,7 +24,7 @@ import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget
 import { buildOpportunityPrompt, buildDiscoveryPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity } from './opportunity-synthesis'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
-import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntentFromTitle } from './opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, filterSecondaryKeywords, assessBusinessRelevance, assessCommercialFit, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType } from './opportunity-validation'
 import { runRecoveryTiers, type TierPlan, type RecoveryTier, type ConfidenceLevel, type FallbackReason } from './recovery-tiers'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -183,8 +183,12 @@ export async function generateOpportunities(
   for (const t of deriveAttributeTokens(entities.map((e) => e.name))) domainTypeWords.add(t)
   const commercialEntityTokens = new Set<string>()
   for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
+  const projectFocusTokens = new Set<string>()
+  for (const s of projectFocus) for (const t of contentTokens(s)) projectFocusTokens.add(t)
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
   for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
+  // Existing indexed page/coverage titles — for local-page ownership/cannibalization.
+  const existingPageTitles = [...entities.map((e) => e.name), ...existingCoverage.map((c) => c.title)]
   const bump = (td: TierDiagnostics, r: string) => { td.rejected_by_reason[r] = (td.rejected_by_reason[r] ?? 0) + 1 }
   let secondaryKeywordsFiltered = 0
   const target_role_mappings: OpportunityDiagnostics['target_role_mappings'] = []
@@ -203,9 +207,10 @@ export async function generateOpportunities(
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
-      // I — an EXPLICIT title signal (לעומת/מול/השוואה → comparison; איך/מדריך →
-      // informational; משלוח/חנות → local) deterministically overrides the model intent.
-      const intent = deriveIntentFromTitle(o.title, (o.intent as SearchIntent) || 'informational')
+      // I/B/F — final intent from the PRIMARY KEYWORD + title (a local-commercial
+      // keyword like חנויות/משלוח WINS over an "איך לבחור" title phrase); explicit
+      // comparison/how-to title signals otherwise override the model intent.
+      const intent = deriveIntent(o.primaryKeyword, o.title, (o.intent as SearchIntent) || 'informational')
       const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent, existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
       if (!w.ok) { bump(td, (w.rejection_reason as RejectionReason) || 'insufficient_independent_need'); continue }
 
@@ -228,6 +233,22 @@ export async function generateOpportunities(
       const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, domainTypeWords, entities.map((e) => ({ name: e.name })), intent)
       if (!relevance.ok) { bump(td, relevance.reason ?? 'low_business_relevance'); continue }
 
+      // D/E — commercial fit: an adjacent/seasonal topic must share a distinctive
+      // subject with an actual product/category ENTITY or the project focus. Search
+      // volume, generic evidence, or a supporting article can NOT establish fit.
+      const fit = assessCommercialFit(primaryKeyword, o.title, commercialEntityTokens, projectFocusTokens, domainTypeWords)
+      if (!fit.ok) { bump(td, 'unsupported_commercial_fit'); continue }
+
+      // C/F — existing local-page ownership: an existing indexed page that already owns
+      // the local intent blocks a new article (cannibalization); a close-but-weak page
+      // becomes an existing-page improvement instead of a new article.
+      let ownershipPageType: RecommendedPageType | null = null
+      if (intent === 'local' || intent === 'transactional') {
+        const own = assessExistingLocalOwnership(primaryKeyword, o.title, existingPageTitles, domainTypeWords)
+        if (own.outcome === 'owns') { bump(td, 'exact_existing_keyword_owner'); continue }
+        if (own.outcome === 'improve') ownershipPageType = 'existing_page_improvement'
+      }
+
       // B/F/H — secondary-keyword quality against the FINAL primary (drops duplicate-
       // of-primary, malformed, generic, generic-type-word combos, off-topic,
       // intent-conflicting).
@@ -246,9 +267,10 @@ export async function generateOpportunities(
         trace: mapped.debug.slice(0, 20).map((a) => ({ url: a.url, type: a.title, role: a.role, reason: a.reason, score: a.score, distinctive: a.distinctiveTokens })),
       })
 
-      // D — recommended page type (only 'article' is auto-enqueued downstream).
+      // D/C — recommended page type (only 'article' is auto-enqueued downstream). An
+      // existing close-but-weak local page becomes an existing-page improvement.
       const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))
-      const recommendedPageType = classifyRecommendedPageType({ intent }, { primaryTargetType, keywordEqualsProduct })
+      const recommendedPageType = ownershipPageType ?? classifyRecommendedPageType({ intent }, { primaryTargetType, keywordEqualsProduct })
 
       // A/E/H — demand evidence ALIGNED to this opportunity (typed match) + final
       // reason validation (strip unsupported claims, repair malformed text, factual

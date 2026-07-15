@@ -70,19 +70,35 @@ export function deriveAttributeTokens(names: string[], opts?: { minCount?: numbe
   return out
 }
 
-// Explicit deterministic title→intent signals (function words, not domain content).
+// Explicit deterministic intent signals (function words, not domain content).
 const CMP_TITLE = /(?:^|\s)(?:לעומת|מול|השוואה|הבדל\s+בין|vs\.?|versus)(?:\s|$)/i
 const HOWTO_TITLE = /(?:^|\s)(?:איך|כיצד|מדריך|טיפול|טיפוח|how\s+to|guide)(?:\s|$)/i
-const LOCAL_COMM_TITLE = /(?:^|\s)(?:משלוח|חנות|מחיר|קנייה|קניה|לקנות|delivery|shop|store|buy|price)(?:\s|$)/i
+const LOCAL_COMM_TITLE = /(?:^|\s)(?:משלוח|חנות|חנויות|מחיר|קנייה|קניה|לקנות|delivery|shop|store|buy|price)(?:\s|$)/i
+// A store/shop marker in the KEYWORD is a strong local-commercial signal.
+const STORE_KW = /(?:^|\s)(?:חנות|חנויות|shop|store)(?:\s|$)/i
+const TXN_KW = /(?:^|\s)(?:מחיר|מחירים|קנייה|קניה|לקנות|buy|price)(?:\s|$)/i
+const LOCAL_KW = /(?:^|\s)(?:משלוח|delivery)(?:\s|$)/i
 
-/** Force an intent from an EXPLICIT title signal, overriding the model. Comparison
- *  wins over everything; then how-to→informational; then a local/commercial marker. */
-export function deriveIntentFromTitle(title: string, modelIntent: SearchIntent): SearchIntent {
+/**
+ * Final intent from the PRIMARY KEYWORD + title (B/F), overriding the model. A local-
+ * commercial keyword (חנות/חנויות, משלוח, מחיר/קנייה) WINS — a title phrase like "איך
+ * לבחור" must not downgrade it to an informational article. Otherwise: comparison
+ * title → comparison; how-to title → informational; local/commercial title → local.
+ */
+export function deriveIntent(primaryKeyword: string, title: string, modelIntent: SearchIntent): SearchIntent {
+  const kw = primaryKeyword || ''
+  if (TXN_KW.test(kw)) return 'transactional'
+  if (STORE_KW.test(kw) || LOCAL_KW.test(kw)) return 'local'
   const t = title || ''
   if (CMP_TITLE.test(t)) return 'comparison'
   if (HOWTO_TITLE.test(t)) return 'informational'
+  if (TXN_KW.test(t)) return 'transactional'
   if (LOCAL_COMM_TITLE.test(t)) return modelIntent === 'transactional' ? 'transactional' : 'local'
   return modelIntent
+}
+/** @deprecated title-only intent — kept for callers/tests; prefer deriveIntent. */
+export function deriveIntentFromTitle(title: string, modelIntent: SearchIntent): SearchIntent {
+  return deriveIntent('', title, modelIntent)
 }
 
 // ── C. title–keyword–intent consistency ──────────────────────────────────────
@@ -220,10 +236,17 @@ export function sanitizeDemandLanguage(
 const DANGLING_END_RE = /(?:^|\s)(?:בין|לבין|בעל|בעלת|של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|the|with|to|vs)\s*$/i
 // No \b — JS word boundaries do not apply around Hebrew letters.
 const BROKEN_FRAGMENT_RE = /(?:^|\s)(?:בעל|בין)\s+(?:לבין|בין|בעל|של)(?:\s|$)|(?:^|\s)בין\s+\S{1,3}\s+לבין(?:\s|$)/
-// Two adjacent Hebrew prepositions with no noun between (e.g. "עונה על של לקוחות") —
-// a missing-noun / broken clause.
-const PREP = '(?:על|של|אל|עם|את|בין|כדי|לפי|עבור|ל|ב|מ)'
-const ADJ_PREPOSITION_RE = new RegExp(`(?:^|\\s)${PREP}\\s+${PREP}(?:\\s|$)`)
+// Broken Hebrew preposition chains (GENERAL, not a literal blacklist): a standalone
+// (multi-letter) preposition immediately followed by EITHER another standalone
+// preposition ("על של", "אל של") OR a ל-prefixed word ("עונה על למילה", "מתאים עבור
+// ל…") — i.e. a preposition where a noun/object is required. Single-letter ל/ב/מ are
+// proclitics (they attach to the next word), so they surface only as the following
+// fragment, never as the standalone head.
+const STANDALONE_PREP = '(?:על|אל|עם|את|בין|כדי|לפי|עבור|של)'
+// The ל-word branch EXCLUDES של, because "של ל…" (e.g. "של לקוחות" = of customers, a
+// ל-ROOT word) is grammatical; "על ל…"/"עבור ל…" is the broken pattern.
+const PREP_NO_SHEL = '(?:על|אל|עם|את|בין|כדי|לפי|עבור)'
+const ADJ_PREPOSITION_RE = new RegExp(`(?:^|\\s)(?:${STANDALONE_PREP}\\s+${STANDALONE_PREP}(?:\\s|$)|${PREP_NO_SHEL}\\s+ל[א-ת])`)
 
 /** True when the reason reads as truncated/malformed (dangling connective or a broken
  *  comparison fragment) and should be replaced with a neutral fallback. */
@@ -262,8 +285,67 @@ export function finalizeReason(
 }
 
 // ── D. recommended page type ──────────────────────────────────────────────────
-export type RecommendedPageType = 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement'
+export type RecommendedPageType = 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
 const COMMERCIAL_INTENTS = new Set<SearchIntent>(['commercial', 'transactional', 'local'])
+
+// ── C. existing local-page ownership / cannibalization ────────────────────────
+export interface LocalOwnershipResult { outcome: 'owns' | 'improve' | 'distinct'; matchedTitle: string | null; overlap: number }
+
+/**
+ * Compare a (local) opportunity against existing indexed pages/coverage by distinctive
+ * subject + location overlap. A very-high overlap means an existing page already OWNS
+ * the intent (reject / cannibalization); a moderate overlap means the page is close but
+ * weak (improve the existing page rather than write a new article); low = distinct.
+ * corpusTypeWords removes attribute/type noise so the match is on real subject+location.
+ */
+export function assessExistingLocalOwnership(
+  primaryKeyword: string,
+  title: string,
+  existingPageTitles: string[],
+  corpusTypeWords: Set<string>,
+): LocalOwnershipResult {
+  const distinctOf = (s: string) => new Set(toks(s).filter((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t)))
+  const opp = distinctOf(`${primaryKeyword} ${title}`)
+  if (opp.size === 0) return { outcome: 'distinct', matchedTitle: null, overlap: 0 }
+  let best = { title: '', overlap: 0 }
+  for (const pt of existingPageTitles) {
+    const p = distinctOf(pt)
+    if (p.size === 0) continue
+    const shared = [...p].filter((t) => opp.has(t)).length
+    // Coverage of the EXISTING page's subject by the opportunity (page fully re-covered
+    // = the opportunity is the same page).
+    const overlap = shared / p.size
+    if (overlap > best.overlap) best = { title: pt, overlap }
+  }
+  // Thresholds are tolerant of proclitic/plural tokenizer fragments (a strip like
+  // משלוח→שלוח slightly dilutes overlap): near-full subject+location re-coverage = owns.
+  const outcome: LocalOwnershipResult['outcome'] = best.overlap >= 0.7 ? 'owns' : best.overlap >= 0.4 ? 'improve' : 'distinct'
+  return { outcome, matchedTitle: best.title || null, overlap: Number(best.overlap.toFixed(2)) }
+}
+
+// ── D/E. commercial-fit for adjacent/seasonal topics ──────────────────────────
+export interface CommercialFitResult { ok: boolean; matched: string[]; reason?: 'unsupported_commercial_fit' }
+
+/**
+ * A topic must have a defensible COMMERCIAL fit — a distinctive subject token shared
+ * with an actual product/category/service ENTITY or the project focus. Generic
+ * evidence (a keyword-research query alone), search volume, or a supporting article
+ * can NOT establish fit (E). An adjacent/seasonal topic ("מתנה לילדים לסוף שנה") with
+ * no matching offering is rejected unsupported_commercial_fit.
+ */
+export function assessCommercialFit(
+  primaryKeyword: string,
+  title: string,
+  commercialEntityTokens: Set<string>,
+  projectFocusTokens: Set<string>,
+  corpusTypeWords: Set<string>,
+): CommercialFitResult {
+  const distinctive = Array.from(new Set(toks(`${primaryKeyword} ${title}`).filter((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t))))
+  if (distinctive.length === 0) return { ok: false, matched: [], reason: 'unsupported_commercial_fit' }
+  const matched = distinctive.filter((t) => commercialEntityTokens.has(t) || projectFocusTokens.has(t))
+  if (matched.length === 0) return { ok: false, matched: [], reason: 'unsupported_commercial_fit' }
+  return { ok: true, matched }
+}
 
 /**
  * Not every valid opportunity is a blog article. A transactional/local commercial

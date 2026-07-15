@@ -70,6 +70,7 @@ export const dashboardEn = {
       pageTypeCategory: 'Category page',
       pageTypeService: 'Service page',
       pageTypeProductImprovement: 'Product page improvement',
+      pageTypeExistingImprovement: 'Existing page improvement',
       noPreciseLink: 'No sufficiently precise internal link was found for this topic.',
       reviewEditHelper: 'You can edit links before adding to the queue. When finished, click “Add to publishing queue”.',
       approvedReady: 'The topics were approved and added to the list of topics ready for publishing. To place them in the automatic workflow queue, click “Add to publishing queue”.',

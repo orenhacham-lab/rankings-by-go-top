@@ -78,7 +78,7 @@ export interface TopicSuggestion {
   /** P0 mapping/validation — recommended destination for this opportunity. Only
    *  'article' is auto-enqueued into the automation queue; other types are shown with
    *  a recommendation but never silently treated as articles. Additive. */
-  recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement'
+  recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
   /** P0 demand-claim integrity — verified demand evidence (from keyword research);
    *  demandConfidence 'none' means NO verified volume (use neutral language). */
   demandEvidence?: { demandEvidenceAvailable: boolean; demandQuery: string | null; avgMonthlySearches: number | null; demandConfidence: 'high' | 'low' | 'none'; demandMatchType?: 'exact' | 'close_intent' | 'supporting_only' | 'none' }
