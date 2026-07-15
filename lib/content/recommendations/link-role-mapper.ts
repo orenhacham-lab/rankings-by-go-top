@@ -22,12 +22,13 @@
 
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
+import type { LinkPlan, LinkTarget, InternalLinkRole } from './types'
 
 export type LinkRole = 'primary_commercial_target' | 'secondary_commercial_target' | 'supporting_informational_link' | 'source_reference' | 'unrelated'
 export type EntityPageType = 'product' | 'category' | 'service' | 'page' | 'post' | 'article' | 'unknown'
 
 export interface LinkCandidateEntity { url: string; title: string; type?: EntityPageType }
-export interface RoleAssignment { url: string; title: string; role: LinkRole; reason: string; score: number; distinctiveTokens: string[] }
+export interface RoleAssignment { url: string; title: string; pageType: EntityPageType; role: LinkRole; reason: string; score: number; distinctiveTokens: string[] }
 
 const COMMERCIAL_TYPES = new Set<EntityPageType>(['product', 'category', 'service'])
 const INFORMATIONAL_TYPES = new Set<EntityPageType>(['post', 'article', 'page'])
@@ -86,33 +87,50 @@ export function mapLinkRoles(
   const isTypeWord = (t: string) => { const d = df.get(t) ?? 0; return d >= 4 && d / Math.max(1, N) >= 0.6 }
   const weight = (t: string) => (GENERIC_TOKENS.has(t) ? 0 : isTypeWord(t) ? TYPE_WORD_WEIGHT : 1)
 
+  // Opportunity SUBJECT head: distinctive tokens of the primary KEYWORD (not the full
+  // title), preferring tokens that repeat (the article's core subject). A SUPPORTING
+  // informational link must share this head (answer-level complementarity, I) — sharing
+  // only a peripheral title modifier (e.g. a color that also appears in a place name
+  // like "מעלה אדומים") is not enough. Commercial targets are not gated by the head.
+  const kwCounts = new Map<string, number>()
+  for (const w of opportunityKeyword.split(/\s+/)) for (const t of linkToks(w)) kwCounts.set(t, (kwCounts.get(t) ?? 0) + 1)
+  const kwDistinct = Array.from(kwCounts.keys()).filter((t) => weight(t) >= 1)
+  const repeated = kwDistinct.filter((t) => (kwCounts.get(t) ?? 0) > 1)
+  const kwHead = new Set(repeated.length ? repeated : kwDistinct)
+
   // Score + provisionally classify every candidate.
   const commercial: RoleAssignment[] = []
   const supporting: RoleAssignment[] = []
   const sources: RoleAssignment[] = []
   const debug: RoleAssignment[] = []
   for (const { c, toks } of prepared) {
+    const pageType = c.type ?? 'unknown'
     const shared = toks.filter((t) => oppToks.has(t))
     const distinctive = Array.from(new Set(shared.filter((t) => weight(t) >= 1)))
     const score = Number(shared.reduce((s, t) => s + weight(t), 0).toFixed(3))
-    const isCommercial = COMMERCIAL_TYPES.has(c.type ?? 'unknown')
-    const isInformational = INFORMATIONAL_TYPES.has(c.type ?? 'unknown')
+    const isCommercial = COMMERCIAL_TYPES.has(pageType)
+    const isInformational = INFORMATIONAL_TYPES.has(pageType)
+    const sharesHead = distinctive.some((t) => kwHead.has(t))
 
     let a: RoleAssignment
     if (distinctive.length === 0) {
-      a = { url: c.url, title: c.title, role: 'unrelated', reason: shared.length ? 'generic_or_type_word_only' : 'no_topical_overlap', score, distinctiveTokens: [] }
+      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: shared.length ? 'generic_or_type_word_only' : 'no_topical_overlap', score, distinctiveTokens: [] }
     } else if (isCommercial) {
       // Role-specific: a distinctive commercial match is a target regardless of the
       // informational bar. Final primary/secondary decided after ranking.
-      a = { url: c.url, title: c.title, role: 'secondary_commercial_target', reason: 'distinctive_commercial_subject_match', score, distinctiveTokens: distinctive }
+      a = { url: c.url, title: c.title, pageType, role: 'secondary_commercial_target', reason: 'distinctive_commercial_subject_match', score, distinctiveTokens: distinctive }
       commercial.push(a)
-    } else if (isInformational) {
-      // Complementarity (E): shares a distinctive subject with the article.
-      a = { url: c.url, title: c.title, role: 'supporting_informational_link', reason: 'shared_distinctive_subject', score, distinctiveTokens: distinctive }
+    } else if (isInformational && sharesHead) {
+      // Complementarity (E/I): shares the article's SUBJECT head, not just any token.
+      a = { url: c.url, title: c.title, pageType, role: 'supporting_informational_link', reason: 'complements_subject_head', score, distinctiveTokens: distinctive }
       supporting.push(a)
-    } else {
-      a = { url: c.url, title: c.title, role: 'source_reference', reason: 'distinctive_match_unknown_type', score, distinctiveTokens: distinctive }
+    } else if (isInformational) {
+      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: 'shares_only_peripheral_modifier', score, distinctiveTokens: distinctive }
+    } else if (sharesHead) {
+      a = { url: c.url, title: c.title, pageType, role: 'source_reference', reason: 'distinctive_match_unknown_type', score, distinctiveTokens: distinctive }
       sources.push(a)
+    } else {
+      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: 'shares_only_peripheral_modifier', score, distinctiveTokens: distinctive }
     }
     debug.push(a)
   }
@@ -144,6 +162,33 @@ export function mapLinkRoles(
     .sort((a, b) => rolePriority[a.role] - rolePriority[b.role] || b.score - a.score)
     .slice(0, TOTAL_CAP) // total cap trims the lowest-priority links last
   return { primaryTarget, assignments, debug }
+}
+
+/** Build the CANONICAL role-aware LinkPlan from a mapping result. This is the ONE
+ *  structure persisted + reloaded + rendered — roles are never re-inferred later. */
+export function buildLinkPlan(mapped: ReturnType<typeof mapLinkRoles>): LinkPlan {
+  const toTarget = (a: RoleAssignment, role: InternalLinkRole): LinkTarget => ({ url: a.url, title: a.title, pageType: a.pageType, role, score: a.score, reason: a.reason })
+  const primaryUrl = mapped.primaryTarget ? mapped.primaryTarget.url.trim().toLowerCase().replace(/\/+$/, '') : null
+  return {
+    primaryCommercialTarget: mapped.primaryTarget ? toTarget(mapped.primaryTarget, 'primary_commercial_target') : null,
+    secondaryCommercialTargets: mapped.assignments.filter((a) => a.role === 'secondary_commercial_target').map((a) => toTarget(a, 'secondary_commercial_target')),
+    // Supporting/source EXCLUDE the primary URL (never duplicated under support).
+    supportingInformationalLinks: mapped.assignments.filter((a) => a.role === 'supporting_informational_link' && a.url.trim().toLowerCase().replace(/\/+$/, '') !== primaryUrl).map((a) => toTarget(a, 'supporting_informational_link')),
+    sourceReferences: mapped.assignments.filter((a) => a.role === 'source_reference' && a.url.trim().toLowerCase().replace(/\/+$/, '') !== primaryUrl).map((a) => toTarget(a, 'source_reference')),
+  }
+}
+
+/** Flatten a LinkPlan to the legacy ordered {url,anchor} list (primary first) for
+ *  backward-compatible consumers. Roles live in the LinkPlan, not here. */
+export function linkPlanToOrdered(plan: LinkPlan): { url: string; anchor: string }[] {
+  const out: { url: string; anchor: string }[] = []
+  const seen = new Set<string>()
+  const push = (t: LinkTarget) => { const k = t.url.trim().toLowerCase().replace(/\/+$/, ''); if (!k || seen.has(k)) return; seen.add(k); out.push({ url: t.url, anchor: t.title }) }
+  if (plan.primaryCommercialTarget) push(plan.primaryCommercialTarget)
+  for (const t of plan.secondaryCommercialTargets) push(t)
+  for (const t of plan.supportingInformationalLinks) push(t)
+  for (const t of plan.sourceReferences) push(t)
+  return out
 }
 
 /** Ordered link list for an opportunity: primary target first, then supporting

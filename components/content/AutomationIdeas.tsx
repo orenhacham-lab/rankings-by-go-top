@@ -50,6 +50,15 @@ interface Suggestion {
   moneyTargetUrl?: string | null
   /** Phase 4C — hybrid provenance: which providers support this idea. */
   supportingSources?: Source[]
+  /** P0 — canonical role-aware link plan (roles rendered from here, never re-inferred). */
+  linkPlan?: {
+    primaryCommercialTarget: { url: string; title: string; pageType: string } | null
+    secondaryCommercialTargets: { url: string; title: string; pageType: string }[]
+    supportingInformationalLinks: { url: string; title: string; pageType: string }[]
+    sourceReferences: { url: string; title: string; pageType: string }[]
+  }
+  /** P0 — recommended destination type; badge shown on the card. */
+  recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement'
 }
 
 export default function AutomationIdeas({
@@ -767,6 +776,16 @@ export default function AutomationIdeas({
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.title}</span>
+                      {/* P0 — recommended destination type (visible, survives reload). */}
+                      {s.recommendedPageType && (
+                        <Badge variant={s.recommendedPageType === 'article' ? 'default' : 'warning'}>
+                          {s.recommendedPageType === 'article' ? t.pageTypeArticle
+                            : s.recommendedPageType === 'commercial_landing_page' ? t.pageTypeCommercialLanding
+                              : s.recommendedPageType === 'category_page' ? t.pageTypeCategory
+                                : s.recommendedPageType === 'service_page' ? t.pageTypeService
+                                  : t.pageTypeProductImprovement}
+                        </Badge>
+                      )}
                       {/* Phase 4C — hybrid provenance: show each supporting source
                           as a badge + a count when >1 (multi-source agreement). */}
                       {s.supportingSources && s.supportingSources.length > 0 ? (
@@ -804,33 +823,48 @@ export default function AutomationIdeas({
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.reasonLabel}: {s.suggestionReason}</div>
                     )}
                     {s.suggestedInternalLinks.length > 0 && (() => {
-                      // Phase 3F.3.6 — split into the PRIMARY commercial link (money
-                      // target) and SUPPORTING links, each with its own heading.
-                      const money = s.moneyTargetUrl ? s.suggestedInternalLinks.find((l) => l.url === s.moneyTargetUrl) : null
-                      const supporting = s.suggestedInternalLinks.filter((l) => !money || l.url !== money.url)
+                      // P0 — render role sections from the CANONICAL linkPlan (roles are
+                      // NEVER re-inferred here). Fallback to the legacy money/supporting
+                      // split for old rows without a link_plan.
                       const linkRow = (l: { url: string; anchor: string }) => (
                         <label key={l.url} className="flex items-start gap-1.5 text-[11px] cursor-pointer">
                           <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 h-3.5 w-3.5 accent-indigo-600" />
                           <span className="text-slate-600 dark:text-slate-300 break-words">{l.anchor || l.url}</span>
                         </label>
                       )
+                      const asRow = (x: { url: string; title: string }) => linkRow({ url: x.url, anchor: x.title })
+                      const lp = s.linkPlan
+                      const section = (label: string, items: { url: string; title: string }[], cls: string) => items.length > 0 && (
+                        <div className="mt-1.5">
+                          <div className={`text-[10px] font-semibold ${cls}`}>{label}</div>
+                          <div className="mt-0.5 space-y-0.5">{items.map(asRow)}</div>
+                        </div>
+                      )
                       return (
                         <div className="mt-1" dir={isHebrew ? 'rtl' : 'ltr'}>
                           <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.internalLinksLabel}</div>
-                          {money ? (
-                            <div className="mt-1">
-                              <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div>
-                              <div className="mt-0.5">{linkRow(money)}</div>
-                            </div>
-                          ) : (
-                            <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>
-                          )}
-                          {supporting.length > 0 && (
-                            <div className="mt-1.5">
-                              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{t.supportingLinks}</div>
-                              <div className="mt-0.5 space-y-0.5">{supporting.map(linkRow)}</div>
-                            </div>
-                          )}
+                          {lp ? (
+                            <>
+                              {lp.primaryCommercialTarget
+                                ? <div className="mt-1">
+                                    <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div>
+                                    <div className="mt-0.5">{asRow(lp.primaryCommercialTarget)}</div>
+                                  </div>
+                                : <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
+                              {section(t.secondaryCommercialLinks, lp.secondaryCommercialTargets, 'text-teal-700 dark:text-teal-300')}
+                              {section(t.supportingLinks, lp.supportingInformationalLinks, 'text-slate-500 dark:text-slate-400')}
+                              {section(t.sourceReferencesLabel, lp.sourceReferences, 'text-slate-400 dark:text-slate-500')}
+                            </>
+                          ) : (() => {
+                            const money = s.moneyTargetUrl ? s.suggestedInternalLinks.find((l) => l.url === s.moneyTargetUrl) : null
+                            const supporting = s.suggestedInternalLinks.filter((l) => !money || l.url !== money.url)
+                            return (<>
+                              {money
+                                ? <div className="mt-1"><div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div><div className="mt-0.5">{linkRow(money)}</div></div>
+                                : <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
+                              {supporting.length > 0 && <div className="mt-1.5"><div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{t.supportingLinks}</div><div className="mt-0.5 space-y-0.5">{supporting.map(linkRow)}</div></div>}
+                            </>)
+                          })()}
                           <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
                         </div>
                       )

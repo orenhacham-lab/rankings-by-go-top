@@ -154,12 +154,13 @@ export default function ContentHub() {
       // + enqueue per topic, with typed per-topic results. Never reports full success
       // when a topic's links did not persist. expectsLinks=true → the server confirms
       // the review-panel's saved link plan (a zero-link topic still has a batch).
-      // allowNonArticle=true — this is an EXPLICIT per-topic user action to queue the
-      // topic as an article (Part D). The server's non-article guard protects
-      // non-explicit/programmatic callers that omit this flag.
+      // P0 Part J — NO unconditional allowNonArticle override: an article topic
+      // enqueues normally (server defaults page type to 'article'); a non-article
+      // recommendation is blocked server-side and requires a deliberate, visible
+      // user override, never an invisible client flag.
       const ir = await fetch(`/api/content/automation/pools/${poolId}/approve-and-queue`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topics: topicIds.map((topicId) => ({ topicId, expectsLinks: true, allowNonArticle: true })) }),
+        body: JSON.stringify({ topics: topicIds.map((topicId) => ({ topicId, expectsLinks: true })) }),
       })
       if (!ir.ok && ir.status !== 207) return false
       const d = await ir.json().catch(() => ({}))

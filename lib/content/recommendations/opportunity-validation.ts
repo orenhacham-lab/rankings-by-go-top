@@ -111,6 +111,62 @@ export function validateIntentKeywordConsistency(
   return { ok: true }
 }
 
+// ── G. final primary-keyword quality gate (after all repairs, before persistence) ──
+export interface PrimaryKeywordQualityResult { ok: boolean; repairedKeyword?: string; reason?: 'invalid_primary_keyword' }
+
+/**
+ * A last gate ensuring the user-visible primary keyword is a real, aligned phrase —
+ * NOT a generic type-word combination (e.g. "זר פרח") and not missing the title's
+ * distinctive subject. Repairs from the title's distinctive subject when possible,
+ * else rejects. corpusTypeWords is the project-derived ubiquitous-type-word set.
+ */
+export function validatePrimaryKeywordQuality(
+  primaryKeyword: string,
+  title: string,
+  corpusTypeWords: Set<string>,
+): PrimaryKeywordQualityResult {
+  const kw = toks(primaryKeyword)
+  const distinctive = kw.filter((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t))
+  const titleDistinctive = toks(title).filter((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t))
+  // A keyword with no distinctive token (only generic/type words) OR that shares NONE
+  // of the title's distinctive subject → repair from the title's distinctive subject.
+  const sharesTitleSubject = distinctive.some((t) => titleDistinctive.includes(t))
+  if (distinctive.length === 0 || (titleDistinctive.length > 0 && !sharesTitleSubject)) {
+    const repaired = repairKeywordFromTitle(title, new Set(), false)
+    const rt = toks(repaired)
+    if (rt.some((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t)) && normalizePhrase(repaired) !== normalizePhrase(primaryKeyword)) return { ok: true, repairedKeyword: repaired }
+    return { ok: false, reason: 'invalid_primary_keyword' }
+  }
+  return { ok: true }
+}
+
+// ── H. deterministic demand language ──────────────────────────────────────────
+// Unsupported demand-claim FUNCTION phrases (explicitly listed by the spec) that must
+// be stripped when there is no verified volume. Not industry/product content.
+const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:ביקוש\s+(?:גבוה\s+מאוד|גבוה|רב|גדול)|חיפושים\s+נפוצים|נפח\s+חיפוש(?:ים)?\s+גבוה(?:\s+מאוד)?|נפח\s+גבוה\s+מאוד|very\s+high\s+search\s+volume|high\s+search\s+volume|high\s+demand|commonly\s+searched)\s*/gi
+
+/**
+ * Produce the FINAL user-visible reason with deterministic demand wording. When real
+ * volume backs the topic, append a factual clause with the exact query + monthly
+ * searches. When there is no verified volume, STRIP the model's unsupported demand
+ * claims and add no demand wording (neutral). Confidence is never described as volume.
+ */
+export function sanitizeDemandLanguage(
+  reason: string,
+  demand: DemandEvidence,
+  language: 'he' | 'en',
+): string {
+  let base = (reason || '').replace(DEMAND_CLAIM_RE, ' ').replace(/\s{2,}/g, ' ').replace(/\s+([.,;])/g, '$1').trim()
+  if (demand.demandEvidenceAvailable && (demand.avgMonthlySearches ?? 0) > 0) {
+    const v = demand.avgMonthlySearches as number
+    const factual = language === 'he'
+      ? `לפי מחקר מילות מפתח, ל"${demand.demandQuery}" יש כ־${v} חיפושים חודשיים.`
+      : `Keyword research shows ~${v} monthly searches for "${demand.demandQuery}".`
+    base = base ? `${base} ${factual}` : factual
+  }
+  return base
+}
+
 // ── D. recommended page type ──────────────────────────────────────────────────
 export type RecommendedPageType = 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement'
 const COMMERCIAL_INTENTS = new Set<SearchIntent>(['commercial', 'transactional', 'local'])

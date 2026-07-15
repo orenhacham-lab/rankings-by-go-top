@@ -23,8 +23,8 @@ import { buildKeywordGuard } from './keyword-guard'
 import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
 import { buildOpportunityPrompt, buildDiscoveryPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity } from './opportunity-synthesis'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
-import { mapLinkRoles, orderedLinksForOpportunity, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
-import { validateIntentKeywordConsistency, classifyRecommendedPageType, computeDemandEvidence, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from './opportunity-validation'
+import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, sanitizeDemandLanguage, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from './opportunity-validation'
 import { runRecoveryTiers, type TierPlan, type RecoveryTier, type ConfidenceLevel, type FallbackReason } from './recovery-tiers'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -201,6 +201,13 @@ export async function generateOpportunities(
       if (!consistency.ok) { bump(td, 'intent_keyword_mismatch'); continue }
       if (consistency.repairedKeyword) primaryKeyword = consistency.repairedKeyword
 
+      // G — FINAL primary-keyword quality gate (after repairs, before persistence):
+      // reject/repair generic type-word combinations (e.g. "זר פרח") missing the
+      // title's distinctive subject.
+      const quality = validatePrimaryKeywordQuality(primaryKeyword, o.title, corpusTypeWords)
+      if (!quality.ok) { bump(td, 'invalid_primary_keyword'); continue }
+      if (quality.repairedKeyword) primaryKeyword = quality.repairedKeyword
+
       // G — business relevance: reject a topic fully disconnected from business evidence.
       const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, corpusTypeWords, entities.map((e) => ({ name: e.name })))
       if (!relevance.ok) { bump(td, 'low_business_relevance'); continue }
@@ -210,15 +217,14 @@ export async function generateOpportunities(
       const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords, intent)
       secondaryKeywordsFiltered += sec.rejected.length
 
-      // A/B — internal-link role mapping (specificity-weighted, Hebrew-aware).
+      // A/B — internal-link role mapping → CANONICAL role-aware LinkPlan.
       const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates)
-      const ordered = orderedLinksForOpportunity(mapped)
-      const primaryTargetUrlKey = mapped.primaryTarget ? mapped.primaryTarget.url.trim().toLowerCase().replace(/\/+$/, '') : null
-      const primaryTargetType = primaryTargetUrlKey ? (urlTypeMap.get(primaryTargetUrlKey) ?? null) : null
+      const linkPlan = buildLinkPlan(mapped)
+      const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null
       if (target_role_mappings.length < 25) target_role_mappings.push({
-        keyword: primaryKeyword, primaryTarget: mapped.primaryTarget?.url ?? null,
+        keyword: primaryKeyword, primaryTarget: linkPlan.primaryCommercialTarget?.url ?? null,
         roles: mapped.assignments.slice(0, 7).map((a) => ({ url: a.url, role: a.role, score: a.score })),
-        // Part A trace — every scored candidate incl. rejected, with reason + score.
+        // Part A/B trace — every scored candidate incl. rejected, with reason + score.
         trace: mapped.debug.slice(0, 20).map((a) => ({ url: a.url, type: a.title, role: a.role, reason: a.reason, score: a.score, distinctive: a.distinctiveTokens })),
       })
 
@@ -226,17 +232,19 @@ export async function generateOpportunities(
       const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))
       const recommendedPageType = classifyRecommendedPageType({ intent }, { primaryTargetType, keywordEqualsProduct })
 
-      // E — verified demand evidence (never fabricated).
+      // E/H — verified demand evidence + deterministic demand wording (no fabrication).
       const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, keywordResearch)
+      const suggestionReason = sanitizeDemandLanguage(o.reason || '', demandEvidence, language)
 
       out.push({
         id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword,
         secondaryKeywords: sec.kept, searchIntent: intent, recommendedWordCount: 1000, angle: '',
-        suggestedInternalLinks: ordered.map((l) => ({ url: l.url, anchor: l.anchor })),
-        moneyTargetUrl: mapped.primaryTarget?.url ?? null,
-        source: 'hybrid', suggestionReason: o.reason || '', suggestionScore: Number((w.distinctiveness_score * 0.5 + 0.5).toFixed(2)),
+        suggestedInternalLinks: linkPlanToOrdered(linkPlan),
+        moneyTargetUrl: linkPlan.primaryCommercialTarget?.url ?? null,
+        source: 'hybrid', suggestionReason, suggestionScore: Number((w.distinctiveness_score * 0.5 + 0.5).toFixed(2)),
         confidenceLevel: plan.confidenceLevel, discoveryGenerated: plan.discovery,
         recommendedPageType, demandEvidence, businessRelevance: { score: relevance.score, relatedCommercialEntities: relevance.relatedCommercialEntities },
+        linkPlan,
       })
     }
     td.mapped_opportunities += out.length

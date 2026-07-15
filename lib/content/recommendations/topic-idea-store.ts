@@ -15,13 +15,27 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ContentTopicIdeaRow } from '@/lib/supabase/types'
-import type { TopicSuggestion, RecommendationSource } from './types'
+import type { TopicSuggestion, RecommendationSource, LinkPlan } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 const TABLE = 'content_topic_ideas'
 /** Postgres "relation does not exist" — the migration has not been applied yet. */
 const MISSING_TABLE = '42P01'
+/** PostgREST "column not found in schema cache" / undefined column — the additive
+ *  link_plan migration has not been applied yet. */
+const MISSING_COLUMN = new Set(['PGRST204', '42703'])
+
+/** Serialized shape of the additive link_plan JSONB — the canonical role-aware plan
+ *  plus the metadata that must survive persistence + reload. */
+interface PersistedPlan {
+  linkPlan?: LinkPlan
+  recommendedPageType?: TopicSuggestion['recommendedPageType']
+  demandEvidence?: TopicSuggestion['demandEvidence']
+  confidenceLevel?: TopicSuggestion['confidenceLevel']
+  discoveryGenerated?: boolean
+  businessRelevance?: TopicSuggestion['businessRelevance']
+}
 
 /**
  * Conservative normalized form: lowercase, collapse whitespace, strip edge
@@ -40,20 +54,54 @@ export function topicIdeaFingerprint(primaryKeyword: string | null | undefined, 
 
 /** Map a persisted idea row to the UI/engine TopicSuggestion shape (id = row id). */
 export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { ideaId: string } {
+  const primaryKeyword = row.primary_keyword || row.title
+  const primNorm = normalizeText(primaryKeyword)
+  // F — the user-visible secondary list must NEVER contain the primary keyword,
+  // regardless of what was persisted upstream (belt-and-suspenders round-trip guard).
+  const secondaryKeywords = (Array.isArray(row.secondary_keywords) ? row.secondary_keywords : []).filter((k) => normalizeText(k) !== primNorm)
+
+  // E — reconstruct the CANONICAL role-aware plan from the persisted link_plan JSONB.
+  // Old rows (pre-migration) have no link_plan → roles are unavailable, so we degrade
+  // exactly as before (flat links, null primary) without crashing.
+  const plan = (row.link_plan && typeof row.link_plan === 'object') ? (row.link_plan as PersistedPlan) : null
+  const linkPlan = plan?.linkPlan
+  const suggestedInternalLinks = linkPlan
+    ? linkPlanToOrderedFromPlan(linkPlan)
+    : (Array.isArray(row.suggested_internal_links) ? row.suggested_internal_links : [])
+
   return {
     id: row.id,
     ideaId: row.id,
     title: row.title,
-    primaryKeyword: row.primary_keyword || row.title,
-    secondaryKeywords: Array.isArray(row.secondary_keywords) ? row.secondary_keywords : [],
+    primaryKeyword,
+    secondaryKeywords,
     searchIntent: row.search_intent || 'informational',
     recommendedWordCount: typeof row.recommended_word_count === 'number' ? row.recommended_word_count : 1000,
     angle: row.angle || '',
-    suggestedInternalLinks: Array.isArray(row.suggested_internal_links) ? row.suggested_internal_links : [],
+    suggestedInternalLinks,
     source: (row.source as RecommendationSource) || 'project_data',
     suggestionReason: row.suggestion_reason || '',
     suggestionScore: typeof row.score === 'number' ? row.score : 0,
+    // Role-aware fields survive the round trip when link_plan is present.
+    ...(linkPlan ? { linkPlan, moneyTargetUrl: linkPlan.primaryCommercialTarget?.url ?? null } : {}),
+    ...(plan?.recommendedPageType ? { recommendedPageType: plan.recommendedPageType } : {}),
+    ...(plan?.demandEvidence ? { demandEvidence: plan.demandEvidence } : {}),
+    ...(plan?.confidenceLevel ? { confidenceLevel: plan.confidenceLevel } : {}),
+    ...(plan?.discoveryGenerated ? { discoveryGenerated: true } : {}),
+    ...(plan?.businessRelevance ? { businessRelevance: plan.businessRelevance } : {}),
   }
+}
+
+/** Flatten a persisted LinkPlan to the ordered {url,anchor} list (primary first). */
+function linkPlanToOrderedFromPlan(plan: LinkPlan): { url: string; anchor: string }[] {
+  const out: { url: string; anchor: string }[] = []
+  const seen = new Set<string>()
+  const push = (t: { url: string; title: string } | null) => { if (!t) return; const k = (t.url || '').trim().toLowerCase().replace(/\/+$/, ''); if (!k || seen.has(k)) return; seen.add(k); out.push({ url: t.url, anchor: t.title }) }
+  push(plan.primaryCommercialTarget)
+  for (const t of plan.secondaryCommercialTargets || []) push(t)
+  for (const t of plan.supportingInformationalLinks || []) push(t)
+  for (const t of plan.sourceReferences || []) push(t)
+  return out
 }
 
 /**
@@ -96,27 +144,42 @@ export interface NewIdeaInput {
 export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Promise<number | null> {
   if (input.suggestions.length === 0) return 0
   const nowIso = new Date().toISOString()
-  const rows = input.suggestions.map((s) => ({
-    user_id: input.userId,
-    project_id: input.projectId,
-    source: input.source,
-    batch_id: input.batchId,
-    title: s.title,
-    primary_keyword: s.primaryKeyword || null,
-    secondary_keywords: s.secondaryKeywords ?? [],
-    search_intent: s.searchIntent || null,
-    angle: s.angle || null,
-    recommended_word_count: typeof s.recommendedWordCount === 'number' ? s.recommendedWordCount : null,
-    suggested_internal_links: s.suggestedInternalLinks ?? [],
-    suggestion_reason: s.suggestionReason || null,
-    source_context: null,
-    source_url: s.suggestedInternalLinks?.[0]?.url ?? null,
-    score: typeof s.suggestionScore === 'number' ? s.suggestionScore : null,
-    fingerprint: topicIdeaFingerprint(s.primaryKeyword, s.title),
-    status: 'pending' as const,
-    updated_at: nowIso,
-  }))
-  const { error } = await admin.from(TABLE).upsert(rows, { onConflict: 'project_id,fingerprint', ignoreDuplicates: true })
+  const rows = input.suggestions.map((s) => {
+    // The additive JSONB link_plan carries the canonical role-aware plan + metadata so
+    // roles survive persistence + reload (never re-inferred in the UI).
+    const persistedPlan: PersistedPlan | null = s.linkPlan
+      ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance }
+      : null
+    return {
+      user_id: input.userId,
+      project_id: input.projectId,
+      source: input.source,
+      batch_id: input.batchId,
+      title: s.title,
+      primary_keyword: s.primaryKeyword || null,
+      secondary_keywords: s.secondaryKeywords ?? [],
+      search_intent: s.searchIntent || null,
+      angle: s.angle || null,
+      recommended_word_count: typeof s.recommendedWordCount === 'number' ? s.recommendedWordCount : null,
+      suggested_internal_links: s.suggestedInternalLinks ?? [],
+      link_plan: persistedPlan,
+      suggestion_reason: s.suggestionReason || null,
+      source_context: null,
+      source_url: s.suggestedInternalLinks?.[0]?.url ?? null,
+      score: typeof s.suggestionScore === 'number' ? s.suggestionScore : null,
+      fingerprint: topicIdeaFingerprint(s.primaryKeyword, s.title),
+      status: 'pending' as const,
+      updated_at: nowIso,
+    }
+  })
+  const upsert = (payload: Record<string, unknown>[]) => admin.from(TABLE).upsert(payload, { onConflict: 'project_id,fingerprint', ignoreDuplicates: true })
+  let { error } = await upsert(rows)
+  // Backward-compatible: if the additive link_plan column is not applied yet, retry
+  // WITHOUT it so persistence still works (roles simply won't survive reload).
+  if (error && MISSING_COLUMN.has((error as { code?: string }).code ?? '')) {
+    const stripped = rows.map(({ link_plan: _omit, ...rest }) => rest)
+    ;({ error } = await upsert(stripped))
+  }
   if (error) { if ((error as { code?: string }).code === MISSING_TABLE) return null; console.warn('[topic-idea-store] insert failed', { message: error.message }); return 0 }
   return rows.length
 }

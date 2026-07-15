@@ -658,6 +658,10 @@ export interface ContentTopicIdeaRow {
   angle: string | null
   recommended_word_count: number | null
   suggested_internal_links: { url: string; anchor: string }[]
+  /** P0 canonical role-aware plan (additive JSONB; null on pre-migration rows). Holds
+   *  the LinkPlan + recommendedPageType + demandEvidence + confidence so link ROLES
+   *  survive persistence + reload and are never re-inferred in the UI. */
+  link_plan: unknown | null
   suggestion_reason: string | null
   source_context: string | null
   source_url: string | null

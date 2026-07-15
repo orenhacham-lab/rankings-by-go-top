@@ -17,6 +17,25 @@ export interface SuggestedInternalLink {
   anchor: string
 }
 
+/** P0 canonical role-aware link contract. ONE structure used end-to-end: mapper →
+ *  suggestion → API → persistence (link_plan JSONB) → reload → UI → approval. Roles
+ *  are NEVER re-inferred downstream and NEVER flattened into an untyped array. */
+export type InternalLinkRole = 'primary_commercial_target' | 'secondary_commercial_target' | 'supporting_informational_link' | 'source_reference'
+export interface LinkTarget {
+  url: string
+  title: string
+  pageType: string
+  role: InternalLinkRole
+  score: number
+  reason: string
+}
+export interface LinkPlan {
+  primaryCommercialTarget: LinkTarget | null
+  secondaryCommercialTargets: LinkTarget[]
+  supportingInformationalLinks: LinkTarget[]
+  sourceReferences: LinkTarget[]
+}
+
 export interface TopicSuggestion {
   /** Stable id derived from source + primary keyword (dedupe/selection in UI). */
   id: string
@@ -66,6 +85,9 @@ export interface TopicSuggestion {
   /** P0 business relevance — 0..1 coverage of the topic's subject by business
    *  evidence + the related commercial entities that support it. Response-only. */
   businessRelevance?: { score: number; relatedCommercialEntities: string[] }
+  /** P0 canonical role-aware internal-link plan (see LinkPlan). Carried end-to-end;
+   *  the UI renders sections from THIS and never re-infers roles. */
+  linkPlan?: LinkPlan
 }
 
 export interface RecommendationMeta {

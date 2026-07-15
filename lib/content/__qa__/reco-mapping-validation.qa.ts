@@ -12,7 +12,7 @@
  *  G. a topic disconnected from all business evidence is low_business_relevance.
  */
 import { mapLinkRoles, orderedLinksForOpportunity, type LinkCandidateEntity } from '../recommendations/link-role-mapper'
-import { validateIntentKeywordConsistency, classifyRecommendedPageType, computeDemandEvidence, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from '../recommendations/opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, sanitizeDemandLanguage, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from '../recommendations/opportunity-validation'
 import { contentTokens } from '../recommendations/evidence-cluster'
 import { blockedNonArticle, classifyTopicOutcome, summarizeBatch, type TopicStageOutcomes } from '../automation/approve-link-queue'
 
@@ -145,7 +145,7 @@ async function main() {
     ]
     const mapped = mapLinkRoles('זר קאלות לכלה', 'זר קאלות לכלה בירושלים', candidates)
     check('F. the commercial product is a commercial target (primary), not supporting', mapped.primaryTarget?.url === '/p/calla')
-    check('F. the informational care page is supporting (complementary), typed reason', mapped.assignments.some((a) => a.url === '/blog/calla-care' && a.role === 'supporting_informational_link' && a.reason === 'shared_distinctive_subject'))
+    check('F. the informational care page is supporting (complementary), typed reason', mapped.assignments.some((a) => a.url === '/blog/calla-care' && a.role === 'supporting_informational_link' && a.reason === 'complements_subject_head'))
     check('F. the commercial page never appears as a supporting link', !mapped.assignments.some((a) => a.url === '/p/calla' && a.role === 'supporting_informational_link'))
   }
 
@@ -163,6 +163,21 @@ async function main() {
     const sec = filterSecondaryKeywords('ורדים לבנים מול ורדים אדומים', 'ורדים לבנים מול ורדים אדומים', ['ורדים בזול', 'הבדל בין ורדים לבנים לאדומים'], 'comparison')
     check('H. intent-conflicting commercial secondary (בזול) removed from informational topic', sec.rejected.some((x) => x.keyword === 'ורדים בזול' && x.reason === 'intent_conflicting'))
     check('H. a genuinely complementary comparison secondary is kept', sec.kept.includes('הבדל בין ורדים לבנים לאדומים'))
+  }
+
+  console.log('G-quality) final primary-keyword quality gate; H demand language')
+  {
+    const typeWords = deriveCorpusTypeWords(['זר ורדים', 'זר קאלות', 'זר שמפנייה', 'זר כפרי', 'פרח יפה'])
+    // "זר פרח" is only generic type words → repair to the title's distinctive subject.
+    const bad = validatePrimaryKeywordQuality('זר פרח', 'שושן צחור: המשמעות, המקור והשימושים בזרים מעוצבים', typeWords)
+    check('G. generic type-word-only primary ("זר פרח") repaired to the title subject', bad.ok && !!bad.repairedKeyword && bad.repairedKeyword!.includes('שושן צחור'))
+    const good = validatePrimaryKeywordQuality('שושן צחור לבן', 'שושן צחור: מדריך גידול', typeWords)
+    check('G. a keyword carrying the distinctive subject passes unchanged', good.ok && !good.repairedKeyword)
+    // H — verified volume → factual wording; none → strip unsupported demand claims.
+    const withVol = sanitizeDemandLanguage('זר קאלות נהנה מביקוש גבוה מאוד של מחפשים ומתאים לחתונות', { demandEvidenceAvailable: true, demandQuery: 'זר קאלות', avgMonthlySearches: 480, demandConfidence: 'high' }, 'he')
+    check('H. verified volume → factual monthly-searches wording added', withVol.includes('480') && withVol.includes('חיפושים חודשיים'))
+    const noVol = sanitizeDemandLanguage('הנושא נהנה מביקוש גבוה מאוד וגם חיפושים נפוצים ומתאים לעונה', { demandEvidenceAvailable: false, demandQuery: null, avgMonthlySearches: null, demandConfidence: 'none' }, 'he')
+    check('H. no verified volume → unsupported demand claims stripped', !/ביקוש גבוה|חיפושים נפוצים/.test(noVol) && noVol.includes('מתאים לעונה'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
