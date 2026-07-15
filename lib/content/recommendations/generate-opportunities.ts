@@ -22,6 +22,7 @@ import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
 import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
 import { buildOpportunityPrompt, buildDiscoveryPrompt, buildFamilyPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity, type OpportunityFamily } from './opportunity-synthesis'
+import { buildValidatorPrompt, parseValidatorResponse, validatorBatches, applyValidatorVerdicts, type ValidatorMetrics, type ValidatorVerdict } from './plan-validator'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, finalizeReason, filterSecondaryKeywords, assessBusinessRelevance, assessCommercialFit, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType } from './opportunity-validation'
@@ -86,6 +87,8 @@ export interface OpportunityDiagnostics {
   persisted_by_page_type: Record<string, number>
   secondary_keywords_filtered: number
   target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[]; trace?: { url: string; type: string; role: string; reason: string; score: number; distinctive: string[] }[] }[]
+  // Real validator metrics (A) — 0 when the validator did not run (single-scan path).
+  validator: ValidatorMetrics
   // Rollups kept for the route's runtimeDiag.
   model_calls: number
   generated_opportunities: number
@@ -107,7 +110,7 @@ const PAGE_TYPE = (t: string | null | undefined): EntityPageType => {
  *  diagnostics only when NO safe opportunity exists after all tiers. */
 export async function generateOpportunities(
   admin: Admin,
-  input: { projectId: string; targetCount: number; maxClusters: number; families?: OpportunityFamily[]; poolTarget?: number },
+  input: { projectId: string; targetCount: number; maxClusters: number; families?: OpportunityFamily[]; poolTarget?: number; validatorCalls?: number },
   controller: RunCostController,
 ): Promise<{ suggestions: TopicSuggestion[]; diagnostics: OpportunityDiagnostics }> {
   // 1) Load evidence.
@@ -212,9 +215,84 @@ export async function generateOpportunities(
   const year = new Date().getFullYear()
   const tierDiags: TierDiagnostics[] = []
 
-  // Synthesize + deterministically validate one tier's candidates. IDENTICAL
-  // worthiness + cannibalization + link-role gates for every tier — only the prompt
-  // (which clusters/evidence) and the confidence label differ.
+  // Run the FULL deterministic gate pipeline on ONE candidate. Reused by synthesis AND
+  // by the validator's repair path (a repair must pass every gate again). Returns a
+  // built suggestion or a typed rejection reason — brand safety, business relevance,
+  // ownership/cannibalization, commercial fit and page-type safety are ALWAYS enforced
+  // here, so nothing downstream can override them.
+  const validateOne = (o: { primaryKeyword: string; title: string; secondaryKeywords: string[]; intent?: string; reason?: string }, label: { confidenceLevel: ConfidenceLevel; discovery: boolean }): { suggestion?: TopicSuggestion; rejectionReason?: string } => {
+    if (classifyKeywordEntity(o.primaryKeyword, brandSafety) === 'suspected_external_business'
+      || containsExternalBusiness(o.title, brandSafety)
+      || containsExternalBusiness(o.reason || '', brandSafety)
+      || (o.secondaryKeywords ?? []).some((k) => containsExternalBusiness(k, brandSafety))) {
+      return { rejectionReason: 'competitor_brand_leakage' }
+    }
+    const intent = deriveIntent(o.primaryKeyword, o.title, (o.intent as SearchIntent) || 'informational')
+    const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent, existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
+    if (!w.ok) return { rejectionReason: (w.rejection_reason as RejectionReason) || 'insufficient_independent_need' }
+
+    let primaryKeyword = o.primaryKeyword
+    const consistency = validateIntentKeywordConsistency({ primaryKeyword, title: o.title, intent }, commercialEntityTokens)
+    if (!consistency.ok) return { rejectionReason: 'intent_keyword_mismatch' }
+    if (consistency.repairedKeyword) primaryKeyword = consistency.repairedKeyword
+
+    const quality = validatePrimaryKeywordQuality(primaryKeyword, o.title, corpusTypeWords)
+    if (!quality.ok) return { rejectionReason: 'invalid_primary_keyword' }
+    if (quality.repairedKeyword) primaryKeyword = quality.repairedKeyword
+
+    if (detectUnsafeNamedEntityMutation(o.title, primaryKeyword, brandSafety) || containsExternalBusiness(primaryKeyword, brandSafety)) return { rejectionReason: 'unsafe_named_entity_mutation' }
+
+    const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, domainTypeWords, entities.map((e) => ({ name: e.name })), intent)
+    if (!relevance.ok) return { rejectionReason: relevance.reason ?? 'low_business_relevance' }
+
+    const fit = assessCommercialFit(primaryKeyword, o.title, commercialEntityTokens, projectFocusTokens, domainTypeWords)
+    if (!fit.ok) return { rejectionReason: 'unsupported_commercial_fit' }
+
+    let ownershipPageType: RecommendedPageType | null = null
+    if (intent === 'local' || intent === 'transactional') {
+      const own = assessExistingLocalOwnership(primaryKeyword, o.title, existingPageTitles, domainTypeWords)
+      if (own.outcome === 'owns') return { rejectionReason: 'exact_existing_keyword_owner' }
+      if (own.outcome === 'improve') ownershipPageType = 'existing_page_improvement'
+    }
+
+    const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords, intent, domainTypeWords)
+    secondaryKeywordsFiltered += sec.rejected.length
+
+    const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates, { corpusTypeWords: domainTypeWords, intent })
+    const linkPlan = buildLinkPlan(mapped)
+    const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null
+    if (target_role_mappings.length < 25) target_role_mappings.push({
+      keyword: primaryKeyword, primaryTarget: linkPlan.primaryCommercialTarget?.url ?? null,
+      roles: mapped.assignments.slice(0, 7).map((a) => ({ url: a.url, role: a.role, score: a.score })),
+      trace: mapped.debug.slice(0, 20).map((a) => ({ url: a.url, type: a.title, role: a.role, reason: a.reason, score: a.score, distinctive: a.distinctiveTokens })),
+    })
+
+    const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))
+    const recommendedPageType = ownershipPageType ?? classifyRecommendedPageType({ intent }, { primaryTargetType, keywordEqualsProduct })
+    const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, keywordResearch, domainTypeWords)
+    const suggestionReason = finalizeReason(o.reason || '', demandEvidence, language)
+
+    const orderedLinks = linkPlanToOrdered(linkPlan)
+    const targetTitles = [linkPlan.primaryCommercialTarget?.title, ...linkPlan.secondaryCommercialTargets.map((tt) => tt.title), ...linkPlan.supportingInformationalLinks.map((tt) => tt.title)].filter((x): x is string => !!x)
+    const scan = scanSuggestionBrandSafety({ title: o.title, primaryKeyword, secondaryKeywords: sec.kept, suggestionReason, anchors: orderedLinks.map((l) => l.anchor), targetTitles }, brandSafety)
+    if (!scan.safe) return { rejectionReason: 'competitor_brand_leakage' }
+
+    return {
+      suggestion: {
+        id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword,
+        secondaryKeywords: sec.kept, searchIntent: intent, recommendedWordCount: 1000, angle: '',
+        suggestedInternalLinks: orderedLinks.map((l) => ({ url: l.url, anchor: l.anchor })),
+        moneyTargetUrl: linkPlan.primaryCommercialTarget?.url ?? null,
+        source: 'hybrid', suggestionReason, suggestionScore: Number((w.distinctiveness_score * 0.5 + 0.5).toFixed(2)),
+        confidenceLevel: label.confidenceLevel, discoveryGenerated: label.discovery,
+        recommendedPageType, demandEvidence, businessRelevance: { score: relevance.score, relatedCommercialEntities: relevance.relatedCommercialEntities },
+        linkPlan,
+      },
+    }
+  }
+
+  // Synthesize a batch of candidates then run each through validateOne (same gates for
+  // every tier — only the prompt + confidence label differ).
   const synthAndValidate = async (prompt: string, plan: TierPlan, td: TierDiagnostics): Promise<TopicSuggestion[]> => {
     const res = await generateRecommendationJSON(prompt, { temperature: plan.discovery ? 0.95 : 0.85, maxOutputTokens: outputBudgetFor(input.targetCount) }, controller, { source: 'opportunity_synthesis', callPurpose: plan.tier === 1 ? 'primary' : 'salvage', requestedIdeaCount: input.targetCount })
     td.model_calls += 1
@@ -223,107 +301,9 @@ export async function generateOpportunities(
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
-      // P0 BRAND SAFETY (early) — reject a suspected external-business contaminated
-      // candidate WHOLE (never partially cleaned). Own-brand queries are allowed.
-      if (classifyKeywordEntity(o.primaryKeyword, brandSafety) === 'suspected_external_business'
-        || containsExternalBusiness(o.title, brandSafety)
-        || containsExternalBusiness(o.reason || '', brandSafety)
-        || (o.secondaryKeywords ?? []).some((k) => containsExternalBusiness(k, brandSafety))) {
-        bump(td, 'competitor_brand_leakage'); continue
-      }
-
-      // I/B/F — final intent from the PRIMARY KEYWORD + title (a local-commercial
-      // keyword like חנויות/משלוח WINS over an "איך לבחור" title phrase); explicit
-      // comparison/how-to title signals otherwise override the model intent.
-      const intent = deriveIntent(o.primaryKeyword, o.title, (o.intent as SearchIntent) || 'informational')
-      const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent, existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
-      if (!w.ok) { bump(td, (w.rejection_reason as RejectionReason) || 'insufficient_independent_need'); continue }
-
-      // C — title/keyword/intent consistency: repair a commercial-drifted keyword from
-      // the title, else reject as intent_keyword_mismatch.
-      let primaryKeyword = o.primaryKeyword
-      const consistency = validateIntentKeywordConsistency({ primaryKeyword, title: o.title, intent }, commercialEntityTokens)
-      if (!consistency.ok) { bump(td, 'intent_keyword_mismatch'); continue }
-      if (consistency.repairedKeyword) primaryKeyword = consistency.repairedKeyword
-
-      // G — FINAL primary-keyword quality gate (after repairs, before persistence):
-      // reject/repair generic type-word combinations (e.g. "זר פרח") missing the
-      // title's distinctive subject.
-      const quality = validatePrimaryKeywordQuality(primaryKeyword, o.title, corpusTypeWords)
-      if (!quality.ok) { bump(td, 'invalid_primary_keyword'); continue }
-      if (quality.repairedKeyword) primaryKeyword = quality.repairedKeyword
-
-      // C — a final keyword must not introduce a named entity absent from the title via
-      // a small edit (title "פרחי אביב" → keyword "פרחי אביה"). Do NOT auto-repair.
-      if (detectUnsafeNamedEntityMutation(o.title, primaryKeyword, brandSafety) || containsExternalBusiness(primaryKeyword, brandSafety)) { bump(td, 'unsafe_named_entity_mutation'); continue }
-
-      // E/G — business relevance: reject a topic disconnected from business evidence,
-      // and (local intent) an unsupported local service area (location not in evidence).
-      const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, domainTypeWords, entities.map((e) => ({ name: e.name })), intent)
-      if (!relevance.ok) { bump(td, relevance.reason ?? 'low_business_relevance'); continue }
-
-      // D/E — commercial fit: an adjacent/seasonal topic must share a distinctive
-      // subject with an actual product/category ENTITY or the project focus. Search
-      // volume, generic evidence, or a supporting article can NOT establish fit.
-      const fit = assessCommercialFit(primaryKeyword, o.title, commercialEntityTokens, projectFocusTokens, domainTypeWords)
-      if (!fit.ok) { bump(td, 'unsupported_commercial_fit'); continue }
-
-      // C/F — existing local-page ownership: an existing indexed page that already owns
-      // the local intent blocks a new article (cannibalization); a close-but-weak page
-      // becomes an existing-page improvement instead of a new article.
-      let ownershipPageType: RecommendedPageType | null = null
-      if (intent === 'local' || intent === 'transactional') {
-        const own = assessExistingLocalOwnership(primaryKeyword, o.title, existingPageTitles, domainTypeWords)
-        if (own.outcome === 'owns') { bump(td, 'exact_existing_keyword_owner'); continue }
-        if (own.outcome === 'improve') ownershipPageType = 'existing_page_improvement'
-      }
-
-      // B/F/H — secondary-keyword quality against the FINAL primary (drops duplicate-
-      // of-primary, malformed, generic, generic-type-word combos, off-topic,
-      // intent-conflicting).
-      const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords, intent, domainTypeWords)
-      secondaryKeywordsFiltered += sec.rejected.length
-
-      // A/B/C/D — internal-link role mapping → CANONICAL LinkPlan (colour/type-only
-      // matches suppressed via project-derived domain type words).
-      const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates, { corpusTypeWords: domainTypeWords, intent })
-      const linkPlan = buildLinkPlan(mapped)
-      const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null
-      if (target_role_mappings.length < 25) target_role_mappings.push({
-        keyword: primaryKeyword, primaryTarget: linkPlan.primaryCommercialTarget?.url ?? null,
-        roles: mapped.assignments.slice(0, 7).map((a) => ({ url: a.url, role: a.role, score: a.score })),
-        // Part A/B trace — every scored candidate incl. rejected, with reason + score.
-        trace: mapped.debug.slice(0, 20).map((a) => ({ url: a.url, type: a.title, role: a.role, reason: a.reason, score: a.score, distinctive: a.distinctiveTokens })),
-      })
-
-      // D/C — recommended page type (only 'article' is auto-enqueued downstream). An
-      // existing close-but-weak local page becomes an existing-page improvement.
-      const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))
-      const recommendedPageType = ownershipPageType ?? classifyRecommendedPageType({ intent }, { primaryTargetType, keywordEqualsProduct })
-
-      // A/E/H — demand evidence ALIGNED to this opportunity (typed match) + final
-      // reason validation (strip unsupported claims, repair malformed text, factual
-      // demand wording only for exact/close_intent).
-      const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, keywordResearch, domainTypeWords)
-      const suggestionReason = finalizeReason(o.reason || '', demandEvidence, language)
-
-      // G — FINAL brand-safety scan over the whole user-visible suggestion (title,
-      // keyword, secondaries, reason, link anchors, target titles) before persistence.
-      const orderedLinks = linkPlanToOrdered(linkPlan)
-      const targetTitles = [linkPlan.primaryCommercialTarget?.title, ...linkPlan.secondaryCommercialTargets.map((tt) => tt.title), ...linkPlan.supportingInformationalLinks.map((tt) => tt.title)].filter((x): x is string => !!x)
-      const scan = scanSuggestionBrandSafety({ title: o.title, primaryKeyword, secondaryKeywords: sec.kept, suggestionReason, anchors: orderedLinks.map((l) => l.anchor), targetTitles }, brandSafety)
-      if (!scan.safe) { bump(td, 'competitor_brand_leakage'); continue }
-
-      out.push({
-        id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword,
-        secondaryKeywords: sec.kept, searchIntent: intent, recommendedWordCount: 1000, angle: '',
-        suggestedInternalLinks: linkPlanToOrdered(linkPlan),
-        moneyTargetUrl: linkPlan.primaryCommercialTarget?.url ?? null,
-        source: 'hybrid', suggestionReason, suggestionScore: Number((w.distinctiveness_score * 0.5 + 0.5).toFixed(2)),
-        confidenceLevel: plan.confidenceLevel, discoveryGenerated: plan.discovery,
-        recommendedPageType, demandEvidence, businessRelevance: { score: relevance.score, relatedCommercialEntities: relevance.relatedCommercialEntities },
-        linkPlan,
-      })
+      const r = validateOne({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent: o.intent, reason: o.reason }, { confidenceLevel: plan.confidenceLevel, discovery: plan.discovery })
+      if (r.suggestion) out.push(r.suggestion)
+      else bump(td, r.rejectionReason || 'insufficient_independent_need')
     }
     td.mapped_opportunities += out.length
     td.persisted += out.length
@@ -359,6 +339,7 @@ export async function generateOpportunities(
   // scoped synthesis calls (never one call per topic); evidence is built ONCE above and
   // reused across families. Otherwise the recovery-tier single-scan path.
   let outcome: Awaited<ReturnType<typeof runRecoveryTiers>>
+  let validatorMetrics: ValidatorMetrics = { validator_call_count: 0, validator_accept_count: 0, validator_reject_count: 0, validator_repair_count: 0, validator_failure_count: 0 }
   if (input.families && input.families.length > 0) {
     const familyClusters = selectClustersWithinBudget(rankClusters(clusters), input.maxClusters)
     const poolTarget = input.poolTarget ?? input.targetCount * 2
@@ -373,7 +354,29 @@ export async function generateOpportunities(
       for (const s of produced) { const k = normalizeText(s.primaryKeyword); if (!k || seen.has(k)) continue; seen.add(k); pool.push({ ...s, opportunityFamily: family }) }
       familiesRun.push(1)
     }
-    outcome = { suggestions: pool, tiersRun: familiesRun, recoveryTierUsed: familiesRun.length ? 1 : null, discoveryUsed: false, fallbackReason: pool.length === 0 ? 'no_safe_opportunities' : null }
+
+    // A — the ACTUAL batched validator over the deterministic survivors. Repairs
+    // re-run EVERY deterministic gate (validateOne); a hard-rejected candidate can
+    // never be revived, a malformed/missing verdict safely rejects. Real metrics only.
+    let finalPool = pool
+    if (input.validatorCalls && input.validatorCalls > 0 && pool.length > 0) {
+      const batches = validatorBatches(pool).slice(0, input.validatorCalls)
+      const batchedIds = new Set(batches.flat().map((s) => s.id))
+      const unvalidated = pool.filter((s) => !batchedIds.has(s.id))
+      const verdictsPerBatch: Map<string, ValidatorVerdict>[] = []
+      for (const batch of batches) {
+        const vres = await generateRecommendationJSON(buildValidatorPrompt(batch, langLabel), { temperature: 0.2, maxOutputTokens: outputBudgetFor(batch.length) }, controller, { source: 'plan_validator', callPurpose: 'validate', requestedIdeaCount: batch.length })
+        verdictsPerBatch.push(vres.ok ? parseValidatorResponse(vres.text) : new Map())
+      }
+      // Repairs re-run EVERY deterministic gate via validateOne; a failed repair → reject.
+      const applied = applyValidatorVerdicts(batches, verdictsPerBatch, (rep, src) => {
+        const r = validateOne(rep, { confidenceLevel: (src.confidenceLevel as ConfidenceLevel) || 'high_confidence', discovery: !!src.discoveryGenerated })
+        return r.suggestion ? { ...r.suggestion, opportunityFamily: src.opportunityFamily } : null
+      }, unvalidated)
+      validatorMetrics = applied.metrics
+      finalPool = applied.accepted
+    }
+    outcome = { suggestions: finalPool, tiersRun: familiesRun, recoveryTierUsed: familiesRun.length ? 1 : null, discoveryUsed: false, fallbackReason: finalPool.length === 0 ? 'no_safe_opportunities' : null }
   } else {
     outcome = await runRecoveryTiers({ targetFloor: TARGET_FLOOR, keyKey: (s) => normalizeText(s.primaryKeyword), runTier })
   }
@@ -421,6 +424,7 @@ export async function generateOpportunities(
     persisted_by_page_type,
     secondary_keywords_filtered: secondaryKeywordsFiltered,
     target_role_mappings,
+    validator: validatorMetrics,
     model_calls: cs.totalCalls,
     generated_opportunities: tierDiags.reduce((s, t) => s + t.raw_candidates, 0),
     persisted: outcome.suggestions.length,

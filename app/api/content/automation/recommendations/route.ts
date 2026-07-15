@@ -103,6 +103,15 @@ export async function POST(request: Request) {
   if (source === 'keyword' && !keyword) {
     return Response.json({ error: 'keyword_required' }, { status: 400 })
   }
+  // D — content-plan mode/count validation (typed 400 for invalid combos). Default is
+  // quick; requestedCount is bounded server-side to each mode's maximum.
+  const KNOWN_PLAN_MODES = ['quick', 'plan', 'plan_25', 'full_calendar', 'full_calendar_50', 'calendar']
+  if (body.mode !== undefined && (typeof body.mode !== 'string' || !KNOWN_PLAN_MODES.includes(body.mode.toLowerCase()))) {
+    return Response.json({ error: 'invalid_mode', allowed: ['quick', 'plan_25', 'full_calendar_50'] }, { status: 400 })
+  }
+  if (body.requestedCount !== undefined && (typeof body.requestedCount !== 'number' || !Number.isFinite(body.requestedCount) || body.requestedCount < 1 || body.requestedCount > 50)) {
+    return Response.json({ error: 'invalid_requested_count', min: 1, max: 50 }, { status: 400 })
+  }
 
   try {
     // Build the exact-keyword guard FIRST so keyword-research can also skip

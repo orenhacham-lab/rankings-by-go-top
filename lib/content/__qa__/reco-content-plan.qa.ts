@@ -3,7 +3,7 @@
  * the batched-plan deterministic core (mode ceilings, diversity allocation, partial/
  * shortfall contract) and the proven live quality regressions J1–J7.
  */
-import { planBudget, estimatePlanCost, planCostActuals, resolvePlanMode } from '../recommendations/plan-cost'
+import { planBudget, estimatePlanCost, planCostActuals, resolvePlanMode, maxRequestedForMode } from '../recommendations/plan-cost'
 import { selectDiverse, DEFAULT_CAPS, type DiversityItem } from '../recommendations/diversity'
 import { validatePrimaryKeywordQuality, computeDemandEvidence, finalizeReason, assessCommercialFit, deriveCorpusTypeWords } from '../recommendations/opportunity-validation'
 import { mapLinkRoles, type LinkCandidateEntity } from '../recommendations/link-role-mapper'
@@ -29,6 +29,13 @@ async function main() {
     check('estimate exposes calls/max-cost/requested BEFORE execution', est.estimated_max_cost === 0.5 && est.requested_topic_count === 50 && est.estimated_calls >= 1)
     const act = planCostActuals(4, 0.32, 40)
     check('actuals expose cost per ACCEPTED topic', act.cost_per_accepted_topic === Number((0.32 / 40).toFixed(4)) && act.accepted_topic_count === 40)
+  }
+
+  console.log('D) route bounds + default-safety contract')
+  {
+    check('D. default is quick when no mode/count is given', resolvePlanMode({}) === 'quick' && resolvePlanMode({ mode: null, requestedCount: null }) === 'quick')
+    check('D. server bounds each mode (quick 10 / plan_25 25 / full_calendar 50)', maxRequestedForMode('quick') === 10 && maxRequestedForMode('plan_25') === 25 && maxRequestedForMode('full_calendar_50') === 50)
+    check('D. a validator runs at most 1 call for quick/plan_25 and 2 for full_calendar_50', planBudget('quick').maxValidatorCalls === 1 && planBudget('plan_25').maxValidatorCalls === 1 && planBudget('full_calendar_50').maxValidatorCalls === 2)
   }
 
   console.log('G/I) diversity allocation + partial (shortfall) contract')

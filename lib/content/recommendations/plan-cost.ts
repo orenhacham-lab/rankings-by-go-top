@@ -19,9 +19,15 @@ export interface PlanBudget {
 }
 
 const BUDGETS: Record<PlanMode, PlanBudget> = {
-  quick: { mode: 'quick', requestedTopicCount: 10, candidatePoolTarget: 15, maxSynthesisCalls: 3, maxValidatorCalls: 0, maxCalls: 4, maxCostUsd: 0.15 },
+  // At most 1 validator call for quick/plan_25, at most 2 for full_calendar_50 (A.1).
+  quick: { mode: 'quick', requestedTopicCount: 10, candidatePoolTarget: 15, maxSynthesisCalls: 2, maxValidatorCalls: 1, maxCalls: 4, maxCostUsd: 0.15 },
   plan_25: { mode: 'plan_25', requestedTopicCount: 25, candidatePoolTarget: 45, maxSynthesisCalls: 2, maxValidatorCalls: 1, maxCalls: 4, maxCostUsd: 0.30 },
-  full_calendar_50: { mode: 'full_calendar_50', requestedTopicCount: 50, candidatePoolTarget: 90, maxSynthesisCalls: 3, maxValidatorCalls: 1, maxCalls: 5, maxCostUsd: 0.50 },
+  full_calendar_50: { mode: 'full_calendar_50', requestedTopicCount: 50, candidatePoolTarget: 90, maxSynthesisCalls: 3, maxValidatorCalls: 2, maxCalls: 5, maxCostUsd: 0.50 },
+}
+
+/** Server-side maximum requestedCount per mode (D.2). */
+export function maxRequestedForMode(mode: PlanMode): number {
+  return planBudget(mode).requestedTopicCount
 }
 
 export function planBudget(mode: PlanMode): PlanBudget {

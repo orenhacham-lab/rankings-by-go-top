@@ -20,11 +20,6 @@ import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-/** In-process evidence-snapshot registry (best-effort reuse signal). A durable cross-
- *  request cache is an additive follow-up; within a single plan request evidence is
- *  already built once and reused across family calls (the actual throughput fix). */
-const SNAPSHOTS = new Map<string, { hash: string; at: number }>()
-
 export interface ContentPlanResult {
   suggestions: TopicSuggestion[]
   plan: {
@@ -33,15 +28,20 @@ export interface ContentPlanResult {
     accepted_count: number
     shortfall: number
     shortfall_reason: 'exhausted_safe_opportunities' | null
-    // Evidence snapshot (B).
-    evidence_snapshot_id: string
-    evidence_snapshot_reused: boolean
-    evidence_snapshot_hash: string
-    evidence_snapshot_age: number
+    // Evidence snapshot (B) — TRUTHFUL: reuse is within THIS request across the family
+    // calls only. No durable cross-request cache is claimed.
+    request_evidence_snapshot_id: string
+    request_evidence_snapshot_hash: string
+    reused_across_family_calls: boolean
+    durable_cache_used: boolean
     // Funnel (G).
     candidate_count: number
     deterministic_survivor_count: number
     validator_accept_count: number
+    validator_reject_count: number
+    validator_repair_count: number
+    validator_failure_count: number
+    validator_call_count: number
     selected_count: number
     rejected_by_reason: Record<string, number>
     distribution_by_intent: Record<string, number>
@@ -91,17 +91,18 @@ export async function generateContentPlan(
   // Mode-specific HARD ceiling (H) via the additive cost-controller override.
   const controller = newRunCostController('standard', input.generationRunId, budget.requestedTopicCount, { maxModelCallsPerRun: budget.maxCalls, maxEstimatedCostUsd: budget.maxCostUsd })
 
-  // D — over-generate a pool via family-scoped batched synthesis (evidence built once).
+  // D — over-generate a pool via family-scoped batched synthesis (evidence built once),
+  // then the ACTUAL batched validator (F) runs inside generateOpportunities.
   const families = OPPORTUNITY_FAMILIES.map((f) => f.family).slice(0, budget.maxSynthesisCalls)
   const perFamily = Math.max(10, Math.ceil(budget.candidatePoolTarget / Math.max(1, families.length)))
-  const opp = await generateOpportunities(admin, { projectId: input.projectId, targetCount: perFamily, maxClusters: 14, families, poolTarget: budget.candidatePoolTarget }, controller)
+  const opp = await generateOpportunities(admin, { projectId: input.projectId, targetCount: perFamily, maxClusters: 14, families, poolTarget: budget.candidatePoolTarget, validatorCalls: budget.maxValidatorCalls }, controller)
 
-  // E — deterministic gates already ran inside generateOpportunities; the returned
-  // suggestions are the deterministic survivors (validator_accept mirrors them until a
-  // batched validator call is enabled — F is a further additive step).
+  // opp.suggestions is the POST-validator survivor set. Pre-validator deterministic
+  // survivors = sum of per-family persisted (mapped) counts.
   const survivors = opp.suggestions
   const candidate_count = opp.diagnostics.generated_opportunities
-  const deterministic_survivor_count = survivors.length
+  const deterministic_survivor_count = opp.diagnostics.tiers.reduce((s, t) => s + t.persisted, 0)
+  const vm = opp.diagnostics.validator
 
   // G — rank globally, then diversity-select to the requested count.
   const div = selectDiverse(survivors.map(toDiversityItem), budget.requestedTopicCount, DEFAULT_CAPS)
@@ -113,12 +114,8 @@ export async function generateContentPlan(
   const shortfall = Math.max(0, budget.requestedTopicCount - accepted_count)
   const shortfall_reason = shortfall > 0 ? 'exhausted_safe_opportunities' as const : null
 
-  // B — evidence snapshot reuse signal (in-process).
+  // B — TRUTHFUL request-only evidence snapshot (built once, reused across family calls).
   const hash = evidenceHash(opp.diagnostics)
-  const prev = SNAPSHOTS.get(input.projectId)
-  const reused = !!prev && prev.hash === hash
-  const age = 0
-  SNAPSHOTS.set(input.projectId, { hash, at: 0 })
 
   const cs = controller.summary()
   const actuals = planCostActuals(cs.totalCalls, cs.estimatedRunCostUsd, accepted_count)
@@ -127,8 +124,10 @@ export async function generateContentPlan(
     suggestions: selected,
     plan: {
       mode, requested_count: budget.requestedTopicCount, accepted_count, shortfall, shortfall_reason,
-      evidence_snapshot_id: `${input.projectId}:${hash.length}`, evidence_snapshot_reused: reused, evidence_snapshot_hash: hash, evidence_snapshot_age: age,
-      candidate_count, deterministic_survivor_count, validator_accept_count: deterministic_survivor_count, selected_count: accepted_count,
+      request_evidence_snapshot_id: `${input.projectId}:${hash.length}`, request_evidence_snapshot_hash: hash, reused_across_family_calls: true, durable_cache_used: false,
+      candidate_count, deterministic_survivor_count,
+      validator_accept_count: vm.validator_accept_count, validator_reject_count: vm.validator_reject_count, validator_repair_count: vm.validator_repair_count, validator_failure_count: vm.validator_failure_count, validator_call_count: vm.validator_call_count,
+      selected_count: accepted_count,
       rejected_by_reason: opp.diagnostics.rejected_by_reason,
       distribution_by_intent: div.distribution_by_intent,
       distribution_by_opportunity_type: div.distribution_by_opportunity_type,

@@ -61,6 +61,13 @@ interface Suggestion {
   recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
 }
 
+/** Content-plan modes shown to the user, with their published ceilings (maximums). */
+const PLAN_MODES = {
+  quick: { max: 10, calls: 3, cost: 0.15 },
+  plan_25: { max: 25, calls: 3, cost: 0.30 },
+  full_calendar_50: { max: 50, calls: 5, cost: 0.50 },
+} as const
+
 export default function AutomationIdeas({
   projectId,
   language,
@@ -124,6 +131,8 @@ export default function AutomationIdeas({
   const [source, setSource] = useState<Source>('hybrid')
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
+  // P0 content-plan mode (default: quick single scan). estimate = mode's ceiling.
+  const [planMode, setPlanMode] = useState<'quick' | 'plan_25' | 'full_calendar_50'>('quick')
   const [creating, setCreating] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -210,7 +219,7 @@ export default function AutomationIdeas({
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId }),
+        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId, ...(planMode !== 'quick' ? { mode: planMode, requestedCount: PLAN_MODES[planMode].max } : {}) }),
       })
       const data = await res.json().catch(() => ({}))
       if (reqId !== reqRef.current) return // a newer request superseded this one
@@ -594,10 +603,49 @@ export default function AutomationIdeas({
             className="flex-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-sm"
           />
         )}
+        {/* P0 — content-plan mode control (default quick single scan). */}
+        <select
+          value={planMode}
+          onChange={(e) => setPlanMode(e.target.value as typeof planMode)}
+          disabled={loading}
+          aria-label={t.planModeLabel}
+          className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-sm"
+        >
+          <option value="quick">{t.planModeQuick}</option>
+          <option value="plan_25">{t.planModePlan}</option>
+          <option value="full_calendar_50">{t.planModeCalendar}</option>
+        </select>
         <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
           {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate)}
         </Button>
       </div>
+
+      {/* Before execution — the plan's ceiling + a clear safe-distinct explanation. */}
+      <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+        {t.planEstimate
+          .replace('{count}', String(PLAN_MODES[planMode].max))
+          .replace('{calls}', String(PLAN_MODES[planMode].calls))
+          .replace('{cost}', PLAN_MODES[planMode].cost.toFixed(2))}
+        {planMode !== 'quick' && loading ? ` ${t.planTakesLonger}` : ''}
+      </p>
+
+      {/* After execution — the truthful plan result (accepted / shortfall / cost). */}
+      {(() => {
+        const cp = (meta as { contentPlan?: { requested_count: number; accepted_count: number; shortfall: number; actual_calls: number; actual_estimated_cost: number; cost_per_accepted_topic: number } } | null)?.contentPlan
+        if (!cp) return null
+        return (
+          <div className="text-[11px] text-slate-600 dark:text-slate-300 mb-2 rounded-md bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5" dir={isHebrew ? 'rtl' : 'ltr'}>
+            <span className="font-medium">{t.planResultTitle}: </span>
+            {t.planResult
+              .replace('{accepted}', String(cp.accepted_count))
+              .replace('{requested}', String(cp.requested_count))
+              .replace('{calls}', String(cp.actual_calls))
+              .replace('{cost}', cp.actual_estimated_cost.toFixed(2))
+              .replace('{per}', cp.cost_per_accepted_topic.toFixed(3))}
+            {cp.shortfall > 0 ? ` ${t.planShortfall.replace('{shortfall}', String(cp.shortfall))}` : ''}
+          </div>
+        )
+      })()}
 
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
