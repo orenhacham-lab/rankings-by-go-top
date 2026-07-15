@@ -17,7 +17,7 @@
 import { isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { authPool, isMigrationMissing } from '@/lib/content/automation/api'
 import { getLatestBatchForTopic } from '@/lib/content/internal-link-plan-store'
-import { classifyTopicOutcome, summarizeBatch, type TopicStageOutcomes } from '@/lib/content/automation/approve-link-queue'
+import { classifyTopicOutcome, blockedNonArticle, summarizeBatch, type TopicStageOutcomes } from '@/lib/content/automation/approve-link-queue'
 
 /** A manual topic still 'suggested' is the only kind this flow may promote — a
  *  genuinely non-approved auto topic is never silently approved here. */
@@ -31,11 +31,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   let body: { topics?: unknown; topicIds?: unknown }
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
-  // Accept [{ topicId, expectsLinks }] or a plain topicIds[] (expectsLinks=false).
-  const rawTopics: { topicId: string; expectsLinks: boolean }[] = Array.isArray(body.topics)
-    ? (body.topics as { topicId?: unknown; expectsLinks?: unknown }[]).filter((t) => typeof t?.topicId === 'string').map((t) => ({ topicId: t.topicId as string, expectsLinks: t.expectsLinks === true }))
+  // Accept [{ topicId, expectsLinks, recommendedPageType, allowNonArticle }] or a
+  // plain topicIds[] (expectsLinks=false). Part D — a non-article recommendation is
+  // blocked from the article queue unless the caller sets allowNonArticle (the user
+  // explicitly changed the type).
+  const rawTopics: { topicId: string; expectsLinks: boolean; recommendedPageType: string; allowNonArticle: boolean }[] = Array.isArray(body.topics)
+    ? (body.topics as { topicId?: unknown; expectsLinks?: unknown; recommendedPageType?: unknown; allowNonArticle?: unknown }[]).filter((t) => typeof t?.topicId === 'string').map((t) => ({ topicId: t.topicId as string, expectsLinks: t.expectsLinks === true, recommendedPageType: typeof t.recommendedPageType === 'string' ? t.recommendedPageType : 'article', allowNonArticle: t.allowNonArticle === true }))
     : Array.isArray(body.topicIds)
-      ? (body.topicIds as unknown[]).filter((x): x is string => typeof x === 'string').map((topicId) => ({ topicId, expectsLinks: false }))
+      ? (body.topicIds as unknown[]).filter((x): x is string => typeof x === 'string').map((topicId) => ({ topicId, expectsLinks: false, recommendedPageType: 'article', allowNonArticle: false }))
       : []
   const topics = Array.from(new Map(rawTopics.map((t) => [t.topicId, t])).values()).slice(0, 200)
   if (topics.length === 0) return Response.json({ error: 'no_topics' }, { status: 400 })
@@ -65,6 +68,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   for (const t of topics) {
     const row = byId.get(t.topicId)
     const outcome: TopicStageOutcomes = { validated: false, linkPlanRequested: t.expectsLinks, linkPlanSaved: false, approved: false, enqueued: false, alreadyQueued: false }
+    // 0) Part D — a non-article recommendation is never auto-enqueued as an article.
+    if (t.recommendedPageType !== 'article' && !t.allowNonArticle) { results.push(blockedNonArticle(t.topicId)); continue }
     // 1) validate.
     if (!row) { results.push(classifyTopicOutcome(t.topicId, outcome)); continue }
     outcome.validated = true
@@ -98,5 +103,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const summary = summarizeBatch(results)
-  return Response.json({ ok: summary.ok, added: summary.added, alreadyQueued: summary.alreadyQueued, failed: summary.failed, byState: summary.byState, results }, { status: summary.ok ? 200 : 207 })
+  return Response.json({ ok: summary.ok, added: summary.added, alreadyQueued: summary.alreadyQueued, blockedNonArticle: summary.blockedNonArticle, failed: summary.failed, byState: summary.byState, results }, { status: summary.ok ? 200 : 207 })
 }

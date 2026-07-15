@@ -63,7 +63,7 @@ export interface ContentOpportunity {
 // ── shared token helpers (domain-neutral) ────────────────────────────────────
 /** Generic, industry-agnostic modifier tokens (commercial/quality/logistics) that
  *  do NOT create a distinct content need. Canonical-normalized. NOT topic words. */
-const GENERIC_TOKENS = new Set<string>(
+export const GENERIC_TOKENS = new Set<string>(
   ['best', 'guide', 'price', 'buy', 'cheap', 'top', 'online', 'review', 'reviews',
    'מדריך', 'מומלץ', 'מומלצת', 'מומלצים', 'איכותי', 'איכותית', 'מחיר', 'מחירים',
    'משלוח', 'הטוב', 'ביותר', 'הכי', 'טוב', 'טובה', 'זול', 'זולה', 'לקנות', 'קניה',

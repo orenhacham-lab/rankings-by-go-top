@@ -72,13 +72,18 @@ function expandHebrew(tok: string): string[] {
   }
   return [tok]
 }
-const contentToks = (s: string): string[] => {
+/** Hebrew-aware content tokens (proclitic-expanded, stop-word filtered, de-duped).
+ *  Shared with the internal-link role mapper so joining and link-matching use the
+ *  SAME tokenization — a mismatch here is what made relevant Hebrew targets look
+ *  unrelated. Exported (do not rename). */
+export function contentTokens(s: string): string[] {
   const out: string[] = []
   for (const t of Array.from(tokens(normalizePhrase(s || ''))).filter((t) => t.length > 1 && !STOP.has(t))) {
     for (const e of expandHebrew(t)) if (!STOP.has(e)) out.push(e)
   }
   return Array.from(new Set(out))
 }
+const contentToks = contentTokens
 
 /**
  * Build cross-source clusters keyed by a shared theme token. Every evidence node

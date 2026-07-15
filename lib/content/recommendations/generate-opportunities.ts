@@ -20,10 +20,11 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
-import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, type EvidenceInput, type EntityNode } from './evidence-cluster'
+import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
 import { buildOpportunityPrompt, buildDiscoveryPrompt, parseOpportunities, type DiscoveryEvidence, type SynthOpportunity } from './opportunity-synthesis'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent, type RejectionReason } from './opportunity'
 import { mapLinkRoles, orderedLinksForOpportunity, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
+import { validateIntentKeywordConsistency, classifyRecommendedPageType, computeDemandEvidence, filterSecondaryKeywords, assessBusinessRelevance, deriveCorpusTypeWords } from './opportunity-validation'
 import { runRecoveryTiers, type TierPlan, type RecoveryTier, type ConfidenceLevel, type FallbackReason } from './recovery-tiers'
 import { generateRecommendationJSON, outputBudgetFor } from './model'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -80,6 +81,8 @@ export interface OpportunityDiagnostics {
   tiers: TierDiagnostics[]
   rejected_by_reason: Record<string, number>
   persisted_by_confidence: Record<string, number>
+  persisted_by_page_type: Record<string, number>
+  secondary_keywords_filtered: number
   target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[] }[]
   // Rollups kept for the route's runtimeDiag.
   model_calls: number
@@ -88,9 +91,14 @@ export interface OpportunityDiagnostics {
   cost: { estimatedRunCostUsd: number; totalCalls: number }
 }
 
+// Map the source-specific entity-type vocabularies onto the mapper's page types.
+// Shopify uses collection/blog; losing these to 'unknown' meant a commercial
+// collection could never become a commercial link target (proven live defect).
+const PAGE_TYPE_ALIASES: Record<string, EntityPageType> = { collection: 'category', blog: 'post', item: 'product' }
 const PAGE_TYPE = (t: string | null | undefined): EntityPageType => {
   const s = (t || '').toLowerCase()
-  return (['product', 'category', 'service', 'page', 'post', 'article'] as EntityPageType[]).includes(s as EntityPageType) ? (s as EntityPageType) : 'unknown'
+  if ((['product', 'category', 'service', 'page', 'post', 'article'] as EntityPageType[]).includes(s as EntityPageType)) return s as EntityPageType
+  return PAGE_TYPE_ALIASES[s] ?? 'unknown'
 }
 
 /** Run the production opportunity path with recovery tiers. Returns [] with full
@@ -157,6 +165,15 @@ export async function generateOpportunities(
   const existingPages: ExistingPageSignal[] = Array.from(guard.entityOwners).map((n) => ({ name: n, pageType: 'unknown' as const }))
   const coveredKeys = new Set<string>([...guard.keywords, ...guard.contentKeywords].map((k) => normalizeText(k)))
   const linkCandidates: LinkCandidateEntity[] = entities.filter((e) => e.url).map((e) => ({ url: e.url as string, title: e.name, type: e.type }))
+  // Validation evidence sets (domain-neutral, derived from THIS project's data).
+  const urlTypeMap = new Map<string, EntityPageType>(linkCandidates.map((c) => [c.url.trim().toLowerCase().replace(/\/+$/, ''), c.type ?? 'unknown']))
+  const corpusTypeWords = deriveCorpusTypeWords(entities.map((e) => e.name))
+  const commercialEntityTokens = new Set<string>()
+  for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
+  const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
+  for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
+  const bump = (td: TierDiagnostics, r: string) => { td.rejected_by_reason[r] = (td.rejected_by_reason[r] ?? 0) + 1 }
+  let secondaryKeywordsFiltered = 0
   const target_role_mappings: OpportunityDiagnostics['target_role_mappings'] = []
   const ctx: ProjectContext = { projectName: p.business_name, domain: p.target_domain, language, primaryProjectFocus: focus.primaryProjectFocus, secondaryProjectAreas: focus.secondaryProjectAreas, ownedCategories: entities.map((e) => e.name).slice(0, 15), existingTopics: existingCoverage.map((c) => c.title).slice(0, 15) }
   const year = new Date().getFullYear()
@@ -173,18 +190,47 @@ export async function generateOpportunities(
     td.raw_candidates += opportunities.length
     const out: TopicSuggestion[] = []
     for (const o of opportunities) {
-      const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent: (o.intent as SearchIntent) || 'informational', existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
-      if (!w.ok) { const r = (w.rejection_reason as RejectionReason) || 'insufficient_independent_need'; td.rejected_by_reason[r] = (td.rejected_by_reason[r] ?? 0) + 1; continue }
-      const mapped = mapLinkRoles(o.primaryKeyword, o.title, linkCandidates)
+      const intent = ((o.intent as SearchIntent) || 'informational')
+      const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent, existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
+      if (!w.ok) { bump(td, (w.rejection_reason as RejectionReason) || 'insufficient_independent_need'); continue }
+
+      // C — title/keyword/intent consistency: repair a commercial-drifted keyword from
+      // the title, else reject as intent_keyword_mismatch.
+      let primaryKeyword = o.primaryKeyword
+      const consistency = validateIntentKeywordConsistency({ primaryKeyword, title: o.title, intent }, commercialEntityTokens)
+      if (!consistency.ok) { bump(td, 'intent_keyword_mismatch'); continue }
+      if (consistency.repairedKeyword) primaryKeyword = consistency.repairedKeyword
+
+      // G — business relevance: reject a topic fully disconnected from business evidence.
+      const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, corpusTypeWords, entities.map((e) => ({ name: e.name })))
+      if (!relevance.ok) { bump(td, 'low_business_relevance'); continue }
+
+      // F — secondary-keyword quality.
+      const sec = filterSecondaryKeywords(primaryKeyword, o.title, o.secondaryKeywords)
+      secondaryKeywordsFiltered += sec.rejected.length
+
+      // A/B — internal-link role mapping (specificity-weighted, Hebrew-aware).
+      const mapped = mapLinkRoles(primaryKeyword, o.title, linkCandidates)
       const ordered = orderedLinksForOpportunity(mapped)
-      if (target_role_mappings.length < 25) target_role_mappings.push({ keyword: o.primaryKeyword, primaryTarget: mapped.primaryTarget?.url ?? null, roles: mapped.assignments.slice(0, 5).map((a) => ({ url: a.url, role: a.role, score: a.score })) })
+      const primaryTargetUrlKey = mapped.primaryTarget ? mapped.primaryTarget.url.trim().toLowerCase().replace(/\/+$/, '') : null
+      const primaryTargetType = primaryTargetUrlKey ? (urlTypeMap.get(primaryTargetUrlKey) ?? null) : null
+      if (target_role_mappings.length < 25) target_role_mappings.push({ keyword: primaryKeyword, primaryTarget: mapped.primaryTarget?.url ?? null, roles: mapped.assignments.slice(0, 5).map((a) => ({ url: a.url, role: a.role, score: a.score })) })
+
+      // D — recommended page type (only 'article' is auto-enqueued downstream).
+      const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))
+      const recommendedPageType = classifyRecommendedPageType({ intent }, { primaryTargetType, keywordEqualsProduct })
+
+      // E — verified demand evidence (never fabricated).
+      const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, keywordResearch)
+
       out.push({
-        id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword: o.primaryKeyword,
-        secondaryKeywords: o.secondaryKeywords, searchIntent: o.intent || 'informational', recommendedWordCount: 1000, angle: '',
+        id: `opportunity:${slugKey(o.title)}`, title: o.title, primaryKeyword,
+        secondaryKeywords: sec.kept, searchIntent: intent, recommendedWordCount: 1000, angle: '',
         suggestedInternalLinks: ordered.map((l) => ({ url: l.url, anchor: l.anchor })),
         moneyTargetUrl: mapped.primaryTarget?.url ?? null,
         source: 'hybrid', suggestionReason: o.reason || '', suggestionScore: Number((w.distinctiveness_score * 0.5 + 0.5).toFixed(2)),
         confidenceLevel: plan.confidenceLevel, discoveryGenerated: plan.discovery,
+        recommendedPageType, demandEvidence, businessRelevance: { score: relevance.score, relatedCommercialEntities: relevance.relatedCommercialEntities },
       })
     }
     td.mapped_opportunities += out.length
@@ -225,6 +271,8 @@ export async function generateOpportunities(
   for (const td of tierDiags) for (const [r, n] of Object.entries(td.rejected_by_reason)) rejected_by_reason[r] = (rejected_by_reason[r] ?? 0) + n
   const persisted_by_confidence: Record<string, number> = {}
   for (const s of outcome.suggestions) { const c = s.confidenceLevel ?? 'high_confidence'; persisted_by_confidence[c] = (persisted_by_confidence[c] ?? 0) + 1 }
+  const persisted_by_page_type: Record<string, number> = {}
+  for (const s of outcome.suggestions) { const t = s.recommendedPageType ?? 'article'; persisted_by_page_type[t] = (persisted_by_page_type[t] ?? 0) + 1 }
   const cs = controller.summary()
 
   const diagnostics: OpportunityDiagnostics = {
@@ -256,6 +304,8 @@ export async function generateOpportunities(
     tiers: tierDiags,
     rejected_by_reason,
     persisted_by_confidence,
+    persisted_by_page_type,
+    secondary_keywords_filtered: secondaryKeywordsFiltered,
     target_role_mappings,
     model_calls: cs.totalCalls,
     generated_opportunities: tierDiags.reduce((s, t) => s + t.raw_candidates, 0),
