@@ -89,6 +89,9 @@ export interface OpportunityDiagnostics {
   target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[]; trace?: { url: string; type: string; role: string; reason: string; score: number; distinctive: string[] }[] }[]
   // Real validator metrics (A) — 0 when the validator did not run (single-scan path).
   validator: ValidatorMetrics
+  // B — per-stage candidate IDs (Preview-only trace; empty outside plan mode). Makes it
+  // impossible for N>0 candidates to vanish without a typed reason at some stage.
+  plan_stage_ids: { generated_candidates: number; deterministic_survivor_ids: string[]; validator_survivor_ids: string[] }
   // Rollups kept for the route's runtimeDiag.
   model_calls: number
   generated_opportunities: number
@@ -339,7 +342,8 @@ export async function generateOpportunities(
   // scoped synthesis calls (never one call per topic); evidence is built ONCE above and
   // reused across families. Otherwise the recovery-tier single-scan path.
   let outcome: Awaited<ReturnType<typeof runRecoveryTiers>>
-  let validatorMetrics: ValidatorMetrics = { validator_call_count: 0, validator_accept_count: 0, validator_reject_count: 0, validator_repair_count: 0, validator_failure_count: 0 }
+  let validatorMetrics: ValidatorMetrics = { validator_call_count: 0, validator_accept_count: 0, validator_reject_count: 0, validator_repair_count: 0, validator_missing_verdict_count: 0, validator_parse_failure_count: 0, validator_degraded: false }
+  const planStageIds = { generated_candidates: 0, deterministic_survivor_ids: [] as string[], validator_survivor_ids: [] as string[] }
   if (input.families && input.families.length > 0) {
     const familyClusters = selectClustersWithinBudget(rankClusters(clusters), input.maxClusters)
     const poolTarget = input.poolTarget ?? input.targetCount * 2
@@ -355,9 +359,13 @@ export async function generateOpportunities(
       familiesRun.push(1)
     }
 
-    // A — the ACTUAL batched validator over the deterministic survivors. Repairs
-    // re-run EVERY deterministic gate (validateOne); a hard-rejected candidate can
-    // never be revived, a malformed/missing verdict safely rejects. Real metrics only.
+    planStageIds.deterministic_survivor_ids = pool.map((s) => s.id)
+    planStageIds.generated_candidates = tierDiags.reduce((s, t) => s + t.raw_candidates, 0)
+
+    // A — the ACTUAL batched validator over the deterministic survivors, strictly
+    // ADDITIVE: it may only remove a candidate via an explicit reject (repairs re-run
+    // every gate; a failed repair keeps the original). A failed/unparsable call
+    // degrades gracefully — it NEVER zeroes a non-empty safe set.
     let finalPool = pool
     if (input.validatorCalls && input.validatorCalls > 0 && pool.length > 0) {
       const batches = validatorBatches(pool).slice(0, input.validatorCalls)
@@ -376,6 +384,7 @@ export async function generateOpportunities(
       validatorMetrics = applied.metrics
       finalPool = applied.accepted
     }
+    planStageIds.validator_survivor_ids = finalPool.map((s) => s.id)
     outcome = { suggestions: finalPool, tiersRun: familiesRun, recoveryTierUsed: familiesRun.length ? 1 : null, discoveryUsed: false, fallbackReason: finalPool.length === 0 ? 'no_safe_opportunities' : null }
   } else {
     outcome = await runRecoveryTiers({ targetFloor: TARGET_FLOOR, keyKey: (s) => normalizeText(s.primaryKeyword), runTier })
@@ -425,6 +434,7 @@ export async function generateOpportunities(
     secondary_keywords_filtered: secondaryKeywordsFiltered,
     target_role_mappings,
     validator: validatorMetrics,
+    plan_stage_ids: planStageIds,
     model_calls: cs.totalCalls,
     generated_opportunities: tierDiags.reduce((s, t) => s + t.raw_candidates, 0),
     persisted: outcome.suggestions.length,

@@ -3,12 +3,15 @@
  * the batched-plan deterministic core (mode ceilings, diversity allocation, partial/
  * shortfall contract) and the proven live quality regressions J1–J7.
  */
-import { planBudget, estimatePlanCost, planCostActuals, resolvePlanMode, maxRequestedForMode } from '../recommendations/plan-cost'
+import { contentIdeasBudget, planCostActuals } from '../recommendations/plan-cost'
 import { selectDiverse, DEFAULT_CAPS, type DiversityItem } from '../recommendations/diversity'
 import { validatePrimaryKeywordQuality, computeDemandEvidence, finalizeReason, assessCommercialFit, deriveCorpusTypeWords } from '../recommendations/opportunity-validation'
 import { mapLinkRoles, type LinkCandidateEntity } from '../recommendations/link-role-mapper'
 import { buildBrandSafety, classifyKeywordEntity } from '../recommendations/brand-safety'
+import { applyValidatorVerdicts } from '../recommendations/plan-validator'
 import { contentTokens } from '../recommendations/evidence-cluster'
+import { GENERIC_TOKENS } from '../recommendations/opportunity'
+import type { TopicSuggestion } from '../recommendations/types'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -18,24 +21,14 @@ const tokSet = (arr: string[]) => new Set(arr.flatMap((s) => contentTokens(s)))
 const item = (o: Partial<DiversityItem> & { key: string; score: number; subjectTokens: string[] }): DiversityItem => ({ entityKey: null, intent: 'informational', opportunityType: 'informational', isSeasonal: false, ...o })
 
 async function main() {
-  console.log('H) mode-specific cost ceilings (maximums, not fixed prices)')
+  console.log('E/H) single content-ideas budget (server-side ceiling only)')
   {
-    check('quick ceiling <= $0.15', planBudget('quick').maxCostUsd <= 0.15)
-    check('plan_25 ceiling <= $0.30 and requests 25', planBudget('plan_25').maxCostUsd <= 0.30 && planBudget('plan_25').requestedTopicCount === 25)
-    check('full_calendar_50 ceiling <= $0.50 and requests 50', planBudget('full_calendar_50').maxCostUsd <= 0.50 && planBudget('full_calendar_50').requestedTopicCount === 50)
-    check('full_calendar uses batched calls, not one-per-topic', planBudget('full_calendar_50').maxSynthesisCalls <= 3 && planBudget('full_calendar_50').candidatePoolTarget >= 70)
-    check('resolvePlanMode maps a 50-count request to full_calendar', resolvePlanMode({ requestedCount: 50 }) === 'full_calendar_50' && resolvePlanMode({ mode: 'plan' }) === 'plan_25')
-    const est = estimatePlanCost('full_calendar_50')
-    check('estimate exposes calls/max-cost/requested BEFORE execution', est.estimated_max_cost === 0.5 && est.requested_topic_count === 50 && est.estimated_calls >= 1)
-    const act = planCostActuals(4, 0.32, 40)
-    check('actuals expose cost per ACCEPTED topic', act.cost_per_accepted_topic === Number((0.32 / 40).toFixed(4)) && act.accepted_topic_count === 40)
-  }
-
-  console.log('D) route bounds + default-safety contract')
-  {
-    check('D. default is quick when no mode/count is given', resolvePlanMode({}) === 'quick' && resolvePlanMode({ mode: null, requestedCount: null }) === 'quick')
-    check('D. server bounds each mode (quick 10 / plan_25 25 / full_calendar 50)', maxRequestedForMode('quick') === 10 && maxRequestedForMode('plan_25') === 25 && maxRequestedForMode('full_calendar_50') === 50)
-    check('D. a validator runs at most 1 call for quick/plan_25 and 2 for full_calendar_50', planBudget('quick').maxValidatorCalls === 1 && planBudget('plan_25').maxValidatorCalls === 1 && planBudget('full_calendar_50').maxValidatorCalls === 2)
+    const b = contentIdeasBudget()
+    check('E. one mode targets up to 30, hard max 30', b.targetTopicCount === 30 && b.maxTopicCount === 30)
+    check('E. over-generates a raw pool via <= 2 synthesis calls + <= 1 validator call', b.candidatePoolTarget >= 35 && b.candidatePoolTarget <= 45 && b.maxSynthesisCalls <= 2 && b.maxValidatorCalls <= 1)
+    check('H. a hard cost/call ceiling still bounds the run', b.maxCalls <= 4 && b.maxCostUsd > 0)
+    const act = planCostActuals(3, 0.21, 18)
+    check('cost-per-accepted-topic is a server-side KPI', act.cost_per_accepted_topic === Number((0.21 / 18).toFixed(4)) && act.accepted_topic_count === 18)
   }
 
   console.log('G/I) diversity allocation + partial (shortfall) contract')
@@ -57,9 +50,16 @@ async function main() {
     // Same user-need dedup: two identical (intent+subject) items collapse to one.
     const dup = selectDiverse([item({ key: 'x', score: 0.9, subjectTokens: ['ורד', 'לבן'] }), item({ key: 'y', score: 0.8, subjectTokens: ['לבן', 'ורד'] })], 10)
     check('G. two topics answering the same user need collapse to one', dup.selected.length === 1 && dup.duplicate_clusters_removed === 1)
-    // I — request 50 but only 6 safe items exist → return 6, shortfall 44, no padding.
-    const partial = selectDiverse(items, 50)
-    check('I. partial result returns all safe items, never fabricates weak ones', partial.selected.length === 6)
+    // I/D — request 30 but only 6 safe items exist → return all 6 (never empty, never padded).
+    const partial = selectDiverse(items, 30)
+    check('I/D. safe input <= max → returns ALL safe items (never empties a non-empty set)', partial.selected.length === 6)
+    // D — safe input > max → returns exactly max (best), never zero.
+    const many = Array.from({ length: 45 }, (_, i) => item({ key: `k${i}`, score: 1 - i / 100, subjectTokens: [`subj${i}`] }))
+    const capped30 = selectDiverse(many, 30)
+    check('D. safe input > max → returns exactly the best max (30)', capped30.selected.length === 30)
+    // D — a candidate with NO opportunityType/family is never removed for that reason.
+    const noFamily = selectDiverse([item({ key: 'nf', score: 0.9, subjectTokens: ['x'], opportunityType: '' })], 30)
+    check('D. a candidate with a missing family is not removed', noFamily.selected.length === 1)
   }
 
   console.log('J) proven live quality regressions')
@@ -89,6 +89,22 @@ async function main() {
     const bs = buildBrandSafety({ businessName: 'הבשמים של דנה', entityNames: ['בושם מתוק לנשים', 'בושם גברים', 'בושם ערב'], ownEvidence: ['מדריך בשמים'] })
     check('J7. an external business ("בושם כהן") is blocked automatically', classifyKeywordEntity('בושם כהן תל אביב', bs) === 'suspected_external_business')
     check('J7. the shop\'s own generic subject is allowed', classifyKeywordEntity('בושם מתוק לנשים', bs) === 'generic_query' || classifyKeywordEntity('בושם מתוק לנשים', bs) === 'own_brand')
+  }
+
+  console.log('H) live-failure regression — 28 survivors must never collapse to zero')
+  {
+    // Reproduce the observed run: 28 deterministic survivors, no rejections. The
+    // validator call FAILS (empty verdicts) and diversity runs — neither may zero it.
+    const survivors: TopicSuggestion[] = Array.from({ length: 28 }, (_, i) => ({ id: `opp:${i}`, title: `topic ${i}`, primaryKeyword: `subjectalpha${i} subjectbeta${i}`, secondaryKeywords: [], searchIntent: 'informational', recommendedWordCount: 1000, angle: '', suggestedInternalLinks: [], source: 'hybrid', suggestionReason: 'r', suggestionScore: 1 - i / 100 }))
+    // Validator whole-call failure → degrade, keep all 28.
+    const afterValidator = applyValidatorVerdicts([survivors], [new Map()], () => null)
+    check('H. validator failure keeps all 28 survivors (validator_degraded)', afterValidator.accepted.length === 28 && afterValidator.metrics.validator_degraded)
+    // Diversity to max 30 → all 28 kept.
+    const div = selectDiverse(afterValidator.accepted.map((s) => ({ key: s.id!, score: s.suggestionScore, subjectTokens: contentTokens(s.primaryKeyword).filter((t) => !GENERIC_TOKENS.has(t)), entityKey: null, intent: s.searchIntent, opportunityType: s.opportunityFamily || 'informational', isSeasonal: false })), 30)
+    check('H. diversity keeps all 28 (never zeroes a non-empty safe set)', div.selected.length === 28)
+    const selectedIds = new Set(div.selected.map((d) => d.key))
+    const persistenceInput = afterValidator.accepted.filter((s) => selectedIds.has(s.id!))
+    check('H. persistence receives the exact 28 selected IDs (diversity_selected === persistence_input)', persistenceInput.length === 28 && persistenceInput.every((s) => selectedIds.has(s.id!)))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

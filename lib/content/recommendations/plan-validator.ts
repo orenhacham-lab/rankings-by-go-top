@@ -86,7 +86,14 @@ export interface ValidatorMetrics {
   validator_accept_count: number
   validator_reject_count: number
   validator_repair_count: number
-  validator_failure_count: number
+  /** Candidates with NO verdict (partial response / malformed single verdict) — these
+   *  are KEPT (the validator is additive, not authoritative). */
+  validator_missing_verdict_count: number
+  /** Validator CALLS whose whole response was empty/unparsable. */
+  validator_parse_failure_count: number
+  /** True when at least one whole validator call failed — the plan continued on the
+   *  deterministic survivors. */
+  validator_degraded: boolean
 }
 
 /** Split survivors into validator batches (~25 each). */
@@ -97,13 +104,19 @@ export function validatorBatches<T>(items: T[], size = VALIDATOR_BATCH_SIZE): T[
 }
 
 /**
- * Apply validator verdicts to the deterministic-survivor batches — PURE (the model
- * calls happen in the orchestrator; here is the decision logic). Rules: accept keeps
- * the candidate; reject drops it; repair is RE-VALIDATED through `revalidate` (all
- * deterministic gates) and only kept if it survives (so a validator can never revive a
- * hard-rejected candidate). A missing/malformed verdict safely rejects (failure). Any
- * `unvalidated` candidates (past the call budget) are deterministic survivors and are
- * kept but NOT counted as validator accepts. Metrics are REAL, never mirrored.
+ * Apply validator verdicts to the deterministic-survivor batches — PURE, and strictly
+ * ADDITIVE (the validator is a refinement layer, NOT the authoritative safety layer;
+ * the deterministic hard gates already passed). Rules:
+ *   - a valid REJECT removes ONLY that candidate;
+ *   - ACCEPT keeps the candidate;
+ *   - REPAIR is re-validated through `revalidate` (every deterministic gate); if it
+ *     passes we keep the repaired version, if it FAILS we keep the ORIGINAL safe
+ *     candidate (a validator can never revive a hard-rejected candidate, and can never
+ *     remove a safe one except by an explicit reject);
+ *   - a MISSING/malformed verdict for a candidate KEEPS it (missing_verdict);
+ *   - an entire unparsable/empty call sets validator_degraded and keeps that batch;
+ *   - `unvalidated` candidates (past the call budget) are kept.
+ * So a non-empty safe set can NEVER become empty because the validator failed.
  */
 export function applyValidatorVerdicts(
   batches: TopicSuggestion[][],
@@ -111,20 +124,23 @@ export function applyValidatorVerdicts(
   revalidate: (repaired: { primaryKeyword: string; title: string; secondaryKeywords: string[]; intent?: string; reason?: string }, source: TopicSuggestion) => TopicSuggestion | null,
   unvalidated: TopicSuggestion[] = [],
 ): { accepted: TopicSuggestion[]; metrics: ValidatorMetrics } {
-  const metrics: ValidatorMetrics = { validator_call_count: batches.length, validator_accept_count: 0, validator_reject_count: 0, validator_repair_count: 0, validator_failure_count: 0 }
+  const metrics: ValidatorMetrics = { validator_call_count: batches.length, validator_accept_count: 0, validator_reject_count: 0, validator_repair_count: 0, validator_missing_verdict_count: 0, validator_parse_failure_count: 0, validator_degraded: false }
   const accepted: TopicSuggestion[] = []
   const keptKw = new Set<string>()
   const keep = (s: TopicSuggestion) => { const k = (s.primaryKeyword || '').trim().toLowerCase(); if (!k || keptKw.has(k)) return; keptKw.add(k); accepted.push(s) }
   batches.forEach((batch, i) => {
     const verdicts = verdictsPerBatch[i] ?? new Map<string, ValidatorVerdict>()
+    // An entire empty verdict set for a non-empty batch = the call failed / was
+    // unparsable → degrade gracefully (keep the whole batch), do not zero the result.
+    if (batch.length > 0 && verdicts.size === 0) { metrics.validator_parse_failure_count += 1; metrics.validator_degraded = true }
     for (const s of batch) {
       const v = verdicts.get(s.id)
-      if (!v) { metrics.validator_failure_count += 1; continue }
+      if (!v) { metrics.validator_missing_verdict_count += 1; keep(s); continue } // missing → KEEP
       if (v.decision === 'accept') { metrics.validator_accept_count += 1; keep(s); continue }
-      if (v.decision === 'reject') { metrics.validator_reject_count += 1; continue }
+      if (v.decision === 'reject') { metrics.validator_reject_count += 1; continue } // explicit reject removes ONLY this one
       const rep = revalidate({ primaryKeyword: v.repaired_primary_keyword || s.primaryKeyword, title: v.repaired_title || s.title, secondaryKeywords: v.repaired_secondary_keywords || s.secondaryKeywords, intent: s.searchIntent, reason: v.repaired_reason || s.suggestionReason }, s)
-      if (rep) { metrics.validator_repair_count += 1; keep(rep) }
-      else metrics.validator_failure_count += 1 // repair failed a hard gate → safe reject
+      if (rep) { metrics.validator_repair_count += 1; keep(rep) } // repair passed all gates
+      else keep(s) // repair failed a gate → keep the ORIGINAL safe candidate (never lose safe inventory)
     }
   })
   for (const s of unvalidated) keep(s)

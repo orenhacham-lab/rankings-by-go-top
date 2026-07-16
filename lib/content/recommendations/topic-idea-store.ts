@@ -136,13 +136,18 @@ export interface NewIdeaInput {
   suggestions: TopicSuggestion[]
 }
 
+/** Persistence outcome (F) — attempted vs actually inserted (the rest were duplicate
+ *  fingerprints skipped by ON CONFLICT DO NOTHING) + a typed failure when it errored. */
+export interface PersistOutcome { attempted: number; inserted: number; duplicate: number; failed: number; failure?: string }
+
 /**
  * Insert NEW pending ideas (fingerprinted). Uses upsert with ignoreDuplicates on
- * (project_id, fingerprint) so a concurrent generation never errors. Returns the
- * number of rows sent, or null when the table is missing.
+ * (project_id, fingerprint) so a concurrent generation never errors. Returns a typed
+ * persistence outcome (attempted/inserted/duplicate/failed), or null when the table is
+ * missing.
  */
-export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Promise<number | null> {
-  if (input.suggestions.length === 0) return 0
+export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Promise<PersistOutcome | null> {
+  if (input.suggestions.length === 0) return { attempted: 0, inserted: 0, duplicate: 0, failed: 0 }
   const nowIso = new Date().toISOString()
   const rows = input.suggestions.map((s) => {
     // The additive JSONB link_plan carries the canonical role-aware plan + metadata so
@@ -172,16 +177,21 @@ export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Pro
       updated_at: nowIso,
     }
   })
-  const upsert = (payload: Record<string, unknown>[]) => admin.from(TABLE).upsert(payload, { onConflict: 'project_id,fingerprint', ignoreDuplicates: true })
-  let { error } = await upsert(rows)
-  // Backward-compatible: if the additive link_plan column is not applied yet, retry
-  // WITHOUT it so persistence still works (roles simply won't survive reload).
+  // .select('id') → ON CONFLICT DO NOTHING RETURNING returns only the ROWS ACTUALLY
+  // INSERTED, so inserted = returned.length and duplicate = attempted - inserted.
+  const upsert = (payload: Record<string, unknown>[]) => admin.from(TABLE).upsert(payload, { onConflict: 'project_id,fingerprint', ignoreDuplicates: true }).select('id')
+  let { data, error } = await upsert(rows)
   if (error && MISSING_COLUMN.has((error as { code?: string }).code ?? '')) {
     const stripped = rows.map(({ link_plan: _omit, ...rest }) => rest)
-    ;({ error } = await upsert(stripped))
+    ;({ data, error } = await upsert(stripped))
   }
-  if (error) { if ((error as { code?: string }).code === MISSING_TABLE) return null; console.warn('[topic-idea-store] insert failed', { message: error.message }); return 0 }
-  return rows.length
+  if (error) {
+    if ((error as { code?: string }).code === MISSING_TABLE) return null
+    console.warn('[topic-idea-store] insert failed', { message: error.message })
+    return { attempted: rows.length, inserted: 0, duplicate: 0, failed: rows.length, failure: (error as { code?: string }).code || 'insert_failed' }
+  }
+  const inserted = Array.isArray(data) ? data.length : 0
+  return { attempted: rows.length, inserted, duplicate: Math.max(0, rows.length - inserted), failed: 0 }
 }
 
 /**

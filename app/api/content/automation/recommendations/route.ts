@@ -103,14 +103,11 @@ export async function POST(request: Request) {
   if (source === 'keyword' && !keyword) {
     return Response.json({ error: 'keyword_required' }, { status: 400 })
   }
-  // D — content-plan mode/count validation (typed 400 for invalid combos). Default is
-  // quick; requestedCount is bounded server-side to each mode's maximum.
-  const KNOWN_PLAN_MODES = ['quick', 'plan', 'plan_25', 'full_calendar', 'full_calendar_50', 'calendar']
-  if (body.mode !== undefined && (typeof body.mode !== 'string' || !KNOWN_PLAN_MODES.includes(body.mode.toLowerCase()))) {
-    return Response.json({ error: 'invalid_mode', allowed: ['quick', 'plan_25', 'full_calendar_50'] }, { status: 400 })
-  }
-  if (body.requestedCount !== undefined && (typeof body.requestedCount !== 'number' || !Number.isFinite(body.requestedCount) || body.requestedCount < 1 || body.requestedCount > 50)) {
-    return Response.json({ error: 'invalid_requested_count', min: 1, max: 50 }, { status: 400 })
+  // D — no user-selected quantity modes. A single generation action targets up to ~30
+  // safe distinct topics (bounded server-side). Any legacy mode/count fields in the
+  // body are ignored; an explicitly malformed one is a typed 400.
+  if (body.requestedCount !== undefined && (typeof body.requestedCount !== 'number' || !Number.isFinite(body.requestedCount))) {
+    return Response.json({ error: 'invalid_requested_count' }, { status: 400 })
   }
 
   try {
@@ -129,7 +126,8 @@ export async function POST(request: Request) {
     // zero result is a TYPED no_safe_opportunities returned inside the opportunity-first
     // architecture — legacy product-derived suggestions never reach the response.
     let opportunityDiagnostics: import('@/lib/content/recommendations/generate-opportunities').OpportunityDiagnostics | null = null
-    let contentPlan: import('@/lib/content/recommendations/content-plan').ContentPlanResult['plan'] | null = null
+    let contentPlanDiag: import('@/lib/content/recommendations/content-plan').ContentPlanResult['diagnostics'] | null = null
+    let contentPlanCustomer: import('@/lib/content/recommendations/content-plan').ContentPlanResult['customer'] | null = null
     let generationPath: 'opportunity_first' | 'legacy_explicit' = 'opportunity_first'
     let legacyUsed = false
     let recoveryTierUsed: number | null = null
@@ -137,36 +135,26 @@ export async function POST(request: Request) {
     let fallbackReason: string | null = null
     let result: Awaited<ReturnType<typeof generateRecommendations>>
     const useLegacy = process.env.RECO_LEGACY_PATH === '1'
-    // Batched CONTENT-PLAN mode (C) — one operation returns a whole calendar. Evidence
-    // is collected once and reused across a few family-scoped batched calls.
-    const planModeReq = typeof body.mode === 'string' ? body.mode : null
-    const requestedCount = typeof body.requestedCount === 'number' ? body.requestedCount : null
-    const isPlanMode = !useLegacy && (['plan', 'plan_25', 'full_calendar', 'full_calendar_50', 'calendar'].includes((planModeReq ?? '').toLowerCase()) || (requestedCount ?? 0) >= 20)
     if (useLegacy) {
       // EXPLICIT operational rollback ONLY.
       generationPath = 'legacy_explicit'; legacyUsed = true; fallbackReason = 'explicit_legacy_mode'
       result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
-    } else if (isPlanMode) {
-      const plan = await generateContentPlan(auth.admin, { projectId: auth.project.id, mode: planModeReq, requestedCount, generationRunId })
+    } else {
+      // SINGLE product action — batched content ideas (up to ~30 safe distinct topics),
+      // built on the opportunity-first model. Evidence collected once, additive
+      // validator, diversity that never empties a non-empty safe set.
+      const plan = await generateContentPlan(auth.admin, { projectId: auth.project.id, generationRunId })
       opportunityDiagnostics = plan.opportunityDiagnostics
-      contentPlan = plan.plan
+      contentPlanDiag = plan.diagnostics
+      contentPlanCustomer = plan.customer
       recoveryTierUsed = plan.opportunityDiagnostics.recoveryTierUsed
       discoveryUsed = plan.opportunityDiagnostics.discoveryUsed
-      fallbackReason = plan.plan.shortfall_reason
-      result = { suggestions: plan.suggestions, meta: { source, generated: plan.plan.candidate_count, skippedDuplicates: 0, finalCount: plan.suggestions.length, attempts: 1, reason: plan.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: plan.plan.actual_calls, rawCandidates: plan.plan.candidate_count, path: 'opportunity_first', contentPlanMode: plan.plan.mode } : undefined } }
-    } else {
-      const controller = newRunCostController(qualityMode, generationRunId, 15)
-      const opp = await generateOpportunities(auth.admin, { projectId: auth.project.id, targetCount: 15, maxClusters: 12 }, controller)
-      opportunityDiagnostics = opp.diagnostics
-      recoveryTierUsed = opp.diagnostics.recoveryTierUsed
-      discoveryUsed = opp.diagnostics.discoveryUsed
-      fallbackReason = opp.diagnostics.fallbackReason
-      // ALWAYS use the opportunity-first result — even zero. NEVER call legacy here.
-      result = { suggestions: opp.suggestions, meta: { source, generated: opp.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: opp.suggestions.length, attempts: opp.diagnostics.tiers.length, reason: opp.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: opp.diagnostics.model_calls, rawCandidates: opp.diagnostics.generated_opportunities, path: 'opportunity_first', recoveryTierUsed, discoveryUsed, fallbackReason } : undefined } }
+      fallbackReason = plan.customer.shortfall_reason
+      result = { suggestions: plan.suggestions, meta: { source, generated: plan.diagnostics.generated_candidates, skippedDuplicates: 0, finalCount: plan.suggestions.length, attempts: 1, reason: plan.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: plan.diagnostics.actual_calls, rawCandidates: plan.diagnostics.generated_candidates, path: 'opportunity_first' } : undefined } }
     }
-    // The authoritative generation-path contract exposed on every response (E). In
-    // plan mode it also carries the content-plan funnel + cost + shortfall contract.
-    const pathContract = { generationPath, legacyUsed, recoveryTierUsed, discoveryUsed, fallbackReason, contentPlan: contentPlan ?? null }
+    // Generation-path contract. Customer summary is safe (accepted/shortfall only);
+    // contentPlanDiag stays Preview-only (never shown to customers).
+    const pathContract = { generationPath, legacyUsed, recoveryTierUsed, discoveryUsed, fallbackReason, contentPlan: contentPlanCustomer ?? null }
 
     // Part C — a run where EVERY attempted source failed at the provider (no raw
     // candidates were generated) is a typed PROVIDER error, never a successful
@@ -344,7 +332,19 @@ export async function POST(request: Request) {
       intraRunCollisions: intraRun.collisions.slice(0, 10),
     }
 
-    await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
+    // F/B — persist the EXACT selected/fresh array; capture the typed persistence
+    // outcome (attempted/inserted/duplicate/failed) so a 0-insert is never shown as
+    // "no safe topics found".
+    const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
+    const persistenceTrace = diagnostics ? {
+      persistence_attempted_ids: fresh.map((s) => s.id),
+      persistence_attempted: persistOutcome?.attempted ?? fresh.length,
+      persistence_inserted: persistOutcome?.inserted ?? 0,
+      persistence_duplicate: persistOutcome?.duplicate ?? 0,
+      persistence_failed: persistOutcome?.failed ?? 0,
+      persistence_failure: persistOutcome?.failure ?? null,
+      contentPlan: contentPlanDiag ?? null,
+    } : undefined
 
     const filteredExisting = result.suggestions.length - fresh.length
     // Phase 3I.6 — in PRODUCTION, a run that added nothing new returns the
@@ -375,7 +375,7 @@ export async function POST(request: Request) {
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null } : undefined,
+        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, ...(persistenceTrace ?? {}) } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
 
@@ -428,6 +428,7 @@ export async function POST(request: Request) {
       accumulatedPendingCount: suggestions.length,
       accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
       persistedCurrentRunCount: fresh.length,
+      ...(persistenceTrace ?? {}),
       rejectionClassification,
       // Authoritative generation-path contract (E) — proves whether opportunity-first
       // or explicit legacy produced the visible suggestions, and which recovery tier.
