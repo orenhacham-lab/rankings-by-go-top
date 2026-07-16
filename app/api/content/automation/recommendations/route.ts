@@ -14,7 +14,7 @@ import { generateOpportunities } from '@/lib/content/recommendations/generate-op
 import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
-import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate } from '@/lib/content/recommendations/topic-idea-store'
+import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate, topicIdeaFingerprint } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, ownedByExistingEntity, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
 import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent } from '@/lib/content/recommendations/opportunity'
 import { salvageLongTailKeyword } from '@/lib/content/recommendations/keyword-salvage'
@@ -127,7 +127,6 @@ export async function POST(request: Request) {
     // architecture — legacy product-derived suggestions never reach the response.
     let opportunityDiagnostics: import('@/lib/content/recommendations/generate-opportunities').OpportunityDiagnostics | null = null
     let contentPlanDiag: import('@/lib/content/recommendations/content-plan').ContentPlanResult['diagnostics'] | null = null
-    let contentPlanCustomer: import('@/lib/content/recommendations/content-plan').ContentPlanResult['customer'] | null = null
     let generationPath: 'opportunity_first' | 'legacy_explicit' = 'opportunity_first'
     let legacyUsed = false
     let recoveryTierUsed: number | null = null
@@ -135,26 +134,38 @@ export async function POST(request: Request) {
     let fallbackReason: string | null = null
     let result: Awaited<ReturnType<typeof generateRecommendations>>
     const useLegacy = process.env.RECO_LEGACY_PATH === '1'
+    // Stabilization Phase 1 — the DEFAULT is the single opportunity-first path
+    // (generateOpportunities → deterministic validation → route dedup → persist →
+    // reload). The batched content-plan is EXPERIMENTAL and unreachable unless
+    // RECO_ENABLE_CONTENT_PLAN=1 (default OFF); it is never the default path.
+    const useContentPlan = !useLegacy && process.env.RECO_ENABLE_CONTENT_PLAN === '1'
     if (useLegacy) {
       // EXPLICIT operational rollback ONLY.
       generationPath = 'legacy_explicit'; legacyUsed = true; fallbackReason = 'explicit_legacy_mode'
       result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
-    } else {
-      // SINGLE product action — batched content ideas (up to ~30 safe distinct topics),
-      // built on the opportunity-first model. Evidence collected once, additive
-      // validator, diversity that never empties a non-empty safe set.
+    } else if (useContentPlan) {
+      // EXPERIMENTAL bulk content-plan (flag-gated). No customer-facing up-to-30 /
+      // shortfall / validator / cost / snapshot wording — everything is Preview-only.
       const plan = await generateContentPlan(auth.admin, { projectId: auth.project.id, generationRunId })
       opportunityDiagnostics = plan.opportunityDiagnostics
       contentPlanDiag = plan.diagnostics
-      contentPlanCustomer = plan.customer
       recoveryTierUsed = plan.opportunityDiagnostics.recoveryTierUsed
       discoveryUsed = plan.opportunityDiagnostics.discoveryUsed
-      fallbackReason = plan.customer.shortfall_reason
+      fallbackReason = plan.opportunityDiagnostics.fallbackReason
       result = { suggestions: plan.suggestions, meta: { source, generated: plan.diagnostics.generated_candidates, skippedDuplicates: 0, finalCount: plan.suggestions.length, attempts: 1, reason: plan.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: plan.diagnostics.actual_calls, rawCandidates: plan.diagnostics.generated_candidates, path: 'opportunity_first' } : undefined } }
+    } else {
+      // DEFAULT — single opportunity-first generation (recovery tiers). Never legacy.
+      const controller = newRunCostController(qualityMode, generationRunId, 15)
+      const opp = await generateOpportunities(auth.admin, { projectId: auth.project.id, targetCount: 15, maxClusters: 12 }, controller)
+      opportunityDiagnostics = opp.diagnostics
+      recoveryTierUsed = opp.diagnostics.recoveryTierUsed
+      discoveryUsed = opp.diagnostics.discoveryUsed
+      fallbackReason = opp.diagnostics.fallbackReason
+      result = { suggestions: opp.suggestions, meta: { source, generated: opp.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: opp.suggestions.length, attempts: opp.diagnostics.tiers.length, reason: opp.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: opp.diagnostics.model_calls, rawCandidates: opp.diagnostics.generated_opportunities, path: 'opportunity_first', recoveryTierUsed, discoveryUsed, fallbackReason } : undefined } }
     }
-    // Generation-path contract. Customer summary is safe (accepted/shortfall only);
-    // contentPlanDiag stays Preview-only (never shown to customers).
-    const pathContract = { generationPath, legacyUsed, recoveryTierUsed, discoveryUsed, fallbackReason, contentPlan: contentPlanCustomer ?? null }
+    // Generation-path contract — customer-safe only (NO content-plan/up-to-30/shortfall/
+    // validator/cost/snapshot fields). Technical detail stays in Preview isolationDebug.
+    const pathContract = { generationPath, legacyUsed, recoveryTierUsed, discoveryUsed, fallbackReason }
 
     // Part C — a run where EVERY attempted source failed at the provider (no raw
     // candidates were generated) is a typed PROVIDER error, never a successful
@@ -332,10 +343,27 @@ export async function POST(request: Request) {
       intraRunCollisions: intraRun.collisions.slice(0, 10),
     }
 
-    // F/B — persist the EXACT selected/fresh array; capture the typed persistence
-    // outcome (attempted/inserted/duplicate/failed) so a 0-insert is never shown as
-    // "no safe topics found".
+    // E — one truthful stage contract. raw = model output BEFORE gates; engine-accepted
+    // = engine output; the engine's removal count is ALWAYS surfaced (customer funnel)
+    // so "generated N / 0 rejections" can never happen when the engine removed some.
+    const rawGeneratedCount = result.meta.generated ?? 0
+    const engineAcceptedCount = result.suggestions.length
+    const engineFiltered = Math.max(0, rawGeneratedCount - engineAcceptedCount)
+    const engineRejectedByReason = opportunityDiagnostics?.rejected_by_reason ?? {}
+    const routeRejectedByReason = () => ({ title_exists: filteredTitleExists, exact_existing_keyword_owner: exactExistingKeywordOwner, source_only_entity_expansion: sourceOnlyEntityExpansion, covered_by_existing_content: filteredCoveredByContent, primary_keyword_exists: filteredPrimaryKeywordExists, intra_run_removed: intraRun.removed, intra_run_merged: intraRun.merged })
+
+    // F/B — persist the EXACT fresh array; capture the typed persistence outcome.
     const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
+
+    // F — persistence errors are NEVER swallowed. attempted>0 with 0 inserted AND 0
+    // duplicates ⇒ every write failed → a TYPED 500, never a "0 new" success response.
+    if (persistOutcome && persistOutcome.attempted > 0 && persistOutcome.inserted === 0 && persistOutcome.duplicate === 0) {
+      const { gitSha, vercelEnv } = runtimeInfo()
+      console.error('[automation-recommendations] persistence failure', { source, attempted: persistOutcome.attempted, failure: persistOutcome.failure })
+      return Response.json({ suggestions: [], ok: false, error: 'persistence_failed', reason: 'persistence_failed', message: 'שמירת הרעיונות נכשלה זמנית. יש לנסות שוב בעוד רגע.', meta: { source, reason: 'persistence_failed', persisted: false, newlyAddedCount: 0, ...(diagnostics ? { isolationDebug: { gitSha, vercelEnv, generationRunId, persistence_attempted: persistOutcome.attempted, persistence_inserted: 0, persistence_failed: persistOutcome.failed, persistence_failure: persistOutcome.failure ?? null } } : {}) } }, { status: 500 })
+    }
+
+    const freshFingerprints = fresh.map((s) => topicIdeaFingerprint(s.primaryKeyword, s.title))
     const persistenceTrace = diagnostics ? {
       persistence_attempted_ids: fresh.map((s) => s.id),
       persistence_attempted: persistOutcome?.attempted ?? fresh.length,
@@ -343,6 +371,7 @@ export async function POST(request: Request) {
       persistence_duplicate: persistOutcome?.duplicate ?? 0,
       persistence_failed: persistOutcome?.failed ?? 0,
       persistence_failure: persistOutcome?.failure ?? null,
+      pipeline: { raw_generated_count: rawGeneratedCount, engine_accepted_count: engineAcceptedCount, engine_rejected_by_reason: engineRejectedByReason, engine_shadow_rejected_by_reason: opportunityDiagnostics?.shadow_rejected_by_reason ?? {}, route_fresh_count: fresh.length, route_rejected_by_reason: routeRejectedByReason(), persistence_attempted_count: persistOutcome?.attempted ?? fresh.length, persistence_inserted_count: persistOutcome?.inserted ?? 0, persistence_duplicate_count: persistOutcome?.duplicate ?? 0, persistence_failed_count: persistOutcome?.failed ?? 0 },
       contentPlan: contentPlanDiag ?? null,
     } : undefined
 
@@ -374,9 +403,20 @@ export async function POST(request: Request) {
       return Response.json({ suggestions: fresh, meta: { ...result.meta, persisted: false, source, ...pathContract, projectId: auth.project.id, generationRunId, clientRequestId, newlyAddedCount: fresh.length, totalPendingCount: fresh.length, filteredCount: filteredExisting, newlySaved: fresh.length, filteredExisting,
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
-        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
         isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, ...(persistenceTrace ?? {}) } : undefined,
         debug: buildDebug({ persisted: false }) } })
+    }
+
+    // F — after a real insert, ASSERT the inserted rows are visible to the reload query.
+    // A mismatch is a TYPED persistence_reload_mismatch, never a successful zero-result.
+    if (persistOutcome && persistOutcome.inserted > 0) {
+      const reloadedFps = new Set((pending as { fingerprint?: string }[]).map((r) => r.fingerprint).filter(Boolean))
+      if (!freshFingerprints.some((fp) => reloadedFps.has(fp))) {
+        const { gitSha, vercelEnv } = runtimeInfo()
+        console.error('[automation-recommendations] persistence/reload mismatch', { source, inserted: persistOutcome.inserted, reloaded: reloadedFps.size })
+        return Response.json({ suggestions: [], ok: false, error: 'persistence_reload_mismatch', reason: 'persistence_reload_mismatch', message: 'הרעיונות נשמרו אך לא נטענו מחדש כראוי. יש לנסות שוב.', meta: { source, reason: 'persistence_reload_mismatch', persisted: true, newlyAddedCount: 0, ...(diagnostics ? { isolationDebug: { gitSha, vercelEnv, generationRunId, persistence_inserted: persistOutcome.inserted, reload_visible_count: reloadedFps.size, ...(persistenceTrace ?? {}) } } : {}) } }, { status: 500 })
+      }
     }
 
     // Phase 3F.3.1c — revalidate ALREADY-PERSISTED pending ideas against the
@@ -428,6 +468,7 @@ export async function POST(request: Request) {
       accumulatedPendingCount: suggestions.length,
       accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
       persistedCurrentRunCount: fresh.length,
+      reload_visible_count: suggestions.length,
       ...(persistenceTrace ?? {}),
       rejectionClassification,
       // Authoritative generation-path contract (E) — proves whether opportunity-first
@@ -456,19 +497,21 @@ export async function POST(request: Request) {
         generationRunId,
         clientRequestId,
         isolationDebug,
-        newlyAddedCount: fresh.length,
+        // F/E — "new ideas added" is the TRUTHFUL persistence result (rows actually
+        // inserted), not the pre-insert fresh count.
+        newlyAddedCount: persistOutcome ? persistOutcome.inserted : fresh.length,
         totalPendingCount: suggestions.length,
         filteredCount: filteredExisting,
         hiddenDuplicateCount: conflictIds.length,
         // Back-compat aliases.
-        newlySaved: fresh.length,
+        newlySaved: persistOutcome ? persistOutcome.inserted : fresh.length,
         filteredExisting,
         revalidatedHidden: conflictIds.length,
         pendingCount: suggestions.length,
         reason,
-        // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
-        // its exact bottleneck in the UI (counts only, no content).
-        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: conflictIds.length },
+        // E — customer funnel ALWAYS carries engineFiltered so "generated N / 0
+        // rejections" is impossible when the engine removed candidates in-generator.
+        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: conflictIds.length },
         debug: buildDebug({ revalidatedHidden: conflictIds.length }),
       },
     })

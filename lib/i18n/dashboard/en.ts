@@ -71,8 +71,6 @@ export const dashboardEn = {
       pageTypeService: 'Service page',
       pageTypeProductImprovement: 'Product page improvement',
       pageTypeExistingImprovement: 'Existing page improvement',
-      planSafeNote: 'We will try to find up to 30 safe, distinct topics.',
-      planFewFound: 'Only {count} safe and distinct topics were found in the current data.',
       noPreciseLink: 'No sufficiently precise internal link was found for this topic.',
       reviewEditHelper: 'You can edit links before adding to the queue. When finished, click “Add to publishing queue”.',
       approvedReady: 'The topics were approved and added to the list of topics ready for publishing. To place them in the automatic workflow queue, click “Add to publishing queue”.',
@@ -119,7 +117,7 @@ export const dashboardEn = {
       allDuplicates: 'All the ideas we found already exist or are too similar.',
       tryOther: 'No ideas found. Try another source or a broader keyword.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
-      funnelLine: 'Run breakdown: {g} ideas generated · {d} duplicates of existing topics · {q} quality-filtered · {k} title/keyword already exists · {c} covered by existing site content',
+      funnelLine: 'Run breakdown: {g} ideas generated · {e} did not pass quality/relevance checks · {d} duplicates of existing topics · {q} quality-filtered · {k} title/keyword already exists · {c} covered by existing site content',
       // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
       kwMatchTitle: 'Diagnostics: what exactly blocked each idea ({n} examples)',
       kwMatchKeyword: 'Keyword',

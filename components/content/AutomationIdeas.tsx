@@ -129,7 +129,7 @@ export default function AutomationIdeas({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [ideasExpanded, setIdeasExpanded] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[] } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[] } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -599,16 +599,6 @@ export default function AutomationIdeas({
         </Button>
       </div>
 
-      {/* G — a plain safe-distinct explanation. No modes / calls / costs / internals. */}
-      <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">{t.planSafeNote}</p>
-
-      {/* When fewer than the target were found, say so clearly (no jargon). */}
-      {(() => {
-        const cp = (meta as { contentPlan?: { accepted_count: number; shortfall: number; shortfall_reason: string | null } } | null)?.contentPlan
-        if (!cp || cp.shortfall <= 0 || cp.accepted_count <= 0) return null
-        return <p className="text-[11px] text-amber-700 dark:text-amber-400 mb-2" dir={isHebrew ? 'rtl' : 'ltr'}>{t.planFewFound.replace('{count}', String(cp.accepted_count))}</p>
-      })()}
-
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
       )}
@@ -692,6 +682,7 @@ export default function AutomationIdeas({
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
           {t.funnelLine
             .replace('{g}', String(meta.funnel.generated))
+            .replace('{e}', String(meta.funnel.engineFiltered ?? 0))
             .replace('{d}', String(meta.funnel.corpusDuplicates))
             .replace('{q}', String(meta.funnel.qualityFiltered))
             .replace('{k}', String(meta.funnel.keywordExists + meta.funnel.titleExists))

@@ -69,8 +69,6 @@ export const dashboardHe = {
       pageTypeService: 'עמוד שירות',
       pageTypeProductImprovement: 'שיפור עמוד מוצר',
       pageTypeExistingImprovement: 'שיפור עמוד קיים',
-      planSafeNote: 'ננסה למצוא עד 30 נושאים בטוחים וייחודיים.',
-      planFewFound: 'נמצאו רק {count} נושאים בטוחים וייחודיים בנתונים הנוכחיים.',
       noPreciseLink: 'לא נמצא קישור פנימי מספיק מדויק לנושא הזה.',
       reviewEditHelper: 'אפשר לערוך קישורים לפני ההוספה לתור. בסיום לחץ ״הוסף לתור הפרסום״.',
       approvedReady: 'הנושאים אושרו ונוספו לרשימת הנושאים המוכנים לפרסום. כדי להכניס אותם לתור העבודה האוטומטי, לחץ על ״הוסף לתור הפרסום״.',
@@ -117,7 +115,7 @@ export const dashboardHe = {
       allDuplicates: 'כל הרעיונות שנמצאו כבר קיימים או דומים מדי.',
       tryOther: 'לא נמצאו רעיונות. נסו מקור אחר או מילת מפתח רחבה יותר.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
-      funnelLine: 'פירוט הריצה: {g} רעיונות נוצרו · {d} כפולים לנושאים קיימים · {q} סוננו באיכות · {k} עם כותרת/מילת מפתח שכבר קיימת · {c} מכוסים בתוכן קיים באתר',
+      funnelLine: 'פירוט הריצה: {g} רעיונות נוצרו · {e} לא עברו בדיקות איכות ורלוונטיות · {d} כפולים לנושאים קיימים · {q} סוננו באיכות · {k} עם כותרת/מילת מפתח שכבר קיימת · {c} מכוסים בתוכן קיים באתר',
       // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
       kwMatchTitle: 'אבחון: מה בדיוק חסם כל רעיון ({n} דוגמאות)',
       kwMatchKeyword: 'מילת מפתח',

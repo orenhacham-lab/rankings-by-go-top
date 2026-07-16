@@ -83,6 +83,10 @@ export interface OpportunityDiagnostics {
   ranked_clusters: { id: string; theme: string; source_label: string; tier: string; score: number; demand: number; missing_coverage: boolean }[]
   tiers: TierDiagnostics[]
   rejected_by_reason: Record<string, number>
+  /** Phase 1 — what the DISABLED experimental gates (auto brand-safety, commercial
+   *  fit, business relevance, local service-area) WOULD have rejected. Observability
+   *  only; these did NOT remove any candidate. */
+  shadow_rejected_by_reason: Record<string, number>
   persisted_by_confidence: Record<string, number>
   persisted_by_page_type: Record<string, number>
   secondary_keywords_filtered: number
@@ -160,19 +164,20 @@ export async function generateOpportunities(
   const focus = deriveProjectFocus({ projectName: p.business_name, domain: p.target_domain, ownedCategories: entities.map((e) => e.name), existingTopics: existingCoverage.map((c) => c.title) })
   const projectFocus = [focus.primaryProjectFocus, ...focus.secondaryProjectAreas].filter(Boolean)
 
-  // Brand safety — AUTOMATIC + evidence-driven (no manual list). Own brand + own
-  // business vocabulary (entities + coverage + focus + tracked — NOT keyword research,
-  // which may surface external names).
+  // Brand safety context (own brand + own vocabulary). Stabilization Phase 1: the
+  // AUTOMATIC external-business classifier is DIAGNOSTICS-ONLY — it is proven unsafe
+  // (rejected most legitimate fixture topics while allowing the real competitor), so it
+  // never rejects a candidate and never removes keyword-research queries here. The only
+  // brand protection that stays a HARD gate is the exact title→keyword named-entity
+  // mutation guard (e.g. generic אביב mutating into a business name אביה).
   const brandSafety: BrandSafety = buildBrandSafety({
     businessName: p.business_name,
     entityNames: entities.map((e) => e.name),
     ownEvidence: [...existingCoverage.map((c) => c.title), ...projectFocus, ...tracked],
   })
-  // Suspected external-business queries never seed clusters/demand/type words.
+  // DIAGNOSTICS-ONLY: how many KR queries the classifier WOULD flag — NONE are removed.
   let competitorQueriesFiltered = 0
-  for (let i = keywordResearch.length - 1; i >= 0; i--) {
-    if (classifyKeywordEntity(keywordResearch[i].query, brandSafety) === 'suspected_external_business') { keywordResearch.splice(i, 1); competitorQueriesFiltered++ }
-  }
+  for (const kr of keywordResearch) if (classifyKeywordEntity(kr.query, brandSafety) === 'suspected_external_business') competitorQueriesFiltered++
 
   // 2) Build + rank clusters ONCE (both cluster tiers reuse the graph).
   const evidence: EvidenceInput = { keywordResearch, trackedKeywords: tracked, projectFocus, entities, existingCoverage }
@@ -212,6 +217,14 @@ export async function generateOpportunities(
   // Existing indexed page/coverage titles — for local-page ownership/cannibalization.
   const existingPageTitles = [...entities.map((e) => e.name), ...existingCoverage.map((c) => c.title)]
   const bump = (td: TierDiagnostics, r: string) => { td.rejected_by_reason[r] = (td.rejected_by_reason[r] ?? 0) + 1 }
+  // Stabilization Phase 1 — experimental hard gates are DIAGNOSTICS-ONLY by default;
+  // each is behind a server-side flag (default OFF). When off, the gate is evaluated
+  // and recorded in shadow_rejected_by_reason but does NOT reject the candidate.
+  const GATE_COMMERCIAL_FIT = process.env.RECO_GATE_COMMERCIAL_FIT === '1'
+  const GATE_LOCAL_SERVICE_AREA = process.env.RECO_GATE_LOCAL_SERVICE_AREA === '1'
+  const GATE_BUSINESS_RELEVANCE = process.env.RECO_GATE_BUSINESS_RELEVANCE === '1'
+  const shadow_rejected_by_reason: Record<string, number> = {}
+  const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
   let secondaryKeywordsFiltered = 0
   const target_role_mappings: OpportunityDiagnostics['target_role_mappings'] = []
   const ctx: ProjectContext = { projectName: p.business_name, domain: p.target_domain, language, primaryProjectFocus: focus.primaryProjectFocus, secondaryProjectAreas: focus.secondaryProjectAreas, ownedCategories: entities.map((e) => e.name).slice(0, 15), existingTopics: existingCoverage.map((c) => c.title).slice(0, 15) }
@@ -224,11 +237,13 @@ export async function generateOpportunities(
   // ownership/cannibalization, commercial fit and page-type safety are ALWAYS enforced
   // here, so nothing downstream can override them.
   const validateOne = (o: { primaryKeyword: string; title: string; secondaryKeywords: string[]; intent?: string; reason?: string }, label: { confidenceLevel: ConfidenceLevel; discovery: boolean }): { suggestion?: TopicSuggestion; rejectionReason?: string } => {
+    // DIAGNOSTICS-ONLY (Phase 1): the automatic external-business classifier NEVER
+    // rejects — it only records what it would have flagged. It proved unsafe.
     if (classifyKeywordEntity(o.primaryKeyword, brandSafety) === 'suspected_external_business'
       || containsExternalBusiness(o.title, brandSafety)
       || containsExternalBusiness(o.reason || '', brandSafety)
       || (o.secondaryKeywords ?? []).some((k) => containsExternalBusiness(k, brandSafety))) {
-      return { rejectionReason: 'competitor_brand_leakage' }
+      shadow('competitor_brand_leakage')
     }
     const intent = deriveIntent(o.primaryKeyword, o.title, (o.intent as SearchIntent) || 'informational')
     const w = evaluateArticleWorthiness({ primaryKeyword: o.primaryKeyword, title: o.title, secondaryKeywords: o.secondaryKeywords, intent, existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
@@ -243,13 +258,21 @@ export async function generateOpportunities(
     if (!quality.ok) return { rejectionReason: 'invalid_primary_keyword' }
     if (quality.repairedKeyword) primaryKeyword = quality.repairedKeyword
 
-    if (detectUnsafeNamedEntityMutation(o.title, primaryKeyword, brandSafety) || containsExternalBusiness(primaryKeyword, brandSafety)) return { rejectionReason: 'unsafe_named_entity_mutation' }
+    // SAFE brand protection kept: an exact title→keyword named-entity mutation (a
+    // generic title word mutating into a business name) is still a HARD reject.
+    if (detectUnsafeNamedEntityMutation(o.title, primaryKeyword, brandSafety)) return { rejectionReason: 'unsafe_named_entity_mutation' }
 
+    // Experimental relevance gates — diagnostics-only unless their flag is on.
     const relevance = assessBusinessRelevance({ primaryKeyword, title: o.title }, businessEvidenceTokens, domainTypeWords, entities.map((e) => ({ name: e.name })), intent)
-    if (!relevance.ok) return { rejectionReason: relevance.reason ?? 'low_business_relevance' }
+    if (!relevance.ok) {
+      const rr = relevance.reason ?? 'low_business_relevance'
+      const gated = rr === 'unsupported_local_service_area' ? GATE_LOCAL_SERVICE_AREA : GATE_BUSINESS_RELEVANCE
+      if (gated) return { rejectionReason: rr }
+      shadow(rr)
+    }
 
     const fit = assessCommercialFit(primaryKeyword, o.title, commercialEntityTokens, projectFocusTokens, domainTypeWords)
-    if (!fit.ok) return { rejectionReason: 'unsupported_commercial_fit' }
+    if (!fit.ok) { if (GATE_COMMERCIAL_FIT) return { rejectionReason: 'unsupported_commercial_fit' }; shadow('unsupported_commercial_fit') }
 
     let ownershipPageType: RecommendedPageType | null = null
     if (intent === 'local' || intent === 'transactional') {
@@ -277,8 +300,9 @@ export async function generateOpportunities(
 
     const orderedLinks = linkPlanToOrdered(linkPlan)
     const targetTitles = [linkPlan.primaryCommercialTarget?.title, ...linkPlan.secondaryCommercialTargets.map((tt) => tt.title), ...linkPlan.supportingInformationalLinks.map((tt) => tt.title)].filter((x): x is string => !!x)
+    // DIAGNOSTICS-ONLY final scan (Phase 1) — records, never rejects.
     const scan = scanSuggestionBrandSafety({ title: o.title, primaryKeyword, secondaryKeywords: sec.kept, suggestionReason, anchors: orderedLinks.map((l) => l.anchor), targetTitles }, brandSafety)
-    if (!scan.safe) return { rejectionReason: 'competitor_brand_leakage' }
+    if (!scan.safe) shadow('competitor_brand_leakage')
 
     return {
       suggestion: {
@@ -429,6 +453,7 @@ export async function generateOpportunities(
     ranked_clusters: ranked.slice(0, 20).map((c) => ({ id: c.cluster_id, theme: c.canonical_topic, source_label: c.source_label, tier: c.tier_class, score: c.score, demand: c.demand_volume, missing_coverage: c.missing_coverage })),
     tiers: tierDiags,
     rejected_by_reason,
+    shadow_rejected_by_reason,
     persisted_by_confidence,
     persisted_by_page_type,
     secondary_keywords_filtered: secondaryKeywordsFiltered,
