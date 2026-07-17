@@ -20,6 +20,7 @@ import { isMalformedReason, isTruncatedKeywordPhrase, validateIntentKeywordConsi
 import type { SearchIntent } from './opportunity'
 import { isSemanticTopicDuplicate, distinctiveTokensOf, canonicalVariants } from './semantic-dup'
 import { isBoilerplatePage } from './link-role-mapper'
+import { evaluateTitleDiversity } from './title-diversity'
 
 export interface AcceptanceRule {
   id: string
@@ -112,6 +113,11 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
     return !c.ok || !!c.repairedKeyword
   })
   add('title_keyword_alignment', misaligned.length === 0, misaligned.map((s) => `"${s.title}" ⇄ "${s.primaryKeyword}"`).join(' · ') || 'none')
+
+  // ── Title-pattern diversity: ≤1 mega-guide opening, ≤2 per opening skeleton
+  // (punctuation/definite-article/grammatical variants folded before comparing).
+  const diversity = evaluateTitleDiversity(suggestions.map((s) => s.title))
+  add('title_pattern_diversity', diversity.pass, diversity.violations.join(' · ') || `skeletons: ${JSON.stringify(diversity.skeletons)}`)
 
   // ── Link relevance ──
   const badLinks: string[] = []

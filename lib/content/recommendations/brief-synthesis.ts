@@ -56,6 +56,7 @@ export function buildBriefSynthesisPrompt(briefs: OpportunityBrief[], ctx: Proje
     `TASK: Below are ${briefs.length} EVIDENCE-BACKED content briefs. For EACH brief, polish it into ONE article topic. The brief IS the opportunity — do NOT invent a different subject, do NOT merge briefs, do NOT add extra topics.`,
     `RULES:`,
     `- "title": one natural, fluent ${langLabel} article title answering the brief's need for its exact subject. Complete words only — never truncate or corrupt a word.`,
+    `- TITLE STRUCTURE: choose the structure that genuinely fits EACH brief's "need" — a question title, a comparison ("A מול B"), a practical how-to, a problem/solution, a buyer guide, a checklist, myths-vs-facts, or a focused explanation. VARY structures across the batch: at most ONE title in the whole batch may open with "המדריך המלא"/"המדריך השלם"/"כל מה שצריך לדעת", and no more than TWO titles may share the same opening pattern (e.g. "איך לבחור…", "מה חשוב לדעת…", "מה ההבדל בין…", "המדריך ל…"). NEVER sacrifice accuracy or the brief's subject for variety — a precise plain title beats an awkward varied one.`,
     `- "primaryKeyword": a real search phrase for THIS need. It MUST keep the brief subject's core words. When "aligned_query" exists, use it verbatim or a minimal natural variant of it.`,
     `- "secondaryKeywords": up to 3 phrases someone searching this exact article would use. No duplicates of the primary.`,
     `- "intent": keep the brief's intent unless it is clearly wrong for the title you wrote.`,

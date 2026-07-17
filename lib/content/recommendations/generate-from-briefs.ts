@@ -38,6 +38,7 @@ import { normalizeText, topicIdeaFingerprint } from './topic-idea-store'
 import { buildBriefPool, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
 import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, type PolishedTopic } from './brief-synthesis'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
+import { dedupeMegaGuideTitle } from './title-diversity'
 import type { RunCostController } from './run-cost-controller'
 import type { TopicSuggestion } from './types'
 
@@ -432,7 +433,12 @@ export async function generateFromBriefs(
     for (const t of rec.polished) {
       const brief = briefById.get(t.briefId)
       if (!brief) { rd.dropped_items++; continue }
-      const r = validatePolished(t, brief)
+      // Title-pattern diversity (SAFE, never artificial): when one mega-guide
+      // title is already accepted, a later "המדריך המלא: X" is reduced to its
+      // standalone core X — subject and keyword alignment preserved; anything
+      // not safely strippable stays untouched (the acceptance rule reports it).
+      const dedupedTitle = dedupeMegaGuideTitle(t.title, suggestions.map((s) => s.title))
+      const r = validatePolished(dedupedTitle === t.title ? t : { ...t, title: dedupedTitle }, brief)
       if (r.suggestion) {
         suggestions.push(r.suggestion)
         rd.accepted++

@@ -3,6 +3,7 @@
  * defect class and PASS a clean run (the /reco-qa runner's automated core).
  */
 import { evaluateRunAcceptance, type RunAcceptanceInput } from '../recommendations/qa-acceptance'
+import { evaluateTitleDiversity, titleSkeleton, dedupeMegaGuideTitle } from '../recommendations/title-diversity'
 import type { BriefRunDiagnostics } from '../recommendations/generate-from-briefs'
 import type { TopicSuggestion } from '../recommendations/types'
 
@@ -80,6 +81,64 @@ async function main() {
     check('empty pool with truthful stop PASSES (no filler demanded)', r.passed, JSON.stringify(r.rules.filter((x) => !x.pass)))
     const warn = evaluateRunAcceptance(base({ suggestions: [goodTopic('ויטמין D', 'ויטמין D מונע מחלות קשות', { suggestionReason: 'הנושא משלים פער תוכן בתחום שהעסק עוסק בו.' })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }))
     check('medical certainty ("מונע מחלות") → WARN, not auto-fail', warn.passed && warn.warnings >= 1, JSON.stringify(warn.rules.filter((x) => !x.pass)))
+  }
+
+  console.log('D) title-pattern diversity (title_pattern_diversity)')
+  {
+    const failsRule = (input: RunAcceptanceInput, ruleId: string): boolean => {
+      const r = evaluateRunAcceptance(input)
+      const rule = r.rules.find((x) => x.id === ruleId)
+      return !!rule && !rule.pass && !r.passed
+    }
+    const topicFor = (i: number, title: string) => goodTopic(`נושא בדיקה מספר ${i}`, title)
+
+    // 7a — EIGHT titles on ONE repeated template must FAIL.
+    const oneTemplate = Array.from({ length: 8 }, (_, i) => topicFor(i, `המדריך המלא: נושא בדיקה מספר ${i}`))
+    check('8× "המדריך המלא: …" → title_pattern_diversity FAILS', failsRule(base({ suggestions: oneTemplate, diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 8 } }) }), 'title_pattern_diversity'))
+
+    // 7b — a NATURALLY VARIED eight-title batch must PASS the diversity rule
+    // (distinct subjects, distinct structures — question/mistakes/myths/how-to-
+    // choose/comparison/steps/why/one mega-guide).
+    const varied = [
+      ['מינון מגנזיום לילדים', 'המדריך המלא: מינון מגנזיום לילדים'],
+      ['אבקת חלבון צמחית', 'אבקת חלבון צמחית: שאלות ותשובות'],
+      ['אנזימי עיכול טבעיים', 'אנזימי עיכול טבעיים — טעויות נפוצות שכדאי להכיר'],
+      ['יתרונות אומגה 3', 'יתרונות אומגה 3: מיתוסים ועובדות'],
+      ['איך לבחור ויטמין C לילדים', 'איך לבחור ויטמין C לילדים'],
+      ['הבדל בין ציטראט לביסגליצינט', 'מה ההבדל בין ציטראט לביסגליצינט'],
+      ['חיזוק מערכת החיסון בחורף', 'חיזוק מערכת החיסון בחורף: צעד אחר צעד'],
+      ['שמן קוקוס לעור', 'למה שמן קוקוס לעור עובד באמת'],
+    ].map(([kw, t]) => goodTopic(kw, t))
+    const rv = evaluateRunAcceptance(base({ suggestions: varied, diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 8 } }) }))
+    check('naturally varied 8-title batch → diversity PASSES', rv.rules.find((x) => x.id === 'title_pattern_diversity')?.pass === true, rv.rules.find((x) => x.id === 'title_pattern_diversity')?.detail)
+
+    // 7c — HEBREW VARIANTS of one skeleton are still ONE skeleton (detected).
+    check('skeleton folding: "איך לבחור" ≡ "כיצד בוחרים" ≡ "איך בוחרים"',
+      titleSkeleton('איך לבחור זר כלה') === titleSkeleton('כיצד בוחרים זר לאירוע') && titleSkeleton('איך בוחרים עציץ למרפסת') === titleSkeleton('איך לבחור זר כלה'))
+    check('skeleton folding: "המדריך המלא" ≡ "מדריך מלא" ≡ "כל מה שכדאי לדעת"',
+      titleSkeleton('המדריך המלא: ורדים') === 'mega_guide' && titleSkeleton('מדריך מלא לגידול ורדים') === 'mega_guide' && titleSkeleton('כל מה שכדאי לדעת על ורדים') === 'mega_guide')
+    check('skeleton folding: "מה ההבדל בין" ≡ "ההבדלים בין" (punctuation/article folded)',
+      titleSkeleton('מה ההבדל בין סחלב לאנתוריום?') === titleSkeleton('ההבדלים בין מגנזיום ציטראט לביסגליצינט'))
+    const variants3 = [
+      topicFor(0, 'איך לבחור זר כלה לחתונה'),
+      topicFor(1, 'כיצד בוחרים עציץ פורח למרפסת'),
+      topicFor(2, 'איך בוחרים אגרטל מתאים לזר'),
+    ]
+    check('3 Hebrew variants of one skeleton → diversity FAILS', failsRule(base({ suggestions: variants3, diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 3 } }) }), 'title_pattern_diversity'))
+
+    // 7d — diverse wording with a title/keyword MISMATCH still fails alignment.
+    const diverseButMisaligned = [
+      goodTopic('נעלים לחתן', 'איך לבחור חליפת חתן לחתונה'),
+      goodTopic('זר כלה קלאסי', 'זר כלה קלאסי: מיתוסים ועובדות'),
+    ]
+    const rm = evaluateRunAcceptance(base({ suggestions: diverseButMisaligned, diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 2 } }) }))
+    check('diverse wording + keyword mismatch → title_keyword_alignment still FAILS', rm.rules.find((x) => x.id === 'title_keyword_alignment')?.pass === false && rm.rules.find((x) => x.id === 'title_pattern_diversity')?.pass === true, JSON.stringify(rm.rules.filter((x) => !x.pass).map((x) => x.id)))
+
+    // Rule 4 — de-templating is SAFE, never artificial.
+    check('2nd mega-guide title is reduced to its standalone core (subject preserved)',
+      dedupeMegaGuideTitle('המדריך המלא: מינון מגנזיום לילדים', ['המדריך המלא: ויטמין C לילדים']) === 'מינון מגנזיום לילדים')
+    check('FIRST mega-guide title is left untouched', dedupeMegaGuideTitle('המדריך המלא: מינון מגנזיום לילדים', ['נושא אחר לגמרי']) === 'המדריך המלא: מינון מגנזיום לילדים')
+    check('a short core is NOT stripped (no awkward 2-word titles)', dedupeMegaGuideTitle('המדריך המלא: זר כלה', ['המדריך המלא: אחר לגמרי כאן']) === 'המדריך המלא: זר כלה')
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

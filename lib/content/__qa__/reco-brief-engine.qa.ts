@@ -84,6 +84,18 @@ function fakeAdmin(tables: Record<string, Record<string, unknown>[]>) {
   return { from } as never
 }
 
+// Deterministic but structurally varied title frames (mirror the synthesis
+// contract: ≤1 mega-guide opening; subject-led/suffix frames keep alignment).
+const TITLE_FRAMES: ((s: string) => string)[] = [
+  (s) => `המדריך המלא: ${s}`,
+  (s) => `${s}: שאלות ותשובות`,
+  (s) => `${s} — טעויות נפוצות שכדאי להכיר`,
+  (s) => `${s}: מיתוסים ועובדות`,
+  (s) => `${s} — המלצות מעשיות`,
+  (s) => `${s}: צעד אחר צעד`,
+]
+const framedTitle = (i: number, subject: string) => TITLE_FRAMES[i % TITLE_FRAMES.length](subject)
+
 // Natural-Shop-like fixture (health/ecommerce, Hebrew, evidence-rich).
 function naturalShopTables(): Record<string, Record<string, unknown>[]> {
   return {
@@ -221,10 +233,10 @@ async function main() {
           if (i === 1) {
             // DEFECT INJECTION (D3/D5): off-subject truncated keyword → the engine
             // must repair from the brief's own aligned query/subject, never accept.
-            topics.push({ briefId: b.id, title: `מדריך מלא: ${b.subject}`, primaryKeyword: 'איך לבנות דף נחיתה לעסק שמייצר', secondaryKeywords: [], intent: 'informational' })
+            topics.push({ briefId: b.id, title: `${b.subject} — סקירה מעשית`, primaryKeyword: 'איך לבנות דף נחיתה לעסק שמייצר', secondaryKeywords: [], intent: 'informational' })
             return
           }
-          topics.push({ briefId: b.id, title: `המדריך המלא: ${b.subject}`, primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })
+          topics.push({ briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })
         })
         topics.push({ briefId: 'brief_unknown9', title: 'זר', primaryKeyword: 'זר', intent: 'informational' }) // DROPPED: unknown id
         return topics
@@ -277,6 +289,9 @@ async function main() {
     check('E17. NO privacy-policy / pest-control link on any topic', !allLinks.some((u) => u.includes('privacy') || u.includes('/b/pest')), JSON.stringify(allLinks))
     check('E18. topics are accepted even with ZERO links (links never gate acceptance)', run.suggestions.every((s) => Array.isArray(s.suggestedInternalLinks)))
     check('E19. reasons carry NO internal vocabulary (אשכול/cluster/brief/tier)', reasons.every((r) => !/אשכול|cluster|brief|tier/i.test(r)))
+    const { evaluateTitleDiversity } = await import('../recommendations/title-diversity')
+    const div = evaluateTitleDiversity(run.suggestions.map((s) => s.title))
+    check('E21. accepted titles satisfy title-pattern diversity (≤1 mega-guide, ≤2 per skeleton)', div.pass, JSON.stringify(div))
     check('E20. evidence inventory records the ordered KR read + zero load errors', d.evidence_inventory.keyword_research_queries >= 8 && d.evidence_inventory.evidence_load_errors.length === 0, JSON.stringify(d.evidence_inventory.evidence_load_errors))
     server.close()
   }
@@ -284,7 +299,7 @@ async function main() {
   console.log('E2E) premium tier — real Pro when offered, EXPLICIT downgrade when not')
   {
     // Pro offered → premium uses it.
-    const s1 = await startFakeGenai({ models: ['gemini-2.5-flash', 'gemini-2.5-pro'], respond: (briefs) => briefs.map((b) => ({ briefId: b.id, title: `מדריך: ${b.subject}`, primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
+    const s1 = await startFakeGenai({ models: ['gemini-2.5-flash', 'gemini-2.5-pro'], respond: (briefs) => briefs.map((b, i) => ({ briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
     process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${s1.port}`
     resetModelResolutionCache()
     resetRecoGenAiClient()
@@ -296,7 +311,7 @@ async function main() {
     s1.server.close()
 
     // Pro NOT offered → explicit typed downgrade to Flash, run still succeeds.
-    const s2 = await startFakeGenai({ models: ['gemini-2.5-flash'], respond: (briefs) => briefs.map((b) => ({ briefId: b.id, title: `מדריך: ${b.subject}`, primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
+    const s2 = await startFakeGenai({ models: ['gemini-2.5-flash'], respond: (briefs) => briefs.map((b, i) => ({ briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
     process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${s2.port}`
     resetModelResolutionCache()
     resetRecoGenAiClient()
