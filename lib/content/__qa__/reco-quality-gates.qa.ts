@@ -6,7 +6,7 @@
  *   P0-3 headline → search-phrase normalization — 5 live keywords.
  */
 import { evaluateLink, isRelevantLink, sharesSubjectHead } from '../recommendations/link-relevance'
-import { isSameNeedDuplicate, assessNeedCannibalization } from '../recommendations/coverage'
+import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed } from '../recommendations/coverage'
 import { normalizeToSearchPhrase, isSearchPhraseQuality } from '../recommendations/search-phrase'
 import { assessExistingLocalOwnership, deriveCorpusTypeWords, localImprovementCompatible } from '../recommendations/opportunity-validation'
 
@@ -35,6 +35,10 @@ async function main() {
     check('portfolio → freelancer article (verb "לעבוד" only)', irr('תיק עבודות', 'איך לבנות תיק עבודות', 'איך לעבוד כפרילנסר'))
     check('landing page → homepage "דף הבית" (structural "דף" only)', !isRelevantLink(evaluateLink({ primaryKeyword: 'דף נחיתה', title: 'בניית דף נחיתה' }, { url: '/', title: 'דף הבית', role: 'supporting_informational_link' }), 'supporting_informational_link'))
     check('multi vitamin → male multi vitamin ("מולטי" alone, informational)', irr('מולטי ויטמין', 'מולטי ויטמין יומי', 'מולטי ויטמין לגברים'))
+    // ISSUE 2 (live) — evaluative/framing/action words never establish a link.
+    check('Natural: supplements → pilates (framing "חשוב"/"בריאות" only)', irr('תוספי תזונה לבריאות הגבר', 'תוספי תזונה לבריאות הגבר', 'למה חשוב מאוד לבריאות לעשות פילאטיס'))
+    check('Matalon: ad-agency → secretary (comparison "עדיף" + "חברת" only)', irr('חברת פרסום בגוגל מול מנהל קמפיינים פרילנסר', 'חברת פרסום בגוגל מול מנהל קמפיינים פרילנסר', 'עדיף חברת מזכירות או מזכירה פרילנסרית'))
+    check('Matalon: landing page → content (action noun "יצירת" only)', irr('יצירת דף נחיתה', 'יצירת דף נחיתה', 'יצירת תוכן לפרילנסרים'))
 
     // LEGITIMATE links stay relevant (proper roles: products = commercial).
     const rel = (kw: string, title: string, cand: string, role = 'supporting_informational_link') =>
@@ -57,6 +61,11 @@ async function main() {
     }
     check('"פרחי אביה" (mutation of own פרחי אביב) IS external', hasNamedExternalBusiness('פרחי אביה ירושלים', bs).hit)
     check('a legal-suffix name (בע"מ) IS external', hasNamedExternalBusiness('משלוחי פרחים בע"מ', bs).hit)
+    // ISSUE 1 (live) — generic "חברת/קבוצת/רשת X" is NOT a named external business.
+    check('generic "חברת פרסום בגוגל …" is NOT an external business', !hasNamedExternalBusiness('חברת פרסום בגוגל מול מנהל קמפיינים פרילנסר', bs).hit)
+    check('generic "חברת מזכירות …" is NOT an external business', !hasNamedExternalBusiness('עדיף חברת מזכירות או מזכירה פרילנסרית', bs).hit)
+    check('generic "קבוצת פרסום" / "רשת חנויות" are NOT external businesses', !hasNamedExternalBusiness('קבוצת פרסום דיגיטלי', bs).hit && !hasNamedExternalBusiness('רשת חנויות פרחים', bs).hit)
+    check('a real "… group" named brand IS external', hasNamedExternalBusiness('Campaign Masters group', bs).hit)
     const { isTitleKeywordAligned } = await import('../recommendations/coverage')
     check('semantic paraphrase title/keyword PASSES alignment', isTitleKeywordAligned('מחיר סידור פרחים לחתונה', 'כמה עולה סידור פרחים לחתונה? פירוט מחירים'))
     check('truly off-topic keyword/title FAILS alignment', !isTitleKeywordAligned('נעלים לחתן', 'איך לבחור חליפת חתן לחתונה'))
@@ -109,6 +118,20 @@ async function main() {
     check('BUG2: the SAME place is still compatible (containment: "פרחים בית שמש")', localImprovementCompatible('משלוח פרחים בבית שמש', 'פרחים בית שמש'))
     check('BUG2: a legitimate same-place existing page is still owned/improved',
       assessExistingLocalOwnership('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', ['פרחים בית שמש'], flowerCorpus).outcome !== 'distinct')
+
+    // ISSUE 3 (live) — synonym + near-identical need ownership.
+    check('Issue3A: "תוספי מזון" owns-need vs existing "תוספי תזונה" (מזון≈תזונה)',
+      assessNeedCannibalization({ primaryKeyword: 'תוספי מזון מומלצים', title: 'תוספי מזון מומלצים', intent: 'informational' }, [{ title: 'תוספי תזונה מומלצים' }]).matchType === 'owns_need')
+    check('Issue3B: near-identical natural-products page owns the need (coarse howto/info noise ignored)',
+      assessNeedCannibalization({ primaryKeyword: 'מוצרים וטיפולים טבעיים', title: 'לחזור לטבע: כיצד מוצרים וטיפולים טבעיים תורמים לבריאות הגוף והנפש', intent: 'informational' },
+        [{ title: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש' }]).matchType === 'owns_need')
+    // ISSUE 4 (live) — build vs promote are INCOMPATIBLE needs; shared "חנות" alone insufficient.
+    check('Issue4: "הקמת חנות אינטרנטית" NOT owned/improved by "קידום חנות וירטואלית" (build≠promote)',
+      assessNeedCannibalization({ primaryKeyword: 'הקמת חנות אינטרנטית', title: 'הקמת חנות אינטרנטית', intent: 'transactional' }, [{ title: 'קידום חנות וירטואלית' }]).matchType === 'distinct')
+    check('Issue4: even with strong entity overlap, build vs promote stays distinct',
+      assessNeedCannibalization({ primaryKeyword: 'הקמת חנות אינטרנטית מקצועית', title: 'הקמת חנות אינטרנטית מקצועית', intent: 'transactional' }, [{ title: 'קידום חנות אינטרנטית מקצועית' }]).matchType === 'distinct')
+    check('Issue4: incompatibleActionNeed(build, promote) is true; (build, build) is false',
+      incompatibleActionNeed('הקמת חנות', 'קידום חנות') && !incompatibleActionNeed('הקמת חנות', 'בניית חנות'))
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')
@@ -127,6 +150,12 @@ async function main() {
     }
     // The specific price-intent rewrite.
     check('"כמה עולה X" → price phrase "מחיר X"', normalizeToSearchPhrase('כמה עולה סידור פרחים לחתונה? פירוט מחירים', { subject: 'סידור פרחים לחתונה' }).keyword.startsWith('מחיר'))
+    // ISSUE 5 (live) — mid/tail "המדריך ל…" guide framing must not survive.
+    check('Issue5: "ויטמין D המדריך להשוואת סוגים ומינונים" FAILS the quality gate', !isSearchPhraseQuality('ויטמין D המדריך להשוואת סוגים ומינונים'))
+    {
+      const r5 = normalizeToSearchPhrase('ויטמין D המדריך להשוואת סוגים ומינונים', { subject: 'ויטמין D' })
+      check('Issue5: normalized output is clean and drops "המדריך"', isSearchPhraseQuality(r5.keyword) && !/מדריך/.test(r5.keyword) && r5.changed)
+    }
     // A clean short query is left unchanged.
     check('a clean short query passes unchanged', normalizeToSearchPhrase('חנות פרחים בירושלים', { subject: 'חנות פרחים בירושלים' }).changed === false)
   }

@@ -97,8 +97,12 @@ export function containsExternalBusiness(text: string, bs: BrandSafety): boolean
 }
 
 // Explicit business/legal markers — a genuine named-entity signal (not a
-// descriptor). Domain-neutral grammar, not industry content.
-const BUSINESS_SUFFIX_RE = /(?:^|\s)(?:בע["״׳']?מ|ltd\.?|inc\.?|llc|corp\.?|גרופ|group|(?:חברת|קבוצת|רשת)\s+\S)/i
+// descriptor). A LEGAL SUFFIX (בע"מ / Ltd / Inc / LLC / Corp / group) is real
+// evidence of a named company. The grammatical words "חברת"/"קבוצת"/"רשת"
+// ("company of"/"group of"/"chain of") are NOT — "חברת פרסום"/"חברת מזכירות"
+// are generic service descriptions, not named external businesses. Domain-
+// neutral grammar, not industry content.
+const BUSINESS_SUFFIX_RE = /(?:^|\s)(?:בע["״׳']?מ|ltd\.?|inc\.?|llc|corp\.?|גרופ|group)(?:\s|$)/i
 
 // Domain-neutral DESCRIPTORS (colours/sizes/quality) — a common word one edit
 // from an owned token is a descriptor coincidence (roses↔pink), NOT a business

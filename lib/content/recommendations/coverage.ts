@@ -18,7 +18,30 @@
 
 import { distinctiveTokensOf, canonicalToken, canonicalVariants, topicSignature, isHighConfidenceDuplicate } from './semantic-dup'
 import { normalizePhrase } from './keyword-guard'
-import { sharesSubjectHead } from './link-relevance'
+import { sharesSubjectHead, coversAllSubjectHeads } from './link-relevance'
+
+// ACTION / NEED class — building/creating a thing answers a DIFFERENT need than
+// promoting/marketing it. A shared commercial entity head ("חנות") does not make
+// "הקמת חנות" (build a store) and "קידום חנות" (promote a store) the same need.
+const BUILD_ACTIONS = new Set(['הקמת', 'הקמה', 'להקים', 'בניית', 'בנייה', 'לבנות', 'יצירת', 'יצירה', 'ליצור', 'פתיחת', 'לפתוח', 'build', 'create', 'setup'].map(canonicalToken).filter(Boolean))
+const PROMOTE_ACTIONS = new Set(['קידום', 'לקדם', 'שיווק', 'לשווק', 'פרסום', 'לפרסם', 'seo', 'marketing', 'promotion', 'advertising'].map(canonicalToken).filter(Boolean))
+function actionClassOf(text: string): 'build' | 'promote' | null {
+  let build = false, promote = false
+  for (const t of distinctiveTokensOf(text)) {
+    const c = canonicalToken(t)
+    if (BUILD_ACTIONS.has(c) || BUILD_ACTIONS.has(t)) build = true
+    if (PROMOTE_ACTIONS.has(c) || PROMOTE_ACTIONS.has(t)) promote = true
+  }
+  if (build && !promote) return 'build'
+  if (promote && !build) return 'promote'
+  return null
+}
+/** True when two phrases carry INCOMPATIBLE action/need classes (build vs
+ *  promote) — they answer different needs and cannot own/improve each other. */
+export function incompatibleActionNeed(a: string, b: string): boolean {
+  const ca = actionClassOf(a), cb = actionClassOf(b)
+  return ca !== null && cb !== null && ca !== cb
+}
 
 /** Domain-neutral synonym groups (equivalent search intent). Each token maps to
  *  its group representative before comparison. Curated, small, grammar-level. */
@@ -162,6 +185,11 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // אנטוריום/סחלב) differ, so the orchid/anthurium page does NOT own roses. The
     // exact-keyword match below is unaffected (it is identity, not overlap).
     const shareHead = sharesSubjectHead(`${topic.primaryKeyword} ${topic.title}`, docText)
+    // The existing page covers the topic's ENTIRE distinctive subject head → it
+    // owns the need regardless of the coarse-need label (a near-identical page
+    // whose title only adds "כיצד"/framing flips howto↔info but answers the same
+    // need — "לחזור לטבע…" ⇄ "לחזור לטבע…"). Keyed on the primary keyword's heads.
+    const coversHeads = coversAllSubjectHeads(topic.primaryKeyword, docText)
     let mt: CoverageMatchType = 'distinct'
     if (normalizePhrase(doc.focusKeyword || doc.title || '') === topicNorm) mt = 'exact'
     else if (!shareHead) mt = 'distinct'
@@ -169,6 +197,9 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // (covTopic keys on the TOPIC so an existing page with extra tokens/slug
     // words still counts; shared>=2 stops a broad page owning a long-tail).
     else if (covTopic >= 0.75 && sameNeed && shared >= 2) mt = 'owns_need'
+    // Near-identical: existing page covers the topic's WHOLE subject head → owns
+    // the need even if the coarse need label differs (howto vs info noise).
+    else if (coversHeads && shared >= 2) mt = 'owns_need'
     // Same NEED + subject overlap with AT MOST ONE uncovered token — the pages
     // answer the same underlying question (wedding-floral pricing), differing only
     // in an arrangement/design synonym (סידור vs עיצוב). NEED comparison, not
@@ -176,6 +207,10 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     else if (sameNeed && shared >= 2 && covTopic >= 0.6 && uncovered <= 1) mt = 'owns_need'
     // Strong-but-partial overlap of the same need → improve the existing page.
     else if (covTopic >= 0.5 && covDoc >= 0.3 && sameNeed && shared >= 2) mt = 'improve'
+    // ACTION/NEED incompatibility (P0): build/create vs promote/market answer
+    // different needs — a shared commercial entity head ("חנות") cannot make
+    // "הקמת חנות" owned/improved by "קידום חנות". Downgrade to distinct.
+    if ((mt === 'owns_need' || mt === 'improve') && incompatibleActionNeed(`${topic.primaryKeyword} ${topic.title}`, docText)) mt = 'distinct'
     if (mt !== 'distinct') {
       matches.push({ existingTitle: doc.title || (doc.focusKeyword ?? ''), url: doc.url ?? null, matchType: mt, score: Number(Math.max(covTopic, covDoc).toFixed(2)), sharedNeed: shared2.slice(0, 6) })
       if (rank[mt] > rank[best]) best = mt

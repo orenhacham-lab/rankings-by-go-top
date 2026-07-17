@@ -31,7 +31,9 @@ const HOW_MUCH_RE = /^\s*כמה\s+עולה\s+(?:ל)?/
 // HEADLINE second-clause / suffix markers: everything from here on is title fluff.
 // No \b — JS word boundaries do not apply around Hebrew letters; anchor on space.
 const SECOND_CLAUSE_RE = /\s*(?:[?!]|:|\s[—–|]\s|\s-\s)\s*.*$/
-const HEADLINE_TAIL_RE = /\s+(?:ו?איך\s.*|ו?כיצד\s.*|כך\s+ת.*|פירוט\s.*|וגורמי.*|וכל\s+מה.*|טיפים\s.*|ומה\s+עוד.*|המדריך\s+המלא.*|מדריך\s+מלא.*|ש(?:כדאי|חשוב|מומלץ|צריך|רצוי|יכול)\s.*|לחיסכון.*|למשלוח\s.*|ה?מושלם(?:\s.*)?|ה?מצליח(?:ה|ות)?(?:\s.*)?)$/
+// A mid/tail "המדריך ל…" / "מדריך ל…" guide clause is headline framing that
+// describes the subject — "ויטמין D המדריך להשוואת סוגים ומינונים" → "ויטמין D".
+const HEADLINE_TAIL_RE = /\s+(?:ו?איך\s.*|ו?כיצד\s.*|כך\s+ת.*|פירוט\s.*|וגורמי.*|וכל\s+מה.*|טיפים\s.*|ומה\s+עוד.*|ה?מדריך\s+(?:ה?מלא|ה?שלם|ה?מקיף|ל\S).*|מדריך\s+מלא.*|ש(?:כדאי|חשוב|מומלץ|צריך|רצוי|יכול)\s.*|לחיסכון.*|למשלוח\s.*|ה?מושלם(?:\s.*)?|ה?מצליח(?:ה|ות)?(?:\s.*)?)$/
 // A trailing dangling connective left after stripping.
 const DANGLING_TAIL_RE = /\s+(?:של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|with|to)\s*$/i
 

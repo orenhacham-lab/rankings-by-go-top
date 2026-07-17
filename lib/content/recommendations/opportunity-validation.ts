@@ -15,6 +15,7 @@
 
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
+import { incompatibleActionNeed } from './coverage'
 import { normalizePhrase } from './keyword-guard'
 import { subjectTokens, type EntityPageType } from './link-role-mapper'
 import type { SearchIntent } from './opportunity'
@@ -365,6 +366,9 @@ export function assessExistingLocalOwnership(
   for (const pt of existingPageTitles) {
     const p = distinctOf(pt)
     if (p.size === 0) continue
+    // ACTION/NEED incompatibility: building a store ("הקמת חנות") is not owned by
+    // promoting one ("קידום חנות") even in the same place. Different need class.
+    if (incompatibleActionNeed(`${primaryKeyword} ${title}`, pt)) continue
     const shared = [...p].filter((t) => opp.has(t)).length
     // GEOGRAPHIC PRECISION (P0): a SINGLE shared token ("בית") must not make two
     // DIFFERENT places the same service area ("בית שמש" city vs "בית וגן" Jerusalem

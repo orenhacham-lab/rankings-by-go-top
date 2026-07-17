@@ -44,6 +44,12 @@ const ATTRIBUTE_LEXICON_RAW = [
   // the subject). "כמה עולה X" and "מחיר X" must not link via כמה/עולה/מחיר.
   'כמה', 'עולה', 'עולות', 'מחיר', 'מחירים', 'עלות', 'עלויות', 'תקציב', 'תמחור', 'עולים',
   'price', 'cost', 'budget', 'much',
+  // EVALUATIVE / FRAMING / ACTION-NOUN words — a shared "חשוב"/"בריאות"/"עדיף"/
+  // "יצירת" is framing, not a subject relation. Comparison framing ("עדיף") across
+  // unrelated professions, an abstract value word ("חשוב"/"בריאות"), a company
+  // grammatical head ("חברת"), or an action noun ("יצירת" — creating different
+  // objects) can never establish link relevance on its own.
+  'חשוב', 'חשובה', 'בריאות', 'בריאותי', 'עדיף', 'עדיפה', 'חברת', 'יצירת', 'יצירה', 'לעשות', 'עשיית',
 ]
 const ATTRIBUTE_LEXICON = new Set(ATTRIBUTE_LEXICON_RAW.map((w) => canonicalToken(w)).filter(Boolean))
 
@@ -95,6 +101,19 @@ export function sharesSubjectHead(a: string, b: string, typeWords?: Set<string>)
   if (A.size === 0) return false
   for (const t of subjectTokensOf(b, typeWords)) if (A.has(lk(t))) return true
   return false
+}
+
+/** Does docText cover EVERY distinctive subject head of topicText (attribute/
+ *  generic/price/framing words stripped, proclitic/construct folded)? An existing
+ *  page that covers the topic's ENTIRE subject head owns the need even when the
+ *  coarse-need label differs — a near-identical article whose title merely adds a
+ *  "כיצד" flips howto↔info yet answers the same need. Returns false for an empty
+ *  topic head (nothing distinctive to own). */
+export function coversAllSubjectHeads(topicText: string, docText: string, typeWords?: Set<string>): boolean {
+  const heads = subjectTokensOf(topicText, typeWords).map(lk)
+  if (heads.length === 0) return false
+  const doc = new Set(subjectTokensOf(docText, typeWords).map(lk))
+  return heads.every((t) => doc.has(t))
 }
 
 export type LinkRejectionReason =

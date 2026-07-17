@@ -218,6 +218,20 @@ async function main() {
     // VALID cases still PASS: head-overlap improvement (need) + same-place local improvement.
     check('VALID need improvement (shared head פרח/חתונה) → rule PASSES', evaluateRunAcceptance(base({ suggestions: [wfTopic({ recommendedPageType: 'existing_page_improvement' })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'existing_page_improvement_valid_basis')?.pass === true)
     check('VALID same-place local improvement (containment) → rule PASSES', evaluateRunAcceptance(base({ suggestions: [goodTopic('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', { searchIntent: 'local', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'פרחים בית שמש', url: null, matchType: 'improve', score: 1, sharedNeed: [] }] })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'existing_page_improvement_valid_basis')?.pass === true)
+
+    // ── FINAL precision: synonym/near-identical cannibalization + action-class ──
+    // ISSUE 3A — synonym need (מזון≈תזונה) accepted as a new page → FAILS.
+    check('Issue3A: "תוספי מזון" (new page) owned by "תוספי תזונה" → no_existing_need_cannibalization FAILS',
+      failsRule(base({ suggestions: [goodTopic('תוספי מזון מומלצים', 'תוספי מזון מומלצים', { coverageMatches: [{ existingTitle: 'תוספי תזונה מומלצים', url: '/s', matchType: 'owns_need', score: 0.9, sharedNeed: ['תוספ'] }] })], diagnostics: onlyPool1 }), 'no_existing_need_cannibalization'))
+    // ISSUE 3B — near-identical natural-products page accepted as a new page → FAILS.
+    check('Issue3B: near-identical natural-products topic as a new page → no_existing_need_cannibalization FAILS',
+      failsRule(base({ suggestions: [goodTopic('מוצרים וטיפולים טבעיים', 'לחזור לטבע: כיצד מוצרים וטיפולים טבעיים תורמים לבריאות הגוף והנפש', { coverageMatches: [{ existingTitle: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש', url: '/n', matchType: 'owns_need', score: 0.8, sharedNeed: ['טיפול', 'טבעי'] }] })], diagnostics: onlyPool1 }), 'no_existing_need_cannibalization'))
+    // ISSUE 4 — build-vs-promote improvement (action-incompatible basis) → FAILS.
+    check('Issue4: "הקמת חנות" improved-by "קידום חנות" (build≠promote) → existing_page_improvement_valid_basis FAILS',
+      failsRule(base({ suggestions: [goodTopic('הקמת חנות אינטרנטית', 'הקמת חנות אינטרנטית', { searchIntent: 'transactional', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'קידום חנות וירטואלית', url: '/c', matchType: 'improve', score: 0.6, sharedNeed: ['חנות'] }] })], diagnostics: onlyPool1 }), 'existing_page_improvement_valid_basis'))
+    // ISSUE 5 — headline keyword with a "המדריך ל…" tail → search-phrase FAILS.
+    check('Issue5: "ויטמין D המדריך להשוואת סוגים ומינונים" → primary_keyword_search_phrase_quality FAILS',
+      failsRule(base({ suggestions: [goodTopic('ויטמין D המדריך להשוואת סוגים ומינונים', 'השוואת סוגי ויטמין D')], diagnostics: onlyPool1 }), 'primary_keyword_search_phrase_quality'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

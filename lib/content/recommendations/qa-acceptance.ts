@@ -22,7 +22,7 @@ import { distinctiveTokensOf, canonicalVariants } from './semantic-dup'
 import { isBoilerplatePage } from './link-role-mapper'
 import { evaluateTitleDiversity } from './title-diversity'
 import { evaluateLink, isRelevantLink, sharesSubjectHead } from './link-relevance'
-import { isSameNeedDuplicate, isTitleKeywordAligned } from './coverage'
+import { isSameNeedDuplicate, isTitleKeywordAligned, incompatibleActionNeed } from './coverage'
 import { isSearchPhraseQuality } from './search-phrase'
 
 export interface AcceptanceRule {
@@ -178,7 +178,9 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
     if (bases.length === 0) return true // no recorded ownership basis at all
     const topicText = `${s.primaryKeyword} ${s.title}`
     const isLocal = s.searchIntent === 'local'
-    return !bases.some((m) => sharesSubjectHead(topicText, m.existingTitle) && (!isLocal || localImprovementCompatible(topicText, m.existingTitle)))
+    // Valid iff SOME basis shares a subject head, is a compatible ACTION/need
+    // class (build≠promote), and — for a local topic — is the same place.
+    return !bases.some((m) => sharesSubjectHead(topicText, m.existingTitle) && !incompatibleActionNeed(topicText, m.existingTitle) && (!isLocal || localImprovementCompatible(topicText, m.existingTitle)))
   })
   add('existing_page_improvement_valid_basis', invalidImprovement.length === 0, invalidImprovement.map((s) => `"${s.primaryKeyword}" (${s.searchIntent}) ← ${(s.coverageMatches ?? []).map((m) => m.existingTitle).join('/') || 'no basis'}`).join(' · ') || 'none')
 
