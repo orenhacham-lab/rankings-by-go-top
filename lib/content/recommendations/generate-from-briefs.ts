@@ -426,12 +426,16 @@ export async function generateFromBriefs(
     if (ownedByExistingEntity(guard, primaryKeyword)) return { rejectionReason: 'exact_existing_keyword_owner' }
     if (coveredByExistingContent(guard, t.title, primaryKeyword)) return { rejectionReason: 'covered_by_existing_content' }
 
-    // (4.5) EXISTING-CONTENT cannibalization (P0-2, synonym + need aware): an
-    // existing page that already owns the need is not a new article. owns_need →
-    // reject; improve → recommend improving the existing page (not a new article).
+    // (4.5) EXISTING-CONTENT cannibalization (P0-2, synonym + NEED aware): an
+    // existing page that already owns the need is not a NEW separate page. exact
+    // keyword owner → reject; owns_need / improve → CONVERT to an
+    // existing_page_improvement recommendation (never a separate landing page),
+    // carrying the existing URL — the underlying search need is compared, not
+    // exact wording (wedding-floral pricing: סידור vs עיצוב פרחוני).
     const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs)
     const coverageMatches: CoverageMatch[] = cann.matches
-    if (cann.matchType === 'exact' || cann.matchType === 'owns_need') return { rejectionReason: 'existing_content_owns_need' }
+    if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
+    const cannibalImprovement = cann.matchType === 'owns_need' || cann.matchType === 'improve'
 
     // (5) pending-idea ownership: exact + PROVEN high-confidence semantic only.
     const sig = topicSignature(primaryKeyword, intent)
@@ -443,8 +447,9 @@ export async function generateFromBriefs(
     if (acceptedNeeds.some((a) => isSameNeedDuplicate(thisNeed, a))) return { rejectionReason: 'intra_run_need_duplicate' }
 
     // (7) local ownership (existing local/commercial page already owns the intent)
-    // + the coverage 'improve' signal → recommend improving the existing page.
-    let ownershipPageType: RecommendedPageType | null = cann.matchType === 'improve' ? 'existing_page_improvement' : null
+    // + the coverage owns_need/improve signal → recommend improving the existing
+    // page (never a separate landing page for a need an existing page owns).
+    let ownershipPageType: RecommendedPageType | null = cannibalImprovement ? 'existing_page_improvement' : null
     if (intent === 'local' || intent === 'transactional') {
       const own = assessExistingLocalOwnership(primaryKeyword, t.title, existingPageTitles, domainTypeWords)
       if (own.outcome === 'owns') return { rejectionReason: 'exact_existing_keyword_owner' }

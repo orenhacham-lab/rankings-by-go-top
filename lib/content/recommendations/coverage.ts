@@ -39,10 +39,22 @@ export function synonymFold(tok: string): string {
   return SYNONYM_REP.get(tok) ?? tok
 }
 
-/** Distinctive tokens with synonym folding — so מזון and תזונה compare equal. */
+// PRICE / question-framing tokens — captured by the coarse NEED, never part of
+// the SUBJECT (a price question is 'cost'; "כמה עולה"/"מחיר"/"תקציב" must not be
+// the shared distinctive tokens that make two pages "the same subject").
+const PRICE_FRAMING = new Set(
+  ['כמה', 'עולה', 'עולות', 'עולים', 'מחיר', 'מחירים', 'עלות', 'עלויות', 'תקציב', 'תמחור', 'מדריך', 'מלא',
+   'price', 'cost', 'budget', 'much'].map((t) => canonicalToken(t)).filter(Boolean),
+)
+/** Distinctive tokens with synonym folding, MINUS price/question-framing words —
+ *  so מזון≈תזונה and "מחיר סידור פרחים לחתונה" vs "כמה עולה עיצוב פרחוני לחתונה"
+ *  compare on the real subject (floral/wedding), not the price framing. */
 function synonymTokens(phrase: string): Set<string> {
   const out = new Set<string>()
-  for (const t of distinctiveTokensOf(phrase)) { out.add(synonymFold(t)); for (const v of canonicalVariants(t)) out.add(synonymFold(v)) }
+  for (const t of distinctiveTokensOf(phrase)) {
+    if (PRICE_FRAMING.has(t)) continue
+    out.add(synonymFold(t)); for (const v of canonicalVariants(t)) if (!PRICE_FRAMING.has(v)) out.add(synonymFold(v))
+  }
   return out
 }
 
@@ -114,7 +126,14 @@ export interface ExistingCoverageDoc { title: string; url?: string | null; focus
  * folding: full subject coverage + same need = owns_need; partial = improve.
  */
 export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCoverageDoc[]): { matchType: CoverageMatchType; matches: CoverageMatch[] } {
-  const topicSub = synonymTokens(`${topic.primaryKeyword} ${topic.title}`)
+  // Compare on the underlying NEED = the normalized primary keyword's distinctive
+  // subject. A headline title carries marketing tail ("פירוט מחירים וטיפים
+  // לחיסכון") that is NOT part of the need and must not dilute coverage — that
+  // dilution let "מחיר סידור פרחים לחתונה" slip past a "כמה עולה עיצוב פרחוני
+  // לחתונה" page that already owns the wedding-floral pricing need. Fall back to
+  // keyword+title only when the keyword alone has no usable distinctive subject.
+  const topicCore = synonymTokens(topic.primaryKeyword)
+  const topicSub = topicCore.size >= 2 ? topicCore : synonymTokens(`${topic.primaryKeyword} ${topic.title}`)
   const topicNeed = searchNeedOf(topic.primaryKeyword, topic.title, topic.intent)
   const topicNorm = normalizePhrase(topic.primaryKeyword)
   const matches: CoverageMatch[] = []
@@ -135,12 +154,18 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     const sameNeed = docNeed === topicNeed
     const shared2 = Array.from(topicSub).filter((t) => docSub.has(t))
 
+    const uncovered = topicSub.size - shared
     let mt: CoverageMatchType = 'distinct'
     if (normalizePhrase(doc.focusKeyword || doc.title || '') === topicNorm) mt = 'exact'
     // Existing doc covers the topic's subject AND same need → it owns the need
     // (covTopic keys on the TOPIC so an existing page with extra tokens/slug
     // words still counts; shared>=2 stops a broad page owning a long-tail).
     else if (covTopic >= 0.75 && sameNeed && shared >= 2) mt = 'owns_need'
+    // Same NEED + subject overlap with AT MOST ONE uncovered token — the pages
+    // answer the same underlying question (wedding-floral pricing), differing only
+    // in an arrangement/design synonym (סידור vs עיצוב). NEED comparison, not
+    // exact wording.
+    else if (sameNeed && shared >= 2 && covTopic >= 0.6 && uncovered <= 1) mt = 'owns_need'
     // Strong-but-partial overlap of the same need → improve the existing page.
     else if (covTopic >= 0.5 && covDoc >= 0.3 && sameNeed && shared >= 2) mt = 'improve'
     if (mt !== 'distinct') {

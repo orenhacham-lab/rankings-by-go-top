@@ -75,6 +75,20 @@ async function main() {
     const wf = assessNeedCannibalization({ primaryKeyword: 'מחיר סידור פרחים לחתונה', title: 'כמה עולה סידור פרחים לחתונה', intent: 'transactional' },
       [{ title: 'עלות עיצוב פרחים לחתונה', url: '/wedding-floral-design-cost', slug: 'wedding-floral-design-cost' }])
     check('Flowers: wedding-cost topic vs existing cost page = owns/improve', wf.matchType === 'owns_need' || wf.matchType === 'improve')
+    // ROUND-5 EXACT live false-pass: the accepted new topic "מחיר סידור פרחים
+    // לחתונה" (headline "כמה עולה … פירוט מחירים וטיפים לחיסכון") vs the existing
+    // page "כמה עולה עיצוב פרחוני לחתונה? המדריך המלא לתקציב פרחים". The need
+    // (wedding-floral pricing) is the SAME; only the arrangement/design synonym
+    // (סידור vs עיצוב פרחוני) differs, and the marketing tail must not dilute it.
+    const wfLive = assessNeedCannibalization(
+      { primaryKeyword: 'מחיר סידור פרחים לחתונה', title: 'כמה עולה סידור פרחים לחתונה? פירוט מחירים וטיפים לחיסכון', intent: 'transactional' },
+      [{ title: 'כמה עולה עיצוב פרחוני לחתונה? המדריך המלא לתקציב פרחים', url: '/wedding-floral-budget', focusKeyword: 'עיצוב פרחוני לחתונה', slug: 'wedding-floral-budget' }])
+    check('Flowers LIVE: סידור-פרחים pricing owns_need vs existing עיצוב-פרחוני pricing page (need, not wording)', wfLive.matchType === 'owns_need')
+    check('Flowers LIVE: owns_need match carries the existing URL for the improvement', wfLive.matches.some((m) => m.url === '/wedding-floral-budget' && m.matchType === 'owns_need'))
+    // A candidate whose ONLY overlap with the topic is price-question framing
+    // (כמה/עולה/מחיר) is NEVER a relevant support link.
+    check('price-question-only overlap → link IRRELEVANT (no distinctive subject)',
+      !isRelevantLink(evaluateLink({ primaryKeyword: 'מחיר סידור פרחים לחתונה', title: 'כמה עולה סידור פרחים לחתונה? פירוט מחירים' }, { url: '/x', title: 'כמה עולה ביטוח רכב? מדריך מחירים מלא', role: 'supporting_informational_link' }), 'supporting_informational_link'))
     check('distinct topic NOT cannibalized',
       assessNeedCannibalization({ primaryKeyword: 'טיפוח ורדים בבית', title: 'איך לטפח ורדים בבית', intent: 'informational' },
         [{ title: 'משלוח פרחים בירושלים', url: '/d' }]).matchType === 'distinct')

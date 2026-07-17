@@ -40,6 +40,10 @@ const ATTRIBUTE_LEXICON_RAW = [
   // ubiquitous relational / level / structural words
   'רמה', 'רמת', 'רשימה', 'מדריך', 'סקירה', 'מידע', 'כללי', 'שלם', 'שלמה', 'מקיף', 'מקיפה',
   'דף', 'עמוד', 'מולטי', 'multi', 'page',
+  // PRICE / question-framing words — never a distinctive SUBJECT (the need, not
+  // the subject). "כמה עולה X" and "מחיר X" must not link via כמה/עולה/מחיר.
+  'כמה', 'עולה', 'עולות', 'מחיר', 'מחירים', 'עלות', 'עלויות', 'תקציב', 'תמחור', 'עולים',
+  'price', 'cost', 'budget', 'much',
 ]
 const ATTRIBUTE_LEXICON = new Set(ATTRIBUTE_LEXICON_RAW.map((w) => canonicalToken(w)).filter(Boolean))
 

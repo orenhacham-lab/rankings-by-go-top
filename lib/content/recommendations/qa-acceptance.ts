@@ -162,9 +162,10 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   }
   add('no_duplicate_pair', dupPairs.length === 0, dupPairs.join(' · ') || 'none')
 
-  // P0-2 — no accepted topic may duplicate a need an EXISTING page already owns.
-  const cannibalized = suggestions.filter((s) => (s.coverageMatches ?? []).some((m) => m.matchType === 'owns_need' || m.matchType === 'exact'))
-  add('no_existing_need_cannibalization', cannibalized.length === 0, cannibalized.map((s) => `"${s.primaryKeyword}" ← ${(s.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct' && m.matchType !== 'improve').map((m) => m.existingTitle).join('/')}`).join(' · ') || 'none')
+  // P0-2 — a need an EXISTING page owns must NOT be accepted as a separate new
+  // page. It passes ONLY when converted to an existing_page_improvement.
+  const cannibalized = suggestions.filter((s) => (s.coverageMatches ?? []).some((m) => m.matchType === 'owns_need' || m.matchType === 'exact') && s.recommendedPageType !== 'existing_page_improvement')
+  add('no_existing_need_cannibalization', cannibalized.length === 0, cannibalized.map((s) => `"${s.primaryKeyword}" (${s.recommendedPageType ?? 'new page'}) ← ${(s.coverageMatches ?? []).filter((m) => m.matchType === 'owns_need' || m.matchType === 'exact').map((m) => m.existingTitle).join('/')}`).join(' · ') || 'none')
 
   // SEMANTIC alignment (paraphrase passes; only a truly off-topic keyword fails).
   const misaligned = suggestions.filter((s) => !isTitleKeywordAligned(s.primaryKeyword, s.title))
