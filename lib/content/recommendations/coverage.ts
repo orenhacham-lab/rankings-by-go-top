@@ -87,6 +87,22 @@ export function isSameNeedDuplicate(a: TopicNeed, b: TopicNeed): boolean {
   return shared >= 2 && shared / Math.min(subA.size, subB.size) >= 0.6
 }
 
+/**
+ * SEMANTIC title–keyword alignment (P0-2 fix): a keyword is aligned when its
+ * distinctive subject tokens are (mostly) present in the title — synonym/fold
+ * tolerant, so a paraphrase passes ("מחיר סידור פרחים לחתונה" ⇄ "כמה עולה סידור
+ * פרחים לחתונה? …") while a truly off-topic pair fails (shoes keyword under a
+ * suit title). NOT literal wording.
+ */
+export function isTitleKeywordAligned(primaryKeyword: string, title: string): boolean {
+  const kw = synonymTokens(primaryKeyword)
+  if (kw.size === 0) return true // no distinctive subject to contradict
+  const ti = synonymTokens(title)
+  let shared = 0
+  for (const t of kw) if (ti.has(t)) shared++
+  return shared / kw.size >= 0.6
+}
+
 export type CoverageMatchType = 'exact' | 'owns_need' | 'improve' | 'distinct'
 export interface CoverageMatch { existingTitle: string; url: string | null; matchType: CoverageMatchType; score: number; sharedNeed: string[] }
 

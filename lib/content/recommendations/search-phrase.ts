@@ -19,12 +19,19 @@ import { distinctiveTokensOf, canonicalVariants } from './semantic-dup'
 // Function-word OPENERS a search query does not start with (question headline
 // frames). Domain-neutral grammar, not industry content.
 const OPENERS_RE = /^\s*(?:מהי|מהו|מהם|מהן|מה\s+(?:זה|היא|הוא|הם|הן)|כיצד|איך|למה|מדוע|האם|מחפשים|מחפש|רוצים|רוצה|צריכים|צריך|מתלבטים)\s+/
+// GUIDE openers ("המדריך המלא ל…", "מדריך ל…", "כל מה שצריך לדעת על…") — the
+// object that follows is the real subject; a leading ל proclitic is stripped.
+const GUIDE_OPENER_RE = /^\s*(?:ה?מדריך\s+(?:ה?מלא|ה?שלם|ה?מקיף)|ה?מדריך|כל\s+מה\s+ש\S+\s+לדעת(?:\s+על)?)\s+/
+// ACTION openers — INFINITIVE VERBS only ("לבחור/לרכוש/לקנות/להקים/לפתוח X" →
+// the object X). Construct-state NOUN forms (בחירת/רכישת/הקמת) are kept — they
+// ARE the subject ("בחירת ויטמין D").
+const ACTION_OPENER_RE = /^\s*(?:לבחור|לרכוש|לקנות|להקים|לפתוח|למצוא)\s+/
 // "כמה עולה X" / "כמה עולה ל־X" → price intent → "מחיר X".
 const HOW_MUCH_RE = /^\s*כמה\s+עולה\s+(?:ל)?/
 // HEADLINE second-clause / suffix markers: everything from here on is title fluff.
 // No \b — JS word boundaries do not apply around Hebrew letters; anchor on space.
 const SECOND_CLAUSE_RE = /\s*(?:[?!]|:|\s[—–|]\s|\s-\s)\s*.*$/
-const HEADLINE_TAIL_RE = /\s+(?:ו?איך\s.*|ו?כיצד\s.*|כך\s+ת.*|פירוט\s.*|וגורמי.*|וכל\s+מה.*|טיפים\s.*|ומה\s+עוד.*|המדריך\s+המלא.*|מדריך\s+מלא.*|ש(?:כדאי|חשוב|מומלץ|צריך|רצוי|יכול)\s.*|לחיסכון.*)$/
+const HEADLINE_TAIL_RE = /\s+(?:ו?איך\s.*|ו?כיצד\s.*|כך\s+ת.*|פירוט\s.*|וגורמי.*|וכל\s+מה.*|טיפים\s.*|ומה\s+עוד.*|המדריך\s+המלא.*|מדריך\s+מלא.*|ש(?:כדאי|חשוב|מומלץ|צריך|רצוי|יכול)\s.*|לחיסכון.*|למשלוח\s.*|ה?מושלם(?:\s.*)?|ה?מצליח(?:ה|ות)?(?:\s.*)?)$/
 // A trailing dangling connective left after stripping.
 const DANGLING_TAIL_RE = /\s+(?:של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|with|to)\s*$/i
 
@@ -45,6 +52,10 @@ export function stripHeadlineFraming(raw: string): string {
   s = s.replace(HEADLINE_TAIL_RE, '')       // drop appended headline tails
   s = s.replace(OPENERS_RE, '')             // drop leading question opener
   s = s.replace(HOW_MUCH_RE, '')            // drop "כמה עולה"
+  // Guide/action openers → strip the frame and de-proclitic the object (a
+  // leading ל on the next word: "לבחירת" → "בחירת").
+  if (GUIDE_OPENER_RE.test(s)) { s = s.replace(GUIDE_OPENER_RE, '').replace(/^ל(?=[א-ת])/, '') }
+  s = s.replace(ACTION_OPENER_RE, '')
   s = s.replace(DANGLING_TAIL_RE, '')       // drop a dangling connective
   s = s.replace(/\s{2,}/g, ' ').replace(/[?!.,:;"'“”׳״]+$/g, '').trim()
   // Price intent: prefix "מחיר" when the query was a "how much does X cost" form

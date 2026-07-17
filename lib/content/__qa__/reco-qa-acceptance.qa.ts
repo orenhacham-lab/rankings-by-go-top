@@ -29,7 +29,7 @@ const cleanDiag = (over: Partial<BriefRunDiagnostics> = {}): BriefRunDiagnostics
   rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 5, finalCount: 5, model_calls: 1,
   stop_reason: 'true_pool_exhausted', insufficient_inventory: false, secondary_keywords_filtered: 0, target_role_mappings: [],
   brief_consumption: { effectivePoolSize: 6, consumedBriefs: 6, remainingBriefs: 0, callsRemaining: 1 },
-  competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [] },
+  competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [], acceptedMatches: [] },
   cost: { totalCalls: 1, calls: [{ model: 'gemini-2.5-pro', source: 'brief_synthesis', callPurpose: 'primary', inputTokens: 1000, answerOutputTokens: 400, thinkingTokens: 1024, totalBillableOutputTokens: 1424, estimatedCostUsd: 0.02, success: true }], totalPaidCalls: 1, estimatedRunCostUsd: 0.02, estimatedRunCostIls: 0.074, costPerAcceptedTopic: 0.004, configuredCostCeilingUsd: 0.5, remainingBudgetUsd: 0.48, callsPreventedByBudget: 0, configuredMaxCalls: 6 },
   ...over,
 })

@@ -33,7 +33,7 @@ import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, isBoilerplatePage, type
 import { filterLinkPlan } from './link-relevance'
 import { assessNeedCannibalization, isSameNeedDuplicate, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
-import { buildBrandSafety, classifyKeywordEntity, containsExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
+import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON } from './model'
 import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -144,6 +144,7 @@ export interface BriefRunDiagnostics {
   competitorLeakage: {
     researchRejected: string[]; discoveryRejected: string[]; briefRejected: string[]
     acceptedTitle: string[]; acceptedPrimaryKeyword: string[]; acceptedSecondaryKeyword: string[]; acceptedLinkTarget: string[]
+    acceptedMatches: { field: string; value: string; token: string | null; evidence: string }[]
   }
   cost: {
     estimatedRunCostUsd: number; totalCalls: number
@@ -669,14 +670,21 @@ export async function generateFromBriefs(
 
   // Competitor leakage — GROUPED by location (P1). Rejected research/discovery
   // are diagnostics; any external business name in ACCEPTED output is a hard fail.
+  const acceptedMatches: { field: string; value: string; token: string | null; evidence: string }[] = []
+  const namedHit = (field: string, value: string): boolean => {
+    const r = hasNamedExternalBusiness(value, brandSafety)
+    if (r.hit) acceptedMatches.push({ field, value, token: r.token, evidence: r.evidence })
+    return r.hit
+  }
   const competitorLeakage = {
     researchRejected: keywordResearch.filter((k) => classifyKeywordEntity(k.query, brandSafety) === 'suspected_external_business').slice(0, 10).map((k) => k.query),
     discoveryRejected: Object.entries(discovery?.rejected_by_reason ?? {}).filter(([r]) => r === 'discovery_external_business').map(([, n]) => `${n}`),
     briefRejected: [] as string[],
-    acceptedTitle: suggestions.filter((s) => containsExternalBusiness(s.title, brandSafety)).map((s) => s.title),
-    acceptedPrimaryKeyword: suggestions.filter((s) => containsExternalBusiness(s.primaryKeyword, brandSafety)).map((s) => s.primaryKeyword),
-    acceptedSecondaryKeyword: suggestions.flatMap((s) => (s.secondaryKeywords ?? []).filter((k) => containsExternalBusiness(k, brandSafety))),
-    acceptedLinkTarget: suggestions.flatMap((s) => (s.suggestedInternalLinks ?? []).filter((l) => containsExternalBusiness(l.anchor, brandSafety)).map((l) => l.anchor)),
+    acceptedTitle: suggestions.filter((s) => namedHit('title', s.title)).map((s) => s.title),
+    acceptedPrimaryKeyword: suggestions.filter((s) => namedHit('primaryKeyword', s.primaryKeyword)).map((s) => s.primaryKeyword),
+    acceptedSecondaryKeyword: suggestions.flatMap((s) => (s.secondaryKeywords ?? []).filter((k) => namedHit('secondaryKeyword', k))),
+    acceptedLinkTarget: suggestions.flatMap((s) => (s.suggestedInternalLinks ?? []).filter((l) => namedHit('linkTarget', l.anchor)).map((l) => l.anchor)),
+    acceptedMatches,
   }
   return {
     suggestions,

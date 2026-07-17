@@ -37,8 +37,9 @@ const ATTRIBUTE_LEXICON_RAW = [
   'פתרון', 'פתרונות', 'רעיון', 'רעיונות', 'טיפ', 'טיפים', 'design', 'style', 'type',
   // generic business containers
   'משרד', 'חברה', 'עסק', 'עסקי', 'שירות', 'שירותי', 'שירותים', 'מערכת', 'תחום', 'company', 'service',
-  // ubiquitous relational / level words
-  'רמה', 'רמת', 'רשימה', 'מדריך', 'סקירה', 'מידע', 'כללי',
+  // ubiquitous relational / level / structural words
+  'רמה', 'רמת', 'רשימה', 'מדריך', 'סקירה', 'מידע', 'כללי', 'שלם', 'שלמה', 'מקיף', 'מקיפה',
+  'דף', 'עמוד', 'מולטי', 'multi', 'page',
 ]
 const ATTRIBUTE_LEXICON = new Set(ATTRIBUTE_LEXICON_RAW.map((w) => canonicalToken(w)).filter(Boolean))
 
@@ -48,10 +49,36 @@ export function isModifierToken(tok: string, extraTypeWords?: Set<string>): bool
   return GENERIC_TOKENS.has(tok) || ATTRIBUTE_LEXICON.has(tok) || (extraTypeWords?.has(tok) ?? false)
 }
 
-/** Distinctive SUBJECT tokens (canonical) of a phrase, minus generic + attribute
- *  + caller type words. */
+/** Distinctive SUBJECT tokens of a phrase, minus generic/attribute/type words,
+ *  but KEEPING single latin letters + digit-bearing tokens (a vitamin letter
+ *  "C"/"D", "B12", "K2", "1000") — these are the SPECIFIC differentiators the
+ *  base tokenizer drops, and losing them let Vitamin-C→Vitamin-D match. */
 export function subjectTokensOf(phrase: string, extraTypeWords?: Set<string>): string[] {
-  return distinctiveTokensOf(phrase).filter((t) => !isModifierToken(t, extraTypeWords))
+  const out: string[] = []
+  for (const w of (phrase || '').toLowerCase().replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ').split(/\s+/).filter(Boolean)) {
+    if (/^[a-z]$/.test(w) || /\d/.test(w)) { out.push(w); continue } // keep C / D / B12 / 1000
+    for (const t of distinctiveTokensOf(w)) if (!isModifierToken(t, extraTypeWords)) out.push(t)
+  }
+  return Array.from(new Set(out))
+}
+
+/** The SPECIFIC differentiator of a subject: a digit/short-latin token only
+ *  (B12, C, D, K2, 1000). Returns null for a purely-Hebrew subject — there the
+ *  head/≥2-token rules decide, and a required-specific check must NOT apply
+ *  (it wrongly rejected סידור פרחים ↔ סידורי פרחים / roses↔rose-bouquet). */
+export function specificToken(subjectTokens: string[]): string | null {
+  return subjectTokens.find((t) => /\d/.test(t) || /^[a-z]{1,3}$/.test(t)) ?? null
+}
+
+const LINK_PROCLITICS = 'והבלמשכ'
+/** Link-matching key: proclitic strip + construct/feminine ־י/־ה fold, so
+ *  סידור/סידורי and חתונה/חתונ compare equal without changing the global
+ *  semantic-dup normalizer. */
+function lk(t: string): string {
+  let s = t
+  if (/^[א-ת]/.test(s) && s.length >= 4 && LINK_PROCLITICS.includes(s[0])) s = s.slice(1)
+  if (/^[א-ת]+$/.test(s) && s.length >= 4) s = s.replace(/[יה]$/, '')
+  return s
 }
 
 export type LinkRejectionReason =
@@ -94,23 +121,34 @@ export interface OpportunitySubject {
  * distinctive subject tokens. coverageOwned = the candidate's subject set covers
  * the opportunity's full distinctive subject (it owns the need — not a support).
  */
+const COMMERCIAL_ROLES = new Set(['primary_commercial_target', 'secondary_commercial_target'])
+
 export function evaluateLink(
   opp: OpportunitySubject,
   candidate: { url: string; title: string; role?: string },
   opts?: { typeWords?: Set<string>; boilerplate?: boolean },
 ): LinkRelevanceDiagnostic {
   const tw = opts?.typeWords
-  // The SEARCH TARGET's own subject head = distinctive tokens of the KEYWORD.
-  const headTokens = new Set(subjectTokensOf(opp.primaryKeyword, tw).flatMap((t) => canonicalVariants(t)))
-  const oppSubject = new Set(subjectTokensOf(`${opp.primaryKeyword} ${opp.title}`, tw).flatMap((t) => canonicalVariants(t)))
+  const role = candidate.role ?? 'unknown'
+  const isCommercial = COMMERCIAL_ROLES.has(role)
+  // The SEARCH TARGET's own subject head = distinctive tokens of the KEYWORD
+  // (single latin/digit differentiators kept).
+  const headRaw = subjectTokensOf(opp.primaryKeyword, tw)
+  const headKeys = new Set(headRaw.map(lk))
+  const oppSubjectRaw = subjectTokensOf(`${opp.primaryKeyword} ${opp.title}`, tw)
+  const oppSubject = new Set(oppSubjectRaw.map(lk))
   const candSubjectRaw = subjectTokensOf(candidate.title, tw)
-  const candSubject = new Set(candSubjectRaw.flatMap((t) => canonicalVariants(t)))
+  const candKeys = new Set(candSubjectRaw.map(lk))
 
-  const sharedSubject = Array.from(new Set(candSubjectRaw.filter((t) => canonicalVariants(t).some((v) => oppSubject.has(v)))))
-  const sharedHead = sharedSubject.filter((t) => canonicalVariants(t).some((v) => headTokens.has(v)))
+  const sharedSubject = Array.from(new Set(candSubjectRaw.filter((t) => oppSubject.has(lk(t)))))
+  const sharedHead = sharedSubject.filter((t) => headKeys.has(lk(t)))
+  // The opportunity's SPECIFIC differentiator (a vitamin letter / code) MUST be
+  // shared when present — separates Vitamin-C from Vitamin-D, B12 from weight-loss.
+  const spec = specificToken(headRaw.length ? headRaw : oppSubjectRaw)
+  const specOk = spec == null || candKeys.has(lk(spec))
 
   const diag: LinkRelevanceDiagnostic = {
-    targetUrl: candidate.url, targetTitle: candidate.title, role: candidate.role ?? 'unknown',
+    targetUrl: candidate.url, targetTitle: candidate.title, role,
     sharedDistinctiveTokens: sharedSubject, semanticRelation: 'none', rejectionReasons: [],
     acceptedBecause: null, isHomepage: isHomepageUrl(candidate.url), coverageOwned: false,
   }
@@ -118,28 +156,35 @@ export function evaluateLink(
   if (opts?.boilerplate) { diag.rejectionReasons.push('boilerplate_page'); return diag }
 
   // Coverage: the candidate's subject covers the opportunity's ENTIRE distinctive
-  // subject → it OWNS the need. For an INFORMATIONAL link this is a
-  // coverage/cannibalization signal (not a support); for a COMMERCIAL target it
-  // is the money page (kept). isRelevantLink decides by role.
-  if (oppSubject.size >= 2 && Array.from(oppSubject).every((t) => candSubject.has(t))) {
+  // subject → it OWNS the need. For an INFORMATIONAL link this is cannibalization;
+  // for a COMMERCIAL target it is the money page (kept).
+  if (oppSubject.size >= 2 && Array.from(oppSubject).every((t) => candKeys.has(t))) {
     diag.coverageOwned = true
     diag.rejectionReasons.push('coverage_owns_need')
   }
 
-  if (sharedHead.length >= 1) {
-    diag.semanticRelation = 'subject_head_shared'
-    diag.acceptedBecause = `shares subject head: ${sharedHead.join(', ')}`
-    return diag
+  // COMMERCIAL target: a single shared HEAD token qualifies ONLY when the
+  // opportunity's specific differentiator (if any) is also shared (an exact owned
+  // product/category head), OR ≥2 shared, OR it owns the subject.
+  if (isCommercial) {
+    if (diag.coverageOwned) { diag.semanticRelation = 'subject_head_shared'; diag.acceptedBecause = 'commercial page owns the subject'; return diag }
+    if (sharedHead.length >= 1 && specOk) { diag.semanticRelation = 'subject_head_shared'; diag.acceptedBecause = `commercial: owned head${spec ? ` + specific (${spec})` : ''}`; return diag }
+    if (sharedSubject.length >= 2 && specOk) { diag.semanticRelation = 'multi_subject_shared'; diag.acceptedBecause = `commercial: ≥2 subject tokens${spec ? ` incl. specific (${spec})` : ''}`; return diag }
+  } else {
+    // INFORMATIONAL / source: require TWO meaningful distinctive subject tokens
+    // AND (when present) the specific differentiator — a single stemmed/generic
+    // token never qualifies (המדריך/מלא/דף/פירות/זריקות/לעבוד/מולטי alone rejected).
+    if (sharedSubject.length >= 2 && specOk) {
+      diag.semanticRelation = 'multi_subject_shared'
+      diag.acceptedBecause = `≥2 distinctive subject tokens${spec ? ` incl. specific (${spec})` : ''}: ${sharedSubject.join(', ')}`
+      return diag
+    }
   }
-  if (sharedSubject.length >= 2) {
-    diag.semanticRelation = 'multi_subject_shared'
-    diag.acceptedBecause = `shares ≥2 distinctive subject tokens: ${sharedSubject.join(', ')}`
-    return diag
-  }
+
   // Not relevant — classify why.
-  if (sharedSubject.length === 1) diag.rejectionReasons.push('single_non_head_token_only')
+  if (spec != null && !specOk && sharedSubject.length >= 1) diag.rejectionReasons.push('single_non_head_token_only')
+  else if (sharedSubject.length >= 1) diag.rejectionReasons.push('single_non_head_token_only')
   else {
-    // Any shared token was attribute/generic, or there was no overlap at all.
     const candAll = new Set(distinctiveTokensOf(candidate.title).flatMap((t) => canonicalVariants(t)))
     const oppAll = new Set(distinctiveTokensOf(`${opp.primaryKeyword} ${opp.title}`).flatMap((t) => canonicalVariants(t)))
     const sharedAny = Array.from(oppAll).some((t) => candAll.has(t))
@@ -148,15 +193,12 @@ export function evaluateLink(
   return diag
 }
 
-const COMMERCIAL_ROLES = new Set(['primary_commercial_target', 'secondary_commercial_target'])
-
-/** Role-aware relevance. A commercial (money) target that OWNS the subject is
- *  valid; an informational/support link that owns the need is cannibalization. */
+/** Role-aware relevance verdict (the acceptedBecause/rejectionReasons already
+ *  encode the decision; a homepage that shares nothing meaningful is rejected). */
 export function isRelevantLink(diag: LinkRelevanceDiagnostic, role?: string): boolean {
-  if (diag.semanticRelation === 'none') return false
-  if (diag.rejectionReasons.some((r) => r === 'boilerplate_page')) return false
-  if (diag.coverageOwned) return COMMERCIAL_ROLES.has(role ?? diag.role)
-  return diag.rejectionReasons.length === 0
+  const r = role ?? diag.role
+  if (diag.coverageOwned) return COMMERCIAL_ROLES.has(r) && diag.semanticRelation !== 'none'
+  return diag.semanticRelation !== 'none' && !diag.rejectionReasons.some((x) => x === 'boilerplate_page')
 }
 
 /**

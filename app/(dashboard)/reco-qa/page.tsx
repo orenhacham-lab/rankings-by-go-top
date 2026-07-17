@@ -191,8 +191,8 @@ export default function RecoQaPage() {
             )}
             {(() => {
               const cost = r.run?.cost as CostTelemetry | undefined
-              const cl = r.run?.competitorLeakage as { researchRejected?: string[]; acceptedTitle?: string[]; acceptedPrimaryKeyword?: string[]; acceptedSecondaryKeyword?: string[]; acceptedLinkTarget?: string[] } | undefined
-              const acceptedLeak = cl ? [...(cl.acceptedTitle ?? []), ...(cl.acceptedPrimaryKeyword ?? []), ...(cl.acceptedSecondaryKeyword ?? []), ...(cl.acceptedLinkTarget ?? [])] : []
+              const cl = r.run?.competitorLeakage as { researchRejected?: string[]; acceptedTitle?: string[]; acceptedPrimaryKeyword?: string[]; acceptedSecondaryKeyword?: string[]; acceptedLinkTarget?: string[]; acceptedMatches?: { field: string; value: string; token: string | null; evidence: string }[] } | undefined
+              const acceptedLeak = cl ? (cl.acceptedMatches ?? []).map((m) => `${m.field}:"${m.value}" [${m.token} · ${m.evidence}]`) : []
               return (
                 <>
                   {cost && (
@@ -219,8 +219,11 @@ export default function RecoQaPage() {
                     {(t0.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct').length > 0 && (
                       <div className="text-amber-600" dir="rtl">כיסוי קיים: {(t0.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct').map((m) => `${m.existingTitle} (${m.matchType} ${m.score})`).join(' · ')}</div>
                     )}
-                    {(t0.linkDiagnostics ?? []).length > 0 && (
-                      <div className="text-slate-400" dir="ltr">{(t0.linkDiagnostics ?? []).map((l) => `${l.targetTitle} [${l.role}] ${l.acceptedBecause ? '✓ ' + l.acceptedBecause : '✗ ' + l.rejectionReasons.join(',')}`).join(' · ')}</div>
+                    {(t0.linkDiagnostics ?? []).filter((l) => !!l.acceptedBecause).length > 0 && (
+                      <div className="text-emerald-600" dir="ltr">✓ links: {(t0.linkDiagnostics ?? []).filter((l) => !!l.acceptedBecause).map((l) => `${l.targetTitle} [${l.role}] ${l.acceptedBecause}`).join(' · ')}</div>
+                    )}
+                    {(t0.linkDiagnostics ?? []).filter((l) => !l.acceptedBecause).length > 0 && (
+                      <div className="text-rose-400/80" dir="ltr">✗ rejected: {(t0.linkDiagnostics ?? []).filter((l) => !l.acceptedBecause).map((l) => `${l.targetTitle} (${l.rejectionReasons.join(',')})`).join(' · ')}</div>
                     )}
                     {(t0.linkDiagnostics ?? []).length === 0 && t0.links.length > 0 && <div className="text-slate-400" dir="ltr">{t0.links.map((l) => l.url).join(' · ')}</div>}
                   </div>

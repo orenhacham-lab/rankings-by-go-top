@@ -27,16 +27,38 @@ async function main() {
     check('digital office → office services (container "משרד" only)', irr('משרד דיגיטל', 'שירותי משרד דיגיטל', 'שירותי משרד לפרילנסרים'))
     check('spec document → SEO profit (no overlap)', irr('מסמך אפיון', 'מהו מסמך אפיון', 'רווחיות SEO לעסקים'))
     check('spec document → branding (no overlap)', irr('מסמך אפיון', 'מהו מסמך אפיון', 'מיתוג עסקי מקצועי'))
-    // LEGITIMATE links stay relevant.
+    // ROUND-4 single-token tightening — one generic/stemmed token never qualifies.
+    check('guide/structural words only (מדריך/מלא/בחירת) → irrelevant', irr('בחירת ויטמין D', 'המדריך המלא לבחירת ויטמין D', 'איך לבחור מזרן מומלץ'))
+    check('Vitamin C fruits → Vitamin D fruits (category "פירות"; C≠D)', irr('ויטמין C בפירות', 'ויטמין C בפירות', 'ויטמין D בפירות'))
+    check('B12 injections → weight-loss injections (form "זריקות"; no B12)', irr('B12 זריקות', 'זריקות B12 למבוגרים', 'זריקות להרזיה'))
+    check('portfolio → freelancer article (verb "לעבוד" only)', irr('תיק עבודות', 'איך לבנות תיק עבודות', 'איך לעבוד כפרילנסר'))
+    check('landing page → homepage "דף הבית" (structural "דף" only)', !isRelevantLink(evaluateLink({ primaryKeyword: 'דף נחיתה', title: 'בניית דף נחיתה' }, { url: '/', title: 'דף הבית', role: 'supporting_informational_link' }), 'supporting_informational_link'))
+    check('multi vitamin → male multi vitamin ("מולטי" alone, informational)', irr('מולטי ויטמין', 'מולטי ויטמין יומי', 'מולטי ויטמין לגברים'))
+
+    // LEGITIMATE links stay relevant (proper roles: products = commercial).
     const rel = (kw: string, title: string, cand: string, role = 'supporting_informational_link') =>
       isRelevantLink(evaluateLink({ primaryKeyword: kw, title }, { url: '/p/x', title: cand, role }), role)
-    check('roses → rose bouquet (subject head shared)', rel('ורדים ורודים', 'איך לשמור על ורדים ורודים', 'זר ורדים אדומים'))
-    check('roses → rose care guide (subject head shared)', rel('ורדים ורודים', 'איך לשמור על ורדים ורודים', 'טיפוח ורדים בבית'))
-    check('Vitamin D level → Vitamin D supplement (subject head)', rel('רמה מומלצת ויטמין D בדם', 'רמה מומלצת של ויטמין D בדם', 'תוסף ויטמין D 1000'))
+    check('roses article → rose bouquet PRODUCT (commercial single head)', rel('ורדים ורודים', 'איך לשמור על ורדים ורודים', 'זר ורדים אדומים', 'primary_commercial_target'))
+    check('Vitamin D level → Vitamin D supplement PRODUCT (commercial, D shared)', rel('רמה מומלצת ויטמין D בדם', 'רמה מומלצת של ויטמין D בדם', 'תוסף ויטמין D 1000', 'primary_commercial_target'))
+    check('flower-arrangement article → arrangement guide (≥2 subject: סידור+פרח)', rel('סידור פרחים לחתונה', 'סידור פרחים לחתונה', 'סידורי פרחים לאירועים'))
     check('spec-document article → spec-writing SERVICE (commercial owns subject)', rel('מסמך אפיון', 'מהו מסמך אפיון', 'שירותי כתיבת מסמך אפיון', 'primary_commercial_target'))
     // A page that owns the informational need is NOT a supporting link.
     const cov = evaluateLink({ primaryKeyword: 'מסמך אפיון', title: 'מהו מסמך אפיון' }, { url: '/b/x', title: 'מסמך אפיון: מדריך מלא', role: 'supporting_informational_link' })
     check('page owning the need → coverage signal, not a supporting link', cov.coverageOwned && !isRelevantLink(cov, 'supporting_informational_link'))
+  }
+
+  console.log('R4) strict external-business (generic phrases never fail; real names do)')
+  {
+    const { buildBrandSafety, hasNamedExternalBusiness } = await import('../recommendations/brand-safety')
+    const bs = buildBrandSafety({ businessName: 'פרחי אביב', entityNames: ['פרחי אביב זר כלה', 'פרחי אביב ורדים אדומים', 'פרחי אביב גיבסניות'], ownEvidence: ['משלוח פרחים'] })
+    for (const g of ['ורדים ורודים', 'גיבסניות לבנות', 'מסמך אפיון', 'עיצוב חופה', 'ויטמין D', 'תוספי תזונה', 'תיק עבודות', 'דף נחיתה']) {
+      check(`generic "${g}" is NOT an external business`, !hasNamedExternalBusiness(g, bs).hit)
+    }
+    check('"פרחי אביה" (mutation of own פרחי אביב) IS external', hasNamedExternalBusiness('פרחי אביה ירושלים', bs).hit)
+    check('a legal-suffix name (בע"מ) IS external', hasNamedExternalBusiness('משלוחי פרחים בע"מ', bs).hit)
+    const { isTitleKeywordAligned } = await import('../recommendations/coverage')
+    check('semantic paraphrase title/keyword PASSES alignment', isTitleKeywordAligned('מחיר סידור פרחים לחתונה', 'כמה עולה סידור פרחים לחתונה? פירוט מחירים'))
+    check('truly off-topic keyword/title FAILS alignment', !isTitleKeywordAligned('נעלים לחתן', 'איך לבחור חליפת חתן לחתונה'))
   }
 
   console.log('P0-2) cannibalization + need duplicates')

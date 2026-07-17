@@ -31,6 +31,10 @@ export interface BrandSafety {
   /** Business-TYPE tokens the project's own entities repeatedly use (e.g. פרחי/פרחים):
    *  the "[type] + [unknown name]" shape is what marks an external business. */
   typeVocab: Set<string>
+  /** Owned NAME phrases (business + entity name token arrays, ≥2 tokens) — used
+   *  to detect an external impersonation: a near-copy of an owned name with one
+   *  token mutated (פרחי אביב → פרחי אביה). */
+  namePhrases: string[][]
 }
 
 /** Build brand safety purely from project-owned evidence — no external input. */
@@ -51,7 +55,8 @@ export function buildBrandSafety(input: {
   for (const n of entityNames) for (const t of new Set(toks(n))) df.set(t, (df.get(t) ?? 0) + 1)
   const typeVocab = new Set<string>()
   for (const [t, d] of df) if (d >= 2 && !GENERIC_TOKENS.has(t)) typeVocab.add(t)
-  return { ownBrandTerms, ownBrandTokens, ownVocab, typeVocab }
+  const namePhrases = [...ownBrandTerms, ...entityNames.map(toks)].filter((a) => a.length >= 2)
+  return { ownBrandTerms, ownBrandTokens, ownVocab, typeVocab, namePhrases }
 }
 
 function ownBrandPresent(textToks: Set<string>, bs: BrandSafety): boolean {
@@ -89,6 +94,58 @@ export function classifyKeywordEntity(query: string, bs: BrandSafety): KeywordEn
 export function containsExternalBusiness(text: string, bs: BrandSafety): boolean {
   if (!text) return false
   return classifyKeywordEntity(text, bs) === 'suspected_external_business'
+}
+
+// Explicit business/legal markers — a genuine named-entity signal (not a
+// descriptor). Domain-neutral grammar, not industry content.
+const BUSINESS_SUFFIX_RE = /(?:^|\s)(?:בע["״׳']?מ|ltd\.?|inc\.?|llc|corp\.?|גרופ|group|(?:חברת|קבוצת|רשת)\s+\S)/i
+
+// Domain-neutral DESCRIPTORS (colours/sizes/quality) — a common word one edit
+// from an owned token is a descriptor coincidence (roses↔pink), NOT a business
+// name. These are exempt from the named-entity-mutation signal.
+const DESCRIPTOR_TOKENS = new Set(
+  ['לבן', 'לבנה', 'לבנים', 'לבנות', 'שחור', 'אדום', 'אדומים', 'כחול', 'ירוק', 'צהוב', 'כתום', 'סגול',
+   'ורוד', 'ורודה', 'ורודים', 'ורודות', 'חום', 'אפור', 'זהב', 'כסף', 'בז', 'קטן', 'גדול', 'בינוני',
+   'ענק', 'רחב', 'צר', 'ארוך', 'קצר', 'חדש', 'ישן', 'טבעי', 'טבעית'].map((t) => toks(t)[0]).filter(Boolean),
+)
+
+/**
+ * STRICT named-external-business detection for ACCEPTED output (hard-fail gate).
+ * The broad classifier flags any "[own type] + [unknown word]" shape, so a
+ * colour/descriptor ("ורדים ורודים") looks like a business — catastrophically
+ * false-positive on generic titles. A HARD failure requires a genuine
+ * proper-name signal backed by evidence:
+ *   (a) an explicit business/legal suffix (בע"מ / Ltd / group / חברת …), OR
+ *   (b) a NAMED-ENTITY MUTATION of an own-brand/type token (the live אביב→אביה
+ *       shape — an unknown token one edit from an owned name).
+ * A generic multi-word phrase, product, vitamin, flower, service or search
+ * phrase never qualifies. Returns the matched token + source evidence.
+ */
+export function hasNamedExternalBusiness(text: string, bs: BrandSafety): { hit: boolean; token: string | null; evidence: string } {
+  if (!text) return { hit: false, token: null, evidence: '' }
+  const suffix = text.match(BUSINESS_SUFFIX_RE)
+  if (suffix) return { hit: true, token: suffix[0].trim(), evidence: 'business_legal_suffix' }
+  // IMPERSONATION: a window of text tokens matches an owned NAME phrase in all
+  // positions but one, where that one differs by a single edit (פרחי אביב →
+  // פרחי אביה). Phrase-level so it never fires on a coincidental 1-edit of a
+  // single generic/type token (ורדים↔ורודים).
+  const tt = toks(text)
+  for (const phrase of bs.namePhrases) {
+    const n = phrase.length
+    for (let i = 0; i + n <= tt.length; i++) {
+      const win = tt.slice(i, i + n)
+      let diffs = 0, mutatedTo = '', mutatedFrom = ''
+      for (let k = 0; k < n; k++) {
+        if (win[k] === phrase[k]) continue
+        diffs++
+        if (diffs > 1) break
+        if (Math.abs(win[k].length - phrase[k].length) <= 1 && editDistance(win[k], phrase[k]) === 1 && !DESCRIPTOR_TOKENS.has(win[k]) && !bs.ownVocab.has(win[k])) { mutatedTo = win[k]; mutatedFrom = phrase[k] }
+        else { diffs = 2; break }
+      }
+      if (diffs === 1 && mutatedTo) return { hit: true, token: mutatedTo, evidence: `named_entity_mutation_of:${mutatedFrom}` }
+    }
+  }
+  return { hit: false, token: null, evidence: '' }
 }
 
 // ── unsafe named-entity mutation ──────────────────────────────────────────────
