@@ -205,6 +205,11 @@ export interface PrimaryKeywordQualityResult { ok: boolean; repairedKeyword?: st
 // ("… בשמים מתוקים ואיך"). Domain-neutral function words, not content.
 const TRUNCATED_KW_RE = /(?:^|\s)(?:ואיך|וכיצד|ומה|ולמה|ואיפה|ומתי|ו|של|עם|או|כי|and|or|how|why|the|of|for|with)$/i
 
+/** Public truncation probe (QA/acceptance): a keyword ending mid-thought. */
+export function isTruncatedKeywordPhrase(keyword: string): boolean {
+  return TRUNCATED_KW_RE.test((keyword || '').trim())
+}
+
 export function validatePrimaryKeywordQuality(
   primaryKeyword: string,
   title: string,

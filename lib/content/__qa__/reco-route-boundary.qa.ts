@@ -136,7 +136,8 @@ async function main() {
     const i18nHe = read('lib/i18n/dashboard/he.ts')
     check('G. no content-plan mode selector / cost / calls / up-to-30 wording in the card', !/planMode|PLAN_MODES|planSafeNote|planFewFound|cost_per_accepted|actual_calls/.test(ui))
     check('G. the up-to-30 / plan i18n keys were removed', !/planSafeNote|planFewFound|planModeQuick/.test(i18nHe))
-    check('G. body sends no mode/requestedCount', !/requestedCount: PLAN_MODES/.test(ui) && /JSON\.stringify\(\{ projectId: requestProjectId, source, keyword: keyword\.trim\(\), clientRequestId \}\)/.test(ui))
+    check('G. body sends qualityMode EXPLICITLY on every request (no requestedCount)', !/requestedCount: PLAN_MODES/.test(ui) && /JSON\.stringify\(\{ projectId: requestProjectId, source, keyword: keyword\.trim\(\), clientRequestId, qualityMode \}\)/.test(ui))
+    check('G/D10. operator quality selector exists (flag-gated) with truthful model labels', /NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'/.test(ui) && /reco-quality-mode/.test(ui) && /qualityPro/.test(ui) && /qualityDowngraded/.test(ui))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

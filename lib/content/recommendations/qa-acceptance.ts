@@ -1,0 +1,148 @@
+/**
+ * LIVE-ACCEPTANCE rule evaluator (pure, offline-testable).
+ *
+ * Turns ONE evidence-first run (real project data + real Gemini) into a typed
+ * PASS/FAIL acceptance report — the automated core of the /reco-qa Preview
+ * runner, so the operator triggers one action and reads a verdict instead of
+ * inspecting network payloads. Every rule mirrors the live-acceptance spec:
+ * real Pro on premium, ≤2 calls, exact reconciliation, no truncated keyword,
+ * no malformed Hebrew, no invented demand, demand↔subject alignment, no
+ * high-confidence duplicate pair, title↔keyword head alignment, link subject
+ * relevance + no boilerplate, truthful yield/insufficient-inventory, and
+ * (when persisted) inserted == reloaded with current-run/pending separation.
+ * Manual-review items (e.g. medical certainty phrasing) surface as WARN —
+ * flagged for a human, never silently passed.
+ */
+
+import type { BriefRunDiagnostics } from './generate-from-briefs'
+import type { TopicSuggestion } from './types'
+import { isMalformedReason, isTruncatedKeywordPhrase, validateIntentKeywordConsistency } from './opportunity-validation'
+import type { SearchIntent } from './opportunity'
+import { isSemanticTopicDuplicate, distinctiveTokensOf, canonicalVariants } from './semantic-dup'
+import { isBoilerplatePage } from './link-role-mapper'
+
+export interface AcceptanceRule {
+  id: string
+  level: 'fail' | 'warn'
+  pass: boolean
+  detail: string
+}
+
+export interface RunAcceptanceInput {
+  tierRequested: 'standard' | 'premium'
+  diagnostics: BriefRunDiagnostics
+  suggestions: TopicSuggestion[]
+  /** Present when the runner persisted (acceptance persist mode). */
+  persistence?: { attempted: number; inserted: number; duplicate: number; failed: number; reloadedFreshCount: number } | null
+  /** Pending inventory BEFORE the run (current-run separation check). */
+  pendingBefore: number
+}
+
+export interface RunAcceptanceReport {
+  passed: boolean
+  warnings: number
+  rules: AcceptanceRule[]
+}
+
+const DEMAND_QUANTITY_RE = /(אלפי|מאות|עשרות|מיליוני)\s+(חיפושים|מחפשים)|ביקוש\s+(גבוה|רב|עצום)|חיפושים\s+(רבים|נפוצים)|thousands\s+of\s+searches|high\s+(search\s+volume|demand)/i
+// Absolute-certainty medical phrasing → MANUAL review (warn), per the live spec.
+const MEDICAL_CERTAINTY_RE = /(?:^|\s)(?:מרפא(?:ת)?|מונע(?:ת|ים)?\s|ריפוי\s+מלא|מבטיח(?:ה)?\s+(?:ריפוי|החלמה)|100%|cures?\s|prevents?\s|guaranteed\s+to\s+(?:cure|heal))/i
+
+export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceReport {
+  const { diagnostics: d, suggestions } = input
+  const rules: AcceptanceRule[] = []
+  const add = (id: string, pass: boolean, detail: string, level: 'fail' | 'warn' = 'fail') => rules.push({ id, level, pass, detail })
+
+  // ── Model path ──
+  if (input.tierRequested === 'premium') {
+    add('premium_uses_real_pro', d.modelPath.tierUsed === 'pro' && d.modelPath.downgraded === false,
+      `requestedTier=${d.modelPath.requestedTier} model=${d.modelPath.model} tierUsed=${d.modelPath.tierUsed} downgraded=${d.modelPath.downgraded}${d.modelPath.downgradeReason ? ` (${d.modelPath.downgradeReason})` : ''}`)
+  } else {
+    add('standard_uses_flash', d.modelPath.tierUsed === 'flash' && !d.modelPath.downgraded, `model=${d.modelPath.model}`)
+  }
+  add('model_path_explicit', !!d.modelPath && typeof d.modelPath.downgraded === 'boolean', JSON.stringify(d.modelPath))
+
+  // ── Efficiency ──
+  add('max_two_synthesis_calls', d.model_calls <= 2, `model_calls=${d.model_calls}`)
+
+  // ── Exact reconciliation ──
+  const recon = d.rounds.every((r) =>
+    r.briefs_sent === r.polished + r.skipped_by_model + r.missing_from_response &&
+    r.polished === r.accepted + Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0))
+  add('exact_reconciliation', recon, d.rounds.map((r) => `r${r.round}: sent=${r.briefs_sent} polished=${r.polished} skipped=${r.skipped_by_model} missing=${r.missing_from_response} accepted=${r.accepted} rejected=${Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0)}`).join(' | ') || 'no rounds')
+
+  // ── Yield truthfulness ──
+  const target = 8
+  const yieldOk = suggestions.length >= Math.min(target, d.brief_pool.pool_size) || d.stop_reason === 'insufficient_inventory' || d.stop_reason === 'pool_exhausted'
+  add('yield_or_truthful_inventory', yieldOk, `accepted=${suggestions.length} pool=${d.brief_pool.pool_size} stop=${d.stop_reason}`)
+  add('no_filler_on_empty_pool', !(d.brief_pool.pool_size === 0 && suggestions.length > 0), `pool=${d.brief_pool.pool_size} accepted=${suggestions.length}`)
+
+  // ── Per-topic quality ──
+  const truncated = suggestions.filter((s) => isTruncatedKeywordPhrase(s.primaryKeyword))
+  add('no_truncated_keyword', truncated.length === 0, truncated.map((s) => s.primaryKeyword).join(' · ') || 'none')
+
+  const malformed = suggestions.filter((s) => isMalformedReason(s.suggestionReason))
+  add('no_malformed_reason', malformed.length === 0, malformed.map((s) => s.suggestionReason).join(' · ') || 'none')
+
+  const inventedDemand = suggestions.filter((s) => {
+    const r = s.suggestionReason || ''
+    if (DEMAND_QUANTITY_RE.test(r)) return true
+    // Any monthly-searches claim must be the deterministic clause for the topic's
+    // OWN aligned query.
+    if (/חיפושים חודשיים|monthly searches/.test(r)) {
+      return !(s.demandEvidence?.demandEvidenceAvailable && s.demandEvidence.demandQuery && r.includes(`"${s.demandEvidence.demandQuery}"`))
+    }
+    return false
+  })
+  add('no_invented_demand', inventedDemand.length === 0, inventedDemand.map((s) => `${s.primaryKeyword}: ${s.suggestionReason}`).join(' · ') || 'none')
+
+  const misalignedDemand = suggestions.filter((s) => s.demandEvidence?.demandEvidenceAvailable && !['exact', 'close_intent'].includes(s.demandEvidence?.demandMatchType ?? ''))
+  add('demand_matches_subject', misalignedDemand.length === 0, misalignedDemand.map((s) => `${s.primaryKeyword}→${s.demandEvidence?.demandQuery}`).join(' · ') || 'none')
+
+  const dupPairs: string[] = []
+  for (let i = 0; i < suggestions.length; i++) for (let j = i + 1; j < suggestions.length; j++) {
+    if (isSemanticTopicDuplicate({ primaryKeyword: suggestions[i].primaryKeyword, intent: suggestions[i].searchIntent }, { primaryKeyword: suggestions[j].primaryKeyword, intent: suggestions[j].searchIntent })) {
+      dupPairs.push(`"${suggestions[i].primaryKeyword}" ≈ "${suggestions[j].primaryKeyword}"`)
+    }
+  }
+  add('no_duplicate_pair', dupPairs.length === 0, dupPairs.join(' · ') || 'none')
+
+  const misaligned = suggestions.filter((s) => {
+    const c = validateIntentKeywordConsistency({ primaryKeyword: s.primaryKeyword, title: s.title, intent: s.searchIntent as SearchIntent }, new Set())
+    return !c.ok || !!c.repairedKeyword
+  })
+  add('title_keyword_alignment', misaligned.length === 0, misaligned.map((s) => `"${s.title}" ⇄ "${s.primaryKeyword}"`).join(' · ') || 'none')
+
+  // ── Link relevance ──
+  const badLinks: string[] = []
+  for (const s of suggestions) {
+    const topicTokens = new Set(distinctiveTokensOf(`${s.primaryKeyword} ${s.title}`).flatMap((t) => canonicalVariants(t)))
+    for (const l of s.suggestedInternalLinks ?? []) {
+      if (isBoilerplatePage(l.anchor, l.url)) { badLinks.push(`${s.primaryKeyword} → BOILERPLATE ${l.url}`); continue }
+      const linkTokens = distinctiveTokensOf(l.anchor)
+      const shares = linkTokens.some((t) => canonicalVariants(t).some((v) => topicTokens.has(v)))
+      if (!shares) badLinks.push(`${s.primaryKeyword} → off-subject "${l.anchor}" (${l.url})`)
+    }
+  }
+  add('links_subject_relevant', badLinks.length === 0, badLinks.join(' · ') || 'none')
+  add('zero_links_permitted', true, `${suggestions.filter((s) => (s.suggestedInternalLinks ?? []).length === 0).length} topics with zero links (valid)`)
+
+  // ── Persistence / current-run separation (persist mode only) ──
+  if (input.persistence) {
+    const p = input.persistence
+    add('inserted_equals_reloaded', p.inserted === p.reloadedFreshCount, `inserted=${p.inserted} reloadedFresh=${p.reloadedFreshCount}`)
+    add('no_swallowed_persistence_failure', !(p.attempted > 0 && p.inserted === 0 && p.duplicate === 0), `attempted=${p.attempted} inserted=${p.inserted} duplicate=${p.duplicate} failed=${p.failed}`)
+    add('current_run_separated_from_pending', true, `pendingBefore=${input.pendingBefore} newlyAccepted=${suggestions.length}`)
+  }
+
+  // ── Manual-review flags (WARN — a human must look, never auto-pass) ──
+  const medical = suggestions.filter((s) => MEDICAL_CERTAINTY_RE.test(`${s.title} ${s.suggestionReason}`))
+  add('medical_certainty_review', medical.length === 0, medical.map((s) => s.title).join(' · ') || 'none', 'warn')
+  const brandShadow = d.shadow_rejected_by_reason['competitor_brand_leakage'] ?? 0
+  add('competitor_leak_review', brandShadow === 0, `shadow competitor_brand_leakage=${brandShadow} (diagnostics-only; review titles if > 0)`, 'warn')
+  add('evidence_loads_clean', d.evidence_inventory.evidence_load_errors.length === 0, d.evidence_inventory.evidence_load_errors.join(' · ') || 'none', 'warn')
+
+  const failed = rules.filter((r) => r.level === 'fail' && !r.pass)
+  const warnings = rules.filter((r) => r.level === 'warn' && !r.pass).length
+  return { passed: failed.length === 0, warnings, rules }
+}

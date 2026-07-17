@@ -142,6 +142,11 @@ export const dashboardHe = {
       rejectSelected: 'דחה נבחרים',
       // Phase 3F.3 — persisted ideas: find-more, per-card reject, empty states.
       findMore: 'מצא רעיונות נוספים',
+      // Operator-only model-tier selector (flag-gated; never shown to customers).
+      qualityFast: 'מהיר — Gemini Flash',
+      qualityPro: 'איכותי — Gemini Pro',
+      qualityModelUsed: 'הרצה אחרונה: {model}',
+      qualityDowngraded: 'שים לב: התבקש מודל Pro אך הוא אינו זמין למפתח הנוכחי — הריצה בוצעה עם {model}. אין שדרוג שקט; זה תועד באבחון.',
       reject: 'דחה',
       rejecting: 'דוחה…',
       noSavedIdeas: 'אין רעיונות שמורים כרגע. אפשר ליצור רעיונות חדשים.',

@@ -123,6 +123,24 @@ export default function AutomationIdeas({
   // any individual source). Selection only; nothing runs until the user clicks.
   const [source, setSource] = useState<Source>('hybrid')
   const [keyword, setKeyword] = useState('')
+  // Model tier (Phase 2 — explicit, truthful): sent on EVERY generate request.
+  // The selector is OPERATOR-facing (Preview / flag-gated); customers never see
+  // model names or costs. The choice is remembered locally per operator.
+  const QUALITY_SELECTOR_ENABLED = process.env.NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'
+  const [qualityMode, setQualityMode] = useState<'standard' | 'premium'>(() => {
+    if (typeof window === 'undefined') return QUALITY_SELECTOR_ENABLED ? 'premium' : 'standard'
+    const saved = window.localStorage.getItem('reco-quality-mode')
+    if (saved === 'premium' || saved === 'standard') return saved
+    // In the operator/Preview environment the acceptance default is Pro.
+    return QUALITY_SELECTOR_ENABLED ? 'premium' : 'standard'
+  })
+  const chooseQuality = (m: 'standard' | 'premium') => {
+    setQualityMode(m)
+    try { window.localStorage.setItem('reco-quality-mode', m) } catch { /* private mode */ }
+  }
+  // Preview-only truthfulness: the ACTUAL model path of the last run (never shown
+  // to customers — present only when server diagnostics are enabled).
+  const [modelPath, setModelPath] = useState<{ requestedTier: string; model: string | null; tierUsed: string; downgraded: boolean; downgradeReason: string | null } | null>(null)
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
@@ -222,7 +240,7 @@ export default function AutomationIdeas({
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId }),
+        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId, qualityMode }),
       })
       const data = await res.json().catch(() => ({}))
       if (reqId !== reqRef.current) return // a newer request superseded this one
@@ -266,6 +284,10 @@ export default function AutomationIdeas({
         // Phase 4C — per-provider status for a hybrid run (partial-failure transparency).
         providers: Array.isArray(data.meta?.providers) ? data.meta.providers : undefined,
       })
+      // TRUTHFUL model path (operator/Preview only — present only when server
+      // diagnostics are enabled; customers never receive it).
+      const mp = data.meta?.isolationDebug?.briefDiagnostics?.modelPath
+      setModelPath(mp && typeof mp === 'object' ? mp : null)
     } catch {
       if (reqId !== reqRef.current) return
       setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error', newlyAdded: 0 })
@@ -609,7 +631,35 @@ export default function AutomationIdeas({
         <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
           {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate)}
         </Button>
+        {/* OPERATOR quality selector (flag-gated; hidden from customers). The chosen
+            tier is sent EXPLICITLY on every request and remembered locally. */}
+        {QUALITY_SELECTOR_ENABLED && (
+          <div className="flex items-center gap-1 text-[11px]" data-testid="reco-quality-selector">
+            {(['premium', 'standard'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => chooseQuality(m)}
+                className={`rounded-full border px-2 py-0.5 transition-colors ${qualityMode === m
+                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300'
+                  : 'border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400'}`}
+              >
+                {m === 'premium' ? t.qualityPro : t.qualityFast}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Preview-only model-path truthfulness: what ACTUALLY ran, and a clear
+          operator warning when a premium request was explicitly downgraded. */}
+      {modelPath && QUALITY_SELECTOR_ENABLED && !loading && (
+        <p className={`text-[11px] mb-2 ${modelPath.downgraded ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`} data-testid="reco-model-path">
+          {modelPath.downgraded
+            ? t.qualityDowngraded.replace('{model}', String(modelPath.model ?? '—'))
+            : t.qualityModelUsed.replace('{model}', String(modelPath.model ?? '—'))}
+        </p>
+      )}
 
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>

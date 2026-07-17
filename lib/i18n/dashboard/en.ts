@@ -144,6 +144,11 @@ export const dashboardEn = {
       rejectSelected: 'Reject selected',
       // Phase 3F.3 — persisted ideas: find-more, per-card reject, empty states.
       findMore: 'Find more ideas',
+      // Operator-only model-tier selector (flag-gated; never shown to customers).
+      qualityFast: 'Fast — Gemini Flash',
+      qualityPro: 'Quality — Gemini Pro',
+      qualityModelUsed: 'Last run: {model}',
+      qualityDowngraded: 'Note: a Pro model was requested but is not available to the current API key — the run used {model}. Never silent; recorded in diagnostics.',
       reject: 'Reject',
       rejecting: 'Rejecting…',
       noSavedIdeas: 'No saved ideas yet. Generate new ideas to get started.',
