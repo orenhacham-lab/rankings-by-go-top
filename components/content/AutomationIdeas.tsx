@@ -194,6 +194,18 @@ export default function AutomationIdeas({
   // Monotonic request id: only the latest generate() call is allowed to write
   // state, so a slow earlier response can never overwrite a newer one.
   const reqRef = useRef(0)
+  // LIVE project scope (cross-project display-leak fix): the closure-captured
+  // `projectId` inside generate() is frozen at click time, so comparing it to
+  // itself can never detect a mid-flight project switch. This ref always holds
+  // the CURRENT project; switching projects also invalidates in-flight requests.
+  const currentProjectRef = useRef(projectId)
+  useEffect(() => {
+    if (currentProjectRef.current !== projectId) {
+      currentProjectRef.current = projectId
+      reqRef.current++ // any in-flight response for the previous project is stale
+      setLoading(false)
+    }
+  }, [projectId])
 
   async function generate() {
     if (loading) return
@@ -217,7 +229,7 @@ export default function AutomationIdeas({
       // Hard scope check: reject a response bound to a different project / request.
       if (res.ok && ((data?.meta?.projectId && data.meta.projectId !== requestProjectId) ||
                      (data?.meta?.clientRequestId && data.meta.clientRequestId !== clientRequestId) ||
-                     requestProjectId !== projectId)) {
+                     requestProjectId !== currentProjectRef.current)) {
         return // stale/cross-project response — discard, never write another project's list
       }
       if (!res.ok) {

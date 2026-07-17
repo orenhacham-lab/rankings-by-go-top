@@ -107,21 +107,35 @@ export interface SynthOpportunity {
   clusterId?: string
 }
 
-/** Defensive parse of the model's JSON into opportunity candidates. */
-export function parseOpportunities(text: string): SynthOpportunity[] {
+/** Exact parse accounting (E-reconciliation): every model-emitted item is either a
+ *  usable candidate or a COUNTED drop — nothing the run paid for vanishes silently. */
+export interface ParsedOpportunities {
+  items: SynthOpportunity[]
+  /** Emitted-but-unusable items (missing title/primaryKeyword), by count. */
+  droppedItems: number
+  /** True when the whole body failed to parse as JSON (nothing recoverable). */
+  parseFailed: boolean
+  /** Model-emitted item count BEFORE any drop (items.length + droppedItems). */
+  emitted: number
+}
+
+/** Defensive parse of the model's JSON into opportunity candidates + exact drop
+ *  accounting. parseOpportunities (below) keeps the legacy items-only shape. */
+export function parseOpportunitiesDetailed(text: string): ParsedOpportunities {
   let parsed: { topics?: unknown }
   try { parsed = JSON.parse(text) } catch {
     const m = (text || '').match(/\{[\s\S]*\}/)
-    if (!m) return []
-    try { parsed = JSON.parse(m[0]) } catch { return [] }
+    if (!m) return { items: [], droppedItems: 0, parseFailed: true, emitted: 0 }
+    try { parsed = JSON.parse(m[0]) } catch { return { items: [], droppedItems: 0, parseFailed: true, emitted: 0 } }
   }
   const arr = Array.isArray((parsed as { topics?: unknown }).topics) ? (parsed as { topics: unknown[] }).topics : []
   const out: SynthOpportunity[] = []
+  let droppedItems = 0
   for (const t of arr) {
     const o = t as Record<string, unknown>
     const title = String(o.title ?? '').trim()
     const primaryKeyword = String(o.primaryKeyword ?? '').trim()
-    if (!title || !primaryKeyword) continue
+    if (!title || !primaryKeyword) { droppedItems++; continue }
     out.push({
       title, primaryKeyword,
       secondaryKeywords: Array.isArray(o.secondaryKeywords) ? o.secondaryKeywords.filter((s): s is string => typeof s === 'string' && !!s.trim()).slice(0, 4) : [],
@@ -130,5 +144,10 @@ export function parseOpportunities(text: string): SynthOpportunity[] {
       clusterId: typeof o.clusterId === 'string' ? o.clusterId : undefined,
     })
   }
-  return out
+  return { items: out, droppedItems, parseFailed: false, emitted: arr.length }
+}
+
+/** Legacy shape — items only (delegates to the detailed parser). */
+export function parseOpportunities(text: string): SynthOpportunity[] {
+  return parseOpportunitiesDetailed(text).items
 }

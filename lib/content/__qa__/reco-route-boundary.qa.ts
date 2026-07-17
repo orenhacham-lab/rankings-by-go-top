@@ -60,8 +60,12 @@ async function main() {
   {
     const route = read('app/api/content/automation/recommendations/route.ts')
     check('A. content-plan is gated behind RECO_ENABLE_CONTENT_PLAN', /RECO_ENABLE_CONTENT_PLAN === '1'/.test(route) && /const useContentPlan/.test(route))
-    check('A. the DEFAULT (else) branch calls generateOpportunities with targetCount 15', /generateOpportunities\(auth\.admin, \{ projectId: auth\.project\.id, targetCount: 15/.test(route))
+    const defaultBlock = route.split('// DEFAULT — EVIDENCE-FIRST brief engine')[1]?.split('pathContract')[0] ?? ''
+    check('A. the DEFAULT (else) branch calls the EVIDENCE-FIRST brief engine', /generateFromBriefs\(auth\.admin, \{ projectId: auth\.project\.id, targetCount: 12, qualityMode \}/.test(route) && defaultBlock.includes('generateFromBriefs') && !defaultBlock.includes('generateOpportunities('))
+    check('A. the tiered generator is reachable ONLY behind RECO_TIERED_OPPORTUNITIES', /RECO_TIERED_OPPORTUNITIES === '1'/.test(route) && route.split('else if (useTiered)')[1]?.split('} else ')[0]?.includes('generateOpportunities') === true)
     check('A. generateContentPlan is only reached inside the flag branch (not the default)', route.split('else if (useContentPlan)')[1]?.includes('generateContentPlan') && !route.split('} else {').pop()!.includes('generateContentPlan'))
+    check('A/D10. premium is ACCEPTED (no 400) and threaded into the engine', !/premium_not_available/.test(route) && /qualityMode: 'standard' \| 'premium'/.test(route) && /qualityMode \}, controller\)|targetCount: 12, qualityMode \}/.test(route))
+    check('A/D10. the model path is surfaced in Preview diagnostics', /model_path: briefDiagnostics\?\.modelPath/.test(route) && /briefDiagnostics: briefDiagnostics \?\? null/.test(route))
   }
 
   console.log('B) unsafe brand + relevance gates are diagnostics-only (source)')

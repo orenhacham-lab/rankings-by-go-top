@@ -11,6 +11,7 @@
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
+import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
 import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
@@ -71,12 +72,11 @@ export async function POST(request: Request) {
   const clientRequestId = typeof body.clientRequestId === 'string' ? body.clientRequestId : null
   const diagnostics = process.env.RECO_ISOLATION_DIAGNOSTICS === '1'
   const excludePendingContext = diagnostics && body.excludePendingContext === true
-  // Premium (Pro curator) is NOT implemented yet — a premium request is explicitly
-  // rejected (never silently downgraded to standard). Standard = Flash only.
-  if (body.qualityMode === 'premium') {
-    return Response.json({ suggestions: [], error: 'premium_not_available', meta: { source, reason: 'premium_not_available', qualityMode: 'premium', persisted: false, newlyAddedCount: 0 } }, { status: 400 })
-  }
-  const qualityMode: 'standard' = 'standard'
+  // Model tier (Phase 2 — explicit, truthful): 'standard' = Flash-class,
+  // 'premium' = a VALIDATED Pro-class model for the (single) synthesis call.
+  // When the key does not offer a Pro-class model the run proceeds on standard
+  // with an EXPLICIT downgrade record in diagnostics — never silent, never a 400.
+  const qualityMode: 'standard' | 'premium' = body.qualityMode === 'premium' ? 'premium' : 'standard'
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
@@ -126,6 +126,7 @@ export async function POST(request: Request) {
     // zero result is a TYPED no_safe_opportunities returned inside the opportunity-first
     // architecture — legacy product-derived suggestions never reach the response.
     let opportunityDiagnostics: import('@/lib/content/recommendations/generate-opportunities').OpportunityDiagnostics | null = null
+    let briefDiagnostics: import('@/lib/content/recommendations/generate-from-briefs').BriefRunDiagnostics | null = null
     let contentPlanDiag: import('@/lib/content/recommendations/content-plan').ContentPlanResult['diagnostics'] | null = null
     let generationPath: 'opportunity_first' | 'legacy_explicit' = 'opportunity_first'
     let legacyUsed = false
@@ -134,15 +135,17 @@ export async function POST(request: Request) {
     let fallbackReason: string | null = null
     let result: Awaited<ReturnType<typeof generateRecommendations>>
     const useLegacy = process.env.RECO_LEGACY_PATH === '1'
-    // Stabilization Phase 1 — the DEFAULT is the single opportunity-first path
-    // (generateOpportunities → deterministic validation → route dedup → persist →
-    // reload). The batched content-plan is EXPERIMENTAL and unreachable unless
-    // RECO_ENABLE_CONTENT_PLAN=1 (default OFF); it is never the default path.
+    // Phase 4 — the DEFAULT is the EVIDENCE-FIRST brief engine (deterministic
+    // OpportunityBrief pool → one batched polish call → deterministic validation).
+    // RECO_TIERED_OPPORTUNITIES=1 rolls back to the previous tiered generator;
+    // RECO_ENABLE_CONTENT_PLAN=1 keeps the experimental batched plan reachable;
+    // RECO_LEGACY_PATH=1 stays the explicit legacy rollback. All default OFF.
     const useContentPlan = !useLegacy && process.env.RECO_ENABLE_CONTENT_PLAN === '1'
+    const useTiered = !useLegacy && !useContentPlan && process.env.RECO_TIERED_OPPORTUNITIES === '1'
     if (useLegacy) {
       // EXPLICIT operational rollback ONLY.
       generationPath = 'legacy_explicit'; legacyUsed = true; fallbackReason = 'explicit_legacy_mode'
-      result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode })
+      result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode: 'standard' })
     } else if (useContentPlan) {
       // EXPERIMENTAL bulk content-plan (flag-gated). No customer-facing up-to-30 /
       // shortfall / validator / cost / snapshot wording — everything is Preview-only.
@@ -153,15 +156,23 @@ export async function POST(request: Request) {
       discoveryUsed = plan.opportunityDiagnostics.discoveryUsed
       fallbackReason = plan.opportunityDiagnostics.fallbackReason
       result = { suggestions: plan.suggestions, meta: { source, generated: plan.diagnostics.generated_candidates, skippedDuplicates: 0, finalCount: plan.suggestions.length, attempts: 1, reason: plan.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: plan.diagnostics.actual_calls, rawCandidates: plan.diagnostics.generated_candidates, path: 'opportunity_first' } : undefined } }
-    } else {
-      // DEFAULT — single opportunity-first generation (recovery tiers). Never legacy.
-      const controller = newRunCostController(qualityMode, generationRunId, 15)
+    } else if (useTiered) {
+      // ROLLBACK — the previous tiered opportunity generator (flag-gated).
+      const controller = newRunCostController('standard', generationRunId, 15)
       const opp = await generateOpportunities(auth.admin, { projectId: auth.project.id, targetCount: 15, maxClusters: 12 }, controller)
       opportunityDiagnostics = opp.diagnostics
       recoveryTierUsed = opp.diagnostics.recoveryTierUsed
       discoveryUsed = opp.diagnostics.discoveryUsed
       fallbackReason = opp.diagnostics.fallbackReason
       result = { suggestions: opp.suggestions, meta: { source, generated: opp.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: opp.suggestions.length, attempts: opp.diagnostics.tiers.length, reason: opp.suggestions.length === 0 ? 'no_safe_opportunities' : undefined, runtimeDiag: diagnostics ? { totalCalls: opp.diagnostics.model_calls, rawCandidates: opp.diagnostics.generated_opportunities, path: 'opportunity_first', recoveryTierUsed, discoveryUsed, fallbackReason } : undefined } }
+    } else {
+      // DEFAULT — EVIDENCE-FIRST brief engine (Phase 4). One controller per run;
+      // premium mode may use a validated Pro-class model for the synthesis call.
+      const controller = newRunCostController(qualityMode, generationRunId, 12)
+      const run = await generateFromBriefs(auth.admin, { projectId: auth.project.id, targetCount: 12, qualityMode }, controller)
+      briefDiagnostics = run.diagnostics
+      fallbackReason = run.diagnostics.insufficient_inventory ? 'insufficient_inventory' : null
+      result = { suggestions: run.suggestions, meta: { source, generated: run.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: run.suggestions.length, attempts: run.diagnostics.rounds.length, reason: run.suggestions.length === 0 ? (run.diagnostics.insufficient_inventory ? 'insufficient_inventory' : 'no_safe_opportunities') : undefined, runtimeDiag: diagnostics ? { totalCalls: run.diagnostics.model_calls, rawCandidates: run.diagnostics.generated_opportunities, path: 'evidence_first_briefs', modelPath: run.diagnostics.modelPath, stopReason: run.diagnostics.stop_reason } : undefined } }
     }
     // Generation-path contract — customer-safe only (NO content-plan/up-to-30/shortfall/
     // validator/cost/snapshot fields). Technical detail stays in Preview isolationDebug.
@@ -349,7 +360,7 @@ export async function POST(request: Request) {
     const rawGeneratedCount = result.meta.generated ?? 0
     const engineAcceptedCount = result.suggestions.length
     const engineFiltered = Math.max(0, rawGeneratedCount - engineAcceptedCount)
-    const engineRejectedByReason = opportunityDiagnostics?.rejected_by_reason ?? {}
+    const engineRejectedByReason = briefDiagnostics?.rejected_by_reason ?? opportunityDiagnostics?.rejected_by_reason ?? {}
     const routeRejectedByReason = () => ({ title_exists: filteredTitleExists, exact_existing_keyword_owner: exactExistingKeywordOwner, source_only_entity_expansion: sourceOnlyEntityExpansion, covered_by_existing_content: filteredCoveredByContent, primary_keyword_exists: filteredPrimaryKeywordExists, intra_run_removed: intraRun.removed, intra_run_merged: intraRun.merged })
 
     // F/B — persist the EXACT fresh array; capture the typed persistence outcome.
@@ -371,7 +382,7 @@ export async function POST(request: Request) {
       persistence_duplicate: persistOutcome?.duplicate ?? 0,
       persistence_failed: persistOutcome?.failed ?? 0,
       persistence_failure: persistOutcome?.failure ?? null,
-      pipeline: { raw_generated_count: rawGeneratedCount, engine_accepted_count: engineAcceptedCount, engine_rejected_by_reason: engineRejectedByReason, engine_shadow_rejected_by_reason: opportunityDiagnostics?.shadow_rejected_by_reason ?? {}, route_fresh_count: fresh.length, route_rejected_by_reason: routeRejectedByReason(), persistence_attempted_count: persistOutcome?.attempted ?? fresh.length, persistence_inserted_count: persistOutcome?.inserted ?? 0, persistence_duplicate_count: persistOutcome?.duplicate ?? 0, persistence_failed_count: persistOutcome?.failed ?? 0 },
+      pipeline: { raw_generated_count: rawGeneratedCount, engine_accepted_count: engineAcceptedCount, engine_rejected_by_reason: engineRejectedByReason, engine_shadow_rejected_by_reason: briefDiagnostics?.shadow_rejected_by_reason ?? opportunityDiagnostics?.shadow_rejected_by_reason ?? {}, model_path: briefDiagnostics?.modelPath ?? null, route_fresh_count: fresh.length, route_rejected_by_reason: routeRejectedByReason(), persistence_attempted_count: persistOutcome?.attempted ?? fresh.length, persistence_inserted_count: persistOutcome?.inserted ?? 0, persistence_duplicate_count: persistOutcome?.duplicate ?? 0, persistence_failed_count: persistOutcome?.failed ?? 0 },
       contentPlan: contentPlanDiag ?? null,
     } : undefined
 
@@ -404,7 +415,7 @@ export async function POST(request: Request) {
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, ...(persistenceTrace ?? {}) } : undefined,
+        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, ...(persistenceTrace ?? {}) } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
 
@@ -477,6 +488,7 @@ export async function POST(request: Request) {
       // Opportunity-first pipeline funnel (evidence → clusters → tiers → synthesis →
       // worthiness → link-roles). Full safe funnel so live validation needs no DB.
       opportunityDiagnostics: opportunityDiagnostics ?? null,
+      briefDiagnostics: briefDiagnostics ?? null,
       // Idempotency (J) — this run actually executed generation (not a replay).
       inFlightHit: false,
       recentReplayHit: false,

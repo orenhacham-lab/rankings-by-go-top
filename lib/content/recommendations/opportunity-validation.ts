@@ -110,10 +110,16 @@ const INFORMATIONAL_INTENTS = new Set<SearchIntent>(['informational', 'compariso
  *  informational title never used) and — unless keepGeneric — generic modifiers. Keeps
  *  original surface words (Hebrew-safe), capped. keepGeneric preserves delivery/location
  *  intent words (e.g. משלוח) for local/transactional repairs. */
+const MAX_REPAIRED_KW_TOKENS = 10
 function repairKeywordFromTitle(title: string, drop: Set<string>, keepGeneric = false): string {
   const main = title.split(/[:—–]|(?:\s-\s)/)[0] || title
   const kept = main.split(/\s+/).filter(Boolean).filter((w) => { const n = normalizePhrase(w); return n && !drop.has(n) && (keepGeneric || !GENERIC_TOKENS.has(n)) })
-  return kept.slice(0, 6).join(' ').trim()
+  // NEVER cut mid-clause. The previous hard 6-word slice manufactured truncated
+  // keywords in live runs ("איך לבנות דף נחיתה לעסק שמייצר" — cut before its
+  // object): a repaired keyword is the title's FULL main clause (bounded), or no
+  // repair at all — an over-long clause fails repair instead of being truncated.
+  if (kept.length > MAX_REPAIRED_KW_TOKENS) return ''
+  return kept.join(' ').trim()
 }
 
 /**
@@ -170,6 +176,19 @@ export function validateIntentKeywordConsistency(
   // General: the keyword should overlap the title (describe the same subject).
   const overlap = kw.filter((t) => titleSet.has(t)).length / kw.length
   if (overlap < 0.34) return repairOr(new Set())
+
+  // SUBJECT-HEAD alignment: the keyword's head (its first distinctive content
+  // token — in Hebrew the construct-state subject noun) must appear in the title
+  // unless the keyword and title already share >= 2 distinctive tokens. The proven
+  // live defect: a groom-SUIT title carrying keyword "נעלים לחתן" passed on the
+  // 0.34 any-token overlap because the audience token ("לחתן") matched while the
+  // subject noun ("נעלים") contradicted the title's subject ("חליפה").
+  const kwDistinctToks = kw.filter((t) => !GENERIC_TOKENS.has(t))
+  const kwHead = kwDistinctToks[0]
+  if (kwHead) {
+    const sharedDistinct = kwDistinctToks.filter((t) => titleSet.has(t)).length
+    if (!titleSet.has(kwHead) && sharedDistinct < 2) return repairOr(new Set())
+  }
   return { ok: true }
 }
 
@@ -206,7 +225,9 @@ export function validatePrimaryKeywordQuality(
   if (distinctive.length === 0 || (titleDistinctive.length > 0 && !sharesTitleSubject)) {
     const repaired = repairKeywordFromTitle(title, new Set(), false)
     const rt = toks(repaired)
-    if (rt.some((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t)) && normalizePhrase(repaired) !== normalizePhrase(primaryKeyword)) return { ok: true, repairedKeyword: repaired }
+    // A repaired keyword must ALSO pass the truncation test — the no-distinctive
+    // branch previously skipped it (asymmetric with the truncated branch above).
+    if (rt.some((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t)) && !TRUNCATED_KW_RE.test(repaired) && normalizePhrase(repaired) !== normalizePhrase(primaryKeyword)) return { ok: true, repairedKeyword: repaired }
     return { ok: false, reason: 'invalid_primary_keyword' }
   }
   return { ok: true }
@@ -217,7 +238,7 @@ export function validatePrimaryKeywordQuality(
 // spec) — stripped ALWAYS (even when a real number exists, the subjective adjective
 // must not survive; the factual clause is generated deterministically). Not
 // industry/product content.
-const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:(?:ביקוש|נפח)\s+(?:חיפוש(?:ים)?\s+)?(?:גבוה\s+מאוד|גבוה|רב|גדול|עצום|משמעותי|מאוד)|חיפושים\s+(?:נפוצים|רבים)|very\s+high\s+search\s+volume|high\s+search\s+volume|huge\s+(?:search\s+)?(?:volume|demand)|extremely\s+high(?:\s+demand)?|high\s+demand|commonly\s+searched)\s*/gi
+const DEMAND_CLAIM_RE = /\s*(?:נהנה\s+מ)?(?:(?:ביקוש|נפח)\s+(?:חיפוש(?:ים)?\s+)?(?:גבוה\s+מאוד|גבוה|רב|גדול|עצום|משמעותי|מאוד)|חיפושים\s+(?:נפוצים|רבים)|(?:של\s+)?(?:אלפי|מאות|עשרות|מיליוני)\s+(?:חיפושים|מחפשים|אנשים\s+שמחפשים)|very\s+high\s+search\s+volume|high\s+search\s+volume|huge\s+(?:search\s+)?(?:volume|demand)|extremely\s+high(?:\s+demand)?|high\s+demand|commonly\s+searched|(?:thousands|hundreds|millions)\s+of\s+(?:searches|monthly\s+searches|people\s+search(?:ing)?))\s*/gi
 
 /**
  * Produce the FINAL user-visible reason with deterministic demand wording. When real

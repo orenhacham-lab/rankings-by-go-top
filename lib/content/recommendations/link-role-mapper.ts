@@ -41,6 +41,20 @@ const TOTAL_CAP = 7
 const TYPE_WORD_WEIGHT = 0.25
 
 const HE = /[א-ת]/
+
+/**
+ * Boilerplate/utility pages (privacy policy, terms, checkout, account …) are NEVER
+ * content-link candidates — a privacy-policy page was assigned as an internal link
+ * for an employment-law article in live runs. These are universal site-plumbing
+ * patterns (function pages), not industry/product words. Matched against BOTH the
+ * candidate's title and its URL path.
+ */
+const BOILERPLATE_TITLE_RE = /(?:מדיניות\s+פרטיות|תנאי\s+(?:שימוש|תקנון)|תקנון|הצהרת\s+נגישות|נגישות|צור\s+קשר|יצירת\s+קשר|אודות(?:ינו)?|מי\s+אנחנו|סל\s+קניות|עגלת\s+קניות|קופה|תשלום\s+מאובטח|התחברות|הרשמה|אזור\s+אישי|החשבון\s+שלי|מעקב\s+הזמנ|מדיניות\s+(?:משלוחים|החזרות|ביטולים)|שאלות\s+נפוצות|מפת\s+האתר|privacy\s+policy|terms(?:\s+of\s+(?:use|service))?|accessibility(?:\s+statement)?|contact(?:\s+us)?|about(?:\s+us)?|shopping\s+cart|checkout|my\s+account|log\s*in|sign\s*up|order\s+tracking|shipping\s+policy|refund\s+policy|return\s+policy|faq|sitemap)/i
+const BOILERPLATE_URL_RE = /\/(?:privacy|privacy-policy|terms|terms-of-(?:use|service)|tos|accessibility|contact(?:-us)?|about(?:-us)?|cart|checkout|basket|account|my-account|login|signin|signup|register|wishlist|compare|faq|sitemap|refund|returns?|shipping|policies|policy|legal|thank-you|search)(?:\/|\.|\?|#|$)/i
+export function isBoilerplatePage(title: string, url: string): boolean {
+  return BOILERPLATE_TITLE_RE.test((title || '').trim()) || BOILERPLATE_URL_RE.test((url || '').trim().toLowerCase())
+}
+
 /** Safe Hebrew plural base (masc. ־ים / fem. ־ות, final-form already normalized so
  *  ־ים surfaces as "…ימ"). Only emitted when a real base remains (len >= 2). */
 function pluralBase(t: string): string | null {
@@ -57,6 +71,32 @@ export function subjectTokens(s: string): string[] {
   return Array.from(out)
 }
 const linkToks = subjectTokens
+
+/** Attribute tokens across candidate token lists (pure): a token spread across MANY
+ *  candidates (>= 4, but <= half of them) co-occurring with >= 6 DISTINCT other
+ *  tokens modifies many different heads — a colour/size/quality/condition-class
+ *  word, never subject evidence on its own. Calibration: a specific subject (one
+ *  flower variety across its product+category+guide) has low count/spread and is
+ *  NOT flagged; corpora under 8 candidates skip derivation entirely (too small to
+ *  distinguish an attribute from the topic's own subject). */
+function deriveCandidateAttributeTokens(tokenLists: string[][]): Set<string> {
+  const N = tokenLists.length
+  if (N < 8) return new Set()
+  const count = new Map<string, number>()
+  const coOcc = new Map<string, Set<string>>()
+  for (const list of tokenLists) {
+    const ts = Array.from(new Set(list))
+    for (const t of ts) {
+      count.set(t, (count.get(t) ?? 0) + 1)
+      const s = coOcc.get(t) ?? new Set<string>()
+      for (const u of ts) if (u !== t) s.add(u)
+      coOcc.set(t, s)
+    }
+  }
+  const out = new Set<string>()
+  for (const [t, c] of count) if (c >= 4 && c / N <= 0.5 && (coOcc.get(t)?.size ?? 0) >= 6) out.add(t)
+  return out
+}
 
 /**
  * Map candidates to roles for one opportunity. Returns the ranked, capped assignments
@@ -88,6 +128,7 @@ export function mapLinkRoles(
     const k = urlKey(c.url)
     if (!k || seen.has(k)) continue
     if (INFORMATIONAL_TYPES.has(c.type ?? 'unknown') && selfKeys.has(normalizePhrase(c.title))) continue // self-link
+    if (isBoilerplatePage(c.title, c.url)) continue // utility pages are never content links
     seen.add(k)
     prepared.push({ c, toks: linkToks(c.title) })
   }
@@ -99,7 +140,12 @@ export function mapLinkRoles(
   const df = new Map<string, number>()
   for (const { toks } of prepared) for (const t of new Set(toks)) df.set(t, (df.get(t) ?? 0) + 1)
   const N = prepared.length
-  const isTypeWord = (t: string) => corpusTypeWords.has(t) || (() => { const d = df.get(t) ?? 0; return d >= 4 && d / Math.max(1, N) >= 0.6 })()
+  // ATTRIBUTE tokens derived from the CANDIDATE corpus itself (a colour/size/quality
+  // modifier co-occurs with many DISTINCT heads across candidate titles). Live defect:
+  // a shared colour ("ורוד") alone qualified an unrelated product as a link target
+  // when the caller's corpus set missed it — attributes are never subject evidence.
+  const candidateAttributes = deriveCandidateAttributeTokens(prepared.map((p) => p.toks))
+  const isTypeWord = (t: string) => corpusTypeWords.has(t) || candidateAttributes.has(t) || (() => { const d = df.get(t) ?? 0; return d >= 4 && d / Math.max(1, N) >= 0.6 })()
   const weight = (t: string) => (GENERIC_TOKENS.has(t) ? 0 : isTypeWord(t) ? TYPE_WORD_WEIGHT : 1)
 
   // Opportunity SUBJECT head: distinctive tokens of the primary KEYWORD (not the full
@@ -132,19 +178,28 @@ export function mapLinkRoles(
       // Shares only attribute/type words (colour/size/generic type) or nothing.
       const reason = shared.some((t) => isTypeWord(t)) ? 'attribute_only_match' : shared.length ? 'generic_or_type_word_only' : 'no_topical_overlap'
       a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason, score, distinctiveTokens: [] }
-    } else if (isCommercial && localIntent && !sharesHead) {
-      // A — local commercial query: a product sharing a distinctive token that is NOT
-      // the subject head (e.g. a random bundle) is not a valid local target → null-able.
-      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: 'local_intent_target_mismatch', score, distinctiveTokens: distinctive }
+    } else if (isCommercial && !sharesHead) {
+      // SUBJECT-HEAD gate for EVERY commercial target (was local-only). Live defect:
+      // for non-local intents one shared non-head token (a colour, a peripheral
+      // modifier, a co-occurring clinical term) qualified an unrelated product —
+      // roses → pink orchid, immunity → pest control. A commercial target must share
+      // the article's SUBJECT, not merely any distinctive token.
+      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: localIntent ? 'local_intent_target_mismatch' : 'commercial_target_subject_mismatch', score, distinctiveTokens: distinctive }
     } else if (isCommercial) {
       // Role-specific: a distinctive commercial match is a target regardless of the
       // informational bar. Final primary/secondary decided after ranking.
       a = { url: c.url, title: c.title, pageType, role: 'secondary_commercial_target', reason: 'distinctive_commercial_subject_match', score, distinctiveTokens: distinctive }
       commercial.push(a)
-    } else if (isInformational && sharesHead) {
-      // Complementarity (E/I): shares the article's SUBJECT head, not just any token.
+    } else if (isInformational && sharesHead && (distinctive.length >= 2 || (df.get(distinctive[0]) ?? 0) <= 3)) {
+      // Complementarity (E/I): shares the article's SUBJECT head — and a SINGLE
+      // shared token qualifies only when it is RARE among candidates (df <= 3).
+      // Live defect: one corpus-frequent condition-class word ("דלקת") linked a
+      // thyroid article to urinary-infection/gingivitis articles; a class word
+      // shared by many candidates is category noise, not subject alignment.
       a = { url: c.url, title: c.title, pageType, role: 'supporting_informational_link', reason: 'complements_subject_head', score, distinctiveTokens: distinctive }
       supporting.push(a)
+    } else if (isInformational && sharesHead) {
+      a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: 'single_frequent_token_only', score, distinctiveTokens: distinctive }
     } else if (isInformational) {
       a = { url: c.url, title: c.title, pageType, role: 'unrelated', reason: 'shares_only_peripheral_modifier', score, distinctiveTokens: distinctive }
     } else if (sharesHead) {

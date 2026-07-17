@@ -48,6 +48,50 @@ export type ModelResolution =
   | { ok: false; reason: 'no_client' | 'list_failed' | 'model_unavailable'; detail?: string }
 
 /**
+ * Enumerate every generateContent-capable model the ACTIVE key offers (bare ids).
+ * Shares the resolver's soft-failure semantics: null = the list could not be
+ * fetched (no client / transient list failure) — callers must treat null as
+ * "unknown", never as "nothing available". Cached with the same TTL.
+ */
+let listCache: { models: string[]; at: number } | null = null
+export async function listAvailableGenerationModels(): Promise<string[] | null> {
+  if (listCache && Date.now() - listCache.at < CACHE_TTL_MS) return listCache.models
+  const client = getRecoGenAiClient()
+  if (!client) return null
+  const available: string[] = []
+  try {
+    const pager = await client.models.list()
+    for await (const m of pager) {
+      const name = m.name ? bare(m.name) : ''
+      if (name && supportsGenerate(m.supportedActions ?? undefined)) available.push(name)
+    }
+  } catch {
+    return null
+  }
+  if (available.length === 0) return null
+  listCache = { models: available, at: Date.now() }
+  return available
+}
+
+/** PURE premium-model choice over a known available list (offline-testable).
+ *  Prefers the configured/default Pro-class id when offered; else the best stable
+ *  Pro-class model on the list; never returns a Flash/lite id. */
+export function pickPremiumModel(available: string[], configured: string): string | undefined {
+  if (available.includes(configured)) return configured
+  const proClass = available.filter((n) => { const l = n.toLowerCase(); return l.includes('pro') && !l.includes('flash') })
+  if (proClass.length === 0) return undefined
+  const score = (raw: string): number => {
+    const n = raw.toLowerCase()
+    let s = 0
+    if (/(preview|exp|experimental)/.test(n)) s -= 20
+    if (n.includes('thinking')) s -= 15
+    if (n.includes('latest')) s += 5
+    return s
+  }
+  return proClass.slice().sort((a, b) => score(b) - score(a) || (a < b ? 1 : -1))[0]
+}
+
+/**
  * Resolve an available Flash-class model for the active key. Cached briefly.
  * - no_client   → GEMINI_API_KEY unset (soft; treated like the legacy no-key path).
  * - list_failed → transient inability to enumerate (soft; retryable).
@@ -85,4 +129,4 @@ export async function resolveAvailableRecommendationModel(): Promise<ModelResolu
 }
 
 /** Test/ops hook — clear the memoized resolution. */
-export function resetModelResolutionCache(): void { cache = null }
+export function resetModelResolutionCache(): void { cache = null; listCache = null }
