@@ -6,8 +6,9 @@
  *   P0-3 headline → search-phrase normalization — 5 live keywords.
  */
 import { evaluateLink, isRelevantLink, sharesSubjectHead } from '../recommendations/link-relevance'
-import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed } from '../recommendations/coverage'
-import { normalizeToSearchPhrase, isSearchPhraseQuality } from '../recommendations/search-phrase'
+import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed, unmatchedDocEntities } from '../recommendations/coverage'
+import { contentTokens } from '../recommendations/evidence-cluster'
+import { normalizeToSearchPhrase, isSearchPhraseQuality, keywordHasRealSubject, keywordPreservesSubject } from '../recommendations/search-phrase'
 import { assessExistingLocalOwnership, deriveCorpusTypeWords, localImprovementCompatible } from '../recommendations/opportunity-validation'
 
 let pass = 0, fail = 0
@@ -132,6 +133,24 @@ async function main() {
       assessNeedCannibalization({ primaryKeyword: 'הקמת חנות אינטרנטית מקצועית', title: 'הקמת חנות אינטרנטית מקצועית', intent: 'transactional' }, [{ title: 'קידום חנות אינטרנטית מקצועית' }]).matchType === 'distinct')
     check('Issue4: incompatibleActionNeed(build, promote) is true; (build, build) is false',
       incompatibleActionNeed('הקמת חנות', 'קידום חנות') && !incompatibleActionNeed('הקמת חנות', 'בניית חנות'))
+
+    // NS-2 (live) — synonym/near-identical ownership over a PENDING-style doc.
+    check('NS2a: "תוספי מזון" owned by a "תוספי תזונה" doc (מזון≈תזונה, pending or link)',
+      assessNeedCannibalization({ primaryKeyword: 'תוספי מזון מומלצים', title: 'תוספי מזון מומלצים', intent: 'informational' }, [{ title: 'תוספי תזונה מומלצים', focusKeyword: 'תוספי תזונה מומלצים' }]).matchType === 'owns_need')
+    check('NS2b: "לחזור לטבע…" support-page owns the need (near-identical, not merely a link)',
+      assessNeedCannibalization({ primaryKeyword: 'מוצרים וטיפולים טבעיים', title: 'לחזור לטבע: איך לשלב מוצרים וטיפולים טבעיים בשגרת היום יום', intent: 'informational' }, [{ title: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש' }]).matchType === 'owns_need')
+
+    // NS-3 (live, DOCUMENTED LIMITATION) — a foreign vertical entity ("סוסים") is
+    // SURFACED as an unmatched entity when project evidence does not corroborate it,
+    // and is NOT surfaced when it does (a horse project). Auto-blocking is a
+    // documented semantic limitation; the diagnostic drives operator/acceptance review.
+    const healthVocab = new Set<string>(['מגנזיום ביסגליצינט', 'ויטמין C טבעי', 'אומגה 3', 'תוספי תזונה טבעיים', 'בריאות הגוף והנפש'].flatMap((w) => contentTokens(w)))
+    const horseVocab = new Set<string>(['אילוף סוסים', 'חוות סוסים', 'טיפול בסוסים', 'רכיבה טיפולית'].flatMap((w) => contentTokens(w)))
+    const d3topic = 'אורח חיים טבעי ובריא'
+    const d3doc = 'איך לשמור על אורח חיים טבעי ובריא לצד פעילות גופנית וטיפול בסוסים'
+    check('NS3: "סוסים" is surfaced as a FOREIGN entity for a health project', unmatchedDocEntities(d3doc, d3topic, healthVocab).some((e) => /סוס/.test(e)))
+    check('NS3: "סוסים" is NOT foreign for a horse project (same-cluster proof)', !unmatchedDocEntities(d3doc, d3topic, horseVocab).some((e) => /סוס/.test(e)))
+    check('NS3: no project vocab → no unmatched diagnostic (cannot judge)', unmatchedDocEntities(d3doc, d3topic).length === 0)
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')
@@ -156,6 +175,13 @@ async function main() {
       const r5 = normalizeToSearchPhrase('ויטמין D המדריך להשוואת סוגים ומינונים', { subject: 'השוואת סוגי ויטמין D', alignedQuery: 'השוואת סוגי ויטמין D' })
       check('Issue5: normalized output is clean and drops "המדריך"', isSearchPhraseQuality(r5.keyword) && !/מדריך/.test(r5.keyword) && r5.changed)
       check('Issue5: normalized output is NOT the over-broad residue "ויטמין D" and keeps comparison/type intent', r5.keyword !== 'ויטמין D' && /השוואת|סוג/.test(r5.keyword))
+    }
+    // NS-1 (live) — a "המדריך לשנת 2026" tail must not leave the year as the keyword.
+    check('NS1: "שנת 2026" has NO real subject token; "ויטמין D" has one', !keywordHasRealSubject('שנת 2026') && keywordHasRealSubject('ויטמין D'))
+    check('NS1: keyword collapsed to a year does NOT preserve the brief subject', !keywordPreservesSubject('שנת 2026', 'ויטמין D מומלץ', 'ויטמין D מומלץ'))
+    {
+      const rns = normalizeToSearchPhrase('המדריך לשנת 2026', { subject: 'ויטמין D מומלץ', alignedQuery: 'ויטמין D מומלץ' })
+      check('NS1: normalize repairs "המדריך לשנת 2026" back to the real subject (not "שנת 2026")', rns.keyword !== 'שנת 2026' && keywordHasRealSubject(rns.keyword) && /ויטמין/.test(rns.keyword))
     }
     // A clean short query is left unchanged.
     check('a clean short query passes unchanged', normalizeToSearchPhrase('חנות פרחים בירושלים', { subject: 'חנות פרחים בירושלים' }).changed === false)

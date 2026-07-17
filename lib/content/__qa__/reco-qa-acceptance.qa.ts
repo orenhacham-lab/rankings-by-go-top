@@ -232,6 +232,10 @@ async function main() {
     // ISSUE 5 — headline keyword with a "המדריך ל…" tail → search-phrase FAILS.
     check('Issue5: "ויטמין D המדריך להשוואת סוגים ומינונים" → primary_keyword_search_phrase_quality FAILS',
       failsRule(base({ suggestions: [goodTopic('ויטמין D המדריך להשוואת סוגים ומינונים', 'השוואת סוגי ויטמין D')], diagnostics: onlyPool1 }), 'primary_keyword_search_phrase_quality'))
+    // NS-1 — a subjectless year residue must FAIL final_keyword_preserves_brief_subject.
+    check('NS1: accepted keyword "שנת 2026" → final_keyword_preserves_brief_subject FAILS',
+      failsRule(base({ suggestions: [goodTopic('שנת 2026', 'איך לבחור ויטמין D מומלץ? המדריך לשנת 2026')], diagnostics: onlyPool1 }), 'final_keyword_preserves_brief_subject'))
+    check('NS1: a real subject keyword PASSES the rule', evaluateRunAcceptance(base({ suggestions: [goodTopic('ויטמין D מומלץ', 'איך לבחור ויטמין D מומלץ')], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'final_keyword_preserves_brief_subject')?.pass === true)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

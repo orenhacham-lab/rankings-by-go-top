@@ -401,6 +401,71 @@ async function main() {
     server.close()
   }
 
+  // ── E2E: Natural-Shop defect 1 — keyword must not collapse to a year residue ──
+  console.log('E2E) NS-1 — a "המדריך לשנת 2026" keyword is repaired to the real subject')
+  {
+    const isVitD = (subject: string) => /ויטמין/.test(subject)
+    const tables = naturalShopTables()
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      // The model returns a headline TITLE plus a subject-losing keyword for the ויטמין brief.
+      respond: (briefs) => briefs.map((b, i) => isVitD(b.subject)
+        ? { briefId: b.id, title: 'איך לבחור ויטמין D מומלץ? המדריך לשנת 2026', primaryKeyword: 'המדריך לשנת 2026', secondaryKeywords: [], intent: 'informational' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'
+    process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`
+    resetModelResolutionCache()
+    resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns1', 8))
+    const kws = run.suggestions.map((s) => s.primaryKeyword)
+    const { keywordHasRealSubject: hasSubj } = await import('../recommendations/search-phrase')
+    check('NS1-E2E. the year residue "שנת 2026" is NEVER an accepted keyword', !kws.includes('שנת 2026'), JSON.stringify(kws))
+    check('NS1-E2E. EVERY accepted keyword carries a real subject token (no year/temporal-only)', run.suggestions.every((s) => hasSubj(s.primaryKeyword)), JSON.stringify(kws))
+    const vit = run.suggestions.find((s) => /ויטמין/.test(s.primaryKeyword))
+    check('NS1-E2E. the ויטמין topic kept its real subject (repaired from aligned/brief)', !vit || /ויטמין/.test(vit.primaryKeyword))
+    server.close()
+  }
+
+  // ── E2E: Natural-Shop defect 2 — pending/link pages ARE in the coverage corpus ──
+  console.log('E2E) NS-2 — synonym pending idea + near-identical support page own the need')
+  {
+    const tables = naturalShopTables()
+    // 2a: a PENDING idea that is a SYNONYM (מזון≈תזונה) of a proposed topic.
+    ;(tables.content_topic_ideas as Record<string, unknown>[]).push({ project_id: 'p1', status: 'pending', title: 'תוספי תזונה מומלצים', primary_keyword: 'תוספי תזונה מומלצים', fingerprint: 'תוספי תזונה מומלצים', search_intent: 'informational' })
+    // 2b: an existing informational blog page that is ALSO a link candidate.
+    ;(tables.shopify_entities as Record<string, unknown>[]).push({ project_id: 'p1', is_active: true, title: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש', handle: 'back-to-nature', entity_type: 'blog', canonical_url: 'https://natural-shop.co.il/b/back-to-nature' })
+    ;(tables.keyword_research_cache[0].results_json as Record<string, unknown>[]).push({ keyword: 'תוספי מזון מומלצים', avgMonthlySearches: 240 }, { keyword: 'מוצרים וטיפולים טבעיים', avgMonthlySearches: 180 })
+    const is2a = (s: string) => /תוספי מזון/.test(s)
+    const is2b = (s: string) => /מוצרים וטיפולים טבעיים/.test(s) && !/תוספי/.test(s)
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b, i) => is2a(b.subject)
+        ? { briefId: b.id, title: 'תוספי מזון מומלצים', primaryKeyword: 'תוספי מזון מומלצים', secondaryKeywords: [], intent: 'informational' }
+        : is2b(b.subject)
+          ? { briefId: b.id, title: 'לחזור לטבע: איך לשלב מוצרים וטיפולים טבעיים בשגרת היום יום', primaryKeyword: 'מוצרים וטיפולים טבעיים', secondaryKeywords: [], intent: 'informational' }
+          : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'
+    process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`
+    resetModelResolutionCache()
+    resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns2', 8))
+    const bykw = (re: RegExp) => run.suggestions.find((s) => re.test(s.primaryKeyword))
+    // 2a — "תוספי מזון" must NOT be a NEW article (converted to improvement or rejected).
+    const s2a = bykw(/תוספי מזון/)
+    check('NS2a-E2E. synonym pending idea (תזונה) blocks/ converts "תוספי מזון" — never a new article', !s2a || s2a.recommendedPageType === 'existing_page_improvement', JSON.stringify(s2a?.recommendedPageType))
+    // 2b — the near-identical existing page owns the need → improvement, not a support link.
+    const s2b = bykw(/מוצרים וטיפולים טבעיים/)
+    check('NS2b-E2E. near-identical support page owns the need → existing_page_improvement (or rejected)', !s2b || s2b.recommendedPageType === 'existing_page_improvement', JSON.stringify(s2b?.recommendedPageType))
+    check('NS2b-E2E. the owning "לחזור לטבע" page is NOT a plain supporting link on that topic', !s2b || !(s2b.suggestedInternalLinks ?? []).some((l) => /back-to-nature/.test(l.url)), JSON.stringify(s2b?.suggestedInternalLinks))
+    server.close()
+  }
+
   console.log('U) unit: model-aware thinking config (the live Pro-400 fix)')
   {
     const pro = resolveModelConfig('gemini-2.5-pro', 3000)

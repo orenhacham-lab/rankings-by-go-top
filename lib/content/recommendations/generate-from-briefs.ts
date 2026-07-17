@@ -44,7 +44,7 @@ import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, b
 import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
 import { dedupeMegaGuideTitle } from './title-diversity'
-import { normalizeToSearchPhrase, isSearchPhraseQuality } from './search-phrase'
+import { normalizeToSearchPhrase, isSearchPhraseQuality, keywordPreservesSubject, keywordHasRealSubject, conciseSubject } from './search-phrase'
 import type { RunCostController } from './run-cost-controller'
 import type { TopicSuggestion } from './types'
 
@@ -156,6 +156,20 @@ export interface BriefRunDiagnostics {
 
 const MAX_ROUNDS = 2
 
+/** Dedupe coverage docs by normalized title+focus (link candidates and entities
+ *  overlap; pending/published may repeat) so the cannibalization corpus is unique. */
+function dedupeCoverageDocs(docs: ExistingCoverageDoc[]): ExistingCoverageDoc[] {
+  const seen = new Set<string>()
+  const out: ExistingCoverageDoc[] = []
+  for (const d of docs) {
+    const key = normalizePhrase(`${d.title || ''} ${d.focusKeyword || ''} ${d.slug || ''}`)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(d)
+  }
+  return out
+}
+
 export async function generateFromBriefs(
   admin: Admin,
   input: { projectId: string; targetCount: number; qualityMode?: ModelTier; userId?: string },
@@ -258,9 +272,12 @@ export async function generateFromBriefs(
   try { const { data } = await admin.from('generated_articles').select('title').eq('project_id', input.projectId); for (const r of (data ?? []) as { title: string | null }[]) if (r.title) { publishedCoverage.push(r.title); generatedArticles++ } } catch (e) { loadErrors.push(`generated_articles:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
   try { const { data } = await admin.from('article_topics').select('topic').eq('project_id', input.projectId); for (const r of (data ?? []) as { topic: string | null }[]) if (r.topic) publishedCoverage.push(r.topic) } catch (e) { loadErrors.push(`article_topics:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
 
-  // PENDING ideas — SEPARATE identity (exact keys + signatures), never coverage.
+  // PENDING ideas — exact keys + signatures for identity, AND need-aware coverage
+  // docs so a synonym-equivalent pending idea (מזון≈תזונה) blocks/converts a new
+  // topic (the exact/signature path does NOT fold synonyms — proven live miss).
   const pendingExactKeys = new Set<string>()
   const pendingSignatures: TopicSignature[] = []
+  const pendingCoverageDocs: ExistingCoverageDoc[] = []
   let pendingCount = 0
   try {
     const { data } = await admin.from('content_topic_ideas').select('title, primary_keyword, search_intent').eq('project_id', input.projectId).eq('status', 'pending')
@@ -271,6 +288,7 @@ export async function generateFromBriefs(
       pendingExactKeys.add(normalizePhrase(kw))
       if (r.title) pendingExactKeys.add(normalizePhrase(r.title))
       pendingSignatures.push(topicSignature(kw, r.search_intent ?? undefined))
+      pendingCoverageDocs.push({ title: r.title || kw, focusKeyword: r.primary_keyword ?? null })
     }
   } catch (e) { loadErrors.push(`content_topic_ideas:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
 
@@ -303,12 +321,16 @@ export async function generateFromBriefs(
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
   for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
   const existingPageTitles = [...entities.map((e) => e.name), ...ineligiblePageTitles, ...publishedCoverage]
-  // Existing-content docs for synonym-aware cannibalization (P0-2): published
-  // article/topic titles (informational need owners) + owned entity pages.
-  const existingCoverageDocs: ExistingCoverageDoc[] = [
+  // Existing-content docs for synonym-aware cannibalization (P0-2): EVERY page
+  // available to link mapping must ALSO be available to coverage/cannibalization —
+  // published article/topic titles + owned entity pages + link candidates +
+  // pending ideas. A page that owns the need can never be "merely a support link".
+  const existingCoverageDocs: ExistingCoverageDoc[] = dedupeCoverageDocs([
     ...publishedCoverage.map((title) => ({ title })),
     ...entities.map((e) => ({ title: e.name, url: e.url ?? null })),
-  ]
+    ...linkCandidates.map((c) => ({ title: c.title, url: c.url })),
+    ...pendingCoverageDocs,
+  ])
 
   const shadow_rejected_by_reason: Record<string, number> = {}
   const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
@@ -430,6 +452,20 @@ export async function generateFromBriefs(
       if (!isTitleKeywordAligned(primaryKeyword, t.title)) { if (!tryRepair()) return { rejectionReason: 'intent_keyword_mismatch' } }
       intent = deriveIntent(primaryKeyword, t.title, intent)
     }
+
+    // (2.7) SUBJECT-PRESERVATION invariant — the FINAL keyword must keep a real
+    // subject/entity token from the brief. A normalization/repair that collapsed
+    // it to a year/adjective/guide residue ("שנת 2026") is repaired from the
+    // aligned query → brief subject → concise title subject, else rejected.
+    const alignedQ = brief.alignedDemandQuery?.query ?? null
+    if (!keywordPreservesSubject(primaryKeyword, brief.subject, alignedQ)) {
+      const subjectRepairs = [alignedQ, brief.subject, conciseSubject(t.title)].filter((x): x is string => !!x)
+      const fixedTo = subjectRepairs.find((c) => keywordHasRealSubject(c) && isSearchPhraseQuality(c) && keywordPreservesSubject(c, brief.subject, alignedQ))
+      if (!fixedTo) return { rejectionReason: 'final_keyword_lost_subject' }
+      primaryKeyword = fixedTo
+      repaired = true
+      intent = deriveIntent(primaryKeyword, t.title, intent)
+    }
     if (!isSearchPhraseQuality(primaryKeyword)) return { rejectionReason: 'primary_keyword_not_search_phrase' }
 
     // (3) SAFE brand gate — exact named-entity mutation only (hard, proven safe).
@@ -449,7 +485,7 @@ export async function generateFromBriefs(
     // existing_page_improvement recommendation (never a separate landing page),
     // carrying the existing URL — the underlying search need is compared, not
     // exact wording (wedding-floral pricing: סידור vs עיצוב פרחוני).
-    const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs)
+    const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens)
     const coverageMatches: CoverageMatch[] = [...cann.matches]
     if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
     const cannibalImprovement = cann.matchType === 'owns_need' || cann.matchType === 'improve'
@@ -514,6 +550,25 @@ export async function generateFromBriefs(
     const filtered = filterLinkPlan(rawPlan, { primaryKeyword, title: t.title, intent }, { typeWords: domainTypeWords, isBoilerplate: isBoilerplatePage })
     const linkPlan = filtered.plan
     const linkDiagnostics = filtered.diagnostics
+
+    // (10.5) NEED-OWNERSHIP over SUPPORT links: an informational support/source
+    // page that already OWNS this topic's need is coverage, not a link. Re-run the
+    // SAME synonym/head cannibalization on each support target; if one owns the
+    // need, convert the topic to existing_page_improvement (carry its URL) and drop
+    // the link — an owning page must never remain "merely a supporting link".
+    const owningUrls = new Set<string>()
+    let owningPage: { title: string; url: string | null } | null = null
+    for (const tg of [...linkPlan.supportingInformationalLinks, ...linkPlan.sourceReferences]) {
+      const mt = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, [{ title: tg.title, url: tg.url }], businessEvidenceTokens).matchType
+      if (mt === 'owns_need' || mt === 'exact') { owningUrls.add(tg.url); if (!owningPage) owningPage = { title: tg.title, url: tg.url } }
+    }
+    if (owningPage) {
+      if (!ownershipPageType) ownershipPageType = 'existing_page_improvement'
+      if (!coverageMatches.some((m) => m.existingTitle === owningPage!.title)) coverageMatches.push({ existingTitle: owningPage.title, url: owningPage.url, matchType: 'owns_need', score: 1, sharedNeed: [] })
+      linkPlan.supportingInformationalLinks = linkPlan.supportingInformationalLinks.filter((tg) => !owningUrls.has(tg.url))
+      linkPlan.sourceReferences = linkPlan.sourceReferences.filter((tg) => !owningUrls.has(tg.url))
+    }
+
     const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null
     if (target_role_mappings.length < 25) target_role_mappings.push({ keyword: primaryKeyword, primaryTarget: linkPlan.primaryCommercialTarget?.url ?? null, roles: mapped.assignments.slice(0, 7).map((a) => ({ url: a.url, role: a.role, score: a.score })) })
     const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))

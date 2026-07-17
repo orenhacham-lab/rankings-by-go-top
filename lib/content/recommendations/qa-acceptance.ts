@@ -23,7 +23,7 @@ import { isBoilerplatePage } from './link-role-mapper'
 import { evaluateTitleDiversity } from './title-diversity'
 import { evaluateLink, isRelevantLink, sharesSubjectHead } from './link-relevance'
 import { isSameNeedDuplicate, isTitleKeywordAligned, incompatibleActionNeed } from './coverage'
-import { isSearchPhraseQuality } from './search-phrase'
+import { isSearchPhraseQuality, keywordHasRealSubject } from './search-phrase'
 
 export interface AcceptanceRule {
   id: string
@@ -151,6 +151,11 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   // P0-3 — every primary keyword must be a clean target SEARCH PHRASE, not a headline.
   const headlineKw = suggestions.filter((s) => !isSearchPhraseQuality(s.primaryKeyword))
   add('primary_keyword_search_phrase_quality', headlineKw.length === 0, headlineKw.map((s) => `"${s.primaryKeyword}"`).join(' · ') || 'none')
+
+  // P0-3b — the final keyword must carry a REAL subject/entity token, never a bare
+  // year/number/temporal/guide residue ("שנת 2026" after a "המדריך לשנת 2026" strip).
+  const subjectlessKw = suggestions.filter((s) => !keywordHasRealSubject(s.primaryKeyword))
+  add('final_keyword_preserves_brief_subject', subjectlessKw.length === 0, subjectlessKw.map((s) => `"${s.primaryKeyword}"`).join(' · ') || 'none')
 
   // P0-2 — strict semantic OR same subject-head + same coarse search-need dup.
   const dupPairs: string[] = []

@@ -18,7 +18,7 @@
 
 import { distinctiveTokensOf, canonicalToken, canonicalVariants, topicSignature, isHighConfidenceDuplicate } from './semantic-dup'
 import { normalizePhrase } from './keyword-guard'
-import { sharesSubjectHead, coversAllSubjectHeads } from './link-relevance'
+import { sharesSubjectHead, coversAllSubjectHeads, subjectTokensOf, isModifierToken } from './link-relevance'
 
 // ACTION / NEED class — building/creating a thing answers a DIFFERENT need than
 // promoting/marketing it. A shared commercial entity head ("חנות") does not make
@@ -140,7 +140,49 @@ export function isTitleKeywordAligned(primaryKeyword: string, title: string): bo
 }
 
 export type CoverageMatchType = 'exact' | 'owns_need' | 'improve' | 'distinct'
-export interface CoverageMatch { existingTitle: string; url: string | null; matchType: CoverageMatchType; score: number; sharedNeed: string[] }
+export interface CoverageMatch { existingTitle: string; url: string | null; matchType: CoverageMatchType; score: number; sharedNeed: string[]; unmatchedEntities?: string[] }
+
+const HEB_PROCLITICS = 'והבלמשכ'
+function deproc(t: string): string { return (t.length >= 4 && HEB_PROCLITICS.includes(t[0])) ? t.slice(1) : t }
+const clusterKey = (t: string): string => synonymFold(canonicalToken(deproc(t)))
+/** Two subject tokens belong to the same content cluster when equal or sharing a
+ *  ≥3-char stem (Hebrew stems are prefix-ish: פרח↔פרחוני, גוף↔גופני). */
+function stemMatch(a: string, b: string): boolean {
+  if (a === b) return true
+  return a.length >= 3 && b.length >= 3 && a.slice(0, 3) === b.slice(0, 3) && Math.abs(a.length - b.length) <= 3
+}
+/**
+ * DIAGNOSTIC: distinctive entities in the EXISTING doc that the topic does NOT
+ * share and that PROJECT EVIDENCE does not corroborate — a candidate FOREIGN
+ * vertical (e.g. "סוסים" on a health-supplement project). Same-cluster proof =
+ * a stem match against the topic's own subject OR the project's evidence
+ * vocabulary. Returns [] when no project vocabulary is supplied.
+ *
+ * PRODUCT LIMITATION (documented, not a bug): this is EXPOSED as a diagnostic but
+ * NOT used to auto-reject ownership. Separating a genuinely foreign vertical
+ * ("סוסים") from an on-domain extra CONCEPT ("body & soul" on a wellness page)
+ * cannot be done by token overlap without a hardcoded word list or a
+ * fixture-tuned count threshold — both of which the multi-domain generalization
+ * contract forbids. Auto-blocking on it regresses legitimate near-identical
+ * ownership (a wellness page whose extra words are "benefits/body/soul"). The
+ * distinction requires a semantic signal, so the unmatched entities are surfaced
+ * for the acceptance runner / operator review instead of silently deciding.
+ */
+export function unmatchedDocEntities(docText: string, topicText: string, projectVocab?: Set<string>): string[] {
+  if (!projectVocab || projectVocab.size === 0) return []
+  const refs: string[] = []
+  for (const t of subjectTokensOf(topicText)) refs.push(clusterKey(t))
+  for (const v of projectVocab) { const k = clusterKey(v); if (k.length >= 3) refs.push(k) }
+  const out = new Set<string>()
+  for (const raw of subjectTokensOf(docText)) {
+    const d = deproc(raw)
+    if (isModifierToken(canonicalToken(d)) || isModifierToken(d)) continue // drop generic/price/attribute words
+    const e = clusterKey(raw)
+    if (e.length < 3 || /^\d+$/.test(e)) continue
+    if (!refs.some((r) => stemMatch(e, r))) out.add(e)
+  }
+  return Array.from(out)
+}
 
 export interface ExistingCoverageDoc { title: string; url?: string | null; focusKeyword?: string | null; slug?: string | null }
 
@@ -149,7 +191,7 @@ export interface ExistingCoverageDoc { title: string; url?: string | null; focus
  * topic against each existing doc's title / focus keyword / slug with synonym
  * folding: full subject coverage + same need = owns_need; partial = improve.
  */
-export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCoverageDoc[]): { matchType: CoverageMatchType; matches: CoverageMatch[] } {
+export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCoverageDoc[], projectVocab?: Set<string>): { matchType: CoverageMatchType; matches: CoverageMatch[] } {
   // Compare on the underlying NEED = the normalized primary keyword's distinctive
   // subject. A headline title carries marketing tail ("פירוט מחירים וטיפים
   // לחיסכון") that is NOT part of the need and must not dilute coverage — that
@@ -211,8 +253,14 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // different needs — a shared commercial entity head ("חנות") cannot make
     // "הקמת חנות" owned/improved by "קידום חנות". Downgrade to distinct.
     if ((mt === 'owns_need' || mt === 'improve') && incompatibleActionNeed(`${topic.primaryKeyword} ${topic.title}`, docText)) mt = 'distinct'
+    // FOREIGN-ENTITY DIAGNOSTIC (P0): surface distinctive entities the existing doc
+    // carries from a possibly-unrelated vertical ("סוסים") that project evidence
+    // does not corroborate. Exposed for the acceptance runner / operator — NOT used
+    // to silently reject (see unmatchedDocEntities: the vertical-vs-concept
+    // distinction is a documented semantic limitation).
+    const foreign = unmatchedDocEntities(docText, `${topic.primaryKeyword} ${topic.title}`, projectVocab)
     if (mt !== 'distinct') {
-      matches.push({ existingTitle: doc.title || (doc.focusKeyword ?? ''), url: doc.url ?? null, matchType: mt, score: Number(Math.max(covTopic, covDoc).toFixed(2)), sharedNeed: shared2.slice(0, 6) })
+      matches.push({ existingTitle: doc.title || (doc.focusKeyword ?? ''), url: doc.url ?? null, matchType: mt, score: Number(Math.max(covTopic, covDoc).toFixed(2)), sharedNeed: shared2.slice(0, 6), ...(foreign.length ? { unmatchedEntities: foreign.slice(0, 6) } : {}) })
       if (rank[mt] > rank[best]) best = mt
     }
   }

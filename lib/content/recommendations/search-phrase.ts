@@ -14,7 +14,36 @@
  */
 
 import { normalizePhrase } from './keyword-guard'
-import { distinctiveTokensOf, canonicalVariants } from './semantic-dup'
+import { subjectTokensOf, sharesSubjectHead } from './link-relevance'
+
+// TEMPORAL / numeric-only residue words — a year, date or number can never be
+// the ONLY meaningful token of a search phrase ("שנת 2026"). Domain-neutral.
+const TEMPORAL_RE = /^(?:שנת|שנה|שנים|השנה|החודש|חודש|חודשים|יום|היום|שבוע|שבועות|רבעון|עונה|(?:19|20)\d\d|q[1-4]|year|month|day|week)$/i
+
+/** The DISTINCTIVE, non-temporal, non-numeric subject tokens of a phrase — the
+ *  tokens that carry a real subject/entity ("ויטמין", "D"), excluding a bare
+ *  year/number/temporal word ("שנת", "2026"). */
+function realSubjectTokens(s: string): string[] {
+  return subjectTokensOf(s).filter((t) => !/^\d+$/.test(t) && !TEMPORAL_RE.test(t))
+}
+
+/** Does the keyword carry at least one REAL subject/entity token (not merely a
+ *  year/number/temporal/generic residue)? "שנת 2026" → false; "ויטמין D" → true. */
+export function keywordHasRealSubject(keyword: string): boolean {
+  return realSubjectTokens(keyword).length > 0
+}
+
+/** INVARIANT: the final keyword must preserve at least one real subject/entity
+ *  token from the brief subject or the aligned demand query — never collapse to a
+ *  year/adjective/guide-word residue. When the reference itself has no real
+ *  subject to compare, fall back to requiring the keyword to carry SOME real
+ *  subject token of its own. */
+export function keywordPreservesSubject(keyword: string, subject: string, alignedQuery?: string | null): boolean {
+  if (!keywordHasRealSubject(keyword)) return false
+  const refHasReal = realSubjectTokens(subject).length > 0 || realSubjectTokens(alignedQuery || '').length > 0
+  if (!refHasReal) return true
+  return sharesSubjectHead(keyword, subject) || (!!alignedQuery && sharesSubjectHead(keyword, alignedQuery))
+}
 
 // Function-word OPENERS a search query does not start with (question headline
 // frames). Domain-neutral grammar, not industry content.
@@ -90,29 +119,31 @@ export function normalizeToSearchPhrase(
 ): SearchPhraseResult {
   const raw = (rawKeyword || '').trim()
   const stripped = stripHeadlineFraming(raw)
-  const strippedOk = stripped.length > 0 && isSearchPhraseQuality(stripped)
+  // A clean residue is acceptable ONLY when it still preserves a real subject
+  // token from the brief — stripping a "המדריך לשנת 2026" tail down to the year
+  // "שנת 2026" passes shape/length yet LOST the subject and must fall back.
+  const strippedOk = stripped.length > 0 && isSearchPhraseQuality(stripped) && keywordPreservesSubject(stripped, brief.subject, brief.alignedQuery)
 
-  // Prefer the brief's aligned query when it is a clean phrase AND shares the
-  // stripped subject (so we keep demand alignment, not a foreign query).
   const aligned = (brief.alignedQuery || '').trim()
-  const strippedToks = new Set(distinctiveTokensOf(stripped).flatMap((t) => canonicalVariants(t)))
-  const alignedShares = aligned && distinctiveTokensOf(aligned).some((t) => canonicalVariants(t).some((v) => strippedToks.has(v)))
 
   if (strippedOk) {
     if (normalizePhrase(stripped) === normalizePhrase(raw)) return { keyword: stripped, changed: false, method: 'unchanged' }
     return { keyword: stripped, changed: true, method: /^מחיר\s/.test(stripped) && !/^מחיר\s/.test(raw) ? 'price_rewrite' : 'stripped_headline' }
   }
-  if (aligned && alignedShares && isSearchPhraseQuality(aligned)) return { keyword: aligned, changed: true, method: 'aligned_query' }
+  // Headline-shaped OR subject-losing residue → prefer a phrase that PRESERVES the
+  // need: the aligned demand query, then a concise brief subject.
+  if (aligned && isSearchPhraseQuality(aligned) && keywordPreservesSubject(aligned, brief.subject, brief.alignedQuery)) return { keyword: aligned, changed: true, method: 'aligned_query' }
 
   // Fall back to a concise subject from the brief (a supported real phrase).
   const subj = conciseSubject(brief.subject)
-  if (subj) return { keyword: subj, changed: true, method: 'brief_subject' }
-  // Last resort: the best clean residue we have.
-  return { keyword: stripped || raw, changed: stripped !== raw, method: 'stripped_headline' }
+  if (subj && keywordHasRealSubject(subj)) return { keyword: subj, changed: true, method: 'brief_subject' }
+  // Last resort: the best clean residue we have (still preferring a real subject).
+  const best = keywordHasRealSubject(stripped) ? stripped : (keywordHasRealSubject(raw) ? raw : (subj || stripped || raw))
+  return { keyword: best, changed: normalizePhrase(best) !== normalizePhrase(raw), method: 'stripped_headline' }
 }
 
-/** A concise subject from a (possibly long) brief subject — strip framing, cap. */
-function conciseSubject(subject: string): string {
+/** A concise subject from a (possibly long) subject/title — strip framing, cap. */
+export function conciseSubject(subject: string): string {
   const s = stripHeadlineFraming(subject)
   const toks = s.split(/\s+/).filter(Boolean)
   return toks.length <= MAX_SEARCH_TOKENS ? s : ''
