@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const generationRunId = randomUUID()
     const controller = newRunCostController(tier, generationRunId, 12)
     const startedAt = Date.now()
-    const run = await generateFromBriefs(auth.admin, { projectId: auth.project.id, targetCount: 12, qualityMode: tier }, controller)
+    const run = await generateFromBriefs(auth.admin, { projectId: auth.project.id, targetCount: 12, qualityMode: tier, userId: auth.user.id }, controller)
 
     // Optional REAL persistence + reload proof (opt-in; additive rows only).
     let persistence: { attempted: number; inserted: number; duplicate: number; failed: number; reloadedFreshCount: number } | null = null
@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         insufficient_inventory: run.diagnostics.insufficient_inventory,
         model_calls: run.diagnostics.model_calls,
         brief_pool: run.diagnostics.brief_pool,
+        discovery: run.diagnostics.discovery,
         rounds: run.diagnostics.rounds,
         rejected_by_reason: run.diagnostics.rejected_by_reason,
         shadow_rejected_by_reason: run.diagnostics.shadow_rejected_by_reason,

@@ -25,7 +25,9 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard, coveredByExistingContent, ownedByExistingEntity, normalizePhrase } from './keyword-guard'
-import { flattenKeywordResearchCache, contentTokens, type EntityNode } from './evidence-cluster'
+import { flattenKeywordResearchCacheDetailed, contentTokens, type EntityNode, type KeywordResearchIngestion } from './evidence-cluster'
+import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/keyword-research-cache'
+import { generateKeywordIdeas } from '@/lib/google-ads/keyword-ideas'
 import { evaluateArticleWorthiness, type ExistingPageSignal } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
@@ -36,7 +38,8 @@ import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
 import { slugKey } from './dedupe'
 import { normalizeText, topicIdeaFingerprint } from './topic-idea-store'
 import { buildBriefPool, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
-import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, type PolishedTopic } from './brief-synthesis'
+import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, briefSynthesisResponseSchema, classifySynthesisFailure, type PolishedTopic, type SynthesisFailureType, type SynthesisResponseDiagnostics } from './brief-synthesis'
+import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
 import { dedupeMegaGuideTitle } from './title-diversity'
 import type { RunCostController } from './run-cost-controller'
@@ -70,6 +73,10 @@ export interface BriefRoundDiagnostics {
   repaired: number
   rejected_by_reason: Record<string, number>
   marginal_yield: number
+  /** RC1 — typed synthesis-contract failure on a provider-SUCCESSFUL response. */
+  synthesis_failure: SynthesisFailureType | null
+  /** RC1 — exact response diagnostics (Preview only; no prompt, no secrets). */
+  synthesisResponse: SynthesisResponseDiagnostics | null
 }
 
 export interface BriefRunDiagnostics {
@@ -92,8 +99,30 @@ export interface BriefRunDiagnostics {
     evidence_load_errors: string[]
     ineligible_pages_excluded: number
     stale_index_excluded: boolean
+    /** RC2 — exact keyword-research ingestion accounting (rows→items) + the
+     *  restored live cache-first URL-seed fetch count. */
+    kr_rows_loaded: number
+    kr_rows_parsed: number
+    kr_rows_skipped: number
+    kr_items_skipped: number
+    kr_skipped_example_keys: string[]
+    kr_live_fetched: number
   }
   brief_pool: BriefPoolDiagnostics
+  /** RC3 — constrained discovery accounting (ran only to fill a pool deficit). */
+  discovery: {
+    ran: boolean
+    deficit: number
+    provider_ok: boolean
+    parse_failed: boolean
+    emitted: number
+    invalid_items: number
+    unknown_anchors: string[]
+    accepted: number
+    rejected_by_reason: Record<string, number>
+    rejected_examples: { subject: string; reason: string }[]
+    candidates: { subject: string; anchor: string }[]
+  } | null
   rounds: BriefRoundDiagnostics[]
   rejected_by_reason: Record<string, number>
   shadow_rejected_by_reason: Record<string, number>
@@ -102,7 +131,7 @@ export interface BriefRunDiagnostics {
   finalCount: number
   model_calls: number
   /** Truthful zero/low-yield classification. */
-  stop_reason: 'target_reached' | 'pool_exhausted' | 'zero_marginal_yield' | 'insufficient_inventory' | 'provider_failed' | 'budget_stopped'
+  stop_reason: 'target_reached' | 'pool_exhausted' | 'zero_marginal_yield' | 'insufficient_inventory' | 'provider_failed' | 'budget_stopped' | 'synthesis_failed'
   insufficient_inventory: boolean
   secondary_keywords_filtered: number
   target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[] }[]
@@ -113,14 +142,14 @@ const MAX_ROUNDS = 2
 
 export async function generateFromBriefs(
   admin: Admin,
-  input: { projectId: string; targetCount: number; qualityMode?: ModelTier },
+  input: { projectId: string; targetCount: number; qualityMode?: ModelTier; userId?: string },
   controller: RunCostController,
 ): Promise<{ suggestions: TopicSuggestion[]; diagnostics: BriefRunDiagnostics }> {
   const loadErrors: string[] = []
 
   // ── 1) Evidence inventory (project-scoped; failures RECORDED, never silent) ──
   const { data: proj } = await admin.from('projects').select('business_name, target_domain, language, country').eq('id', input.projectId).maybeSingle()
-  const p = (proj as { business_name: string | null; target_domain: string | null; language: string | null } | null) ?? { business_name: null, target_domain: null, language: null }
+  const p = (proj as { business_name: string | null; target_domain: string | null; language: string | null; country?: string | null } | null) ?? { business_name: null, target_domain: null, language: null, country: null }
   const language: 'he' | 'en' = String(p.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
   const langLabel = language === 'he' ? 'Hebrew' : 'English'
 
@@ -131,14 +160,39 @@ export async function generateFromBriefs(
 
   const keywordResearch: { query: string; volume?: number | null }[] = []
   let krCacheRows = 0
+  let krIngestion: KeywordResearchIngestion = { nodes: [], rows_loaded: 0, rows_parsed: 0, rows_skipped: 0, items_parsed: 0, items_skipped: 0, skipped_example_keys: [] }
+  let krLiveFetched = 0
   try {
-    // RECENCY-ORDERED (live defect: unordered limit(20) returned an arbitrary,
-    // possibly stale subset of the research cache).
-    const { data } = await admin.from('keyword_research_cache').select('results_json').eq('project_id', input.projectId).order('created_at', { ascending: false }).limit(20)
+    // Ordered by the table's REAL timestamp column, fetched_at (the live defect:
+    // ordering by a non-existent created_at made PostgREST return a RESPONSE
+    // error object — not a throw — which read as "no keyword research exists").
+    const { data, error } = await admin.from('keyword_research_cache').select('results_json, fetched_at').eq('project_id', input.projectId).order('fetched_at', { ascending: false }).limit(20)
+    if (error) loadErrors.push(`keyword_research_cache:${String((error as { message?: string }).message ?? 'query_error').slice(0, 80)}`)
     const rows = (data ?? []) as { results_json: unknown }[]
     krCacheRows = rows.length
-    keywordResearch.push(...flattenKeywordResearchCache(rows))
+    krIngestion = flattenKeywordResearchCacheDetailed(rows)
+    keywordResearch.push(...krIngestion.nodes)
+    if (krIngestion.rows_skipped > 0 || krIngestion.items_skipped > 0) loadErrors.push(`keyword_research_cache:unparsed rows=${krIngestion.rows_skipped} items=${krIngestion.items_skipped} keys=[${krIngestion.skipped_example_keys.join(' | ')}]`)
   } catch (e) { loadErrors.push(`keyword_research_cache:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
+
+  // RESTORED evidence source (lost in the rewrite): the previous live generator
+  // fetched Google-Ads keyword ideas for the project URL (cache-first, 30-day
+  // TTL). When the raw cache yields ZERO queries, do ONE bounded cache-first
+  // URL-seed fetch — never per-topic, never per-round.
+  if (keywordResearch.length === 0 && input.userId && p.target_domain) {
+    const country = (p.country || 'IL').toUpperCase()
+    const langCode = language
+    const key = { projectId: input.projectId, seedType: 'url' as const, seedValue: p.target_domain, country, language: langCode }
+    try {
+      let results = await getCachedKeywordResults(admin, key)
+      if (!results) {
+        const resp = await generateKeywordIdeas({ researchType: 'url', keywords: [], url: p.target_domain, country, language: langCode, minMonthlySearches: 30, resultsLimit: 250 })
+        results = resp.results
+        await setCachedKeywordResults(admin, input.userId, key, results)
+      }
+      for (const r of results ?? []) if (r?.keyword?.trim()) { keywordResearch.push({ query: r.keyword, volume: r.avgMonthlySearches ?? null }); krLiveFetched++ }
+    } catch (e) { loadErrors.push(`keyword_research_live:${((e as Error)?.message ?? 'error').slice(0, 80)}`) }
+  }
   const searchVolumeValues = keywordResearch.filter((k) => (k.volume ?? 0) > 0).length
 
   const PAGE_TYPE_ALIASES: Record<string, EntityPageType> = { collection: 'category', blog: 'post', item: 'product' }
@@ -226,7 +280,8 @@ export async function generateFromBriefs(
     { minDocs: 6, minFraction: 0.3 },
   )
   for (const t of corpusTypeWords) domainTypeWords.add(t)
-  for (const t of deriveAttributeTokens(entities.map((e) => e.name))) domainTypeWords.add(t)
+  const attributeTokens = deriveAttributeTokens(entities.map((e) => e.name))
+  for (const t of attributeTokens) domainTypeWords.add(t)
   const commercialEntityTokens = new Set<string>()
   for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
@@ -253,10 +308,12 @@ export async function generateFromBriefs(
     isOwnedByEntity: (phrase) => ownedByExistingEntity(guard, phrase),
     isCoveredByContent: (title, keyword) => coveredByExistingContent(guard, title, keyword),
     domainTypeWords,
+    attributeTokens,
   })
 
   // ── 4) Model path (explicit; downgrade always recorded, never silent) ────────
   const modelPath = await resolveRunModel(input.qualityMode ?? 'standard')
+  const modelConfigHolder: { value: BriefRunDiagnostics['modelConfig'] } = { value: null }
 
   const ctx: ProjectContext = { projectName: p.business_name, domain: p.target_domain, language, primaryProjectFocus: focus.primaryProjectFocus, secondaryProjectAreas: focus.secondaryProjectAreas, ownedCategories: entities.map((e) => e.name).slice(0, 15), existingTopics: publishedCoverage.slice(0, 15) }
   const year = new Date().getFullYear()
@@ -405,36 +462,89 @@ export async function generateFromBriefs(
     }
   }
 
+  // ── 4b) CONSTRAINED DISCOVERY (RC3) — ONE batched call, only for a deficit ──
+  let discovery: BriefRunDiagnostics['discovery'] = null
+  const workingPool = [...pool]
+  if (workingPool.length < input.targetCount && modelPath.model) {
+    const deficit = input.targetCount - workingPool.length
+    // Owned anchors: category/service/product names + real focus areas (exact strings).
+    const anchorList = Array.from(new Set([
+      ...entities.filter((e) => ['category', 'service', 'product'].includes(e.type ?? '')).map((e) => e.name),
+      ...(entities.length > 0 ? projectFocus : []),
+      ...tracked,
+    ].map((a) => a.trim()).filter(Boolean))).slice(0, 30)
+    if (anchorList.length > 0) {
+      const dPrompt = buildDiscoveryPrompt({ language, ctx, year, deficit, anchors: anchorList, publishedTitles: publishedCoverage, pendingTitles: Array.from(pendingExactKeys).slice(0, 25) })
+      const dRes = await generateRecommendationJSON(
+        dPrompt,
+        { temperature: 0.6, maxOutputTokens: Math.max(1024, deficit * 120 + 600), ...(modelPath.model ? { model: modelPath.model } : {}), responseSchema: discoveryResponseSchema(anchorList) },
+        controller,
+        { source: 'brief_discovery', callPurpose: 'discovery', requestedIdeaCount: deficit },
+      )
+      if (modelConfigHolder.value === null && dRes.modelConfig) modelConfigHolder.value = { model: dRes.modelConfig.model, thinkingMode: dRes.modelConfig.thinkingMode, thinkingBudget: dRes.modelConfig.thinkingBudget, maxOutputTokens: dRes.modelConfig.maxOutputTokens }
+      if (!dRes.ok) {
+        discovery = { ran: true, deficit, provider_ok: false, parse_failed: false, emitted: 0, invalid_items: 0, unknown_anchors: [], accepted: 0, rejected_by_reason: {}, rejected_examples: [], candidates: [] }
+      } else {
+        const dRec = reconcileDiscovery(dRes.text, anchorList)
+        const dVal = validateDiscoveredCandidates(dRec.candidates, {
+          anchors: new Set(anchorList),
+          attributeTokens,
+          brandSafety,
+          isOwnedByEntity: (phrase) => ownedByExistingEntity(guard, phrase),
+          isCoveredByContent: (title, keyword) => coveredByExistingContent(guard, title, keyword),
+          pendingExactKeys,
+          pendingSignatures,
+          existingPoolSignatures: workingPool.map((b) => topicSignature(b.subject, b.intendedIntent)),
+          keywordResearch,
+          relatedEntitiesFor: (subject) => {
+            const subToks = new Set(contentTokens(subject))
+            return entities.filter((e) => contentTokens(e.name).some((t) => subToks.has(t))).map((e) => ({ name: e.name, url: e.url ?? null, type: e.type }))
+          },
+        })
+        workingPool.push(...dVal.accepted.slice(0, deficit))
+        discovery = {
+          ran: true, deficit, provider_ok: true, parse_failed: dRec.parseFailed, emitted: dRec.emitted,
+          invalid_items: dRec.invalidItems, unknown_anchors: dRec.unknownAnchors,
+          accepted: Math.min(dVal.accepted.length, deficit), rejected_by_reason: dVal.rejected_by_reason,
+          rejected_examples: dVal.rejected_examples,
+          candidates: dRec.candidates.map((c) => ({ subject: c.subject.slice(0, 100), anchor: c.anchor.slice(0, 60) })),
+        }
+      }
+    }
+  }
+
   // ── 5) Adaptive synthesis rounds ─────────────────────────────────────────────
   const rounds: BriefRoundDiagnostics[] = []
-  let modelConfig: BriefRunDiagnostics['modelConfig'] = null
   const suggestions: TopicSuggestion[] = []
-  const briefById = new Map(pool.map((b) => [b.opportunityId, b]))
+  const briefById = new Map(workingPool.map((b) => [b.opportunityId, b]))
   let cursor = 0
   let stop: BriefRunDiagnostics['stop_reason'] | null = null
 
-  if (pool.length === 0) stop = 'insufficient_inventory'
+  // Paid-call cap: discovery + synthesis together may never exceed TWO calls.
+  const maxSynthesisRounds = discovery?.ran ? 1 : MAX_ROUNDS
 
-  for (let round = 1; round <= MAX_ROUNDS && !stop; round++) {
+  if (workingPool.length === 0) stop = 'insufficient_inventory'
+
+  for (let round = 1; round <= maxSynthesisRounds && !stop; round++) {
     const deficit = input.targetCount - suggestions.length
     if (deficit <= 0) { stop = 'target_reached'; break }
     // Batch size: the deficit + a small validation allowance (bounded) — never
     // "ask for 15 when 1 is missing".
-    const batchSize = Math.min(pool.length - cursor, Math.max(4, Math.ceil(deficit * 1.5)))
+    const batchSize = Math.min(workingPool.length - cursor, Math.max(4, Math.ceil(deficit * 1.5)))
     if (batchSize <= 0) { stop = suggestions.length > 0 ? 'pool_exhausted' : 'insufficient_inventory'; break }
-    const batch = pool.slice(cursor, cursor + batchSize)
+    const batch = workingPool.slice(cursor, cursor + batchSize)
     cursor += batchSize
 
     const prompt = buildBriefSynthesisPrompt(batch, ctx, langLabel, year)
     const res = await generateRecommendationJSON(
       prompt,
-      { temperature: 0.4, maxOutputTokens: synthesisOutputBudget(batch.length), ...(modelPath.model ? { model: modelPath.model } : {}) },
+      { temperature: 0.4, maxOutputTokens: synthesisOutputBudget(batch.length), ...(modelPath.model ? { model: modelPath.model } : {}), responseSchema: briefSynthesisResponseSchema(batch.map((b) => b.opportunityId)) },
       controller,
       { source: 'brief_synthesis', callPurpose: round === 1 ? 'primary' : 'refill', requestedIdeaCount: batch.length },
     )
-    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? modelPath.model, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0 }
+    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? modelPath.model, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
     rounds.push(rd)
-    if (modelConfig === null && res.modelConfig) modelConfig = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
+    if (modelConfigHolder.value === null && res.modelConfig) modelConfigHolder.value = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
     if (res.stopped) { stop = 'budget_stopped'; break }
     if (!res.ok) {
       // The provider rejected the request before returning content — EVERY brief
@@ -450,6 +560,11 @@ export async function generateFromBriefs(
     rd.skipped_by_model = rec.skipped.length
     rd.missing_from_response = rec.missing.length
     rd.dropped_items = rec.droppedItems
+    rd.synthesisResponse = rec.response
+    // RC1 — a provider-SUCCESSFUL response that cannot honor the contract is a
+    // TYPED synthesis failure, never "zero marginal topic quality".
+    rd.synthesis_failure = classifySynthesisFailure(rec, batch.length)
+    if (rd.synthesis_failure) { stop = 'synthesis_failed'; break }
 
     for (const t of rec.polished) {
       const brief = briefById.get(t.briefId)
@@ -474,8 +589,8 @@ export async function generateFromBriefs(
     rd.marginal_yield = rd.briefs_sent > 0 ? Number((rd.accepted / rd.briefs_sent).toFixed(3)) : 0
 
     if (suggestions.length >= input.targetCount) { stop = 'target_reached'; break }
-    if (rd.accepted === 0) { stop = suggestions.length > 0 ? 'zero_marginal_yield' : (cursor >= pool.length ? 'insufficient_inventory' : 'zero_marginal_yield'); break }
-    if (cursor >= pool.length) { stop = suggestions.length > 0 ? 'pool_exhausted' : 'insufficient_inventory'; break }
+    if (rd.accepted === 0) { stop = suggestions.length > 0 ? 'zero_marginal_yield' : (cursor >= workingPool.length ? 'insufficient_inventory' : 'zero_marginal_yield'); break }
+    if (cursor >= workingPool.length) { stop = suggestions.length > 0 ? 'pool_exhausted' : 'insufficient_inventory'; break }
   }
   if (!stop) stop = suggestions.length >= input.targetCount ? 'target_reached' : (suggestions.length > 0 ? 'pool_exhausted' : 'insufficient_inventory')
 
@@ -485,7 +600,7 @@ export async function generateFromBriefs(
     diagnostics: {
       engine: 'evidence_first_briefs',
       modelPath,
-      modelConfig,
+      modelConfig: modelConfigHolder.value,
       evidence_inventory: {
         project_focus_terms: projectFocus.length,
         tracked_keywords: tracked.length,
@@ -501,14 +616,22 @@ export async function generateFromBriefs(
         evidence_load_errors: loadErrors,
         ineligible_pages_excluded: ineligiblePageTitles.length,
         stale_index_excluded: staleIndexExcluded,
+        kr_rows_loaded: krIngestion.rows_loaded,
+        kr_rows_parsed: krIngestion.rows_parsed,
+        kr_rows_skipped: krIngestion.rows_skipped,
+        kr_items_skipped: krIngestion.items_skipped,
+        kr_skipped_example_keys: krIngestion.skipped_example_keys,
+        kr_live_fetched: krLiveFetched,
       },
       brief_pool: briefPool,
+      discovery,
       rounds,
       rejected_by_reason,
       shadow_rejected_by_reason,
       generated_opportunities: rounds.reduce((s, r) => s + r.polished, 0),
       finalCount: suggestions.length,
-      model_calls: rounds.length,
+      // TOTAL paid calls: synthesis rounds + the (single) discovery call.
+      model_calls: rounds.length + (discovery?.ran ? 1 : 0),
       stop_reason: stop,
       insufficient_inventory: stop === 'insufficient_inventory',
       secondary_keywords_filtered: secondaryKeywordsFiltered,

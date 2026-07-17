@@ -77,27 +77,114 @@ export function synthesisOutputBudget(briefCount: number): number {
   return Math.max(1536, Math.min(12288, briefCount * 260 + 800))
 }
 
-/** Reconcile the model response against the EXACT brief batch. */
-export function reconcileSynthesis(text: string, briefs: OpportunityBrief[]): SynthesisReconciliation {
-  const ids = new Set(briefs.map((b) => b.opportunityId))
-  const out: SynthesisReconciliation = { polished: [], skipped: [], missing: [], droppedItems: 0, parseFailed: false, emitted: 0 }
-  let parsed: { topics?: unknown }
-  try { parsed = JSON.parse(text) } catch {
-    const m = (text || '').match(/\{[\s\S]*\}/)
-    if (!m) { out.parseFailed = true; out.missing = briefs.map((b) => b.opportunityId); return out }
-    try { parsed = JSON.parse(m[0]) } catch { out.parseFailed = true; out.missing = briefs.map((b) => b.opportunityId); return out }
+const SYNTH_INTENTS = ['informational', 'commercial', 'comparison', 'transactional', 'local'] as const
+
+/**
+ * ENFORCED structured-output schema (OpenAPI style, uppercase types — the shape
+ * @google/genai forwards to generationConfig.responseSchema). briefId is an ENUM
+ * of the exact batch ids, so an omitted/renamed/invented id is a provider-side
+ * schema violation, not a silent "missing". Prompt wording alone proved
+ * insufficient live (Gemini Pro returned a shape the parser could not
+ * reconcile — 18/18 briefs "missing").
+ */
+export function briefSynthesisResponseSchema(briefIds: string[]): Record<string, unknown> {
+  return {
+    type: 'OBJECT',
+    properties: {
+      topics: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            briefId: { type: 'STRING', enum: briefIds },
+            skip: { type: 'BOOLEAN' },
+            why: { type: 'STRING' },
+            title: { type: 'STRING' },
+            primaryKeyword: { type: 'STRING' },
+            secondaryKeywords: { type: 'ARRAY', items: { type: 'STRING' } },
+            intent: { type: 'STRING', enum: [...SYNTH_INTENTS] },
+          },
+          required: ['briefId', 'skip'],
+        },
+      },
+    },
+    required: ['topics'],
   }
-  const arr = Array.isArray((parsed as { topics?: unknown }).topics) ? (parsed as { topics: unknown[] }).topics : []
-  out.emitted = arr.length
+}
+
+export type SynthesisFailureType =
+  | 'synthesis_parse_failure'
+  | 'synthesis_schema_failure'
+  | 'synthesis_all_briefs_missing'
+  | 'synthesis_unknown_brief_ids'
+
+/** Exact response diagnostics (Preview only — no prompt, no secrets). */
+export interface SynthesisResponseDiagnostics {
+  parseFailed: boolean
+  topLevelType: string
+  topLevelKeys: string[]
+  emittedItems: number
+  recognizedBriefIds: number
+  unknownBriefIds: string[]
+  duplicateBriefIds: string[]
+  invalidItems: number
+  missingBriefIds: string[]
+  responseHash: string
+  /** Sanitized truncated excerpt for authenticated-Preview diagnosis only. */
+  sanitizedExcerpt: string
+}
+
+function fnvHash(s: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) }
+  return (h >>> 0).toString(16)
+}
+const sanitizeExcerpt = (text: string) => (text || '').replace(/AIza[0-9A-Za-z_-]{20,}/g, '[key]').replace(/\s+/g, ' ').slice(0, 300)
+
+/** Reconcile the model response against the EXACT brief batch, with full typed
+ *  response diagnostics. Accepts `id` as a briefId alias defensively (counted
+ *  as recognized) — the responseSchema makes the canonical field authoritative. */
+export function reconcileSynthesis(text: string, briefs: OpportunityBrief[]): SynthesisReconciliation & { response: SynthesisResponseDiagnostics } {
+  const ids = new Set(briefs.map((b) => b.opportunityId))
+  const response: SynthesisResponseDiagnostics = {
+    parseFailed: false, topLevelType: 'none', topLevelKeys: [], emittedItems: 0,
+    recognizedBriefIds: 0, unknownBriefIds: [], duplicateBriefIds: [], invalidItems: 0,
+    missingBriefIds: [], responseHash: fnvHash(text || ''), sanitizedExcerpt: sanitizeExcerpt(text),
+  }
+  const out: SynthesisReconciliation & { response: SynthesisResponseDiagnostics } = { polished: [], skipped: [], missing: [], droppedItems: 0, parseFailed: false, emitted: 0, response }
+
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch {
+    const m = (text || '').match(/\{[\s\S]*\}|\[[\s\S]*\]/)
+    if (!m) { out.parseFailed = true; response.parseFailed = true; out.missing = briefs.map((b) => b.opportunityId); response.missingBriefIds = out.missing; return out }
+    try { parsed = JSON.parse(m[0]) } catch { out.parseFailed = true; response.parseFailed = true; out.missing = briefs.map((b) => b.opportunityId); response.missingBriefIds = out.missing; return out }
+  }
+  response.topLevelType = Array.isArray(parsed) ? 'array' : typeof parsed
+  response.topLevelKeys = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? Object.keys(parsed as object).slice(0, 8) : []
+
+  // SCHEMA SHAPE: only {"topics":[...]} is the contract. A direct array or a
+  // renamed wrapper is a SCHEMA failure — never silently coerced.
+  const topics = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray((parsed as { topics?: unknown }).topics)
+    ? (parsed as { topics: unknown[] }).topics
+    : null
+  if (topics === null) {
+    out.missing = briefs.map((b) => b.opportunityId)
+    response.missingBriefIds = out.missing
+    return out
+  }
+  out.emitted = topics.length
+  response.emittedItems = topics.length
   const seen = new Set<string>()
-  for (const t of arr) {
-    const o = t as Record<string, unknown>
-    const briefId = String(o.briefId ?? '').trim()
-    if (!briefId || !ids.has(briefId) || seen.has(briefId)) { out.droppedItems++; continue }
+  for (const t of topics) {
+    const o = (t ?? {}) as Record<string, unknown>
+    const briefId = String(o.briefId ?? o.id ?? '').trim()
+    if (!briefId || !ids.has(briefId)) { out.droppedItems++; response.invalidItems++; if (briefId) response.unknownBriefIds.push(briefId.slice(0, 40)); continue }
+    if (seen.has(briefId)) { out.droppedItems++; response.duplicateBriefIds.push(briefId); continue }
+    response.recognizedBriefIds++
     if (o.skip === true) { seen.add(briefId); out.skipped.push({ briefId, why: String(o.why ?? '').slice(0, 120) }); continue }
     const title = String(o.title ?? '').trim()
     const primaryKeyword = String(o.primaryKeyword ?? '').trim()
-    if (!title || !primaryKeyword) { out.droppedItems++; continue }
+    if (!title || !primaryKeyword) { out.droppedItems++; response.invalidItems++; continue }
     seen.add(briefId)
     out.polished.push({
       briefId, title, primaryKeyword,
@@ -106,5 +193,20 @@ export function reconcileSynthesis(text: string, briefs: OpportunityBrief[]): Sy
     })
   }
   for (const b of briefs) if (!seen.has(b.opportunityId)) out.missing.push(b.opportunityId)
+  response.missingBriefIds = out.missing
   return out
+}
+
+/**
+ * Typed classification of a provider-SUCCESSFUL response that cannot honor the
+ * synthesis contract. null = contract honored. An all-missing response is a
+ * CONTRACT failure — never "zero marginal topic quality".
+ */
+export function classifySynthesisFailure(rec: SynthesisReconciliation & { response: SynthesisResponseDiagnostics }, sentCount: number): SynthesisFailureType | null {
+  if (sentCount === 0) return null
+  if (rec.parseFailed) return 'synthesis_parse_failure'
+  if (rec.response.topLevelType !== 'object' || (rec.response.emittedItems === 0 && rec.response.topLevelKeys.indexOf('topics') === -1)) return 'synthesis_schema_failure'
+  if (rec.response.unknownBriefIds.length > 0 && rec.response.recognizedBriefIds === 0) return 'synthesis_unknown_brief_ids'
+  if (rec.missing.length === sentCount) return 'synthesis_all_briefs_missing'
+  return null
 }

@@ -194,12 +194,57 @@ export function selectClustersWithinBudget(ranked: EvidenceCluster[], maxCluster
  * + pure so the exact production parse is offline-testable (Part I).
  */
 export function flattenKeywordResearchCache(rows: { results_json: unknown }[]): KeywordResearchNode[] {
+  return flattenKeywordResearchCacheDetailed(rows).nodes
+}
+
+export interface KeywordResearchIngestion {
+  nodes: KeywordResearchNode[]
+  rows_loaded: number
+  rows_parsed: number
+  rows_skipped: number
+  items_parsed: number
+  items_skipped: number
+  /** Top-level keys of unparsed rows/items (diagnosis of unknown formats). */
+  skipped_example_keys: string[]
+}
+
+/**
+ * TOLERANT flatten with EXACT ingestion accounting (live defect: a silently
+ * unparsed format reads as "no keyword research exists"). Accepts:
+ *  - results_json as KeywordIdeaResult[]  ({keyword, avgMonthlySearches})
+ *  - results_json as {results: [...]} / {keywords: [...]} wrappers
+ *  - item field aliases: keyword|query|text · avgMonthlySearches|
+ *    avg_monthly_searches|monthlySearches|volume
+ * Unknown shapes are COUNTED with example keys, never silently dropped.
+ */
+export function flattenKeywordResearchCacheDetailed(rows: { results_json: unknown }[]): KeywordResearchIngestion {
   const out: KeywordResearchNode[] = []
+  let rowsParsed = 0, rowsSkipped = 0, itemsParsed = 0, itemsSkipped = 0
+  const exampleKeys: string[] = []
+  const noteKeys = (o: unknown) => {
+    if (exampleKeys.length >= 5) return
+    if (o && typeof o === 'object') exampleKeys.push(Object.keys(o as object).slice(0, 6).join(','))
+    else exampleKeys.push(typeof o)
+  }
   for (const row of rows) {
-    const arr = Array.isArray(row?.results_json) ? row.results_json : []
-    for (const kw of arr as { keyword?: string; avgMonthlySearches?: number | null }[]) {
-      if (kw?.keyword?.trim()) out.push({ query: kw.keyword, volume: kw.avgMonthlySearches ?? null })
+    const rj = row?.results_json
+    const arr: unknown[] | null = Array.isArray(rj)
+      ? rj
+      : rj && typeof rj === 'object' && Array.isArray((rj as { results?: unknown }).results)
+        ? (rj as { results: unknown[] }).results
+        : rj && typeof rj === 'object' && Array.isArray((rj as { keywords?: unknown }).keywords)
+          ? (rj as { keywords: unknown[] }).keywords
+          : null
+    if (!arr) { rowsSkipped++; noteKeys(rj); continue }
+    rowsParsed++
+    for (const item of arr) {
+      const o = (item ?? {}) as Record<string, unknown>
+      const query = [o.keyword, o.query, o.text].find((v): v is string => typeof v === 'string' && !!v.trim())
+      if (!query) { itemsSkipped++; noteKeys(item); continue }
+      const volRaw = [o.avgMonthlySearches, o.avg_monthly_searches, o.monthlySearches, o.volume].find((v) => typeof v === 'number')
+      out.push({ query, volume: typeof volRaw === 'number' ? volRaw : null })
+      itemsParsed++
     }
   }
-  return out
+  return { nodes: out, rows_loaded: rows.length, rows_parsed: rowsParsed, rows_skipped: rowsSkipped, items_parsed: itemsParsed, items_skipped: itemsSkipped, skipped_example_keys: exampleKeys }
 }

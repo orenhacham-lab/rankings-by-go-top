@@ -65,6 +65,9 @@ export interface BriefPoolInput {
   isCoveredByContent: (title: string, keyword: string) => boolean
   /** Domain type/attribute words — a subject must have a non-type distinctive token. */
   domainTypeWords: Set<string>
+  /** Descriptive ATTRIBUTE tokens (colours/sizes/occasions/recipients — from
+   *  deriveAttributeTokens): NEVER eligible inside a theme subject. */
+  attributeTokens?: Set<string>
 }
 
 export interface BriefPoolDiagnostics {
@@ -182,7 +185,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
   // (c) ENTITY-THEME briefs: a distinctive subject token shared by >= 2 entities
   // becomes ONE care/selection guide brief (never one article per entity, never a
   // bare entity name as subject). Demand never claimed.
-  const themes = entityThemes(input.entities, input.domainTypeWords, input.language)
+  const themes = entityThemes(input.entities, input.domainTypeWords, input.attributeTokens ?? new Set())
   for (const th of themes) {
     rawTheme++
     if (seenQuery.has(normalizePhrase(th.subject))) { reject('theme_duplicates_query', th.subject, 'site_scan'); continue }
@@ -311,33 +314,44 @@ function coverageFor(subjectToks: string[], idx: Map<string, string[]>): string[
 /** Entity themes: a distinctive (non-generic, non-type/attribute) token shared by
  *  >= 2 entities → ONE broader guide subject built from the token's surface form. */
 const THEMEABLE_TYPES = new Set(['product', 'category', 'service'])
-function entityThemes(allEntities: EntityNode[], domainTypeWords: Set<string>, language: 'he' | 'en'): { subject: string; need: SearchNeed; entities: EntityNode[] }[] {
-  // Only COMMERCIAL entities seed a selection-guide theme — a token shared by blog
-  // posts (e.g. a condition-class word across articles) is not a buyable subject.
+/**
+ * RC4 — themes are STANDALONE SEMANTIC SUBJECT CLASSES, never a shared modifier.
+ * The old heuristic framed ANY token shared across entities as "איך לבחור X",
+ * producing "איך לבחור ורוד/כלה/שוקולד/גיבסניות" live. Now a theme requires a
+ * MULTI-TOKEN NOUN PHRASE (an adjacent bigram) appearing consistently across
+ * >= 2 commercial entities, where NO token is a generic/attribute/type modifier
+ * (colour, size, occasion, recipient, packaging …). Single shared tokens are
+ * never themes — creative single-subject needs belong to constrained discovery,
+ * which must anchor them explicitly. No forced "איך לבחור" frame: the subject
+ * IS the noun phrase; the synthesis stage chooses a fitting structure.
+ */
+function entityThemes(allEntities: EntityNode[], domainTypeWords: Set<string>, attributeTokens: Set<string>): { subject: string; need: SearchNeed; entities: EntityNode[] }[] {
   const entities = allEntities.filter((e) => THEMEABLE_TYPES.has(e.type ?? 'unknown'))
-  const byToken = new Map<string, { surface: string; entities: EntityNode[] }>()
+  const phrases = new Map<string, { surface: string; entities: EntityNode[] }>()
   for (const e of entities) {
-    const surfaceWords = (e.name || '').split(/\s+/).filter(Boolean)
-    for (const w of surfaceWords) {
-      const toks = contentTokens(w)
-      for (const t of toks) {
-        if (GENERIC_TOKENS.has(t) || domainTypeWords.has(t) || t.length < 3) continue
-        const cur = byToken.get(t) ?? { surface: w, entities: [] }
-        if (!cur.entities.some((x) => x.name === e.name)) cur.entities.push(e)
-        byToken.set(t, cur)
-      }
+    const words = (e.name || '').split(/\s+/).filter(Boolean)
+    const seenInEntity = new Set<string>()
+    for (let i = 0; i + 1 < words.length; i++) {
+      const surface = `${words[i]} ${words[i + 1]}`
+      const t1 = contentTokens(words[i])[0]
+      const t2 = contentTokens(words[i + 1])[0]
+      if (!t1 || !t2 || t1.length < 3 || t2.length < 3) continue
+      // NO modifier token may participate: generic commerce words, corpus
+      // attributes (colours/sizes/occasions/recipients), numbers.
+      if ([t1, t2].some((t) => GENERIC_TOKENS.has(t) || attributeTokens.has(t) || /\d/.test(t))) continue
+      const key = `${t1} ${t2}`
+      if (seenInEntity.has(key)) continue
+      seenInEntity.add(key)
+      const cur = phrases.get(key) ?? { surface, entities: [] }
+      if (!cur.entities.some((x) => x.name === e.name)) cur.entities.push(e)
+      phrases.set(key, cur)
     }
   }
-  const used = new Set<string>()
   const themes: { subject: string; need: SearchNeed; entities: EntityNode[] }[] = []
-  const ranked = Array.from(byToken.entries()).filter(([, v]) => v.entities.length >= 2).sort((a, b) => b[1].entities.length - a[1].entities.length || (a[0] < b[0] ? -1 : 1))
-  for (const [tok, v] of ranked) {
-    if (used.has(tok) || themes.length >= 8) continue
-    used.add(tok)
-    // Subject = a NEED phrase around the theme's surface word — a real user need,
-    // never the bare entity/category name (which the owning page already owns).
-    // The phrase is a grammatical FUNCTION frame (selection need), not domain content.
-    themes.push({ subject: language === 'he' ? `איך לבחור ${v.surface}` : `how to choose ${v.surface}`, need: 'selection', entities: v.entities })
+  const ranked = Array.from(phrases.entries()).filter(([, v]) => v.entities.length >= 2).sort((a, b) => b[1].entities.length - a[1].entities.length || (a[0] < b[0] ? -1 : 1))
+  for (const [, v] of ranked) {
+    if (themes.length >= 8) break
+    themes.push({ subject: v.surface, need: 'category_guide', entities: v.entities })
   }
   return themes
 }

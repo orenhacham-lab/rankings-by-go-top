@@ -153,6 +153,10 @@ export interface RecoGenOptions {
   model?: string
   /** Skip the transient-retry fallback (e.g. the curator makes ONE call only). */
   noFallback?: boolean
+  /** ENFORCED structured output (OpenAPI-style schema, uppercase Type names) —
+   *  passed to the provider as generationConfig.responseSchema. Prompt wording
+   *  alone proved insufficient (live all-briefs-missing failure). */
+  responseSchema?: Record<string, unknown>
 }
 
 /** Per-call telemetry context (source + purpose) for the shared controller. */
@@ -240,6 +244,7 @@ export async function generateRecommendationJSON(prompt: string, opts: RecoGenOp
     temperature: opts.temperature ?? 0.7,
     maxOutputTokens: mc.maxOutputTokens,
     thinkingConfig: { thinkingBudget: mc.thinkingBudget },
+    ...(opts.responseSchema ? { responseSchema: opts.responseSchema } : {}),
   }
 
   // ENFORCED pre-call gate — the shared controller decides whether this call may

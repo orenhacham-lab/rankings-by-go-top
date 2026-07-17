@@ -81,6 +81,14 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   add('provider_no_failure', providerFailedRounds.length === 0 && d.stop_reason !== 'provider_failed',
     providerFailedRounds.map((r) => `r${r.round}: ${r.providerErrorType ?? 'unknown'} — ${r.sanitizedProviderMessage ?? ''}`).join(' | ') || 'none')
 
+  // ── RC1: synthesis response contract — a provider-SUCCESSFUL response must
+  // honor the structured-output contract. Missing briefs, parse failures,
+  // schema-shape failures and unknown-id responses are CONTRACT failures —
+  // never "insufficient inventory" and never zero-quality.
+  const contractBreaches = d.rounds.filter((r) => r.synthesis_failure !== null || (r.provider_ok && r.briefs_sent > 0 && r.missing_from_response > 0))
+  add('synthesis_response_contract', contractBreaches.length === 0 && d.stop_reason !== 'synthesis_failed',
+    contractBreaches.map((r) => `r${r.round}: ${r.synthesis_failure ?? 'missing_briefs'} missing=${r.missing_from_response}/${r.briefs_sent} topLevel=${r.synthesisResponse?.topLevelType}[${(r.synthesisResponse?.topLevelKeys ?? []).join(',')}] unknownIds=${(r.synthesisResponse?.unknownBriefIds ?? []).length} hash=${r.synthesisResponse?.responseHash}`).join(' | ') || 'none')
+
   // ── Exact reconciliation (provider failures have their OWN bucket) ──
   const recon = d.rounds.every((r) =>
     r.briefs_sent === r.polished + r.skipped_by_model + r.missing_from_response + r.provider_failed_briefs &&
@@ -95,11 +103,13 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   add('raw_query_candidates_expected', !(d.evidence_inventory.keyword_research_queries > 0 && bp.raw_query_candidates === 0),
     `kr_queries=${d.evidence_inventory.keyword_research_queries} raw_query_candidates=${bp.raw_query_candidates}`)
 
-  // ── Yield truthfulness ──
+  // ── Yield truthfulness (effective pool = deterministic pool + validated
+  // discovery briefs — RC3 discovery is a LEGITIMATE anchored source) ──
+  const effectivePool = bp.pool_size + (d.discovery?.accepted ?? 0)
   const target = 8
-  const yieldOk = suggestions.length >= Math.min(target, d.brief_pool.pool_size) || d.stop_reason === 'insufficient_inventory' || d.stop_reason === 'pool_exhausted'
-  add('yield_or_truthful_inventory', yieldOk, `accepted=${suggestions.length} pool=${d.brief_pool.pool_size} stop=${d.stop_reason}`)
-  add('no_filler_on_empty_pool', !(d.brief_pool.pool_size === 0 && suggestions.length > 0), `pool=${d.brief_pool.pool_size} accepted=${suggestions.length}`)
+  const yieldOk = suggestions.length >= Math.min(target, effectivePool) || d.stop_reason === 'insufficient_inventory' || d.stop_reason === 'pool_exhausted'
+  add('yield_or_truthful_inventory', yieldOk, `accepted=${suggestions.length} pool=${bp.pool_size} discovery=${d.discovery?.accepted ?? 0} stop=${d.stop_reason}`)
+  add('no_filler_on_empty_pool', !(effectivePool === 0 && suggestions.length > 0), `effectivePool=${effectivePool} accepted=${suggestions.length}`)
 
   // ── Per-topic quality ──
   const truncated = suggestions.filter((s) => isTruncatedKeywordPhrase(s.primaryKeyword))
@@ -173,7 +183,7 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
 
   // ── Empty-pool scrutiny (Natural-Shop false-green class): an empty pool must
   // PROVE why it is empty before it may be called insufficient inventory.
-  if (bp.pool_size === 0 && suggestions.length === 0) {
+  if (effectivePool === 0 && suggestions.length === 0) {
     add('empty_pool_loads_clean', d.evidence_inventory.evidence_load_errors.length === 0,
       d.evidence_inventory.evidence_load_errors.join(' · ') || 'none')
     add('empty_pool_not_stale_evidence', !d.evidence_inventory.stale_index_excluded,

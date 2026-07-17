@@ -169,7 +169,7 @@ export async function POST(request: Request) {
       // DEFAULT — EVIDENCE-FIRST brief engine (Phase 4). One controller per run;
       // premium mode may use a validated Pro-class model for the synthesis call.
       const controller = newRunCostController(qualityMode, generationRunId, 12)
-      const run = await generateFromBriefs(auth.admin, { projectId: auth.project.id, targetCount: 12, qualityMode }, controller)
+      const run = await generateFromBriefs(auth.admin, { projectId: auth.project.id, targetCount: 12, qualityMode, userId: auth.user.id }, controller)
       briefDiagnostics = run.diagnostics
       fallbackReason = run.diagnostics.insufficient_inventory ? 'insufficient_inventory' : null
       result = { suggestions: run.suggestions, meta: { source, generated: run.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: run.suggestions.length, attempts: run.diagnostics.rounds.length, reason: run.suggestions.length === 0 ? (run.diagnostics.insufficient_inventory ? 'insufficient_inventory' : 'no_safe_opportunities') : undefined, runtimeDiag: diagnostics ? { totalCalls: run.diagnostics.model_calls, rawCandidates: run.diagnostics.generated_opportunities, path: 'evidence_first_briefs', modelPath: run.diagnostics.modelPath, stopReason: run.diagnostics.stop_reason } : undefined } }

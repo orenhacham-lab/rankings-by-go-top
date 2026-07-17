@@ -33,6 +33,10 @@ interface GenaiServerConfig {
   respond: (briefs: { id: string; subject: string; aligned_query?: string }[]) => unknown[]
   /** Simulate a provider that rejects EVERY generateContent with the live 400. */
   alwaysFail?: boolean
+  /** Return this RAW text as the model output (contract-failure scenarios). */
+  respondRaw?: (briefs: { id: string; subject: string; aligned_query?: string }[]) => string
+  /** Respond to CONSTRAINED-DISCOVERY prompts (default: anchored needs). */
+  respondDiscovery?: (anchors: string[]) => unknown
 }
 function startFakeGenai(cfg: GenaiServerConfig): Promise<{ server: Server; port: number; calls: { model: string; briefCount: number; thinkingBudget: number | null }[] }> {
   const calls: { model: string; briefCount: number; thinkingBudget: number | null }[] = []
@@ -67,16 +71,36 @@ function startFakeGenai(cfg: GenaiServerConfig): Promise<{ server: Server; port:
           res.end(JSON.stringify({ error: { code: 400, message: `Budget ${thinkingBudget} is invalid. Valid range is 128-32768.`, status: 'INVALID_ARGUMENT' } }))
           return
         }
+        // STRICT structured-output validation (RC1 regression trap): every
+        // generation call must carry an explicit responseSchema.
+        if (!body.includes('"responseSchema"')) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: { code: 400, message: 'Missing responseSchema: structured output is required by this contract.', status: 'INVALID_ARGUMENT' } }))
+          return
+        }
         const prompt: string = (() => { try { const j = JSON.parse(body); return JSON.stringify(j) } catch { return body } })()
+        // CONSTRAINED-DISCOVERY prompt → respond with anchored needs JSON.
+        if (prompt.includes('OWNED ANCHORS')) {
+          const am = prompt.match(/OWNED ANCHORS[^\[]*?(\[[\s\S]*?\])/)
+          let anchors: string[] = []
+          if (am) { try { anchors = JSON.parse(am[1].replace(/\\"/g, '"')) } catch { anchors = [] } }
+          calls.push({ model, briefCount: -1, thinkingBudget })
+          const needs = cfg.respondDiscovery
+            ? cfg.respondDiscovery(anchors)
+            : anchors.slice(0, 6).map((a, i) => ({ subject: i % 2 === 0 ? `יתרונות ${a} בשימוש יומיומי` : `טעויות נפוצות עם ${a}`, anchor: a, need: i % 2 === 0 ? 'explanation' : 'checklist', intent: 'informational' }))
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ needs }) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 800, candidatesTokenCount: 300, totalTokenCount: 1100 } }))
+          return
+        }
         // Extract the BRIEFS payload embedded in the prompt text.
         const m = prompt.match(/BRIEFS:\\n(\[.*?\])\\n\\nOUTPUT/) ?? prompt.match(/BRIEFS:\s*\n(\[[\s\S]*?\])\s*\n\s*\nOUTPUT/)
         let briefs: { id: string; subject: string; aligned_query?: string }[] = []
         if (m) { try { briefs = JSON.parse(m[1].replace(/\\"/g, '"').replace(/\\n/g, '\n')) } catch { briefs = [] } }
         calls.push({ model, briefCount: briefs.length, thinkingBudget })
-        const topics = cfg.respond(briefs)
+        const textOut = cfg.respondRaw ? cfg.respondRaw(briefs) : JSON.stringify({ topics: cfg.respond(briefs) })
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify({
-          candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ topics }) }] }, finishReason: 'STOP' }],
+          candidates: [{ content: { role: 'model', parts: [{ text: textOut }] }, finishReason: 'STOP' }],
           usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 400, totalTokenCount: 1400 },
         }))
         return
@@ -366,6 +390,92 @@ async function main() {
     const acc = evaluateRunAcceptance({ tierRequested: 'premium', diagnostics: run.diagnostics, suggestions: run.suggestions, pendingBefore: 0 })
     check('PF5. acceptance verdict is FAIL (provider_no_failure + reconciliation intact)', acc.verdict === 'FAIL' && acc.rules.find((r) => r.id === 'provider_no_failure')?.pass === false && acc.rules.find((r) => r.id === 'exact_reconciliation')?.pass === true, JSON.stringify(acc.rules.filter((r) => !r.pass).map((r) => r.id)))
     sFail.server.close()
+  }
+
+  console.log('E2E) RC1 — synthesis response contract failures are TYPED, never inventory')
+  {
+    const { evaluateRunAcceptance } = await import('../recommendations/qa-acceptance')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const runWithRaw = async (name: string, raw: (briefs: { id: string }[]) => string) => {
+      const srv = await startFakeGenai({ models: ['gemini-2.5-flash', 'gemini-2.5-pro'], respond: () => [], respondRaw: raw as never })
+      process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${srv.port}`
+      resetModelResolutionCache(); resetRecoGenAiClient()
+      const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+      const run = await generateFromBriefs(fakeAdmin(naturalShopTables()), { projectId: 'p1', targetCount: 5, qualityMode: 'premium' }, newRunCostController('premium', `rc1-${name}`, 5))
+      srv.server.close()
+      return run
+    }
+    // T1: direct ARRAY instead of {"topics":[]} → typed schema failure.
+    const r1 = await runWithRaw('array', (briefs) => JSON.stringify(briefs.map((b) => ({ briefId: b.id, skip: false, title: 'כותרת כלשהי לבדיקה', primaryKeyword: 'מילת מפתח לבדיקה' }))))
+    check('T1. direct array → synthesis_schema_failure + stop synthesis_failed', r1.diagnostics.rounds[0]?.synthesis_failure === 'synthesis_schema_failure' && r1.diagnostics.stop_reason === 'synthesis_failed', JSON.stringify({ f: r1.diagnostics.rounds[0]?.synthesis_failure, s: r1.diagnostics.stop_reason }))
+    const a1 = evaluateRunAcceptance({ tierRequested: 'premium', diagnostics: r1.diagnostics, suggestions: r1.suggestions, pendingBefore: 0 })
+    check('T1b. verdict FAIL via synthesis_response_contract (NEVER insufficient)', a1.verdict === 'FAIL' && a1.rules.find((x) => x.id === 'synthesis_response_contract')?.pass === false, a1.verdict)
+
+    // T2: renamed wrapper {"suggestions":[]} → typed schema failure.
+    const r2 = await runWithRaw('renamed', () => JSON.stringify({ suggestions: [] }))
+    check('T2. {"suggestions":[]} wrapper → synthesis_schema_failure', r2.diagnostics.rounds[0]?.synthesis_failure === 'synthesis_schema_failure', JSON.stringify(r2.diagnostics.rounds[0]?.synthesisResponse?.topLevelKeys))
+
+    // T3: unknown brief ids → typed failure.
+    const r3 = await runWithRaw('unknown', () => JSON.stringify({ topics: [{ briefId: 'brief_zzz1', skip: false, title: 'כותרת', primaryKeyword: 'מילה' }, { briefId: 'brief_zzz2', skip: true, why: 'x' }] }))
+    check('T3. unknown brief ids → synthesis_unknown_brief_ids (ids recorded)', r3.diagnostics.rounds[0]?.synthesis_failure === 'synthesis_unknown_brief_ids' && (r3.diagnostics.rounds[0]?.synthesisResponse?.unknownBriefIds.length ?? 0) >= 2, JSON.stringify(r3.diagnostics.rounds[0]?.synthesisResponse?.unknownBriefIds))
+
+    // T4/T6: ALL briefs omitted (Matalon class) → all-missing → FAIL.
+    const r4 = await runWithRaw('empty', () => JSON.stringify({ topics: [] }))
+    const rd4 = r4.diagnostics.rounds[0]
+    check('T4. all briefs omitted → synthesis_all_briefs_missing, missing=sent', rd4?.synthesis_failure === 'synthesis_all_briefs_missing' && rd4?.missing_from_response === rd4?.briefs_sent && (rd4?.briefs_sent ?? 0) > 0, JSON.stringify({ f: rd4?.synthesis_failure, m: rd4?.missing_from_response, s: rd4?.briefs_sent }))
+    check('T4b. reconciliation still EXACT with all-missing', !!rd4 && rd4.briefs_sent === rd4.polished + rd4.skipped_by_model + rd4.missing_from_response + rd4.provider_failed_briefs)
+    const a4 = evaluateRunAcceptance({ tierRequested: 'premium', diagnostics: r4.diagnostics, suggestions: r4.suggestions, pendingBefore: 0 })
+    check('T6. Matalon-class all-missing run → verdict FAIL, never INSUFFICIENT_INVENTORY', a4.verdict === 'FAIL', a4.verdict)
+
+    // T5 is the MAIN E2E scenario above: full schema-honoring response succeeds
+    // against the STRICT fake (which now REQUIRES responseSchema on the wire).
+  }
+
+  console.log('E2E) RC3 — constrained discovery fills a deficit (no stored research)')
+  {
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const { evaluateRunAcceptance } = await import('../recommendations/qa-acceptance')
+    // Natural-Shop class: NO keyword research; tracked terms already owned as
+    // entities → deterministic pool is EMPTY; discovery must fill from anchors.
+    const tables = naturalShopTables()
+    tables.keyword_research_cache = []
+    tables.tracking_targets = [{ project_id: 'p1', keyword: 'אבקת חלבון צמחית' }] // exact owned entity name
+    const srv = await startFakeGenai({ models: ['gemini-2.5-flash', 'gemini-2.5-pro'], respond: (briefs) => briefs.map((b, i) => ({ briefId: b.id, skip: false, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
+    process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${srv.port}`
+    resetModelResolutionCache(); resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 6, qualityMode: 'premium' }, newRunCostController('premium', 'disc1', 6))
+    check('T8/T9. NO stored research ≠ zero opportunities: discovery ran and filled the pool', run.diagnostics.discovery?.ran === true && (run.diagnostics.discovery?.accepted ?? 0) > 0 && run.suggestions.length > 0, JSON.stringify({ d: run.diagnostics.discovery?.accepted, acc: run.suggestions.length }))
+    check('T8b. deterministic pool was empty/owned yet run produced anchored topics', run.diagnostics.brief_pool.pool_size === 0 && run.suggestions.length > 0, `pool=${run.diagnostics.brief_pool.pool_size}`)
+    check('T12. at most TWO paid calls (discovery + one synthesis)', run.diagnostics.model_calls <= 2 && srv.calls.length <= 2, `calls=${srv.calls.length}`)
+    check('T11. discovered topics claim NO volume (no exact research match exists)', run.suggestions.every((s) => !s.demandEvidence?.demandEvidenceAvailable && !/חיפושים חודשיים/.test(s.suggestionReason)), JSON.stringify(run.suggestions.map((s) => s.suggestionReason).slice(0, 2)))
+    const acc = evaluateRunAcceptance({ tierRequested: 'premium', diagnostics: run.diagnostics, suggestions: run.suggestions, pendingBefore: 0 })
+    check('T8c. the discovery-backed run PASSES acceptance', acc.verdict === 'PASS', JSON.stringify(acc.rules.filter((r) => !r.pass).map((r) => r.id)))
+    srv.server.close()
+  }
+
+  console.log('U) RC4 — modifier tokens can never become standalone themes')
+  {
+    const { buildBriefPool } = await import('../recommendations/opportunity-brief')
+    const entities = [
+      { name: 'זר ורוד רומנטי', url: '/p/1', type: 'product' as const },
+      { name: 'סחלב ורוד מרהיב', url: '/p/2', type: 'product' as const },
+      { name: 'בלון ורוד לכלה', url: '/p/3', type: 'product' as const },
+      { name: 'מארז שוקולד לכלה', url: '/p/4', type: 'product' as const },
+      { name: 'זר גיבסניות לבן', url: '/p/5', type: 'product' as const },
+      { name: 'אבקת חלבון צמחית', url: '/p/6', type: 'product' as const },
+      { name: 'אבקת חלבון חלבית', url: '/p/7', type: 'product' as const },
+    ]
+    const { pool, diagnostics } = buildBriefPool({
+      language: 'he', keywordResearch: [], trackedKeywords: [], projectFocus: [], entities,
+      publishedCoverage: [], pendingExactKeys: new Set(), pendingSignatures: [],
+      isOwnedByEntity: () => false, isCoveredByContent: () => false,
+      domainTypeWords: new Set(), attributeTokens: new Set(['ורוד', 'לכלה', 'כלה', 'לבנ', 'רומנטי']),
+    })
+    const subjects = pool.map((b) => b.subject)
+    check('T10. ורוד/כלה/שוקולד/גיבסניות never become theme subjects', !subjects.some((sub) => /^(?:איך לבחור\s+)?(?:ורוד|כלה|שוקולד|גיבסניות)$/.test(sub.trim())), JSON.stringify(subjects))
+    check('T10b. NO forced "איך לבחור X" theme frame exists at all', !subjects.some((sub) => sub.startsWith('איך לבחור')), JSON.stringify(subjects))
+    check('T10c. a REAL multi-token noun phrase shared across entities IS a theme (אבקת חלבון)', subjects.some((sub) => sub.includes('אבקת חלבון')), JSON.stringify({ subjects, raw_theme: diagnostics.raw_theme_candidates }))
   }
 
   console.log('E2E) premium tier — real Pro when offered, EXPLICIT downgrade when not')
