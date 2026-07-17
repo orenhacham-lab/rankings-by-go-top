@@ -18,6 +18,7 @@
 
 import { distinctiveTokensOf, canonicalToken, canonicalVariants, topicSignature, isHighConfidenceDuplicate } from './semantic-dup'
 import { normalizePhrase } from './keyword-guard'
+import { sharesSubjectHead } from './link-relevance'
 
 /** Domain-neutral synonym groups (equivalent search intent). Each token maps to
  *  its group representative before comparison. Curated, small, grammar-level. */
@@ -155,8 +156,15 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     const shared2 = Array.from(topicSub).filter((t) => docSub.has(t))
 
     const uncovered = topicSub.size - shared
+    // ATTRIBUTE-ONLY guard (P0): ownership/improve requires a shared HEAD ENTITY,
+    // not merely a shared colour/size/occasion/generic modifier. "ורדים ורודים"
+    // and "אנטוריום ורוד" overlap only on the colour ורוד — the heads (ורד vs
+    // אנטוריום/סחלב) differ, so the orchid/anthurium page does NOT own roses. The
+    // exact-keyword match below is unaffected (it is identity, not overlap).
+    const shareHead = sharesSubjectHead(`${topic.primaryKeyword} ${topic.title}`, docText)
     let mt: CoverageMatchType = 'distinct'
     if (normalizePhrase(doc.focusKeyword || doc.title || '') === topicNorm) mt = 'exact'
+    else if (!shareHead) mt = 'distinct'
     // Existing doc covers the topic's subject AND same need → it owns the need
     // (covTopic keys on the TOPIC so an existing page with extra tokens/slug
     // words still counts; shared>=2 stops a broad page owning a long-tail).

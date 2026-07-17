@@ -5,9 +5,10 @@
  *   P0-2 cannibalization + synonym/need duplicates — Natural/Flowers/Matalon;
  *   P0-3 headline → search-phrase normalization — 5 live keywords.
  */
-import { evaluateLink, isRelevantLink } from '../recommendations/link-relevance'
+import { evaluateLink, isRelevantLink, sharesSubjectHead } from '../recommendations/link-relevance'
 import { isSameNeedDuplicate, assessNeedCannibalization } from '../recommendations/coverage'
 import { normalizeToSearchPhrase, isSearchPhraseQuality } from '../recommendations/search-phrase'
+import { assessExistingLocalOwnership, deriveCorpusTypeWords, localImprovementCompatible } from '../recommendations/opportunity-validation'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -92,6 +93,22 @@ async function main() {
     check('distinct topic NOT cannibalized',
       assessNeedCannibalization({ primaryKeyword: 'טיפוח ורדים בבית', title: 'איך לטפח ורדים בבית', intent: 'informational' },
         [{ title: 'משלוח פרחים בירושלים', url: '/d' }]).matchType === 'distinct')
+
+    // ── LAST-MILE precision (live) — two false existing_page_improvement causes ──
+    // BUG 1: attribute-only (colour) overlap must NOT own the head entity.
+    check('BUG1: "ורדים ורודים" NOT owned by pink orchid/anthurium (colour ורוד only)',
+      assessNeedCannibalization({ primaryKeyword: 'ורדים ורודים', title: 'ורדים ורודים', intent: 'informational' },
+        [{ title: 'אנטוריום ורוד' }, { title: 'סחלב ורוד 2 ענפים' }]).matchType === 'distinct')
+    check('BUG1: a shared colour alone shares NO subject head', !sharesSubjectHead('ורדים ורודים', 'אנטוריום ורוד'))
+    check('BUG1: same head entity still shares (ורדים ⇄ זר ורדים)', sharesSubjectHead('ורדים ורודים', 'זר ורדים אדומים'))
+    // BUG 2: weak location-token overlap ("בית") across DIFFERENT places must NOT own.
+    const flowerCorpus = deriveCorpusTypeWords(['משלוח פרחים בית וגן ירושלים', 'משלוח פרחים נחלאות ירושלים', 'משלוח פרחים גילה ירושלים', 'משלוח פרחים מרכז העיר ירושלים', 'משלוח פרחים מושבה גרמנית ירושלים', 'משלוח זר פרחים ירושלים'])
+    const bs = assessExistingLocalOwnership('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', ['בית וגן ירושלים', 'נחלאות', 'גילה', 'מרכז העיר ירושלים', 'מושבה גרמנית'], flowerCorpus)
+    check('BUG2: "בית שמש" NOT owned by Jerusalem neighbourhoods sharing only "בית"', bs.outcome === 'distinct')
+    check('BUG2: "בית שמש" (city) vs "בית וגן ירושלים" (neighbourhood) are geographically INcompatible', !localImprovementCompatible('משלוח פרחים בבית שמש', 'בית וגן ירושלים'))
+    check('BUG2: the SAME place is still compatible (containment: "פרחים בית שמש")', localImprovementCompatible('משלוח פרחים בבית שמש', 'פרחים בית שמש'))
+    check('BUG2: a legitimate same-place existing page is still owned/improved',
+      assessExistingLocalOwnership('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', ['פרחים בית שמש'], flowerCorpus).outcome !== 'distinct')
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')

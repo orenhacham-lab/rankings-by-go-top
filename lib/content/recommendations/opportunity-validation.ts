@@ -334,6 +334,24 @@ export interface LocalOwnershipResult { outcome: 'owns' | 'improve' | 'distinct'
  * weak (improve the existing page rather than write a new article); low = distinct.
  * corpusTypeWords removes attribute/type noise so the match is on real subject+location.
  */
+/** Number of distinctive (non-generic) tokens two phrases share. */
+function sharedDistinctiveCount(a: string, b: string): number {
+  const A = new Set(toks(a).filter((t) => !GENERIC_TOKENS.has(t)))
+  const B = new Set(toks(b).filter((t) => !GENERIC_TOKENS.has(t)))
+  let n = 0
+  for (const t of A) if (B.has(t)) n++
+  return n
+}
+
+/** Geographic/subject compatibility for a local existing-page improvement (used
+ *  by the acceptance runner without a project corpus). A SINGLE shared token can
+ *  NOT bridge two compound place names — "בית שמש" (a city) and "בית וגן ירושלים"
+ *  (a Jerusalem neighbourhood) share only "בית" yet are different service areas.
+ *  The same place shares its subject AND its location (≥ 2 distinctive tokens). */
+export function localImprovementCompatible(oppText: string, existingTitle: string): boolean {
+  return sharedDistinctiveCount(oppText, existingTitle) >= 2
+}
+
 export function assessExistingLocalOwnership(
   primaryKeyword: string,
   title: string,
@@ -348,6 +366,11 @@ export function assessExistingLocalOwnership(
     const p = distinctOf(pt)
     if (p.size === 0) continue
     const shared = [...p].filter((t) => opp.has(t)).length
+    // GEOGRAPHIC PRECISION (P0): a SINGLE shared token ("בית") must not make two
+    // DIFFERENT places the same service area ("בית שמש" city vs "בית וגן" Jerusalem
+    // neighbourhood). The same place shares its subject AND its location — at least
+    // two distinctive tokens. A lone bridging token is not ownership.
+    if (shared < 2) continue
     // Coverage of the EXISTING page's subject by the opportunity (page fully re-covered
     // = the opportunity is the same page).
     const overlap = shared / p.size

@@ -203,6 +203,21 @@ async function main() {
     const wfTopic = (over: Partial<TopicSuggestion> = {}) => goodTopic('מחיר סידור פרחים לחתונה', 'כמה עולה סידור פרחים לחתונה? פירוט מחירים וטיפים לחיסכון', { searchIntent: 'transactional', coverageMatches: wfCoverage, ...over })
     check('Flowers LIVE: owns_need topic as a NEW landing page → no_existing_need_cannibalization FAILS', failsRule(base({ suggestions: [wfTopic()], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }), 'no_existing_need_cannibalization'))
     check('Flowers LIVE: same topic CONVERTED to existing_page_improvement → rule PASSES', evaluateRunAcceptance(base({ suggestions: [wfTopic({ recommendedPageType: 'existing_page_improvement' })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) })).rules.find((x) => x.id === 'no_existing_need_cannibalization')?.pass === true)
+
+    // ── LAST-MILE: existing_page_improvement must have a VALID semantic basis ──
+    const onlyPool1 = cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } })
+    // BUG1 — attribute-only (colour) ownership → invalid basis → FAILS.
+    check('BUG1: improvement owned only by a shared COLOUR → existing_page_improvement_valid_basis FAILS',
+      failsRule(base({ suggestions: [goodTopic('ורדים ורודים', 'ורדים ורודים', { recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'אנטוריום ורוד', url: null, matchType: 'owns_need', score: 0.67, sharedNeed: ['ורוד'] }] })], diagnostics: onlyPool1 }), 'existing_page_improvement_valid_basis'))
+    // BUG2 — different-place local ownership (shared "בית" only) → invalid → FAILS.
+    check('BUG2: local improvement owned by a DIFFERENT place → existing_page_improvement_valid_basis FAILS',
+      failsRule(base({ suggestions: [goodTopic('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', { searchIntent: 'local', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'בית וגן ירושלים', url: null, matchType: 'improve', score: 0.5, sharedNeed: [] }] })], diagnostics: onlyPool1 }), 'existing_page_improvement_valid_basis'))
+    // An improvement with NO recorded basis is also invalid.
+    check('improvement with NO coverage basis → existing_page_improvement_valid_basis FAILS',
+      failsRule(base({ suggestions: [goodTopic('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', { searchIntent: 'local', recommendedPageType: 'existing_page_improvement', coverageMatches: [] })], diagnostics: onlyPool1 }), 'existing_page_improvement_valid_basis'))
+    // VALID cases still PASS: head-overlap improvement (need) + same-place local improvement.
+    check('VALID need improvement (shared head פרח/חתונה) → rule PASSES', evaluateRunAcceptance(base({ suggestions: [wfTopic({ recommendedPageType: 'existing_page_improvement' })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'existing_page_improvement_valid_basis')?.pass === true)
+    check('VALID same-place local improvement (containment) → rule PASSES', evaluateRunAcceptance(base({ suggestions: [goodTopic('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', { searchIntent: 'local', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'פרחים בית שמש', url: null, matchType: 'improve', score: 1, sharedNeed: [] }] })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'existing_page_improvement_valid_basis')?.pass === true)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

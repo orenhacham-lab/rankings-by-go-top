@@ -85,6 +85,18 @@ function lk(t: string): string {
   return s
 }
 
+/** Do two phrases share at least one distinctive SUBJECT HEAD token — with
+ *  colours/sizes/occasion/price/generic modifiers stripped (subjectTokensOf) and
+ *  the proclitic/construct fold applied? Used to reject ATTRIBUTE-ONLY ownership
+ *  (e.g. "ורדים ורודים" ⇄ "אנטוריום ורוד" share only the colour ורוד, not a head
+ *  entity). A shared attribute alone returns false. */
+export function sharesSubjectHead(a: string, b: string, typeWords?: Set<string>): boolean {
+  const A = new Set(subjectTokensOf(a, typeWords).map(lk))
+  if (A.size === 0) return false
+  for (const t of subjectTokensOf(b, typeWords)) if (A.has(lk(t))) return true
+  return false
+}
+
 export type LinkRejectionReason =
   | 'no_subject_overlap'
   | 'attribute_or_generic_overlap_only'

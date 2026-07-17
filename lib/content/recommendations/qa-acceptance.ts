@@ -16,12 +16,12 @@
 
 import type { BriefRunDiagnostics } from './generate-from-briefs'
 import type { TopicSuggestion } from './types'
-import { isMalformedReason, isTruncatedKeywordPhrase, validateIntentKeywordConsistency } from './opportunity-validation'
+import { isMalformedReason, isTruncatedKeywordPhrase, validateIntentKeywordConsistency, localImprovementCompatible } from './opportunity-validation'
 import type { SearchIntent } from './opportunity'
 import { distinctiveTokensOf, canonicalVariants } from './semantic-dup'
 import { isBoilerplatePage } from './link-role-mapper'
 import { evaluateTitleDiversity } from './title-diversity'
-import { evaluateLink, isRelevantLink } from './link-relevance'
+import { evaluateLink, isRelevantLink, sharesSubjectHead } from './link-relevance'
 import { isSameNeedDuplicate, isTitleKeywordAligned } from './coverage'
 import { isSearchPhraseQuality } from './search-phrase'
 
@@ -166,6 +166,21 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   // page. It passes ONLY when converted to an existing_page_improvement.
   const cannibalized = suggestions.filter((s) => (s.coverageMatches ?? []).some((m) => m.matchType === 'owns_need' || m.matchType === 'exact') && s.recommendedPageType !== 'existing_page_improvement')
   add('no_existing_need_cannibalization', cannibalized.length === 0, cannibalized.map((s) => `"${s.primaryKeyword}" (${s.recommendedPageType ?? 'new page'}) ← ${(s.coverageMatches ?? []).filter((m) => m.matchType === 'owns_need' || m.matchType === 'exact').map((m) => m.existingTitle).join('/')}`).join(' · ') || 'none')
+
+  // P0 — an existing_page_improvement must have a SEMANTICALLY VALID basis: some
+  // recorded existing page whose subject HEAD overlaps the topic (not merely a
+  // shared attribute/colour — "ורדים ורודים" is not owned by "אנטוריום ורוד"),
+  // and for a LOCAL topic that basis must be the SAME place (geographic
+  // containment — "בית שמש" is not owned by "בית וגן ירושלים").
+  const invalidImprovement = suggestions.filter((s) => {
+    if (s.recommendedPageType !== 'existing_page_improvement') return false
+    const bases = s.coverageMatches ?? []
+    if (bases.length === 0) return true // no recorded ownership basis at all
+    const topicText = `${s.primaryKeyword} ${s.title}`
+    const isLocal = s.searchIntent === 'local'
+    return !bases.some((m) => sharesSubjectHead(topicText, m.existingTitle) && (!isLocal || localImprovementCompatible(topicText, m.existingTitle)))
+  })
+  add('existing_page_improvement_valid_basis', invalidImprovement.length === 0, invalidImprovement.map((s) => `"${s.primaryKeyword}" (${s.searchIntent}) ← ${(s.coverageMatches ?? []).map((m) => m.existingTitle).join('/') || 'no basis'}`).join(' · ') || 'none')
 
   // SEMANTIC alignment (paraphrase passes; only a truly off-topic keyword fails).
   const misaligned = suggestions.filter((s) => !isTitleKeywordAligned(s.primaryKeyword, s.title))

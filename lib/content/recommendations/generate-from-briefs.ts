@@ -433,7 +433,7 @@ export async function generateFromBriefs(
     // carrying the existing URL — the underlying search need is compared, not
     // exact wording (wedding-floral pricing: סידור vs עיצוב פרחוני).
     const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs)
-    const coverageMatches: CoverageMatch[] = cann.matches
+    const coverageMatches: CoverageMatch[] = [...cann.matches]
     if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
     const cannibalImprovement = cann.matchType === 'owns_need' || cann.matchType === 'improve'
 
@@ -453,7 +453,14 @@ export async function generateFromBriefs(
     if (intent === 'local' || intent === 'transactional') {
       const own = assessExistingLocalOwnership(primaryKeyword, t.title, existingPageTitles, domainTypeWords)
       if (own.outcome === 'owns') return { rejectionReason: 'exact_existing_keyword_owner' }
-      if (own.outcome === 'improve') ownershipPageType = 'existing_page_improvement'
+      if (own.outcome === 'improve') {
+        ownershipPageType = 'existing_page_improvement'
+        // Record the local match as the improvement's BASIS so acceptance can
+        // re-validate it (geographic containment, not a stray shared token).
+        if (own.matchedTitle && !coverageMatches.some((m) => m.existingTitle === own.matchedTitle)) {
+          coverageMatches.push({ existingTitle: own.matchedTitle, url: null, matchType: 'improve', score: own.overlap, sharedNeed: [] })
+        }
+      }
     }
 
     // (8) relevance diagnostics (briefs are evidence-backed BY CONSTRUCTION; these
