@@ -31,7 +31,7 @@ import { generateKeywordIdeas } from '@/lib/google-ads/keyword-ideas'
 import { evaluateArticleWorthiness, type ExistingPageSignal } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, isBoilerplatePage, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
 import { filterLinkPlan } from './link-relevance'
-import { assessNeedCannibalization, isSameNeedDuplicate, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
+import { assessNeedCannibalization, isSameNeedDuplicate, isTitleKeywordAligned, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
 import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON } from './model'
@@ -413,6 +413,23 @@ export async function generateFromBriefs(
     // or subject when the residue is still headline-shaped. Never mid-clause.
     const sp = normalizeToSearchPhrase(primaryKeyword, { subject: brief.subject, alignedQuery: brief.alignedDemandQuery?.query ?? null })
     if (sp.changed) { primaryKeyword = sp.keyword; repaired = true; intent = deriveIntent(primaryKeyword, t.title, intent) }
+
+    // (2.6) RE-VALIDATE the NORMALIZED keyword through the general gates. The
+    // normalization can change the phrase after the (1)/(2) gates already ran, and
+    // stripping a headline/guide tail may leave an over-broad residue (e.g.
+    // "ויטמין D"). Rerun keyword-quality + intent-consistency + title alignment on
+    // the FINAL keyword; repair from the brief's aligned query/subject when they
+    // fail (preserving the title need), else reject.
+    if (sp.changed) {
+      const q2 = validatePrimaryKeywordQuality(primaryKeyword, t.title, corpusTypeWords)
+      if (!q2.ok) { if (!tryRepair()) return { rejectionReason: 'invalid_primary_keyword' } }
+      else if (q2.repairedKeyword) { primaryKeyword = q2.repairedKeyword; repaired = true }
+      const c2 = validateIntentKeywordConsistency({ primaryKeyword, title: t.title, intent }, commercialEntityTokens)
+      if (!c2.ok) { if (!tryRepair()) return { rejectionReason: 'intent_keyword_mismatch' } }
+      else if (c2.repairedKeyword) { primaryKeyword = c2.repairedKeyword; repaired = true }
+      if (!isTitleKeywordAligned(primaryKeyword, t.title)) { if (!tryRepair()) return { rejectionReason: 'intent_keyword_mismatch' } }
+      intent = deriveIntent(primaryKeyword, t.title, intent)
+    }
     if (!isSearchPhraseQuality(primaryKeyword)) return { rejectionReason: 'primary_keyword_not_search_phrase' }
 
     // (3) SAFE brand gate — exact named-entity mutation only (hard, proven safe).

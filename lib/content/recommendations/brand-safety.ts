@@ -168,13 +168,28 @@ function editDistance(a: string, b: string): number {
  * a generic word mutated into a possible business name (title "פרחי אביב" → keyword
  * "פרחי אביה"). The caller must NOT auto-repair; it rejects the opportunity.
  */
+const HEB_PROCLITICS = 'והבלמשכ'
+/** Is `k` merely a proclitic-stripped FRAGMENT of a token that is present (e.g.
+ *  "שוואת" from the title's "השוואת"/"להשוואת")? The tokenizer emits such
+ *  fragments; they are the SAME word, not a foreign named entity, and must never
+ *  count as a mutation (they differ from the full form by exactly one leading
+ *  proclitic letter — a length change, unlike the same-length אביב→אביה swap). */
+function isProcliticFragmentOf(k: string, toksList: string[]): boolean {
+  return toksList.some((s) => (s.length === k.length + 1 && HEB_PROCLITICS.includes(s[0]) && s.slice(1) === k)
+    || (k.length === s.length + 1 && HEB_PROCLITICS.includes(k[0]) && k.slice(1) === s))
+}
+
 export function detectUnsafeNamedEntityMutation(title: string, primaryKeyword: string, bs: BrandSafety): boolean {
   const titleToks = toks(title)
   const titleSet = new Set(titleToks)
   for (const k of toks(primaryKeyword)) {
     if (titleSet.has(k) || bs.ownVocab.has(k) || GENERIC_TOKENS.has(k) || k.length < 3) continue
+    if (isProcliticFragmentOf(k, titleToks)) continue
     for (const s of titleToks) {
-      if (s.length >= 3 && Math.abs(s.length - k.length) <= 1 && editDistance(s, k) <= 1) return true
+      // A proclitic length-change (השוואת→שוואת) is a tokenizer fragment, not a
+      // named-entity mutation — require a SAME-LENGTH single-letter swap (the
+      // proven אביב→אביה shape).
+      if (s.length >= 3 && s.length === k.length && editDistance(s, k) === 1) return true
     }
   }
   return false

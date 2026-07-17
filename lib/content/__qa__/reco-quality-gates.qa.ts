@@ -153,8 +153,9 @@ async function main() {
     // ISSUE 5 (live) — mid/tail "המדריך ל…" guide framing must not survive.
     check('Issue5: "ויטמין D המדריך להשוואת סוגים ומינונים" FAILS the quality gate', !isSearchPhraseQuality('ויטמין D המדריך להשוואת סוגים ומינונים'))
     {
-      const r5 = normalizeToSearchPhrase('ויטמין D המדריך להשוואת סוגים ומינונים', { subject: 'ויטמין D' })
+      const r5 = normalizeToSearchPhrase('ויטמין D המדריך להשוואת סוגים ומינונים', { subject: 'השוואת סוגי ויטמין D', alignedQuery: 'השוואת סוגי ויטמין D' })
       check('Issue5: normalized output is clean and drops "המדריך"', isSearchPhraseQuality(r5.keyword) && !/מדריך/.test(r5.keyword) && r5.changed)
+      check('Issue5: normalized output is NOT the over-broad residue "ויטמין D" and keeps comparison/type intent', r5.keyword !== 'ויטמין D' && /השוואת|סוג/.test(r5.keyword))
     }
     // A clean short query is left unchanged.
     check('a clean short query passes unchanged', normalizeToSearchPhrase('חנות פרחים בירושלים', { subject: 'חנות פרחים בירושלים' }).changed === false)

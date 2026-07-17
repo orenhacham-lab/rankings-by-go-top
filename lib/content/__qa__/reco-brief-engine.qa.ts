@@ -368,6 +368,39 @@ async function main() {
     server.close()
   }
 
+  // ── E2E: Issue-5 guide-tail keyword normalized END-TO-END (not over-broad) ──
+  console.log('E2E) Issue5 — headline guide-tail keyword → focused query through the REAL pipeline')
+  {
+    const HEADLINE = 'ויטמין D המדריך להשוואת סוגים ומינונים'
+    const isVitD = (subject: string) => /השוואת/.test(subject) && /ויטמין/.test(subject)
+    const tables = naturalShopTables()
+    // Seed a real brief whose subject IS the vitamin-D comparison need.
+    ;(tables.keyword_research_cache[0].results_json as Record<string, unknown>[]).push({ keyword: 'השוואת סוגי ויטמין D', avgMonthlySearches: 210 })
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      // The model returns the HEADLINE-shaped keyword for that brief (the live defect).
+      respond: (briefs) => briefs.map((b, i) => isVitD(b.subject)
+        ? { briefId: b.id, title: HEADLINE, primaryKeyword: HEADLINE, secondaryKeywords: [], intent: 'informational' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'
+    process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`
+    resetModelResolutionCache()
+    resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-issue5', 8))
+    const kws = run.suggestions.map((s) => s.primaryKeyword)
+    const { isSearchPhraseQuality: isSP } = await import('../recommendations/search-phrase')
+    check('I5-1. the raw headline keyword NEVER survives acceptance', !kws.includes(HEADLINE), JSON.stringify(kws))
+    check('I5-2. the over-broad residue "ויטמין D" is NOT an accepted keyword', !kws.includes('ויטמין D'), JSON.stringify(kws))
+    const vitD = run.suggestions.find((s) => /ויטמין/.test(s.primaryKeyword) && /D/.test(s.primaryKeyword))
+    check('I5-3. a focused ויטמין-D query was accepted (clean phrase, comparison/type intent preserved)',
+      !!vitD && isSP(vitD.primaryKeyword) && vitD.primaryKeyword !== 'ויטמין D' && /השוואת|סוג/.test(vitD.primaryKeyword), JSON.stringify(vitD?.primaryKeyword))
+    check('I5-4. EVERY accepted keyword is still a clean search phrase (no headline leaked)', run.suggestions.every((s) => isSP(s.primaryKeyword)), JSON.stringify(kws.filter((k) => !isSP(k))))
+    server.close()
+  }
+
   console.log('U) unit: model-aware thinking config (the live Pro-400 fix)')
   {
     const pro = resolveModelConfig('gemini-2.5-pro', 3000)

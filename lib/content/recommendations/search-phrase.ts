@@ -47,8 +47,21 @@ export interface SearchPhraseResult {
 
 /** Strip one layer of headline framing from a phrase (openers, second clause,
  *  tail fluff, dangling connective). Pure string surgery — never mid-clause. */
+// "X המדריך ל Y" — a GUIDE about X whose object Y IS the differentiated search
+// intent (a comparison, a dosage, a how-to). Collapsing to the head X alone
+// ("ויטמין D") is over-broad and loses intent; keep the object by reordering to
+// "Y X" ("השוואת סוגים ומינונים ויטמין D"). Requires a real head before the guide
+// (a LEADING "המדריך ל…" is a GUIDE_OPENER, handled separately — no head here).
+const GUIDE_ABOUT_RE = /^(.*?\S)\s+ה?מדריך\s+ל(?![א-ת]*\s*$)(\S.*)$/
+
 export function stripHeadlineFraming(raw: string): string {
   let s = (raw || '').trim()
+  const guide = s.match(GUIDE_ABOUT_RE)
+  if (guide) {
+    const head = guide[1].trim()
+    const object = guide[2].trim()
+    if (head && object) s = `${object} ${head}`
+  }
   const priced = HOW_MUCH_RE.test(s)
   s = s.replace(SECOND_CLAUSE_RE, '')       // drop everything after ? ! : — | -
   s = s.replace(HEADLINE_TAIL_RE, '')       // drop appended headline tails
