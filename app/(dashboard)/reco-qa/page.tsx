@@ -25,8 +25,8 @@ interface RunReport {
   project?: { id: string }
   tierRequested?: string
   durationMs?: number
-  acceptance?: { passed: boolean; warnings: number; rules: RuleRow[] }
-  run?: Record<string, unknown> & { modelPath?: { requestedTier: string; model: string | null; tierUsed: string; downgraded: boolean; downgradeReason: string | null }; accepted?: number; model_calls?: number; stop_reason?: string; brief_pool?: { pool_size: number } }
+  acceptance?: { verdict?: 'PASS' | 'FAIL' | 'INSUFFICIENT_INVENTORY'; passed: boolean; warnings: number; rules: RuleRow[] }
+  run?: Record<string, unknown> & { modelPath?: { requestedTier: string; model: string | null; tierUsed: string; downgraded: boolean; downgradeReason: string | null }; modelConfig?: { model: string; thinkingMode: string; thinkingBudget: number; maxOutputTokens: number } | null; accepted?: number; model_calls?: number; stop_reason?: string; brief_pool?: { pool_size: number; total_raw_candidates?: number; raw_query_candidates?: number; raw_tracked_candidates?: number; raw_theme_candidates?: number; with_demand?: number; rejected_by_reason?: Record<string, number>; rejected_examples?: { subject: string; reason: string; evidenceKind: string }[] } }
   topics?: { title: string; primaryKeyword: string; intent: string; reason: string; demand: { demandQuery: string | null; avgMonthlySearches: number | null } | null; links: { url: string; anchor: string }[] }[]
 }
 
@@ -85,7 +85,11 @@ export default function RecoQaPage() {
   }
 
   const done = Object.keys(reports).length
-  const allPassed = done > 0 && Object.values(reports).every((r) => r.ok && r.acceptance?.passed)
+  const verdictOf = (r: RunReport): 'PASS' | 'FAIL' | 'INSUFFICIENT_INVENTORY' =>
+    !r.ok ? 'FAIL' : (r.acceptance?.verdict ?? (r.acceptance?.passed ? 'PASS' : 'FAIL'))
+  const verdictColor = (v: string) => v === 'PASS' ? 'text-emerald-600' : v === 'INSUFFICIENT_INVENTORY' ? 'text-amber-600' : 'text-red-600'
+  const counts = Object.values(reports).reduce((acc, r) => { const v = verdictOf(r); acc[v] = (acc[v] ?? 0) + 1; return acc }, {} as Record<string, number>)
+  const allPassed = done > 0 && (counts['FAIL'] ?? 0) === 0 && (counts['INSUFFICIENT_INVENTORY'] ?? 0) === 0
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4" dir="rtl">
@@ -121,9 +125,7 @@ export default function RecoQaPage() {
               onChange={(e) => setSelected((prev) => { const n = new Set(prev); if (e.target.checked) n.add(p.id); else n.delete(p.id); return n })} />
             {label(p)}
             {reports[p.id] && (
-              <span className={reports[p.id].ok && reports[p.id].acceptance?.passed ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>
-                {reports[p.id].ok && reports[p.id].acceptance?.passed ? 'PASS' : 'FAIL'}
-              </span>
+              <span className={`${verdictColor(verdictOf(reports[p.id]))} font-bold`}>{verdictOf(reports[p.id])}</span>
             )}
           </label>
         ))}
@@ -131,8 +133,8 @@ export default function RecoQaPage() {
       </div>
 
       {done > 0 && !running && (
-        <p className={`text-sm font-bold mb-4 ${allPassed ? 'text-emerald-700' : 'text-red-700'}`}>
-          {allPassed ? `✓ כל ${done} הריצות עברו את כללי הקבלה` : `✗ יש ריצות שנכשלו — פירוט למטה`}
+        <p className={`text-sm font-bold mb-4 ${allPassed ? 'text-emerald-700' : (counts['FAIL'] ?? 0) > 0 ? 'text-red-700' : 'text-amber-700'}`}>
+          {`PASS: ${counts['PASS'] ?? 0} · INSUFFICIENT_INVENTORY: ${counts['INSUFFICIENT_INVENTORY'] ?? 0} · FAIL: ${counts['FAIL'] ?? 0}`}
         </p>
       )}
 
@@ -142,7 +144,7 @@ export default function RecoQaPage() {
         return (
           <div key={pid} className="mb-6 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
             <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">
-              {p ? label(p) : pid} — {r.ok && r.acceptance?.passed ? <span className="text-emerald-600">PASS</span> : <span className="text-red-600">FAIL</span>}
+              {p ? label(p) : pid} — <span className={verdictColor(verdictOf(r))}>{verdictOf(r)}</span>
               {typeof r.acceptance?.warnings === 'number' && r.acceptance.warnings > 0 && <span className="text-amber-600 text-xs"> · {r.acceptance.warnings} לבדיקה ידנית</span>}
             </h2>
             {!r.ok && <p className="text-xs text-red-600 mb-2">{r.error} {r.message}</p>}
@@ -151,6 +153,26 @@ export default function RecoQaPage() {
                 model: <b>{mp.model}</b> · tierUsed: <b>{mp.tierUsed}</b> · requested: {mp.requestedTier} · downgraded: <b className={mp.downgraded ? 'text-red-600' : 'text-emerald-600'}>{String(mp.downgraded)}</b>
                 {' '}· calls: {String(r.run?.model_calls)} · accepted: {String(r.run?.accepted)} · pool: {String(r.run?.brief_pool?.pool_size)} · stop: {String(r.run?.stop_reason)} · {r.durationMs}ms
               </p>
+            )}
+            {r.run?.modelConfig && (
+              <p className="text-[11px] text-slate-500 mb-1" dir="ltr">
+                thinking: {r.run.modelConfig.thinkingMode} · budget {r.run.modelConfig.thinkingBudget} · maxOutputTokens {r.run.modelConfig.maxOutputTokens}
+              </p>
+            )}
+            {r.run?.brief_pool && (
+              <p className="text-[11px] text-slate-500 mb-1" dir="ltr">
+                pool: raw {String(r.run.brief_pool.total_raw_candidates ?? '—')} (queries {String(r.run.brief_pool.raw_query_candidates ?? '—')} · tracked {String(r.run.brief_pool.raw_tracked_candidates ?? '—')} · themes {String(r.run.brief_pool.raw_theme_candidates ?? '—')}) → pool {r.run.brief_pool.pool_size} · withDemand {String(r.run.brief_pool.with_demand ?? '—')} · rejected {JSON.stringify(r.run.brief_pool.rejected_by_reason ?? {})}
+              </p>
+            )}
+            {Array.isArray(r.run?.brief_pool?.rejected_examples) && r.run.brief_pool.rejected_examples.length > 0 && (
+              <details className="text-[11px] text-slate-500 mb-2">
+                <summary>דוגמאות מועמדים שנדחו ({r.run.brief_pool.rejected_examples.length})</summary>
+                <ul className="mt-1 space-y-0.5">
+                  {r.run.brief_pool.rejected_examples.map((ex, i) => (
+                    <li key={i} dir="rtl">「{ex.subject}」 — <span dir="ltr">{ex.reason} · {ex.evidenceKind}</span></li>
+                  ))}
+                </ul>
+              </details>
             )}
             {r.acceptance && (
               <table className="w-full text-[11px] mb-3" dir="ltr">

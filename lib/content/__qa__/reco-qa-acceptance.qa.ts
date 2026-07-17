@@ -21,9 +21,10 @@ const goodTopic = (kw: string, title: string, extra: Partial<TopicSuggestion> = 
 const cleanDiag = (over: Partial<BriefRunDiagnostics> = {}): BriefRunDiagnostics => ({
   engine: 'evidence_first_briefs',
   modelPath: { requestedTier: 'premium', requestedModel: 'gemini-2.5-pro', model: 'gemini-2.5-pro', tierUsed: 'pro', downgraded: false, downgradeReason: null },
+  modelConfig: { model: 'gemini-2.5-pro', thinkingMode: 'budgeted', thinkingBudget: 1024, maxOutputTokens: 3384 },
   evidence_inventory: { project_focus_terms: 1, tracked_keywords: 1, keyword_research_cache_rows: 1, keyword_research_queries: 6, search_volume_values: 5, site_scan_entities: 0, shopify_entities: 6, existing_informational_coverage: 1, pending_topics: 0, generated_articles: 1, competitor_queries_filtered: 0, evidence_load_errors: [], ineligible_pages_excluded: 0, stale_index_excluded: false },
-  brief_pool: { raw_query_candidates: 6, raw_theme_candidates: 0, raw_tracked_candidates: 1, rejected_by_reason: {}, pool_size: 6, by_family: { informational: 6 }, with_demand: 5 },
-  rounds: [{ round: 1, model: 'gemini-2.5-pro', briefs_sent: 6, provider_ok: true, emitted: 6, polished: 5, skipped_by_model: 1, missing_from_response: 0, dropped_items: 0, accepted: 5, repaired: 0, rejected_by_reason: {}, marginal_yield: 0.833 }],
+  brief_pool: { raw_query_candidates: 6, raw_theme_candidates: 0, raw_tracked_candidates: 1, total_raw_candidates: 7, rejected_by_reason: { subject_too_generic: 1 }, rejected_examples: [{ subject: 'מגנזיום', reason: 'subject_too_generic', evidenceKind: 'keyword_research' }], pool_size: 6, by_family: { informational: 6 }, with_demand: 5 },
+  rounds: [{ round: 1, model: 'gemini-2.5-pro', briefs_sent: 6, provider_ok: true, provider_failed_briefs: 0, providerStatus: 'ok', providerErrorType: null, sanitizedProviderMessage: null, finishReason: 'STOP', textPresent: true, textLength: 1200, emitted: 6, polished: 5, skipped_by_model: 1, missing_from_response: 0, dropped_items: 0, accepted: 5, repaired: 0, rejected_by_reason: {}, marginal_yield: 0.833 }],
   rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 5, finalCount: 5, model_calls: 1,
   stop_reason: 'pool_exhausted', insufficient_inventory: false, secondary_keywords_filtered: 0, target_role_mappings: [],
   cost: { estimatedRunCostUsd: 0.02, totalCalls: 1 },
@@ -48,7 +49,7 @@ async function main() {
   console.log('A) a clean premium run PASSES every rule')
   {
     const r = evaluateRunAcceptance(base())
-    check('clean run passes', r.passed, JSON.stringify(r.rules.filter((x) => !x.pass)))
+    check('clean run passes with verdict PASS', r.passed && r.verdict === 'PASS', JSON.stringify(r.rules.filter((x) => !x.pass)))
     check('no warnings on a clean run', r.warnings === 0)
   }
 
@@ -61,7 +62,7 @@ async function main() {
     }
     check('premium on Flash (downgrade) → premium_uses_real_pro FAILS', failsRule(base({ diagnostics: cleanDiag({ modelPath: { requestedTier: 'premium', requestedModel: 'gemini-2.5-pro', model: 'gemini-2.5-flash', tierUsed: 'flash', downgraded: true, downgradeReason: 'premium_model_unavailable' } }) }), 'premium_uses_real_pro'))
     check('3 calls → max_two_synthesis_calls FAILS', failsRule(base({ diagnostics: cleanDiag({ model_calls: 3 }) }), 'max_two_synthesis_calls'))
-    check('broken round math → exact_reconciliation FAILS', failsRule(base({ diagnostics: cleanDiag({ rounds: [{ round: 1, model: 'x', briefs_sent: 6, provider_ok: true, emitted: 6, polished: 5, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 3, rejected_by_reason: {}, repaired: 0, marginal_yield: 0.5 }] }) }), 'exact_reconciliation'))
+    check('broken round math → exact_reconciliation FAILS', failsRule(base({ diagnostics: cleanDiag({ rounds: [{ round: 1, model: 'x', briefs_sent: 6, provider_ok: true, provider_failed_briefs: 0, providerStatus: 'ok', providerErrorType: null, sanitizedProviderMessage: null, finishReason: 'STOP', textPresent: true, textLength: 900, emitted: 6, polished: 5, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 3, rejected_by_reason: {}, repaired: 0, marginal_yield: 0.5 }] }) }), 'exact_reconciliation'))
     check('truncated keyword → no_truncated_keyword FAILS', failsRule(base({ suggestions: [goodTopic('זר פרחים ואיך', 'זר פרחים ואיך לבחור')] , diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } })}), 'no_truncated_keyword'))
     check('malformed reason → no_malformed_reason FAILS', failsRule(base({ suggestions: [goodTopic('מגנזיום לילדים מינון', 'מדריך', { suggestionReason: 'נושא זה עונה על של' })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }), 'no_malformed_reason'))
     check('invented demand → no_invented_demand FAILS', failsRule(base({ suggestions: [goodTopic('מותג דיור', 'מותג דיור מוביל', { suggestionReason: 'מותג דיור של אלפי חיפושים בחודש.' })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }), 'no_invented_demand'))
@@ -75,11 +76,38 @@ async function main() {
     check('swallowed persistence failure → FAILS', failsRule(base({ persistence: { attempted: 5, inserted: 0, duplicate: 0, failed: 5, reloadedFreshCount: 0 } }), 'no_swallowed_persistence_failure'))
   }
 
-  console.log('C) truthful insufficient inventory + warns')
+  console.log('C) three-way verdicts — an empty pool is NEVER a green PASS')
   {
-    const r = evaluateRunAcceptance(base({ suggestions: [], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 0 }, rounds: [], model_calls: 0, stop_reason: 'insufficient_inventory', insufficient_inventory: true, generated_opportunities: 0, finalCount: 0 }) }))
-    check('empty pool with truthful stop PASSES (no filler demanded)', r.passed, JSON.stringify(r.rules.filter((x) => !x.pass)))
-    const warn = evaluateRunAcceptance(base({ suggestions: [goodTopic('ויטמין D', 'ויטמין D מונע מחלות קשות', { suggestionReason: 'הנושא משלים פער תוכן בתחום שהעסק עוסק בו.' })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }))
+    // FULLY-EXPLAINED empty pool: accounting reconciles, every candidate typed,
+    // loads clean → INSUFFICIENT_INVENTORY (amber), never PASS and never FAIL.
+    const explainedEmptyPool = { raw_query_candidates: 6, raw_theme_candidates: 0, raw_tracked_candidates: 1, total_raw_candidates: 7, rejected_by_reason: { pending_exact_duplicate: 3, covered_by_existing_content: 2, subject_too_generic: 2 }, rejected_examples: [{ subject: 'א', reason: 'pending_exact_duplicate', evidenceKind: 'keyword_research' }], pool_size: 0, by_family: {}, with_demand: 0 }
+    const r = evaluateRunAcceptance(base({ suggestions: [], diagnostics: cleanDiag({ brief_pool: explainedEmptyPool, rounds: [], model_calls: 0, stop_reason: 'insufficient_inventory', insufficient_inventory: true, generated_opportunities: 0, finalCount: 0 }) }))
+    check('fully-explained empty pool → INSUFFICIENT_INVENTORY (not PASS, not FAIL)', r.verdict === 'INSUFFICIENT_INVENTORY' && !r.passed && r.rules.filter((x) => x.level === 'fail' && !x.pass).length === 0, JSON.stringify({ v: r.verdict, failed: r.rules.filter((x) => !x.pass).map((x) => x.id) }))
+
+    // KR evidence exists but produced ZERO raw query candidates → FAIL (Natural-Shop class).
+    const noRawPool = { ...explainedEmptyPool, raw_query_candidates: 0, total_raw_candidates: 1, rejected_by_reason: { subject_too_generic: 1 } }
+    const rNoRaw = evaluateRunAcceptance(base({ suggestions: [], diagnostics: cleanDiag({ brief_pool: noRawPool, rounds: [], model_calls: 0, stop_reason: 'insufficient_inventory', insufficient_inventory: true, generated_opportunities: 0, finalCount: 0 }) }))
+    check('kr evidence with ZERO raw query candidates → verdict FAIL', rNoRaw.verdict === 'FAIL' && rNoRaw.rules.find((x) => x.id === 'raw_query_candidates_expected')?.pass === false)
+
+    // Raw candidates that do NOT reconcile → FAIL.
+    const brokenPool = { ...explainedEmptyPool, total_raw_candidates: 12 }
+    const rBroken = evaluateRunAcceptance(base({ suggestions: [], diagnostics: cleanDiag({ brief_pool: brokenPool, rounds: [], model_calls: 0, stop_reason: 'insufficient_inventory', insufficient_inventory: true, generated_opportunities: 0, finalCount: 0 }) }))
+    check('non-reconciling pool accounting → verdict FAIL', rBroken.verdict === 'FAIL' && rBroken.rules.find((x) => x.id === 'pool_accounting_reconciles')?.pass === false)
+
+    // Pool emptied MAINLY by the broad semantic rule → FAIL (review required).
+    const semanticPool = { ...explainedEmptyPool, rejected_by_reason: { pending_semantic_duplicate: 5, subject_too_generic: 2 } }
+    const rSem = evaluateRunAcceptance(base({ suggestions: [], diagnostics: cleanDiag({ brief_pool: semanticPool, rounds: [], model_calls: 0, stop_reason: 'insufficient_inventory', insufficient_inventory: true, generated_opportunities: 0, finalCount: 0 }) }))
+    check('pool emptied mainly by semantic rule → verdict FAIL (reviewable)', rSem.verdict === 'FAIL' && rSem.rules.find((x) => x.id === 'empty_pool_not_semantic_emptied')?.pass === false)
+
+    // Evidence load failure on an empty pool → FAIL.
+    const rLoad = evaluateRunAcceptance(base({ suggestions: [], diagnostics: cleanDiag({ brief_pool: explainedEmptyPool, rounds: [], model_calls: 0, stop_reason: 'insufficient_inventory', insufficient_inventory: true, generated_opportunities: 0, finalCount: 0, evidence_inventory: { ...cleanDiag().evidence_inventory, evidence_load_errors: ['keyword_research_cache:timeout'] } }) }))
+    check('evidence load failure on empty pool → verdict FAIL', rLoad.verdict === 'FAIL' && rLoad.rules.find((x) => x.id === 'empty_pool_loads_clean')?.pass === false)
+
+    // Provider failure → FAIL with exact provider bucket accounting.
+    const pfRound = { round: 1, model: 'gemini-2.5-pro', briefs_sent: 18, provider_ok: false, provider_failed_briefs: 18, providerStatus: 'error', providerErrorType: 'invalid_model_configuration', sanitizedProviderMessage: 'Budget 0 is invalid. This model only works in thinking mode.', finishReason: null, textPresent: false, textLength: 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0 }
+    const rPf = evaluateRunAcceptance(base({ suggestions: [], diagnostics: cleanDiag({ rounds: [pfRound], model_calls: 1, stop_reason: 'provider_failed', generated_opportunities: 0, finalCount: 0 }) }))
+    check('provider failure → verdict FAIL, reconciliation INTACT via provider bucket', rPf.verdict === 'FAIL' && rPf.rules.find((x) => x.id === 'provider_no_failure')?.pass === false && rPf.rules.find((x) => x.id === 'exact_reconciliation')?.pass === true, JSON.stringify(rPf.rules.filter((x) => !x.pass).map((x) => x.id)))
+    const warn = evaluateRunAcceptance(base({ suggestions: [goodTopic('ויטמין D', 'ויטמין D מונע מחלות קשות', { suggestionReason: 'הנושא משלים פער תוכן בתחום שהעסק עוסק בו.' })], diagnostics: cleanDiag({ brief_pool: { raw_query_candidates: 2, raw_theme_candidates: 0, raw_tracked_candidates: 0, total_raw_candidates: 2, rejected_by_reason: { subject_too_generic: 1 }, rejected_examples: [], pool_size: 1, by_family: { informational: 1 }, with_demand: 0 } }) }))
     check('medical certainty ("מונע מחלות") → WARN, not auto-fail', warn.passed && warn.warnings >= 1, JSON.stringify(warn.rules.filter((x) => !x.pass)))
   }
 

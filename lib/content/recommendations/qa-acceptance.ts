@@ -39,7 +39,16 @@ export interface RunAcceptanceInput {
   pendingBefore: number
 }
 
+export type AcceptanceVerdict = 'PASS' | 'FAIL' | 'INSUFFICIENT_INVENTORY'
+
 export interface RunAcceptanceReport {
+  /** Three-way verdict — an empty pool is NEVER a green PASS: it is
+   *  INSUFFICIENT_INVENTORY only when the pool accounting reconciles, every
+   *  candidate carries a typed legitimate rejection, no evidence load failed,
+   *  and no broad semantic rule emptied the pool without reviewable evidence;
+   *  otherwise it is FAIL. */
+  verdict: AcceptanceVerdict
+  /** Back-compat: verdict === 'PASS'. */
   passed: boolean
   warnings: number
   rules: AcceptanceRule[]
@@ -66,11 +75,25 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   // ── Efficiency ──
   add('max_two_synthesis_calls', d.model_calls <= 2, `model_calls=${d.model_calls}`)
 
-  // ── Exact reconciliation ──
+  // ── Provider health: a provider rejection is a typed FAILURE, never silent
+  // and never mislabeled as quality rejection or "model unavailable".
+  const providerFailedRounds = d.rounds.filter((r) => r.provider_failed_briefs > 0 || !r.provider_ok)
+  add('provider_no_failure', providerFailedRounds.length === 0 && d.stop_reason !== 'provider_failed',
+    providerFailedRounds.map((r) => `r${r.round}: ${r.providerErrorType ?? 'unknown'} — ${r.sanitizedProviderMessage ?? ''}`).join(' | ') || 'none')
+
+  // ── Exact reconciliation (provider failures have their OWN bucket) ──
   const recon = d.rounds.every((r) =>
-    r.briefs_sent === r.polished + r.skipped_by_model + r.missing_from_response &&
+    r.briefs_sent === r.polished + r.skipped_by_model + r.missing_from_response + r.provider_failed_briefs &&
     r.polished === r.accepted + Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0))
-  add('exact_reconciliation', recon, d.rounds.map((r) => `r${r.round}: sent=${r.briefs_sent} polished=${r.polished} skipped=${r.skipped_by_model} missing=${r.missing_from_response} accepted=${r.accepted} rejected=${Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0)}`).join(' | ') || 'no rounds')
+  add('exact_reconciliation', recon, d.rounds.map((r) => `r${r.round}: sent=${r.briefs_sent} polished=${r.polished} skipped=${r.skipped_by_model} missing=${r.missing_from_response} providerFailed=${r.provider_failed_briefs} accepted=${r.accepted} rejected=${Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0)}`).join(' | ') || 'no rounds')
+
+  // ── Brief-pool accounting: raw candidates NEVER vanish untyped ──
+  const bp = d.brief_pool
+  const rejectedSum = Object.values(bp.rejected_by_reason).reduce((a, b) => a + b, 0)
+  add('pool_accounting_reconciles', bp.total_raw_candidates === bp.pool_size + rejectedSum,
+    `totalRaw=${bp.total_raw_candidates} pool=${bp.pool_size} rejected=${rejectedSum} (${JSON.stringify(bp.rejected_by_reason)})`)
+  add('raw_query_candidates_expected', !(d.evidence_inventory.keyword_research_queries > 0 && bp.raw_query_candidates === 0),
+    `kr_queries=${d.evidence_inventory.keyword_research_queries} raw_query_candidates=${bp.raw_query_candidates}`)
 
   // ── Yield truthfulness ──
   const target = 8
@@ -148,7 +171,24 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   add('competitor_leak_review', brandShadow === 0, `shadow competitor_brand_leakage=${brandShadow} (diagnostics-only; review titles if > 0)`, 'warn')
   add('evidence_loads_clean', d.evidence_inventory.evidence_load_errors.length === 0, d.evidence_inventory.evidence_load_errors.join(' · ') || 'none', 'warn')
 
+  // ── Empty-pool scrutiny (Natural-Shop false-green class): an empty pool must
+  // PROVE why it is empty before it may be called insufficient inventory.
+  if (bp.pool_size === 0 && suggestions.length === 0) {
+    add('empty_pool_loads_clean', d.evidence_inventory.evidence_load_errors.length === 0,
+      d.evidence_inventory.evidence_load_errors.join(' · ') || 'none')
+    add('empty_pool_not_stale_evidence', !d.evidence_inventory.stale_index_excluded,
+      d.evidence_inventory.stale_index_excluded ? 'cached site index excluded as stale (host mismatch) — evidence inputs stale' : 'none')
+    const semanticRejected = (bp.rejected_by_reason['pending_semantic_duplicate'] ?? 0) + (bp.rejected_by_reason['brief_semantic_duplicate'] ?? 0)
+    add('empty_pool_not_semantic_emptied', !(bp.total_raw_candidates > 0 && semanticRejected / bp.total_raw_candidates > 0.5),
+      `semantic=${semanticRejected}/${bp.total_raw_candidates} — review rejected_examples before trusting a broad semantic rule`)
+  }
+
   const failed = rules.filter((r) => r.level === 'fail' && !r.pass)
   const warnings = rules.filter((r) => r.level === 'warn' && !r.pass).length
-  return { passed: failed.length === 0, warnings, rules }
+  const verdict: AcceptanceVerdict = failed.length > 0
+    ? 'FAIL'
+    : suggestions.length > 0
+      ? 'PASS'
+      : 'INSUFFICIENT_INVENTORY'
+  return { verdict, passed: verdict === 'PASS', warnings, rules }
 }

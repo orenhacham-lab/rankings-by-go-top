@@ -18,6 +18,8 @@ import { isSemanticTopicDuplicate } from '../recommendations/semantic-dup'
 import { salvageLongTailKeyword } from '../recommendations/keyword-salvage'
 import { sanitizeDemandLanguage, isMalformedReason, validateIntentKeywordConsistency, validatePrimaryKeywordQuality } from '../recommendations/opportunity-validation'
 import { mapLinkRoles, isBoilerplatePage, type LinkCandidateEntity } from '../recommendations/link-role-mapper'
+import { resolveModelConfig, modelCapability } from '../recommendations/model-config'
+import { classifyModelError, sanitizeProviderMessage } from '../recommendations/model'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -29,9 +31,11 @@ interface GenaiServerConfig {
   models: string[]
   /** Given the parsed briefs payload from the prompt, produce topics[] items. */
   respond: (briefs: { id: string; subject: string; aligned_query?: string }[]) => unknown[]
+  /** Simulate a provider that rejects EVERY generateContent with the live 400. */
+  alwaysFail?: boolean
 }
-function startFakeGenai(cfg: GenaiServerConfig): Promise<{ server: Server; port: number; calls: { model: string; briefCount: number }[] }> {
-  const calls: { model: string; briefCount: number }[] = []
+function startFakeGenai(cfg: GenaiServerConfig): Promise<{ server: Server; port: number; calls: { model: string; briefCount: number; thinkingBudget: number | null }[] }> {
+  const calls: { model: string; briefCount: number; thinkingBudget: number | null }[] = []
   const server = createServer((req, res) => {
     let body = ''
     req.on('data', (c) => { body += c })
@@ -43,12 +47,32 @@ function startFakeGenai(cfg: GenaiServerConfig): Promise<{ server: Server; port:
       }
       if ((req.url ?? '').includes(':generateContent')) {
         const model = ((req.url ?? '').match(/models\/([^:]+):generateContent/) ?? [])[1] ?? 'unknown'
+        // STRICT capability validation (live-regression trap): Gemini 2.5 Pro
+        // cannot disable thinking — thinkingBudget 0 gets the REAL provider 400.
+        const budgetMatch = body.match(/"thinkingBudget"\s*:\s*(\d+)/)
+        const thinkingBudget = budgetMatch ? Number(budgetMatch[1]) : null
+        if (cfg.alwaysFail) {
+          calls.push({ model, briefCount: 0, thinkingBudget })
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: { code: 400, message: 'Budget 0 is invalid. This model only works in thinking mode.', status: 'INVALID_ARGUMENT' } }))
+          return
+        }
+        if (model.includes('pro') && thinkingBudget === 0) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: { code: 400, message: 'Budget 0 is invalid. This model only works in thinking mode.', status: 'INVALID_ARGUMENT' } }))
+          return
+        }
+        if (model.includes('pro') && (thinkingBudget === null || thinkingBudget < 128 || thinkingBudget > 32768)) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: { code: 400, message: `Budget ${thinkingBudget} is invalid. Valid range is 128-32768.`, status: 'INVALID_ARGUMENT' } }))
+          return
+        }
         const prompt: string = (() => { try { const j = JSON.parse(body); return JSON.stringify(j) } catch { return body } })()
         // Extract the BRIEFS payload embedded in the prompt text.
         const m = prompt.match(/BRIEFS:\\n(\[.*?\])\\n\\nOUTPUT/) ?? prompt.match(/BRIEFS:\s*\n(\[[\s\S]*?\])\s*\n\s*\nOUTPUT/)
         let briefs: { id: string; subject: string; aligned_query?: string }[] = []
         if (m) { try { briefs = JSON.parse(m[1].replace(/\\"/g, '"').replace(/\\n/g, '\n')) } catch { briefs = [] } }
-        calls.push({ model, briefCount: briefs.length })
+        calls.push({ model, briefCount: briefs.length, thinkingBudget })
         const topics = cfg.respond(briefs)
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify({
@@ -293,7 +317,55 @@ async function main() {
     const div = evaluateTitleDiversity(run.suggestions.map((s) => s.title))
     check('E21. accepted titles satisfy title-pattern diversity (≤1 mega-guide, ≤2 per skeleton)', div.pass, JSON.stringify(div))
     check('E20. evidence inventory records the ordered KR read + zero load errors', d.evidence_inventory.keyword_research_queries >= 8 && d.evidence_inventory.evidence_load_errors.length === 0, JSON.stringify(d.evidence_inventory.evidence_load_errors))
+    check('E22. FLASH standard calls sent thinkingBudget 0 (low-cost behavior preserved)', calls.every((c) => c.thinkingBudget === 0), JSON.stringify(calls.map((c) => c.thinkingBudget)))
+    check('E23. pool accounting reconciles: totalRaw = pool + Σrejected (with examples)', d.brief_pool.total_raw_candidates === d.brief_pool.pool_size + Object.values(d.brief_pool.rejected_by_reason).reduce((a: number, b) => a + (b as number), 0) && d.brief_pool.rejected_examples.length > 0, JSON.stringify(d.brief_pool))
     server.close()
+  }
+
+  console.log('U) unit: model-aware thinking config (the live Pro-400 fix)')
+  {
+    const pro = resolveModelConfig('gemini-2.5-pro', 3000)
+    check('M1. Pro NEVER gets thinkingBudget 0 (default 1024, budgeted mode)', pro.thinkingMode === 'budgeted' && pro.thinkingBudget === 1024, JSON.stringify(pro))
+    check('M1b. Pro ceiling covers answer + thinking (3000+1024)', pro.maxOutputTokens === 4024, String(pro.maxOutputTokens))
+    const flash = resolveModelConfig('gemini-2.5-flash', 3000)
+    check('M2. Flash keeps thinkingBudget 0 (disabled) and answer-only ceiling', flash.thinkingMode === 'disabled' && flash.thinkingBudget === 0 && flash.maxOutputTokens === 3000)
+    process.env.RECO_PRO_THINKING_BUDGET = '64'
+    check('M3. configured Pro budget below 128 is CLAMPED to the valid range', resolveModelConfig('gemini-2.5-pro', 3000).thinkingBudget === 128)
+    process.env.RECO_PRO_THINKING_BUDGET = '99999'
+    check('M3b. configured Pro budget above 32768 is CLAMPED down', resolveModelConfig('gemini-2.5-pro', 3000).thinkingBudget === 32768)
+    delete process.env.RECO_PRO_THINKING_BUDGET
+    check('M4. capability comes from the EXPLICIT table (pro preview id → cannot disable)', modelCapability('gemini-2.5-pro-preview-06-05').canDisableThinking === false && modelCapability('gemini-2.5-flash-lite').canDisableThinking === true)
+    check('M5. unknown pro-like id falls back CONSERVATIVELY (cannot disable)', modelCapability('gemini-9-pro-experimental').canDisableThinking === false)
+  }
+
+  console.log('U) unit: provider-error classification + sanitization')
+  {
+    check('C1. the LIVE 400 message → invalid_model_configuration (never model_unavailable)', classifyModelError('got status: 400 . {"error":{"code":400,"message":"Budget 0 is invalid. This model only works in thinking mode.","status":"INVALID_ARGUMENT"}}') === 'invalid_model_configuration')
+    check('C2. generic INVALID_ARGUMENT → provider_invalid_argument', classifyModelError('{"error":{"code":400,"message":"Invalid JSON payload received.","status":"INVALID_ARGUMENT"}}') === 'provider_invalid_argument')
+    check('C3. 404 not-found still → model_unavailable', classifyModelError('models/gemini-x is not found for API version v1beta') === 'model_unavailable')
+    check('C4. 429 → rate_limited', classifyModelError('429 Too Many Requests: quota exceeded') === 'rate_limited')
+    const san = sanitizeProviderMessage('POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ123456 failed: Budget 0 is invalid')
+    check('C5. sanitized message strips API keys and URL params', !san.includes('AIza') && !/key=(?!\[key\])/.test(san) && san.includes('Budget 0 is invalid'), san)
+  }
+
+  console.log('E2E) provider failure — exact accounting, typed cause, FAIL verdict')
+  {
+    const sFail = await startFakeGenai({ models: ['gemini-2.5-flash', 'gemini-2.5-pro'], alwaysFail: true, respond: () => [] })
+    process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${sFail.port}`
+    resetModelResolutionCache()
+    resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(naturalShopTables()), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'runPF', 8))
+    const rd = run.diagnostics.rounds[0]
+    check('PF1. stop_reason is provider_failed (never insufficient_inventory)', run.diagnostics.stop_reason === 'provider_failed', run.diagnostics.stop_reason)
+    check('PF2. provider_failed_briefs equals briefs_sent (no quality-rejection mislabel)', !!rd && rd.provider_failed_briefs === rd.briefs_sent && rd.briefs_sent > 0, JSON.stringify(rd))
+    check('PF3. the exact equation holds: sent = polished+skipped+missing+providerFailed', !!rd && rd.briefs_sent === rd.polished + rd.skipped_by_model + rd.missing_from_response + rd.provider_failed_briefs)
+    check('PF4. typed cause is invalid_model_configuration with a sanitized message', rd?.providerErrorType === 'invalid_model_configuration' && !!rd?.sanitizedProviderMessage && !String(rd.sanitizedProviderMessage).includes('AIza'), JSON.stringify({ t: rd?.providerErrorType, m: rd?.sanitizedProviderMessage }))
+    const { evaluateRunAcceptance } = await import('../recommendations/qa-acceptance')
+    const acc = evaluateRunAcceptance({ tierRequested: 'premium', diagnostics: run.diagnostics, suggestions: run.suggestions, pendingBefore: 0 })
+    check('PF5. acceptance verdict is FAIL (provider_no_failure + reconciliation intact)', acc.verdict === 'FAIL' && acc.rules.find((r) => r.id === 'provider_no_failure')?.pass === false && acc.rules.find((r) => r.id === 'exact_reconciliation')?.pass === true, JSON.stringify(acc.rules.filter((r) => !r.pass).map((r) => r.id)))
+    sFail.server.close()
   }
 
   console.log('E2E) premium tier — real Pro when offered, EXPLICIT downgrade when not')
@@ -308,6 +380,8 @@ async function main() {
     const run1 = await generateFromBriefs(fakeAdmin(naturalShopTables()), { projectId: 'p1', targetCount: 5, qualityMode: 'premium' }, newRunCostController('premium', 'run2', 5))
     check('P1. premium resolves the REAL Pro model (no silent Flash)', run1.diagnostics.modelPath.tierUsed === 'pro' && run1.diagnostics.modelPath.downgraded === false, JSON.stringify(run1.diagnostics.modelPath))
     check('P2. the actual HTTP call hit the Pro model id', s1.calls.every((c) => c.model.includes('pro')), JSON.stringify(s1.calls.map((c) => c.model)))
+    check('P2b. Pro calls carried a VALID thinking budget (>=128, never 0) on the wire', s1.calls.every((c) => (c.thinkingBudget ?? 0) >= 128), JSON.stringify(s1.calls.map((c) => c.thinkingBudget)))
+    check('P2c. modelConfig surfaced in diagnostics (budgeted thinking + real ceiling)', run1.diagnostics.modelConfig?.thinkingMode === 'budgeted' && (run1.diagnostics.modelConfig?.thinkingBudget ?? 0) >= 128 && (run1.diagnostics.modelConfig?.maxOutputTokens ?? 0) > (run1.diagnostics.modelConfig?.thinkingBudget ?? 0), JSON.stringify(run1.diagnostics.modelConfig))
     s1.server.close()
 
     // Pro NOT offered → explicit typed downgrade to Flash, run still succeeds.

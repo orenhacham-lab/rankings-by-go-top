@@ -71,7 +71,11 @@ export interface BriefPoolDiagnostics {
   raw_query_candidates: number
   raw_theme_candidates: number
   raw_tracked_candidates: number
+  /** raw_query + raw_tracked + raw_theme — MUST equal pool_size + Σ rejected. */
+  total_raw_candidates: number
   rejected_by_reason: Record<string, number>
+  /** Operator-only reviewability: up to 5 rejected candidates per reason. */
+  rejected_examples: { subject: string; reason: string; evidenceKind: string }[]
   pool_size: number
   by_family: Record<string, number>
   with_demand: number
@@ -119,7 +123,11 @@ const briefId = (subject: string) => {
 export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead?: number }): { pool: OpportunityBrief[]; diagnostics: BriefPoolDiagnostics } {
   const maxPerHead = opts?.maxPerSubjectHead ?? 2
   const rejected: Record<string, number> = {}
-  const reject = (r: string) => { rejected[r] = (rejected[r] ?? 0) + 1 }
+  const rejectedExamples: { subject: string; reason: string; evidenceKind: string }[] = []
+  const reject = (r: string, subject: string, evidenceKind: string) => {
+    rejected[r] = (rejected[r] ?? 0) + 1
+    if (rejectedExamples.filter((e) => e.reason === r).length < 5) rejectedExamples.push({ subject: subject.slice(0, 120), reason: r, evidenceKind })
+  }
   const entityTokenIndex = buildEntityTokenIndex(input.entities)
   const coverageTokenIndex = buildCoverageTokenIndex(input.publishedCoverage)
 
@@ -137,7 +145,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
     seenQuery.add(nq)
     rawQuery++
     const toks = distinctiveTokensOf(q)
-    if (toks.length < 2) { reject('subject_too_generic'); continue }
+    if (toks.length < 2) { reject('subject_too_generic', q, 'keyword_research'); continue }
     const need = needOf(q)
     candidates.push(makeBrief({
       subject: q,
@@ -160,7 +168,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
     seenQuery.add(ns)
     rawTracked++
     const toks = distinctiveTokensOf(s)
-    if (toks.length < 2) { reject('subject_too_generic'); continue }
+    if (toks.length < 2) { reject('subject_too_generic', s, 'project_data'); continue }
     const exact = krByNorm.get(ns)
     candidates.push(makeBrief({
       subject: s,
@@ -177,7 +185,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
   const themes = entityThemes(input.entities, input.domainTypeWords, input.language)
   for (const th of themes) {
     rawTheme++
-    if (seenQuery.has(normalizePhrase(th.subject))) { reject('theme_duplicates_query'); continue }
+    if (seenQuery.has(normalizePhrase(th.subject))) { reject('theme_duplicates_query', th.subject, 'site_scan'); continue }
     candidates.push(makeBrief({
       subject: th.subject,
       need: th.need,
@@ -193,16 +201,17 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
   const acceptedSignatures: TopicSignature[] = []
   const perHead = new Map<string, number>()
   for (const b of candidates) {
-    if (input.isOwnedByEntity(b.subject)) { reject('exact_existing_keyword_owner'); continue }
-    if (input.pendingExactKeys.has(normalizePhrase(b.subject))) { reject('pending_exact_duplicate'); continue }
-    if (input.isCoveredByContent(b.subject, b.subject)) { reject('covered_by_existing_content'); continue }
+    const kind = b.sourceEvidence[0]?.kind ?? 'unknown'
+    if (input.isOwnedByEntity(b.subject)) { reject('exact_existing_keyword_owner', b.subject, kind); continue }
+    if (input.pendingExactKeys.has(normalizePhrase(b.subject))) { reject('pending_exact_duplicate', b.subject, kind); continue }
+    if (input.isCoveredByContent(b.subject, b.subject)) { reject('covered_by_existing_content', b.subject, kind); continue }
     const sig = topicSignature(b.subject, b.intendedIntent)
-    if (input.pendingSignatures.some((p) => isHighConfidenceDuplicate(sig, p))) { reject('pending_semantic_duplicate'); continue }
-    if (acceptedSignatures.some((a) => isHighConfidenceDuplicate(sig, a))) { reject('brief_semantic_duplicate'); continue }
+    if (input.pendingSignatures.some((p) => isHighConfidenceDuplicate(sig, p))) { reject('pending_semantic_duplicate', b.subject, kind); continue }
+    if (acceptedSignatures.some((a) => isHighConfidenceDuplicate(sig, a))) { reject('brief_semantic_duplicate', b.subject, kind); continue }
     const head = sig.head ?? ''
     if (head) {
       const n = perHead.get(head) ?? 0
-      if (n >= maxPerHead) { reject('subject_head_cap'); continue }
+      if (n >= maxPerHead) { reject('subject_head_cap', b.subject, kind); continue }
       perHead.set(head, n + 1)
     }
     acceptedSignatures.push(sig)
@@ -229,7 +238,9 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       raw_query_candidates: rawQuery,
       raw_theme_candidates: rawTheme,
       raw_tracked_candidates: rawTracked,
+      total_raw_candidates: rawQuery + rawTracked + rawTheme,
       rejected_by_reason: rejected,
+      rejected_examples: rejectedExamples,
       pool_size: interleaved.length,
       by_family,
       with_demand: interleaved.filter((b) => b.alignedDemandQuery).length,

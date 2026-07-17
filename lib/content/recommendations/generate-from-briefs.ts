@@ -44,12 +44,23 @@ import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-/** Per-synthesis-round exact accounting (E-reconciliation). */
+/** Per-synthesis-round exact accounting (E-reconciliation):
+ *  briefs_sent = polished + skipped_by_model + missing_from_response
+ *              + provider_failed_briefs. Provider failures are NEVER quality
+ *  rejections — they get their own bucket + typed cause. */
 export interface BriefRoundDiagnostics {
   round: number
   model: string | null
   briefs_sent: number
   provider_ok: boolean
+  /** Briefs whose synthesis the PROVIDER failed before returning content. */
+  provider_failed_briefs: number
+  providerStatus: string | null
+  providerErrorType: string | null
+  sanitizedProviderMessage: string | null
+  finishReason: string | null
+  textPresent: boolean
+  textLength: number
   emitted: number
   polished: number
   skipped_by_model: number
@@ -64,6 +75,8 @@ export interface BriefRoundDiagnostics {
 export interface BriefRunDiagnostics {
   engine: 'evidence_first_briefs'
   modelPath: ModelPath
+  /** EXACT generation config of the synthesis calls (model-aware thinking). */
+  modelConfig: { model: string; thinkingMode: string; thinkingBudget: number; maxOutputTokens: number } | null
   evidence_inventory: {
     project_focus_terms: number
     tracked_keywords: number
@@ -394,6 +407,7 @@ export async function generateFromBriefs(
 
   // ── 5) Adaptive synthesis rounds ─────────────────────────────────────────────
   const rounds: BriefRoundDiagnostics[] = []
+  let modelConfig: BriefRunDiagnostics['modelConfig'] = null
   const suggestions: TopicSuggestion[] = []
   const briefById = new Map(pool.map((b) => [b.opportunityId, b]))
   let cursor = 0
@@ -418,10 +432,17 @@ export async function generateFromBriefs(
       controller,
       { source: 'brief_synthesis', callPurpose: round === 1 ? 'primary' : 'refill', requestedIdeaCount: batch.length },
     )
-    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? modelPath.model, briefs_sent: batch.length, provider_ok: res.ok, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0 }
+    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? modelPath.model, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0 }
     rounds.push(rd)
+    if (modelConfig === null && res.modelConfig) modelConfig = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
     if (res.stopped) { stop = 'budget_stopped'; break }
-    if (!res.ok) { stop = suggestions.length > 0 ? 'provider_failed' : 'provider_failed'; break }
+    if (!res.ok) {
+      // The provider rejected the request before returning content — EVERY brief
+      // in this batch is a provider failure, not a quality rejection.
+      rd.provider_failed_briefs = batch.length
+      stop = 'provider_failed'
+      break
+    }
 
     const rec = reconcileSynthesis(res.text, batch)
     rd.emitted = rec.emitted
@@ -464,6 +485,7 @@ export async function generateFromBriefs(
     diagnostics: {
       engine: 'evidence_first_briefs',
       modelPath,
+      modelConfig,
       evidence_inventory: {
         project_focus_terms: projectFocus.length,
         tracked_keywords: tracked.length,

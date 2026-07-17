@@ -27,7 +27,10 @@ async function main() {
   {
     check('1. reco client uses @google/genai (GoogleGenAI)', /from '@google\/genai'/.test(clientSrc) && /new GoogleGenAI\(/.test(clientSrc))
     check('1. model adapter uses the @google/genai client + models.generateContent', /getRecoGenAiClient/.test(modelSrc) && /client\.models\.generateContent/.test(modelSrc))
-    check('2. thinkingBudget is exactly 0', /thinkingConfig:\s*\{\s*thinkingBudget:\s*0\s*\}/.test(modelSrc))
+    // Model-aware thinking (live Pro-400 fix): the budget comes from
+    // resolveModelConfig — Flash stays 0 (the original fix preserved), Pro gets
+    // a VALID clamped budget; a hardcoded 0 for every model would 400 on Pro.
+    check('2. thinkingBudget is MODEL-AWARE (resolveModelConfig, no hardcoded 0)', /thinkingConfig:\s*\{\s*thinkingBudget:\s*mc\.thinkingBudget\s*\}/.test(modelSrc) && /resolveModelConfig\(/.test(modelSrc) && !/thinkingBudget:\s*0\b/.test(modelSrc))
     check('3. legacy @google/generative-ai is NOT used by the reco JSON path', !/@google\/generative-ai/.test(modelSrc) && !/getGeminiClient/.test(modelSrc))
     check('10/11. Flash-only primary, Pro never wired as generator', RECOMMENDATION_MODEL_PRIMARY === 'gemini-2.5-flash' && !/opts\.model \|\| RECOMMENDATION_MODEL_CURATOR/.test(modelSrc))
     check('same GEMINI_API_KEY (no new credential)', /process\.env\.GEMINI_API_KEY/.test(clientSrc))

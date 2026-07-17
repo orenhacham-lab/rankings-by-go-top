@@ -12,6 +12,7 @@
 
 import { getRecoGenAiClient } from './genai-client'
 import { resolveAvailableRecommendationModel } from './model-availability'
+import { resolveModelConfig, type RecoModelConfig } from './model-config'
 import type { RunCostController, CallStopReason } from './run-cost-controller'
 
 /** DEFAULT generation model — Gemini 2.5 Flash (NOT Flash-Lite, NOT Pro). */
@@ -23,8 +24,9 @@ export const RECOMMENDATION_MODEL_CURATOR = process.env.RECOMMENDATION_MODEL_CUR
 /** Config version tag (internal diagnostics / benchmark provenance). */
 export const RECOMMENDATION_MODEL_VERSION = process.env.RECOMMENDATION_MODEL_VERSION || 'reco-2026-07-flash-default'
 
-/** Typed model-error categories. billing_exhausted is a HARD stop (no fallback). */
-export type ModelErrorCategory = 'billing_exhausted' | 'rate_limited' | 'model_unavailable'
+/** Typed model-error categories. billing_exhausted is a HARD stop (no fallback).
+ *  A provider 400 (bad request/config) is NEVER described as model_unavailable. */
+export type ModelErrorCategory = 'billing_exhausted' | 'rate_limited' | 'model_unavailable' | 'invalid_model_configuration' | 'provider_invalid_argument'
 
 /** Explicit recommendation-call outcomes (Part 2). A MAX_TOKENS/empty response is
  *  NEVER silently collapsed into a generic model_error. */
@@ -38,6 +40,8 @@ export type RecoErrorType =
   | 'billing_exhausted'
   | 'rate_limited'
   | 'model_unavailable'
+  | 'invalid_model_configuration'
+  | 'provider_invalid_argument'
 
 /** Provider/response classification (Part 2). */
 export type RecoProviderStatus = 'ok' | 'empty' | 'blocked' | 'error'
@@ -68,12 +72,30 @@ export function isModelUnavailableMessage(message: string): boolean {
   return /no longer available|is not found|not found for api version|models\/[\w.-]+ is not|404.*model|model.*not.*(found|available)/.test(m)
 }
 
-/** Classify a provider error message into a typed category. */
+/** Classify a provider error message into a typed category. Order matters:
+ *  billing → rate limit → thinking/config 400 → generic 400 → unavailable. */
 export function classifyModelError(message: string): ModelErrorCategory {
   const m = (message || '').toLowerCase()
   if (/prepayment credits are depleted|no credits|billing required|payment required|insufficient (funds|credit)|quota.*billing|resource_exhausted.*billing/.test(m)) return 'billing_exhausted'
   if (/429|too many requests|rate limit|resource_exhausted|quota exceeded/.test(m)) return 'rate_limited'
+  // The live Pro defect class: "Budget 0 is invalid. This model only works in
+  // thinking mode." — a CONFIGURATION error, never "model unavailable".
+  if (/only works in thinking mode|thinking.?budget|budget \d+ is invalid|thinking mode/.test(m)) return 'invalid_model_configuration'
+  if (/invalid_argument|invalid json payload|"code"\s*:\s*400|\[400[\s\]]|http 400|status.*400.*invalid/.test(m)) return 'provider_invalid_argument'
   return 'model_unavailable'
+}
+
+/** Strip anything secret-shaped from a provider message before it reaches
+ *  diagnostics: API keys, key= params, full URLs, bearer tokens. */
+export function sanitizeProviderMessage(message: string): string {
+  return (message || '')
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, '[key]')
+    .replace(/([?&]key=)[^&\s"']+/gi, '$1[key]')
+    .replace(/bearer\s+[A-Za-z0-9._-]+/gi, 'bearer [token]')
+    .replace(/https?:\/\/\S+/g, (u) => u.split('?')[0])
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240)
 }
 
 /**
@@ -117,6 +139,11 @@ export interface RecoGenResult {
   errorType?: RecoErrorType
   /** Whether an IDENTICAL retry could plausibly resolve the failure (Part 3). */
   retryable?: boolean
+  /** The EXACT generation config used (model-aware thinking budget + real
+   *  output ceiling) — surfaced in Preview diagnostics as modelConfig. */
+  modelConfig?: RecoModelConfig
+  /** Sanitized provider error text (keys/URLs/tokens stripped) on failure. */
+  errorMessage?: string
 }
 
 export interface RecoGenOptions {
@@ -178,15 +205,9 @@ export function classifyGenAiResponse(inp: GenAiClassifyInput): GenAiClassifyRes
 export async function generateRecommendationJSON(prompt: string, opts: RecoGenOptions = {}, controller?: RunCostController, callInfo?: RecoCallInfo): Promise<RecoGenResult> {
   const client = getRecoGenAiClient()
   if (!client) { console.warn('[reco-model] no gemini client (GEMINI_API_KEY unset)'); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable', errorType: 'model_unavailable', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: false } }
-  const maxOutputTokens = opts.maxOutputTokens ?? outputBudgetFor(15)
-  // Flash-only generator. thinkingBudget:0 DISABLES dynamic thinking so the entire
-  // output budget is spent on the JSON answer (no thinking→empty MAX_TOKENS body).
-  const config = {
-    responseMimeType: 'application/json',
-    temperature: opts.temperature ?? 0.7,
-    maxOutputTokens,
-    thinkingConfig: { thinkingBudget: 0 },
-  }
+  // opts.maxOutputTokens is the ANSWER budget (the JSON itself); the real
+  // provider ceiling is model-aware (thinking budget added for Pro-class).
+  const answerBudget = opts.maxOutputTokens ?? outputBudgetFor(15)
   const source = callInfo?.source ?? 'unknown'
   const callPurpose = callInfo?.callPurpose ?? 'primary'
   const requestedIdeaCount = callInfo?.requestedIdeaCount ?? 0
@@ -210,12 +231,23 @@ export async function generateRecommendationJSON(prompt: string, opts: RecoGenOp
     // list_failed → keep the configured id and let the call surface a typed error.
   }
 
+  // MODEL-AWARE generation config (live Pro defect fix): Flash keeps
+  // thinkingBudget 0; Pro-class gets a valid clamped thinking budget and the
+  // ceiling covers BOTH the JSON answer and the thinking budget.
+  const mc = resolveModelConfig(id, answerBudget)
+  const config = {
+    responseMimeType: 'application/json',
+    temperature: opts.temperature ?? 0.7,
+    maxOutputTokens: mc.maxOutputTokens,
+    thinkingConfig: { thinkingBudget: mc.thinkingBudget },
+  }
+
   // ENFORCED pre-call gate — the shared controller decides whether this call may
-  // start (billing / call ceiling / cost ceiling). No controller → ungated.
+  // start (billing / call ceiling / cost ceiling), estimated on the REAL ceiling.
   if (controller) {
-    const est = controller.estimateNextCallUsd(id, prompt.length, maxOutputTokens)
+    const est = controller.estimateNextCallUsd(id, prompt.length, mc.maxOutputTokens)
     const gate = controller.beforeCall(est)
-    if (!gate.allowed) return { text: '', ok: false, modelUsed: null, usedFallback: false, stopped: true, stopReason: gate.reason, errorCategory: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable', errorType: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: false }
+    if (!gate.allowed) return { text: '', ok: false, modelUsed: null, usedFallback: false, stopped: true, stopReason: gate.reason, errorCategory: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable', errorType: gate.reason === 'billing_exhausted' ? 'billing_exhausted' : 'model_unavailable', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: false, modelConfig: mc }
   }
   const startedAt = Date.now()
   const ac = new AbortController()
@@ -235,16 +267,16 @@ export async function generateRecommendationJSON(prompt: string, opts: RecoGenOp
     const hasCandidates = (resp.candidates?.length ?? 0) > 0
     const blocked = (finishReason && BLOCKING_FINISH.has(finishReason)) || !!resp.promptFeedback?.blockReason
 
-    controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: promptTokenCount, outputTokens, thinkingTokens, finishReason, retryNumber, success: textPresent, durationMs: Date.now() - startedAt })
+    controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens: mc.maxOutputTokens, inputTokens: promptTokenCount, outputTokens, thinkingTokens, finishReason, retryNumber, success: textPresent, durationMs: Date.now() - startedAt })
 
     const base = {
       modelUsed: id, usedFallback: false, finishReason, truncated: finishReason === 'MAX_TOKENS',
       promptTokenCount, candidatesTokenCount: outputTokens, thoughtsTokenCount: thinkingTokens, totalTokenCount, outputTokens,
-      textPresent, textLength: text.length,
+      textPresent, textLength: text.length, modelConfig: mc,
     }
     const cls = classifyGenAiResponse({ textPresent, finishReason, hasCandidates, blocked })
     if (cls.errorType === 'gemini_max_tokens_empty') {
-      console.error('[reco-model] MAX_TOKENS with empty text', { model: id, source, maxOutputTokens, outputTokens, thinkingTokens })
+      console.error('[reco-model] MAX_TOKENS with empty text', { model: id, source, maxOutputTokens: mc.maxOutputTokens, outputTokens, thinkingTokens })
     }
     return {
       ...base,
@@ -259,15 +291,18 @@ export async function generateRecommendationJSON(prompt: string, opts: RecoGenOp
     const aborted = ac.signal.aborted || (err as { name?: string })?.name === 'AbortError'
     const message = err instanceof Error ? err.message : String(err)
     const category = classifyModelError(message)
-    controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens, inputTokens: 0, outputTokens: 0, thinkingTokens: 0, retryNumber, success: false, errorType: aborted ? 'gemini_timeout' : category, durationMs: Date.now() - startedAt })
+    controller?.recordCall({ generationRunId: controller.generationRunId, model: id, source, callPurpose, requestedIdeaCount, maxOutputTokens: mc.maxOutputTokens, inputTokens: 0, outputTokens: 0, thinkingTokens: 0, retryNumber, success: false, errorType: aborted ? 'gemini_timeout' : category, durationMs: Date.now() - startedAt })
     // BILLING EXHAUSTED → trip the breaker + hard abort. Never a paid fallback.
     if (!aborted && category === 'billing_exhausted') { controller?.markBillingExhausted(); console.error('[reco-model] billing exhausted — aborting run', { model: id }); throw new BillingExhaustedError(message) }
     // MODEL UNAVAILABLE (404 / "no longer available") → HARD typed abort so the run
     // never renders a provider 404 as a successful zero-result (Part C).
     if (!aborted && isModelUnavailableMessage(message)) { console.error('[reco-model] model unavailable (404) — aborting run', { model: id }); throw new RecommendationModelUnavailableError(id, message) }
-    if (aborted) { console.error('[reco-model] generation timeout', { model: id, source, ms: GENAI_TIMEOUT_MS }); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable', errorType: 'gemini_timeout', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: true } }
-    console.error('[reco-model] generation error', { model: id, category, message: message.slice(0, 200) })
-    return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: category, errorType: category, providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: category === 'rate_limited' }
+    if (aborted) { console.error('[reco-model] generation timeout', { model: id, source, ms: GENAI_TIMEOUT_MS }); return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: 'model_unavailable', errorType: 'gemini_timeout', providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: true, modelConfig: mc, errorMessage: 'timeout' } }
+    console.error('[reco-model] generation error', { model: id, category, message: sanitizeProviderMessage(message) })
+    // A provider 400 (config / bad argument) is a NON-RETRYABLE typed failure —
+    // returned (never thrown) so the round records provider_failed_briefs with
+    // its exact typed cause.
+    return { text: '', ok: false, modelUsed: null, usedFallback: false, errorCategory: category, errorType: category, providerStatus: 'error', parseStatus: 'not_attempted', textPresent: false, textLength: 0, retryable: category === 'rate_limited', modelConfig: mc, errorMessage: sanitizeProviderMessage(message) }
   } finally {
     clearTimeout(timer)
   }
