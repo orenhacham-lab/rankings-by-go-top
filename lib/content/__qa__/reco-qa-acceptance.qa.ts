@@ -27,8 +27,10 @@ const cleanDiag = (over: Partial<BriefRunDiagnostics> = {}): BriefRunDiagnostics
   rounds: [{ round: 1, model: 'gemini-2.5-pro', briefs_sent: 6, provider_ok: true, provider_failed_briefs: 0, providerStatus: 'ok', providerErrorType: null, sanitizedProviderMessage: null, finishReason: 'STOP', textPresent: true, textLength: 1200, emitted: 6, polished: 5, skipped_by_model: 1, missing_from_response: 0, dropped_items: 0, accepted: 5, repaired: 0, rejected_by_reason: {}, marginal_yield: 0.833, synthesis_failure: null, synthesisResponse: null }],
   discovery: null,
   rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 5, finalCount: 5, model_calls: 1,
-  stop_reason: 'pool_exhausted', insufficient_inventory: false, secondary_keywords_filtered: 0, target_role_mappings: [],
-  cost: { estimatedRunCostUsd: 0.02, totalCalls: 1 },
+  stop_reason: 'true_pool_exhausted', insufficient_inventory: false, secondary_keywords_filtered: 0, target_role_mappings: [],
+  brief_consumption: { effectivePoolSize: 6, consumedBriefs: 6, remainingBriefs: 0, callsRemaining: 1 },
+  competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [] },
+  cost: { totalCalls: 1, calls: [{ model: 'gemini-2.5-pro', source: 'brief_synthesis', callPurpose: 'primary', inputTokens: 1000, answerOutputTokens: 400, thinkingTokens: 1024, totalBillableOutputTokens: 1424, estimatedCostUsd: 0.02, success: true }], totalPaidCalls: 1, estimatedRunCostUsd: 0.02, estimatedRunCostIls: 0.074, costPerAcceptedTopic: 0.004, configuredCostCeilingUsd: 0.5, remainingBudgetUsd: 0.48, callsPreventedByBudget: 0, configuredMaxCalls: 6 },
   ...over,
 })
 
@@ -168,6 +170,33 @@ async function main() {
       dedupeMegaGuideTitle('המדריך המלא: מינון מגנזיום לילדים', ['המדריך המלא: ויטמין C לילדים']) === 'מינון מגנזיום לילדים')
     check('FIRST mega-guide title is left untouched', dedupeMegaGuideTitle('המדריך המלא: מינון מגנזיום לילדים', ['נושא אחר לגמרי']) === 'המדריך המלא: מינון מגנזיום לילדים')
     check('a short core is NOT stripped (no awkward 2-word titles)', dedupeMegaGuideTitle('המדריך המלא: זר כלה', ['המדריך המלא: אחר לגמרי כאן']) === 'המדריך המלא: זר כלה')
+  }
+
+  console.log('E) stop-reason + cost gates')
+  {
+    const failsRule = (input: RunAcceptanceInput, ruleId: string): boolean => {
+      const r = evaluateRunAcceptance(input)
+      const rule = r.rules.find((x) => x.id === ruleId)
+      return !!rule && !rule.pass
+    }
+    // pool=80, sent=24, cap=2 → call_cap_reached (NOT pool_exhausted); reconciles.
+    const callCap = evaluateRunAcceptance(base({ diagnostics: cleanDiag({ stop_reason: 'call_cap_reached', model_calls: 2, brief_consumption: { effectivePoolSize: 80, consumedBriefs: 24, remainingBriefs: 56, callsRemaining: 0 } }) }))
+    check('call_cap_reached with remaining briefs PASSES stop_reason_reconciles', callCap.rules.find((x) => x.id === 'stop_reason_reconciles')?.pass === true, JSON.stringify(callCap.rules.filter((x) => !x.pass).map((x) => x.id)))
+    check('call_cap_reached run overall PASS (not a failure)', callCap.verdict === 'PASS')
+    // A FALSE true_pool_exhausted (remaining>0) must FAIL reconciliation.
+    check('true_pool_exhausted with remaining briefs → stop_reason_reconciles FAILS', failsRule(base({ diagnostics: cleanDiag({ stop_reason: 'true_pool_exhausted', brief_consumption: { effectivePoolSize: 80, consumedBriefs: 24, remainingBriefs: 56, callsRemaining: 0 } }) }), 'stop_reason_reconciles'))
+    // Cost gates.
+    check('3 paid calls → no_more_than_two_paid_calls FAILS', failsRule(base({ diagnostics: cleanDiag({ cost: { ...cleanDiag().cost, totalPaidCalls: 3 } }) }), 'no_more_than_two_paid_calls'))
+    check('over-budget → run_cost_within_budget FAILS', failsRule(base({ diagnostics: cleanDiag({ cost: { ...cleanDiag().cost, estimatedRunCostUsd: 0.9, configuredCostCeilingUsd: 0.5 } }) }), 'run_cost_within_budget'))
+    check('per-call sum ≠ run cost → cost_telemetry_reconciles FAILS', failsRule(base({ diagnostics: cleanDiag({ cost: { ...cleanDiag().cost, estimatedRunCostUsd: 0.99 } }) }), 'cost_telemetry_reconciles'))
+    check('thinking counted as billable output (telemetry reconciles clean)', evaluateRunAcceptance(base()).rules.find((x) => x.id === 'cost_telemetry_reconciles')?.pass === true)
+    // Accepted external-business leakage → hard FAIL; rejected research is diagnostic.
+    check('external business in ACCEPTED title → accepted_output_has_no_external_business FAILS', failsRule(base({ diagnostics: cleanDiag({ competitorLeakage: { ...cleanDiag().competitorLeakage, acceptedTitle: ['סוכנות מתחרה בע"מ'] } }) }), 'accepted_output_has_no_external_business'))
+    check('competitor terms only in REJECTED research → still PASS (diagnostic)', evaluateRunAcceptance(base({ diagnostics: cleanDiag({ competitorLeakage: { ...cleanDiag().competitorLeakage, researchRejected: ['מתחרה א', 'מתחרה ב'] } }) })).rules.find((x) => x.id === 'accepted_output_has_no_external_business')?.pass === true)
+    // Headline keyword + link/cannibalization rules.
+    check('headline primary keyword → primary_keyword_search_phrase_quality FAILS', failsRule(base({ suggestions: [goodTopic('מהו מסמך אפיון ואיך הוא תורם להצלחת הפרויקט?', 'מהו מסמך אפיון')], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }), 'primary_keyword_search_phrase_quality'))
+    check('colour-only link → links_subject_relevant FAILS', failsRule(base({ suggestions: [goodTopic('ורדים ורודים', 'איך לשמור על ורדים ורודים', { linkPlan: { primaryCommercialTarget: null, secondaryCommercialTargets: [{ url: '/p/orchid', title: 'סחלב ורוד מרהיב', pageType: 'product', role: 'secondary_commercial_target', score: 1, reason: 'x' }], supportingInformationalLinks: [], sourceReferences: [] }, suggestedInternalLinks: [{ url: '/p/orchid', anchor: 'סחלב ורוד מרהיב' }] })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }), 'links_subject_relevant'))
+    check('existing-need cannibalization → no_existing_need_cannibalization FAILS', failsRule(base({ suggestions: [goodTopic('תוספי מזון מומלצים', 'תוספי מזון מומלצים', { coverageMatches: [{ existingTitle: 'תוספי תזונה מומלצים', url: '/s', matchType: 'owns_need', score: 0.9, sharedNeed: ['תוספ'] }] })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }), 'no_existing_need_cannibalization'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

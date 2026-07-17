@@ -18,9 +18,12 @@ import type { BriefRunDiagnostics } from './generate-from-briefs'
 import type { TopicSuggestion } from './types'
 import { isMalformedReason, isTruncatedKeywordPhrase, validateIntentKeywordConsistency } from './opportunity-validation'
 import type { SearchIntent } from './opportunity'
-import { isSemanticTopicDuplicate, distinctiveTokensOf, canonicalVariants } from './semantic-dup'
+import { distinctiveTokensOf, canonicalVariants } from './semantic-dup'
 import { isBoilerplatePage } from './link-role-mapper'
 import { evaluateTitleDiversity } from './title-diversity'
+import { evaluateLink, isRelevantLink } from './link-relevance'
+import { isSameNeedDuplicate } from './coverage'
+import { isSearchPhraseQuality } from './search-phrase'
 
 export interface AcceptanceRule {
   id: string
@@ -107,7 +110,7 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   // discovery briefs — RC3 discovery is a LEGITIMATE anchored source) ──
   const effectivePool = bp.pool_size + (d.discovery?.accepted ?? 0)
   const target = 8
-  const yieldOk = suggestions.length >= Math.min(target, effectivePool) || d.stop_reason === 'insufficient_inventory' || d.stop_reason === 'pool_exhausted'
+  const yieldOk = suggestions.length >= Math.min(target, effectivePool) || d.stop_reason === 'insufficient_inventory' || d.stop_reason === 'true_pool_exhausted' || d.stop_reason === 'call_cap_reached'
   add('yield_or_truthful_inventory', yieldOk, `accepted=${suggestions.length} pool=${bp.pool_size} discovery=${d.discovery?.accepted ?? 0} stop=${d.stop_reason}`)
   add('no_filler_on_empty_pool', !(effectivePool === 0 && suggestions.length > 0), `effectivePool=${effectivePool} accepted=${suggestions.length}`)
 
@@ -130,16 +133,38 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   })
   add('no_invented_demand', inventedDemand.length === 0, inventedDemand.map((s) => `${s.primaryKeyword}: ${s.suggestionReason}`).join(' · ') || 'none')
 
-  const misalignedDemand = suggestions.filter((s) => s.demandEvidence?.demandEvidenceAvailable && !['exact', 'close_intent'].includes(s.demandEvidence?.demandMatchType ?? ''))
-  add('demand_matches_subject', misalignedDemand.length === 0, misalignedDemand.map((s) => `${s.primaryKeyword}→${s.demandEvidence?.demandQuery}`).join(' · ') || 'none')
+  // Customer-visible demand must be exact/close AND not a head-term BROADER than
+  // the primary keyword (P1 — a broad head query never states a narrow topic's
+  // volume). Re-check breadth defensively over the FINAL primary keyword.
+  const misalignedDemand = suggestions.filter((s) => {
+    const de = s.demandEvidence
+    if (!de?.demandEvidenceAvailable) return false
+    if (!['exact', 'close_intent'].includes(de.demandMatchType ?? '')) return true
+    if (de.demandMatchType === 'exact' || !de.demandQuery) return false
+    const qToks = distinctiveTokensOf(de.demandQuery)
+    const kSet = new Set(distinctiveTokensOf(s.primaryKeyword).flatMap((t) => canonicalVariants(t)))
+    const subset = qToks.length > 0 && qToks.every((t) => canonicalVariants(t).some((v) => kSet.has(v)))
+    return subset && qToks.length < distinctiveTokensOf(s.primaryKeyword).length // broader than the keyword
+  })
+  add('demand_matches_subject', misalignedDemand.length === 0, misalignedDemand.map((s) => `${s.primaryKeyword}→${s.demandEvidence?.demandQuery}(${s.demandEvidence?.demandMatchType})`).join(' · ') || 'none')
 
+  // P0-3 — every primary keyword must be a clean target SEARCH PHRASE, not a headline.
+  const headlineKw = suggestions.filter((s) => !isSearchPhraseQuality(s.primaryKeyword))
+  add('primary_keyword_search_phrase_quality', headlineKw.length === 0, headlineKw.map((s) => `"${s.primaryKeyword}"`).join(' · ') || 'none')
+
+  // P0-2 — strict semantic OR same subject-head + same coarse search-need dup.
   const dupPairs: string[] = []
   for (let i = 0; i < suggestions.length; i++) for (let j = i + 1; j < suggestions.length; j++) {
-    if (isSemanticTopicDuplicate({ primaryKeyword: suggestions[i].primaryKeyword, intent: suggestions[i].searchIntent }, { primaryKeyword: suggestions[j].primaryKeyword, intent: suggestions[j].searchIntent })) {
-      dupPairs.push(`"${suggestions[i].primaryKeyword}" ≈ "${suggestions[j].primaryKeyword}"`)
+    const a = suggestions[i], b = suggestions[j]
+    if (isSameNeedDuplicate({ primaryKeyword: a.primaryKeyword, title: a.title, intent: a.searchIntent }, { primaryKeyword: b.primaryKeyword, title: b.title, intent: b.searchIntent })) {
+      dupPairs.push(`"${a.primaryKeyword}" ≈ "${b.primaryKeyword}"`)
     }
   }
   add('no_duplicate_pair', dupPairs.length === 0, dupPairs.join(' · ') || 'none')
+
+  // P0-2 — no accepted topic may duplicate a need an EXISTING page already owns.
+  const cannibalized = suggestions.filter((s) => (s.coverageMatches ?? []).some((m) => m.matchType === 'owns_need' || m.matchType === 'exact'))
+  add('no_existing_need_cannibalization', cannibalized.length === 0, cannibalized.map((s) => `"${s.primaryKeyword}" ← ${(s.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct' && m.matchType !== 'improve').map((m) => m.existingTitle).join('/')}`).join(' · ') || 'none')
 
   const misaligned = suggestions.filter((s) => {
     const c = validateIntentKeywordConsistency({ primaryKeyword: s.primaryKeyword, title: s.title, intent: s.searchIntent as SearchIntent }, new Set())
@@ -152,18 +177,25 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   const diversity = evaluateTitleDiversity(suggestions.map((s) => s.title))
   add('title_pattern_diversity', diversity.pass, diversity.violations.join(' · ') || `skeletons: ${JSON.stringify(diversity.skeletons)}`)
 
-  // ── Link relevance ──
+  // ── Link relevance — EVERY accepted link re-evaluated by the strict subject-
+  // head contract (P0-1): colour/adjective/occasion/generic overlap alone never
+  // qualifies; a page owning the informational need is cannibalization, not a
+  // link. Uses the link-plan roles (a commercial money page may own the subject).
   const badLinks: string[] = []
   for (const s of suggestions) {
-    const topicTokens = new Set(distinctiveTokensOf(`${s.primaryKeyword} ${s.title}`).flatMap((t) => canonicalVariants(t)))
-    for (const l of s.suggestedInternalLinks ?? []) {
-      if (isBoilerplatePage(l.anchor, l.url)) { badLinks.push(`${s.primaryKeyword} → BOILERPLATE ${l.url}`); continue }
-      const linkTokens = distinctiveTokensOf(l.anchor)
-      const shares = linkTokens.some((t) => canonicalVariants(t).some((v) => topicTokens.has(v)))
-      if (!shares) badLinks.push(`${s.primaryKeyword} → off-subject "${l.anchor}" (${l.url})`)
+    const plan = s.linkPlan
+    const roleTargets: { t: { url: string; title: string }; role: string }[] = plan ? [
+      ...(plan.primaryCommercialTarget ? [{ t: plan.primaryCommercialTarget, role: 'primary_commercial_target' }] : []),
+      ...plan.secondaryCommercialTargets.map((t) => ({ t, role: 'secondary_commercial_target' })),
+      ...plan.supportingInformationalLinks.map((t) => ({ t, role: 'supporting_informational_link' })),
+      ...plan.sourceReferences.map((t) => ({ t, role: 'source_reference' })),
+    ] : (s.suggestedInternalLinks ?? []).map((l) => ({ t: { url: l.url, title: l.anchor }, role: 'supporting_informational_link' }))
+    for (const { t, role } of roleTargets) {
+      const d = evaluateLink({ primaryKeyword: s.primaryKeyword, title: s.title, intent: s.searchIntent }, { url: t.url, title: t.title, role }, { boilerplate: isBoilerplatePage(t.title, t.url) })
+      if (!isRelevantLink(d, role)) badLinks.push(`"${s.primaryKeyword}" → [${role}] "${t.title}" (${d.rejectionReasons.join(',') || d.semanticRelation})`)
     }
   }
-  add('links_subject_relevant', badLinks.length === 0, badLinks.join(' · ') || 'none')
+  add('links_subject_relevant', badLinks.length === 0, badLinks.slice(0, 12).join(' · ') || 'none')
   add('zero_links_permitted', true, `${suggestions.filter((s) => (s.suggestedInternalLinks ?? []).length === 0).length} topics with zero links (valid)`)
 
   // ── Persistence / current-run separation (persist mode only) ──
@@ -174,11 +206,34 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
     add('current_run_separated_from_pending', true, `pendingBefore=${input.pendingBefore} newlyAccepted=${suggestions.length}`)
   }
 
+  // ── P1-2: competitor leakage — an external business name in ACCEPTED output
+  // (title / keyword / secondary / link) is a HARD FAIL; rejected research and
+  // discovery are diagnostics only, never a run failure.
+  const cl = d.competitorLeakage
+  const acceptedLeak = [...cl.acceptedTitle, ...cl.acceptedPrimaryKeyword, ...cl.acceptedSecondaryKeyword, ...cl.acceptedLinkTarget]
+  add('accepted_output_has_no_external_business', acceptedLeak.length === 0,
+    acceptedLeak.length ? `ACCEPTED leakage: ${acceptedLeak.slice(0, 8).join(' · ')}` : `rejected(diagnostic): research=${cl.researchRejected.length} discovery=${cl.discoveryRejected.length}`)
+
+  // ── COST observability release gate (versioned pricing; thinking = billable). ──
+  const cost = d.cost
+  add('no_more_than_two_paid_calls', cost.totalPaidCalls <= 2, `totalPaidCalls=${cost.totalPaidCalls} (synthesis rounds + discovery)`)
+  add('run_cost_within_budget', cost.estimatedRunCostUsd <= cost.configuredCostCeilingUsd,
+    `estimatedRunCostUsd=${cost.estimatedRunCostUsd} ceiling=${cost.configuredCostCeilingUsd} remaining=${cost.remainingBudgetUsd}`)
+  const perCallSum = Number(cost.calls.reduce((n, c) => n + c.estimatedCostUsd, 0).toFixed(6))
+  const billableConsistent = cost.calls.every((c) => c.totalBillableOutputTokens === c.answerOutputTokens + c.thinkingTokens)
+  add('cost_telemetry_reconciles', Math.abs(perCallSum - cost.estimatedRunCostUsd) <= 0.000001 && billableConsistent && cost.calls.length === cost.totalPaidCalls,
+    `Σcalls=${perCallSum} run=${cost.estimatedRunCostUsd} calls=${cost.calls.length}/${cost.totalPaidCalls} billableConsistent=${billableConsistent}`)
+  add('no_model_call_on_empty_pool', !(d.brief_pool.pool_size === 0 && !(d.discovery?.ran) && d.model_calls > 0),
+    `pool=${d.brief_pool.pool_size} discovery=${d.discovery?.ran ?? false} model_calls=${d.model_calls}`)
+
+  // ── Stop-reason reconciliation: consumed + remaining = effective pool size. ──
+  const bc = d.brief_consumption
+  add('stop_reason_reconciles', bc.consumedBriefs + bc.remainingBriefs === bc.effectivePoolSize && !(d.stop_reason === 'true_pool_exhausted' && bc.remainingBriefs > 0),
+    `consumed=${bc.consumedBriefs} remaining=${bc.remainingBriefs} pool=${bc.effectivePoolSize} stop=${d.stop_reason}`)
+
   // ── Manual-review flags (WARN — a human must look, never auto-pass) ──
   const medical = suggestions.filter((s) => MEDICAL_CERTAINTY_RE.test(`${s.title} ${s.suggestionReason}`))
   add('medical_certainty_review', medical.length === 0, medical.map((s) => s.title).join(' · ') || 'none', 'warn')
-  const brandShadow = d.shadow_rejected_by_reason['competitor_brand_leakage'] ?? 0
-  add('competitor_leak_review', brandShadow === 0, `shadow competitor_brand_leakage=${brandShadow} (diagnostics-only; review titles if > 0)`, 'warn')
   add('evidence_loads_clean', d.evidence_inventory.evidence_load_errors.length === 0, d.evidence_inventory.evidence_load_errors.join(' · ') || 'none', 'warn')
 
   // ── Empty-pool scrutiny (Natural-Shop false-green class): an empty pool must

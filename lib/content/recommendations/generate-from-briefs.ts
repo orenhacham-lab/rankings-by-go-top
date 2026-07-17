@@ -29,9 +29,11 @@ import { flattenKeywordResearchCacheDetailed, contentTokens, type EntityNode, ty
 import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/keyword-research-cache'
 import { generateKeywordIdeas } from '@/lib/google-ads/keyword-ideas'
 import { evaluateArticleWorthiness, type ExistingPageSignal } from './opportunity'
-import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
+import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, isBoilerplatePage, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
+import { filterLinkPlan } from './link-relevance'
+import { assessNeedCannibalization, isSameNeedDuplicate, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
-import { buildBrandSafety, classifyKeywordEntity, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
+import { buildBrandSafety, classifyKeywordEntity, containsExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON } from './model'
 import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -42,6 +44,7 @@ import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, b
 import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
 import { dedupeMegaGuideTitle } from './title-diversity'
+import { normalizeToSearchPhrase, isSearchPhraseQuality } from './search-phrase'
 import type { RunCostController } from './run-cost-controller'
 import type { TopicSuggestion } from './types'
 
@@ -130,12 +133,24 @@ export interface BriefRunDiagnostics {
   generated_opportunities: number
   finalCount: number
   model_calls: number
-  /** Truthful zero/low-yield classification. */
-  stop_reason: 'target_reached' | 'pool_exhausted' | 'zero_marginal_yield' | 'insufficient_inventory' | 'provider_failed' | 'budget_stopped' | 'synthesis_failed'
+  /** Truthful zero/low-yield classification. call_cap_reached ≠ true_pool_exhausted. */
+  stop_reason: 'target_reached' | 'true_pool_exhausted' | 'call_cap_reached' | 'zero_marginal_yield' | 'insufficient_inventory' | 'provider_failed' | 'budget_stopped' | 'synthesis_failed'
+  /** consumedBriefs + remainingBriefs = effectivePoolSize (stop-reason reconciliation). */
+  brief_consumption: { effectivePoolSize: number; consumedBriefs: number; remainingBriefs: number; callsRemaining: number }
   insufficient_inventory: boolean
   secondary_keywords_filtered: number
   target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[] }[]
-  cost: { estimatedRunCostUsd: number; totalCalls: number }
+  /** Competitor leakage grouped by location — rejected evidence vs accepted output. */
+  competitorLeakage: {
+    researchRejected: string[]; discoveryRejected: string[]; briefRejected: string[]
+    acceptedTitle: string[]; acceptedPrimaryKeyword: string[]; acceptedSecondaryKeyword: string[]; acceptedLinkTarget: string[]
+  }
+  cost: {
+    estimatedRunCostUsd: number; totalCalls: number
+    calls: { model: string; source: string; callPurpose: string; inputTokens: number; answerOutputTokens: number; thinkingTokens: number; totalBillableOutputTokens: number; estimatedCostUsd: number; success: boolean }[]
+    totalPaidCalls: number; estimatedRunCostIls: number; costPerAcceptedTopic: number
+    configuredCostCeilingUsd: number; remainingBudgetUsd: number; callsPreventedByBudget: number; configuredMaxCalls: number
+  }
 }
 
 const MAX_ROUNDS = 2
@@ -287,6 +302,12 @@ export async function generateFromBriefs(
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
   for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
   const existingPageTitles = [...entities.map((e) => e.name), ...ineligiblePageTitles, ...publishedCoverage]
+  // Existing-content docs for synonym-aware cannibalization (P0-2): published
+  // article/topic titles (informational need owners) + owned entity pages.
+  const existingCoverageDocs: ExistingCoverageDoc[] = [
+    ...publishedCoverage.map((title) => ({ title })),
+    ...entities.map((e) => ({ title: e.name, url: e.url ?? null })),
+  ]
 
   const shadow_rejected_by_reason: Record<string, number> = {}
   const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
@@ -344,6 +365,7 @@ export async function generateFromBriefs(
 
   // ── Per-topic deterministic validation (+ brief-anchored repair) ────────────
   const acceptedSignatures: TopicSignature[] = []
+  const acceptedNeeds: TopicNeed[] = []
   const validatePolished = (t: PolishedTopic, brief: OpportunityBrief): { suggestion?: TopicSuggestion; rejectionReason?: string; repaired?: boolean } => {
     let repaired = false
     let primaryKeyword = t.primaryKeyword
@@ -384,6 +406,14 @@ export async function generateFromBriefs(
     else if (consistency.repairedKeyword) { primaryKeyword = consistency.repairedKeyword; repaired = true }
     intent = deriveIntent(primaryKeyword, t.title, intent)
 
+    // (2.5) SEARCH-PHRASE normalization (P0-3): a primary keyword must be a
+    // concise target QUERY, not the article headline. Strips headline framing,
+    // rewrites "כמה עולה X" → "מחיר X"; falls back to the brief's aligned query
+    // or subject when the residue is still headline-shaped. Never mid-clause.
+    const sp = normalizeToSearchPhrase(primaryKeyword, { subject: brief.subject, alignedQuery: brief.alignedDemandQuery?.query ?? null })
+    if (sp.changed) { primaryKeyword = sp.keyword; repaired = true; intent = deriveIntent(primaryKeyword, t.title, intent) }
+    if (!isSearchPhraseQuality(primaryKeyword)) return { rejectionReason: 'primary_keyword_not_search_phrase' }
+
     // (3) SAFE brand gate — exact named-entity mutation only (hard, proven safe).
     if (detectUnsafeNamedEntityMutation(t.title, primaryKeyword, brandSafety)) return { rejectionReason: 'unsafe_named_entity_mutation' }
     if (classifyKeywordEntity(primaryKeyword, brandSafety) === 'suspected_external_business') shadow('competitor_brand_leakage')
@@ -395,15 +425,25 @@ export async function generateFromBriefs(
     if (ownedByExistingEntity(guard, primaryKeyword)) return { rejectionReason: 'exact_existing_keyword_owner' }
     if (coveredByExistingContent(guard, t.title, primaryKeyword)) return { rejectionReason: 'covered_by_existing_content' }
 
+    // (4.5) EXISTING-CONTENT cannibalization (P0-2, synonym + need aware): an
+    // existing page that already owns the need is not a new article. owns_need →
+    // reject; improve → recommend improving the existing page (not a new article).
+    const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs)
+    const coverageMatches: CoverageMatch[] = cann.matches
+    if (cann.matchType === 'exact' || cann.matchType === 'owns_need') return { rejectionReason: 'existing_content_owns_need' }
+
     // (5) pending-idea ownership: exact + PROVEN high-confidence semantic only.
     const sig = topicSignature(primaryKeyword, intent)
     if (pendingExactKeys.has(normalizePhrase(primaryKeyword)) || pendingExactKeys.has(normalizePhrase(t.title))) return { rejectionReason: 'primary_keyword_exists' }
     if (pendingSignatures.some((ps) => isHighConfidenceDuplicate(sig, ps))) return { rejectionReason: 'pending_semantic_duplicate' }
-    // (6) within-run semantic dedupe (the multiple-magnesium defect class).
-    if (acceptedSignatures.some((as) => isHighConfidenceDuplicate(sig, as))) return { rejectionReason: 'intra_run_semantic_duplicate' }
+    // (6) within-run NEED dedupe: strict semantic dup OR same subject-head + same
+    // coarse search-need (catches the transactional/informational price-page pair).
+    const thisNeed: TopicNeed = { primaryKeyword, title: t.title, intent }
+    if (acceptedNeeds.some((a) => isSameNeedDuplicate(thisNeed, a))) return { rejectionReason: 'intra_run_need_duplicate' }
 
-    // (7) local ownership (existing local/commercial page already owns the intent).
-    let ownershipPageType: RecommendedPageType | null = null
+    // (7) local ownership (existing local/commercial page already owns the intent)
+    // + the coverage 'improve' signal → recommend improving the existing page.
+    let ownershipPageType: RecommendedPageType | null = cann.matchType === 'improve' ? 'existing_page_improvement' : null
     if (intent === 'local' || intent === 'transactional') {
       const own = assessExistingLocalOwnership(primaryKeyword, t.title, existingPageTitles, domainTypeWords)
       if (own.outcome === 'owns') return { rejectionReason: 'exact_existing_keyword_owner' }
@@ -418,14 +458,32 @@ export async function generateFromBriefs(
     const sec = filterSecondaryKeywords(primaryKeyword, t.title, t.secondaryKeywords, intent, domainTypeWords)
     secondaryKeywordsFiltered += sec.rejected.length
 
-    // (9) demand — ONLY the brief's own aligned query may back a claim.
-    const demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, brief.alignedDemandQuery ? [brief.alignedDemandQuery] : [], domainTypeWords)
+    // (9) demand — ONLY the brief's own aligned query may back a claim, and only
+    // when it is NOT broader than the (normalized) primary keyword. A head-term
+    // breadth mismatch (a broad query subset-contained in a narrower keyword) is
+    // downgraded to supporting_only: internal ranking signal, never shown as this
+    // topic's monthly volume (P1 — broad-query overstatement).
+    let demandEvidence = computeDemandEvidence(primaryKeyword, sec.kept, brief.alignedDemandQuery ? [brief.alignedDemandQuery] : [], domainTypeWords)
+    if (demandEvidence.demandEvidenceAvailable && demandEvidence.demandQuery && demandEvidence.demandMatchType !== 'exact') {
+      const qToks = distinctiveTokensOf(demandEvidence.demandQuery)
+      const kSet = new Set(distinctiveTokensOf(primaryKeyword).flatMap((t) => canonicalVariants(t)))
+      const querySubset = qToks.length > 0 && qToks.every((t) => canonicalVariants(t).some((v) => kSet.has(v)))
+      if (querySubset && qToks.length < distinctiveTokensOf(primaryKeyword).length) {
+        demandEvidence = { ...demandEvidence, demandEvidenceAvailable: false, demandConfidence: 'none', demandMatchType: 'supporting_only' }
+      }
+    }
     const suggestionReason = composeReason(brief, demandEvidence)
 
     // (10) LINKS — mapped AFTER acceptance is already decided; can never reject
-    // or degrade the topic. Zero links is a valid outcome.
+    // or degrade the topic. Zero links is a valid outcome. The role mapper's
+    // output is then RE-FILTERED by the strict subject-head relevance contract
+    // (P0-1): colour/adjective/occasion/generic overlap never qualifies; a page
+    // that owns the informational need becomes a coverage signal, not a link.
     const mapped = mapLinkRoles(primaryKeyword, t.title, linkCandidates, { corpusTypeWords: domainTypeWords, intent })
-    const linkPlan = buildLinkPlan(mapped)
+    const rawPlan = buildLinkPlan(mapped)
+    const filtered = filterLinkPlan(rawPlan, { primaryKeyword, title: t.title, intent }, { typeWords: domainTypeWords, isBoilerplate: isBoilerplatePage })
+    const linkPlan = filtered.plan
+    const linkDiagnostics = filtered.diagnostics
     const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null
     if (target_role_mappings.length < 25) target_role_mappings.push({ keyword: primaryKeyword, primaryTarget: linkPlan.primaryCommercialTarget?.url ?? null, roles: mapped.assignments.slice(0, 7).map((a) => ({ url: a.url, role: a.role, score: a.score })) })
     const keywordEqualsProduct = existingPages.some((pg) => normalizeText(pg.name) === normalizeText(primaryKeyword))
@@ -441,6 +499,7 @@ export async function generateFromBriefs(
       : suggestionReason
 
     acceptedSignatures.push(sig)
+    acceptedNeeds.push(thisNeed)
     return {
       repaired,
       suggestion: {
@@ -458,6 +517,10 @@ export async function generateFromBriefs(
         linkPlan,
         modelUsed: modelPath.model ?? undefined,
         opportunityFamily: brief.family,
+        // Preview-only diagnostics for the acceptance runner.
+        linkDiagnostics,
+        coverageMatches,
+        normalizedPrimaryKeyword: primaryKeyword,
       },
     }
   }
@@ -531,7 +594,7 @@ export async function generateFromBriefs(
     // Batch size: the deficit + a small validation allowance (bounded) — never
     // "ask for 15 when 1 is missing".
     const batchSize = Math.min(workingPool.length - cursor, Math.max(4, Math.ceil(deficit * 1.5)))
-    if (batchSize <= 0) { stop = suggestions.length > 0 ? 'pool_exhausted' : 'insufficient_inventory'; break }
+    if (batchSize <= 0) { stop = suggestions.length > 0 ? 'true_pool_exhausted' : 'insufficient_inventory'; break }
     const batch = workingPool.slice(cursor, cursor + batchSize)
     cursor += batchSize
 
@@ -590,11 +653,31 @@ export async function generateFromBriefs(
 
     if (suggestions.length >= input.targetCount) { stop = 'target_reached'; break }
     if (rd.accepted === 0) { stop = suggestions.length > 0 ? 'zero_marginal_yield' : (cursor >= workingPool.length ? 'insufficient_inventory' : 'zero_marginal_yield'); break }
-    if (cursor >= workingPool.length) { stop = suggestions.length > 0 ? 'pool_exhausted' : 'insufficient_inventory'; break }
+    if (cursor >= workingPool.length) { stop = suggestions.length > 0 ? 'true_pool_exhausted' : 'insufficient_inventory'; break }
   }
-  if (!stop) stop = suggestions.length >= input.targetCount ? 'target_reached' : (suggestions.length > 0 ? 'pool_exhausted' : 'insufficient_inventory')
+  // The loop ended without an in-loop stop only because the CALL CAP was reached
+  // (a paid-call limit, NOT an exhausted pool) — this was the false pool_exhausted.
+  if (!stop) stop = suggestions.length >= input.targetCount ? 'target_reached' : (cursor >= workingPool.length ? 'true_pool_exhausted' : 'call_cap_reached')
 
+  // Brief-consumption reconciliation: consumed + remaining = effective pool size.
+  const effectivePoolSize = workingPool.length
+  const consumedBriefs = Math.min(cursor, effectivePoolSize)
+  const remainingBriefs = Math.max(0, effectivePoolSize - consumedBriefs)
   const summary = controller.summary()
+  const totalPaidCalls = rounds.length + (discovery?.ran ? 1 : 0)
+  const costTelemetry = controller.costTelemetry(suggestions.length)
+
+  // Competitor leakage — GROUPED by location (P1). Rejected research/discovery
+  // are diagnostics; any external business name in ACCEPTED output is a hard fail.
+  const competitorLeakage = {
+    researchRejected: keywordResearch.filter((k) => classifyKeywordEntity(k.query, brandSafety) === 'suspected_external_business').slice(0, 10).map((k) => k.query),
+    discoveryRejected: Object.entries(discovery?.rejected_by_reason ?? {}).filter(([r]) => r === 'discovery_external_business').map(([, n]) => `${n}`),
+    briefRejected: [] as string[],
+    acceptedTitle: suggestions.filter((s) => containsExternalBusiness(s.title, brandSafety)).map((s) => s.title),
+    acceptedPrimaryKeyword: suggestions.filter((s) => containsExternalBusiness(s.primaryKeyword, brandSafety)).map((s) => s.primaryKeyword),
+    acceptedSecondaryKeyword: suggestions.flatMap((s) => (s.secondaryKeywords ?? []).filter((k) => containsExternalBusiness(k, brandSafety))),
+    acceptedLinkTarget: suggestions.flatMap((s) => (s.suggestedInternalLinks ?? []).filter((l) => containsExternalBusiness(l.anchor, brandSafety)).map((l) => l.anchor)),
+  }
   return {
     suggestions,
     diagnostics: {
@@ -633,10 +716,12 @@ export async function generateFromBriefs(
       // TOTAL paid calls: synthesis rounds + the (single) discovery call.
       model_calls: rounds.length + (discovery?.ran ? 1 : 0),
       stop_reason: stop,
+      brief_consumption: { effectivePoolSize, consumedBriefs, remainingBriefs, callsRemaining: Math.max(0, 2 - totalPaidCalls) },
       insufficient_inventory: stop === 'insufficient_inventory',
       secondary_keywords_filtered: secondaryKeywordsFiltered,
       target_role_mappings,
-      cost: { estimatedRunCostUsd: summary.estimatedRunCostUsd, totalCalls: summary.totalCalls },
+      competitorLeakage,
+      cost: { totalCalls: summary.totalCalls, ...costTelemetry },
     },
   }
 }

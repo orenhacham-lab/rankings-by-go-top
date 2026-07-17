@@ -27,8 +27,9 @@ interface RunReport {
   durationMs?: number
   acceptance?: { verdict?: 'PASS' | 'FAIL' | 'INSUFFICIENT_INVENTORY'; passed: boolean; warnings: number; rules: RuleRow[] }
   run?: Record<string, unknown> & { modelPath?: { requestedTier: string; model: string | null; tierUsed: string; downgraded: boolean; downgradeReason: string | null }; modelConfig?: { model: string; thinkingMode: string; thinkingBudget: number; maxOutputTokens: number } | null; accepted?: number; model_calls?: number; stop_reason?: string; brief_pool?: { pool_size: number; total_raw_candidates?: number; raw_query_candidates?: number; raw_tracked_candidates?: number; raw_theme_candidates?: number; with_demand?: number; rejected_by_reason?: Record<string, number>; rejected_examples?: { subject: string; reason: string; evidenceKind: string }[] } }
-  topics?: { title: string; primaryKeyword: string; intent: string; reason: string; demand: { demandQuery: string | null; avgMonthlySearches: number | null } | null; links: { url: string; anchor: string }[] }[]
+  topics?: { title: string; primaryKeyword: string; normalizedPrimaryKeyword?: string; intent: string; reason: string; demand: { demandQuery: string | null; avgMonthlySearches: number | null } | null; demandMatchType?: string; coverageMatches?: { existingTitle: string; matchType: string; score: number }[]; links: { url: string; anchor: string }[]; linkDiagnostics?: { targetUrl: string; targetTitle: string; role: string; semanticRelation: string; rejectionReasons: string[]; acceptedBecause: string | null }[]; recommendedPageType?: string | null }[]
 }
+interface CostTelemetry { totalPaidCalls: number; estimatedRunCostUsd: number; estimatedRunCostIls: number; costPerAcceptedTopic: number; configuredCostCeilingUsd: number; remainingBudgetUsd: number; callsPreventedByBudget: number; calls: { model: string; callPurpose: string; inputTokens: number; answerOutputTokens: number; thinkingTokens: number; totalBillableOutputTokens: number; estimatedCostUsd: number }[] }
 
 export default function RecoQaPage() {
   const [projects, setProjects] = useState<ProjectOpt[]>([])
@@ -188,14 +189,40 @@ export default function RecoQaPage() {
                 </tbody>
               </table>
             )}
+            {(() => {
+              const cost = r.run?.cost as CostTelemetry | undefined
+              const cl = r.run?.competitorLeakage as { researchRejected?: string[]; acceptedTitle?: string[]; acceptedPrimaryKeyword?: string[]; acceptedSecondaryKeyword?: string[]; acceptedLinkTarget?: string[] } | undefined
+              const acceptedLeak = cl ? [...(cl.acceptedTitle ?? []), ...(cl.acceptedPrimaryKeyword ?? []), ...(cl.acceptedSecondaryKeyword ?? []), ...(cl.acceptedLinkTarget ?? [])] : []
+              return (
+                <>
+                  {cost && (
+                    <p className="text-[11px] text-slate-500 mb-1" dir="ltr">
+                      cost: ${cost.estimatedRunCostUsd} (₪{cost.estimatedRunCostIls}) · perTopic ${cost.costPerAcceptedTopic} · calls {cost.totalPaidCalls}/2 · ceiling ${cost.configuredCostCeilingUsd} · remaining ${cost.remainingBudgetUsd} · preventedByBudget {cost.callsPreventedByBudget}
+                      {(cost.calls ?? []).map((c, i) => <span key={i}> · [{c.callPurpose} {c.model}: in {c.inputTokens} / out {c.answerOutputTokens} + think {c.thinkingTokens} = {c.totalBillableOutputTokens} → ${c.estimatedCostUsd}]</span>)}
+                    </p>
+                  )}
+                  {cl && (
+                    <p className={`text-[11px] mb-1 ${acceptedLeak.length ? 'text-red-600' : 'text-slate-500'}`} dir="rtl">
+                      דליפת מתחרים — בפלט מאושר: {acceptedLeak.length ? acceptedLeak.join(' · ') : 'אין'} · במחקר שנדחה (אבחון): {(cl.researchRejected ?? []).length}
+                    </p>
+                  )}
+                </>
+              )
+            })()}
             {Array.isArray(r.topics) && r.topics.length > 0 && (
               <div className="space-y-2">
                 {r.topics.map((t0, i) => (
                   <div key={i} className="rounded border border-slate-100 dark:border-slate-800 p-2 text-xs">
                     <div className="font-medium text-slate-800 dark:text-slate-200">{t0.title}</div>
-                    <div className="text-slate-500">מילת מפתח: {t0.primaryKeyword} · כוונה: {t0.intent}{t0.demand?.avgMonthlySearches ? ` · ביקוש: "${t0.demand.demandQuery}" ≈ ${t0.demand.avgMonthlySearches}/חודש` : ''}</div>
+                    <div className="text-slate-500">מילת מפתח: {t0.normalizedPrimaryKeyword ?? t0.primaryKeyword} · כוונה: {t0.intent}{t0.recommendedPageType ? ` · ${t0.recommendedPageType}` : ''} · demand: {t0.demandMatchType ?? 'none'}{t0.demand?.avgMonthlySearches && (t0.demandMatchType === 'exact' || t0.demandMatchType === 'close_intent') ? ` "${t0.demand.demandQuery}" ≈ ${t0.demand.avgMonthlySearches}/חודש` : ''}</div>
                     <div className="text-slate-500">{t0.reason}</div>
-                    {t0.links.length > 0 && <div className="text-slate-400" dir="ltr">{t0.links.map((l) => l.url).join(' · ')}</div>}
+                    {(t0.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct').length > 0 && (
+                      <div className="text-amber-600" dir="rtl">כיסוי קיים: {(t0.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct').map((m) => `${m.existingTitle} (${m.matchType} ${m.score})`).join(' · ')}</div>
+                    )}
+                    {(t0.linkDiagnostics ?? []).length > 0 && (
+                      <div className="text-slate-400" dir="ltr">{(t0.linkDiagnostics ?? []).map((l) => `${l.targetTitle} [${l.role}] ${l.acceptedBecause ? '✓ ' + l.acceptedBecause : '✗ ' + l.rejectionReasons.join(',')}`).join(' · ')}</div>
+                    )}
+                    {(t0.linkDiagnostics ?? []).length === 0 && t0.links.length > 0 && <div className="text-slate-400" dir="ltr">{t0.links.map((l) => l.url).join(' · ')}</div>}
                   </div>
                 ))}
               </div>

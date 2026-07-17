@@ -91,6 +91,15 @@ export interface TopicSuggestion {
   /** P0 content-plan — the opportunity family this topic was generated in
    *  (informational / comparison / commercial). Used for diversity allocation. */
   opportunityFamily?: string
+  /** Per-link relevance diagnostics (Preview-only; every evaluated link target
+   *  with sharedDistinctiveTokens / semanticRelation / rejectionReasons /
+   *  acceptedBecause). Never rendered on the customer card. */
+  linkDiagnostics?: { targetUrl: string; targetTitle: string; role: string; sharedDistinctiveTokens: string[]; semanticRelation: string; rejectionReasons: string[]; acceptedBecause: string | null; isHomepage: boolean; coverageOwned: boolean }[]
+  /** Existing pages/topics that already cover this need (coverage/cannibalization
+   *  signal). Preview-only. */
+  coverageMatches?: { existingTitle: string; url: string | null; matchType: string; score: number; sharedNeed: string[] }[]
+  /** Normalized clean search phrase (the keyword the search-phrase gate approved). */
+  normalizedPrimaryKeyword?: string
 }
 
 export interface RecommendationMeta {

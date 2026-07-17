@@ -341,6 +341,28 @@ async function main() {
     const div = evaluateTitleDiversity(run.suggestions.map((s) => s.title))
     check('E21. accepted titles satisfy title-pattern diversity (≤1 mega-guide, ≤2 per skeleton)', div.pass, JSON.stringify(div))
     check('E20. evidence inventory records the ordered KR read + zero load errors', d.evidence_inventory.keyword_research_queries >= 8 && d.evidence_inventory.evidence_load_errors.length === 0, JSON.stringify(d.evidence_inventory.evidence_load_errors))
+    // Round-3 quality gates on the REAL pipeline output.
+    const bc = d.brief_consumption
+    check('E24. brief consumption reconciles: consumed + remaining = effective pool', bc.consumedBriefs + bc.remainingBriefs === bc.effectivePoolSize, JSON.stringify(bc))
+    check('E25. stop_reason is a truthful member (never a false pool_exhausted)', ['target_reached', 'true_pool_exhausted', 'call_cap_reached', 'zero_marginal_yield', 'insufficient_inventory'].includes(d.stop_reason), d.stop_reason)
+    const { isSearchPhraseQuality: isSP } = await import('../recommendations/opportunity-validation').then(() => import('../recommendations/search-phrase'))
+    check('E26. EVERY accepted primary keyword is a clean search phrase (no headline)', run.suggestions.every((x) => isSP(x.primaryKeyword)), JSON.stringify(run.suggestions.map((x) => x.primaryKeyword).filter((k) => !isSP(k))))
+    const { evaluateLink: evL, isRelevantLink: isRL } = await import('../recommendations/link-relevance')
+    const badLinks = run.suggestions.flatMap((x) => (x.linkPlan ? [
+      ...(x.linkPlan.primaryCommercialTarget ? [{ t: x.linkPlan.primaryCommercialTarget, role: 'primary_commercial_target' }] : []),
+      ...x.linkPlan.secondaryCommercialTargets.map((t) => ({ t, role: 'secondary_commercial_target' })),
+      ...x.linkPlan.supportingInformationalLinks.map((t) => ({ t, role: 'supporting_informational_link' })),
+    ] : []).filter(({ t, role }) => !isRL(evL({ primaryKeyword: x.primaryKeyword, title: x.title }, { url: t.url, title: t.title, role }), role)))
+    check('E27. NO accepted link fails the strict subject-head relevance contract', badLinks.length === 0, JSON.stringify(badLinks.map((b) => b.t.title)))
+    check('E28. cost telemetry present, thinking billed, ≤2 paid calls', d.cost.totalPaidCalls <= 2 && d.cost.calls.every((c) => c.totalBillableOutputTokens === c.answerOutputTokens + c.thinkingTokens) && d.cost.estimatedRunCostUsd <= d.cost.configuredCostCeilingUsd, JSON.stringify({ calls: d.cost.totalPaidCalls, usd: d.cost.estimatedRunCostUsd, ceiling: d.cost.configuredCostCeilingUsd }))
+    const { evaluateRunAcceptance: evalAcc } = await import('../recommendations/qa-acceptance')
+    const accClean = evalAcc({ tierRequested: 'standard', diagnostics: d, suggestions: run.suggestions, pendingBefore: 0 })
+    // This fixture deliberately omits one brief (RC1 reconciliation test), so the
+    // synthesis contract rule legitimately fails; assert the ROUND-3 QUALITY rules
+    // (links / keyword / cannibalization / demand / leakage / cost) all pass.
+    const qualityRuleIds = ['links_subject_relevant', 'primary_keyword_search_phrase_quality', 'no_existing_need_cannibalization', 'demand_matches_subject', 'no_duplicate_pair', 'title_keyword_alignment', 'accepted_output_has_no_external_business', 'run_cost_within_budget', 'cost_telemetry_reconciles', 'no_more_than_two_paid_calls', 'stop_reason_reconciles']
+    const failedQuality = accClean.rules.filter((x) => qualityRuleIds.includes(x.id) && !x.pass)
+    check('E29. the REAL run passes EVERY round-3 quality gate (no false quality pass)', failedQuality.length === 0, JSON.stringify(failedQuality.map((x) => x.id + ':' + x.detail)))
     check('E22. FLASH standard calls sent thinkingBudget 0 (low-cost behavior preserved)', calls.every((c) => c.thinkingBudget === 0), JSON.stringify(calls.map((c) => c.thinkingBudget)))
     check('E23. pool accounting reconciles: totalRaw = pool + Σrejected (with examples)', d.brief_pool.total_raw_candidates === d.brief_pool.pool_size + Object.values(d.brief_pool.rejected_by_reason).reduce((a: number, b) => a + (b as number), 0) && d.brief_pool.rejected_examples.length > 0, JSON.stringify(d.brief_pool))
     server.close()
