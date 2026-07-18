@@ -230,6 +230,19 @@ async function main() {
     check('P0-accept: improvement whose basis shares a real concrete head ("ניקיון") → rule PASSES (domain word stripped, head remains)',
       evaluateRunAcceptance(base({ suggestions: [goodTopic('ניקיון משרדים', 'ניקיון משרדים יסודי לעסק', { searchIntent: 'informational', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'שירותי ניקיון משרדים בתל אביב', url: '/clean', matchType: 'improve', score: 0.6, sharedNeed: ['ניקיון', 'משרד'], basisPageType: 'article' }] })], diagnostics: officeDiag })).rules.find((x) => x.id === 'existing_page_improvement_valid_basis')?.pass === true)
 
+    // ── P0: acceptance catches INCOMPATIBLE SUBTYPES (same discriminative core) ──
+    // An improvement whose ONLY basis is a DIFFERENT subtype of the shared parent
+    // ("שמלות ערב" ⇏ "שמלות כלה") is an INVALID basis → rule FAILS.
+    check('P0-subtype-accept: improvement based on a different subtype ("שמלות ערב" for "שמלות כלה") → existing_page_improvement_valid_basis FAILS',
+      failsRule(base({ suggestions: [goodTopic('שמלות כלה יד שנייה', 'שמלות כלה יד שנייה', { searchIntent: 'commercial', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'שמלות ערב יד שנייה', url: '/e', matchType: 'improve', score: 0.6, sharedNeed: ['שמל'], basisPageType: 'article' }] })], diagnostics: onlyPool1 }), 'existing_page_improvement_valid_basis'))
+    // A same-subtype (bride) basis is still a VALID improvement basis → rule PASSES.
+    check('P0-subtype-accept: a same-subtype ("שמלות כלה") basis is still a valid improvement → rule PASSES',
+      evaluateRunAcceptance(base({ suggestions: [goodTopic('שמלות כלה יד שנייה', 'שמלות כלה יד שנייה', { searchIntent: 'commercial', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'שמלות כלה יד שנייה במבצע', url: '/b', matchType: 'improve', score: 0.8, sharedNeed: ['שמל', 'כלה'], basisPageType: 'product' }] })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'existing_page_improvement_valid_basis')?.pass === true)
+    // A new-page topic whose owns_need "match" is really a DIFFERENT subtype is NOT
+    // cannibalization → no_existing_need_cannibalization PASSES (not a false fail).
+    check('P0-subtype-accept: a different-subtype owns_need match is NOT cannibalization → no_existing_need_cannibalization PASSES',
+      evaluateRunAcceptance(base({ suggestions: [goodTopic('שמלות כלה יד שנייה', 'שמלות כלה יד שנייה', { searchIntent: 'commercial', coverageMatches: [{ existingTitle: 'שמלות ערב יד שנייה', url: '/e', matchType: 'owns_need', score: 0.7, sharedNeed: ['שמל'], basisPageType: 'product' }] })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'no_existing_need_cannibalization')?.pass === true)
+
     // ── FINAL precision: synonym/near-identical cannibalization + action-class ──
     // ISSUE 3A — synonym need (מזון≈תזונה) accepted as a new page → FAILS.
     check('Issue3A: "תוספי מזון" (new page) owned by "תוספי תזונה" → no_existing_need_cannibalization FAILS',

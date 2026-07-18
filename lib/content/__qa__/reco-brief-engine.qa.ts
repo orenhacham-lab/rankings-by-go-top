@@ -429,6 +429,42 @@ async function main() {
     server.close()
   }
 
+  // ── E2E: FINAL title↔keyword alignment runs UNCONDITIONALLY (Blocker 1) ──
+  // The live defect: alignment ran only inside `if (sp.changed)`, so an UNCHANGED
+  // keyword that is off-subject vs its title slipped through and attached its demand
+  // to the wrong title. Here the model keeps a valid on-brief keyword ("ויטמין C
+  // לילדים") — passing quality/consistency/normalization/subject-preservation — but
+  // DRIFTS the title to an off-subject one. Only the UNCONDITIONAL alignment gate
+  // catches the title↔keyword mismatch; without it the mismatch would be accepted.
+  console.log('E2E) B1 — unconditional title↔keyword alignment (unchanged keyword, drifted title)')
+  {
+    const isVitC = (subject: string) => /ויטמין\s*c/i.test(subject)
+    const tables = naturalShopTables()
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b, i) => isVitC(b.subject)
+        ? { briefId: b.id, title: 'המדריך המלא לניקיון משרדים ותחזוקת חברה', primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'
+    process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`
+    resetModelResolutionCache()
+    resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-b1', 8))
+    // The drifted off-subject cleaning title must NEVER reach accepted output —
+    // the unconditional gate rejects (or repairs) the title↔keyword mismatch.
+    check('B1-E2E. the drifted off-subject title ("ניקיון משרדים") is NEVER accepted next to a ויטמין keyword',
+      !run.suggestions.some((s) => /ניקיון|משרד/.test(s.title)), JSON.stringify(run.suggestions.map((s) => s.title)))
+    check('B1-E2E. the title↔keyword mismatch was caught (title_keyword_mismatch recorded)',
+      (run.diagnostics.rejected_by_reason['title_keyword_mismatch'] ?? 0) >= 1, JSON.stringify(run.diagnostics.rejected_by_reason))
+    // Every accepted suggestion's keyword genuinely aligns with its own title.
+    const { isTitleKeywordAligned: aligned } = await import('../recommendations/coverage')
+    check('B1-E2E. EVERY accepted suggestion has an aligned title↔keyword pair', run.suggestions.every((s) => aligned(s.primaryKeyword, s.title)), JSON.stringify(run.suggestions.map((s) => [s.primaryKeyword, s.title])))
+    server.close()
+  }
+
   // ── E2E: Natural-Shop defect 2 — pending/link pages ARE in the coverage corpus ──
   console.log('E2E) NS-2 — synonym pending idea + near-identical support page own the need')
   {

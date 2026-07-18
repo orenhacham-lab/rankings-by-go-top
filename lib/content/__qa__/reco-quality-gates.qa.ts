@@ -5,8 +5,8 @@
  *   P0-2 cannibalization + synonym/need duplicates — Natural/Flowers/Matalon;
  *   P0-3 headline → search-phrase normalization — 5 live keywords.
  */
-import { evaluateLink, isRelevantLink, sharesSubjectHead } from '../recommendations/link-relevance'
-import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed, unmatchedDocEntities, isTitleKeywordAligned } from '../recommendations/coverage'
+import { evaluateLink, isRelevantLink, sharesSubjectHead, subjectTokensOf } from '../recommendations/link-relevance'
+import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed, unmatchedDocEntities, isTitleKeywordAligned, hasIncompatibleSubtype } from '../recommendations/coverage'
 import { contentTokens } from '../recommendations/evidence-cluster'
 import { normalizeToSearchPhrase, isSearchPhraseQuality, keywordHasRealSubject, keywordPreservesSubject } from '../recommendations/search-phrase'
 import { assessExistingLocalOwnership, deriveCorpusTypeWords, localImprovementCompatible, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible } from '../recommendations/opportunity-validation'
@@ -277,6 +277,43 @@ async function main() {
       !isSameNeedDuplicate({ primaryKeyword: 'ציוד כושר משקולות', title: 'ציוד כושר משקולות', intent: 'transactional' }, { primaryKeyword: 'ציוד כושר רצועות', title: 'ציוד כושר רצועות', intent: 'transactional' }, fitnessTW))
     check('P0-dup preserve: a genuine same-need price pair is STILL a duplicate',
       isSameNeedDuplicate({ primaryKeyword: 'מחיר בניית דף נחיתה', title: 'כמה עולה לבנות דף נחיתה', intent: 'transactional' }, { primaryKeyword: 'מחיר בניית דף נחיתה', title: 'כמה עולה לבנות דף נחיתה? המדריך המלא', intent: 'informational' }, new Set()))
+
+    // ── P0 (4): a shared PARENT/category head must NOT let two INCOMPATIBLE
+    // subtypes own each other (VO2 vs YORK, bride vs evening dress). Central
+    // discriminative-subtype helper; per-project corpus evidence, no industry list.
+    const cannMt = (kw: string, ti: string, doc: string, intent = 'commercial', tw?: Set<string>) =>
+      assessNeedCannibalization({ primaryKeyword: kw, title: ti, intent }, [{ title: doc, url: '/x' }], undefined, undefined, tw).matchType
+    // (A) treadmill spec vs brand — different subtypes → distinct.
+    check('P0-subtype: "ליכוני VO2" NOT owned by "השוואת הליכוני YORK" (VO2 ≠ YORK, shared parent "ליכון")',
+      cannMt('ליכוני VO2', 'ליכוני VO2 max', 'השוואת הליכוני YORK') === 'distinct')
+    check('P0-subtype: hasIncompatibleSubtype(VO2, YORK) is true', hasIncompatibleSubtype('ליכוני VO2', 'השוואת הליכוני YORK'))
+    // (A2) an EXPLICIT comparison naming BOTH subtypes is NOT an incompatible subtype.
+    check('P0-subtype: an explicit "VO2 מול YORK" comparison is NOT flagged incompatible (spans both subtypes)',
+      !hasIncompatibleSubtype('השוואת ליכוני VO2 מול YORK', 'השוואת הליכוני YORK'))
+    // (B) bride vs evening dress, both second-hand → different subtypes → distinct.
+    check('P0-subtype: "שמלות כלה יד שנייה" NOT owned by "שמלות ערב יד שנייה" (כלה ≠ ערב)',
+      cannMt('שמלות כלה יד שנייה', 'שמלות כלה יד שנייה', 'המדריך לבחירת שמלות ערב יד שנייה') === 'distinct')
+    check('P0-subtype: the real token "כלה" drives the split (bride ≠ evening) and is NOT collapsed to the quantifier "כל"',
+      hasIncompatibleSubtype('שמלות כלה', 'שמלות ערב') && subjectTokensOf('שמלות כלה').includes('כלה'))
+    check('P0-subtype: singular/plural of the SAME subtype ("שמלות כלה" ⇄ "שמלת כלה") is NOT an incompatible subtype',
+      !hasIncompatibleSubtype('שמלות כלה', 'שמלת כלה'))
+    // (C) a generic informational parent article does NOT own a narrower informational need.
+    check('P0-subtype: generic "שמלות יד שנייה" article does NOT own the narrower "שמלות כלה יד שנייה" informational need',
+      cannMt('שמלות כלה יד שנייה', 'המדריך לשמלות כלה יד שנייה', 'המדריך לשמלות יד שנייה', 'informational') === 'distinct')
+    // Preserve: a real category PARENT and its subtype remain related.
+    check('P0-subtype preserve: "כלוב כושר" ⇄ "כלוב משקולות" remain related (parent↔child, "כושר" is domain)',
+      ['owns_need', 'improve'].includes(cannMt('כלוב כושר', 'כלוב כושר', 'כלוב משקולות לחדר כושר', 'commercial',
+        deriveCorpusTypeWords(['ציוד כושר', 'מכשיר כושר', 'משקולות כושר', 'אופני כושר', 'ספת כושר', 'רצועות כושר', 'מוט כושר', 'כלוב כושר']))))
+    check('P0-subtype preserve: a commercial parent category still owns its subcategory',
+      ['owns_need', 'improve'].includes(cannMt('נעלי ספורט לריצה', 'נעלי ספורט לריצה', 'נעלי ספורט', 'commercial')))
+    // Preserve: near-identical themed articles + wedding-floral pricing still own.
+    check('P0-subtype preserve: near-identical natural-lifestyle articles still own (shared theme, not a subtype pair)',
+      cannMt('מוצרים וטיפולים טבעיים', 'לחזור לטבע: כיצד מוצרים וטיפולים טבעיים תורמים לבריאות', 'לחזור לטבע: היתרונות של טיפולים ומוצרים טבעיים לגוף ולנפש', 'informational') === 'owns_need')
+    check('P0-subtype preserve: wedding-floral pricing still owns/improves even with flower domain words stripped',
+      ['owns_need', 'improve'].includes(cannMt('מחיר סידור פרחים לחתונה', 'כמה עולה סידור פרחים לחתונה', 'כמה עולה עיצוב פרחוני לחתונה', 'transactional',
+        deriveCorpusTypeWords(['סידור פרחים', 'זר פרחים', 'עציץ פרחים', 'משלוח פרחים', 'פרחים לחתונה', 'פרחים לאירוע']))))
+    check('P0-subtype preserve: different vitamins (B12 ≠ C) are distinct via the specific',
+      cannMt('ויטמין B12', 'ויטמין B12 למבוגרים', 'ויטמין C מומלץ', 'informational') === 'distinct')
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')

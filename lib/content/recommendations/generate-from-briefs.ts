@@ -498,6 +498,23 @@ export async function generateFromBriefs(
     }
     if (!isSearchPhraseQuality(primaryKeyword)) return { rejectionReason: 'primary_keyword_not_search_phrase' }
 
+    // (2.8) FINAL TITLE↔KEYWORD ALIGNMENT — UNCONDITIONAL. Even when nothing above
+    // changed the model's keyword, it can be OFF-SUBJECT vs the title ("מזכירות
+    // חברה" under an office-cleaning-company title). Run the discriminative-core
+    // alignment on the FINAL keyword and FINAL title, before coverage/demand. Repair
+    // ONLY to an evidence-backed candidate (the brief's aligned demand query or
+    // subject) that ITSELF aligns with the title AND preserves the brief subject;
+    // else reject — never attach the rejected off-subject keyword's demand to the title.
+    if (!isTitleKeywordAligned(primaryKeyword, t.title)) {
+      const alignQ = brief.alignedDemandQuery?.query ?? null
+      const alignRepairs = [alignQ, brief.subject].filter((x): x is string => !!x)
+      const fixedTo = alignRepairs.find((c) => isTitleKeywordAligned(c, t.title) && isSearchPhraseQuality(c) && keywordHasRealSubject(c) && keywordPreservesSubject(c, brief.subject, alignQ))
+      if (!fixedTo) return { rejectionReason: 'title_keyword_mismatch' }
+      primaryKeyword = fixedTo
+      repaired = true
+      intent = deriveIntent(primaryKeyword, t.title, intent)
+    }
+
     // (3) SAFE brand gate — exact named-entity mutation only (hard, proven safe).
     if (detectUnsafeNamedEntityMutation(t.title, primaryKeyword, brandSafety)) return { rejectionReason: 'unsafe_named_entity_mutation' }
     if (classifyKeywordEntity(primaryKeyword, brandSafety) === 'suspected_external_business') shadow('competitor_brand_leakage')

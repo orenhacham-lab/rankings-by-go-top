@@ -156,6 +156,99 @@ export function isTitleKeywordAligned(primaryKeyword: string, title: string): bo
   return sharesSubjectHead(primaryKeyword, title)
 }
 
+/**
+ * DISCRIMINATIVE-SUBTYPE compatibility (P0): a shared parent/category head must
+ * not let two INCOMPATIBLE subtypes own each other. After stripping domain/type/
+ * generic/attribute/condition words (subjectTokensOf) each side keeps its concrete
+ * differentiators (subtype tokens, brand/model/product specifics). When BOTH sides
+ * carry a concrete differentiator the other lacks — VO2 vs YORK, bride (כלה) vs
+ * evening (ערב) — they are incompatible subtypes and must be distinct, even though
+ * the category head (treadmill, dress) matches.
+ *
+ * NOT incompatible: a bare parent vs a subtype (one side has NO extra
+ * differentiator — parent↔child, "כלוב" ⇄ "כלוב משקולות"); an explicit comparison
+ * that names BOTH subtypes (the other side's differentiator is present, so it is
+ * covered, not exclusive); or morphological/synonym variants of the SAME subtype
+ * (clusterKeys folds plural/construct + synonym reps, so מזון≈תזונה and a real
+ * token "כלה" is compared as its own cluster, never the quantifier "כל").
+ */
+/** Two tokens RELATE when they cluster-match (morphology/proclitic/synonym-rep
+ *  folded — פרח↔פרחוני, מזון≈תזונה) or share a ≥3-char stem (סידור variants). A
+ *  short specific with no ≥3-char cluster (a vitamin letter) relates only when
+ *  equal, so C still differentiates from D. */
+function tokensRelate(x: string, y: string): boolean {
+  if (x === y || stemMatch(x, y)) return true
+  const kx = clusterKeys(x), ky = clusterKeys(y)
+  if (kx.length === 0 || ky.length === 0) return false
+  const s = new Set(ky); return kx.some((k) => s.has(k))
+}
+const WORD_SPLIT_RE = /[?!.,:;"'“”׳״()\-–—/|]/g
+/** Concrete subject differentiators: subjectTokensOf minus bare digits AND minus
+ *  any token that morphologically RELATES to a per-project domain word (so a
+ *  domain word whose corpus form differs — "פרחוני" vs derived "פרח" — is stripped
+ *  consistently, not left as a false differentiator). */
+function concreteSubject(p: string, typeWords?: Set<string>): string[] {
+  const tw = typeWords && typeWords.size ? [...typeWords] : []
+  return subjectTokensOf(p, typeWords).filter((t) => !/^\d+$/.test(t) && !tw.some((w) => tokensRelate(t, w)))
+}
+/** Shared THEME cluster keys: non-condition MODIFIER/attribute words (base lexicon,
+ *  NOT per-project domain words) present in a phrase — a lifestyle/thematic vocabulary
+ *  ("טבעי", "בריא") shared by both sides marks near-identical CONTENT, not a subtype
+ *  pair. Conditions ("יד שנייה") are excluded so a shared condition never counts. */
+function themeKeys(p: string): Set<string> {
+  const out = new Set<string>()
+  for (const w of (p || '').toLowerCase().replace(WORD_SPLIT_RE, ' ').split(/\s+/).filter(Boolean)) {
+    const c = canonicalToken(w)
+    if (!c || isConditionOrQuantity(c) || isConditionOrQuantity(w)) continue
+    if (!isModifierToken(w) && !isModifierToken(c)) continue
+    const ks = clusterKeys(c); if (ks.length) ks.forEach((k) => out.add(k)); else out.add(c)
+  }
+  return out
+}
+/** Differentiator relation between two subjects after stripping domain/type/
+ *  generic/attribute/condition words: how many heads they share, whether each side
+ *  carries a concrete differentiator the other lacks, and whether they share a
+ *  thematic (attribute) vocabulary. */
+function subtypeRelation(a: string, b: string, typeWords?: Set<string>): { sharedCount: number; aOnly: boolean; bOnly: boolean; themeOverlap: boolean } {
+  const at = concreteSubject(a, typeWords), bt = concreteSubject(b, typeWords)
+  if (at.length === 0 || bt.length === 0) return { sharedCount: 0, aOnly: false, bOnly: false, themeOverlap: false }
+  const sharedCount = at.filter((x) => bt.some((y) => tokensRelate(x, y))).length
+  const aOnly = at.some((x) => !bt.some((y) => tokensRelate(x, y)))
+  const bOnly = bt.some((y) => !at.some((x) => tokensRelate(x, y)))
+  const ta = themeKeys(a), tb = themeKeys(b)
+  let themeOverlap = false; for (const k of ta) if (tb.has(k)) { themeOverlap = true; break }
+  return { sharedCount, aOnly, bOnly, themeOverlap }
+}
+export function hasIncompatibleSubtype(a: string, b: string, typeWords?: Set<string>): boolean {
+  const r = subtypeRelation(a, b, typeWords)
+  // A SINGLE shared parent/category head with a concrete differentiator on EACH
+  // side (VO2 vs YORK, כלה vs ערב) = mutually exclusive subtypes → distinct. Two or
+  // more shared subject tokens, or a shared thematic vocabulary, is the SAME subject
+  // with incidental content (a near-identical article), NOT an incompatible subtype.
+  return r.sharedCount === 1 && r.aOnly && r.bOnly && !r.themeOverlap
+}
+/** The topic is strictly NARROWER than a broad PARENT `b`: they share a head, the
+ *  topic carries a concrete subtype `b` lacks, and `b` carries NO differentiator
+ *  the topic lacks (b ⊆ topic). Used so a BROAD informational article does not own
+ *  a narrower informational need ("שמלות" article ⇏ "שמלות כלה" need); a commercial
+ *  parent category and an explicit both-subtype comparison are unaffected. */
+export function isNarrowerThanBroadParent(topic: string, b: string, typeWords?: Set<string>): boolean {
+  const r = subtypeRelation(topic, b, typeWords)
+  if (!(r.sharedCount >= 1 && r.aOnly && !r.bOnly)) return false
+  // The doc must be a BARE category parent — a brand/model/spec token (latin or
+  // alphanumeric, e.g. "YORK") marks a SPECIFIC page, not a broad parent.
+  return !concreteSubject(b, typeWords).some((t) => /[a-z0-9]/i.test(t))
+}
+
+/** Second-hand / quantity CONDITION tokens ("יד שנייה", "יד2", a bare count) — a
+ *  product condition, never part of the subject NEED. Excluded from the coverage
+ *  overlap count so a shared condition ("יד שנייה" on both) cannot inflate a
+ *  broad-vs-narrow pair to ownership (generic "שמלות יד שנייה" ⇄ "שמלות כלה יד
+ *  שנייה"). Domain-neutral. */
+const CONDITION_TOKENS = new Set(['יד', 'שני', 'שניה', 'שנייה', 'משומש', 'משומשת', 'משומשים', 'יד2'].map((w) => canonicalToken(w)).filter(Boolean))
+// bare digit / "יד2" quantity — NOT an alphanumeric specific (B12/K2/VO2 kept).
+function isConditionOrQuantity(t: string): boolean { return CONDITION_TOKENS.has(t) || /^\d+$/.test(t) || /^יד\d+$/.test(t) }
+
 export type CoverageMatchType = 'exact' | 'owns_need' | 'improve' | 'distinct'
 export interface CoverageMatch { existingTitle: string; url: string | null; matchType: CoverageMatchType; score: number; sharedNeed: string[]; unmatchedEntities?: string[]; basisPageType?: string | null }
 
@@ -261,8 +354,12 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
   // dilution let "מחיר סידור פרחים לחתונה" slip past a "כמה עולה עיצוב פרחוני
   // לחתונה" page that already owns the wedding-floral pricing need. Fall back to
   // keyword+title only when the keyword alone has no usable distinctive subject.
-  const topicCore = synonymTokens(topic.primaryKeyword)
-  const topicSub = topicCore.size >= 2 ? topicCore : synonymTokens(`${topic.primaryKeyword} ${topic.title}`)
+  // Condition/quantity markers ("יד שנייה", a bare count) are NOT part of the
+  // need — excluded from the overlap count so a shared condition cannot inflate a
+  // broad-vs-narrow second-hand pair to ownership.
+  const noCondition = (s: Set<string>) => new Set([...s].filter((t) => !isConditionOrQuantity(t)))
+  const topicCore = noCondition(synonymTokens(topic.primaryKeyword))
+  const topicSub = topicCore.size >= 2 ? topicCore : noCondition(synonymTokens(`${topic.primaryKeyword} ${topic.title}`))
   const topicNeed = searchNeedOf(topic.primaryKeyword, topic.title, topic.intent)
   const topicNorm = normalizePhrase(topic.primaryKeyword)
   const matches: CoverageMatch[] = []
@@ -272,7 +369,7 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
   for (const doc of existing) {
     const docText = [doc.title, doc.focusKeyword, (doc.slug || '').replace(/[-_]+/g, ' ')].filter(Boolean).join(' ')
     if (!docText.trim()) continue
-    const docSub = synonymTokens(docText)
+    const docSub = noCondition(synonymTokens(docText))
     if (docSub.size === 0) continue
     let shared = 0
     for (const t of topicSub) if (docSub.has(t)) shared++
@@ -318,6 +415,19 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // different needs — a shared commercial entity head ("חנות") cannot make
     // "הקמת חנות" owned/improved by "קידום חנות". Downgrade to distinct.
     if ((mt === 'owns_need' || mt === 'improve') && incompatibleActionNeed(`${topic.primaryKeyword} ${topic.title}`, docText)) mt = 'distinct'
+    // DISCRIMINATIVE-SUBTYPE incompatibility (P0): a shared parent/category head
+    // (treadmill, dress) must not let two mutually-exclusive subtypes own each
+    // other — "ליכוני VO2" vs "ליכוני YORK", "שמלות כלה" vs "שמלות ערב". Downgrade
+    // to distinct. A parent↔child is unaffected; an explicit comparison (topicNeed
+    // 'compare', naming both subtypes) is exempt — it legitimately spans subtypes.
+    const topicIsComparison = topicNeed === 'compare'
+    if ((mt === 'owns_need' || mt === 'improve') && !topicIsComparison && hasIncompatibleSubtype(`${topic.primaryKeyword} ${topic.title}`, docText, typeWords)) mt = 'distinct'
+    // A BROAD INFORMATIONAL parent article does not own a NARROWER informational
+    // need: the topic carries a concrete subtype the (bare-parent) doc lacks. Gated
+    // on the topic's INFORMATIONAL intent — a commercial parent→subcategory and a
+    // same-need synonym pricing page (wedding-floral, transactional) are unaffected.
+    const informationalTopic = /^(informational|info)$/i.test(topic.intent || '') || (!topic.intent && (topicNeed === 'info' || topicNeed === 'howto'))
+    if ((mt === 'owns_need' || mt === 'improve') && informationalTopic && !topicIsComparison && isNarrowerThanBroadParent(`${topic.primaryKeyword} ${topic.title}`, docText, typeWords)) mt = 'distinct'
     // FOREIGN-ENTITY DIAGNOSTIC (P0): surface distinctive entities the existing doc
     // carries from a possibly-unrelated vertical ("סוסים") that project evidence
     // does not corroborate. Exposed for the acceptance runner / operator — NOT used

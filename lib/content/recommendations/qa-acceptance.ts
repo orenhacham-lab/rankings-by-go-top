@@ -23,7 +23,7 @@ import { distinctiveTokensOf, canonicalVariants } from './semantic-dup'
 import { isBoilerplatePage } from './link-role-mapper'
 import { evaluateTitleDiversity } from './title-diversity'
 import { evaluateLink, isRelevantLink, sharesSubjectHead } from './link-relevance'
-import { isSameNeedDuplicate, isTitleKeywordAligned, incompatibleActionNeed } from './coverage'
+import { isSameNeedDuplicate, isTitleKeywordAligned, incompatibleActionNeed, hasIncompatibleSubtype } from './coverage'
 import { isSearchPhraseQuality, keywordHasRealSubject } from './search-phrase'
 
 export interface AcceptanceRule {
@@ -197,7 +197,12 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   const cannibalized = suggestions.filter((s) => {
     if (s.recommendedPageType === 'existing_page_improvement') return false
     const desired = desiredOpportunityRole(s.primaryKeyword, s.title, s.searchIntent as import('./opportunity').SearchIntent)
+    const topicText = `${s.primaryKeyword} ${s.title}`
     return (s.coverageMatches ?? []).filter((m) => m.matchType === 'owns_need' || m.matchType === 'exact').some((m) => {
+      // An INCOMPATIBLE-SUBTYPE match (shared parent, different subtype — VO2 vs
+      // YORK, כלה vs ערב) is NOT real cannibalization; the discriminative-subtype
+      // contract is the same as generation's.
+      if (m.matchType !== 'exact' && hasIncompatibleSubtype(topicText, m.existingTitle, dtw)) return false
       const br = basisRoleOf((m.basisPageType as EntityPageType | undefined) ?? null, !!m.url)
       if (br === 'unresolved') {
         // A title-only owner blocks only a PROVEN same-need synonym duplicate.
@@ -220,8 +225,10 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
     const topicText = `${s.primaryKeyword} ${s.title}`
     const isLocal = s.searchIntent === 'local'
     // Valid iff SOME basis shares a subject head, is a compatible ACTION/need
-    // class (build≠promote), and — for a local topic — is the same place.
-    return !bases.some((m) => sharesSubjectHead(topicText, m.existingTitle, dtw) && !incompatibleActionNeed(topicText, m.existingTitle) && (!isLocal || localImprovementCompatible(topicText, m.existingTitle)))
+    // class (build≠promote), is NOT an incompatible SUBTYPE (shared parent but a
+    // different subtype — "שמלות ערב" ⇏ "שמלות כלה"), and — for a local topic — is
+    // the same place.
+    return !bases.some((m) => sharesSubjectHead(topicText, m.existingTitle, dtw) && !incompatibleActionNeed(topicText, m.existingTitle) && !hasIncompatibleSubtype(topicText, m.existingTitle, dtw) && (!isLocal || localImprovementCompatible(topicText, m.existingTitle)))
   })
   add('existing_page_improvement_valid_basis', invalidImprovement.length === 0, invalidImprovement.map((s) => `"${s.primaryKeyword}" (${s.searchIntent}) ← ${(s.coverageMatches ?? []).map((m) => m.existingTitle).join('/') || 'no basis'}`).join(' · ') || 'none')
 
