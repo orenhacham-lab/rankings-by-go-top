@@ -250,6 +250,15 @@ async function main() {
     // Wedding-floral + near-identical natural-products improvements (no foreign entity) → no warning.
     check('FE3: wedding-floral improvement → NO warning', feRule(base({ suggestions: [wfTopic({ recommendedPageType: 'existing_page_improvement' })], diagnostics: onlyPool1 }))?.pass === true)
     check('FE3b: near-identical natural-products improvement → NO warning', feRule(base({ suggestions: [goodTopic('מוצרים וטיפולים טבעיים', 'לחזור לטבע: איך לשלב מוצרים וטיפולים טבעיים', { recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש', url: '/n', matchType: 'owns_need', score: 0.8, sharedNeed: ['טיפול', 'טבעי'] }] })], diagnostics: onlyPool1 }))?.pass === true)
+
+    // ── #2: an improvement-basis page must not ALSO be an internal link ──
+    const basisPage = { existingTitle: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש', url: '/b/back-to-nature', matchType: 'owns_need' as const, score: 1, sharedNeed: ['טבעי'] }
+    check('IBL1: improvement basis ALSO emitted as an internal link → improvement_basis_not_linked FAILS',
+      failsRule(base({ suggestions: [goodTopic('חזרה לטבע', 'חזרה לטבע: מוצרים וטיפולים טבעיים', { recommendedPageType: 'existing_page_improvement', coverageMatches: [basisPage], suggestedInternalLinks: [{ url: '/b/back-to-nature', anchor: 'לחזור לטבע' }] })], diagnostics: onlyPool1 }), 'improvement_basis_not_linked'))
+    check('IBL2: basis matched by normalized TITLE (no URL) → still FAILS',
+      failsRule(base({ suggestions: [goodTopic('חזרה לטבע', 'חזרה לטבע', { recommendedPageType: 'existing_page_improvement', coverageMatches: [{ ...basisPage, url: null }], suggestedInternalLinks: [{ url: '/x', anchor: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש' }] })], diagnostics: onlyPool1 }), 'improvement_basis_not_linked'))
+    check('IBL3: improvement whose basis is NOT linked → rule PASSES',
+      evaluateRunAcceptance(base({ suggestions: [goodTopic('חזרה לטבע', 'חזרה לטבע', { recommendedPageType: 'existing_page_improvement', coverageMatches: [basisPage], suggestedInternalLinks: [{ url: '/p/other', anchor: 'מוצר אחר' }] })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'improvement_basis_not_linked')?.pass === true)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

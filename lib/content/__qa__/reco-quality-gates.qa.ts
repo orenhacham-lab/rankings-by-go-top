@@ -151,6 +151,12 @@ async function main() {
     check('NS3: "סוסים" is surfaced as a FOREIGN entity for a health project', unmatchedDocEntities(d3doc, d3topic, healthVocab).some((e) => /סוס/.test(e)))
     check('NS3: "סוסים" is NOT foreign for a horse project (same-cluster proof)', !unmatchedDocEntities(d3doc, d3topic, horseVocab).some((e) => /סוס/.test(e)))
     check('NS3: no project vocab → no unmatched diagnostic (cannot judge)', unmatchedDocEntities(d3doc, d3topic).length === 0)
+    // NS3b (live) — morphology/framing must NOT be reported as foreign entities.
+    const feHealth = new Set<string>(['מגנזיום', 'ויטמין C טבעי', 'אומגה 3', 'תוספי תזונה טבעיים', 'ויטמינים לשיער', 'נשירת שיער'].flatMap((w) => contentTokens(w)))
+    const feDoc = 'מתמודדים עם נשירת שיער? אלו הוויטמינים ותוספי התזונה שכדאי להכיר בכל גיל'
+    const feOut = unmatchedDocEntities(feDoc, 'קניית מוצרים לנשירת שיער', feHealth)
+    check('NS3b: none of {וויטמינ, כדאי, הכיר, חיוני, בכל, גיל} is reported as foreign', !feOut.some((e) => /ויטמ|דאי|כיר|חיונ|בכל|גיל/.test(e)), JSON.stringify(feOut))
+    check('NS3b: an on-domain health article basis produces NO foreign entity at all', feOut.length === 0, JSON.stringify(feOut))
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')

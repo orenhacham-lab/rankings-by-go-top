@@ -189,6 +189,23 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   })
   add('existing_page_improvement_valid_basis', invalidImprovement.length === 0, invalidImprovement.map((s) => `"${s.primaryKeyword}" (${s.searchIntent}) ← ${(s.coverageMatches ?? []).map((m) => m.existingTitle).join('/') || 'no basis'}`).join(' · ') || 'none')
 
+  // An improvement-BASIS page must never ALSO be emitted as an internal link on the
+  // same topic — an owning page is coverage, not support.
+  const canonUrl = (u: string | null | undefined) => (u || '').trim().toLowerCase().replace(/\/+$/, '')
+  const normTitle = (t: string) => (t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const basisLinked = suggestions.flatMap((s) => {
+    if (s.recommendedPageType !== 'existing_page_improvement') return []
+    const bases = (s.coverageMatches ?? []).filter((m) => m.matchType === 'owns_need' || m.matchType === 'exact' || m.matchType === 'improve')
+    const basisUrls = new Set(bases.map((m) => canonUrl(m.url)).filter(Boolean))
+    const basisTitles = new Set(bases.map((m) => normTitle(m.existingTitle)))
+    const links = [
+      ...(s.suggestedInternalLinks ?? []).map((l) => ({ url: l.url, title: l.anchor })),
+      ...(s.linkPlan ? [s.linkPlan.primaryCommercialTarget, ...s.linkPlan.secondaryCommercialTargets, ...s.linkPlan.supportingInformationalLinks, ...s.linkPlan.sourceReferences].filter(Boolean).map((t) => ({ url: (t as { url: string }).url, title: (t as { title: string }).title })) : []),
+    ]
+    return links.filter((l) => (canonUrl(l.url) && basisUrls.has(canonUrl(l.url))) || basisTitles.has(normTitle(l.title))).map((l) => `"${s.primaryKeyword}" ↯ links its own basis "${l.title || l.url}"`)
+  })
+  add('improvement_basis_not_linked', basisLinked.length === 0, basisLinked.join(' · ') || 'none')
+
   // OBSERVABILITY (warn, never fail): an accepted existing_page_improvement whose
   // coverage basis carries an unmatched FOREIGN entity (after project-vocabulary
   // corroboration — e.g. a horse-care page owning a natural-health topic) is

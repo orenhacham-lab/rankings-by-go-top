@@ -143,8 +143,22 @@ export type CoverageMatchType = 'exact' | 'owns_need' | 'improve' | 'distinct'
 export interface CoverageMatch { existingTitle: string; url: string | null; matchType: CoverageMatchType; score: number; sharedNeed: string[]; unmatchedEntities?: string[] }
 
 const HEB_PROCLITICS = 'והבלמשכ'
-function deproc(t: string): string { return (t.length >= 4 && HEB_PROCLITICS.includes(t[0])) ? t.slice(1) : t }
-const clusterKey = (t: string): string => synonymFold(canonicalToken(deproc(t)))
+/** Every canonical/morphological form of a token — final-letter + plural folded
+ *  (canonicalVariants, applied recursively so "הוויטמינ"→"וויטמינ"→"ויטמינ"),
+ *  each proclitic-stripped form (בכל→כל), and each synonym-folded — so a spelling
+ *  / morphology / clitic variant collapses onto its canonical base. */
+function expandForms(t: string): Set<string> {
+  const forms = new Set<string>([t])
+  for (let pass = 0; pass < 2; pass++) for (const f of [...forms]) { forms.add(canonicalToken(f)); for (const v of canonicalVariants(f)) forms.add(v) }
+  for (const f of [...forms]) { let s = f; while (s.length >= 3 && HEB_PROCLITICS.includes(s[0])) { s = s.slice(1); forms.add(s) } }
+  const out = new Set<string>()
+  for (const f of forms) { if (!f) continue; out.add(f); out.add(synonymFold(canonicalToken(f))) }
+  return out
+}
+/** Cluster keys ≥3 chars (the comparable subject forms). */
+function clusterKeys(t: string): string[] { return [...expandForms(t)].filter((k) => k.length >= 3 && !/^\d+$/.test(k)) }
+/** A token is grammar (modifier/framing/quantifier/verb) if ANY of its forms is. */
+function isGrammarToken(t: string): boolean { for (const f of expandForms(t)) if (isModifierToken(f)) return true; return false }
 /** Two subject tokens belong to the same content cluster when equal or sharing a
  *  ≥3-char stem (Hebrew stems are prefix-ish: פרח↔פרחוני, גוף↔גופני). */
 function stemMatch(a: string, b: string): boolean {
@@ -170,16 +184,20 @@ function stemMatch(a: string, b: string): boolean {
  */
 export function unmatchedDocEntities(docText: string, topicText: string, projectVocab?: Set<string>): string[] {
   if (!projectVocab || projectVocab.size === 0) return []
-  const refs: string[] = []
-  for (const t of subjectTokensOf(topicText)) refs.push(clusterKey(t))
-  for (const v of projectVocab) { const k = clusterKey(v); if (k.length >= 3) refs.push(k) }
+  const refKeys = new Set<string>()
+  const addRef = (t: string) => { for (const k of clusterKeys(t)) refKeys.add(k) }
+  for (const t of subjectTokensOf(topicText)) addRef(t)
+  for (const v of projectVocab) addRef(v)
   const out = new Set<string>()
   for (const raw of subjectTokensOf(docText)) {
-    const d = deproc(raw)
-    if (isModifierToken(canonicalToken(d)) || isModifierToken(d)) continue // drop generic/price/attribute words
-    const e = clusterKey(raw)
-    if (e.length < 3 || /^\d+$/.test(e)) continue
-    if (!refs.some((r) => stemMatch(e, r))) out.add(e)
+    // Drop generic/price/attribute/framing/quantifier/verb words (grammar, not entities).
+    if (isGrammarToken(raw)) continue
+    const keys = clusterKeys(raw)
+    if (keys.length === 0) continue
+    // A real FOREIGN entity: no morphological cluster key stem-matches the topic
+    // subject OR the project's evidence vocabulary.
+    const matched = keys.some((k) => { for (const r of refKeys) if (stemMatch(k, r)) return true; return false })
+    if (!matched) out.add(keys.reduce((a, b) => (b.length < a.length ? b : a))) // canonical (shortest) form
   }
   return Array.from(out)
 }

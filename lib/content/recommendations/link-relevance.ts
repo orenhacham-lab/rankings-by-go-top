@@ -50,6 +50,12 @@ const ATTRIBUTE_LEXICON_RAW = [
   // grammatical head ("חברת"), or an action noun ("יצירת" — creating different
   // objects) can never establish link relevance on its own.
   'חשוב', 'חשובה', 'בריאות', 'בריאותי', 'עדיף', 'עדיפה', 'חברת', 'יצירת', 'יצירה', 'לעשות', 'עשיית',
+  // Evaluative adjectives, quantifiers/determiners and common framing verbs — all
+  // grammar-level (NOT industry content): "כדאי להכיר", "חיוני בכל גיל", "אלו".
+  'כדאי', 'חיוני', 'חיונית', 'נחוץ', 'נחוצה', 'שימושי', 'מעולה', 'איכותי',
+  'כל', 'אלו', 'אלה', 'כמה', 'מספר', 'סוגי', 'לדעת', 'להכיר', 'הכיר', 'להתמודד', 'מתמודד', 'להשתמש',
+  // Common verbs / prepositions / generic measure nouns (grammar, domain-neutral).
+  'לשמור', 'שמור', 'לצד', 'צד', 'גיל', 'גילאי', 'שלב', 'שלבים', 'דרך', 'דרכים',
 ]
 const ATTRIBUTE_LEXICON = new Set(ATTRIBUTE_LEXICON_RAW.map((w) => canonicalToken(w)).filter(Boolean))
 

@@ -321,15 +321,19 @@ export async function generateFromBriefs(
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
   for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
   const existingPageTitles = [...entities.map((e) => e.name), ...ineligiblePageTitles, ...publishedCoverage]
-  // Existing-content docs for synonym-aware cannibalization (P0-2): EVERY page
-  // available to link mapping must ALSO be available to coverage/cannibalization —
-  // published article/topic titles + owned entity pages + link candidates +
-  // pending ideas. A page that owns the need can never be "merely a support link".
+  // Existing-content docs for synonym-aware cannibalization (P0-2): EVERY exact
+  // owner known to keyword-guard / pending / indexed content must ALSO participate
+  // in synonym-aware need ownership — published article/topic titles + owned entity
+  // pages + link candidates + pending ideas + guard keyword/entity owners. A
+  // synonym owner ("תוספי תזונה" ⇄ "תוספי מזון") that the EXACT guard blocks must
+  // still block the synonym topic here; an owner page can never be a mere support link.
   const existingCoverageDocs: ExistingCoverageDoc[] = dedupeCoverageDocs([
     ...publishedCoverage.map((title) => ({ title })),
     ...entities.map((e) => ({ title: e.name, url: e.url ?? null })),
     ...linkCandidates.map((c) => ({ title: c.title, url: c.url })),
     ...pendingCoverageDocs,
+    ...Array.from(guard.keywords).map((k) => ({ title: k })),
+    ...Array.from(guard.entityOwners).map((k) => ({ title: k })),
   ])
 
   const shadow_rejected_by_reason: Record<string, number> = {}
@@ -488,7 +492,19 @@ export async function generateFromBriefs(
     const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens)
     const coverageMatches: CoverageMatch[] = [...cann.matches]
     if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
-    const cannibalImprovement = cann.matchType === 'owns_need' || cann.matchType === 'improve'
+    // PAGE-ROLE / INTENT compatibility: a COMMERCIAL/transactional opportunity (a
+    // products/category/landing need) can NOT be an "improvement" of an
+    // INFORMATIONAL article just because the broad problem/entity overlaps — an
+    // article cannot own a commercial page's need. It may still support it as a
+    // link. Require a commercial-type basis (product/category/service page) before
+    // converting a commercial topic to an existing_page_improvement.
+    const commercialIntent = intent === 'commercial' || intent === 'transactional'
+    const basisIsCommercial = (m: CoverageMatch): boolean => {
+      const ty = m.url ? urlTypeMap.get(m.url.trim().toLowerCase().replace(/\/+$/, '')) : undefined
+      return ty === 'product' || ty === 'category' || ty === 'service'
+    }
+    const ownsMatches = coverageMatches.filter((m) => m.matchType === 'owns_need' || m.matchType === 'improve')
+    const cannibalImprovement = ownsMatches.length > 0 && (!commercialIntent || ownsMatches.some(basisIsCommercial))
 
     // (5) pending-idea ownership: exact + PROVEN high-confidence semantic only.
     const sig = topicSignature(primaryKeyword, intent)
@@ -567,6 +583,22 @@ export async function generateFromBriefs(
       if (!coverageMatches.some((m) => m.existingTitle === owningPage!.title)) coverageMatches.push({ existingTitle: owningPage.title, url: owningPage.url, matchType: 'owns_need', score: 1, sharedNeed: [] })
       linkPlan.supportingInformationalLinks = linkPlan.supportingInformationalLinks.filter((tg) => !owningUrls.has(tg.url))
       linkPlan.sourceReferences = linkPlan.sourceReferences.filter((tg) => !owningUrls.has(tg.url))
+    }
+
+    // (10.6) FINAL basis-link removal (applied AFTER every late conversion above):
+    // any page used as an exact/owns_need/improve BASIS for this
+    // existing_page_improvement must never ALSO be emitted as an internal link.
+    // Remove by canonical URL when available, with normalized-title fallback.
+    if (ownershipPageType === 'existing_page_improvement') {
+      const bases = coverageMatches.filter((m) => m.matchType === 'exact' || m.matchType === 'owns_need' || m.matchType === 'improve')
+      const canon = (u: string | null | undefined) => (u || '').trim().toLowerCase().replace(/\/+$/, '')
+      const basisUrls = new Set(bases.map((m) => canon(m.url)).filter(Boolean))
+      const basisTitles = new Set(bases.map((m) => normalizeText(m.existingTitle)).filter(Boolean))
+      const isBasis = (tg: { url: string; title: string }) => (!!canon(tg.url) && basisUrls.has(canon(tg.url))) || basisTitles.has(normalizeText(tg.title))
+      linkPlan.supportingInformationalLinks = linkPlan.supportingInformationalLinks.filter((tg) => !isBasis(tg))
+      linkPlan.sourceReferences = linkPlan.sourceReferences.filter((tg) => !isBasis(tg))
+      linkPlan.secondaryCommercialTargets = linkPlan.secondaryCommercialTargets.filter((tg) => !isBasis(tg))
+      if (linkPlan.primaryCommercialTarget && isBasis(linkPlan.primaryCommercialTarget)) linkPlan.primaryCommercialTarget = null
     }
 
     const primaryTargetType = linkPlan.primaryCommercialTarget ? (urlTypeMap.get(linkPlan.primaryCommercialTarget.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null

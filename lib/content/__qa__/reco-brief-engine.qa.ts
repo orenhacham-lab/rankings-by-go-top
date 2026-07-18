@@ -466,6 +466,49 @@ async function main() {
     server.close()
   }
 
+  // ── E2E: NS-3/4 — guard-owner synonym + page-role/intent compatibility ────────
+  console.log('E2E) NS-3 — a keyword-guard exact owner also blocks its SYNONYM topic')
+  {
+    const tables = naturalShopTables()
+    // The exact owner lives ONLY on the keyword-guard path (a TRACKED keyword), not
+    // as a pending idea — the exact live owner-data path.
+    ;(tables.tracking_targets as Record<string, unknown>[]).push({ project_id: 'p1', keyword: 'תוספי תזונה מומלצים' })
+    ;(tables.keyword_research_cache[0].results_json as Record<string, unknown>[]).push({ keyword: 'תוספי מזון מומלצים', avgMonthlySearches: 240 })
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b, i) => /תוספי מזון/.test(b.subject)
+        ? { briefId: b.id, title: 'תוספי מזון מומלצים', primaryKeyword: 'תוספי מזון מומלצים', secondaryKeywords: [], intent: 'informational' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`; resetModelResolutionCache(); resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns3', 8))
+    const s = run.suggestions.find((x) => /תוספי מזון/.test(x.primaryKeyword))
+    check('NS3-E2E. synonym of a keyword-guard owner (תזונה) is NEVER a new article', !s || s.recommendedPageType === 'existing_page_improvement', JSON.stringify(s?.recommendedPageType))
+    server.close()
+  }
+
+  console.log('E2E) NS-4 — a COMMERCIAL topic is not an improvement of an INFORMATIONAL article')
+  {
+    const tables = naturalShopTables()
+    ;(tables.generated_articles as Record<string, unknown>[]).push({ project_id: 'p1', title: 'תוספים למניעת נשירת שיער' })
+    ;(tables.keyword_research_cache[0].results_json as Record<string, unknown>[]).push({ keyword: 'קניית תוספים לנשירת שיער', avgMonthlySearches: 260 })
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b, i) => /קניית תוספים לנשירת/.test(b.subject)
+        ? { briefId: b.id, title: 'קניית תוספים לנשירת שיער', primaryKeyword: 'קניית תוספים לנשירת שיער', secondaryKeywords: [], intent: 'commercial' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`; resetModelResolutionCache(); resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns4', 8))
+    const s = run.suggestions.find((x) => /קניית תוספים לנשירת/.test(x.primaryKeyword))
+    check('NS4-E2E. commercial topic is NOT existing_page_improvement of an informational article', !s || s.recommendedPageType !== 'existing_page_improvement', JSON.stringify(s?.recommendedPageType))
+    server.close()
+  }
+
   console.log('U) unit: model-aware thinking config (the live Pro-400 fix)')
   {
     const pro = resolveModelConfig('gemini-2.5-pro', 3000)
