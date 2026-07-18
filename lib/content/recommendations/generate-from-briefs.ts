@@ -30,8 +30,8 @@ import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/
 import { generateKeywordIdeas } from '@/lib/google-ads/keyword-ideas'
 import { evaluateArticleWorthiness, type ExistingPageSignal } from './opportunity'
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, isBoilerplatePage, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
-import { filterLinkPlan } from './link-relevance'
-import { assessNeedCannibalization, isSameNeedDuplicate, isTitleKeywordAligned, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
+import { filterLinkPlan, sharesSubjectHead } from './link-relevance'
+import { assessNeedCannibalization, isSameNeedDuplicate, isTitleKeywordAligned, hasIncompatibleSubtype, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
 import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON } from './model'
@@ -574,8 +574,19 @@ export async function generateFromBriefs(
     let ownershipPageType: RecommendedPageType | null = cannibalImprovement ? 'existing_page_improvement' : null
     if (intent === 'local' || intent === 'transactional') {
       const own = assessExistingLocalOwnership(primaryKeyword, t.title, existingPageTitles, domainTypeWords)
-      if (own.outcome === 'owns') return { rejectionReason: 'exact_existing_keyword_owner' }
-      if (own.outcome === 'improve' && own.matchedTitle) {
+      // DISCRIMINATIVE-SUBTYPE contract (P0) — SAME as assessNeedCannibalization:
+      // local-ownership overlap can be carried entirely by domain/condition tokens
+      // ("שמלות … יד שנייה"), so a broad parent ("שמלות יד שנייה") would falsely own a
+      // specific subtype ("שמלות כלה …"). Ownership here holds ONLY when the topic and
+      // the matched page share a real CONCRETE head (domain words stripped) AND are not
+      // incompatible subtypes. This is the COMMERCIAL/local path, so a genuine parent
+      // category MAY still own a narrower subcategory (isNarrowerThanBroadParent, the
+      // broad-INFORMATIONAL-article rule, is applied only in assessNeedCannibalization).
+      const localBasisOwns = (basis: string): boolean =>
+        sharesSubjectHead(`${primaryKeyword} ${t.title}`, basis, domainTypeWords) &&
+        !hasIncompatibleSubtype(`${primaryKeyword} ${t.title}`, basis, domainTypeWords)
+      if (own.outcome === 'owns' && own.matchedTitle && localBasisOwns(own.matchedTitle)) return { rejectionReason: 'exact_existing_keyword_owner' }
+      if (own.outcome === 'improve' && own.matchedTitle && localBasisOwns(own.matchedTitle)) {
         // Route through the SAME basis-compatibility helper: resolve the matched
         // title to its actionable entity (URL + page type) and require a compatible
         // role before converting to an existing_page_improvement.

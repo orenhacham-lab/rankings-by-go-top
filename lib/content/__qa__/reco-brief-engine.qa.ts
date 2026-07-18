@@ -465,6 +465,52 @@ async function main() {
     server.close()
   }
 
+  // ── E2E: the LOCAL-ownership path (step 7) applies the discriminative-subtype
+  // contract — a broad parent ("שמלות יד שנייה") must NOT own a specific subtype
+  // ("שמלות כלה יד שנייה") through the assessExistingLocalOwnership conversion.
+  console.log('E2E) subtype — a broad parent does not own a specific subtype via local-ownership')
+  {
+    // A second-hand DRESS shop: "שמלה" is a per-project domain word (every product),
+    // but NO product is a bridal dress. A broad informational ARTICLE ("המדריך
+    // לשמלות יד שנייה") is the only thing resembling the narrower bridal topic.
+    const fashionTables: Record<string, Record<string, unknown>[]> = {
+      projects: [{ id: 'pf', business_name: 'יד שנייה שיק', target_domain: 'https://secondhand.example', language: 'he', country: 'IL' }],
+      tracking_targets: [{ project_id: 'pf', keyword: 'שמלת ערב יד שנייה' }],
+      keyword_research_cache: [{ project_id: 'pf', created_at: '2026-07-01', results_json: [
+        { keyword: 'שמלת כלה יד שנייה', avgMonthlySearches: 480 },
+      ] }],
+      shopify_entities: [
+        { project_id: 'pf', is_active: true, title: 'שמלת ערב שחורה יד שנייה', handle: 'd1', entity_type: 'product', canonical_url: 'https://secondhand.example/p/d1' },
+        { project_id: 'pf', is_active: true, title: 'שמלת קוקטייל אדומה יד שנייה', handle: 'd2', entity_type: 'product', canonical_url: 'https://secondhand.example/p/d2' },
+        { project_id: 'pf', is_active: true, title: 'שמלת מקסי פרחונית יד שנייה', handle: 'd3', entity_type: 'product', canonical_url: 'https://secondhand.example/p/d3' },
+        { project_id: 'pf', is_active: true, title: 'שמלת מיני לבנה יד שנייה', handle: 'd4', entity_type: 'product', canonical_url: 'https://secondhand.example/p/d4' },
+      ],
+      generated_articles: [{ project_id: 'pf', title: 'המדריך לשמלות יד שנייה' }],
+      article_topics: [], content_topic_ideas: [], wordpress_content_index: [],
+    }
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b) => ({ briefId: b.id, title: b.subject, primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'transactional' })),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'
+    process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`
+    resetModelResolutionCache()
+    resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(fashionTables), { projectId: 'pf', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-st', 8))
+    const bride = run.suggestions.find((s) => /כלה/.test(s.primaryKeyword) || /כלה/.test(s.title))
+    // The bridal-dress subtype must NOT be an existing_page_improvement owned by the
+    // broad "שמלות יד שנייה" collection — that broad parent shares only the domain
+    // ("שמלות") + condition ("יד שנייה"), no concrete subtype head.
+    const ownedByBroad = (s: { coverageMatches?: { existingTitle: string }[] } | undefined) =>
+      !!s && (s.coverageMatches ?? []).some((m) => /^\s*שמלות יד שנייה\s*$/.test(m.existingTitle))
+    check('ST-E2E. the bridal-dress subtype is generated (not swallowed by the broad parent)', !!bride, JSON.stringify(run.suggestions.map((s) => s.primaryKeyword)))
+    check('ST-E2E. it is NOT an existing_page_improvement owned by the broad "שמלות יד שנייה" collection',
+      !bride || (bride.recommendedPageType !== 'existing_page_improvement' && !ownedByBroad(bride)), JSON.stringify({ type: bride?.recommendedPageType, matches: bride?.coverageMatches }))
+    server.close()
+  }
+
   // ── E2E: Natural-Shop defect 2 — pending/link pages ARE in the coverage corpus ──
   console.log('E2E) NS-2 — synonym pending idea + near-identical support page own the need')
   {
