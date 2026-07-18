@@ -97,7 +97,7 @@ export interface TopicSuggestion {
   linkDiagnostics?: { targetUrl: string; targetTitle: string; role: string; sharedDistinctiveTokens: string[]; semanticRelation: string; rejectionReasons: string[]; acceptedBecause: string | null; isHomepage: boolean; coverageOwned: boolean }[]
   /** Existing pages/topics that already cover this need (coverage/cannibalization
    *  signal). Preview-only. */
-  coverageMatches?: { existingTitle: string; url: string | null; matchType: string; score: number; sharedNeed: string[] }[]
+  coverageMatches?: { existingTitle: string; url: string | null; matchType: string; score: number; sharedNeed: string[]; unmatchedEntities?: string[] }[]
   /** Normalized clean search phrase (the keyword the search-phrase gate approved). */
   normalizedPrimaryKeyword?: string
 }

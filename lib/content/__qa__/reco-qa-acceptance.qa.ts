@@ -236,6 +236,20 @@ async function main() {
     check('NS1: accepted keyword "שנת 2026" → final_keyword_preserves_brief_subject FAILS',
       failsRule(base({ suggestions: [goodTopic('שנת 2026', 'איך לבחור ויטמין D מומלץ? המדריך לשנת 2026')], diagnostics: onlyPool1 }), 'final_keyword_preserves_brief_subject'))
     check('NS1: a real subject keyword PASSES the rule', evaluateRunAcceptance(base({ suggestions: [goodTopic('ויטמין D מומלץ', 'איך לבחור ויטמין D מומלץ')], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'final_keyword_preserves_brief_subject')?.pass === true)
+
+    // ── OBSERVABILITY: foreign-entity improvement review (WARN, never fail) ──
+    const feRule = (input: RunAcceptanceInput) => evaluateRunAcceptance(input).rules.find((x) => x.id === 'foreign_entity_improvement_review')
+    const horsePage = { existingTitle: 'איך לשמור על אורח חיים טבעי ובריא לצד פעילות גופנית וטיפול בסוסים', url: '/b/horses', matchType: 'owns_need' as const, score: 1, sharedNeed: ['אורח', 'חיים'], unmatchedEntities: ['סוס', 'פעיל'] }
+    const feHorse = feRule(base({ suggestions: [goodTopic('אורח חיים טבעי ובריא', 'איך לאמץ אורח חיים טבעי ובריא יותר', { recommendedPageType: 'existing_page_improvement', coverageMatches: [horsePage] })], diagnostics: onlyPool1 }))
+    check('FE1: health topic improved by a horse-care page → WARN (not fail), detail names "סוס"', feHorse?.level === 'warn' && feHorse?.pass === false && /סוס/.test(feHorse?.detail ?? ''))
+    check('FE1b: the WARN never fails the run (verdict still PASS-able)', evaluateRunAcceptance(base({ suggestions: [goodTopic('אורח חיים טבעי ובריא', 'איך לאמץ אורח חיים טבעי ובריא יותר', { recommendedPageType: 'existing_page_improvement', coverageMatches: [horsePage] })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'foreign_entity_improvement_review' && x.level === 'fail') === undefined)
+    // A horse BUSINESS (project evidence corroborates סוסים) → the pipeline records NO
+    // unmatchedEntities on the basis → no warning.
+    const feHorseBiz = feRule(base({ suggestions: [goodTopic('אורח חיים טבעי ובריא', 'איך לאמץ אורח חיים טבעי ובריא יותר', { recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'טיפול בסוסים לאורח חיים בריא', url: '/b/h', matchType: 'owns_need', score: 1, sharedNeed: ['אורח'], unmatchedEntities: [] }] })], diagnostics: onlyPool1 }))
+    check('FE2: horse-business project (evidence corroborates סוסים) → NO warning', feHorseBiz?.pass === true)
+    // Wedding-floral + near-identical natural-products improvements (no foreign entity) → no warning.
+    check('FE3: wedding-floral improvement → NO warning', feRule(base({ suggestions: [wfTopic({ recommendedPageType: 'existing_page_improvement' })], diagnostics: onlyPool1 }))?.pass === true)
+    check('FE3b: near-identical natural-products improvement → NO warning', feRule(base({ suggestions: [goodTopic('מוצרים וטיפולים טבעיים', 'לחזור לטבע: איך לשלב מוצרים וטיפולים טבעיים', { recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש', url: '/n', matchType: 'owns_need', score: 0.8, sharedNeed: ['טיפול', 'טבעי'] }] })], diagnostics: onlyPool1 }))?.pass === true)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

@@ -189,6 +189,16 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   })
   add('existing_page_improvement_valid_basis', invalidImprovement.length === 0, invalidImprovement.map((s) => `"${s.primaryKeyword}" (${s.searchIntent}) ← ${(s.coverageMatches ?? []).map((m) => m.existingTitle).join('/') || 'no basis'}`).join(' · ') || 'none')
 
+  // OBSERVABILITY (warn, never fail): an accepted existing_page_improvement whose
+  // coverage basis carries an unmatched FOREIGN entity (after project-vocabulary
+  // corroboration — e.g. a horse-care page owning a natural-health topic) is
+  // surfaced for MANUAL operator review, not auto-rejected (a documented semantic
+  // limitation — see coverage.ts unmatchedDocEntities).
+  const foreignBasis = suggestions.flatMap((s) => s.recommendedPageType !== 'existing_page_improvement' ? [] :
+    (s.coverageMatches ?? []).filter((m) => (m.unmatchedEntities ?? []).length > 0)
+      .map((m) => `"${s.primaryKeyword}" / "${s.title}" ← "${m.existingTitle}" [${m.matchType} ${m.score}] foreign: ${(m.unmatchedEntities ?? []).join(', ')}`))
+  add('foreign_entity_improvement_review', foreignBasis.length === 0, foreignBasis.join(' · ') || 'none', 'warn')
+
   // SEMANTIC alignment (paraphrase passes; only a truly off-topic keyword fails).
   const misaligned = suggestions.filter((s) => !isTitleKeywordAligned(s.primaryKeyword, s.title))
   add('title_keyword_alignment', misaligned.length === 0, misaligned.map((s) => `"${s.title}" ⇄ "${s.primaryKeyword}"`).join(' · ') || 'none')
