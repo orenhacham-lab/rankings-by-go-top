@@ -485,12 +485,19 @@ async function main() {
         { project_id: 'pf', is_active: true, title: 'שמלת מקסי פרחונית יד שנייה', handle: 'd3', entity_type: 'product', canonical_url: 'https://secondhand.example/p/d3' },
         { project_id: 'pf', is_active: true, title: 'שמלת מיני לבנה יד שנייה', handle: 'd4', entity_type: 'product', canonical_url: 'https://secondhand.example/p/d4' },
       ],
-      generated_articles: [{ project_id: 'pf', title: 'המדריך לשמלות יד שנייה' }],
+      // Broad parent + a DIFFERENT subtype (evening dress) both exist as articles —
+      // exactly the live Shashka coverage that falsely owned the bridal topic.
+      generated_articles: [
+        { project_id: 'pf', title: 'המדריך לשמלות יד שנייה' },
+        { project_id: 'pf', title: 'המדריך השלם לבחירת שמלות ערב יד שנייה באיכות גבוהה' },
+      ],
       article_topics: [], content_topic_ideas: [], wordpress_content_index: [],
     }
     const { server, port } = await startFakeGenai({
       models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-      respond: (briefs) => briefs.map((b) => ({ briefId: b.id, title: b.subject, primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'transactional' })),
+      // The bridal topic is INFORMATIONAL (like the live case) — so it flows through
+      // assessNeedCannibalization, not the local-ownership path.
+      respond: (briefs) => briefs.map((b) => ({ briefId: b.id, title: `${b.subject}: כל היתרונות בבחירה אופנתית ומשתלמת`, primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })),
     })
     process.env.GEMINI_API_KEY = 'test-key'
     process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`
@@ -501,13 +508,17 @@ async function main() {
     const run = await generateFromBriefs(fakeAdmin(fashionTables), { projectId: 'pf', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-st', 8))
     const bride = run.suggestions.find((s) => /כלה/.test(s.primaryKeyword) || /כלה/.test(s.title))
     // The bridal-dress subtype must NOT be an existing_page_improvement owned by the
-    // broad "שמלות יד שנייה" collection — that broad parent shares only the domain
-    // ("שמלות") + condition ("יד שנייה"), no concrete subtype head.
-    const ownedByBroad = (s: { coverageMatches?: { existingTitle: string }[] } | undefined) =>
-      !!s && (s.coverageMatches ?? []).some((m) => /^\s*שמלות יד שנייה\s*$/.test(m.existingTitle))
+    // broad parent ("שמלות יד שנייה" — domain + condition only) NOR by a DIFFERENT
+    // subtype ("שמלות ערב" — incompatible subtype). No owns_need on either.
+    const ownsAny = (s: { coverageMatches?: { existingTitle: string; matchType: string }[] } | undefined, re: RegExp) =>
+      !!s && (s.coverageMatches ?? []).some((m) => (m.matchType === 'owns_need' || m.matchType === 'improve') && re.test(m.existingTitle))
     check('ST-E2E. the bridal-dress subtype is generated (not swallowed by the broad parent)', !!bride, JSON.stringify(run.suggestions.map((s) => s.primaryKeyword)))
-    check('ST-E2E. it is NOT an existing_page_improvement owned by the broad "שמלות יד שנייה" collection',
-      !bride || (bride.recommendedPageType !== 'existing_page_improvement' && !ownedByBroad(bride)), JSON.stringify({ type: bride?.recommendedPageType, matches: bride?.coverageMatches }))
+    check('ST-E2E. bridal is NOT an existing_page_improvement (broad parent + evening-dress subtype do not own it)',
+      !bride || bride.recommendedPageType !== 'existing_page_improvement', JSON.stringify({ type: bride?.recommendedPageType, matches: bride?.coverageMatches }))
+    check('ST-E2E. the broad parent "שמלות יד שנייה" does NOT own the bridal subtype',
+      !ownsAny(bride, /^\s*שמלות יד שנייה\s*$/), JSON.stringify(bride?.coverageMatches))
+    check('ST-E2E. the different subtype "שמלות ערב" does NOT own the bridal subtype (incompatible subtype)',
+      !ownsAny(bride, /ערב/), JSON.stringify(bride?.coverageMatches))
     server.close()
   }
 
