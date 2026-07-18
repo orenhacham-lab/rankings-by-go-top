@@ -259,6 +259,25 @@ async function main() {
       failsRule(base({ suggestions: [goodTopic('חזרה לטבע', 'חזרה לטבע', { recommendedPageType: 'existing_page_improvement', coverageMatches: [{ ...basisPage, url: null }], suggestedInternalLinks: [{ url: '/x', anchor: 'לחזור לטבע: היתרונות הברורים של טיפולים ומוצרים טבעיים לגוף ולנפש' }] })], diagnostics: onlyPool1 }), 'improvement_basis_not_linked'))
     check('IBL3: improvement whose basis is NOT linked → rule PASSES',
       evaluateRunAcceptance(base({ suggestions: [goodTopic('חזרה לטבע', 'חזרה לטבע', { recommendedPageType: 'existing_page_improvement', coverageMatches: [basisPage], suggestedInternalLinks: [{ url: '/p/other', anchor: 'מוצר אחר' }] })], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'improvement_basis_not_linked')?.pass === true)
+
+    // ── existing_page_improvement_role_compatible (page-role/intent compatibility) ──
+    const roleRule = (s: TopicSuggestion) => evaluateRunAcceptance(base({ suggestions: [s], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'existing_page_improvement_role_compatible')
+    const improv = (kw: string, title: string, intent: TopicSuggestion['searchIntent'], m: { t: string; ty: string | null; url: string | null }) =>
+      goodTopic(kw, title, { searchIntent: intent, recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: m.t, url: m.url, matchType: 'owns_need', score: 1, sharedNeed: [], basisPageType: m.ty }] })
+    // FAIL: commercial opportunity improved by an informational article.
+    check('ROLE1: commercial topic ← informational article → role_compatible FAILS', failsRule(base({ suggestions: [improv('קניית מוצרים לנשירת שיער', 'קניית מוצרים לנשירת שיער', 'commercial', { t: 'ויטמינים למניעת נשירת שיער', ty: 'article', url: '/a' })], diagnostics: onlyPool1 }), 'existing_page_improvement_role_compatible'))
+    // FAIL: informational topic improved by a commercial product page.
+    check('ROLE2: informational topic ← commercial product page → role_compatible FAILS', failsRule(base({ suggestions: [improv('מהי נשירת שיער', 'מהי נשירת שיער וכיצד מטפלים', 'informational', { t: 'שמפו לנשירת שיער', ty: 'product', url: '/p' })], diagnostics: onlyPool1 }), 'existing_page_improvement_role_compatible'))
+    // FAIL: improvement with only an unresolved title-only owner (no actionable page).
+    check('ROLE3: improvement with only a title-only owner (no page) → role_compatible FAILS', failsRule(base({ suggestions: [improv('מוצרים טבעיים לשיער', 'מוצרים טבעיים לשיער', 'informational', { t: 'תוספי תזונה לשיער', ty: null, url: null })], diagnostics: onlyPool1 }), 'existing_page_improvement_role_compatible'))
+    // PASS: wedding-floral price article → existing price article (informational↔informational).
+    check('ROLE4: wedding-floral price ← existing price article → PASSES', roleRule(improv('מחיר סידור פרחים לחתונה', 'כמה עולה סידור פרחים לחתונה? פירוט מחירים', 'transactional', { t: 'כמה עולה עיצוב פרחוני לחתונה', ty: 'article', url: '/wedding' }))?.pass === true)
+    // PASS: informational hair-loss → existing informational article.
+    check('ROLE5: informational hair-loss ← informational article → PASSES', roleRule(improv('נשירת שיער אצל נשים', 'נשירת שיער אצל נשים: גורמים', 'informational', { t: 'נשירת שיער: המדריך המלא', ty: 'article', url: '/hair' }))?.pass === true)
+    // PASS: commercial product/category topic → existing product/category/service page.
+    check('ROLE6: commercial topic ← existing product page → PASSES', roleRule(improv('קניית שמפו לשיער', 'קניית שמפו לשיער', 'commercial', { t: 'שמפו מקצועי לשיער', ty: 'product', url: '/p/shampoo' }))?.pass === true)
+    // PASS: valid same-location service improvement (local ↔ service page).
+    check('ROLE7: local service topic ← existing service page → PASSES', roleRule(improv('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', 'local', { t: 'שירות משלוחי פרחים בבית שמש', ty: 'service', url: '/s/bs' }))?.pass === true)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

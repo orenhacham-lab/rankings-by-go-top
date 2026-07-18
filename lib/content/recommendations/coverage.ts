@@ -140,7 +140,7 @@ export function isTitleKeywordAligned(primaryKeyword: string, title: string): bo
 }
 
 export type CoverageMatchType = 'exact' | 'owns_need' | 'improve' | 'distinct'
-export interface CoverageMatch { existingTitle: string; url: string | null; matchType: CoverageMatchType; score: number; sharedNeed: string[]; unmatchedEntities?: string[] }
+export interface CoverageMatch { existingTitle: string; url: string | null; matchType: CoverageMatchType; score: number; sharedNeed: string[]; unmatchedEntities?: string[]; basisPageType?: string | null }
 
 const HEB_PROCLITICS = 'והבלמשכ'
 /** Every canonical/morphological form of a token — final-letter + plural folded
@@ -159,6 +159,18 @@ function expandForms(t: string): Set<string> {
 function clusterKeys(t: string): string[] { return [...expandForms(t)].filter((k) => k.length >= 3 && !/^\d+$/.test(k)) }
 /** A token is grammar (modifier/framing/quantifier/verb) if ANY of its forms is. */
 function isGrammarToken(t: string): boolean { for (const f of expandForms(t)) if (isModifierToken(f)) return true; return false }
+// AUDIENCE / RECIPIENT words — "לילדים", "למבוגרים", "לנשים" qualify WHO the
+// subject is for; a shared audience alone ("ויטמין C לילדים" vs "מינון מגנזיום
+// לילדים") is NOT a shared subject and must not establish ownership. They stay
+// distinctive for coversAllSubjectHeads (kids-magnesium ≠ sleep-magnesium), so
+// they are excluded ONLY from the shared-head gate. Domain-neutral.
+const AUDIENCE_TYPEWORDS = (() => {
+  const base = ['ילד', 'ילדים', 'ילדות', 'תינוק', 'תינוקות', 'פעוט', 'פעוטות', 'מבוגר', 'מבוגרים', 'נשים', 'אישה', 'גבר', 'גברים', 'נוער', 'בנים', 'בנות', 'קשיש', 'קשישים',
+    'kids', 'children', 'child', 'adults', 'adult', 'women', 'woman', 'men', 'man', 'baby', 'babies', 'teens']
+  const out = new Set<string>()
+  for (const w of base) { const c = canonicalToken(w); if (c) out.add(c); for (const p of 'להבומש') { const pc = canonicalToken(p + w); if (pc) out.add(pc) } } // + proclitic forms (לילד, הילד…)
+  return out
+})()
 /** Two subject tokens belong to the same content cluster when equal or sharing a
  *  ≥3-char stem (Hebrew stems are prefix-ish: פרח↔פרחוני, גוף↔גופני). */
 function stemMatch(a: string, b: string): boolean {
@@ -202,7 +214,7 @@ export function unmatchedDocEntities(docText: string, topicText: string, project
   return Array.from(out)
 }
 
-export interface ExistingCoverageDoc { title: string; url?: string | null; focusKeyword?: string | null; slug?: string | null }
+export interface ExistingCoverageDoc { title: string; url?: string | null; focusKeyword?: string | null; slug?: string | null; type?: string | null }
 
 /**
  * Assess whether existing content already owns the topic's need. Compares the
@@ -244,7 +256,9 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // and "אנטוריום ורוד" overlap only on the colour ורוד — the heads (ורד vs
     // אנטוריום/סחלב) differ, so the orchid/anthurium page does NOT own roses. The
     // exact-keyword match below is unaffected (it is identity, not overlap).
-    const shareHead = sharesSubjectHead(`${topic.primaryKeyword} ${topic.title}`, docText)
+    // The shared head must be a REAL subject, not merely a shared audience/recipient
+    // ("לילדים") — a kids-vitamin-C page does not own a kids-magnesium page.
+    const shareHead = sharesSubjectHead(`${topic.primaryKeyword} ${topic.title}`, docText, AUDIENCE_TYPEWORDS)
     // The existing page covers the topic's ENTIRE distinctive subject head → it
     // owns the need regardless of the coarse-need label (a near-identical page
     // whose title only adds "כיצד"/framing flips howto↔info but answers the same
@@ -278,7 +292,7 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // distinction is a documented semantic limitation).
     const foreign = unmatchedDocEntities(docText, `${topic.primaryKeyword} ${topic.title}`, projectVocab)
     if (mt !== 'distinct') {
-      matches.push({ existingTitle: doc.title || (doc.focusKeyword ?? ''), url: doc.url ?? null, matchType: mt, score: Number(Math.max(covTopic, covDoc).toFixed(2)), sharedNeed: shared2.slice(0, 6), ...(foreign.length ? { unmatchedEntities: foreign.slice(0, 6) } : {}) })
+      matches.push({ existingTitle: doc.title || (doc.focusKeyword ?? ''), url: doc.url ?? null, matchType: mt, score: Number(Math.max(covTopic, covDoc).toFixed(2)), sharedNeed: shared2.slice(0, 6), basisPageType: doc.type ?? null, ...(foreign.length ? { unmatchedEntities: foreign.slice(0, 6) } : {}) })
       if (rank[mt] > rank[best]) best = mt
     }
   }

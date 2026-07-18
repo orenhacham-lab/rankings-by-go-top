@@ -15,7 +15,7 @@
 
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
-import { incompatibleActionNeed } from './coverage'
+import { incompatibleActionNeed, searchNeedOf } from './coverage'
 import { normalizePhrase } from './keyword-guard'
 import { subjectTokens, type EntityPageType } from './link-role-mapper'
 import type { SearchIntent } from './opportunity'
@@ -324,6 +324,50 @@ export function finalizeReason(
 // ── D. recommended page type ──────────────────────────────────────────────────
 export type RecommendedPageType = 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
 const COMMERCIAL_INTENTS = new Set<SearchIntent>(['commercial', 'transactional', 'local'])
+
+// ── SHARED basis-compatibility (P0) — the ONE function every path that may assign
+// existing_page_improvement must use. Compares the DESIRED opportunity page role
+// (derived from the real need, not just the coarse intent), the EXISTING basis
+// page role, and resolvability. No duplicated per-path conditions. ───────────────
+export type BasisRole = 'commercial' | 'informational' | 'local_service' | 'unresolved'
+
+// A buy / shop / product / category / store NEED → a commercial page role.
+const BUY_NEED_RE = /(?:^|\s)(?:קניי?[הת]?|לקנות|קניות|לרכוש|רכיש[הת]|למכירה|חנות|חנויות|קטלוג|קטגורי\S*|קולקצי\S*|מוצר\S*|shop|buy|store|products?|category|categories|collection)(?:\s|$)/i
+// A price-guide / cost / comparison / how-to NEED → an INFORMATIONAL article role
+// EVEN when the coarse intent is transactional ("מחיר סידור פרחים לחתונה").
+const PRICE_INFO_RE = /(?:^|\s)(?:מחיר\S*|מחירון|כמה\s+עולה|עלות|עלויות|תמחור|השווא\S*|לעומת|מול|כדאי|איך|כיצד|מדריך|טיפים|guide|how|vs|versus|price|cost|compare)(?:\s|$)/i
+
+/** Desired PAGE ROLE from the actual NEED (not merely the coarse intent). */
+export function desiredOpportunityRole(primaryKeyword: string, title: string, intent: SearchIntent): BasisRole {
+  const hay = `${primaryKeyword} ${title}`
+  if (searchNeedOf(primaryKeyword, title, intent) === 'local') return 'local_service'
+  if (BUY_NEED_RE.test(hay) && !PRICE_INFO_RE.test(hay)) return 'commercial'
+  if (PRICE_INFO_RE.test(hay)) return 'informational'
+  if (intent === 'local') return 'local_service'
+  if (intent === 'commercial' || intent === 'transactional') return 'commercial'
+  return 'informational'
+}
+
+/** Role of an EXISTING basis page from its entity type + whether an actual page
+ *  (URL/type) resolves. A title-only owner (keyword-guard / pending, no page) is
+ *  UNRESOLVED — it may block a duplicate but is not an actionable improvement. */
+export function basisRoleOf(pageType: EntityPageType | null | undefined, hasResolvablePage: boolean): BasisRole {
+  if (pageType === 'product' || pageType === 'category' || pageType === 'service') return 'commercial'
+  if (pageType === 'article' || pageType === 'post' || pageType === 'page') return hasResolvablePage ? 'informational' : 'unresolved'
+  return hasResolvablePage ? 'informational' : 'unresolved'
+}
+
+/** Can an existing page of `basis` role legitimately be IMPROVED to satisfy a
+ *  `desired`-role opportunity? An unresolved (title-only) basis is never an
+ *  actionable improvement. A commercial buy/category need requires a commercial
+ *  page; an informational need requires an informational page; a local service
+ *  need accepts a commercial/service page. */
+export function isImprovementBasisCompatible(desired: BasisRole, basis: BasisRole): boolean {
+  if (basis === 'unresolved') return false
+  if (desired === 'local_service') return basis === 'commercial' || basis === 'local_service'
+  if (desired === 'commercial') return basis === 'commercial'
+  return basis === 'informational' // desired informational (incl. price guides)
+}
 
 // ── C. existing local-page ownership / cannibalization ────────────────────────
 export interface LocalOwnershipResult { outcome: 'owns' | 'improve' | 'distinct'; matchedTitle: string | null; overlap: number }

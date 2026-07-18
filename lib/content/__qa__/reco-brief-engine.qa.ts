@@ -505,7 +505,49 @@ async function main() {
     const { newRunCostController } = await import('../recommendations/run-cost-controller')
     const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns4', 8))
     const s = run.suggestions.find((x) => /קניית תוספים לנשירת/.test(x.primaryKeyword))
-    check('NS4-E2E. commercial topic is NOT existing_page_improvement of an informational article', !s || s.recommendedPageType !== 'existing_page_improvement', JSON.stringify(s?.recommendedPageType))
+    check('NS4-E2E (path A: initial cannibalization). commercial topic is NOT improvement of an informational article', !s || s.recommendedPageType !== 'existing_page_improvement', JSON.stringify(s?.recommendedPageType))
+    server.close()
+  }
+
+  console.log('E2E) NS-5 — commercial-vs-informational blocked through LOCAL ownership (path B)')
+  {
+    const tables = naturalShopTables()
+    // An INFORMATIONAL blog at the same place; a COMMERCIAL buy+location topic.
+    ;(tables.shopify_entities as Record<string, unknown>[]).push({ project_id: 'p1', is_active: true, title: 'מדריך זרי פרחים בבית שמש', handle: 'guide-bs', entity_type: 'blog', canonical_url: 'https://natural-shop.co.il/b/guide-bs' })
+    ;(tables.keyword_research_cache[0].results_json as Record<string, unknown>[]).push({ keyword: 'קניית זרי פרחים בבית שמש', avgMonthlySearches: 150 })
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b, i) => /קניית זרי פרחים בבית שמש/.test(b.subject)
+        ? { briefId: b.id, title: 'קניית זרי פרחים בבית שמש', primaryKeyword: 'קניית זרי פרחים בבית שמש', secondaryKeywords: [], intent: 'transactional' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`; resetModelResolutionCache(); resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns5', 8))
+    const s = run.suggestions.find((x) => /קניית זרי פרחים בבית שמש/.test(x.primaryKeyword))
+    check('NS5-E2E (path B: local ownership). commercial+local topic is NOT improvement of an informational blog', !s || s.recommendedPageType !== 'existing_page_improvement', JSON.stringify({ t: s?.recommendedPageType, cov: s?.coverageMatches?.map((m) => m.basisPageType) }))
+    server.close()
+  }
+
+  console.log('E2E) NS-6 — commercial-vs-informational blocked through late SUPPORT-LINK conversion (path C)')
+  {
+    const tables = naturalShopTables()
+    // An informational blog that OWNS a commercial topic's need + is a link candidate.
+    ;(tables.shopify_entities as Record<string, unknown>[]).push({ project_id: 'p1', is_active: true, title: 'כל מה שצריך לדעת על נשירת שיער', handle: 'hair-guide', entity_type: 'blog', canonical_url: 'https://natural-shop.co.il/b/hair-guide' })
+    ;(tables.keyword_research_cache[0].results_json as Record<string, unknown>[]).push({ keyword: 'קניית תוספים לנשירת שיער', avgMonthlySearches: 220 })
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b, i) => /קניית תוספים לנשירת שיער/.test(b.subject)
+        ? { briefId: b.id, title: 'קניית תוספים לנשירת שיער', primaryKeyword: 'קניית תוספים לנשירת שיער', secondaryKeywords: [], intent: 'commercial' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`; resetModelResolutionCache(); resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns6', 8))
+    const s = run.suggestions.find((x) => /קניית תוספים לנשירת שיער/.test(x.primaryKeyword))
+    check('NS6-E2E (path C: support-link conversion). commercial topic is NOT improved by an informational blog', !s || s.recommendedPageType !== 'existing_page_improvement', JSON.stringify(s?.recommendedPageType))
     server.close()
   }
 

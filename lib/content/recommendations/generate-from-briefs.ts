@@ -32,7 +32,7 @@ import { evaluateArticleWorthiness, type ExistingPageSignal } from './opportunit
 import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, isBoilerplatePage, type LinkCandidateEntity, type EntityPageType } from './link-role-mapper'
 import { filterLinkPlan } from './link-relevance'
 import { assessNeedCannibalization, isSameNeedDuplicate, isTitleKeywordAligned, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
-import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
+import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
 import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON } from './model'
 import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
@@ -308,6 +308,9 @@ export async function generateFromBriefs(
   const coveredKeys = new Set<string>([...guard.keywords, ...guard.contentKeywords].map((k) => normalizeText(k)))
   const linkCandidates: LinkCandidateEntity[] = entities.filter((e) => e.url).map((e) => ({ url: e.url as string, title: e.name, type: e.type }))
   const urlTypeMap = new Map<string, EntityPageType>(linkCandidates.map((c) => [c.url.trim().toLowerCase().replace(/\/+$/, ''), c.type ?? 'unknown']))
+  // Resolve a local-ownership matched TITLE back to its actionable entity (URL +
+  // page type) so improvement basis-compatibility can be judged consistently.
+  const entityByTitle = new Map<string, EntityNode>(entities.map((e) => [normalizeText(e.name), e]))
   const corpusTypeWords = deriveCorpusTypeWords(entities.map((e) => e.name))
   const domainTypeWords = deriveCorpusTypeWords(
     [...entities.map((e) => e.name), ...publishedCoverage, ...keywordResearch.map((k) => k.query), ...tracked, ...projectFocus],
@@ -328,12 +331,14 @@ export async function generateFromBriefs(
   // synonym owner ("תוספי תזונה" ⇄ "תוספי מזון") that the EXACT guard blocks must
   // still block the synonym topic here; an owner page can never be a mere support link.
   const existingCoverageDocs: ExistingCoverageDoc[] = dedupeCoverageDocs([
-    ...publishedCoverage.map((title) => ({ title })),
-    ...entities.map((e) => ({ title: e.name, url: e.url ?? null })),
-    ...linkCandidates.map((c) => ({ title: c.title, url: c.url })),
+    ...publishedCoverage.map((title) => ({ title, type: 'article' as const })),
+    ...entities.map((e) => ({ title: e.name, url: e.url ?? null, type: e.type })),
+    ...linkCandidates.map((c) => ({ title: c.title, url: c.url, type: c.type })),
     ...pendingCoverageDocs,
-    ...Array.from(guard.keywords).map((k) => ({ title: k })),
-    ...Array.from(guard.entityOwners).map((k) => ({ title: k })),
+    // Keyword-guard / entity owners are keyword STRINGS (no resolvable page) — they
+    // may block a duplicate but are UNRESOLVED bases (type/url null).
+    ...Array.from(guard.keywords).map((k) => ({ title: k, type: null })),
+    ...Array.from(guard.entityOwners).map((k) => ({ title: k, type: null })),
   ])
 
   const shadow_rejected_by_reason: Record<string, number> = {}
@@ -492,19 +497,29 @@ export async function generateFromBriefs(
     const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens)
     const coverageMatches: CoverageMatch[] = [...cann.matches]
     if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
-    // PAGE-ROLE / INTENT compatibility: a COMMERCIAL/transactional opportunity (a
-    // products/category/landing need) can NOT be an "improvement" of an
-    // INFORMATIONAL article just because the broad problem/entity overlaps — an
-    // article cannot own a commercial page's need. It may still support it as a
-    // link. Require a commercial-type basis (product/category/service page) before
-    // converting a commercial topic to an existing_page_improvement.
-    const commercialIntent = intent === 'commercial' || intent === 'transactional'
-    const basisIsCommercial = (m: CoverageMatch): boolean => {
-      const ty = m.url ? urlTypeMap.get(m.url.trim().toLowerCase().replace(/\/+$/, '')) : undefined
-      return ty === 'product' || ty === 'category' || ty === 'service'
-    }
+    // PAGE-ROLE / INTENT compatibility (ONE shared helper for EVERY conversion
+    // path): existing_page_improvement requires an EXISTING basis whose page role
+    // matches the DESIRED role of the opportunity's real need (a buy/category need
+    // → commercial page; a price-guide/how-to → informational article even when the
+    // coarse intent is transactional; a local service → service/location) AND that
+    // resolves to an actual page. A title-only owner (keyword guard) may block a
+    // duplicate but is not an actionable improvement.
+    const desiredRole = desiredOpportunityRole(primaryKeyword, t.title, intent)
+    const basisTypeOf = (m: CoverageMatch): EntityPageType | null => (m.basisPageType as EntityPageType | undefined) ?? (m.url ? (urlTypeMap.get(m.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null) : null)
+    const basisRoleFor = (m: CoverageMatch) => basisRoleOf(basisTypeOf(m), !!m.url)
+    const isActionableBasis = (m: CoverageMatch) => isImprovementBasisCompatible(desiredRole, basisRoleFor(m))
     const ownsMatches = coverageMatches.filter((m) => m.matchType === 'owns_need' || m.matchType === 'improve')
-    const cannibalImprovement = ownsMatches.length > 0 && (!commercialIntent || ownsMatches.some(basisIsCommercial))
+    const cannibalImprovement = ownsMatches.some(isActionableBasis)
+    // A SYNONYM near-duplicate of a title-only owner (keyword-guard / pending, no
+    // resolvable page) blocks the DUPLICATE new article — but ONLY a genuine
+    // same-need synonym ("תוספי מזון" ⇄ "תוספי תזונה"), NOT any broad owns_need
+    // overlap, and only when roles are compatible (an informational owner does not
+    // own a commercial buy need). Narrow by design, so distinct topics are not
+    // over-rejected against broad title-only owners.
+    if (!cannibalImprovement && isImprovementBasisCompatible(desiredRole, 'informational') &&
+        ownsMatches.some((m) => basisRoleFor(m) === 'unresolved' && isSameNeedDuplicate({ primaryKeyword, title: t.title, intent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent }))) {
+      return { rejectionReason: 'existing_content_owns_need' }
+    }
 
     // (5) pending-idea ownership: exact + PROVEN high-confidence semantic only.
     const sig = topicSignature(primaryKeyword, intent)
@@ -522,12 +537,17 @@ export async function generateFromBriefs(
     if (intent === 'local' || intent === 'transactional') {
       const own = assessExistingLocalOwnership(primaryKeyword, t.title, existingPageTitles, domainTypeWords)
       if (own.outcome === 'owns') return { rejectionReason: 'exact_existing_keyword_owner' }
-      if (own.outcome === 'improve') {
-        ownershipPageType = 'existing_page_improvement'
-        // Record the local match as the improvement's BASIS so acceptance can
-        // re-validate it (geographic containment, not a stray shared token).
-        if (own.matchedTitle && !coverageMatches.some((m) => m.existingTitle === own.matchedTitle)) {
-          coverageMatches.push({ existingTitle: own.matchedTitle, url: null, matchType: 'improve', score: own.overlap, sharedNeed: [] })
+      if (own.outcome === 'improve' && own.matchedTitle) {
+        // Route through the SAME basis-compatibility helper: resolve the matched
+        // title to its actionable entity (URL + page type) and require a compatible
+        // role before converting to an existing_page_improvement.
+        const ent = entityByTitle.get(normalizeText(own.matchedTitle))
+        const br = basisRoleOf(ent?.type ?? null, !!ent?.url)
+        if (isImprovementBasisCompatible(desiredRole, br)) {
+          ownershipPageType = 'existing_page_improvement'
+          if (!coverageMatches.some((m) => m.existingTitle === own.matchedTitle)) {
+            coverageMatches.push({ existingTitle: own.matchedTitle, url: ent?.url ?? null, matchType: 'improve', score: own.overlap, sharedNeed: [], basisPageType: ent?.type ?? null })
+          }
         }
       }
     }
@@ -573,14 +593,20 @@ export async function generateFromBriefs(
     // need, convert the topic to existing_page_improvement (carry its URL) and drop
     // the link — an owning page must never remain "merely a supporting link".
     const owningUrls = new Set<string>()
-    let owningPage: { title: string; url: string | null } | null = null
+    let owningPage: { title: string; url: string | null; type: EntityPageType | null } | null = null
     for (const tg of [...linkPlan.supportingInformationalLinks, ...linkPlan.sourceReferences]) {
       const mt = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, [{ title: tg.title, url: tg.url }], businessEvidenceTokens).matchType
-      if (mt === 'owns_need' || mt === 'exact') { owningUrls.add(tg.url); if (!owningPage) owningPage = { title: tg.title, url: tg.url } }
+      if (mt !== 'owns_need' && mt !== 'exact') continue
+      // Convert ONLY when the owning support page is a role-COMPATIBLE, actionable
+      // basis (the same shared helper) — an informational page that owns a
+      // COMMERCIAL topic's need may still SUPPORT it as a link, but cannot own it.
+      const tgType = urlTypeMap.get(tg.url.trim().toLowerCase().replace(/\/+$/, '')) ?? null
+      if (!isImprovementBasisCompatible(desiredRole, basisRoleOf(tgType, !!tg.url))) continue
+      owningUrls.add(tg.url); if (!owningPage) owningPage = { title: tg.title, url: tg.url, type: tgType }
     }
     if (owningPage) {
       if (!ownershipPageType) ownershipPageType = 'existing_page_improvement'
-      if (!coverageMatches.some((m) => m.existingTitle === owningPage!.title)) coverageMatches.push({ existingTitle: owningPage.title, url: owningPage.url, matchType: 'owns_need', score: 1, sharedNeed: [] })
+      if (!coverageMatches.some((m) => m.existingTitle === owningPage!.title)) coverageMatches.push({ existingTitle: owningPage.title, url: owningPage.url, matchType: 'owns_need', score: 1, sharedNeed: [], basisPageType: owningPage.type })
       linkPlan.supportingInformationalLinks = linkPlan.supportingInformationalLinks.filter((tg) => !owningUrls.has(tg.url))
       linkPlan.sourceReferences = linkPlan.sourceReferences.filter((tg) => !owningUrls.has(tg.url))
     }

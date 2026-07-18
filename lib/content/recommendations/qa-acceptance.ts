@@ -16,7 +16,8 @@
 
 import type { BriefRunDiagnostics } from './generate-from-briefs'
 import type { TopicSuggestion } from './types'
-import { isMalformedReason, isTruncatedKeywordPhrase, validateIntentKeywordConsistency, localImprovementCompatible } from './opportunity-validation'
+import { isMalformedReason, isTruncatedKeywordPhrase, validateIntentKeywordConsistency, localImprovementCompatible, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible } from './opportunity-validation'
+import type { EntityPageType } from './link-role-mapper'
 import type { SearchIntent } from './opportunity'
 import { distinctiveTokensOf, canonicalVariants } from './semantic-dup'
 import { isBoilerplatePage } from './link-role-mapper'
@@ -205,6 +206,19 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
     return links.filter((l) => (canonUrl(l.url) && basisUrls.has(canonUrl(l.url))) || basisTitles.has(normTitle(l.title))).map((l) => `"${s.primaryKeyword}" ↯ links its own basis "${l.title || l.url}"`)
   })
   add('improvement_basis_not_linked', basisLinked.length === 0, basisLinked.join(' · ') || 'none')
+
+  // PAGE-ROLE compatibility: an existing_page_improvement must have a basis whose
+  // page role matches the opportunity's DESIRED role (a commercial category/product
+  // need cannot be improved by an informational article; an informational topic
+  // cannot be improved by an unrelated commercial product page) AND that resolves to
+  // an actionable page (never a title-only owner with no page to update).
+  const roleIncompatible = suggestions.filter((s) => {
+    if (s.recommendedPageType !== 'existing_page_improvement') return false
+    const desired = desiredOpportunityRole(s.primaryKeyword, s.title, s.searchIntent as import('./opportunity').SearchIntent)
+    const bases = (s.coverageMatches ?? []).filter((m) => m.matchType === 'owns_need' || m.matchType === 'exact' || m.matchType === 'improve')
+    return !bases.some((m) => isImprovementBasisCompatible(desired, basisRoleOf((m.basisPageType as EntityPageType | undefined) ?? null, !!m.url)))
+  })
+  add('existing_page_improvement_role_compatible', roleIncompatible.length === 0, roleIncompatible.map((s) => `"${s.primaryKeyword}" (${s.searchIntent}) ← ${(s.coverageMatches ?? []).map((m) => `${m.existingTitle}[${m.basisPageType ?? (m.url ? 'url' : 'title-only')}]`).join('/') || 'no basis'}`).join(' · ') || 'none')
 
   // OBSERVABILITY (warn, never fail): an accepted existing_page_improvement whose
   // coverage basis carries an unmatched FOREIGN entity (after project-vocabulary
