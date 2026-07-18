@@ -245,7 +245,13 @@ export function isNarrowerThanBroadParent(topic: string, b: string, typeWords?: 
  *  overlap count so a shared condition ("יד שנייה" on both) cannot inflate a
  *  broad-vs-narrow pair to ownership (generic "שמלות יד שנייה" ⇄ "שמלות כלה יד
  *  שנייה"). Domain-neutral. */
-const CONDITION_TOKENS = new Set(['יד', 'שני', 'שניה', 'שנייה', 'משומש', 'משומשת', 'משומשים', 'יד2'].map((w) => canonicalToken(w)).filter(Boolean))
+// Include each condition word's canonicalVariants — synonymTokens folds "שנייה" to
+// the proclitic-stripped fragment "נייה" (canonicalVariants strips a leading ש), and
+// that fragment must ALSO count as a condition or it silently inflates the shared
+// count (a shared "נייה" made "שמלות כלה יד שנייה" ≈ "שמלות יד שנייה" → false owns_need).
+const CONDITION_TOKENS = new Set(['יד', 'שני', 'שניה', 'שנייה', 'משומש', 'משומשת', 'משומשים', 'יד2']
+  .flatMap((w) => { const c = canonicalToken(w); return c ? [c, ...canonicalVariants(c)] : [] })
+  .filter(Boolean))
 // bare digit / "יד2" quantity — NOT an alphanumeric specific (B12/K2/VO2 kept).
 function isConditionOrQuantity(t: string): boolean { return CONDITION_TOKENS.has(t) || /^\d+$/.test(t) || /^יד\d+$/.test(t) }
 

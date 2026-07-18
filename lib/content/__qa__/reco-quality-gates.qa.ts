@@ -314,6 +314,26 @@ async function main() {
         deriveCorpusTypeWords(['סידור פרחים', 'זר פרחים', 'עציץ פרחים', 'משלוח פרחים', 'פרחים לחתונה', 'פרחים לאירוע']))))
     check('P0-subtype preserve: different vitamins (B12 ≠ C) are distinct via the specific',
       cannMt('ויטמין B12', 'ויטמין B12 למבוגרים', 'ויטמין C מומלץ', 'informational') === 'distinct')
+
+    // ── P0 (5): a CONDITION FRAGMENT must not inflate the coverage overlap. In a
+    // second-hand shop the condition "יד שנייה" is in almost every entity, so
+    // deriveCorpusTypeWords derives it — and synonymTokens folds "שנייה" to the
+    // proclitic-stripped fragment "נייה", which used to leak into the shared count
+    // and made a broad parent ("שמלות יד שנייה") falsely own a specific subtype
+    // ("שמלות כלה יד שנייה"). owns_need must NEVER be CREATED for this pair.
+    const secondHandTW = deriveCorpusTypeWords(['תיק עור יד שנייה', 'נעלי ספורט יד שנייה', 'חולצת בייסיק יד שנייה', 'מכנס מחויט יד שנייה', 'שמלת ערב יד שנייה', 'בגד ים יד שנייה'])
+    // Robust regardless of intent: TRANSACTIONAL gates the narrower-downgrade OFF, so
+    // only accurate condition-fragment handling keeps this distinct.
+    check('P0-condition-fragment: transactional broad parent → distinct ("נייה" does not inflate the overlap)',
+      cannMt('שמלות כלה יד שנייה', 'שמלות כלה יד שנייה', 'שמלות יד שנייה', 'transactional', secondHandTW) === 'distinct')
+    // EXACT live Shashka set: no owns_need match is created against the broad parent
+    // or the different (evening-dress) subtype.
+    const shashka = assessNeedCannibalization(
+      { primaryKeyword: 'שמלות כלה יד שנייה', title: 'שמלות כלה יד שנייה: כל היתרונות בבחירה אופנתית ומשתלמת', intent: 'informational' },
+      [{ title: 'שמלות יד שנייה', focusKeyword: 'שמלות יד שנייה', type: 'article' }, { title: 'שמלות ערב יד שנייה', focusKeyword: 'שמלות ערב יד שנייה', type: 'article' }, { title: 'המדריך השלם לבחירת שמלות ערב יד שנייה באיכות גבוהה', type: 'article' }],
+      undefined, undefined, secondHandTW)
+    check('P0-condition-fragment: EXACT live Shashka coverage set → NO owns_need match created',
+      shashka.matchType === 'distinct' && shashka.matches.every((m) => m.matchType !== 'owns_need'), JSON.stringify(shashka.matches))
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')
