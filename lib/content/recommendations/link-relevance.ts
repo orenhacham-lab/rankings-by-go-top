@@ -81,12 +81,21 @@ export function isModifierToken(tok: string, extraTypeWords?: Set<string>): bool
 
 /** Distinctive SUBJECT tokens of a phrase, minus generic/attribute/type words,
  *  but KEEPING single latin letters + digit-bearing tokens (a vitamin letter
- *  "C"/"D", "B12", "K2", "1000") — these are the SPECIFIC differentiators the
- *  base tokenizer drops, and losing them let Vitamin-C→Vitamin-D match. */
+ *  "C"/"D", "B12", "K2", "D3", "VO2", "1000mg") — these are the SPECIFIC
+ *  differentiators the base tokenizer drops, and losing them let Vitamin-C→
+ *  Vitamin-D match. A digit-bearing CONDITION/quantity COMPOUND the modifier
+ *  lexicon knows ("יד2") is NOT a specific and must still be dropped — otherwise
+ *  it bypasses the modifier filter and falsely bridges two products. */
 export function subjectTokensOf(phrase: string, extraTypeWords?: Set<string>): string[] {
   const out: string[] = []
   for (const w of (phrase || '').toLowerCase().replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ').split(/\s+/).filter(Boolean)) {
-    if (/^[a-z]$/.test(w) || /\d/.test(w)) { out.push(w); continue } // keep C / D / B12 / 1000
+    if (/^[a-z]$/.test(w)) { out.push(w); continue } // keep a single vitamin letter C / D
+    if (/\d/.test(w)) {
+      // keep real alphanumeric specifics (B12/K2/D3/VO2/1000mg) but drop a
+      // digit-bearing modifier/condition compound (יד2) the lexicon recognises.
+      if (!isModifierToken(w, extraTypeWords) && !isModifierToken(canonicalToken(w), extraTypeWords)) out.push(w)
+      continue
+    }
     for (const t of distinctiveTokensOf(w)) if (!isModifierToken(t, extraTypeWords)) out.push(t)
   }
   return Array.from(new Set(out))

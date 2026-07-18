@@ -225,6 +225,18 @@ async function main() {
     check('P0-sports: "משקולות כושר" vs "רצועות כושר" are distinct concrete heads', !sharesSubjectHead('משקולות כושר', 'רצועות כושר לאימון', fitnessTW))
     check('P0-sports: a BARE domain word ("כושר") does NOT own "ציוד כושר"', !sharesSubjectHead('כושר', 'ציוד כושר מקצועי', fitnessTW))
     check('P0-sports: second-hand "ספת כושר יד 2" vs "אופני כושר יד 2" — the condition/quantity does NOT bridge', !sharesSubjectHead('ספת כושר יד 2', 'אופני כושר יד 2', fitnessTW))
+    // The condition compound "יד2" (no space) must NOT bypass the modifier filter
+    // via the digit short-circuit — a digit-bearing MODIFIER is still dropped.
+    check('P0-sports: second-hand "ספת כושר יד2" vs "אופני כושר יד2" (no space) does NOT bridge', !sharesSubjectHead('ספת כושר יד2', 'אופני כושר יד2', fitnessTW))
+    // Real alphanumeric SPECIFICS are preserved: the vitamin specific differentiates
+    // (B12 ≠ C) at link/cannibalization level, and a shared specific still relates.
+    check('P0-specific: "ויטמין B12" vs "ויטמין C" → link IRRELEVANT (specific differs, not the type word)',
+      !isRelevantLink(evaluateLink({ primaryKeyword: 'ויטמין B12', title: 'ויטמין B12 למבוגרים' }, { url: '/c', title: 'ויטמין C מומלץ', role: 'supporting_informational_link' }), 'supporting_informational_link'))
+    check('P0-specific: "ויטמין B12" topic NOT cannibalized by a "ויטמין C" page (B12 ≠ C)',
+      assessNeedCannibalization({ primaryKeyword: 'ויטמין B12', title: 'ויטמין B12 למבוגרים', intent: 'informational' }, [{ title: 'ויטמין C מומלץ', url: '/c' }]).matchType === 'distinct')
+    check('P0-specific: a B12 topic → a B12 article STILL shares the specific subject',
+      isRelevantLink(evaluateLink({ primaryKeyword: 'ויטמין B12', title: 'ויטמין B12 למבוגרים' }, { url: '/b', title: 'מדריך ויטמין B12 לצמחונים', role: 'supporting_informational_link' }), 'supporting_informational_link') &&
+      sharesSubjectHead('ויטמין B12', 'מדריך ויטמין B12 לצמחונים'))
     check('P0-sports: "רצועות כושר" topic NOT owned/improved by a "מאמן כושר" service page',
       assessNeedCannibalization({ primaryKeyword: 'רצועות כושר', title: 'רצועות כושר לאימון', intent: 'transactional' }, [{ title: 'מאמן כושר אישי', url: '/coach', type: 'service' }], undefined, undefined, fitnessTW).matchType === 'distinct')
     // (b) OFFICE cleaning — a shared container ("משרד") is NOT a shared subject.
