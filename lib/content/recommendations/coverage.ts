@@ -108,7 +108,7 @@ export interface TopicNeed { primaryKeyword: string; title: string; intent?: str
  *  SAME coarse search need — catches the transactional/informational price-page
  *  pair the intent-cluster dedupe missed. Falls back to the strict semantic
  *  duplicate for non-cost needs. */
-export function isSameNeedDuplicate(a: TopicNeed, b: TopicNeed): boolean {
+export function isSameNeedDuplicate(a: TopicNeed, b: TopicNeed, typeWords?: Set<string>): boolean {
   if (isHighConfidenceDuplicate(topicSignature(a.primaryKeyword, a.intent), topicSignature(b.primaryKeyword, b.intent))) return true
   const needA = searchNeedOf(a.primaryKeyword, a.title, a.intent)
   const needB = searchNeedOf(b.primaryKeyword, b.title, b.intent)
@@ -120,7 +120,13 @@ export function isSameNeedDuplicate(a: TopicNeed, b: TopicNeed): boolean {
   for (const t of subA) if (subB.has(t)) shared++
   // A distinctive-subject overlap covering the majority of the smaller topic +
   // the same coarse need = the same page (price/how-to/… of the same subject).
-  return shared >= 2 && shared / Math.min(subA.size, subB.size) >= 0.6
+  if (!(shared >= 2 && shared / Math.min(subA.size, subB.size) >= 0.6)) return false
+  // DISCRIMINATIVE-CORE gate (P0): when per-project domain/type words are known,
+  // two topics overlapping ONLY on broad domain words (ציוד/כושר) but with
+  // different concrete heads are NOT the same page — require a shared subject head
+  // after those domain words are stripped.
+  if (typeWords && typeWords.size) return sharesSubjectHead(`${a.primaryKeyword} ${a.title}`, `${b.primaryKeyword} ${b.title}`, typeWords)
+  return true
 }
 
 /**
@@ -136,7 +142,18 @@ export function isTitleKeywordAligned(primaryKeyword: string, title: string): bo
   const ti = synonymTokens(title)
   let shared = 0
   for (const t of kw) if (ti.has(t)) shared++
-  return shared / kw.size >= 0.6
+  if (shared / kw.size < 0.6) return false
+  // DISCRIMINATIVE-CORE gate (P0): a generic CONTAINER word ("חברה"→"משרד"
+  // synonym fold) shared with the title must NOT, by itself, establish alignment
+  // — otherwise a generic "מזכירות חברה" keyword aligns with any office/company
+  // title. The keyword's real subject core (base generic/container/audience words
+  // stripped — but per-project DOMAIN CONTENT words like "אופנה"/"כושר" KEPT,
+  // since they are legitimate subject matter) must share a head with the title.
+  // When the keyword has NO discriminative core (only generic words) the ratio
+  // alone decides (nothing distinctive to gate).
+  const kwCore = subjectTokensOf(primaryKeyword).filter((t) => !/^\d+$/.test(t))
+  if (kwCore.length === 0) return true
+  return sharesSubjectHead(primaryKeyword, title)
 }
 
 export type CoverageMatchType = 'exact' | 'owns_need' | 'improve' | 'distinct'
@@ -230,7 +247,14 @@ function vocabExcludingSource(provenance: Map<string, Set<string>>, excludeSourc
  * topic against each existing doc's title / focus keyword / slug with synonym
  * folding: full subject coverage + same need = owns_need; partial = improve.
  */
-export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCoverageDoc[], projectVocab?: Set<string>, provenance?: Map<string, Set<string>>): { matchType: CoverageMatchType; matches: CoverageMatch[] } {
+export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCoverageDoc[], projectVocab?: Set<string>, provenance?: Map<string, Set<string>>, typeWords?: Set<string>): { matchType: CoverageMatchType; matches: CoverageMatch[] } {
+  // DISCRIMINATIVE SUBJECT CORE (P0): fold the per-project corpus-derived
+  // domain/type/container words (domainTypeWords) into the head gates so a broad
+  // domain word alone ("כושר"/"משרד") can never own a specific subject
+  // ("רצועות כושר"). The shared-head gate also excludes audience words; the
+  // covers-all-heads gate keeps audience distinctive (see AUDIENCE_TYPEWORDS).
+  const shareHeadTypeWords = typeWords && typeWords.size ? new Set([...AUDIENCE_TYPEWORDS, ...typeWords]) : AUDIENCE_TYPEWORDS
+  const coverHeadTypeWords = typeWords && typeWords.size ? typeWords : undefined
   // Compare on the underlying NEED = the normalized primary keyword's distinctive
   // subject. A headline title carries marketing tail ("פירוט מחירים וטיפים
   // לחיסכון") that is NOT part of the need and must not dilute coverage — that
@@ -267,12 +291,12 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // exact-keyword match below is unaffected (it is identity, not overlap).
     // The shared head must be a REAL subject, not merely a shared audience/recipient
     // ("לילדים") — a kids-vitamin-C page does not own a kids-magnesium page.
-    const shareHead = sharesSubjectHead(`${topic.primaryKeyword} ${topic.title}`, docText, AUDIENCE_TYPEWORDS)
+    const shareHead = sharesSubjectHead(`${topic.primaryKeyword} ${topic.title}`, docText, shareHeadTypeWords)
     // The existing page covers the topic's ENTIRE distinctive subject head → it
     // owns the need regardless of the coarse-need label (a near-identical page
     // whose title only adds "כיצד"/framing flips howto↔info but answers the same
     // need — "לחזור לטבע…" ⇄ "לחזור לטבע…"). Keyed on the primary keyword's heads.
-    const coversHeads = coversAllSubjectHeads(topic.primaryKeyword, docText)
+    const coversHeads = coversAllSubjectHeads(topic.primaryKeyword, docText, coverHeadTypeWords)
     let mt: CoverageMatchType = 'distinct'
     if (normalizePhrase(doc.focusKeyword || doc.title || '') === topicNorm) mt = 'exact'
     else if (!shareHead) mt = 'distinct'

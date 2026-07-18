@@ -80,6 +80,11 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   const { diagnostics: d, suggestions } = input
   const rules: AcceptanceRule[] = []
   const add = (id: string, pass: boolean, detail: string, level: 'fail' | 'warn' = 'fail') => rules.push({ id, level, pass, detail })
+  // DISCRIMINATIVE SUBJECT CORE (P0): the SAME per-project corpus-derived
+  // domain/type/container words generation used, so acceptance strips the same
+  // broad domain head ("כושר"/"משרד") a generic subject can never own/align with.
+  const domainTypeWords = new Set(d.domainTypeWords ?? [])
+  const dtw = domainTypeWords.size ? domainTypeWords : undefined
 
   // ── Model path ──
   if (input.tierRequested === 'premium') {
@@ -177,7 +182,7 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   const dupPairs: string[] = []
   for (let i = 0; i < suggestions.length; i++) for (let j = i + 1; j < suggestions.length; j++) {
     const a = suggestions[i], b = suggestions[j]
-    if (isSameNeedDuplicate({ primaryKeyword: a.primaryKeyword, title: a.title, intent: a.searchIntent }, { primaryKeyword: b.primaryKeyword, title: b.title, intent: b.searchIntent })) {
+    if (isSameNeedDuplicate({ primaryKeyword: a.primaryKeyword, title: a.title, intent: a.searchIntent }, { primaryKeyword: b.primaryKeyword, title: b.title, intent: b.searchIntent }, dtw)) {
       dupPairs.push(`"${a.primaryKeyword}" ≈ "${b.primaryKeyword}"`)
     }
   }
@@ -196,7 +201,7 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
       const br = basisRoleOf((m.basisPageType as EntityPageType | undefined) ?? null, !!m.url)
       if (br === 'unresolved') {
         // A title-only owner blocks only a PROVEN same-need synonym duplicate.
-        return isImprovementBasisCompatible(desired, 'informational') && isSameNeedDuplicate({ primaryKeyword: s.primaryKeyword, title: s.title, intent: s.searchIntent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent: s.searchIntent })
+        return isImprovementBasisCompatible(desired, 'informational') && isSameNeedDuplicate({ primaryKeyword: s.primaryKeyword, title: s.title, intent: s.searchIntent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent: s.searchIntent }, dtw)
       }
       return isImprovementBasisCompatible(desired, br) // role-compatible actionable basis owns the need
     })
@@ -216,7 +221,7 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
     const isLocal = s.searchIntent === 'local'
     // Valid iff SOME basis shares a subject head, is a compatible ACTION/need
     // class (build≠promote), and — for a local topic — is the same place.
-    return !bases.some((m) => sharesSubjectHead(topicText, m.existingTitle) && !incompatibleActionNeed(topicText, m.existingTitle) && (!isLocal || localImprovementCompatible(topicText, m.existingTitle)))
+    return !bases.some((m) => sharesSubjectHead(topicText, m.existingTitle, dtw) && !incompatibleActionNeed(topicText, m.existingTitle) && (!isLocal || localImprovementCompatible(topicText, m.existingTitle)))
   })
   add('existing_page_improvement_valid_basis', invalidImprovement.length === 0, invalidImprovement.map((s) => `"${s.primaryKeyword}" (${s.searchIntent}) ← ${(s.coverageMatches ?? []).map((m) => m.existingTitle).join('/') || 'no basis'}`).join(' · ') || 'none')
 

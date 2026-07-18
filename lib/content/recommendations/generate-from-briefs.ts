@@ -144,6 +144,10 @@ export interface BriefRunDiagnostics {
   brief_consumption: { effectivePoolSize: number; consumedBriefs: number; remainingBriefs: number; callsRemaining: number }
   insufficient_inventory: boolean
   secondary_keywords_filtered: number
+  /** Per-project corpus-derived domain/type/container words (the DISCRIMINATIVE
+   *  subject core) — surfaced so the acceptance runner can strip the SAME broad
+   *  domain words a generic head ("כושר"/"משרד") can never own a subject with. */
+  domainTypeWords: string[]
   target_role_mappings: { keyword: string; primaryTarget: string | null; roles: { url: string; role: string; score: number }[] }[]
   /** Competitor leakage grouped by location — rejected evidence vs accepted output. */
   competitorLeakage: {
@@ -511,7 +515,7 @@ export async function generateFromBriefs(
     // existing_page_improvement recommendation (never a separate landing page),
     // carrying the existing URL — the underlying search need is compared, not
     // exact wording (wedding-floral pricing: סידור vs עיצוב פרחוני).
-    const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens, evidenceProvenance)
+    const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens, evidenceProvenance, domainTypeWords)
     const coverageMatches: CoverageMatch[] = [...cann.matches]
     if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
     // PAGE-ROLE / INTENT compatibility (ONE shared helper for EVERY conversion
@@ -534,7 +538,7 @@ export async function generateFromBriefs(
     // own a commercial buy need). Narrow by design, so distinct topics are not
     // over-rejected against broad title-only owners.
     if (!cannibalImprovement && isImprovementBasisCompatible(desiredRole, 'informational') &&
-        ownsMatches.some((m) => basisRoleFor(m) === 'unresolved' && isSameNeedDuplicate({ primaryKeyword, title: t.title, intent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent }))) {
+        ownsMatches.some((m) => basisRoleFor(m) === 'unresolved' && isSameNeedDuplicate({ primaryKeyword, title: t.title, intent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent }, domainTypeWords))) {
       return { rejectionReason: 'existing_content_owns_need' }
     }
 
@@ -545,7 +549,7 @@ export async function generateFromBriefs(
     // (6) within-run NEED dedupe: strict semantic dup OR same subject-head + same
     // coarse search-need (catches the transactional/informational price-page pair).
     const thisNeed: TopicNeed = { primaryKeyword, title: t.title, intent }
-    if (acceptedNeeds.some((a) => isSameNeedDuplicate(thisNeed, a))) return { rejectionReason: 'intra_run_need_duplicate' }
+    if (acceptedNeeds.some((a) => isSameNeedDuplicate(thisNeed, a, domainTypeWords))) return { rejectionReason: 'intra_run_need_duplicate' }
 
     // (7) local ownership (existing local/commercial page already owns the intent)
     // + the coverage owns_need/improve signal → recommend improving the existing
@@ -612,7 +616,7 @@ export async function generateFromBriefs(
     const owningUrls = new Set<string>()
     let owningPage: { title: string; url: string | null; type: EntityPageType | null } | null = null
     for (const tg of [...linkPlan.supportingInformationalLinks, ...linkPlan.sourceReferences]) {
-      const mt = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, [{ title: tg.title, url: tg.url, sourceKey: `entity:${normalizeText(tg.title)}` }], businessEvidenceTokens, evidenceProvenance).matchType
+      const mt = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, [{ title: tg.title, url: tg.url, sourceKey: `entity:${normalizeText(tg.title)}` }], businessEvidenceTokens, evidenceProvenance, domainTypeWords).matchType
       if (mt !== 'owns_need' && mt !== 'exact') continue
       // Convert ONLY when the owning support page is a role-COMPATIBLE, actionable
       // basis (the same shared helper) — an informational page that owns a
@@ -887,6 +891,7 @@ export async function generateFromBriefs(
       brief_consumption: { effectivePoolSize, consumedBriefs, remainingBriefs, callsRemaining: Math.max(0, 2 - totalPaidCalls) },
       insufficient_inventory: stop === 'insufficient_inventory',
       secondary_keywords_filtered: secondaryKeywordsFiltered,
+      domainTypeWords: Array.from(domainTypeWords),
       target_role_mappings,
       competitorLeakage,
       cost: { totalCalls: summary.totalCalls, ...costTelemetry },

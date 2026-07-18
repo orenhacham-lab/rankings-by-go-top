@@ -6,7 +6,7 @@
  *   P0-3 headline → search-phrase normalization — 5 live keywords.
  */
 import { evaluateLink, isRelevantLink, sharesSubjectHead } from '../recommendations/link-relevance'
-import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed, unmatchedDocEntities } from '../recommendations/coverage'
+import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed, unmatchedDocEntities, isTitleKeywordAligned } from '../recommendations/coverage'
 import { contentTokens } from '../recommendations/evidence-cluster'
 import { normalizeToSearchPhrase, isSearchPhraseQuality, keywordHasRealSubject, keywordPreservesSubject } from '../recommendations/search-phrase'
 import { assessExistingLocalOwnership, deriveCorpusTypeWords, localImprovementCompatible, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible } from '../recommendations/opportunity-validation'
@@ -210,6 +210,61 @@ async function main() {
     // (5) same-location service improvement remains valid.
     check('NS9-5: same-place service ownership still valid (concrete location, not thematic)',
       localImprovementCompatible('משלוח פרחים בבית שמש', 'שירות משלוחי פרחים בבית שמש'))
+
+    // ── P0 (cross-domain matrix): A GENERIC DOMAIN HEAD CANNOT OWN A SPECIFIC ──
+    // SUBJECT. The per-project corpus-derived domain/type/container words are
+    // stripped before the ownership/link head gate, so a broad domain word alone
+    // ("כושר"/"משרד"/"בגד") can never own a specific subject. Derived from real
+    // corpus evidence (deriveCorpusTypeWords) — NOT an industry blacklist.
+    const fitnessTW = deriveCorpusTypeWords(['ציוד כושר ביתי', 'ציוד כושר מקצועי', 'ציוד כושר לסטודיו', 'ציוד כושר משקולות', 'ציוד כושר רצועות', 'ציוד כושר אופניים', 'ציוד כושר מסלולים', 'ציוד כושר ספות'])
+    const officeTW = deriveCorpusTypeWords(['שירותי משרד', 'ציוד משרד', 'ריהוט משרד', 'ניהול משרד', 'אחזקת משרד', 'ניקיון משרד'])
+    const fashionTW = deriveCorpusTypeWords(['בגד נשים', 'בגד ערב', 'בגד גוף', 'בגד ים', 'בגד עבודה', 'בגד ספורט', 'בגד חורף'])
+    const flowerTW = deriveCorpusTypeWords(['סידור פרחים', 'זר פרחים', 'עציץ פרחים', 'משלוח פרחים', 'פרחים לחתונה', 'פרחים לאירוע'])
+    // (a) SPORTS ecommerce — a shared domain head ("כושר") is NOT a shared subject.
+    check('P0-sports: "רצועות כושר" shares NO subject head with "מאמן כושר" (only domain "כושר")', !sharesSubjectHead('רצועות כושר', 'איך לבחור מאמן כושר אישי', fitnessTW))
+    check('P0-sports: "משקולות כושר" vs "רצועות כושר" are distinct concrete heads', !sharesSubjectHead('משקולות כושר', 'רצועות כושר לאימון', fitnessTW))
+    check('P0-sports: a BARE domain word ("כושר") does NOT own "ציוד כושר"', !sharesSubjectHead('כושר', 'ציוד כושר מקצועי', fitnessTW))
+    check('P0-sports: second-hand "ספת כושר יד 2" vs "אופני כושר יד 2" — the condition/quantity does NOT bridge', !sharesSubjectHead('ספת כושר יד 2', 'אופני כושר יד 2', fitnessTW))
+    check('P0-sports: "רצועות כושר" topic NOT owned/improved by a "מאמן כושר" service page',
+      assessNeedCannibalization({ primaryKeyword: 'רצועות כושר', title: 'רצועות כושר לאימון', intent: 'transactional' }, [{ title: 'מאמן כושר אישי', url: '/coach', type: 'service' }], undefined, undefined, fitnessTW).matchType === 'distinct')
+    // (b) OFFICE cleaning — a shared container ("משרד") is NOT a shared subject.
+    check('P0-office: "ניהול משרד" shares NO subject head with "ניקיון משרדים" (only container "משרד")', !sharesSubjectHead('ניהול משרד', 'ניקיון משרדים בתל אביב', officeTW))
+    check('P0-office: "ריהוט משרדי" topic NOT owned by a "ניקיון משרדים" page',
+      assessNeedCannibalization({ primaryKeyword: 'ריהוט משרדי', title: 'ריהוט משרדי ארגונומי', intent: 'transactional' }, [{ title: 'שירותי ניקיון משרדים בתל אביב', url: '/clean', type: 'service' }], undefined, undefined, officeTW).matchType === 'distinct')
+    // (c) FASHION / second-hand retail — condition "יד שנייה" is not a subject.
+    check('P0-fashion: "בגד גוף יד שנייה" vs "חצאית יד שנייה" are distinct concrete heads', !sharesSubjectHead('בגד גוף יד שנייה', 'חצאית מיני יד שנייה', fashionTW))
+    check('P0-fashion: a BARE domain word ("בגד") does NOT own "בגד ערב"', !sharesSubjectHead('בגד', 'בגד ערב אלגנטי', fashionTW))
+    // (d) SAME concrete head STILL owns (the discriminative core is present) —
+    // true same-subject ownership when the basis is an actionable page.
+    check('P0-preserve: "רצועות כושר" DOES own an actionable "רצועות כושר" product page (shared concrete head)',
+      ['owns_need', 'improve', 'exact'].includes(assessNeedCannibalization({ primaryKeyword: 'רצועות כושר', title: 'רצועות כושר להתנגדות', intent: 'transactional' }, [{ title: 'רצועות כושר להתנגדות', url: '/p/straps', type: 'product', focusKeyword: 'רצועות כושר' }], undefined, undefined, fitnessTW).matchType))
+    // (e) PRESERVE with typeWords: wedding-floral pricing still owns/improves,
+    // hair-loss stays relevant, singular/plural morphology still shares.
+    check('P0-preserve: wedding-floral pricing still owns/improves even with flower domain words stripped',
+      ['owns_need', 'improve'].includes(assessNeedCannibalization({ primaryKeyword: 'מחיר סידור פרחים לחתונה', title: 'כמה עולה סידור פרחים לחתונה', intent: 'transactional' }, [{ title: 'כמה עולה עיצוב פרחוני לחתונה', url: '/wf', focusKeyword: 'עיצוב פרחוני לחתונה' }], undefined, undefined, flowerTW).matchType))
+    check('P0-preserve: singular/plural "סידור פרחים" ⇄ "סידורי פרחים" still share a head (morphology)', sharesSubjectHead('סידור פרחים', 'סידורי פרחים מעוצבים', flowerTW))
+    check('P0-preserve: hair-loss topic → hair-loss article stays RELEVANT (no domain words for a general shop)',
+      sharesSubjectHead('נשירת שיער', 'טיפול בנשירת שיער', new Set()))
+
+    // ── P0 (2): title↔keyword alignment uses the SAME discriminative core —
+    // a generic business/container word ("חברה") can NOT align an off-subject
+    // demand to a title; domain CONTENT words and real subjects still align.
+    check('P0-align: generic "מזכירות חברה" does NOT align with an off-subject office-cleaning title',
+      !isTitleKeywordAligned('מזכירות חברה', 'שירותי ניקיון משרדים לעסקים בתל אביב'))
+    check('P0-align: generic "ניהול חברה" does NOT align with a cleaning guide title',
+      !isTitleKeywordAligned('ניהול חברה', 'מדריך ניקיון משרדים יסודי'))
+    check('P0-align preserve: "מיכל הדחה" aligns with a fault-repair title (concrete subject shared)',
+      isTitleKeywordAligned('מיכל הדחה', 'מיכל הדחה דולף? כך מתקנים תקלה נפוצה'))
+    check('P0-align preserve: "אופנה לנשים" aligns with a women\'s-fashion title (domain content is legitimate subject)',
+      isTitleKeywordAligned('אופנה לנשים', 'טרנדים חמים באופנה לנשים לעונת החורף'))
+    check('P0-align preserve: floral paraphrase still aligns', isTitleKeywordAligned('מחיר סידור פרחים לחתונה', 'כמה עולה סידור פרחים לחתונה? פירוט מחירים'))
+
+    // ── P0 (3): same-domain, different concrete heads are NOT a same-need dup;
+    // a genuine same-need pair still is.
+    check('P0-dup: two products sharing only the domain words ("ציוד כושר") are NOT a same-need duplicate',
+      !isSameNeedDuplicate({ primaryKeyword: 'ציוד כושר משקולות', title: 'ציוד כושר משקולות', intent: 'transactional' }, { primaryKeyword: 'ציוד כושר רצועות', title: 'ציוד כושר רצועות', intent: 'transactional' }, fitnessTW))
+    check('P0-dup preserve: a genuine same-need price pair is STILL a duplicate',
+      isSameNeedDuplicate({ primaryKeyword: 'מחיר בניית דף נחיתה', title: 'כמה עולה לבנות דף נחיתה', intent: 'transactional' }, { primaryKeyword: 'מחיר בניית דף נחיתה', title: 'כמה עולה לבנות דף נחיתה? המדריך המלא', intent: 'informational' }, new Set()))
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')

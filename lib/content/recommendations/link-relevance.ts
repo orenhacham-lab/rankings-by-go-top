@@ -63,6 +63,8 @@ const ATTRIBUTE_LEXICON_RAW = [
   'טבע', 'טבעי', 'טבעית', 'טבעיים', 'טבעיות', 'בריא', 'בריאה', 'בריאים', 'בריאותית',
   'חיים', 'חיי', 'לחיות', 'רווחה', 'אמת', 'באמת', 'אמיתי', 'אמיתית', 'אמיתיים',
   'יעיל', 'יעילה', 'יעילים', 'יעילות', 'ממש', 'ממשי', 'פייק', 'הופך', 'עובד',
+  // Product-CONDITION markers (second-hand / used) — a condition, not a subject.
+  'יד', 'שני', 'שניה', 'שנייה', 'משומש', 'משומשת', 'משומשים', 'יד2',
 ]
 const ATTRIBUTE_LEXICON = new Set(ATTRIBUTE_LEXICON_RAW.map((w) => canonicalToken(w)).filter(Boolean))
 
@@ -115,9 +117,13 @@ function lk(t: string): string {
  *  (e.g. "ורדים ורודים" ⇄ "אנטוריום ורוד" share only the colour ורוד, not a head
  *  entity). A shared attribute alone returns false. */
 export function sharesSubjectHead(a: string, b: string, typeWords?: Set<string>): boolean {
-  const A = new Set(subjectTokensOf(a, typeWords).map(lk))
+  // A bare digit ("2" from "יד 2", a quantity) is a condition marker, not a
+  // subject differentiator — it must not bridge two different products. Keep
+  // alphanumeric specifics (B12, K2) and standalone latin letters (C/D).
+  const isBareDigit = (t: string) => /^\d+$/.test(t)
+  const A = new Set(subjectTokensOf(a, typeWords).filter((t) => !isBareDigit(t)).map(lk))
   if (A.size === 0) return false
-  for (const t of subjectTokensOf(b, typeWords)) if (A.has(lk(t))) return true
+  for (const t of subjectTokensOf(b, typeWords)) if (!isBareDigit(t) && A.has(lk(t))) return true
   return false
 }
 
