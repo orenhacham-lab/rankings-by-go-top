@@ -61,6 +61,18 @@ export interface RunAcceptanceReport {
 const DEMAND_QUANTITY_RE = /(אלפי|מאות|עשרות|מיליוני)\s+(חיפושים|מחפשים)|ביקוש\s+(גבוה|רב|עצום)|חיפושים\s+(רבים|נפוצים)|thousands\s+of\s+searches|high\s+(search\s+volume|demand)/i
 // Absolute-certainty medical phrasing → MANUAL review (warn), per the live spec.
 const MEDICAL_CERTAINTY_RE = /(?:^|\s)(?:מרפא(?:ת)?|מונע(?:ת|ים)?\s|ריפוי\s+מלא|מבטיח(?:ה)?\s+(?:ריפוי|החלמה)|100%|cures?\s|prevents?\s|guaranteed\s+to\s+(?:cure|heal))/i
+// HIGH-RISK medical / YMYL content classes → professional editorial review (WARN).
+// Deliberately targets clinical/decision content (lab values, injections/procedures,
+// diagnosis, treatment necessity, condition claims, MEDICATION dosage) and NOT a
+// generic supplement/nutrition/wellness topic ("מינון מגנזיום", "יתרונות אומגה").
+const YMYL_RISK_CLASSES: [string, RegExp][] = [
+  ['blood/lab level', /(?:רמ[הת]\s+\S*\s*(?:ה?תקינה|בדם)|רמ[הת]\s+\S+\s+בדם|רמות\s+\S*\s*בדם|ערכ[יי]\s+דם|בדיק[תות]\s+דם|blood\s+level|lab\s+values?|reference\s+range)/i],
+  ['injection/procedure/medication', /(?:זריק[הות]|הזרק|תרופת?[יי]?|תרופות|כדור[יי]ם|אנטיביוטיק|ניתוח|פרוצדור|injections?|medication|antibiotic|surgery|procedure)/i],
+  ['diagnosis', /(?:אבחו[ןנ]|אבחנ[הת]|diagnos)/i],
+  ['treatment necessity', /(?:מתי\s+\S*\s*(?:נחוצ|צריך|חייב|כדאי)|האם\s+(?:צריך|חייב|כדאי\s+ליטול)|when\s+(?:needed|necessary)|necessity)/i],
+  ['prevent/stop/treat condition', /(?:למניע\S*|למנוע|לעצור\s+\S*(?:מחל|נשיר|דלק)|מטפל\s+ב|לטפל\s+ב|לרפא|ריפוי\s+\S*(?:מחל|דלק)|treats?\s+\S*(?:disease|condition)|to\s+(?:stop|prevent|treat))/i],
+  ['medication dosage', /(?:מינון\s+\S*\s*(?:תרופ|יתר|מרשם)|מנת\s+יתר|overdose|medication\s+dose|prescription\s+dosage)/i],
+]
 
 export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceReport {
   const { diagnostics: d, suggestions } = input
@@ -168,9 +180,24 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   }
   add('no_duplicate_pair', dupPairs.length === 0, dupPairs.join(' · ') || 'none')
 
-  // P0-2 — a need an EXISTING page owns must NOT be accepted as a separate new
-  // page. It passes ONLY when converted to an existing_page_improvement.
-  const cannibalized = suggestions.filter((s) => (s.coverageMatches ?? []).some((m) => m.matchType === 'owns_need' || m.matchType === 'exact') && s.recommendedPageType !== 'existing_page_improvement')
+  // P0-2 — a need a ROLE-COMPATIBLE, ACTIONABLE existing page owns must NOT be
+  // accepted as a separate new page (it should have converted to an
+  // existing_page_improvement). ROLE-AWARE (same centralized helpers as generation):
+  // an informational article owning a COMMERCIAL topic's need is role-incompatible —
+  // it stays diagnostic evidence and does NOT fail the commercial opportunity. A
+  // title-only synonym owner fails only when it is a PROVEN same-need duplicate.
+  const cannibalized = suggestions.filter((s) => {
+    if (s.recommendedPageType === 'existing_page_improvement') return false
+    const desired = desiredOpportunityRole(s.primaryKeyword, s.title, s.searchIntent as import('./opportunity').SearchIntent)
+    return (s.coverageMatches ?? []).filter((m) => m.matchType === 'owns_need' || m.matchType === 'exact').some((m) => {
+      const br = basisRoleOf((m.basisPageType as EntityPageType | undefined) ?? null, !!m.url)
+      if (br === 'unresolved') {
+        // A title-only owner blocks only a PROVEN same-need synonym duplicate.
+        return isImprovementBasisCompatible(desired, 'informational') && isSameNeedDuplicate({ primaryKeyword: s.primaryKeyword, title: s.title, intent: s.searchIntent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent: s.searchIntent })
+      }
+      return isImprovementBasisCompatible(desired, br) // role-compatible actionable basis owns the need
+    })
+  })
   add('no_existing_need_cannibalization', cannibalized.length === 0, cannibalized.map((s) => `"${s.primaryKeyword}" (${s.recommendedPageType ?? 'new page'}) ← ${(s.coverageMatches ?? []).filter((m) => m.matchType === 'owns_need' || m.matchType === 'exact').map((m) => m.existingTitle).join('/')}`).join(' · ') || 'none')
 
   // P0 — an existing_page_improvement must have a SEMANTICALLY VALID basis: some
@@ -298,6 +325,16 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   // ── Manual-review flags (WARN — a human must look, never auto-pass) ──
   const medical = suggestions.filter((s) => MEDICAL_CERTAINTY_RE.test(`${s.title} ${s.suggestionReason}`))
   add('medical_certainty_review', medical.length === 0, medical.map((s) => s.title).join(' · ') || 'none', 'warn')
+
+  // HIGH-RISK medical / YMYL topics → professional editorial review (WARN, never
+  // fail, no extra call). Targets lab values / injections / diagnosis / treatment-
+  // necessity / condition claims — NOT every generic nutrition or wellness topic.
+  const ymyl = suggestions.map((s) => {
+    const hay = `${s.primaryKeyword} ${s.title}`
+    const cls = YMYL_RISK_CLASSES.filter(([, re]) => re.test(hay)).map(([c]) => c)
+    return cls.length ? `"${s.title}" [${cls.join(', ')}]` : null
+  }).filter((x): x is string => !!x)
+  add('medical_ymyl_topic_review', ymyl.length === 0, ymyl.join(' · ') || 'none', 'warn')
   add('evidence_loads_clean', d.evidence_inventory.evidence_load_errors.length === 0, d.evidence_inventory.evidence_load_errors.join(' · ') || 'none', 'warn')
 
   // ── Empty-pool scrutiny (Natural-Shop false-green class): an empty pool must

@@ -214,14 +214,23 @@ export function unmatchedDocEntities(docText: string, topicText: string, project
   return Array.from(out)
 }
 
-export interface ExistingCoverageDoc { title: string; url?: string | null; focusKeyword?: string | null; slug?: string | null; type?: string | null }
+export interface ExistingCoverageDoc { title: string; url?: string | null; focusKeyword?: string | null; slug?: string | null; type?: string | null; sourceKey?: string | null }
+
+/** Vocabulary tokens corroborated by at least one source OTHER than `excludeSource`
+ *  — provenance-aware so a coverage document can never corroborate its OWN unmatched
+ *  entity (a horse article can't place "סוסים" in the vocab and then prove it). */
+function vocabExcludingSource(provenance: Map<string, Set<string>>, excludeSource: string): Set<string> {
+  const out = new Set<string>()
+  for (const [tok, sources] of provenance) { for (const s of sources) if (s !== excludeSource) { out.add(tok); break } }
+  return out
+}
 
 /**
  * Assess whether existing content already owns the topic's need. Compares the
  * topic against each existing doc's title / focus keyword / slug with synonym
  * folding: full subject coverage + same need = owns_need; partial = improve.
  */
-export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCoverageDoc[], projectVocab?: Set<string>): { matchType: CoverageMatchType; matches: CoverageMatch[] } {
+export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCoverageDoc[], projectVocab?: Set<string>, provenance?: Map<string, Set<string>>): { matchType: CoverageMatchType; matches: CoverageMatch[] } {
   // Compare on the underlying NEED = the normalized primary keyword's distinctive
   // subject. A headline title carries marketing tail ("פירוט מחירים וטיפים
   // לחיסכון") that is NOT part of the need and must not dilute coverage — that
@@ -290,7 +299,10 @@ export function assessNeedCannibalization(topic: TopicNeed, existing: ExistingCo
     // does not corroborate. Exposed for the acceptance runner / operator — NOT used
     // to silently reject (see unmatchedDocEntities: the vertical-vs-concept
     // distinction is a documented semantic limitation).
-    const foreign = unmatchedDocEntities(docText, `${topic.primaryKeyword} ${topic.title}`, projectVocab)
+    // PROVENANCE-aware corroboration: exclude THIS doc's own contribution so it
+    // cannot self-corroborate its unmatched entity ("סוסים" from a horse article).
+    const docVocab = provenance ? vocabExcludingSource(provenance, doc.sourceKey ?? '') : projectVocab
+    const foreign = unmatchedDocEntities(docText, `${topic.primaryKeyword} ${topic.title}`, docVocab)
     if (mt !== 'distinct') {
       matches.push({ existingTitle: doc.title || (doc.focusKeyword ?? ''), url: doc.url ?? null, matchType: mt, score: Number(Math.max(covTopic, covDoc).toFixed(2)), sharedNeed: shared2.slice(0, 6), basisPageType: doc.type ?? null, ...(foreign.length ? { unmatchedEntities: foreign.slice(0, 6) } : {}) })
       if (rank[mt] > rank[best]) best = mt

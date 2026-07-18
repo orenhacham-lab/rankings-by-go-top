@@ -282,6 +282,24 @@ async function main() {
     // still NOT be improvable by an informational vitamin/hair-loss article.
     check('ROLE8: EXACT live "קניית מוצרים לנשירת שיער: המדריך …" ← informational article → role_compatible FAILS',
       failsRule(base({ suggestions: [goodTopic('מוצרים לנשירת שיער', 'קניית מוצרים לנשירת שיער: המדריך לבחירת הטיפול היעיל ביותר', { searchIntent: 'commercial', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'מתמודדים עם נשירת שיער? אלו הוויטמינים ותוספי התזונה שכדאי להכיר', url: '/a/hair', matchType: 'owns_need', score: 1, sharedNeed: [], basisPageType: 'article' }] })], diagnostics: onlyPool1 }), 'existing_page_improvement_role_compatible'))
+
+    // ── GAP 1: no_existing_need_cannibalization is ROLE-AWARE ──
+    // EXACT live false FAIL: commercial landing page + informational article owns_need bases.
+    const commHair = goodTopic('מוצרים לנשירת שיער', 'קניית מוצרים לנשירת שיער', { searchIntent: 'commercial', recommendedPageType: 'commercial_landing_page', coverageMatches: [{ existingTitle: 'ויטמינים למניעת נשירת שיער', url: '/a1', matchType: 'owns_need', score: 1, sharedNeed: [], basisPageType: 'article' }, { existingTitle: 'מתמודדים עם נשירת שיער? אלו הוויטמינים', url: '/a2', matchType: 'owns_need', score: 1, sharedNeed: [], basisPageType: 'post' }] })
+    check('GAP1: commercial topic + informational (role-incompatible) owns_need → no_existing_need_cannibalization PASSES',
+      evaluateRunAcceptance(base({ suggestions: [commHair], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'no_existing_need_cannibalization')?.pass === true)
+    // A genuine informational topic owned by an actionable informational article as a NEW page → still FAILS.
+    check('GAP1: informational new page + informational article owns_need (role-compatible) → FAILS',
+      failsRule(base({ suggestions: [goodTopic('נשירת שיער גורמים', 'נשירת שיער גורמים', { searchIntent: 'informational', recommendedPageType: 'article', coverageMatches: [{ existingTitle: 'המדריך המלא לנשירת שיער', url: '/a3', matchType: 'owns_need', score: 1, sharedNeed: [], basisPageType: 'article' }] })], diagnostics: onlyPool1 }), 'no_existing_need_cannibalization'))
+
+    // ── GAP 3: medical_ymyl_topic_review (WARN, never fail) ──
+    const ymylRule = (kw: string, title: string) => evaluateRunAcceptance(base({ suggestions: [goodTopic(kw, title)], diagnostics: onlyPool1 })).rules.find((x) => x.id === 'medical_ymyl_topic_review')
+    check('YMYL1: vitamin-D blood-level topic → WARN (blood/lab level)', (() => { const r = ymylRule('רמה תקינה ויטמין D בדם', 'מהי הרמה התקינה של ויטמין D בדם ואיך מגיעים אליה?'); return r?.level === 'warn' && r?.pass === false && /level/.test(r?.detail ?? '') })())
+    check('YMYL2: B12 injection/necessity topic → WARN', (() => { const r = ymylRule('זריקות B12', 'זריקות B12: מתי הן נחוצות, מה היתרונות ומהן החלופות הטבעיות?'); return r?.level === 'warn' && r?.pass === false && /injection|necessity/.test(r?.detail ?? '') })())
+    check('YMYL3: generic vitamin comparison → NO warning', ymylRule('השוואת סוגי ויטמין D', 'השוואת סוגי ויטמין D')?.pass === true)
+    check('YMYL4: natural-lifestyle topic → NO warning', ymylRule('אורח חיים טבעי ובריא', 'איך לאמץ אורח חיים טבעי ובריא יותר')?.pass === true)
+    check('YMYL5: generic supplement dosage ("מינון מגנזיום לילדים") → NO warning', ymylRule('מגנזיום לילדים מינון', 'המדריך המלא: מינון מגנזיום לילדים')?.pass === true)
+    check('YMYL6: medical_ymyl_topic_review is distinct from medical_certainty_review', evaluateRunAcceptance(base({ suggestions: [goodTopic('זריקות B12', 'זריקות B12: מתי נחוצות')], diagnostics: onlyPool1 })).rules.filter((x) => x.id === 'medical_ymyl_topic_review' || x.id === 'medical_certainty_review').length === 2)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

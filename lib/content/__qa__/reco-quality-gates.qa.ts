@@ -151,6 +151,24 @@ async function main() {
     check('NS3: "סוסים" is surfaced as a FOREIGN entity for a health project', unmatchedDocEntities(d3doc, d3topic, healthVocab).some((e) => /סוס/.test(e)))
     check('NS3: "סוסים" is NOT foreign for a horse project (same-cluster proof)', !unmatchedDocEntities(d3doc, d3topic, horseVocab).some((e) => /סוס/.test(e)))
     check('NS3: no project vocab → no unmatched diagnostic (cannot judge)', unmatchedDocEntities(d3doc, d3topic).length === 0)
+    // NS-3c (live) — PROVENANCE: a coverage doc may not corroborate its OWN entity.
+    {
+      const horse = 'איך לשמור על אורח חיים טבעי ובריא לצד פעילות גופנית וטיפול בסוסים'
+      const prov = (pairs: [string, string][]) => { const m = new Map<string, Set<string>>(); for (const [text, src] of pairs) for (const t of contentTokens(text)) { let s = m.get(t); if (!s) m.set(t, s = new Set()); s.add(src) } return m }
+      const foreignOf = (p: Map<string, Set<string>>, docSrc: string) => {
+        const r = assessNeedCannibalization({ primaryKeyword: 'אורח חיים טבעי ובריא', title: 'איך לאמץ אורח חיים טבעי ובריא יותר', intent: 'informational' },
+          [{ title: horse, url: '/b/h', type: 'post', sourceKey: docSrc }], new Set(p.keys()), p)
+        return r.matches[0]?.unmatchedEntities ?? []
+      }
+      // (1) health project — the ONLY source of "סוסים" is the horse article itself → WARN on סוס.
+      const health = prov([['מגנזיום ביסגליצינט', 'entity:mag'], ['תוספי תזונה טבעיים', 'tracked'], [horse, 'entity:horse']])
+      check('NS3c: a doc cannot self-corroborate → "סוס" IS foreign for a health project', foreignOf(health, 'entity:horse').some((e) => /סוס/.test(e)))
+      // (2) real horse business — "סוסים" corroborated by INDEPENDENT product + tracked → no warning.
+      const horseBiz = prov([['אוכף לסוסים', 'entity:saddle'], ['אילוף סוסים', 'tracked'], [horse, 'entity:horse']])
+      check('NS3c: independent evidence corroborates → "סוס" is NOT foreign for a horse business', !foreignOf(horseBiz, 'entity:horse').some((e) => /סוס/.test(e)))
+      // (3) presence in entities must not let a doc suppress its OWN warning.
+      check('NS3c: a doc present in entities cannot suppress its own warning', foreignOf(prov([[horse, 'entity:horse'], ['ויטמין C', 'entity:vitc']]), 'entity:horse').some((e) => /סוס/.test(e)))
+    }
     // NS3b (live) — morphology/framing must NOT be reported as foreign entities.
     const feHealth = new Set<string>(['מגנזיום', 'ויטמין C טבעי', 'אומגה 3', 'תוספי תזונה טבעיים', 'ויטמינים לשיער', 'נשירת שיער'].flatMap((w) => contentTokens(w)))
     const feDoc = 'מתמודדים עם נשירת שיער? אלו הוויטמינים ותוספי התזונה שכדאי להכיר בכל גיל'

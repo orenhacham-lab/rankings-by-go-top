@@ -551,6 +551,34 @@ async function main() {
     server.close()
   }
 
+  console.log('E2E) NS-7 — foreign-entity WARN uses PROVENANCE (a doc cannot self-corroborate)')
+  {
+    const tables = naturalShopTables()
+    // A horse-care lifestyle article is the project's ONLY source of "סוסים".
+    ;(tables.shopify_entities as Record<string, unknown>[]).push({ project_id: 'p1', is_active: true, title: 'איך לשמור על אורח חיים טבעי ובריא לצד פעילות גופנית וטיפול בסוסים', handle: 'horse', entity_type: 'blog', canonical_url: 'https://natural-shop.co.il/b/horse' })
+    ;(tables.keyword_research_cache[0].results_json as Record<string, unknown>[]).push({ keyword: 'אורח חיים טבעי ובריא', avgMonthlySearches: 200 })
+    const { server, port } = await startFakeGenai({
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+      respond: (briefs) => briefs.map((b, i) => /אורח חיים טבעי ובריא/.test(b.subject)
+        ? { briefId: b.id, title: 'איך לאמץ אורח חיים טבעי ובריא יותר', primaryKeyword: 'אורח חיים טבעי ובריא', secondaryKeywords: [], intent: 'informational' }
+        : { briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' }),
+    })
+    process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`; resetModelResolutionCache(); resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const { evaluateRunAcceptance } = await import('../recommendations/qa-acceptance')
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns7', 8))
+    const s = run.suggestions.find((x) => /אורח חיים/.test(x.primaryKeyword))
+    const foreign = (s?.coverageMatches ?? []).flatMap((m) => m.unmatchedEntities ?? [])
+    check('NS7-E2E. the horse article as its OWN basis surfaces "סוס" (no self-corroboration)', !s || s.recommendedPageType !== 'existing_page_improvement' || foreign.some((e) => /סוס/.test(e)), JSON.stringify({ t: s?.recommendedPageType, foreign }))
+    if (s && s.recommendedPageType === 'existing_page_improvement') {
+      const acc = evaluateRunAcceptance({ tierRequested: 'premium', diagnostics: run.diagnostics, suggestions: run.suggestions, pendingBefore: 0 })
+      const fe = acc.rules.find((r) => r.id === 'foreign_entity_improvement_review')
+      check('NS7-E2E. foreign_entity_improvement_review WARNs (never fails) and names "סוס"', fe?.level === 'warn' && fe?.pass === false && /סוס/.test(fe?.detail ?? ''), JSON.stringify(fe))
+    }
+    server.close()
+  }
+
   console.log('U) unit: model-aware thinking config (the live Pro-400 fix)')
   {
     const pro = resolveModelConfig('gemini-2.5-pro', 3000)

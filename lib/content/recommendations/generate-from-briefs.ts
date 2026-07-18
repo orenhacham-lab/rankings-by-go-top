@@ -323,6 +323,18 @@ export async function generateFromBriefs(
   for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
   for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
+  // PROVENANCE — which INDEPENDENT source contributed each evidence token, so a
+  // coverage document cannot corroborate its OWN unmatched entity (a horse article
+  // placing "סוסים" in the vocab and then proving it is on-domain). Per-source keys
+  // match the coverage docs' sourceKey below.
+  const evidenceProvenance = new Map<string, Set<string>>()
+  const addProvenance = (text: string, source: string) => { for (const t of contentTokens(text)) { let set = evidenceProvenance.get(t); if (!set) evidenceProvenance.set(t, set = new Set()); set.add(source) } }
+  addProvenance(p.business_name ?? '', 'business')
+  for (const e of entities) addProvenance(e.name, `entity:${normalizeText(e.name)}`)
+  for (const s of projectFocus) addProvenance(s, 'focus')
+  for (const k of tracked) addProvenance(k, 'tracked')
+  for (const k of keywordResearch.map((kr) => kr.query)) addProvenance(k, 'kr')
+  for (const c of publishedCoverage) addProvenance(c, `cov:${normalizeText(c)}`)
   const existingPageTitles = [...entities.map((e) => e.name), ...ineligiblePageTitles, ...publishedCoverage]
   // Existing-content docs for synonym-aware cannibalization (P0-2): EVERY exact
   // owner known to keyword-guard / pending / indexed content must ALSO participate
@@ -331,14 +343,14 @@ export async function generateFromBriefs(
   // synonym owner ("תוספי תזונה" ⇄ "תוספי מזון") that the EXACT guard blocks must
   // still block the synonym topic here; an owner page can never be a mere support link.
   const existingCoverageDocs: ExistingCoverageDoc[] = dedupeCoverageDocs([
-    ...publishedCoverage.map((title) => ({ title, type: 'article' as const })),
-    ...entities.map((e) => ({ title: e.name, url: e.url ?? null, type: e.type })),
-    ...linkCandidates.map((c) => ({ title: c.title, url: c.url, type: c.type })),
+    ...publishedCoverage.map((title) => ({ title, type: 'article' as const, sourceKey: `cov:${normalizeText(title)}` })),
+    ...entities.map((e) => ({ title: e.name, url: e.url ?? null, type: e.type, sourceKey: `entity:${normalizeText(e.name)}` })),
+    ...linkCandidates.map((c) => ({ title: c.title, url: c.url, type: c.type, sourceKey: `entity:${normalizeText(c.title)}` })),
     ...pendingCoverageDocs,
     // Keyword-guard / entity owners are keyword STRINGS (no resolvable page) — they
     // may block a duplicate but are UNRESOLVED bases (type/url null).
-    ...Array.from(guard.keywords).map((k) => ({ title: k, type: null })),
-    ...Array.from(guard.entityOwners).map((k) => ({ title: k, type: null })),
+    ...Array.from(guard.keywords).map((k) => ({ title: k, type: null, sourceKey: `guard:${normalizeText(k)}` })),
+    ...Array.from(guard.entityOwners).map((k) => ({ title: k, type: null, sourceKey: `entity:${normalizeText(k)}` })),
   ])
 
   const shadow_rejected_by_reason: Record<string, number> = {}
@@ -494,7 +506,7 @@ export async function generateFromBriefs(
     // existing_page_improvement recommendation (never a separate landing page),
     // carrying the existing URL — the underlying search need is compared, not
     // exact wording (wedding-floral pricing: סידור vs עיצוב פרחוני).
-    const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens)
+    const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens, evidenceProvenance)
     const coverageMatches: CoverageMatch[] = [...cann.matches]
     if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
     // PAGE-ROLE / INTENT compatibility (ONE shared helper for EVERY conversion
@@ -595,7 +607,7 @@ export async function generateFromBriefs(
     const owningUrls = new Set<string>()
     let owningPage: { title: string; url: string | null; type: EntityPageType | null } | null = null
     for (const tg of [...linkPlan.supportingInformationalLinks, ...linkPlan.sourceReferences]) {
-      const mt = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, [{ title: tg.title, url: tg.url }], businessEvidenceTokens).matchType
+      const mt = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, [{ title: tg.title, url: tg.url, sourceKey: `entity:${normalizeText(tg.title)}` }], businessEvidenceTokens, evidenceProvenance).matchType
       if (mt !== 'owns_need' && mt !== 'exact') continue
       // Convert ONLY when the owning support page is a role-COMPATIBLE, actionable
       // basis (the same shared helper) — an informational page that owns a
