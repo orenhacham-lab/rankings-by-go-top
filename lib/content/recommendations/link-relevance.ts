@@ -56,13 +56,25 @@ const ATTRIBUTE_LEXICON_RAW = [
   'כל', 'אלו', 'אלה', 'כמה', 'מספר', 'סוגי', 'לדעת', 'להכיר', 'הכיר', 'להתמודד', 'מתמודד', 'להשתמש',
   // Common verbs / prepositions / generic measure nouns (grammar, domain-neutral).
   'לשמור', 'שמור', 'לצד', 'צד', 'גיל', 'גילאי', 'שלב', 'שלבים', 'דרך', 'דרכים',
+  // BROAD THEMATIC nouns + evaluative/truth framing — "healthy / natural / life /
+  // real / effective / fake" are a THEME, not a concrete subject. A shared
+  // "בריא"/"טבעי"/"אמת"/"באמת" alone can never establish ownership or a relevant
+  // link (a lifestyle topic does not own a dental page). Domain-neutral.
+  'טבע', 'טבעי', 'טבעית', 'טבעיים', 'טבעיות', 'בריא', 'בריאה', 'בריאים', 'בריאותית',
+  'חיים', 'חיי', 'לחיות', 'רווחה', 'אמת', 'באמת', 'אמיתי', 'אמיתית', 'אמיתיים',
+  'יעיל', 'יעילה', 'יעילים', 'יעילות', 'ממש', 'ממשי', 'פייק', 'הופך', 'עובד',
 ]
 const ATTRIBUTE_LEXICON = new Set(ATTRIBUTE_LEXICON_RAW.map((w) => canonicalToken(w)).filter(Boolean))
 
+const MODIFIER_PROCLITICS = 'והבלמשכ'
 /** Is a canonical token a modifier (generic OR attribute/container) — never a
- *  standalone subject? Extra caller-derived type/attribute words are folded in. */
+ *  standalone subject? Extra caller-derived type/attribute words are folded in.
+ *  Proclitic-aware: "ובריא"/"הטבעי"/"בטבע" fold to their base before the check. */
 export function isModifierToken(tok: string, extraTypeWords?: Set<string>): boolean {
-  return GENERIC_TOKENS.has(tok) || ATTRIBUTE_LEXICON.has(tok) || (extraTypeWords?.has(tok) ?? false)
+  const hit = (t: string) => GENERIC_TOKENS.has(t) || ATTRIBUTE_LEXICON.has(t) || (extraTypeWords?.has(t) ?? false)
+  if (hit(tok)) return true
+  if (tok.length >= 4 && MODIFIER_PROCLITICS.includes(tok[0])) { const s = tok.slice(1); if (hit(s) || hit(canonicalToken(s))) return true }
+  return false
 }
 
 /** Distinctive SUBJECT tokens of a phrase, minus generic/attribute/type words,

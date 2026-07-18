@@ -307,7 +307,7 @@ async function main() {
     check('E4. the pending semantic duplicate was blocked PRE-AI', (d.brief_pool.rejected_by_reason['pending_semantic_duplicate'] ?? 0) + (d.brief_pool.rejected_by_reason['pending_exact_duplicate'] ?? 0) >= 1, JSON.stringify(d.brief_pool.rejected_by_reason))
     for (const rd of d.rounds) {
       check(`E5. round ${rd.round} reconciles EXACTLY: sent = polished+skipped+missing`, rd.briefs_sent === rd.polished + rd.skipped_by_model + rd.missing_from_response, JSON.stringify(rd))
-      check(`E6. round ${rd.round}: polished = accepted + rejected (no silent loss)`, rd.polished === rd.accepted + Object.values(rd.rejected_by_reason).reduce((a, b) => a + b, 0), JSON.stringify(rd))
+      check(`E6. round ${rd.round}: polished = accepted + rejected + notProcessed (no silent loss)`, rd.polished === rd.accepted + Object.values(rd.rejected_by_reason).reduce((a, b) => a + b, 0) + (rd.not_processed ?? 0), JSON.stringify(rd))
     }
     check('E7. missing + dropped items are COUNTED, not silent', d.rounds.some((r) => r.missing_from_response >= 1) && d.rounds.some((r) => r.dropped_items >= 1), JSON.stringify(d.rounds))
     check('E8. suggestions were accepted (evidence-rich project yields topics)', run.suggestions.length >= 4, `got ${run.suggestions.length}`)
@@ -548,6 +548,34 @@ async function main() {
     const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns6', 8))
     const s = run.suggestions.find((x) => /קניית תוספים לנשירת שיער/.test(x.primaryKeyword))
     check('NS6-E2E (path C: support-link conversion). commercial topic is NOT improved by an informational blog', !s || s.recommendedPageType !== 'existing_page_improvement', JSON.stringify(s?.recommendedPageType))
+    server.close()
+  }
+
+  console.log('E2E) NS-8 — target reached mid-response: every polished topic is accounted for')
+  {
+    const tables = {
+      projects: [{ id: 'p1', business_name: 'הצמחייה', target_domain: 'https://natural-shop.co.il', language: 'he', country: 'IL' }],
+      tracking_targets: [{ project_id: 'p1', keyword: 'תוספי תזונה טבעיים' }],
+      keyword_research_cache: [{ project_id: 'p1', fetched_at: '2026-07-01', results_json: [
+        { keyword: 'ברזל לנשים בהריון', avgMonthlySearches: 300 }, { keyword: 'ויטמין B12 לצמחונים', avgMonthlySearches: 280 },
+        { keyword: 'פרוביוטיקה לבריאות המעי', avgMonthlySearches: 260 }, { keyword: 'קולגן לעור ולמפרקים', avgMonthlySearches: 240 },
+        { keyword: 'אבץ לחיזוק מערכת החיסון', avgMonthlySearches: 220 },
+      ] }],
+      shopify_entities: [{ project_id: 'p1', is_active: true, title: 'מגנזיום ביסגליצינט', entity_type: 'product', canonical_url: 'https://x/p/mag' }],
+      generated_articles: [], article_topics: [], content_topic_ideas: [], wordpress_content_index: [],
+    }
+    const { server, port } = await startFakeGenai({ models: ['gemini-2.5-flash', 'gemini-2.5-pro'], respond: (briefs) => briefs.map((b, i) => ({ briefId: b.id, title: framedTitle(i, b.subject), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
+    process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${port}`; resetModelResolutionCache(); resetRecoGenAiClient()
+    const { generateFromBriefs } = await import('../recommendations/generate-from-briefs')
+    const { newRunCostController } = await import('../recommendations/run-cost-controller')
+    const { evaluateRunAcceptance } = await import('../recommendations/qa-acceptance')
+    // targetCount = 3, but the round returns 5 valid polished topics.
+    const run = await generateFromBriefs(fakeAdmin(tables), { projectId: 'p1', targetCount: 3, qualityMode: 'premium' }, newRunCostController('premium', 'run-ns8', 3))
+    const r0 = run.diagnostics.rounds[0]
+    check('NS8-E2E. every round reconciles: polished = accepted+rejected+notProcessed', run.diagnostics.rounds.every((r) => r.polished === r.accepted + Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0) + r.not_processed), JSON.stringify(r0))
+    check('NS8-E2E. target reached mid-response → the remainder is bucketed as not_processed (not dropped, not a rejection)', run.diagnostics.rounds.some((r) => r.not_processed > 0) && run.suggestions.length === 3, JSON.stringify(run.diagnostics.rounds.map((r) => ({ pol: r.polished, acc: r.accepted, np: r.not_processed }))))
+    const acc = evaluateRunAcceptance({ tierRequested: 'premium', diagnostics: run.diagnostics, suggestions: run.suggestions, pendingBefore: 0 })
+    check('NS8-E2E. exact_reconciliation PASSES with the not_processed bucket', acc.rules.find((x) => x.id === 'exact_reconciliation')?.pass === true, JSON.stringify(acc.rules.find((x) => x.id === 'exact_reconciliation')?.detail))
     server.close()
   }
 

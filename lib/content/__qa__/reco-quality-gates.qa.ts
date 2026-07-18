@@ -193,6 +193,23 @@ async function main() {
       desiredOpportunityRole('מדריך לקניית מחשב', 'מדריך לקניית מחשב', 'informational') === 'informational')
     check('NS7 preserve: informational subject "מוצרים וטיפולים טבעיים" → informational (bare "מוצרים" is not a buy need)',
       desiredOpportunityRole('מוצרים וטיפולים טבעיים', 'לחזור לטבע: איך לשלב מוצרים וטיפולים טבעיים', 'informational') === 'informational')
+
+    // ── NS-9 (live): generic THEMATIC overlap cannot establish ownership OR a link ──
+    // (1) natural-lifestyle topic vs strong-teeth page → distinct (only "בריא" shared).
+    check('NS9-1: "לחיות טבעי ובריא" NOT an improvement of a dental page (thematic-only overlap)',
+      assessNeedCannibalization({ primaryKeyword: 'לחיות טבעי ובריא', title: 'לחיות טבעי ובריא', intent: 'informational' }, [{ title: 'שיניים חזקות ובריאות' }, { title: '5 טיפים לשיניים חזקות ובריאות' }, { title: 'מוצרי טבע ובריאות' }]).matchType === 'distinct')
+    // (2) natural-products topic vs natural-teeth-whitening page sharing only אמת/באמת/טבעי → no link.
+    check('NS9-2: framing-only overlap ("אמת"/"באמת"/"טבעי") → link IRRELEVANT',
+      !isRelevantLink(evaluateLink({ primaryKeyword: 'מוצרי בריאות טבעיים', title: 'מה הופך מוצרי בריאות לטבעיים ויעילים באמת?' }, { url: '/x', title: 'הלבנת שיניים טבעית: פייק או אמת – גלו מה באמת עובד?', role: 'supporting_informational_link' }), 'supporting_informational_link'))
+    // (3) hair-loss topic vs hair-loss article → still relevant (concrete נשיר/שיער shared).
+    check('NS9-3: hair-loss topic → hair-loss article stays RELEVANT (concrete subject)',
+      isRelevantLink(evaluateLink({ primaryKeyword: 'נשירת שיער', title: 'נשירת שיער גורמים' }, { url: '/b', title: 'טיפול בנשירת שיער: המדריך המלא', role: 'supporting_informational_link' }), 'supporting_informational_link'))
+    // (4) wedding-floral pricing vs existing wedding-floral pricing → still ownership.
+    check('NS9-4: wedding-floral pricing still owns/improves the existing pricing page',
+      ['owns_need', 'improve'].includes(assessNeedCannibalization({ primaryKeyword: 'מחיר סידור פרחים לחתונה', title: 'כמה עולה סידור פרחים לחתונה', intent: 'transactional' }, [{ title: 'כמה עולה עיצוב פרחוני לחתונה' }]).matchType))
+    // (5) same-location service improvement remains valid.
+    check('NS9-5: same-place service ownership still valid (concrete location, not thematic)',
+      localImprovementCompatible('משלוח פרחים בבית שמש', 'שירות משלוחי פרחים בבית שמש'))
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')

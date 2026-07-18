@@ -52,8 +52,10 @@ type Admin = ReturnType<typeof createAdminClient>
 
 /** Per-synthesis-round exact accounting (E-reconciliation):
  *  briefs_sent = polished + skipped_by_model + missing_from_response
- *              + provider_failed_briefs. Provider failures are NEVER quality
- *  rejections — they get their own bucket + typed cause. */
+ *              + provider_failed_briefs, and
+ *  polished    = accepted + Σrejected_by_reason + not_processed + dropped_items.
+ *  Provider failures and target-reached-not-processed are NEVER quality rejections —
+ *  each gets its own typed bucket, so no polished response is ever silently dropped. */
 export interface BriefRoundDiagnostics {
   round: number
   model: string | null
@@ -72,6 +74,9 @@ export interface BriefRoundDiagnostics {
   skipped_by_model: number
   missing_from_response: number
   dropped_items: number
+  /** Polished topics NOT validated because targetCount was reached mid-response —
+   *  a typed NON-error bucket (never a quality rejection, never silently dropped). */
+  not_processed: number
   accepted: number
   repaired: number
   rejected_by_reason: Record<string, number>
@@ -760,7 +765,7 @@ export async function generateFromBriefs(
       controller,
       { source: 'brief_synthesis', callPurpose: round === 1 ? 'primary' : 'refill', requestedIdeaCount: batch.length },
     )
-    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? modelPath.model, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
+    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? modelPath.model, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
     rounds.push(rd)
     if (modelConfigHolder.value === null && res.modelConfig) modelConfigHolder.value = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
     if (res.stopped) { stop = 'budget_stopped'; break }
@@ -784,7 +789,8 @@ export async function generateFromBriefs(
     rd.synthesis_failure = classifySynthesisFailure(rec, batch.length)
     if (rd.synthesis_failure) { stop = 'synthesis_failed'; break }
 
-    for (const t of rec.polished) {
+    for (let idx = 0; idx < rec.polished.length; idx++) {
+      const t = rec.polished[idx]
       const brief = briefById.get(t.briefId)
       if (!brief) { rd.dropped_items++; continue }
       // Title-pattern diversity (SAFE, never artificial): when one mega-guide
@@ -802,7 +808,7 @@ export async function generateFromBriefs(
         rd.rejected_by_reason[reason] = (rd.rejected_by_reason[reason] ?? 0) + 1
         rejectTopic(reason)
       }
-      if (suggestions.length >= input.targetCount) break
+      if (suggestions.length >= input.targetCount) { rd.not_processed = rec.polished.length - idx - 1; break }
     }
     rd.marginal_yield = rd.briefs_sent > 0 ? Number((rd.accepted / rd.briefs_sent).toFixed(3)) : 0
 

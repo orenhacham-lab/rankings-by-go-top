@@ -66,7 +66,9 @@ const MEDICAL_CERTAINTY_RE = /(?:^|\s)(?:מרפא(?:ת)?|מונע(?:ת|ים)?\s|
 // diagnosis, treatment necessity, condition claims, MEDICATION dosage) and NOT a
 // generic supplement/nutrition/wellness topic ("מינון מגנזיום", "יתרונות אומגה").
 const YMYL_RISK_CLASSES: [string, RegExp][] = [
-  ['blood/lab level', /(?:רמ[הת]\s+\S*\s*(?:ה?תקינה|בדם)|רמ[הת]\s+\S+\s+בדם|רמות\s+\S*\s*בדם|ערכ[יי]\s+דם|בדיק[תות]\s+דם|blood\s+level|lab\s+values?|reference\s+range)/i],
+  // CO-OCCURRENCE (generic, not vitamin-D-specific): a LEVEL/VALUE word and a
+  // BLOOD/LAB word anywhere in the same topic, even with words between them.
+  ['blood/lab level', /(?=[\s\S]*(?:רמ[הת]|הרמות|רמות|ערכ?ים|ערך|level|values?))(?=[\s\S]*(?:בדם|בדיק[תת]\s+דם|ערכי?\s+דם|טווח\s+תקין|ערכי\s+מעבדה|blood|lab\s+values?|reference\s+range))/i],
   ['injection/procedure/medication', /(?:זריק[הות]|הזרק|תרופת?[יי]?|תרופות|כדור[יי]ם|אנטיביוטיק|ניתוח|פרוצדור|injections?|medication|antibiotic|surgery|procedure)/i],
   ['diagnosis', /(?:אבחו[ןנ]|אבחנ[הת]|diagnos)/i],
   ['treatment necessity', /(?:מתי\s+\S*\s*(?:נחוצ|צריך|חייב|כדאי)|האם\s+(?:צריך|חייב|כדאי\s+ליטול)|when\s+(?:needed|necessary)|necessity)/i],
@@ -105,11 +107,12 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   add('synthesis_response_contract', contractBreaches.length === 0 && d.stop_reason !== 'synthesis_failed',
     contractBreaches.map((r) => `r${r.round}: ${r.synthesis_failure ?? 'missing_briefs'} missing=${r.missing_from_response}/${r.briefs_sent} topLevel=${r.synthesisResponse?.topLevelType}[${(r.synthesisResponse?.topLevelKeys ?? []).join(',')}] unknownIds=${(r.synthesisResponse?.unknownBriefIds ?? []).length} hash=${r.synthesisResponse?.responseHash}`).join(' | ') || 'none')
 
-  // ── Exact reconciliation (provider failures have their OWN bucket) ──
+  // ── Exact reconciliation: EVERY polished topic is accounted for (provider
+  // failures and target-reached-not-processed each have their OWN typed bucket) ──
   const recon = d.rounds.every((r) =>
     r.briefs_sent === r.polished + r.skipped_by_model + r.missing_from_response + r.provider_failed_briefs &&
-    r.polished === r.accepted + Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0))
-  add('exact_reconciliation', recon, d.rounds.map((r) => `r${r.round}: sent=${r.briefs_sent} polished=${r.polished} skipped=${r.skipped_by_model} missing=${r.missing_from_response} providerFailed=${r.provider_failed_briefs} accepted=${r.accepted} rejected=${Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0)}`).join(' | ') || 'no rounds')
+    r.polished === r.accepted + Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0) + (r.not_processed ?? 0))
+  add('exact_reconciliation', recon, d.rounds.map((r) => `r${r.round}: sent=${r.briefs_sent} polished=${r.polished} skipped=${r.skipped_by_model} missing=${r.missing_from_response} providerFailed=${r.provider_failed_briefs} accepted=${r.accepted} rejected=${Object.values(r.rejected_by_reason).reduce((a, b) => a + b, 0)} notProcessed=${r.not_processed ?? 0} dropped=${r.dropped_items ?? 0}`).join(' | ') || 'no rounds')
 
   // ── Brief-pool accounting: raw candidates NEVER vanish untyped ──
   const bp = d.brief_pool
