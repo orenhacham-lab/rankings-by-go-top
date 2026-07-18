@@ -9,7 +9,7 @@ import { evaluateLink, isRelevantLink, sharesSubjectHead } from '../recommendati
 import { isSameNeedDuplicate, assessNeedCannibalization, incompatibleActionNeed, unmatchedDocEntities } from '../recommendations/coverage'
 import { contentTokens } from '../recommendations/evidence-cluster'
 import { normalizeToSearchPhrase, isSearchPhraseQuality, keywordHasRealSubject, keywordPreservesSubject } from '../recommendations/search-phrase'
-import { assessExistingLocalOwnership, deriveCorpusTypeWords, localImprovementCompatible } from '../recommendations/opportunity-validation'
+import { assessExistingLocalOwnership, deriveCorpusTypeWords, localImprovementCompatible, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible } from '../recommendations/opportunity-validation'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -157,6 +157,24 @@ async function main() {
     const feOut = unmatchedDocEntities(feDoc, 'קניית מוצרים לנשירת שיער', feHealth)
     check('NS3b: none of {וויטמינ, כדאי, הכיר, חיוני, בכל, גיל} is reported as foreign', !feOut.some((e) => /ויטמ|דאי|כיר|חיונ|בכל|גיל/.test(e)), JSON.stringify(feOut))
     check('NS3b: an on-domain health article basis produces NO foreign entity at all', feOut.length === 0, JSON.stringify(feOut))
+
+    // NS-7 (live) — a strong buy/category need must NOT be flipped to informational
+    // by a subtitle "המדריך"/"איך לבחור"/"טיפים"; role precedence is keyword → main
+    // clause → subtitle. The exact live commercial topic must derive commercial.
+    check('NS7: EXACT live "קניית מוצרים לנשירת שיער: המדריך …" → commercial',
+      desiredOpportunityRole('מוצרים לנשירת שיער', 'קניית מוצרים לנשירת שיער: המדריך לבחירת הטיפול היעיל ביותר', 'commercial') === 'commercial')
+    check('NS7: subtitle "איך לבחור"/"טיפים" does NOT override a buy keyword',
+      desiredOpportunityRole('מוצרים לנשירת שיער', 'קניית מוצרים לנשירת שיער: איך לבחור', 'commercial') === 'commercial' &&
+      desiredOpportunityRole('קניית שמפו', 'קניית שמפו: טיפים לבחירה', 'commercial') === 'commercial')
+    check('NS7: the EXACT commercial topic is NOT compatible with an informational article basis',
+      !isImprovementBasisCompatible(desiredOpportunityRole('מוצרים לנשירת שיער', 'קניית מוצרים לנשירת שיער: המדריך לבחירת הטיפול היעיל ביותר', 'commercial'), basisRoleOf('article', true)))
+    check('NS7 preserve: price guide "מחיר סידור פרחים לחתונה: המדריך לתקציב" → informational',
+      desiredOpportunityRole('מחיר סידור פרחים לחתונה', 'מחיר סידור פרחים לחתונה: המדריך לתקציב', 'transactional') === 'informational')
+    check('NS7 preserve: "איך לבחור ויטמין D" → informational', desiredOpportunityRole('בחירת ויטמין D', 'איך לבחור ויטמין D', 'informational') === 'informational')
+    check('NS7 preserve: editorial "מדריך לקניית מחשב" → informational (buying GUIDE, not a category page)',
+      desiredOpportunityRole('מדריך לקניית מחשב', 'מדריך לקניית מחשב', 'informational') === 'informational')
+    check('NS7 preserve: informational subject "מוצרים וטיפולים טבעיים" → informational (bare "מוצרים" is not a buy need)',
+      desiredOpportunityRole('מוצרים וטיפולים טבעיים', 'לחזור לטבע: איך לשלב מוצרים וטיפולים טבעיים', 'informational') === 'informational')
   }
 
   console.log('P0-3) primary keyword → clean search phrase (headlines rejected)')

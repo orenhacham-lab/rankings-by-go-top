@@ -278,6 +278,10 @@ async function main() {
     check('ROLE6: commercial topic ← existing product page → PASSES', roleRule(improv('קניית שמפו לשיער', 'קניית שמפו לשיער', 'commercial', { t: 'שמפו מקצועי לשיער', ty: 'product', url: '/p/shampoo' }))?.pass === true)
     // PASS: valid same-location service improvement (local ↔ service page).
     check('ROLE7: local service topic ← existing service page → PASSES', roleRule(improv('משלוח פרחים בבית שמש', 'משלוח פרחים בבית שמש', 'local', { t: 'שירות משלוחי פרחים בבית שמש', ty: 'service', url: '/s/bs' }))?.pass === true)
+    // EXACT LIVE: a commercial topic whose title carries a "המדריך" subtitle must
+    // still NOT be improvable by an informational vitamin/hair-loss article.
+    check('ROLE8: EXACT live "קניית מוצרים לנשירת שיער: המדריך …" ← informational article → role_compatible FAILS',
+      failsRule(base({ suggestions: [goodTopic('מוצרים לנשירת שיער', 'קניית מוצרים לנשירת שיער: המדריך לבחירת הטיפול היעיל ביותר', { searchIntent: 'commercial', recommendedPageType: 'existing_page_improvement', coverageMatches: [{ existingTitle: 'מתמודדים עם נשירת שיער? אלו הוויטמינים ותוספי התזונה שכדאי להכיר', url: '/a/hair', matchType: 'owns_need', score: 1, sharedNeed: [], basisPageType: 'article' }] })], diagnostics: onlyPool1 }), 'existing_page_improvement_role_compatible'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

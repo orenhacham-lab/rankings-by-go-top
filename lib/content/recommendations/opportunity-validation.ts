@@ -331,20 +331,45 @@ const COMMERCIAL_INTENTS = new Set<SearchIntent>(['commercial', 'transactional',
 // page role, and resolvability. No duplicated per-path conditions. ───────────────
 export type BasisRole = 'commercial' | 'informational' | 'local_service' | 'unresolved'
 
-// A buy / shop / product / category / store NEED → a commercial page role.
-const BUY_NEED_RE = /(?:^|\s)(?:קניי?[הת]?|לקנות|קניות|לרכוש|רכיש[הת]|למכירה|חנות|חנויות|קטלוג|קטגורי\S*|קולקצי\S*|מוצר\S*|shop|buy|store|products?|category|categories|collection)(?:\s|$)/i
-// A price-guide / cost / comparison / how-to NEED → an INFORMATIONAL article role
-// EVEN when the coarse intent is transactional ("מחיר סידור פרחים לחתונה").
-const PRICE_INFO_RE = /(?:^|\s)(?:מחיר\S*|מחירון|כמה\s+עולה|עלות|עלויות|תמחור|השווא\S*|לעומת|מול|כדאי|איך|כיצד|מדריך|טיפים|guide|how|vs|versus|price|cost|compare)(?:\s|$)/i
+// STRONG explicit buy / shop / category NEED → a commercial page role. Only buy
+// VERBS (קנייה/לקנות/רכישה) and shop/category NOUNS (חנות/קטגוריה/קטלוג/קולקציה)
+// count — a bare "מוצרים"/"products" is an ambiguous subject word ("מוצרים
+// וטיפולים טבעיים" is an informational topic), NOT a shopping need on its own.
+const BUY_CAT_RE = /(?:^|\s)(?:קניי?[הת]|קניות|לקנות|רכיש[הת]|לרכוש|למכירה|חנות|חנויות|קטלוג|קטגורי\S*|קולקצי\S*|buy|shop|store|category|categories|collection)(?:\s|$)/i
+// TRUE informational price / comparison NEED → informational article role EVEN
+// when the coarse intent is transactional ("מחיר סידור פרחים לחתונה").
+const PRICE_COMPARE_RE = /(?:^|\s)(?:מחיר\S*|מחירון|כמה\s+עולה|עלות|עלויות|תמחור|השווא\S*|לעומת|מול|price|cost|compare|vs|versus)(?:\s|$)/i
+// An EDITORIAL guide OPENER — the phrase STARTS with "מדריך"/"guide"/"how to"/"כל
+// מה ש…". "מדריך לקניית מחשב" targets an editorial buying guide (an article), not a
+// category/product page, so it is informational even though it contains a buy word.
+// These words are otherwise WEAK framing that must NOT override a buy/category need
+// carried by the primary keyword or the title's main clause.
+const EDITORIAL_GUIDE_OPENER = /^\s*(?:ה?מדריך|כל\s+מה\s+ש|guide\b|how\s+to)/i
 
-/** Desired PAGE ROLE from the actual NEED (not merely the coarse intent). */
+/**
+ * Desired PAGE ROLE from the actual NEED, derived in a fixed precedence:
+ *   1) the normalized PRIMARY KEYWORD, then
+ *   2) the TITLE'S MAIN CLAUSE (before ":" / dash), then
+ *   3) subtitle framing (only as a fallback).
+ * A strong buy/category need in the keyword or main clause is NEVER overridden by a
+ * subtitle "מדריך"/"איך לבחור"/"טיפים". A leading editorial "מדריך …" opener stays
+ * informational (an article, not a category/product page).
+ */
 export function desiredOpportunityRole(primaryKeyword: string, title: string, intent: SearchIntent): BasisRole {
-  const hay = `${primaryKeyword} ${title}`
   if (searchNeedOf(primaryKeyword, title, intent) === 'local') return 'local_service'
-  if (BUY_NEED_RE.test(hay) && !PRICE_INFO_RE.test(hay)) return 'commercial'
-  if (PRICE_INFO_RE.test(hay)) return 'informational'
+  const kw = (primaryKeyword || '').trim()
+  const mainClause = (title || '').split(/[:：]|\s[-—–|]\s/)[0].trim()
+  // (1) primary keyword — the strongest signal.
+  if (PRICE_COMPARE_RE.test(kw)) return 'informational'
+  if (EDITORIAL_GUIDE_OPENER.test(kw)) return 'informational'
+  if (BUY_CAT_RE.test(kw)) return 'commercial'
+  // (2) title main clause (before the subtitle).
+  if (PRICE_COMPARE_RE.test(mainClause)) return 'informational'
+  if (EDITORIAL_GUIDE_OPENER.test(mainClause)) return 'informational'
+  if (BUY_CAT_RE.test(mainClause)) return 'commercial'
+  // (3) fallback: coarse intent (how-to / selection framing alone → informational).
   if (intent === 'local') return 'local_service'
-  if (intent === 'commercial' || intent === 'transactional') return 'commercial'
+  if (intent === 'commercial') return 'commercial'
   return 'informational'
 }
 
