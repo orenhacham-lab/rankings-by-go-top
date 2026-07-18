@@ -59,6 +59,8 @@ interface Suggestion {
   }
   /** P0 — recommended destination type; badge shown on the card. */
   recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
+  /** This single idea was refined with the Pro model via "שפר עם Gemini Pro". */
+  improvedWithPro?: boolean
 }
 
 export default function AutomationIdeas({
@@ -126,13 +128,14 @@ export default function AutomationIdeas({
   // Model tier (Phase 2 — explicit, truthful): sent on EVERY generate request.
   // The selector is OPERATOR-facing (Preview / flag-gated); customers never see
   // model names or costs. The choice is remembered locally per operator.
+  // QUALITY_SELECTOR_ENABLED now gates ONLY the operator model-path telemetry line;
+  // the model selector itself is a production customer-facing control.
   const QUALITY_SELECTOR_ENABLED = process.env.NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'
   const [qualityMode, setQualityMode] = useState<'standard' | 'premium'>(() => {
-    if (typeof window === 'undefined') return QUALITY_SELECTOR_ENABLED ? 'premium' : 'standard'
+    // Default to מהיר (standard). Remember the customer's explicit choice locally.
+    if (typeof window === 'undefined') return 'standard'
     const saved = window.localStorage.getItem('reco-quality-mode')
-    if (saved === 'premium' || saved === 'standard') return saved
-    // In the operator/Preview environment the acceptance default is Pro.
-    return QUALITY_SELECTOR_ENABLED ? 'premium' : 'standard'
+    return saved === 'premium' || saved === 'standard' ? saved : 'standard'
   })
   const chooseQuality = (m: 'standard' | 'premium') => {
     setQualityMode(m)
@@ -151,6 +154,8 @@ export default function AutomationIdeas({
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
+  // Per-item "שפר עם Gemini Pro": the id currently being improved (spinner + disable).
+  const [improvingId, setImprovingId] = useState<string | null>(null)
   // Phase 3F.3.2 — per-idea suggested-link selection (keyed by suggestion id →
   // set of selected link URLs). Undefined for an idea means "all checked".
   const [linkSel, setLinkSel] = useState<Record<string, Set<string>>>({})
@@ -326,6 +331,37 @@ export default function AutomationIdeas({
     if (rejectingId) return
     setRejectingId(id)
     try { await rejectIds([id]) } finally { setRejectingId(null) }
+  }
+
+  // Per-item "שפר עם Gemini Pro": polish only THIS recommendation's wording with Pro
+  // and mark it. The server preserves the keyword/intent/links/coverage; only the
+  // title + reason may change. The item is never degraded (server keeps the original
+  // wording if the polish is off-subject) and stays in place.
+  async function improveOne(s: Suggestion) {
+    const ideaId = s.ideaId ?? s.id
+    if (improvingId || !ideaId) return
+    setImprovingId(s.id); setMessage(null)
+    try {
+      const res = await fetch('/api/content/automation/topic-ideas/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, ideaId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.ok) {
+        setMessage({ text: data?.reason === 'pro_model_unavailable' ? t.improveUnavailable : t.improveFailed, ok: false })
+        return
+      }
+      if (data.changed === false) { setMessage({ text: t.improveNoChange, ok: true }); return }
+      const updated = data.suggestion as Suggestion | undefined
+      if (updated) {
+        setSuggestions((prev) => prev.map((x) => (x.id === s.id ? { ...x, ...updated, id: s.id, improvedWithPro: true } : x)))
+      }
+    } catch {
+      setMessage({ text: t.improveFailed, ok: false })
+    } finally {
+      setImprovingId(null)
+    }
   }
 
   function rejectSelected() {
@@ -631,28 +667,42 @@ export default function AutomationIdeas({
         <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
           {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate)}
         </Button>
-        {/* OPERATOR quality selector (flag-gated; hidden from customers). The chosen
-            tier is sent EXPLICITLY on every request and remembered locally. */}
-        {QUALITY_SELECTOR_ENABLED && (
-          <div className="flex items-center gap-1 text-[11px]" data-testid="reco-quality-selector">
-            {(['premium', 'standard'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => chooseQuality(m)}
-                className={`rounded-full border px-2 py-0.5 transition-colors ${qualityMode === m
-                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950 dark:text-indigo-300'
-                  : 'border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400'}`}
-              >
-                {m === 'premium' ? t.qualityPro : t.qualityFast}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Preview-only model-path truthfulness: what ACTUALLY ran, and a clear
-          operator warning when a premium request was explicitly downgraded. */}
+      {/* PRODUCTION model selector — two clear options with a short explanation each.
+          Default מהיר. No model names / tiers / costs here (telemetry lives in QA). The
+          chosen tier is sent EXPLICITLY on every request; one tier per generation run. */}
+      <div className="mb-3" data-testid="reco-quality-selector">
+        <span id="reco-quality-label" className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">{t.qualityChooseLabel}</span>
+        <div role="radiogroup" aria-labelledby="reco-quality-label" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {([
+            { m: 'standard' as const, label: t.qualityFastLabel, desc: t.qualityFastDesc },
+            { m: 'premium' as const, label: t.qualityProLabel, desc: t.qualityProDesc },
+          ]).map(({ m, label, desc }) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={qualityMode === m}
+              aria-label={m === 'premium' ? `${label} — Gemini Pro` : `${label} — Gemini Flash`}
+              onClick={() => chooseQuality(m)}
+              disabled={loading}
+              className={`text-start rounded-lg border px-3 py-2 transition-colors disabled:opacity-60 ${qualityMode === m
+                ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/50'
+                : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}
+            >
+              <span className={`flex items-center gap-1.5 text-sm font-medium ${qualityMode === m ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-200'}`}>
+                <span className={`inline-block h-3.5 w-3.5 rounded-full border-2 ${qualityMode === m ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-600'}`} aria-hidden />
+                {label}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Operator-only (flag-gated) model-path truthfulness — NEVER shown to customers.
+          Model name / tier / downgrade state stay out of the normal UI (QA/admin only). */}
       {modelPath && QUALITY_SELECTOR_ENABLED && !loading && (
         <p className={`text-[11px] mb-2 ${modelPath.downgraded ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`} data-testid="reco-model-path">
           {modelPath.downgraded
@@ -839,6 +889,10 @@ export default function AutomationIdeas({
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.title}</span>
+                      {/* Per-item "improved with Pro" marker (survives reload). */}
+                      {s.improvedWithPro && (
+                        <Badge variant="success" data-testid="reco-improved-badge">{t.improvedWithProBadge}</Badge>
+                      )}
                       {/* P0 — recommended destination type (visible, survives reload). */}
                       {s.recommendedPageType && (
                         <Badge variant={s.recommendedPageType === 'article' ? 'default' : 'warning'}>
@@ -867,14 +921,26 @@ export default function AutomationIdeas({
                       {typeof s.suggestionScore === 'number' && (
                         <span className="text-[10px] text-slate-400">{Math.round(s.suggestionScore * 100)}%</span>
                       )}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); rejectOne(s.id) }}
-                        disabled={rejectingId === s.id}
-                        className="ms-auto text-[11px] text-slate-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
-                      >
-                        {rejectingId === s.id ? t.rejecting : t.reject}
-                      </button>
+                      <span className="ms-auto flex items-center gap-2">
+                        {/* Optional per-item Pro polish — refines only this item's wording. */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); improveOne(s) }}
+                          disabled={improvingId === s.id || !!improvingId}
+                          data-testid="reco-improve-one"
+                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 disabled:opacity-50"
+                        >
+                          {improvingId === s.id ? t.improvingWithPro : t.improveWithPro}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); rejectOne(s.id) }}
+                          disabled={rejectingId === s.id}
+                          className="text-[11px] text-slate-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                        >
+                          {rejectingId === s.id ? t.rejecting : t.reject}
+                        </button>
+                      </span>
                     </div>
                     <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">
                       {t.keywordLabel}: <span className="font-medium">{s.primaryKeyword}</span>

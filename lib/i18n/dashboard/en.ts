@@ -144,7 +144,21 @@ export const dashboardEn = {
       rejectSelected: 'Reject selected',
       // Phase 3F.3 — persisted ideas: find-more, per-card reject, empty states.
       findMore: 'Find more ideas',
-      // Operator-only model-tier selector (flag-gated; never shown to customers).
+      // Customer-facing generation-model selector (Fast default). Explanations only —
+      // no model names / tiers / costs on the normal screen (those live in QA/admin).
+      qualityChooseLabel: 'Generation model',
+      qualityFastLabel: 'Fast',
+      qualityProLabel: 'Advanced',
+      qualityFastDesc: 'Faster and more economical, suitable for most projects.',
+      qualityProDesc: 'Higher-quality reasoning and wording for complex projects.',
+      // Per-item "improve with Pro" action + the visible "improved" marker.
+      improveWithPro: 'Improve with Gemini Pro',
+      improvingWithPro: 'Improving…',
+      improvedWithProBadge: 'Improved with Pro',
+      improveNoChange: 'The wording is already good — no change needed.',
+      improveUnavailable: 'Gemini Pro is not available right now.',
+      improveFailed: 'Improving the recommendation failed. Please try again.',
+      // Operator-only model-tier telemetry (flag-gated; never shown to customers).
       qualityFast: 'Fast — Gemini Flash',
       qualityPro: 'Quality — Gemini Pro',
       qualityModelUsed: 'Last run: {model}',

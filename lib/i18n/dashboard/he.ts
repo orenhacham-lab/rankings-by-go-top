@@ -142,7 +142,21 @@ export const dashboardHe = {
       rejectSelected: 'דחה נבחרים',
       // Phase 3F.3 — persisted ideas: find-more, per-card reject, empty states.
       findMore: 'מצא רעיונות נוספים',
-      // Operator-only model-tier selector (flag-gated; never shown to customers).
+      // Customer-facing generation-model selector (מהיר default). Explanations only —
+      // no model names / tiers / costs on the normal screen (those live in QA/admin).
+      qualityChooseLabel: 'מודל יצירה',
+      qualityFastLabel: 'מהיר',
+      qualityProLabel: 'מתקדם',
+      qualityFastDesc: 'מהיר וחסכוני יותר, מתאים לרוב הפרויקטים.',
+      qualityProDesc: 'איכות ניסוח וחשיבה גבוהה יותר לפרויקטים מורכבים.',
+      // Per-item "improve with Pro" action + the visible "improved" marker.
+      improveWithPro: 'שפר עם Gemini Pro',
+      improvingWithPro: 'משפר…',
+      improvedWithProBadge: 'שופר עם Pro',
+      improveNoChange: 'הניסוח כבר טוב — לא נדרש שיפור.',
+      improveUnavailable: 'מודל Gemini Pro אינו זמין כרגע.',
+      improveFailed: 'שיפור ההמלצה נכשל זמנית. יש לנסות שוב.',
+      // Operator-only model-tier telemetry (flag-gated; never shown to customers).
       qualityFast: 'מהיר — Gemini Flash',
       qualityPro: 'איכותי — Gemini Pro',
       qualityModelUsed: 'הרצה אחרונה: {model}',

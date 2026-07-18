@@ -364,7 +364,9 @@ export async function POST(request: Request) {
     const routeRejectedByReason = () => ({ title_exists: filteredTitleExists, exact_existing_keyword_owner: exactExistingKeywordOwner, source_only_entity_expansion: sourceOnlyEntityExpansion, covered_by_existing_content: filteredCoveredByContent, primary_keyword_exists: filteredPrimaryKeywordExists, intra_run_removed: intraRun.removed, intra_run_merged: intraRun.merged })
 
     // F/B — persist the EXACT fresh array; capture the typed persistence outcome.
-    const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh })
+    // Persist the customer's SELECTED tier + the actual model the run used, so the
+    // QA/admin view can show them later (never rendered as telemetry on the card).
+    const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh, requestedTier: qualityMode, modelUsed: briefDiagnostics?.modelPath?.model ?? null })
 
     // F — persistence errors are NEVER swallowed. attempted>0 with 0 inserted AND 0
     // duplicates ⇒ every write failed → a TYPED 500, never a "0 new" success response.

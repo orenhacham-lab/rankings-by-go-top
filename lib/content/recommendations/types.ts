@@ -67,6 +67,13 @@ export interface TopicSuggestion {
   /** Internal diagnostic — which Gemini model produced this idea (primary or
    *  fallback id). Response/diagnostic-only; NEVER rendered on the idea card. */
   modelUsed?: string
+  /** The tier the customer EXPLICITLY selected for the batch that produced this
+   *  idea ('standard' = מהיר/Flash, 'premium' = מתקדם/Pro). Survives persistence so
+   *  the QA/admin view can show it; never rendered as raw telemetry on the card. */
+  requestedTier?: 'standard' | 'premium'
+  /** True when THIS single idea was later polished with the Pro model via the
+   *  per-item "שפר עם Gemini Pro" action. Drives the visible "improved" marker. */
+  improvedWithPro?: boolean
   /** P0 recovery tiers — the confidence band the opportunity was generated in:
    *  'high_confidence' (Tier 1, strong multi-source evidence), 'medium_confidence'
    *  (Tier 2, broadened single-strong-source), 'discovery' (Tier 3, controlled

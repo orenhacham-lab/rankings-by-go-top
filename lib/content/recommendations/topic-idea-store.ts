@@ -35,6 +35,13 @@ interface PersistedPlan {
   confidenceLevel?: TopicSuggestion['confidenceLevel']
   discoveryGenerated?: boolean
   businessRelevance?: TopicSuggestion['businessRelevance']
+  /** Model-selection provenance that must survive reload (surfaced in the QA/admin
+   *  view; the customer card shows only the "improved" marker, never model names). */
+  requestedTier?: 'standard' | 'premium'
+  modelUsed?: string
+  improvedWithPro?: boolean
+  /** The Pro model that produced the per-item improvement (diagnostic). */
+  improvedModel?: string
 }
 
 /**
@@ -89,6 +96,11 @@ export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { 
     ...(plan?.confidenceLevel ? { confidenceLevel: plan.confidenceLevel } : {}),
     ...(plan?.discoveryGenerated ? { discoveryGenerated: true } : {}),
     ...(plan?.businessRelevance ? { businessRelevance: plan.businessRelevance } : {}),
+    // Model-selection provenance (survives reload). requestedTier / modelUsed are
+    // diagnostic-only; improvedWithPro drives the visible per-item "improved" marker.
+    ...(plan?.requestedTier ? { requestedTier: plan.requestedTier } : {}),
+    ...(plan?.modelUsed ? { modelUsed: plan.modelUsed } : {}),
+    ...(plan?.improvedWithPro ? { improvedWithPro: true } : {}),
   }
 }
 
@@ -134,6 +146,10 @@ export interface NewIdeaInput {
   batchId: string
   source: string
   suggestions: TopicSuggestion[]
+  /** The tier the customer EXPLICITLY selected for this batch, and the actual model
+   *  the run used — stored per row so the QA/admin view can show them later. */
+  requestedTier?: 'standard' | 'premium'
+  modelUsed?: string | null
 }
 
 /** Persistence outcome (F) — attempted vs actually inserted (the rest were duplicate
@@ -152,8 +168,12 @@ export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Pro
   const rows = input.suggestions.map((s) => {
     // The additive JSONB link_plan carries the canonical role-aware plan + metadata so
     // roles survive persistence + reload (never re-inferred in the UI).
-    const persistedPlan: PersistedPlan | null = s.linkPlan
-      ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance }
+    // The bundle is persisted whenever there is a link plan OR model-selection
+    // provenance to preserve (a zero-link idea still records its tier/model).
+    const modelMeta = { requestedTier: input.requestedTier, modelUsed: input.modelUsed ?? s.modelUsed ?? undefined, improvedWithPro: s.improvedWithPro }
+    const hasModelMeta = !!(modelMeta.requestedTier || modelMeta.modelUsed || modelMeta.improvedWithPro)
+    const persistedPlan: PersistedPlan | null = (s.linkPlan || hasModelMeta)
+      ? { ...(s.linkPlan ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance } : {}), ...modelMeta }
       : null
     return {
       user_id: input.userId,
@@ -213,6 +233,35 @@ export async function markIdeasDuplicate(admin: Admin, projectId: string, ideaId
       .select('id')
     return ((data ?? []) as { id: string }[]).length
   } catch { return 0 }
+}
+
+/** Load ONE pending idea by id (project-scoped). Null when missing/rejected/table absent. */
+export async function loadPendingIdeaById(admin: Admin, projectId: string, ideaId: string): Promise<ContentTopicIdeaRow | null> {
+  const { data, error } = await admin.from(TABLE).select('*').eq('project_id', projectId).eq('id', ideaId).eq('status', 'pending').maybeSingle()
+  if (error || !data) return null
+  return data as ContentTopicIdeaRow
+}
+
+/** Persist a per-item Pro improvement: replaces the human-facing title + reason,
+ *  marks the row improvedWithPro, and records the Pro model — the primary keyword,
+ *  intent, page type, links and coverage are NOT touched (the validated engine
+ *  decisions are preserved; only the wording is refined). Best-effort; on a missing
+ *  link_plan column it still updates the visible title/reason. Returns the reloaded
+ *  suggestion, or null when the row is gone. */
+export async function applyProImprovement(admin: Admin, projectId: string, ideaId: string, update: { title: string; suggestionReason: string; improvedModel: string }): Promise<(TopicSuggestion & { ideaId: string }) | null> {
+  const row = await loadPendingIdeaById(admin, projectId, ideaId)
+  if (!row) return null
+  const prevPlan = (row.link_plan && typeof row.link_plan === 'object') ? (row.link_plan as PersistedPlan) : {}
+  const mergedPlan: PersistedPlan = { ...prevPlan, improvedWithPro: true, improvedModel: update.improvedModel, modelUsed: prevPlan.modelUsed ?? update.improvedModel }
+  const nowIso = new Date().toISOString()
+  const base = { title: update.title, suggestion_reason: update.suggestionReason, updated_at: nowIso }
+  const doUpdate = (payload: Record<string, unknown>) => admin.from(TABLE).update(payload).eq('project_id', projectId).eq('id', ideaId).eq('status', 'pending').select('*').maybeSingle()
+  let { data, error } = await doUpdate({ ...base, link_plan: mergedPlan })
+  if (error && MISSING_COLUMN.has((error as { code?: string }).code ?? '')) {
+    ;({ data, error } = await doUpdate(base)) // link_plan column absent → still persist the visible wording
+  }
+  if (error || !data) return null
+  return ideaToSuggestion(data as ContentTopicIdeaRow)
 }
 
 /** Durably reject pending ideas by id. Returns count rejected (0 on missing table). */
