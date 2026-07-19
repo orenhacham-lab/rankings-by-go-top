@@ -15,6 +15,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { POST as comparePOST } from '../../../app/api/content/automation/reco-qa/compare/route'
 import { assembleComparisonPayload } from '../recommendations/smart-run-report'
+import { parseQaCostCapUsd, authorizeQaRunCost, maxAuthorizedCostFor } from '../recommendations/smart-run-harness'
 import { computeRescueAccounting, type BriefOutcome } from '../recommendations/smart-controller'
 import type { SmartComparisonResult, SmartAttemptRecord } from '../recommendations/smart-run-harness'
 import type { TopicSuggestion } from '../recommendations/types'
@@ -107,6 +108,34 @@ async function main() {
     const dirty = assembleComparisonPayload(mkResult('הנושא הופק על ידי gemini-2.5-pro'), 'abc123')
     check('R18. injected model-id leak → blind file WITHHELD (not returned)', dirty.blindReview === null && dirty.response.blindAvailable === false && !!dirty.response.blindBlocked)
     check('R19. even when blocked, the SEPARATE mapping is still produced', Object.keys(dirty.mapping).length === 6)
+  }
+
+  console.log('COST) authorized-cap parse, enforcement + honest preflight display')
+  {
+    // 1. the env cap is read correctly; invalid/missing/≤0 fall back to the default.
+    check('C1. valid cap parses ($0.75)', parseQaCostCapUsd('0.75', 5) === 0.75)
+    check('C2. missing cap → default', parseQaCostCapUsd(undefined, 5) === 5)
+    check('C3. non-numeric cap → default (never NaN)', parseQaCostCapUsd('abc', 5) === 5 && !Number.isNaN(parseQaCostCapUsd('abc', 5)))
+    check('C4. zero/negative cap → default', parseQaCostCapUsd('0', 5) === 5 && parseQaCostCapUsd('-1', 5) === 5)
+    // 2. a run above the cap is NOT authorized; equal/under is.
+    check('C5. worst-case $3.50 over cap $0.75 → not within limit', authorizeQaRunCost(3.5, 0.75).withinAuthorizedLimit === false)
+    check('C6. worst-case equal to cap → within', authorizeQaRunCost(0.75, 0.75).withinAuthorizedLimit === true)
+    check('C7. worst-case under cap → within', authorizeQaRunCost(0.30, 0.75).withinAuthorizedLimit === true)
+    // 3. the worst-case estimate recalculates with ATTEMPTS (its applicable driver);
+    //    it is a per-run ceiling, so it does NOT vary with target count — documented.
+    check('C8. estimate recalculates with attempts (3 < 6)', maxAuthorizedCostFor(3, 0.5, 0.5) < maxAuthorizedCostFor(6, 0.5, 0.5))
+    check('C9. the observed $3.50 reproduces exactly (0.5 + 0.5×3×2)', maxAuthorizedCostFor(3, 0.5, 0.5) === 3.5)
+
+    // 4. route wiring: preflight exposes the ENFORCED limit + within flag and gates
+    //    the confirm on it; a confirmed over-cap run is rejected 402 BEFORE spend.
+    const routeSrc = read('../../../app/api/content/automation/reco-qa/compare/route.ts')
+    check('C10. cap is safe-parsed from RECO_QA_MAX_RUN_COST_USD (no bare Number(?? ))', /parseQaCostCapUsd\(process\.env\.RECO_QA_MAX_RUN_COST_USD/.test(routeSrc) && !/Number\(process\.env\.RECO_QA_MAX_RUN_COST_USD/.test(routeSrc))
+    check('C11. preflight returns the enforced limit + within flag + gated confirm', /authorizedLimitUsd/.test(routeSrc) && /withinAuthorizedLimit/.test(routeSrc) && /requiresConfirmation: withinAuthorizedLimit/.test(routeSrc))
+    check('C12. confirmed over-cap run is rejected 402 before prep/spend', /if \(!withinAuthorizedLimit\)/.test(routeSrc) && /cost_exceeds_authorized_limit/.test(routeSrc) && /status: 402/.test(routeSrc) && routeSrc.indexOf('cost_exceeds_authorized_limit') < routeSrc.indexOf('inFlightProjects.add'))
+    // 5. UI shows no actionable confirm above the cap.
+    const pageSrc = read('../../../app/(dashboard)/reco-qa/page.tsx')
+    check('C13. UI gates the confirm button on withinAuthorizedLimit (blocked message otherwise)', /withinAuthorizedLimit/.test(pageSrc) && /reco-qa-cost-blocked/.test(pageSrc) && /within \?/.test(pageSrc))
+    check('C14. UI displays the enforced authorized limit, not just the estimate', /authorizedLimitUsd/.test(pageSrc) && /תקרת QA מאושרת/.test(pageSrc))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

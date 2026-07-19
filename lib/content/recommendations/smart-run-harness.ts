@@ -401,9 +401,27 @@ export async function runSmartComparison(admin: Admin, input: BriefRunInput, opt
   }
 }
 
-/** Pre-run maximum-authorized cost (no snapshot prepared, no provider calls) — shown
- *  to the operator for explicit confirmation BEFORE any spend. */
+/** Pre-run WORST-CASE cost estimate (no snapshot prepared, no provider calls): the
+ *  preparation ceiling + the per-attempt ceiling for every Flash and Pro attempt. It is
+ *  a worst-case CEILING (each attempt's real spend is bounded far below its per-run
+ *  ceiling), and it depends on the attempt count + the per-run ceiling — NOT on the
+ *  target count, because the per-run cost ceiling is itself target-independent. */
 export function maxAuthorizedCostFor(attemptsPerModel: number, perAttemptCeilingUsd: number, preparationCeilingUsd: number): number {
   const n = Math.min(HARNESS_MAX_ATTEMPTS_PER_MODEL, Math.max(HARNESS_MIN_ATTEMPTS_PER_MODEL, attemptsPerModel))
   return round(preparationCeilingUsd + perAttemptCeilingUsd * (n * 2), 6)
+}
+
+/** Parse the QA global cost cap from its env string. A missing, non-numeric, or
+ *  non-positive value falls back to the default (never NaN — which would break the
+ *  authorization comparison). */
+export function parseQaCostCapUsd(raw: string | undefined, defaultCapUsd: number): number {
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : defaultCapUsd
+}
+
+/** Authorize a QA comparison run against the enforced cap. A run whose WORST-CASE
+ *  estimate exceeds the authorized limit is NOT authorized — the endpoint must reject
+ *  it (and the UI must not offer a confirm) rather than start spending. */
+export function authorizeQaRunCost(estimatedWorstCaseCostUsd: number, authorizedLimitUsd: number): { withinAuthorizedLimit: boolean } {
+  return { withinAuthorizedLimit: estimatedWorstCaseCostUsd <= authorizedLimitUsd }
 }

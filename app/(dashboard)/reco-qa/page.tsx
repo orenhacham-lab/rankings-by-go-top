@@ -260,7 +260,8 @@ interface CompareResponse {
   ok: boolean; preflight?: boolean; error?: string; message?: string
   snapshotId?: string; commitSha?: string | null; poolSize?: number; discoveryRan?: boolean
   preparationProviderCalls?: number; targetCount?: number; attemptsPerModel?: number
-  maxAuthorizedCostUsd?: number; actualCostUsd?: number; requiresConfirmation?: boolean
+  maxAuthorizedCostUsd?: number; estimatedWorstCaseCostUsd?: number; authorizedLimitUsd?: number
+  withinAuthorizedLimit?: boolean; actualCostUsd?: number; requiresConfirmation?: boolean
   attempts?: AttemptRow[]; aggregate?: { flash: AggMetrics; pro: AggMetrics }
   selection?: { select: string; reason: string; provisional: boolean }
   budget?: { ok: boolean; path: string; requiredAuthorizationUsd: number }
@@ -337,16 +338,28 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
 
       {stage === 'error' && <p className="text-xs text-red-600 mb-2">{err}</p>}
 
-      {preflight && stage !== 'done' && (
-        <div className="rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 mb-3 text-sm" data-testid="reco-qa-preflight">
-          <p className="text-amber-800 dark:text-amber-300 mb-2" dir="rtl">
-            עלות QA מקסימלית מאושרת: <b dir="ltr">${preflight.maxAuthorizedCostUsd}</b> · {attempts}×2 ניסיונות · יעד {targetCount}. הריצה אינה שומרת המלצות. יש לאשר במפורש.
-          </p>
-          <button onClick={doRun} disabled={running} className="rounded-md bg-rose-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-confirm-run">
-            {stage === 'running' ? 'מריץ השוואה…' : 'אשר והרץ השוואה'}
-          </button>
-        </div>
-      )}
+      {preflight && stage !== 'done' && (() => {
+        const estWorst = preflight.estimatedWorstCaseCostUsd ?? preflight.maxAuthorizedCostUsd
+        const limit = preflight.authorizedLimitUsd
+        // Trust the SERVER's decision; fall back to a client compare only if absent.
+        const within = preflight.withinAuthorizedLimit ?? (typeof estWorst === 'number' && typeof limit === 'number' ? estWorst <= limit : true)
+        return (
+          <div className="rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 mb-3 text-sm" data-testid="reco-qa-preflight">
+            <p className="text-amber-800 dark:text-amber-300 mb-2" dir="rtl">
+              עלות בתרחיש הגרוע: <b dir="ltr">${estWorst}</b> · תקרת QA מאושרת: <b dir="ltr">${limit ?? '—'}</b> · {attempts}×2 ניסיונות · יעד {targetCount}. הריצה אינה שומרת המלצות.
+            </p>
+            {within ? (
+              <button onClick={doRun} disabled={running} className="rounded-md bg-rose-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-confirm-run">
+                {stage === 'running' ? 'מריץ השוואה…' : 'אשר והרץ השוואה'}
+              </button>
+            ) : (
+              <p className="text-red-600 text-xs" data-testid="reco-qa-cost-blocked" dir="rtl">
+                הריצה חסומה: העלות בתרחיש הגרוע (${estWorst}) חורגת מהתקרה המאושרת (${limit}). הקטן את מספר הניסיונות או העלה את RECO_QA_MAX_RUN_COST_USD ופרוס מחדש את ה-Preview.
+              </p>
+            )}
+          </div>
+        )
+      })()}
 
       {result && stage === 'done' && (
         <div data-testid="reco-qa-comparison-result">

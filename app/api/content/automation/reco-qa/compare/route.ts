@@ -17,7 +17,7 @@
  *                      artifacts (the blind file is withheld if the leakage scan trips).
  */
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
-import { runSmartComparison, maxAuthorizedCostFor, HARNESS_MIN_ATTEMPTS_PER_MODEL } from '@/lib/content/recommendations/smart-run-harness'
+import { runSmartComparison, maxAuthorizedCostFor, parseQaCostCapUsd, authorizeQaRunCost, HARNESS_MIN_ATTEMPTS_PER_MODEL } from '@/lib/content/recommendations/smart-run-harness'
 import { assembleComparisonPayload } from '@/lib/content/recommendations/smart-run-report'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from '@/lib/content/recommendations/model'
 import { runBudget } from '@/lib/content/recommendations/reco-cost'
@@ -32,6 +32,8 @@ const SERVER_MAX_TARGET_COUNT = 20
 const DEFAULT_ATTEMPTS_PER_MODEL = 3
 const DEFAULT_TARGET_COUNT = 12
 const QA_MODE = 'premium' as const
+// Fallback authorized cap when RECO_QA_MAX_RUN_COST_USD is unset/invalid.
+const DEFAULT_QA_MAX_RUN_COST_USD = 5
 
 // One comparison per project at a time (in-memory best-effort concurrency guard).
 const inFlightProjects = new Set<string>()
@@ -61,25 +63,45 @@ export async function POST(request: Request) {
   // Cost model: each attempt is one bounded run; preparation is one discovery call.
   const perAttemptCeilingUsd = runBudget(QA_MODE, targetCount).maxEstimatedCostUsd
   const preparationCeilingUsd = perAttemptCeilingUsd
-  const maxAuthorizedCostUsd = maxAuthorizedCostFor(attemptsPerModel, perAttemptCeilingUsd, preparationCeilingUsd)
-  const globalAuthorizedUsd = Number(process.env.RECO_QA_MAX_RUN_COST_USD ?? '5')
+  // WORST-CASE estimate (attempts × per-run ceiling); NOT the authorized cap.
+  const estimatedWorstCaseCostUsd = maxAuthorizedCostFor(attemptsPerModel, perAttemptCeilingUsd, preparationCeilingUsd)
+  // The ENFORCED authorized QA cap (env; safe-parsed so an invalid value falls back).
+  const authorizedLimitUsd = parseQaCostCapUsd(process.env.RECO_QA_MAX_RUN_COST_USD, DEFAULT_QA_MAX_RUN_COST_USD)
+  const { withinAuthorizedLimit } = authorizeQaRunCost(estimatedWorstCaseCostUsd, authorizedLimitUsd)
   const limits = {
     serverMaxAttemptsPerModel: SERVER_MAX_ATTEMPTS_PER_MODEL,
     serverMaxTargetCount: SERVER_MAX_TARGET_COUNT,
     minAttemptsPerModel: HARNESS_MIN_ATTEMPTS_PER_MODEL,
-    globalAuthorizedUsd,
+    authorizedLimitUsd,
   }
 
-  // ── PREFLIGHT — show the maximum authorized cost; spend nothing ──────────────
+  // ── PREFLIGHT — show the worst-case estimate AND the enforced limit; spend
+  //    nothing. A confirm is offered ONLY when the estimate is within the cap. ──
   if (!confirm) {
     return Response.json({
       ok: true, preflight: true,
       project: { id: auth.project.id },
       commitSha: currentGitSha(),
       targetCount, attemptsPerModel, persist: false,
-      maxAuthorizedCostUsd, limits,
-      requiresConfirmation: true,
+      estimatedWorstCaseCostUsd,
+      authorizedLimitUsd,
+      withinAuthorizedLimit,
+      // Back-compat alias (equals the worst-case estimate).
+      maxAuthorizedCostUsd: estimatedWorstCaseCostUsd,
+      limits,
+      // The operator may confirm ONLY when the run is within the authorized cap.
+      requiresConfirmation: withinAuthorizedLimit,
     })
+  }
+
+  // ── COST GATE — a confirmed run whose worst case exceeds the authorized cap is
+  //    REJECTED before any snapshot prep or provider spend (defence beyond the UI). ─
+  if (!withinAuthorizedLimit) {
+    return Response.json({
+      ok: false, error: 'cost_exceeds_authorized_limit',
+      estimatedWorstCaseCostUsd, authorizedLimitUsd,
+      message: `Worst-case QA cost $${estimatedWorstCaseCostUsd} exceeds the authorized limit $${authorizedLimitUsd}. Lower attemptsPerModel or raise RECO_QA_MAX_RUN_COST_USD (then redeploy Preview).`,
+    }, { status: 402 })
   }
 
   // ── RUN — requires explicit confirmation ────────────────────────────────────
@@ -92,7 +114,7 @@ export async function POST(request: Request) {
       preparationMaxUsd: preparationCeilingUsd,
       flashAttemptMaxUsd: perAttemptCeilingUsd * attemptsPerModel,
       proRescueMaxUsd: perAttemptCeilingUsd * attemptsPerModel,
-      globalAuthorizedUsd,
+      globalAuthorizedUsd: authorizedLimitUsd,
     }
     const result = await runSmartComparison(
       auth.admin,
@@ -112,7 +134,7 @@ export async function POST(request: Request) {
 
     const { response, blindReview, mapping } = assembleComparisonPayload(result, currentGitSha())
     // persist:false is server-enforced; the harness performs no writes.
-    return Response.json({ ...response, limits, blindReview, mapping })
+    return Response.json({ ...response, limits, authorizedLimitUsd, withinAuthorizedLimit, estimatedWorstCaseCostUsd, blindReview, mapping })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return Response.json({ ok: false, error: 'comparison_failed', message: message.slice(0, 300) }, { status: 500 })
