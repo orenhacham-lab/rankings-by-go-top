@@ -21,7 +21,7 @@ const check = (n: string, c: boolean, d?: string) => { if (c) { pass++; console.
 const read = (rel: string) => readFileSync(join(__dirname, rel), 'utf8')
 
 // ── Model-aware fake Gemini server ───────────────────────────────────────────────
-interface SrvCfg { proAvailable: boolean; proMode: 'ok' | 'provider_fail' | 'synth_fail'; flashMode: 'ok' | 'empty'; flashAvailable?: boolean }
+interface SrvCfg { proAvailable: boolean; proMode: 'ok' | 'provider_fail' | 'synth_fail'; flashMode: 'ok' | 'empty'; flashAvailable?: boolean; flashYieldCap?: number }
 function startServer(cfg: SrvCfg): Promise<{ server: Server; port: number; calls: { model: string; kind: string }[] }> {
   const calls: { model: string; kind: string }[] = []
   const topicsFor = (body: string, prefix: string) => {
@@ -53,7 +53,15 @@ function startServer(cfg: SrvCfg): Promise<{ server: Server; port: number; calls
         if (isPro && cfg.proMode === 'synth_fail') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: '[]' }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 40, totalTokenCount: 940 } })); return }
         // Titles stay keyword-aligned for BOTH models (a prefix would break the engine's
         // title↔keyword gate). Selection is asserted via provenance, not title content.
-        const topics = isPro ? topicsFor(body, '') : (cfg.flashMode === 'empty' ? [] : topicsFor(body, ''))
+        // flashYieldCap: a Flash round returns at most N topics (a PARTIAL round-1 yield),
+        // leaving a deficit so a real second synthesis round is attempted — used to drive a
+        // provider-level budget stop on round 2. The capped topics carry an aligned secondary
+        // keyword so they pass the engine's content-depth gate and are actually ACCEPTED
+        // (an under-target-but-non-zero round 1 is what forces the engine into round 2).
+        const flashTopics = cfg.flashMode === 'empty' ? [] : (cfg.flashYieldCap != null
+          ? topicsFor(body, '').slice(0, cfg.flashYieldCap).map((t) => ({ ...t, secondaryKeywords: [`${t.primaryKeyword} מדריך`] }))
+          : topicsFor(body, ''))
+        const topics = isPro ? topicsFor(body, '') : flashTopics
         res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ topics }) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 400, totalTokenCount: 1400 } })); return
       }
       res.writeHead(404); res.end('{}')
@@ -70,6 +78,14 @@ function tables(): Record<string, Record<string, unknown>[]> {
     keyword_research_cache: [{ project_id: 'p1', fetched_at: '2026-07-01', results_json: KWS.map((k, i) => ({ keyword: k, avgMonthlySearches: 100 + i * 25 })) }],
     shopify_entities: [{ project_id: 'p1', is_active: true, title: 'אבקת חלבון צמחית', handle: 'prot', entity_type: 'product', canonical_url: 'https://natural-shop.co.il/p/prot' }],
     generated_articles: [], article_topics: [], content_topic_ideas: [], wordpress_content_index: [],
+  }
+}
+/** No-evidence project: a successful preparation that yields an EMPTY working pool. */
+function emptyTables(): Record<string, Record<string, unknown>[]> {
+  return {
+    projects: [{ id: 'p1', business_name: 'הצמחייה', target_domain: 'https://natural-shop.co.il', language: 'he', country: 'IL' }],
+    tracking_targets: [], keyword_research_cache: [{ project_id: 'p1', fetched_at: '2026-07-01', results_json: [] }],
+    shopify_entities: [], generated_articles: [], article_topics: [], content_topic_ideas: [], wordpress_content_index: [],
   }
 }
 async function loadRun(port: number) {
@@ -208,6 +224,75 @@ async function main() {
     s15.server.close()
   }
 
+  console.log('PRO-UNAVAILABLE) the pre-Pro Flash downgrade runs under the SAME fallback safety gates')
+  {
+    // 16. Pro unavailable + EMPTY pool → NO Flash synthesis, typed no_evidence, 0 writes.
+    const s16 = await startServer({ proAvailable: false, proMode: 'ok', flashMode: 'ok' })
+    const rr16 = await loadRun(s16.port)
+    const r16 = await rr16.runProFirstProduction(fakeAdmin(emptyTables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, rr16.newRunCostController('premium', 'run16', 12))
+    check('R16. Pro unavailable + empty pool → NO Flash synthesis; no_evidence; Flash NOT attempted; 0 writes',
+      synthCalls(s16.calls, 'flash') === 0 && r16.provenance.fallbackReason === 'no_evidence' && r16.provenance.flashAttempted === false && r16.provenance.fallbackTriggered === false && r16.selectedModel === 'none' && r16.provenance.persistedWrites === 0,
+      JSON.stringify({ flashCalls: synthCalls(s16.calls, 'flash'), reason: r16.provenance.fallbackReason }))
+    s16.server.close()
+
+    // 17. Pro unavailable + tiny premium cap → EXACT pre-check blocks; NO Flash synthesis.
+    const save17 = process.env.RECO_MAX_ESTIMATED_COST_USD_PREMIUM
+    process.env.RECO_MAX_ESTIMATED_COST_USD_PREMIUM = '0.0000001'
+    const s17 = await startServer({ proAvailable: false, proMode: 'ok', flashMode: 'ok' })
+    const rr17 = await loadRun(s17.port)
+    const r17 = await rr17.runProFirstProduction(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, rr17.newRunCostController('premium', 'run17', 12))
+    check('R17. Pro unavailable + budget blocked → NO Flash synthesis; fallback_budget_blocked; Flash NOT attempted; 0 writes',
+      synthCalls(s17.calls, 'flash') === 0 && r17.provenance.fallbackReason === 'fallback_budget_blocked' && r17.provenance.flashAttempted === false && r17.provenance.fallbackTriggered === false && r17.selectedModel === 'none' && r17.provenance.persistedWrites === 0,
+      JSON.stringify({ flashCalls: synthCalls(s17.calls, 'flash'), reason: r17.provenance.fallbackReason }))
+    if (save17 === undefined) delete process.env.RECO_MAX_ESTIMATED_COST_USD_PREMIUM; else process.env.RECO_MAX_ESTIMATED_COST_USD_PREMIUM = save17
+    s17.server.close()
+
+    // 18. Pro unavailable + EXACT pre-check PASSES but the provider stops on the SECOND
+    //     synthesis round (call cap 1, partial round-1 yield leaves a deficit) → the run
+    //     returns stop_reason=budget_stopped, which is NORMALIZED to fallback_budget_blocked:
+    //     Flash NOT reported as attempted/completed, no batch, 0 writes.
+    // Round 1 under-yields (flashYieldCap) leaving a deficit; the call cap of 1 means the
+    // SECOND synthesis round is refused by the controller → stop_reason=budget_stopped. The
+    // EXACT pre-check still PASSES (1 free slot at pre-check) so we reach the provider and
+    // exercise the post-synth normalization, not the pre-check block.
+    const s18 = await startServer({ proAvailable: false, proMode: 'ok', flashMode: 'ok', flashYieldCap: 4 })
+    const rr18 = await loadRun(s18.port)
+    const r18 = await rr18.runProFirstProduction(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, rr18.newRunCostController('premium', 'run18', 8, { maxModelCallsPerRun: 1 }))
+    // A flash synthesis call DID happen (the EXACT pre-check passed) yet the outcome is
+    // normalized to fallback_budget_blocked with flashAttempted=false — in this branch only
+    // the post-synth budgetStopped() check can turn a made call into fallback_budget_blocked
+    // (the pre-check returns BEFORE any call), so a flash call + this reason proves the
+    // round-2 budget_stopped normalization ran.
+    check('R18. Pro unavailable + provider budget stop (round 2) → normalized fallback_budget_blocked; Flash NOT reported complete; 0 writes',
+      synthCalls(s18.calls, 'flash') >= 1 && r18.provenance.fallbackReason === 'fallback_budget_blocked' && r18.provenance.flashAttempted === false && r18.provenance.fallbackTriggered === false && r18.selectedModel === 'none' && r18.provenance.persistedWrites === 0 && r18.selectedFinalization.finalSuggestions.length === 0,
+      JSON.stringify({ reason: r18.provenance.fallbackReason, flashCalls: synthCalls(s18.calls, 'flash'), sel: r18.selectedModel }))
+    s18.server.close()
+
+    // 19. Pro unavailable + Flash available + budget authorized → Flash runs EXACTLY once.
+    const s19 = await startServer({ proAvailable: false, proMode: 'ok', flashMode: 'ok' })
+    const rr19 = await loadRun(s19.port)
+    const r19 = await rr19.runProFirstProduction(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, rr19.newRunCostController('premium', 'run19', 12))
+    check('R19. Pro unavailable + Flash available + budget ok → Flash attempted ONCE, batch selected, recorded Flash',
+      r19.provenance.flashAttempted === true && r19.provenance.fallbackTriggered === true && synthCalls(s19.calls, 'pro') === 0 && synthCalls(s19.calls, 'flash') >= 1 && synthCalls(s19.calls, 'flash') <= 2 && r19.selectedModel === 'flash' && /flash/.test(r19.provenance.modelUsedForPersistence ?? ''),
+      JSON.stringify({ flashCalls: synthCalls(s19.calls, 'flash'), sel: r19.selectedModel }))
+    s19.server.close()
+
+    // 20. selectedModelPath is NEVER downgraded:true with downgradeReason:null. On a Pro-zero
+    //     Flash-selected batch the runtime downgrade carries a TRUTHFUL reason.
+    const s20 = await startServer({ proAvailable: true, proMode: 'provider_fail', flashMode: 'ok' })
+    const rr20 = await loadRun(s20.port)
+    const r20 = await rr20.runProFirstProduction(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, rr20.newRunCostController('premium', 'run20', 12))
+    const noNullDowngrade = (p: { downgraded: boolean; downgradeReason: string | null }) => !(p.downgraded === true && p.downgradeReason === null)
+    check('R20. selected path never has downgraded:true with reason:null; Pro→Flash runtime fallback reason is pro_runtime_fallback',
+      r20.selectedModel === 'flash' && r20.selectedModelPath.downgraded === true && r20.selectedModelPath.downgradeReason === 'pro_runtime_fallback' && noNullDowngrade(r20.selectedModelPath) && noNullDowngrade(r19.selectedModelPath) && noNullDowngrade(r16.selectedModelPath),
+      JSON.stringify({ sel: r20.selectedModel, path: r20.selectedModelPath }))
+    s20.server.close()
+
+    // 21. persistedWrites === 0 across ALL THREE Pro-unavailable zero paths.
+    check('R21. persistedWrites === 0 in every Pro-unavailable zero path (empty pool / budget blocked / provider stop)',
+      r16.provenance.persistedWrites === 0 && r17.provenance.persistedWrites === 0 && r18.provenance.persistedWrites === 0)
+  }
+
   console.log('GUARD) route wiring, single flag, finalize-once, provenance, engine + QA untouched')
   {
     const routeSrc = read('../../../app/api/content/automation/recommendations/route.ts')
@@ -245,13 +330,24 @@ async function main() {
     // Pro id is never used as a Flash override; flash_unavailable is a typed reason.
     check('G21. Flash resolution requires a Flash-class model; resolveFlashClassModel returns null otherwise', /isFlashClassModel\(fr\.model\) \? fr\.model : null/.test(runSrc) && /'flash_unavailable'/.test(runSrc) && /flash_unavailable/.test(ctrlSrc) && !/flashResolution\.ok\s*\?\s*flashResolution\.model\s*:\s*proRequestedModel/.test(runSrc))
     check('G22. Flash resolver is NOT called when there is no rescue (genuine_exhaustion returned first)', runSrc.indexOf('rescueCount === 0') !== -1 && runSrc.indexOf('rescueCount === 0') < runSrc.indexOf('await resolveFlashClassModel()'))
-    check('G23. pre-call Pro downgrade to a non-Flash/null model → no synthesis (flash_unavailable)', /if \(!isFlashClassModel\(flashModel\)\)[\s\S]{0,120}flash_unavailable/.test(runSrc))
+    check('G23. pre-call Pro downgrade to a non-Flash/null model → no synthesis (flash_unavailable)', /if \(!flashModel \|\| !isFlashClassModel\(flashModel\)\)[\s\S]{0,120}flash_unavailable/.test(runSrc))
     // Blocker 4 — session-only (no ideas table → persistOutcome null): persistedWrites=0,
     // persisted:false; the persistedWrites assignment precedes the session-only return.
     check('G24. session-only branch: persisted:false; persistedWrites computed before it (→ 0 when null)', /persisted: false/.test(routeSrc) && routeSrc.indexOf('proFirstProvenance.persistedWrites = persistOutcome') < routeSrc.indexOf('if (pending === null)'))
     // Blocker 3 — fallbackEvaluated true for every evaluated/triggered path (incl. Pro
     // unavailable); fallbackTriggered true only when Flash actually started.
     check('G25. Pro-unavailable path sets fallbackEvaluated=true + fallbackTriggered=true', /fallbackEvaluated: true, fallbackTriggered: true, fallbackReason: 'pro_unavailable'/.test(runSrc))
+    // Blocker (round 3) — the pre-Pro Flash downgrade runs under the SAME safety gates as
+    // the Pro-zero fallback: empty pool, EXACT-prompt budget, and a budget_stopped
+    // normalization — each BEFORE (or right after) the single synthesizeFromSnapshot call.
+    {
+      const branch = runSrc.slice(runSrc.indexOf('if (proDowngraded) {'), runSrc.indexOf('// 3) REAL Pro'))
+      check('G26. Pro-unavailable branch gates the Flash downgrade: empty-pool no_evidence + exactFlashBudgetOk + budgetStopped normalization',
+        /workingPool\.length === 0[\s\S]{0,160}no_evidence/.test(branch) && /if \(!exactFlashBudgetOk\(controller, snapshot, flashModel\)\)[\s\S]{0,160}fallback_budget_blocked/.test(branch) && /if \(budgetStopped\(flashSynth\)\)[\s\S]{0,160}fallback_budget_blocked/.test(branch) && branch.indexOf('exactFlashBudgetOk') < branch.indexOf('await synthesizeFromSnapshot'))
+    }
+    // Blocker (round 3) #4 — the selected attempt path is NEVER downgraded:true with a null
+    // reason; a runtime Pro→Flash fallback carries the typed pro_runtime_fallback reason.
+    check('G27. flashAttemptModelPath uses a truthful downgradeReason (pro_runtime_fallback), never null', /downgraded: true, downgradeReason: 'pro_runtime_fallback'/.test(runSrc) && !/downgraded: true, downgradeReason: null/.test(runSrc) && /'pro_runtime_fallback'/.test(read('../recommendations/model-select.ts')))
     check('G18. UI: flag-gated single button, selector hidden', /!PRO_FIRST && \(/.test(uiSrc) && /צור המלצות/.test(uiSrc) && /יוצר המלצות…/.test(uiSrc) && /PRO_FIRST \? \{\} : \{ qualityMode \}/.test(uiSrc))
     // Frozen surfaces untouched.
     check('G19. validated engine files unchanged by Stage D', !/production-run|production-controller|proFirst/i.test(read('../recommendations/generate-from-briefs.ts')) && !/production-run|proFirst/i.test(read('../recommendations/finalize-attempt.ts')))

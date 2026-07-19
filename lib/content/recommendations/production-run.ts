@@ -113,7 +113,9 @@ function emptyReasonFor(fallbackReason: FallbackReason | 'pro_unavailable' | nul
 }
 
 function flashAttemptModelPath(snapshot: BriefRunSnapshot, flashModel: string): ModelPath {
-  return { requestedTier: 'premium', requestedModel: snapshot.modelPath.requestedModel, model: flashModel, tierUsed: 'flash', downgraded: true, downgradeReason: null }
+  // A REAL Pro attempt finalized zero and Flash created the batch → a runtime downgrade
+  // with a TRUTHFUL, non-null reason (never downgraded:true with reason:null).
+  return { requestedTier: 'premium', requestedModel: snapshot.modelPath.requestedModel, model: flashModel, tierUsed: 'flash', downgraded: true, downgradeReason: 'pro_runtime_fallback' }
 }
 
 /** Resolve a REAL Flash-class model, or null when none is offered / a non-Flash id is
@@ -173,14 +175,29 @@ export async function runProFirstProduction(
     },
   })
 
-  // 2) Pro UNAVAILABLE before any Pro call → run ONE Flash, but ONLY if the resolved
-  //    (downgraded) model is a REAL Flash-class model; else flash_unavailable (no run).
+  // 2) Pro UNAVAILABLE before any Pro call → run ONE Flash, but under the SAME safety
+  //    gates as the Pro-zero fallback: a REAL Flash-class model, a non-empty pool, and
+  //    EXACT-prompt budget authorization — each failure is a typed NON-run (0 writes),
+  //    never a silent Flash attempt.
   if (proDowngraded) {
     const flashModel = snapshot.modelPath.model
-    if (!isFlashClassModel(flashModel)) {
+    if (!flashModel || !isFlashClassModel(flashModel)) {
       return noBatch('flash_unavailable', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: false })
     }
+    // Empty pool after successful preparation → no evidence to synthesize from.
+    if (snapshot.workingPool.length === 0) {
+      return noBatch('no_evidence', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: false, flashResolvedModel: flashModel })
+    }
+    // EXACT-prompt budget authorization (no slot consumed) BEFORE any provider call.
+    if (!exactFlashBudgetOk(controller, snapshot, flashModel)) {
+      return noBatch('fallback_budget_blocked', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: false, flashResolvedModel: flashModel })
+    }
     const flashSynth = await synthesizeFromSnapshot(snapshot, controller)
+    // A provider-level budget stop (despite the pre-check) → normalized NON-run: Flash is
+    // NOT reported as attempted/completed, and nothing is written.
+    if (budgetStopped(flashSynth)) {
+      return noBatch('fallback_budget_blocked', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: false, flashResolvedModel: flashModel })
+    }
     const flashFin = finalizeOnce(flashSynth.suggestions)
     const flashFinalizedCount = flashFin.finalSuggestions.length
     const sel = selectProductionBatch(0, flashFinalizedCount)

@@ -31,7 +31,11 @@ export interface ModelPath {
   /** True whenever what runs is weaker than what was requested. NEVER silent —
    *  this exact object must be surfaced in Preview diagnostics. */
   downgraded: boolean
-  downgradeReason: 'premium_model_unavailable' | 'model_list_unavailable' | 'no_model_available' | null
+  // 'pro_runtime_fallback' is set additively by the Stage-D production controller when a
+  // REAL Pro attempt finalized zero and a single Flash fallback created the batch — the
+  // selected attempt path is then a runtime downgrade with a truthful, non-null reason.
+  // resolveRunModel never emits it; it is purely a surfaced-provenance value.
+  downgradeReason: 'premium_model_unavailable' | 'model_list_unavailable' | 'no_model_available' | 'pro_runtime_fallback' | null
 }
 
 /** Operator-configurable premium model id (validated against the live list). */
