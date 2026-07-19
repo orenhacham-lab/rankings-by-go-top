@@ -131,6 +131,9 @@ export default function AutomationIdeas({
   // QUALITY_SELECTOR_ENABLED now gates ONLY the operator model-path telemetry line;
   // the model selector itself is a production customer-facing control.
   const QUALITY_SELECTOR_ENABLED = process.env.NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'
+  // Stage D (client mirror of the server RECO_PRO_FIRST_CONTROLLER flag): hide the
+  // Flash/Pro selector + all model/tier/fallback wording; one button only.
+  const PRO_FIRST = process.env.NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER === 'true'
   const [qualityMode, setQualityMode] = useState<'standard' | 'premium'>(() => {
     // Default to מהיר (standard). Remember the customer's explicit choice locally.
     if (typeof window === 'undefined') return 'standard'
@@ -245,7 +248,9 @@ export default function AutomationIdeas({
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId, qualityMode }),
+        // Stage D — when the Pro-first controller owns the flow the client sends NO
+        // tier: the server always runs Pro-first and ignores any legacy tier field.
+        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId, ...(PRO_FIRST ? {} : { qualityMode }) }),
       })
       const data = await res.json().catch(() => ({}))
       if (reqId !== reqRef.current) return // a newer request superseded this one
@@ -665,13 +670,17 @@ export default function AutomationIdeas({
           />
         )}
         <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
-          {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate)}
+          {PRO_FIRST
+            ? (loading ? 'יוצר המלצות…' : 'צור המלצות')
+            : (loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate))}
         </Button>
       </div>
 
       {/* PRODUCTION model selector — two clear options with a short explanation each.
           Default מהיר. No model names / tiers / costs here (telemetry lives in QA). The
-          chosen tier is sent EXPLICITLY on every request; one tier per generation run. */}
+          chosen tier is sent EXPLICITLY on every request; one tier per generation run.
+          Stage D: HIDDEN entirely when the global Pro-first controller is active. */}
+      {!PRO_FIRST && (
       <div className="mb-3" data-testid="reco-quality-selector">
         <span id="reco-quality-label" className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">{t.qualityChooseLabel}</span>
         <div role="radiogroup" aria-labelledby="reco-quality-label" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -700,10 +709,12 @@ export default function AutomationIdeas({
           ))}
         </div>
       </div>
+      )}
 
       {/* Operator-only (flag-gated) model-path truthfulness — NEVER shown to customers.
-          Model name / tier / downgrade state stay out of the normal UI (QA/admin only). */}
-      {modelPath && QUALITY_SELECTOR_ENABLED && !loading && (
+          Model name / tier / downgrade state stay out of the normal UI (QA/admin only).
+          Stage D: also hidden whenever the Pro-first controller is active. */}
+      {modelPath && QUALITY_SELECTOR_ENABLED && !PRO_FIRST && !loading && (
         <p className={`text-[11px] mb-2 ${modelPath.downgraded ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`} data-testid="reco-model-path">
           {modelPath.downgraded
             ? t.qualityDowngraded.replace('{model}', String(modelPath.model ?? '—'))

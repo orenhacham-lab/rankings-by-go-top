@@ -28,6 +28,16 @@ export function isContentAutomationEnabled(): boolean {
 }
 
 /**
+ * Stage-D global Pro-first controller flag. Missing/invalid → false. Preview → true,
+ * Production → false (set per environment). When false the existing recommendation flow
+ * is byte-for-byte unchanged; when true the Pro-first production controller fully owns
+ * the normal recommendation route. Requires the automation module.
+ */
+export function isProFirstControllerEnabled(): boolean {
+  return isContentAutomationEnabled() && process.env.RECO_PRO_FIRST_CONTROLLER === 'true'
+}
+
+/**
  * Internal-link planning flag (Phase 1 = dry-run only). Independent + default
  * off so the read-only diagnostic can ship dark. Requires the automation module.
  * NOTE: this flag currently gates ONLY the read-only dry-run — it never causes

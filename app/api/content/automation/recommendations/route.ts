@@ -8,10 +8,11 @@
  * Gated by ENABLE_CONTENT_AUTOMATION + project ownership.
  */
 
-import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
+import { authContentProject, isContentAutomationEnabled, isProFirstControllerEnabled } from '@/lib/content/api-auth'
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
+import { runProFirstProduction, type ProductionProvenance } from '@/lib/content/recommendations/production-run'
 import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
@@ -132,15 +133,32 @@ export async function POST(request: Request) {
     let discoveryUsed = false
     let fallbackReason: string | null = null
     let result: Awaited<ReturnType<typeof generateRecommendations>>
-    const useLegacy = process.env.RECO_LEGACY_PATH === '1'
+    // Stage D — the GLOBAL Pro-first production controller. When enabled it fully owns
+    // the normal recommendation flow: one snapshot, real Pro once, Flash only as a
+    // strictly-gated single fallback. The old UI tier field is IGNORED (no Flash-first).
+    let proFirstProvenance: ProductionProvenance | null = null
+    const useProFirst = isProFirstControllerEnabled()
+    const useLegacy = !useProFirst && process.env.RECO_LEGACY_PATH === '1'
     // Phase 4 — the DEFAULT is the EVIDENCE-FIRST brief engine (deterministic
     // OpportunityBrief pool → one batched polish call → deterministic validation).
     // RECO_TIERED_OPPORTUNITIES=1 rolls back to the previous tiered generator;
     // RECO_ENABLE_CONTENT_PLAN=1 keeps the experimental batched plan reachable;
     // RECO_LEGACY_PATH=1 stays the explicit legacy rollback. All default OFF.
-    const useContentPlan = !useLegacy && process.env.RECO_ENABLE_CONTENT_PLAN === '1'
-    const useTiered = !useLegacy && !useContentPlan && process.env.RECO_TIERED_OPPORTUNITIES === '1'
-    if (useLegacy) {
+    const useContentPlan = !useProFirst && !useLegacy && process.env.RECO_ENABLE_CONTENT_PLAN === '1'
+    const useTiered = !useProFirst && !useLegacy && !useContentPlan && process.env.RECO_TIERED_OPPORTUNITIES === '1'
+    if (useProFirst) {
+      // GLOBAL Pro-first (Stage D). Ignore the client's tier field; always premium.
+      // One controller covers preparation + Pro + the single Flash fallback (premium
+      // budget — never the QA cap). The orchestrator returns the SELECTED attempt's
+      // PRISTINE engine suggestions; the route finalizes + persists them exactly as
+      // usual, so only the selected finalized batch is stored.
+      const controller = newRunCostController('premium', generationRunId, 12)
+      const prod = await runProFirstProduction(auth.admin, { projectId: auth.project.id, targetCount: 12, userId: auth.user.id }, controller)
+      proFirstProvenance = prod.provenance
+      briefDiagnostics = prod.briefDiagnostics
+      fallbackReason = prod.provenance.fallbackReason
+      result = { suggestions: prod.selectedEngineSuggestions, meta: { source, generated: prod.rawGenerated, skippedDuplicates: 0, finalCount: prod.selectedEngineSuggestions.length, attempts: prod.briefDiagnostics.rounds.length, reason: prod.selectedModel === 'none' ? (prod.emptyReason ?? 'no_safe_opportunities') : undefined, runtimeDiag: diagnostics ? { totalCalls: controller.summary().totalCalls, rawCandidates: prod.rawGenerated, path: 'pro_first_production', selectedModel: prod.selectedModel, flashRan: prod.provenance.flashRan } : undefined } }
+    } else if (useLegacy) {
       // EXPLICIT operational rollback ONLY.
       generationPath = 'legacy_explicit'; legacyUsed = true; fallbackReason = 'explicit_legacy_mode'
       result = await generateRecommendations(auth.admin, { userId: auth.user.id, projectId: auth.project.id, source, keyword, avoidKeywords: Array.from(guard.keywords), generationRunId, collectTrace: diagnostics, excludePendingContext, qualityMode: 'standard' })
@@ -217,7 +235,11 @@ export async function POST(request: Request) {
     // F/B — persist the EXACT fresh array; capture the typed persistence outcome.
     // Persist the customer's SELECTED tier + the actual model the run used, so the
     // QA/admin view can show them later (never rendered as telemetry on the card).
-    const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh, requestedTier: qualityMode, modelUsed: briefDiagnostics?.modelPath?.model ?? null })
+    // Stage D — persist the SELECTED model truthfully. A Flash fallback is stored as
+    // Flash (its resolved id), never as Pro; the requested tier is always premium.
+    const persistTier = proFirstProvenance ? 'premium' : qualityMode
+    const persistModelUsed = proFirstProvenance ? proFirstProvenance.modelUsedForPersistence : (briefDiagnostics?.modelPath?.model ?? null)
+    const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh, requestedTier: persistTier, modelUsed: persistModelUsed })
 
     // F — persistence errors are NEVER swallowed. attempted>0 with 0 inserted AND 0
     // duplicates ⇒ every write failed → a TYPED 500, never a "0 new" success response.
