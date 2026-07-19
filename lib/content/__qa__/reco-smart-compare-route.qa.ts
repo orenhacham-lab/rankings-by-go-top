@@ -138,6 +138,25 @@ async function main() {
     check('C14. UI displays the enforced authorized limit, not just the estimate', /authorizedLimitUsd/.test(pageSrc) && /תקרת QA מאושרת/.test(pageSrc))
   }
 
+  console.log('UI) ComparisonSection — independent loading states, no stuck preflight')
+  {
+    const pageSrc = read('../../../app/(dashboard)/reco-qa/page.tsx')
+    // Isolate the ComparisonSection (the outer acceptance runner has its own `running`).
+    const sec = pageSrc.slice(pageSrc.indexOf('function ComparisonSection'))
+    check('U1. two INDEPENDENT loading states (isCalculatingCost + isRunningComparison)', /const \[isCalculatingCost, setIsCalculatingCost\] = useState\(false\)/.test(sec) && /const \[isRunningComparison, setIsRunningComparison\] = useState\(false\)/.test(sec))
+    check('U2. the section no longer uses a shared derived running boolean or a stage machine', !/const running =/.test(sec) && !/useState<'idle'/.test(sec) && !/stage/.test(sec))
+    check('U3. doPreflight ALWAYS clears isCalculatingCost in finally', /async function doPreflight\(\)[\s\S]*?finally \{[\s\S]*?setIsCalculatingCost\(false\)[\s\S]*?\}/.test(sec))
+    check('U4. doRun ALWAYS clears isRunningComparison in finally', /async function doRun\(\)[\s\S]*?finally \{[\s\S]*?setIsRunningComparison\(false\)[\s\S]*?\}/.test(sec))
+    check('U5. preflight success path does NOT leave a loading flag set (no early return before finally)', /setPreflight\(d\)\s*\n\s*\} catch/.test(sec))
+    check('U6. confirm enabled only when preflight+within+!calculating+!running', /const canConfirm = !!preflight && within && !isCalculatingCost && !isRunningComparison/.test(sec))
+    check('U7. doRun refuses a stale/absent/over-cap preflight (guard)', /if \(!preflight \|\| preflight\.withinAuthorizedLimit === false \|\| busy\) return/.test(sec))
+    check('U8. changing project/target/attempts invalidates the preflight', (sec.match(/invalidatePreflight\(\)/g) ?? []).length >= 4 && /function invalidatePreflight\(\) \{ setPreflight\(null\)/.test(sec))
+    check('U9. preflight label ← isCalculatingCost; confirm label ← isRunningComparison', /isCalculatingCost \? 'מחשב…'/.test(sec) && /isRunningComparison \? 'מריץ השוואה…'/.test(sec))
+    check('U10. buttons are type="button" (no accidental form submit)', /<button type="button" onClick=\{doPreflight\}/.test(sec) && /<button type="button" onClick=\{doRun\}/.test(sec) && (sec.match(/type="button"/g) ?? []).length >= 4)
+    check('U11. preflight button disabled ONLY by busy; confirm disabled by !canConfirm', /onClick=\{doPreflight\} disabled=\{busy\}/.test(sec) && /onClick=\{doRun\} disabled=\{!canConfirm\}/.test(sec))
+    check('U12. no <form> wraps the controls (no submit path to swallow the click)', !/<form/.test(sec))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }

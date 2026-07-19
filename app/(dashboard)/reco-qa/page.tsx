@@ -274,12 +274,20 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
   const [projectId, setProjectId] = useState<string>('')
   const [targetCount, setTargetCount] = useState(12)
   const [attempts, setAttempts] = useState(3)
-  const [stage, setStage] = useState<'idle' | 'preflight' | 'running' | 'done' | 'error'>('idle')
+  // Two INDEPENDENT states — the preflight and the confirmed run never share a
+  // loading flag (the earlier bug: one derived boolean stayed true after preflight).
+  const [isCalculatingCost, setIsCalculatingCost] = useState(false)
+  const [isRunningComparison, setIsRunningComparison] = useState(false)
   const [preflight, setPreflight] = useState<CompareResponse | null>(null)
   const [result, setResult] = useState<CompareResponse | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
   const effectiveProject = projectId || projects[0]?.id || ''
+  const busy = isCalculatingCost || isRunningComparison
+
+  // Changing project / target / attempts invalidates the previous preflight
+  // authorization — the operator must recalculate the cost before confirming.
+  function invalidatePreflight() { setPreflight(null); setResult(null); setErr(null) }
 
   async function call(confirm: boolean): Promise<CompareResponse> {
     const res = await fetch('/api/content/automation/reco-qa/compare', {
@@ -293,17 +301,32 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
 
   async function doPreflight() {
     setErr(null); setResult(null); setPreflight(null)
-    if (!effectiveProject) { setErr('בחר פרויקט'); setStage('error'); return }
-    setStage('preflight')
-    const d = await call(false)
-    if (!d.ok) { setErr(`${d.error ?? ''} ${d.message ?? ''}`); setStage('error'); return }
-    setPreflight(d)
+    if (!effectiveProject) { setErr('בחר פרויקט'); return }
+    setIsCalculatingCost(true)
+    try {
+      const d = await call(false)
+      if (!d.ok) { setErr(`${d.error ?? ''} ${d.message ?? ''}`); return } // preflight stays null → confirm gated
+      setPreflight(d)
+    } catch (e) {
+      setErr(`preflight_error ${String(e).slice(0, 160)}`)
+    } finally {
+      setIsCalculatingCost(false) // ALWAYS clears — success, failure or abort
+    }
   }
   async function doRun() {
-    setErr(null); setStage('running')
-    const d = await call(true)
-    if (!d.ok) { setErr(`${d.error ?? ''} ${d.message ?? ''}`); setStage('error'); return }
-    setResult(d); setStage('done')
+    // Never run against a stale/absent or over-cap preflight.
+    if (!preflight || preflight.withinAuthorizedLimit === false || busy) return
+    setErr(null)
+    setIsRunningComparison(true)
+    try {
+      const d = await call(true)
+      if (!d.ok) { setErr(`${d.error ?? ''} ${d.message ?? ''}`); return }
+      setResult(d)
+    } catch (e) {
+      setErr(`run_error ${String(e).slice(0, 160)}`)
+    } finally {
+      setIsRunningComparison(false)
+    }
   }
 
   function download(obj: unknown, name: string) {
@@ -311,7 +334,8 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click()
   }
 
-  const running = stage === 'preflight' || stage === 'running'
+  const within = preflight ? (preflight.withinAuthorizedLimit ?? true) : false
+  const canConfirm = !!preflight && within && !isCalculatingCost && !isRunningComparison
   const pct = (n: number) => `${Math.round(n * 100)}%`
 
   return (
@@ -321,36 +345,34 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
 
       <div className="flex flex-wrap items-end gap-3 mb-3 text-sm">
         <label className="flex flex-col gap-1 text-xs">פרויקט
-          <select value={effectiveProject} onChange={(e) => setProjectId(e.target.value)} disabled={running} className="rounded border border-slate-300 px-2 py-1 text-sm min-w-[180px]">
+          <select value={effectiveProject} onChange={(e) => { setProjectId(e.target.value); invalidatePreflight() }} disabled={busy} className="rounded border border-slate-300 px-2 py-1 text-sm min-w-[180px]">
             {projects.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs">מספר המלצות מבוקש
-          <input type="number" min={1} max={20} value={targetCount} disabled={running} onChange={(e) => setTargetCount(Number(e.target.value) || 1)} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
+          <input type="number" min={1} max={20} value={targetCount} disabled={busy} onChange={(e) => { setTargetCount(Number(e.target.value) || 1); invalidatePreflight() }} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
         </label>
         <label className="flex flex-col gap-1 text-xs">ניסיונות לכל מודל
-          <input type="number" min={3} max={6} value={attempts} disabled={running} onChange={(e) => setAttempts(Number(e.target.value) || 3)} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
+          <input type="number" min={3} max={6} value={attempts} disabled={busy} onChange={(e) => { setAttempts(Number(e.target.value) || 3); invalidatePreflight() }} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
         </label>
-        <button onClick={doPreflight} disabled={running} className="rounded-md bg-indigo-600 text-white px-4 py-1.5 text-sm disabled:opacity-50">
-          {stage === 'preflight' ? 'מחשב…' : 'חשב עלות מקסימלית'}
+        <button type="button" onClick={doPreflight} disabled={busy} className="rounded-md bg-indigo-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-preflight-btn">
+          {isCalculatingCost ? 'מחשב…' : 'חשב עלות מקסימלית'}
         </button>
       </div>
 
-      {stage === 'error' && <p className="text-xs text-red-600 mb-2">{err}</p>}
+      {err && <p className="text-xs text-red-600 mb-2" data-testid="reco-qa-error">{err}</p>}
 
-      {preflight && stage !== 'done' && (() => {
+      {preflight && !result && (() => {
         const estWorst = preflight.estimatedWorstCaseCostUsd ?? preflight.maxAuthorizedCostUsd
         const limit = preflight.authorizedLimitUsd
-        // Trust the SERVER's decision; fall back to a client compare only if absent.
-        const within = preflight.withinAuthorizedLimit ?? (typeof estWorst === 'number' && typeof limit === 'number' ? estWorst <= limit : true)
         return (
           <div className="rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 mb-3 text-sm" data-testid="reco-qa-preflight">
             <p className="text-amber-800 dark:text-amber-300 mb-2" dir="rtl">
               עלות בתרחיש הגרוע: <b dir="ltr">${estWorst}</b> · תקרת QA מאושרת: <b dir="ltr">${limit ?? '—'}</b> · {attempts}×2 ניסיונות · יעד {targetCount}. הריצה אינה שומרת המלצות.
             </p>
             {within ? (
-              <button onClick={doRun} disabled={running} className="rounded-md bg-rose-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-confirm-run">
-                {stage === 'running' ? 'מריץ השוואה…' : 'אשר והרץ השוואה'}
+              <button type="button" onClick={doRun} disabled={!canConfirm} className="rounded-md bg-rose-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-confirm-run">
+                {isRunningComparison ? 'מריץ השוואה…' : 'אשר והרץ השוואה'}
               </button>
             ) : (
               <p className="text-red-600 text-xs" data-testid="reco-qa-cost-blocked" dir="rtl">
@@ -361,7 +383,7 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
         )
       })()}
 
-      {result && stage === 'done' && (
+      {result && (
         <div data-testid="reco-qa-comparison-result">
           <p className="text-xs text-slate-600 dark:text-slate-300 mb-2" dir="ltr">
             snapshot <b>{result.snapshotId}</b> · commit <b>{result.commitSha ?? 'unknown'}</b> · pool {result.poolSize} · discovery {String(result.discoveryRan)} · prepCalls {result.preparationProviderCalls} · maxCost ${result.maxAuthorizedCostUsd} · actualCost ${result.actualCostUsd} · persist {String(result.persist)} · writes {result.persistedWrites}
@@ -371,13 +393,13 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
           </p>
 
           <div className="mb-4 flex flex-wrap gap-2">
-            <button
+            <button type="button"
               onClick={() => result.blindReview && download(result.blindReview, `blind-review-${result.snapshotId}.json`)}
               disabled={!result.blindAvailable}
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40" data-testid="reco-qa-download-blind">
               הורדת קובץ לבדיקה עיוורת
             </button>
-            <button
+            <button type="button"
               onClick={() => result.mapping && download(result.mapping, `blind-mapping-${result.snapshotId}.json`)}
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" data-testid="reco-qa-download-mapping">
               הורדת מיפוי פנימי
