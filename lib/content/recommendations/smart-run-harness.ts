@@ -30,12 +30,13 @@ import type { RunCostController } from './run-cost-controller'
 import { newRunCostController } from './run-cost-controller'
 import { prepareBriefRun, synthesizeFromSnapshot, type BriefRunSnapshot, type BriefRunInput } from './generate-from-briefs'
 import { finalizeRecommendationAttempt } from './finalize-attempt'
+import { sanitizeProviderMessage, classifyModelError } from './model'
 import type { KeywordGuard } from './keyword-guard'
 import type { TopicSuggestion } from './types'
 import {
-  computeRescueAccounting, escalateToPro, selectBatch, authorizeSmartRunBudget,
+  computeRescueAccounting, escalateToPro, authorizeSmartRunBudget, simulatePairedSelection,
   type BriefOutcome, type FinalizedAttempt, type PreparationTelemetry, type EscalationResult,
-  type SelectResult, type BudgetAuthorization, type BudgetMaxima,
+  type PairedSelectionResult, type BudgetAuthorization, type BudgetMaxima,
 } from './smart-controller'
 
 /** Server-side HARD ceiling on attempts per model (defense in depth; the QA endpoint
@@ -150,6 +151,18 @@ export interface SmartAttemptRecord {
   uniqueAcceptedBriefIds: string[]
   /** Rescue-accounting counts DERIVED from unique briefId sets (never summed). */
   rescueCounts: FinalizedAttempt['rescue']['counts']
+  /** QA/admin-only provider diagnostics for this attempt (exact requested model id +
+   *  the sanitized provider failure cause). NEVER enters the blind-review export. */
+  providerDiagnostics: {
+    requestedModel: string | null
+    providerStatus: string | null
+    providerErrorType: string | null
+    sanitizedProviderMessage: string | null
+    finishReason: string | null
+    httpStatus: number | null
+    retryCount: number
+    threw: boolean
+  }
   /** Server-only: the finalized suggestions, used to build the blind export. NEVER
    *  serialized to the client raw (they carry modelUsed). */
   finalizedSuggestions: TopicSuggestion[]
@@ -185,7 +198,9 @@ export interface SmartComparisonResult {
   flash: SmartAttemptRecord[]
   pro: SmartAttemptRecord[]
   aggregate: { flash: AggregateMetrics; pro: AggregateMetrics }
-  selection: SelectResult
+  /** QA measurement over SIX independent attempts — a labeled per-attempt-pair
+   *  simulation, never one arbitrary top-level winner. Failed attempts are ineligible. */
+  selectionSimulation: PairedSelectionResult
   budget: BudgetAuthorization
   maxAuthorizedCostUsd: number
   actualCostUsd: number
@@ -220,6 +235,31 @@ export function snapshotIdOf(snapshot: BriefRunSnapshot, projectId: string): str
   return `snap_${(h >>> 0).toString(36)}`
 }
 
+function parseHttpStatus(s: string | null | undefined): number | null {
+  if (!s) return null
+  const m = /\b(4\d\d|5\d\d)\b/.exec(s)
+  return m ? Number(m[1]) : null
+}
+
+type SynthResultForDiag = Awaited<ReturnType<typeof synthesizeFromSnapshot>>
+/** Pull the exact provider diagnostics for a (possibly failed) synthesis attempt from
+ *  its round diagnostics — the failing round if any, else the last. QA/admin only. */
+function providerDiagnosticsOf(synth: SynthResultForDiag, requestedModel: string): SmartAttemptRecord['providerDiagnostics'] {
+  const rounds = synth.diagnostics.rounds
+  const bad = rounds.find((r) => !r.provider_ok) ?? rounds[rounds.length - 1] ?? null
+  const msg = bad?.sanitizedProviderMessage ?? null
+  return {
+    requestedModel,
+    providerStatus: bad ? (bad.provider_ok ? 'ok' : (bad.providerStatus ?? 'error')) : null,
+    providerErrorType: bad?.providerErrorType ?? null,
+    sanitizedProviderMessage: msg,
+    finishReason: bad?.finishReason ?? null,
+    httpStatus: parseHttpStatus(msg) ?? parseHttpStatus(bad?.providerErrorType ?? null),
+    retryCount: 0, // synthesis never repeats a non-retryable provider failure in a round
+    threw: false,
+  }
+}
+
 /** Run one finalized attempt (synthesize → finalize → accounting → escalate). */
 async function runOneAttempt(
   snapshot: BriefRunSnapshot,
@@ -250,11 +290,18 @@ async function runOneAttempt(
       model, role, attemptIndex, engineAcceptedCount: 0, finalizedCount: 0, zeroResult: true,
       providerOk: false, synthesisFailure: null, stopReason: 'provider_failed', finalized,
       escalation: escalateToPro(finalized, input.targetCount), reconciled: rescue.reconciled,
-      failed: true, error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+      failed: true, error: sanitizeProviderMessage(err instanceof Error ? err.message : String(err)).slice(0, 300),
       estimatedCostUsd: ctrl.costTelemetry(0).estimatedRunCostUsd,
       tokenUsage: { input: sum.totalInputTokens, output: sum.totalOutputTokens, thinking: sum.totalThinkingTokens },
       callCount: sum.totalCalls, latencyMs: now() - t0,
       uniqueAcceptedBriefIds: [], rescueCounts: rescue.counts, finalizedSuggestions: [],
+      providerDiagnostics: {
+        requestedModel: model, providerStatus: 'error',
+        providerErrorType: classifyModelError(err instanceof Error ? err.message : String(err)),
+        sanitizedProviderMessage: sanitizeProviderMessage(err instanceof Error ? err.message : String(err)),
+        finishReason: null, httpStatus: parseHttpStatus(err instanceof Error ? err.message : String(err)),
+        retryCount: 0, threw: true,
+      },
     }
   }
   // FRESH cloned guard per attempt: finalize mutates guard.keywords/titles for
@@ -284,8 +331,10 @@ async function runOneAttempt(
     finalized,
     escalation: escalateToPro(finalized, input.targetCount),
     reconciled: rescue.reconciled,
-    failed: false,
-    error: null,
+    // A provider- or synthesis-failed attempt (even without a throw) is a FAILED
+    // attempt — never an eligible batch. A valid attempt that finalized 0 is NOT failed.
+    failed: !providerOk || synthesisFailure !== null,
+    error: providerOk && synthesisFailure === null ? null : (synth.diagnostics.rounds.find((r) => !r.provider_ok)?.sanitizedProviderMessage ?? synthesisFailure ?? 'attempt_incomplete'),
     estimatedCostUsd: ctrl.costTelemetry(fin.finalSuggestions.length).estimatedRunCostUsd,
     tokenUsage: { input: sum.totalInputTokens, output: sum.totalOutputTokens, thinking: sum.totalThinkingTokens },
     callCount: sum.totalCalls,
@@ -293,6 +342,7 @@ async function runOneAttempt(
     uniqueAcceptedBriefIds: Array.from(rescue.finalizedAcceptedBriefIds),
     rescueCounts: rescue.counts,
     finalizedSuggestions: fin.finalSuggestions,
+    providerDiagnostics: providerDiagnosticsOf(synth, model),
   }
 }
 
@@ -370,14 +420,11 @@ export async function runSmartComparison(admin: Admin, input: BriefRunInput, opt
     pro.push(rec); opts.onAttempt?.(rec)
   }
 
-  // Selection uses the strongest attempt on each side (highest finalized count).
-  const best = (xs: SmartAttemptRecord[]) => xs.reduce((a, b) => (b.finalizedCount > a.finalizedCount ? b : a))
-  const bestFlash = best(flash)
-  const bestPro = best(pro)
-  const selection = selectBatch(
-    { complete: bestFlash.finalizedCount >= input.targetCount || bestFlash.escalation.reason === 'genuine_exhaustion', finalUserFacingCount: bestFlash.finalizedCount },
-    { complete: bestPro.finalizedCount >= input.targetCount || bestPro.escalation.reason === 'genuine_exhaustion', finalUserFacingCount: bestPro.finalizedCount },
-  )
+  // Selection is a per-attempt-PAIR simulation over the six independent attempts —
+  // NOT a single arbitrary winner. Failed attempts are ineligible; a complete batch
+  // always outranks an ineligible one; Flash and Pro are never merged.
+  const forSel = (a: SmartAttemptRecord) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })
+  const selectionSimulation = simulatePairedSelection(flash.map(forSel), pro.map(forSel))
 
   const perAttemptCeilingUsd = opts.perAttemptCeilingUsd ?? opts.budgetMaxima.flashAttemptMaxUsd
   const preparationCeilingUsd = opts.preparationCeilingUsd ?? opts.budgetMaxima.preparationMaxUsd
@@ -393,7 +440,7 @@ export async function runSmartComparison(admin: Admin, input: BriefRunInput, opt
     targetCount: input.targetCount,
     flash, pro,
     aggregate: { flash: computeAggregate(flash, input.targetCount, opts.flashModel), pro: computeAggregate(pro, input.targetCount, opts.proModel) },
-    selection,
+    selectionSimulation,
     budget: authorizeSmartRunBudget(opts.budgetMaxima),
     maxAuthorizedCostUsd,
     actualCostUsd,

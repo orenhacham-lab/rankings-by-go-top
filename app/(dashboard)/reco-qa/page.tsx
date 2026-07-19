@@ -249,7 +249,9 @@ interface AttemptRow {
   estimatedCostUsd: number; tokenUsage: { input: number; output: number; thinking: number }
   callCount: number; latencyMs: number; uniqueAcceptedCount: number; uniqueAcceptedBriefIds: string[]
   rescueCounts: RescueCounts; escalation: { escalate: boolean; reason: string }; failed: boolean; error: string | null
+  providerDiagnostics?: { requestedModel: string | null; providerStatus: string | null; providerErrorType: string | null; sanitizedProviderMessage: string | null; finishReason: string | null; httpStatus: number | null; retryCount: number; threw: boolean }
 }
+interface PairOutcome { index: number; decision: string; reason: string; provisional: boolean; flashCount: number; proCount: number }
 interface AggMetrics {
   model: string | null; totalAttempts: number; targetCompletionRate: number; nonEmptyRate: number; zeroResultRate: number
   meanFinalized: number; medianFinalized: number; minFinalized: number; maxFinalized: number
@@ -263,8 +265,9 @@ interface CompareResponse {
   maxAuthorizedCostUsd?: number; estimatedWorstCaseCostUsd?: number; authorizedLimitUsd?: number
   withinAuthorizedLimit?: boolean; actualCostUsd?: number; requiresConfirmation?: boolean
   attempts?: AttemptRow[]; aggregate?: { flash: AggMetrics; pro: AggMetrics }
-  selection?: { select: string; reason: string; provisional: boolean }
+  selectionSimulation?: { policy: string; pairedBy: string; simulated: boolean; pairs: PairOutcome[]; summary: { proWins: number; flashWins: number; provisionalTies: number; noDecision: number; pairsCompared: number } }
   budget?: { ok: boolean; path: string; requiredAuthorizationUsd: number }
+  modelResolution?: { flashRequested: string; flashResolved: boolean; flashResolutionReason: string | null; proRequested: string; proTierUsed: string; proDowngraded: boolean; proDowngradeReason: string | null }
   blindAvailable?: boolean; blindBlocked?: { reason: string; hitCount: number } | null
   blindReview?: unknown; mapping?: unknown; persist?: boolean; persistedWrites?: number
   limits?: { serverMaxAttemptsPerModel: number; serverMaxTargetCount: number }
@@ -388,9 +391,16 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
           <p className="text-xs text-slate-600 dark:text-slate-300 mb-2" dir="ltr">
             snapshot <b>{result.snapshotId}</b> · commit <b>{result.commitSha ?? 'unknown'}</b> · pool {result.poolSize} · discovery {String(result.discoveryRan)} · prepCalls {result.preparationProviderCalls} · maxCost ${result.maxAuthorizedCostUsd} · actualCost ${result.actualCostUsd} · persist {String(result.persist)} · writes {result.persistedWrites}
           </p>
-          <p className="text-xs mb-3" dir="ltr">
-            selection: <b>{result.selection?.select}</b> ({result.selection?.reason}{result.selection?.provisional ? ' · provisional' : ''}) · budget: <b>{result.budget?.path}</b>
-          </p>
+          {result.modelResolution && (
+            <p className="text-xs mb-1" dir="ltr" data-testid="reco-qa-model-resolution">
+              models: flash <b>{result.modelResolution.flashRequested}</b>{result.modelResolution.flashResolved ? '' : ` (unresolved: ${result.modelResolution.flashResolutionReason})`} · pro <b>{result.modelResolution.proRequested}</b> (tierUsed {result.modelResolution.proTierUsed}{result.modelResolution.proDowngraded ? ` · DOWNGRADED: ${result.modelResolution.proDowngradeReason}` : ''})
+            </p>
+          )}
+          {result.selectionSimulation && (
+            <p className="text-xs mb-3" dir="ltr" data-testid="reco-qa-selection-sim">
+              selection <b>(simulated · {result.selectionSimulation.policy}, paired by {result.selectionSimulation.pairedBy})</b>: Pro won {result.selectionSimulation.summary.proWins}/{result.selectionSimulation.summary.pairsCompared} · Flash won {result.selectionSimulation.summary.flashWins} · provisional ties {result.selectionSimulation.summary.provisionalTies} · no-decision {result.selectionSimulation.summary.noDecision} · budget <b>{result.budget?.path}</b>
+            </p>
+          )}
 
           <div className="mb-4 flex flex-wrap gap-2">
             <button type="button"
@@ -439,9 +449,9 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
             </table>
           )}
 
-          <table className="w-full text-[10px] border border-slate-200 dark:border-slate-700" dir="ltr">
+          <table className="w-full text-[10px] border border-slate-200 dark:border-slate-700" dir="ltr" data-testid="reco-qa-attempt-table">
             <thead><tr className="bg-slate-50 dark:bg-slate-800">
-              {['batchId', 'model', 'final', 'engine', 'zero', 'provider', 'synth', 'stop', 'cost$', 'tokens(i/o/t)', 'calls', 'ms', 'uniqAccepted', 'rescue', 'escalate'].map((h) => <th key={h} className="p-1">{h}</th>)}
+              {['batchId', 'model', 'final', 'engine', 'zero', 'provider', 'synth', 'stop', 'cost$', 'tokens(i/o/t)', 'calls', 'ms', 'uniqAccepted', 'rescue', 'escalate', 'reqModel', 'providerErr', 'http', 'retry', 'providerMsg'].map((h) => <th key={h} className="p-1">{h}</th>)}
             </tr></thead>
             <tbody>
               {(result.attempts ?? []).map((a) => (
@@ -461,6 +471,11 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
                   <td className="p-1 text-center">{a.uniqueAcceptedCount}</td>
                   <td className="p-1 text-center" title={`rescue potential ${a.rescueCounts.totalRescuePotential}`}>{a.rescueCounts.totalRescuePotential}</td>
                   <td className={`p-1 text-center ${a.escalation.escalate ? 'text-amber-600' : 'text-slate-400'}`}>{a.escalation.escalate ? a.escalation.reason : '—'}</td>
+                  <td className="p-1 font-mono">{a.providerDiagnostics?.requestedModel ?? '—'}</td>
+                  <td className={`p-1 ${a.providerDiagnostics?.providerErrorType ? 'text-red-600' : 'text-slate-400'}`}>{a.providerDiagnostics?.providerErrorType ?? '—'}</td>
+                  <td className="p-1 text-center">{a.providerDiagnostics?.httpStatus ?? '—'}</td>
+                  <td className="p-1 text-center">{a.providerDiagnostics?.retryCount ?? 0}</td>
+                  <td className="p-1 text-rose-500 max-w-[240px] truncate" title={a.providerDiagnostics?.sanitizedProviderMessage ?? ''}>{a.providerDiagnostics?.sanitizedProviderMessage ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

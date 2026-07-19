@@ -24,6 +24,8 @@ interface Cfg {
   models: string[]
   respond: (briefs: { id: string; subject: string; aligned_query?: string }[], model: string) => unknown[]
   respondDiscovery?: (anchors: string[]) => unknown
+  /** Return a provider error for a given model (simulate an unavailable/invalid model). */
+  errorFor?: (model: string) => { status: number; message: string } | null
 }
 function startServer(cfg: Cfg): Promise<{ server: Server; port: number; calls: { model: string; kind: 'synthesis' | 'discovery' }[] }> {
   const calls: { model: string; kind: 'synthesis' | 'discovery' }[] = []
@@ -38,6 +40,8 @@ function startServer(cfg: Cfg): Promise<{ server: Server; port: number; calls: {
       }
       if ((req.url ?? '').includes(':generateContent')) {
         const model = ((req.url ?? '').match(/models\/([^:]+):generateContent/) ?? [])[1] ?? 'unknown'
+        const forced = cfg.errorFor?.(model)
+        if (forced) { calls.push({ model, kind: 'synthesis' }); res.writeHead(forced.status, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: { code: forced.status, message: forced.message, status: 'NOT_FOUND' } })); return }
         const budgetMatch = body.match(/"thinkingBudget"\s*:\s*(\d+)/)
         const thinkingBudget = budgetMatch ? Number(budgetMatch[1]) : null
         if (model.includes('pro') && (thinkingBudget === null || thinkingBudget < 128 || thinkingBudget > 32768)) {
@@ -136,7 +140,7 @@ async function main() {
     check('A6. synthesis provider calls == flash+pro attempts (snapshot reused, no re-prepare)', srv.calls.filter((c) => c.kind === 'synthesis').length === r.flash.length + r.pro.length, JSON.stringify(srv.calls.length))
     check('A7. ZERO discovery calls total (rich pool)', srv.calls.filter((c) => c.kind === 'discovery').length === 0)
     check('A8. NOTHING persisted (zero write attempts) + persistedWrites==0', writes === 0 && r.persistedWrites === 0)
-    check('A9. equal-count tie → provisional Pro (QA-only, unresolved pending Stage C)', r.selection.select === 'pro' && r.selection.reason === 'provisional_tie_pro' && r.selection.provisional === true, JSON.stringify(r.selection))
+    check('A9. equal-count ties → provisional Pro in EVERY pair (QA-only, unresolved pending Stage C)', r.selectionSimulation.simulated === true && r.selectionSimulation.summary.provisionalTies === r.selectionSimulation.summary.pairsCompared && r.selectionSimulation.summary.flashWins === 0, JSON.stringify(r.selectionSimulation.summary))
     check('A10. budget authorized flash_first (worst-case fits)', r.budget.ok && r.budget.path === 'flash_first')
     srv.server.close()
   }
@@ -154,7 +158,7 @@ async function main() {
     console.log('SCENARIO B) Pro out-yields Flash')
     check('B1. all attempts reconcile', [...r.flash, ...r.pro].every((a) => a.reconciled))
     check('B2. Pro finalized strictly > Flash finalized', r.pro[0].finalizedCount > r.flash[0].finalizedCount, JSON.stringify({ f: r.flash[0].finalizedCount, p: r.pro[0].finalizedCount }))
-    check('B3. selector picks Pro by higher count (non-provisional)', r.selection.select === 'pro' && r.selection.reason === 'pro_higher_count' && r.selection.provisional === false, JSON.stringify(r.selection))
+    check('B3. paired simulation gives Pro every pair by higher count (non-provisional)', r.selectionSimulation.summary.proWins === r.selectionSimulation.summary.pairsCompared && r.selectionSimulation.summary.flashWins === 0 && r.selectionSimulation.summary.provisionalTies === 0, JSON.stringify(r.selectionSimulation.summary))
     check('B4. under-target Flash with rescue potential → escalate=true', r.flash[0].finalizedCount < 6 && r.flash[0].escalation.escalate === true && /rescue/.test(r.flash[0].escalation.reason), JSON.stringify(r.flash[0].escalation))
     check('B5. no writes', writes === 0)
     srv.server.close()
@@ -209,11 +213,33 @@ async function main() {
     check('F1. orderedBriefIds equals the pool size and is snapshot-stable', r.orderedBriefIds.length === r.poolSize && /^snap_[a-z0-9]+$/.test(r.snapshotId), JSON.stringify({ n: r.orderedBriefIds.length, pool: r.poolSize, id: r.snapshotId }))
     const idset = new Set(r.orderedBriefIds)
     check('F2. every attempt accepted only briefs from the SAME ordered pool', [...r.flash, ...r.pro].every((a) => a.uniqueAcceptedBriefIds.every((id) => idset.has(id))))
-    check('F3. Flash and Pro attempt sets are DISJOINT (never merged)', r.flash.every((f) => !r.pro.includes(f)) && r.selection.select !== undefined && (r.selection.select === 'flash' || r.selection.select === 'pro'))
+    check('F3. Flash and Pro attempt sets are DISJOINT (never merged); paired sim yields typed decisions', r.flash.every((f) => !r.pro.includes(f)) && r.selectionSimulation.pairs.length === Math.min(r.flash.length, r.pro.length) && r.selectionSimulation.pairs.every((p) => p.decision === 'flash' || p.decision === 'pro' || p.decision === 'none'))
     // F4. aggregate correctness recomputed independently.
     const expected = computeAggregate(r.flash, r.targetCount, FLASH)
     check('F4. aggregate metrics match an independent recompute', JSON.stringify(expected) === JSON.stringify(r.aggregate.flash))
     check('F5. mean finalized equals the arithmetic mean of the attempts', r.aggregate.flash.meanFinalized === Number((r.flash.reduce((s, a) => s + a.finalizedCount, 0) / r.flash.length).toFixed(3)))
+    srv.server.close()
+  }
+
+  // ── Scenario G — Flash provider failure: exact QA diagnostics, no secrets, no
+  //    invalidation of the Pro side, failed attempts never selected. ──────────────
+  {
+    // Flash model rejected with the exact live 404 (containing a fake secret to prove
+    // sanitization); Pro succeeds. Mirrors the Rightfit live smoke shape.
+    const SECRET = 'AIzaSyFAKEKEY_secret_1234567890'
+    const srv = await startServer({
+      models: [FLASH, PRO],
+      respond: (briefs) => briefs.map((b, i) => ({ briefId: b.id, title: genTitle(b.subject, i), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })),
+      errorFor: (m) => m.includes('pro') ? null : { status: 404, message: `This model models/${FLASH} is no longer available to new users. key=${SECRET} https://generativelanguage.googleapis.com/v1beta/models?key=${SECRET}` },
+    })
+    const { runSmartComparison } = await loadHarness(srv.port)
+    const r = await runSmartComparison(trappingAdmin(richTables(), () => {}), { projectId: 'p1', targetCount: 6, qualityMode: 'standard' }, { flashModel: FLASH, proModel: PRO, budgetMaxima: budgetFits })
+    console.log('SCENARIO G) Flash provider failure — exact diagnostics + coherent selection')
+    check('G1. every Flash attempt is FAILED with exact provider diagnostics (requested model + message)', r.flash.every((a) => a.failed && a.providerOk === false && a.providerDiagnostics.requestedModel === FLASH && (a.providerDiagnostics.sanitizedProviderMessage ?? '').length > 0 && a.providerDiagnostics.threw === true), JSON.stringify(r.flash[0]?.providerDiagnostics))
+    check('G2. failed Flash attempts are RECORDED with zero tokens/cost + present (never summarized away)', r.flash.length === 3 && r.flash.every((a) => a.tokenUsage.input === 0 && a.tokenUsage.output === 0 && a.tokenUsage.thinking === 0 && a.estimatedCostUsd === 0 && a.callCount === 1))
+    check('G3. NO secret ever appears anywhere in the QA output (sanitized)', !JSON.stringify(r).includes(SECRET) && !JSON.stringify(r).includes('AIzaSy'))
+    check('G4. one failed side does NOT invalidate the Pro side (Pro attempts still valid + measured)', r.pro.some((a) => !a.failed && a.finalizedCount > 0) && r.aggregate.pro.providerFailureRate === 0 && r.aggregate.flash.providerFailureRate === 1)
+    check('G5. selection simulation: failed Flash NEVER selected; Pro wins every eligible pair', r.selectionSimulation.summary.flashWins === 0 && r.selectionSimulation.summary.proWins >= 1 && r.selectionSimulation.pairs.every((p) => p.decision !== 'flash'), JSON.stringify(r.selectionSimulation.summary))
     srv.server.close()
   }
 

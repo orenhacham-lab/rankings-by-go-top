@@ -16,7 +16,7 @@ import { join } from 'path'
 import { POST as comparePOST } from '../../../app/api/content/automation/reco-qa/compare/route'
 import { assembleComparisonPayload } from '../recommendations/smart-run-report'
 import { parseQaCostCapUsd, authorizeQaRunCost, maxAuthorizedCostFor } from '../recommendations/smart-run-harness'
-import { computeRescueAccounting, type BriefOutcome } from '../recommendations/smart-controller'
+import { computeRescueAccounting, simulatePairedSelection, selectAttemptPair, isEligibleBatch, type BriefOutcome } from '../recommendations/smart-controller'
 import type { SmartComparisonResult, SmartAttemptRecord } from '../recommendations/smart-run-harness'
 import type { TopicSuggestion } from '../recommendations/types'
 
@@ -39,6 +39,7 @@ function mkAttempt(role: 'flash' | 'pro', attemptIndex: number, model: string, s
     escalation: { escalate: false, reason: 'target_met' }, reconciled: rescue.reconciled, failed: false, error: null,
     estimatedCostUsd: 0.02, tokenUsage: { input: 1000, output: 400, thinking: 0 }, callCount: 1, latencyMs: 1234,
     uniqueAcceptedBriefIds: Array.from(rescue.finalizedAcceptedBriefIds), rescueCounts: rescue.counts, finalizedSuggestions: sugs,
+    providerDiagnostics: { requestedModel: model, providerStatus: 'ok', providerErrorType: null, sanitizedProviderMessage: null, finishReason: 'STOP', httpStatus: null, retryCount: 0, threw: false },
   }
 }
 
@@ -50,7 +51,10 @@ function mkResult(proReason = 'סיבה תקינה וברורה לנושא.'): S
     snapshotId: 'snap_test', poolSize: 6, orderedBriefIds: ['a', 'b', 'c', 'd', 'e', 'f'], discoveryRan: false,
     preparationProviderCalls: 0, targetCount: 12, flash, pro,
     aggregate: { flash: agg('gemini-2.5-flash', 1), pro: agg('gemini-2.5-pro', 2) },
-    selection: { select: 'pro', reason: 'pro_higher_count', provisional: false },
+    selectionSimulation: simulatePairedSelection(
+      flash.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+      pro.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+    ),
     budget: { ok: true, path: 'flash_first', requiredAuthorizationUsd: 0.5, reason: 'full_smart_path_authorized' },
     maxAuthorizedCostUsd: 0.9, actualCostUsd: 0.12, persistedWrites: 0,
   }
@@ -136,6 +140,41 @@ async function main() {
     const pageSrc = read('../../../app/(dashboard)/reco-qa/page.tsx')
     check('C13. UI gates the confirm button on withinAuthorizedLimit (blocked message otherwise)', /withinAuthorizedLimit/.test(pageSrc) && /reco-qa-cost-blocked/.test(pageSrc) && /within \?/.test(pageSrc))
     check('C14. UI displays the enforced authorized limit, not just the estimate', /authorizedLimitUsd/.test(pageSrc) && /תקרת QA מאושרת/.test(pageSrc))
+  }
+
+  console.log('MODELS) the route resolves AVAILABLE flash/pro ids (not raw constants)')
+  {
+    const routeSrc = read('../../../app/api/content/automation/reco-qa/compare/route.ts')
+    check('M1. flash id comes from resolveAvailableRecommendationModel (engine availability resolution)', /resolveAvailableRecommendationModel\(\)/.test(routeSrc) && /const flashModel = flashResolution\.ok \? flashResolution\.model/.test(routeSrc))
+    check('M2. pro id comes from resolveRunModel (premium path, with downgrade info)', /resolveRunModel\('premium'\)/.test(routeSrc) && /proModel = proPath\.model/.test(routeSrc))
+    check('M3. the run passes the RESOLVED ids (raw constants only as fallback)', /flashModel,\n\s*proModel,/.test(routeSrc) && !/flashModel: RECOMMENDATION_MODEL_PRIMARY/.test(routeSrc))
+    check('M4. modelResolution (requested ids + pro downgrade) is surfaced to QA', /modelResolution/.test(routeSrc) && /proDowngraded: proPath\.downgraded/.test(routeSrc))
+  }
+
+  console.log('SEL) selector-reporting — no arbitrary top-level winner; failed never wins')
+  {
+    // The EXACT Rightfit live shape: Flash 0/0/0 all FAILED, Pro finalized 3/0/4.
+    const flashFailed = [0, 1, 2].map((i) => {
+      const a = mkAttempt('flash', i, 'gemini-2.5-flash', [])
+      return { ...a, failed: true, providerOk: false, finalizedCount: 0, zeroResult: true, engineAcceptedCount: 0, stopReason: 'provider_failed', providerDiagnostics: { requestedModel: 'gemini-2.5-flash', providerStatus: 'error', providerErrorType: 'model_unavailable', sanitizedProviderMessage: 'This model models/gemini-2.5-flash is no longer available to new users.', finishReason: null, httpStatus: 404, retryCount: 0, threw: true } }
+    })
+    const proBatches = [3, 0, 4].map((n, i) => {
+      const a = mkAttempt('pro', i, 'gemini-2.5-pro', Array.from({ length: n }, (_, k) => sug(`פרו ${i}-${k}`, `ביטוי פרו ${i}-${k}`, 'סיבה תקינה וברורה לנושא.')))
+      return { ...a, finalizedCount: n, zeroResult: n === 0 }
+    })
+    const rightfit: SmartComparisonResult = { ...mkResult(), flash: flashFailed, pro: proBatches, targetCount: 8,
+      selectionSimulation: simulatePairedSelection(
+        flashFailed.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+        proBatches.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+      ) }
+    const { response, blindReview, mapping } = assembleComparisonPayload(rightfit, 'abc123')
+    check('S1. NO single arbitrary top-level "selection" field is emitted', !('selection' in response) && !!response.selectionSimulation)
+    check('S2. the simulation is LABELED simulated + explains its inputs (paired by attempt index)', response.selectionSimulation.simulated === true && response.selectionSimulation.policy === 'per_attempt_pair' && response.selectionSimulation.pairedBy === 'attempt_index')
+    check('S3. Rightfit shape NEVER yields flash — Pro wins every eligible pair, Flash 0', response.selectionSimulation.summary.flashWins === 0 && response.selectionSimulation.summary.proWins === 3 && response.selectionSimulation.pairs.every((p) => p.decision !== 'flash'), JSON.stringify(response.selectionSimulation.summary))
+    check('S4. failed Flash attempts remain PRESENT in the report (never summarized away)', response.attempts.filter((a) => a.role === 'flash' && a.failed).length === 3)
+    check('S5. QA exposes exact provider diagnostics per failed attempt (model + http + message)', response.attempts.filter((a) => a.failed).every((a) => a.providerDiagnostics.requestedModel === 'gemini-2.5-flash' && a.providerDiagnostics.httpStatus === 404 && (a.providerDiagnostics.sanitizedProviderMessage ?? '').includes('no longer available')))
+    check('S6. blind export EXCLUDES all provider/technical telemetry + model identity', blindReview !== null && !/providerDiagnostics|requestedModel|httpStatus|gemini|provider_failed|latencyMs|estimatedCostUsd/.test(JSON.stringify(blindReview)))
+    check('S7. the SEPARATE mapping still round-trips (unblinding intact)', Object.keys(mapping).length === response.attempts.length)
   }
 
   console.log('UI) ComparisonSection — independent loading states, no stuck preflight')

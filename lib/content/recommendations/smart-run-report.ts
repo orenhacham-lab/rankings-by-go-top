@@ -15,7 +15,7 @@
  */
 import type { SmartComparisonResult, SmartAttemptRecord, AggregateMetrics } from './smart-run-harness'
 import { buildBlindReview, scanBlindExportForLeakage, type BlindReviewExport, type BlindReviewMapping, type AttemptForReview } from './blind-review-export'
-import type { SelectResult, BudgetAuthorization, EscalationResult } from './smart-controller'
+import type { PairedSelectionResult, BudgetAuthorization, EscalationResult } from './smart-controller'
 
 export interface AttemptRow {
   attemptId: string
@@ -38,6 +38,8 @@ export interface AttemptRow {
   escalation: EscalationResult
   failed: boolean
   error: string | null
+  /** QA/admin-only exact provider diagnostics (requested model + sanitized cause). */
+  providerDiagnostics: SmartAttemptRecord['providerDiagnostics']
 }
 
 export interface ComparisonResponse {
@@ -52,7 +54,8 @@ export interface ComparisonResponse {
   targetCount: number
   attempts: AttemptRow[]
   aggregate: { flash: AggregateMetrics; pro: AggregateMetrics }
-  selection: SelectResult
+  /** Labeled per-attempt-pair selection simulation (never one arbitrary top winner). */
+  selectionSimulation: PairedSelectionResult
   budget: BudgetAuthorization
   maxAuthorizedCostUsd: number
   actualCostUsd: number
@@ -120,6 +123,7 @@ export function assembleComparisonPayload(result: SmartComparisonResult, commitS
     escalation: a.escalation,
     failed: a.failed,
     error: a.error,
+    providerDiagnostics: a.providerDiagnostics,
   }))
 
   const response: ComparisonResponse = {
@@ -134,7 +138,7 @@ export function assembleComparisonPayload(result: SmartComparisonResult, commitS
     targetCount: result.targetCount,
     attempts: rows,
     aggregate: result.aggregate,
-    selection: result.selection,
+    selectionSimulation: result.selectionSimulation,
     budget: result.budget,
     maxAuthorizedCostUsd: result.maxAuthorizedCostUsd,
     actualCostUsd: result.actualCostUsd,

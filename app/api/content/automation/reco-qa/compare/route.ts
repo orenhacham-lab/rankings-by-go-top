@@ -20,6 +20,8 @@ import { authContentProject, isContentAutomationEnabled } from '@/lib/content/ap
 import { runSmartComparison, maxAuthorizedCostFor, parseQaCostCapUsd, authorizeQaRunCost, HARNESS_MIN_ATTEMPTS_PER_MODEL } from '@/lib/content/recommendations/smart-run-harness'
 import { assembleComparisonPayload } from '@/lib/content/recommendations/smart-run-report'
 import { RECOMMENDATION_MODEL_PRIMARY, RECOMMENDATION_MODEL_CURATOR } from '@/lib/content/recommendations/model'
+import { resolveAvailableRecommendationModel } from '@/lib/content/recommendations/model-availability'
+import { resolveRunModel } from '@/lib/content/recommendations/model-select'
 import { runBudget } from '@/lib/content/recommendations/reco-cost'
 import { currentGitSha } from '@/lib/runtime-info'
 
@@ -110,6 +112,24 @@ export async function POST(request: Request) {
   }
   inFlightProjects.add(auth.project.id)
   try {
+    // Resolve the ACTUAL models available to this key — the SAME resolution the engine
+    // uses — instead of forcing raw constants. (The earlier Flash 100%-failure was a raw
+    // `gemini-2.5-flash` override bypassing availability resolution; when opts.model is
+    // set, model.ts skips its resolver, so the QA harness must resolve first.)
+    const flashResolution = await resolveAvailableRecommendationModel()
+    const proPath = await resolveRunModel('premium')
+    const flashModel = flashResolution.ok ? flashResolution.model : RECOMMENDATION_MODEL_PRIMARY
+    const proModel = proPath.model ?? RECOMMENDATION_MODEL_CURATOR
+    const modelResolution = {
+      flashRequested: flashModel,
+      flashResolved: flashResolution.ok,
+      flashResolutionReason: flashResolution.ok ? null : flashResolution.reason,
+      proRequested: proModel,
+      proTierUsed: proPath.tierUsed,
+      proDowngraded: proPath.downgraded,
+      proDowngradeReason: proPath.downgradeReason,
+    }
+
     const budgetMaxima = {
       preparationMaxUsd: preparationCeilingUsd,
       flashAttemptMaxUsd: perAttemptCeilingUsd * attemptsPerModel,
@@ -120,8 +140,8 @@ export async function POST(request: Request) {
       auth.admin,
       { projectId: auth.project.id, targetCount, qualityMode: QA_MODE, userId: auth.user.id },
       {
-        flashModel: RECOMMENDATION_MODEL_PRIMARY,
-        proModel: RECOMMENDATION_MODEL_CURATOR,
+        flashModel,
+        proModel,
         flashAttempts: attemptsPerModel,
         proAttempts: attemptsPerModel,
         mode: QA_MODE,
@@ -134,7 +154,7 @@ export async function POST(request: Request) {
 
     const { response, blindReview, mapping } = assembleComparisonPayload(result, currentGitSha())
     // persist:false is server-enforced; the harness performs no writes.
-    return Response.json({ ...response, limits, authorizedLimitUsd, withinAuthorizedLimit, estimatedWorstCaseCostUsd, blindReview, mapping })
+    return Response.json({ ...response, limits, authorizedLimitUsd, withinAuthorizedLimit, estimatedWorstCaseCostUsd, modelResolution, blindReview, mapping })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return Response.json({ ok: false, error: 'comparison_failed', message: message.slice(0, 300) }, { status: 500 })

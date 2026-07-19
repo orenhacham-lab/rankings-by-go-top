@@ -9,7 +9,8 @@
  */
 import {
   classifyEngineReason, classifyPostProcReason, computeRescueAccounting, escalateToPro,
-  selectBatch, authorizeSmartRunBudget, type BriefOutcome, type FinalizedAttempt, type PreparationTelemetry,
+  selectBatch, authorizeSmartRunBudget, isEligibleBatch, selectAttemptPair, simulatePairedSelection,
+  type BriefOutcome, type FinalizedAttempt, type PreparationTelemetry, type AttemptForSelection,
 } from '../recommendations/smart-controller'
 
 let pass = 0, fail = 0
@@ -136,6 +137,35 @@ async function main() {
     check('B1. full path authorized → flash_first', authorizeSmartRunBudget({ preparationMaxUsd: 0.01, flashAttemptMaxUsd: 0.02, proRescueMaxUsd: 0.06, globalAuthorizedUsd: 0.20 }).path === 'flash_first')
     check('B2. cannot fund Flash+rescue but Pro fits → pro_first', authorizeSmartRunBudget({ preparationMaxUsd: 0.01, flashAttemptMaxUsd: 0.02, proRescueMaxUsd: 0.06, globalAuthorizedUsd: 0.08 }).path === 'pro_first')
     check('B3. cannot fund even Pro path → reject', authorizeSmartRunBudget({ preparationMaxUsd: 0.01, flashAttemptMaxUsd: 0.02, proRescueMaxUsd: 0.06, globalAuthorizedUsd: 0.03 }).ok === false)
+  }
+
+  console.log('PS) per-attempt-pair selection simulation (Stage-C measurement)')
+  {
+    const F = (o: Partial<AttemptForSelection>): AttemptForSelection => ({ failed: false, providerOk: true, synthesisFailure: null, finalizedCount: 0, ...o })
+    // Eligibility
+    check('PS1. a provider-failed attempt is NOT eligible', !isEligibleBatch(F({ failed: true, providerOk: false })))
+    check('PS2. a synthesis-failed attempt is NOT eligible', !isEligibleBatch(F({ synthesisFailure: 'synthesis_schema_failure' })))
+    check('PS3. a valid zero-result attempt IS an eligible (empty) batch', isEligibleBatch(F({ finalizedCount: 0 })))
+    // A failed attempt can never be selected; a complete batch outranks it.
+    check('PS4. failed Flash vs complete Pro → Pro wins (complete outranks failed)', selectAttemptPair(F({ failed: true, providerOk: false }), F({ finalizedCount: 4 })).decision === 'pro')
+    check('PS5. complete Flash vs failed Pro → Flash wins', selectAttemptPair(F({ finalizedCount: 3 }), F({ failed: true, providerOk: false })).decision === 'flash')
+    check('PS6. both failed → NO decision (neither eligible)', selectAttemptPair(F({ failed: true, providerOk: false }), F({ failed: true, providerOk: false })).decision === 'none')
+    check('PS7. both eligible, Pro higher count → Pro (non-provisional)', (() => { const r = selectAttemptPair(F({ finalizedCount: 2 }), F({ finalizedCount: 5 })); return r.decision === 'pro' && r.reason === 'pro_higher_count' && !r.provisional })())
+    check('PS8. both eligible, equal count → provisional Pro', (() => { const r = selectAttemptPair(F({ finalizedCount: 3 }), F({ finalizedCount: 3 })); return r.decision === 'pro' && r.provisional === true })())
+
+    // The EXACT Rightfit live shape: Flash 0/0/0 (all failed) vs Pro 3/0/4.
+    const flash = [0, 0, 0].map(() => F({ failed: true, providerOk: false }))
+    const pro = [F({ finalizedCount: 3 }), F({ finalizedCount: 0 }), F({ finalizedCount: 4 })]
+    const sim = simulatePairedSelection(flash, pro)
+    check('PS9. Rightfit shape → NEVER "flash (pro_incomplete)"; Pro wins all eligible pairs', sim.summary.flashWins === 0 && sim.summary.proWins === 3 && sim.summary.noDecision === 0, JSON.stringify(sim.summary))
+    check('PS10. simulation is explicitly labeled + paired by attempt index', sim.simulated === true && sim.policy === 'per_attempt_pair' && sim.pairedBy === 'attempt_index' && sim.pairs.length === 3)
+    check('PS11. one failed Pro attempt does not invalidate the other Pro attempts', (() => {
+      const f = [F({ finalizedCount: 1 }), F({ finalizedCount: 1 }), F({ finalizedCount: 1 })]
+      const p = [F({ finalizedCount: 5 }), F({ failed: true, providerOk: false }), F({ finalizedCount: 6 })]
+      const s = simulatePairedSelection(f, p)
+      // pair0 pro(5>1), pair1 pro failed → flash eligible wins, pair2 pro(6>1)
+      return s.summary.proWins === 2 && s.summary.flashWins === 1 && s.pairs[1].decision === 'flash'
+    })())
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

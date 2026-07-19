@@ -252,6 +252,80 @@ export function selectBatch(flash: AttemptSummary, pro: AttemptSummary): SelectR
   return { select: 'flash', reason: 'flash_higher_count', provisional: false }
 }
 
+// ── Per-attempt-pair selection simulation (Stage-C measurement) ───────────────────
+//
+// selectBatch decides ONE Flash batch vs ONE Pro batch. A Stage-C run has SIX
+// independent measurement attempts; collapsing them to a single top-level "selection"
+// by picking one arbitrary/best attempt per side is misleading (a valid under-target
+// Pro batch was wrongly read as "incomplete" and lost to a FAILED Flash attempt). The
+// simulation below is the correct QA reporting: it PAIRS attempts by index, excludes
+// FAILED attempts (a provider/synthesis-failed attempt is never an eligible batch), and
+// a complete batch always outranks an ineligible one. Flash and Pro are never merged.
+
+/** The minimal per-attempt view the selection simulation needs. */
+export interface AttemptForSelection { failed: boolean; providerOk: boolean; synthesisFailure: string | null; finalizedCount: number }
+
+/** A non-failed attempt that completed provider + synthesis is an eligible batch
+ *  (a zero-result but valid attempt is an eligible EMPTY batch). */
+export function isEligibleBatch(a: AttemptForSelection): boolean {
+  return !a.failed && a.providerOk && a.synthesisFailure === null
+}
+
+export type PairDecision = 'flash' | 'pro' | 'none'
+export type PairReason = SelectReason | 'flash_only_eligible' | 'pro_only_eligible' | 'both_ineligible'
+export interface PairOutcome {
+  index: number
+  decision: PairDecision
+  reason: PairReason
+  provisional: boolean
+  flashEligible: boolean
+  proEligible: boolean
+  flashCount: number
+  proCount: number
+}
+
+/** Select the winner of ONE matched attempt pair. A failed attempt is ineligible and
+ *  can never be selected; if only one side is eligible it wins; if both are eligible the
+ *  whole-batch rule applies; if neither is eligible there is no decision. */
+export function selectAttemptPair(flash: AttemptForSelection, pro: AttemptForSelection, index = 0): PairOutcome {
+  const fE = isEligibleBatch(flash), pE = isEligibleBatch(pro)
+  const base = { index, flashEligible: fE, proEligible: pE, flashCount: flash.finalizedCount, proCount: pro.finalizedCount }
+  if (!fE && !pE) return { ...base, decision: 'none', reason: 'both_ineligible', provisional: false }
+  if (fE && !pE) return { ...base, decision: 'flash', reason: 'flash_only_eligible', provisional: false }
+  if (!fE && pE) return { ...base, decision: 'pro', reason: 'pro_only_eligible', provisional: false }
+  const s = selectBatch({ complete: true, finalUserFacingCount: flash.finalizedCount }, { complete: true, finalUserFacingCount: pro.finalizedCount })
+  return { ...base, decision: s.select, reason: s.reason, provisional: s.provisional }
+}
+
+export interface PairedSelectionResult {
+  policy: 'per_attempt_pair'
+  /** How the inputs were matched — pairs are Flash[i] vs Pro[i]. */
+  pairedBy: 'attempt_index'
+  pairs: PairOutcome[]
+  summary: { proWins: number; flashWins: number; provisionalTies: number; noDecision: number; pairsCompared: number }
+  /** ALWAYS true — this is a documented simulation, never a real production selection. */
+  simulated: true
+}
+
+/** Simulate selection across all matched attempt pairs (Flash[i] vs Pro[i]). Returns
+ *  the per-pair outcomes + a labeled summary distribution — never a single arbitrary
+ *  top-level winner. */
+export function simulatePairedSelection(flash: AttemptForSelection[], pro: AttemptForSelection[]): PairedSelectionResult {
+  const n = Math.min(flash.length, pro.length)
+  const pairs: PairOutcome[] = []
+  for (let i = 0; i < n; i++) pairs.push(selectAttemptPair(flash[i], pro[i], i))
+  return {
+    policy: 'per_attempt_pair', pairedBy: 'attempt_index', pairs, simulated: true,
+    summary: {
+      proWins: pairs.filter((p) => p.decision === 'pro').length,
+      flashWins: pairs.filter((p) => p.decision === 'flash').length,
+      provisionalTies: pairs.filter((p) => p.provisional).length,
+      noDecision: pairs.filter((p) => p.decision === 'none').length,
+      pairsCompared: n,
+    },
+  }
+}
+
 // ── Budget authorization (pre-run, worst-case smart path) ────────────────────────
 
 export interface BudgetMaxima { preparationMaxUsd: number; flashAttemptMaxUsd: number; proRescueMaxUsd: number; globalAuthorizedUsd: number }
