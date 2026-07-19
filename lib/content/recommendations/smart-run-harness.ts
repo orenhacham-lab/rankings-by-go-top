@@ -31,11 +31,18 @@ import { newRunCostController } from './run-cost-controller'
 import { prepareBriefRun, synthesizeFromSnapshot, type BriefRunSnapshot, type BriefRunInput } from './generate-from-briefs'
 import { finalizeRecommendationAttempt } from './finalize-attempt'
 import type { KeywordGuard } from './keyword-guard'
+import type { TopicSuggestion } from './types'
 import {
   computeRescueAccounting, escalateToPro, selectBatch, authorizeSmartRunBudget,
   type BriefOutcome, type FinalizedAttempt, type PreparationTelemetry, type EscalationResult,
   type SelectResult, type BudgetAuthorization, type BudgetMaxima,
 } from './smart-controller'
+
+/** Server-side HARD ceiling on attempts per model (defense in depth; the QA endpoint
+ *  enforces its own, lower, operator-facing maximum). */
+export const HARNESS_MAX_ATTEMPTS_PER_MODEL = 8
+/** Minimum attempts per model (Stage-B requires ≥3 Flash + ≥3 Pro). */
+export const HARNESS_MIN_ATTEMPTS_PER_MODEL = 3
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -124,20 +131,64 @@ export interface SmartAttemptRecord {
   attemptIndex: number
   engineAcceptedCount: number
   finalizedCount: number
+  zeroResult: boolean
+  providerOk: boolean
+  synthesisFailure: string | null
+  stopReason: string
   finalized: FinalizedAttempt
   escalation: EscalationResult
   reconciled: boolean
+  /** True when the attempt threw (e.g. provider/model unavailable) — recorded, never
+   *  aborts the comparison. A failed attempt processed nothing (all briefs unprocessed). */
+  failed: boolean
+  error: string | null
   estimatedCostUsd: number
+  tokenUsage: { input: number; output: number; thinking: number }
+  callCount: number
+  latencyMs: number
+  /** UNIQUE finalized-accepted brief IDs (from the rescue accounting's ID set). */
+  uniqueAcceptedBriefIds: string[]
+  /** Rescue-accounting counts DERIVED from unique briefId sets (never summed). */
+  rescueCounts: FinalizedAttempt['rescue']['counts']
+  /** Server-only: the finalized suggestions, used to build the blind export. NEVER
+   *  serialized to the client raw (they carry modelUsed). */
+  finalizedSuggestions: TopicSuggestion[]
+}
+
+/** Aggregate Flash-vs-Pro metrics for one model side (derived from the attempts). */
+export interface AggregateMetrics {
+  model: string | null
+  totalAttempts: number
+  targetCompletionRate: number
+  nonEmptyRate: number
+  zeroResultRate: number
+  meanFinalized: number
+  medianFinalized: number
+  minFinalized: number
+  maxFinalized: number
+  averageCostUsd: number
+  costPerNonEmptyBatchUsd: number | null
+  costPerFinalizedAcceptedUsd: number | null
+  averageLatencyMs: number
+  p95LatencyMs: number
+  providerFailureRate: number
+  synthesisFailureRate: number
 }
 
 export interface SmartComparisonResult {
+  snapshotId: string
   poolSize: number
+  orderedBriefIds: string[]
   discoveryRan: boolean
   preparationProviderCalls: number
+  targetCount: number
   flash: SmartAttemptRecord[]
   pro: SmartAttemptRecord[]
+  aggregate: { flash: AggregateMetrics; pro: AggregateMetrics }
   selection: SelectResult
   budget: BudgetAuthorization
+  maxAuthorizedCostUsd: number
+  actualCostUsd: number
   /** Writes attempted by the harness — MUST be 0 (nothing is persisted). */
   persistedWrites: number
 }
@@ -148,9 +199,25 @@ export interface SmartComparisonOptions {
   flashAttempts?: number
   proAttempts?: number
   budgetMaxima: BudgetMaxima
-  /** Optional hook to observe/count any persistence attempt (there must be none). */
-  onPersistAttempt?: () => void
+  /** Per-attempt cost ceiling (USD) for the pre-run max-authorized cost (defaults to
+   *  budgetMaxima.flashAttemptMaxUsd). */
+  perAttemptCeilingUsd?: number
+  /** Preparation (discovery) cost ceiling (USD) for the pre-run max-authorized cost
+   *  (defaults to budgetMaxima.preparationMaxUsd). */
+  preparationCeilingUsd?: number
   mode?: 'standard' | 'premium'
+  /** Cooperative cancellation — checked between attempts. */
+  signal?: { aborted: boolean }
+  /** Progress hook (attempt completed). */
+  onAttempt?: (rec: SmartAttemptRecord) => void
+}
+
+/** Deterministic, model-independent snapshot id from the ORDERED brief pool. */
+export function snapshotIdOf(snapshot: BriefRunSnapshot, projectId: string): string {
+  const basis = `${projectId}|${snapshot.workingPool.length}|${snapshot.workingPool.map((b) => b.opportunityId).join(',')}`
+  let h = 0x811c9dc5
+  for (let i = 0; i < basis.length; i++) { h ^= basis.charCodeAt(i); h = Math.imul(h, 0x01000193) }
+  return `snap_${(h >>> 0).toString(36)}`
 }
 
 /** Run one finalized attempt (synthesize → finalize → accounting → escalate). */
@@ -161,12 +228,39 @@ async function runOneAttempt(
   role: 'flash' | 'pro',
   attemptIndex: number,
   mode: 'standard' | 'premium',
+  now: () => number,
 ): Promise<SmartAttemptRecord> {
   const ctrl: RunCostController = newRunCostController(mode, `smart-${role}-${attemptIndex}`, input.targetCount)
-  const synth = await synthesizeFromSnapshot(snapshot, ctrl, { modelOverride: model })
+  const t0 = now()
+  let synth: Awaited<ReturnType<typeof synthesizeFromSnapshot>>
+  try {
+    synth = await synthesizeFromSnapshot(snapshot, ctrl, { modelOverride: model })
+  } catch (err) {
+    // A hard provider/model failure for THIS attempt — recorded, never fatal. The
+    // attempt processed nothing, so every pool brief is unprocessed (rescue potential),
+    // and it reads as a provider-failed under-target attempt (escalates).
+    const rescue = computeRescueAccounting(snapshot.workingPool.map((b) => ({ briefId: b.opportunityId, stage: 'unprocessed' as const })), snapshot.workingPool.length)
+    const finalized: FinalizedAttempt = {
+      poolSize: snapshot.workingPool.length, finalUserFacingCount: 0,
+      preparation: preparationTelemetryOf(snapshot), rounds: [{ providerOk: false, synthesisFailure: null }],
+      stopReason: 'provider_failed', rescue,
+    }
+    const sum = ctrl.summary()
+    return {
+      model, role, attemptIndex, engineAcceptedCount: 0, finalizedCount: 0, zeroResult: true,
+      providerOk: false, synthesisFailure: null, stopReason: 'provider_failed', finalized,
+      escalation: escalateToPro(finalized, input.targetCount), reconciled: rescue.reconciled,
+      failed: true, error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+      estimatedCostUsd: ctrl.costTelemetry(0).estimatedRunCostUsd,
+      tokenUsage: { input: sum.totalInputTokens, output: sum.totalOutputTokens, thinking: sum.totalThinkingTokens },
+      callCount: sum.totalCalls, latencyMs: now() - t0,
+      uniqueAcceptedBriefIds: [], rescueCounts: rescue.counts, finalizedSuggestions: [],
+    }
+  }
   // FRESH cloned guard per attempt: finalize mutates guard.keywords/titles for
   // intra-batch dedup and must never leak into the next attempt or the snapshot.
   const fin = finalizeRecommendationAttempt({ guard: cloneKeywordGuard(snapshot.guard), existingPages: snapshot.existingPages }, synth.suggestions)
+  const latencyMs = now() - t0
   const rescue = computeRescueAccounting(deriveBriefOutcomes(snapshot, synth, fin), snapshot.workingPool.length)
   const finalized: FinalizedAttempt = {
     poolSize: snapshot.workingPool.length,
@@ -176,14 +270,70 @@ async function runOneAttempt(
     stopReason: synth.diagnostics.stop_reason,
     rescue,
   }
+  const sum = ctrl.summary()
+  const providerOk = synth.diagnostics.stop_reason !== 'provider_failed' && synth.diagnostics.rounds.every((r) => r.provider_ok)
+  const synthesisFailure = synth.diagnostics.rounds.map((r) => r.synthesis_failure).find((x) => x !== null) ?? (synth.diagnostics.stop_reason === 'synthesis_failed' ? 'synthesis_failed' : null)
   return {
     model, role, attemptIndex,
     engineAcceptedCount: synth.suggestions.length,
     finalizedCount: fin.finalSuggestions.length,
+    zeroResult: fin.finalSuggestions.length === 0,
+    providerOk,
+    synthesisFailure,
+    stopReason: synth.diagnostics.stop_reason,
     finalized,
     escalation: escalateToPro(finalized, input.targetCount),
     reconciled: rescue.reconciled,
+    failed: false,
+    error: null,
     estimatedCostUsd: ctrl.costTelemetry(fin.finalSuggestions.length).estimatedRunCostUsd,
+    tokenUsage: { input: sum.totalInputTokens, output: sum.totalOutputTokens, thinking: sum.totalThinkingTokens },
+    callCount: sum.totalCalls,
+    latencyMs,
+    uniqueAcceptedBriefIds: Array.from(rescue.finalizedAcceptedBriefIds),
+    rescueCounts: rescue.counts,
+    finalizedSuggestions: fin.finalSuggestions,
+  }
+}
+
+const median = (xs: number[]): number => {
+  if (xs.length === 0) return 0
+  const s = [...xs].sort((a, b) => a - b)
+  const mid = Math.floor(s.length / 2)
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+}
+const p95 = (xs: number[]): number => {
+  if (xs.length === 0) return 0
+  const s = [...xs].sort((a, b) => a - b)
+  return s[Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1)]
+}
+const round = (n: number, d = 4): number => Number(n.toFixed(d))
+
+/** Aggregate one model side's attempts (target completion, yield distribution, cost
+ *  efficiency, latency, failure rates) — all derived from the attempt records. */
+export function computeAggregate(records: SmartAttemptRecord[], targetCount: number, model: string | null): AggregateMetrics {
+  const n = records.length
+  const finals = records.map((r) => r.finalizedCount)
+  const nonEmpty = records.filter((r) => r.finalizedCount > 0)
+  const totalCost = records.reduce((s, r) => s + r.estimatedCostUsd, 0)
+  const totalFinalized = finals.reduce((s, x) => s + x, 0)
+  return {
+    model,
+    totalAttempts: n,
+    targetCompletionRate: n ? round(records.filter((r) => r.finalizedCount >= targetCount).length / n) : 0,
+    nonEmptyRate: n ? round(nonEmpty.length / n) : 0,
+    zeroResultRate: n ? round(records.filter((r) => r.zeroResult).length / n) : 0,
+    meanFinalized: n ? round(totalFinalized / n, 3) : 0,
+    medianFinalized: median(finals),
+    minFinalized: n ? Math.min(...finals) : 0,
+    maxFinalized: n ? Math.max(...finals) : 0,
+    averageCostUsd: n ? round(totalCost / n, 6) : 0,
+    costPerNonEmptyBatchUsd: nonEmpty.length ? round(totalCost / nonEmpty.length, 6) : null,
+    costPerFinalizedAcceptedUsd: totalFinalized ? round(totalCost / totalFinalized, 6) : null,
+    averageLatencyMs: n ? Math.round(records.reduce((s, r) => s + r.latencyMs, 0) / n) : 0,
+    p95LatencyMs: p95(records.map((r) => r.latencyMs)),
+    providerFailureRate: n ? round(records.filter((r) => !r.providerOk).length / n) : 0,
+    synthesisFailureRate: n ? round(records.filter((r) => r.synthesisFailure !== null).length / n) : 0,
   }
 }
 
@@ -194,8 +344,13 @@ async function runOneAttempt(
  */
 export async function runSmartComparison(admin: Admin, input: BriefRunInput, opts: SmartComparisonOptions): Promise<SmartComparisonResult> {
   const mode = opts.mode ?? 'standard'
-  const flashAttempts = Math.max(3, opts.flashAttempts ?? 3)
-  const proAttempts = Math.max(3, opts.proAttempts ?? 3)
+  const clamp = (v: number | undefined) => Math.min(HARNESS_MAX_ATTEMPTS_PER_MODEL, Math.max(HARNESS_MIN_ATTEMPTS_PER_MODEL, v ?? HARNESS_MIN_ATTEMPTS_PER_MODEL))
+  const flashAttempts = clamp(opts.flashAttempts)
+  const proAttempts = clamp(opts.proAttempts)
+  // Date.now is unavailable to workflow scripts but this is a normal module — used
+  // ONLY for latency telemetry, never for control flow.
+  const now = () => Date.now()
+  const aborted = () => opts.signal?.aborted === true
 
   // ── ONE snapshot (evidence → pool → the single discovery call) ──────────────
   const runController = newRunCostController(mode, 'smart-prepare', input.targetCount)
@@ -203,9 +358,17 @@ export async function runSmartComparison(admin: Admin, input: BriefRunInput, opt
   const preparationProviderCalls = runController.summary().totalCalls
 
   const flash: SmartAttemptRecord[] = []
-  for (let i = 0; i < flashAttempts; i++) flash.push(await runOneAttempt(snapshot, input, opts.flashModel, 'flash', i, mode))
+  for (let i = 0; i < flashAttempts; i++) {
+    if (aborted()) break
+    const rec = await runOneAttempt(snapshot, input, opts.flashModel, 'flash', i, mode, now)
+    flash.push(rec); opts.onAttempt?.(rec)
+  }
   const pro: SmartAttemptRecord[] = []
-  for (let i = 0; i < proAttempts; i++) pro.push(await runOneAttempt(snapshot, input, opts.proModel, 'pro', i, mode))
+  for (let i = 0; i < proAttempts; i++) {
+    if (aborted()) break
+    const rec = await runOneAttempt(snapshot, input, opts.proModel, 'pro', i, mode, now)
+    pro.push(rec); opts.onAttempt?.(rec)
+  }
 
   // Selection uses the strongest attempt on each side (highest finalized count).
   const best = (xs: SmartAttemptRecord[]) => xs.reduce((a, b) => (b.finalizedCount > a.finalizedCount ? b : a))
@@ -216,13 +379,31 @@ export async function runSmartComparison(admin: Admin, input: BriefRunInput, opt
     { complete: bestPro.finalizedCount >= input.targetCount || bestPro.escalation.reason === 'genuine_exhaustion', finalUserFacingCount: bestPro.finalizedCount },
   )
 
+  const perAttemptCeilingUsd = opts.perAttemptCeilingUsd ?? opts.budgetMaxima.flashAttemptMaxUsd
+  const preparationCeilingUsd = opts.preparationCeilingUsd ?? opts.budgetMaxima.preparationMaxUsd
+  const actualCostUsd = round([...flash, ...pro].reduce((s, r) => s + r.estimatedCostUsd, 0), 6)
+  const maxAuthorizedCostUsd = round(preparationCeilingUsd + perAttemptCeilingUsd * (flashAttempts + proAttempts), 6)
+
   return {
+    snapshotId: snapshotIdOf(snapshot, input.projectId),
     poolSize: snapshot.workingPool.length,
+    orderedBriefIds: snapshot.workingPool.map((b) => b.opportunityId),
     discoveryRan: snapshot.discovery?.ran ?? false,
     preparationProviderCalls,
+    targetCount: input.targetCount,
     flash, pro,
+    aggregate: { flash: computeAggregate(flash, input.targetCount, opts.flashModel), pro: computeAggregate(pro, input.targetCount, opts.proModel) },
     selection,
     budget: authorizeSmartRunBudget(opts.budgetMaxima),
+    maxAuthorizedCostUsd,
+    actualCostUsd,
     persistedWrites: 0,
   }
+}
+
+/** Pre-run maximum-authorized cost (no snapshot prepared, no provider calls) — shown
+ *  to the operator for explicit confirmation BEFORE any spend. */
+export function maxAuthorizedCostFor(attemptsPerModel: number, perAttemptCeilingUsd: number, preparationCeilingUsd: number): number {
+  const n = Math.min(HARNESS_MAX_ATTEMPTS_PER_MODEL, Math.max(HARNESS_MIN_ATTEMPTS_PER_MODEL, attemptsPerModel))
+  return round(preparationCeilingUsd + perAttemptCeilingUsd * (n * 2), 6)
 }

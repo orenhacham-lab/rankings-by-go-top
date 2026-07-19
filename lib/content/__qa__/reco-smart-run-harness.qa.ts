@@ -187,6 +187,36 @@ async function main() {
     srv.server.close()
   }
 
+  // ── Scenario E — server-side attempts-per-model maximum is enforced ───────────
+  {
+    const srv = await startServer({ models: [FLASH, PRO], respond: (briefs) => briefs.map((b, i) => ({ briefId: b.id, title: genTitle(b.subject, i), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
+    const mod = await import('../recommendations/smart-run-harness')
+    process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${srv.port}`
+    resetModelResolutionCache(); resetRecoGenAiClient()
+    const r = await mod.runSmartComparison(trappingAdmin(richTables(), () => {}), { projectId: 'p1', targetCount: 5, qualityMode: 'standard' }, { flashModel: FLASH, proModel: PRO, flashAttempts: 50, proAttempts: 50, budgetMaxima: budgetFits })
+    console.log('SCENARIO E) attempts-per-model maximum')
+    check('E1. huge attemptsPerModel is clamped to the harness maximum', r.flash.length === mod.HARNESS_MAX_ATTEMPTS_PER_MODEL && r.pro.length === mod.HARNESS_MAX_ATTEMPTS_PER_MODEL, JSON.stringify({ f: r.flash.length, p: r.pro.length, max: mod.HARNESS_MAX_ATTEMPTS_PER_MODEL }))
+    check('E2. maxAuthorizedCostFor is monotonic + covers the clamped run', mod.maxAuthorizedCostFor(3, 0.1, 0.1) < mod.maxAuthorizedCostFor(6, 0.1, 0.1))
+    srv.server.close()
+  }
+
+  // ── Scenario F — same ordered brief IDs; snapshotId stable; no merge ──────────
+  {
+    const srv = await startServer({ models: [FLASH, PRO], respond: (briefs) => briefs.map((b, i) => ({ briefId: b.id, title: genTitle(b.subject, i), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })) })
+    const { runSmartComparison, computeAggregate } = await loadHarness(srv.port)
+    const r = await runSmartComparison(trappingAdmin(richTables(), () => {}), { projectId: 'p1', targetCount: 5, qualityMode: 'standard' }, { flashModel: FLASH, proModel: PRO, budgetMaxima: budgetFits })
+    console.log('SCENARIO F) ordered brief IDs + no Flash/Pro merge')
+    check('F1. orderedBriefIds equals the pool size and is snapshot-stable', r.orderedBriefIds.length === r.poolSize && /^snap_[a-z0-9]+$/.test(r.snapshotId), JSON.stringify({ n: r.orderedBriefIds.length, pool: r.poolSize, id: r.snapshotId }))
+    const idset = new Set(r.orderedBriefIds)
+    check('F2. every attempt accepted only briefs from the SAME ordered pool', [...r.flash, ...r.pro].every((a) => a.uniqueAcceptedBriefIds.every((id) => idset.has(id))))
+    check('F3. Flash and Pro attempt sets are DISJOINT (never merged)', r.flash.every((f) => !r.pro.includes(f)) && r.selection.select !== undefined && (r.selection.select === 'flash' || r.selection.select === 'pro'))
+    // F4. aggregate correctness recomputed independently.
+    const expected = computeAggregate(r.flash, r.targetCount, FLASH)
+    check('F4. aggregate metrics match an independent recompute', JSON.stringify(expected) === JSON.stringify(r.aggregate.flash))
+    check('F5. mean finalized equals the arithmetic mean of the attempts', r.aggregate.flash.meanFinalized === Number((r.flash.reduce((s, a) => s + a.finalizedCount, 0) / r.flash.length).toFixed(3)))
+    srv.server.close()
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }

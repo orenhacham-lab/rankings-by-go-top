@@ -233,6 +233,205 @@ export default function RecoQaPage() {
           </div>
         )
       })}
+
+      <ComparisonSection projects={projects} label={label} />
     </div>
+  )
+}
+
+// ── Stage-B QA/admin Flash-vs-Pro comparison (isolated; Preview-only; never in the
+//    normal project UI). Non-persisting; two-step (preflight cost → confirm → run). ──
+interface RescueCounts { finalizedAccepted: number; totalRescuePotential: number; permanentlyStructuralRejected: number; engineModelRescuableRejected: number; postProcessingModelRescuable: number; batchReplacementPotential: number; unprocessedPotential: number; modelSkipped: number; partialMissingPotential: number }
+interface AttemptRow {
+  attemptId: string; role: 'flash' | 'pro'; model: string | null; attemptIndex: number
+  engineAcceptedCount: number; finalizedCount: number; zeroResult: boolean
+  providerStatus: string; synthesisStatus: string; stopReason: string
+  estimatedCostUsd: number; tokenUsage: { input: number; output: number; thinking: number }
+  callCount: number; latencyMs: number; uniqueAcceptedCount: number; uniqueAcceptedBriefIds: string[]
+  rescueCounts: RescueCounts; escalation: { escalate: boolean; reason: string }; failed: boolean; error: string | null
+}
+interface AggMetrics {
+  model: string | null; totalAttempts: number; targetCompletionRate: number; nonEmptyRate: number; zeroResultRate: number
+  meanFinalized: number; medianFinalized: number; minFinalized: number; maxFinalized: number
+  averageCostUsd: number; costPerNonEmptyBatchUsd: number | null; costPerFinalizedAcceptedUsd: number | null
+  averageLatencyMs: number; p95LatencyMs: number; providerFailureRate: number; synthesisFailureRate: number
+}
+interface CompareResponse {
+  ok: boolean; preflight?: boolean; error?: string; message?: string
+  snapshotId?: string; commitSha?: string | null; poolSize?: number; discoveryRan?: boolean
+  preparationProviderCalls?: number; targetCount?: number; attemptsPerModel?: number
+  maxAuthorizedCostUsd?: number; actualCostUsd?: number; requiresConfirmation?: boolean
+  attempts?: AttemptRow[]; aggregate?: { flash: AggMetrics; pro: AggMetrics }
+  selection?: { select: string; reason: string; provisional: boolean }
+  budget?: { ok: boolean; path: string; requiredAuthorizationUsd: number }
+  blindAvailable?: boolean; blindBlocked?: { reason: string; hitCount: number } | null
+  blindReview?: unknown; mapping?: unknown; persist?: boolean; persistedWrites?: number
+  limits?: { serverMaxAttemptsPerModel: number; serverMaxTargetCount: number }
+}
+
+function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label: (p: ProjectOpt) => string }) {
+  const [projectId, setProjectId] = useState<string>('')
+  const [targetCount, setTargetCount] = useState(12)
+  const [attempts, setAttempts] = useState(3)
+  const [stage, setStage] = useState<'idle' | 'preflight' | 'running' | 'done' | 'error'>('idle')
+  const [preflight, setPreflight] = useState<CompareResponse | null>(null)
+  const [result, setResult] = useState<CompareResponse | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  const effectiveProject = projectId || projects[0]?.id || ''
+
+  async function call(confirm: boolean): Promise<CompareResponse> {
+    const res = await fetch('/api/content/automation/reco-qa/compare', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: effectiveProject, targetCount, attemptsPerModel: attempts, confirm }),
+    })
+    const data: CompareResponse = await res.json().catch(() => ({ ok: false, error: `http_${res.status}` }))
+    if (!res.ok && !data.error) data.error = `http_${res.status}`
+    return data
+  }
+
+  async function doPreflight() {
+    setErr(null); setResult(null); setPreflight(null)
+    if (!effectiveProject) { setErr('בחר פרויקט'); setStage('error'); return }
+    setStage('preflight')
+    const d = await call(false)
+    if (!d.ok) { setErr(`${d.error ?? ''} ${d.message ?? ''}`); setStage('error'); return }
+    setPreflight(d)
+  }
+  async function doRun() {
+    setErr(null); setStage('running')
+    const d = await call(true)
+    if (!d.ok) { setErr(`${d.error ?? ''} ${d.message ?? ''}`); setStage('error'); return }
+    setResult(d); setStage('done')
+  }
+
+  function download(obj: unknown, name: string) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click()
+  }
+
+  const running = stage === 'preflight' || stage === 'running'
+  const pct = (n: number) => `${Math.round(n * 100)}%`
+
+  return (
+    <section className="mt-10 rounded-lg border-2 border-dashed border-indigo-300 dark:border-indigo-800 p-4" dir="rtl" data-testid="reco-qa-comparison">
+      <h2 className="text-lg font-bold text-indigo-800 dark:text-indigo-300 mb-1">השוואת Flash מול Pro (QA/אדמין בלבד)</h2>
+      <p className="text-xs text-slate-500 mb-3">מריץ תמונת מצב אחת (snapshot) ומריץ עליה מספר ניסיונות Flash ו-Pro. אינו נוגע בזרימת המשתמש הרגילה, אינו שומר דבר, ואינו מפעיל אסקלציה אוטומטית. Preview בלבד.</p>
+
+      <div className="flex flex-wrap items-end gap-3 mb-3 text-sm">
+        <label className="flex flex-col gap-1 text-xs">פרויקט
+          <select value={effectiveProject} onChange={(e) => setProjectId(e.target.value)} disabled={running} className="rounded border border-slate-300 px-2 py-1 text-sm min-w-[180px]">
+            {projects.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs">מספר המלצות מבוקש
+          <input type="number" min={1} max={20} value={targetCount} disabled={running} onChange={(e) => setTargetCount(Number(e.target.value) || 1)} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs">ניסיונות לכל מודל
+          <input type="number" min={3} max={6} value={attempts} disabled={running} onChange={(e) => setAttempts(Number(e.target.value) || 3)} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
+        </label>
+        <button onClick={doPreflight} disabled={running} className="rounded-md bg-indigo-600 text-white px-4 py-1.5 text-sm disabled:opacity-50">
+          {stage === 'preflight' ? 'מחשב…' : 'חשב עלות מקסימלית'}
+        </button>
+      </div>
+
+      {stage === 'error' && <p className="text-xs text-red-600 mb-2">{err}</p>}
+
+      {preflight && stage !== 'done' && (
+        <div className="rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 mb-3 text-sm" data-testid="reco-qa-preflight">
+          <p className="text-amber-800 dark:text-amber-300 mb-2" dir="rtl">
+            עלות QA מקסימלית מאושרת: <b dir="ltr">${preflight.maxAuthorizedCostUsd}</b> · {attempts}×2 ניסיונות · יעד {targetCount}. הריצה אינה שומרת המלצות. יש לאשר במפורש.
+          </p>
+          <button onClick={doRun} disabled={running} className="rounded-md bg-rose-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-confirm-run">
+            {stage === 'running' ? 'מריץ השוואה…' : 'אשר והרץ השוואה'}
+          </button>
+        </div>
+      )}
+
+      {result && stage === 'done' && (
+        <div data-testid="reco-qa-comparison-result">
+          <p className="text-xs text-slate-600 dark:text-slate-300 mb-2" dir="ltr">
+            snapshot <b>{result.snapshotId}</b> · commit <b>{result.commitSha ?? 'unknown'}</b> · pool {result.poolSize} · discovery {String(result.discoveryRan)} · prepCalls {result.preparationProviderCalls} · maxCost ${result.maxAuthorizedCostUsd} · actualCost ${result.actualCostUsd} · persist {String(result.persist)} · writes {result.persistedWrites}
+          </p>
+          <p className="text-xs mb-3" dir="ltr">
+            selection: <b>{result.selection?.select}</b> ({result.selection?.reason}{result.selection?.provisional ? ' · provisional' : ''}) · budget: <b>{result.budget?.path}</b>
+          </p>
+
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => result.blindReview && download(result.blindReview, `blind-review-${result.snapshotId}.json`)}
+              disabled={!result.blindAvailable}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40" data-testid="reco-qa-download-blind">
+              הורדת קובץ לבדיקה עיוורת
+            </button>
+            <button
+              onClick={() => result.mapping && download(result.mapping, `blind-mapping-${result.snapshotId}.json`)}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" data-testid="reco-qa-download-mapping">
+              הורדת מיפוי פנימי
+            </button>
+            {!result.blindAvailable && <span className="text-xs text-red-600 self-center">קובץ הבדיקה נחסם: {result.blindBlocked?.reason} ({result.blindBlocked?.hitCount})</span>}
+          </div>
+
+          {result.aggregate && (
+            <table className="w-full text-[11px] mb-4 border border-slate-200 dark:border-slate-700" dir="ltr">
+              <thead><tr className="bg-slate-50 dark:bg-slate-800">
+                <th className="p-1 text-right">metric</th><th className="p-1">Flash</th><th className="p-1">Pro</th>
+              </tr></thead>
+              <tbody>
+                {([
+                  ['attempts', (a: AggMetrics) => a.totalAttempts],
+                  ['target completion', (a: AggMetrics) => pct(a.targetCompletionRate)],
+                  ['non-empty rate', (a: AggMetrics) => pct(a.nonEmptyRate)],
+                  ['zero-result rate', (a: AggMetrics) => pct(a.zeroResultRate)],
+                  ['mean finalized', (a: AggMetrics) => a.meanFinalized],
+                  ['median finalized', (a: AggMetrics) => a.medianFinalized],
+                  ['min / max', (a: AggMetrics) => `${a.minFinalized} / ${a.maxFinalized}`],
+                  ['avg cost $', (a: AggMetrics) => a.averageCostUsd],
+                  ['$/non-empty batch', (a: AggMetrics) => a.costPerNonEmptyBatchUsd ?? '—'],
+                  ['$/finalized accepted', (a: AggMetrics) => a.costPerFinalizedAcceptedUsd ?? '—'],
+                  ['avg latency ms', (a: AggMetrics) => a.averageLatencyMs],
+                  ['p95 latency ms', (a: AggMetrics) => a.p95LatencyMs],
+                  ['provider fail rate', (a: AggMetrics) => pct(a.providerFailureRate)],
+                  ['synthesis fail rate', (a: AggMetrics) => pct(a.synthesisFailureRate)],
+                ] as [string, (a: AggMetrics) => unknown][]).map(([k, f]) => (
+                  <tr key={k} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="p-1 text-right text-slate-500">{k}</td>
+                    <td className="p-1 text-center">{String(f(result.aggregate!.flash))}</td>
+                    <td className="p-1 text-center">{String(f(result.aggregate!.pro))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <table className="w-full text-[10px] border border-slate-200 dark:border-slate-700" dir="ltr">
+            <thead><tr className="bg-slate-50 dark:bg-slate-800">
+              {['batchId', 'model', 'final', 'engine', 'zero', 'provider', 'synth', 'stop', 'cost$', 'tokens(i/o/t)', 'calls', 'ms', 'uniqAccepted', 'rescue', 'escalate'].map((h) => <th key={h} className="p-1">{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {(result.attempts ?? []).map((a) => (
+                <tr key={a.attemptId} className={`border-t border-slate-100 dark:border-slate-800 ${a.failed ? 'bg-rose-50 dark:bg-rose-950/30' : ''}`}>
+                  <td className="p-1 font-mono">{a.attemptId}</td>
+                  <td className="p-1">{a.model}</td>
+                  <td className="p-1 text-center font-bold">{a.finalizedCount}</td>
+                  <td className="p-1 text-center">{a.engineAcceptedCount}</td>
+                  <td className="p-1 text-center">{a.zeroResult ? '∅' : ''}</td>
+                  <td className={`p-1 text-center ${a.providerStatus === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>{a.providerStatus}</td>
+                  <td className={`p-1 text-center ${a.synthesisStatus === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>{a.synthesisStatus}</td>
+                  <td className="p-1">{a.stopReason}</td>
+                  <td className="p-1 text-center">{a.estimatedCostUsd}</td>
+                  <td className="p-1 text-center">{a.tokenUsage.input}/{a.tokenUsage.output}/{a.tokenUsage.thinking}</td>
+                  <td className="p-1 text-center">{a.callCount}</td>
+                  <td className="p-1 text-center">{a.latencyMs}</td>
+                  <td className="p-1 text-center">{a.uniqueAcceptedCount}</td>
+                  <td className="p-1 text-center" title={`rescue potential ${a.rescueCounts.totalRescuePotential}`}>{a.rescueCounts.totalRescuePotential}</td>
+                  <td className={`p-1 text-center ${a.escalation.escalate ? 'text-amber-600' : 'text-slate-400'}`}>{a.escalation.escalate ? a.escalation.reason : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   )
 }
