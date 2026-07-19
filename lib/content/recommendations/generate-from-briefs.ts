@@ -547,6 +547,7 @@ export type BriefRunSnapshot = Awaited<ReturnType<typeof prepareBriefRun>>
 export async function synthesizeFromSnapshot(
   snapshot: BriefRunSnapshot,
   controller: RunCostController,
+  opts?: { modelOverride?: string | null },
 ): Promise<{ suggestions: TopicSuggestion[]; diagnostics: BriefRunDiagnostics }> {
   const {
     input, language, langLabel, guard, existingPages, coveredKeys, entities,
@@ -556,6 +557,11 @@ export async function synthesizeFromSnapshot(
     brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
     discovery, evidenceInventory,
   } = snapshot
+  // Synthesis model: the snapshot's resolved model by default. The QA/admin smart-run
+  // harness (Increment 4) passes a modelOverride so a Flash attempt and a Pro attempt
+  // synthesize the SAME snapshot with different models. Omitting opts is byte-identical
+  // to the pre-split behavior (the deterministic identity gate proves this).
+  const effectiveModel: string | null = (opts?.modelOverride ?? modelPath.model) ?? null
   // Discovery may have captured the model config; the first synthesis round fills it
   // when still null — a FRESH per-attempt holder so attempts never share the field.
   const modelConfigHolder: { value: BriefRunDiagnostics['modelConfig'] } = { value: snapshot.modelConfig }
@@ -878,7 +884,7 @@ export async function synthesizeFromSnapshot(
         recommendedPageType, demandEvidence,
         businessRelevance: { score: relevance.score, relatedCommercialEntities: relevance.relatedCommercialEntities },
         linkPlan,
-        modelUsed: modelPath.model ?? undefined,
+        modelUsed: effectiveModel ?? undefined,
         opportunityFamily: brief.family,
         // Preview-only diagnostics for the acceptance runner.
         linkDiagnostics,
@@ -913,11 +919,11 @@ export async function synthesizeFromSnapshot(
     const prompt = buildBriefSynthesisPrompt(batch, ctx, langLabel, year)
     const res = await generateRecommendationJSON(
       prompt,
-      { temperature: 0.4, maxOutputTokens: synthesisOutputBudget(batch.length), ...(modelPath.model ? { model: modelPath.model } : {}), responseSchema: briefSynthesisResponseSchema(batch.map((b) => b.opportunityId)) },
+      { temperature: 0.4, maxOutputTokens: synthesisOutputBudget(batch.length), ...(effectiveModel ? { model: effectiveModel } : {}), responseSchema: briefSynthesisResponseSchema(batch.map((b) => b.opportunityId)) },
       controller,
       { source: 'brief_synthesis', callPurpose: round === 1 ? 'primary' : 'refill', requestedIdeaCount: batch.length },
     )
-    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? modelPath.model, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
+    const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? effectiveModel, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
     rounds.push(rd)
     if (modelConfigHolder.value === null && res.modelConfig) modelConfigHolder.value = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
     if (res.stopped) { stop = 'budget_stopped'; break }
