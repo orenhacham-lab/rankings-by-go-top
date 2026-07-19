@@ -255,8 +255,10 @@ export async function POST(request: Request) {
       return Response.json({ suggestions: [], ok: false, error: 'persistence_failed', reason: 'persistence_failed', message: 'שמירת הרעיונות נכשלה זמנית. יש לנסות שוב בעוד רגע.', meta: { source, reason: 'persistence_failed', persisted: false, newlyAddedCount: 0, ...(diagnostics ? { isolationDebug: { gitSha, vercelEnv, generationRunId, persistence_attempted: persistOutcome.attempted, persistence_inserted: 0, persistence_failed: persistOutcome.failed, persistence_failure: persistOutcome.failure ?? null } } : {}) } }, { status: 500 })
     }
 
-    // Stage D — record the REAL persisted-writes count into the production provenance.
-    if (proFirstProvenance) proFirstProvenance.persistedWrites = persistOutcome ? persistOutcome.inserted : fresh.length
+    // Stage D — record the REAL persisted-writes count. A null persistOutcome (no ideas
+    // table → session-only) means NOTHING was durably written: persistedWrites = 0, never
+    // fresh.length.
+    if (proFirstProvenance) proFirstProvenance.persistedWrites = persistOutcome?.inserted ?? 0
     const freshFingerprints = fresh.map((s) => topicIdeaFingerprint(s.primaryKeyword, s.title))
     const persistenceTrace = diagnostics ? {
       persistence_attempted_ids: fresh.map((s) => s.id),

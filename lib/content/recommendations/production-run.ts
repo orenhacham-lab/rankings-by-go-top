@@ -3,26 +3,30 @@
  *
  * Wires the validated engine building blocks (prepareBriefRun → synthesizeFromSnapshot
  * → finalizeRecommendationAttempt) into the global Pro-first production policy. It does
- * NOT modify any engine logic — it only sequences calls and applies the PURE decisions
- * from production-controller. Exactly one immutable snapshot; discovery runs once; Pro
- * runs once; Flash is a single fallback on the SAME snapshot under strict conditions.
+ * NOT modify any engine logic — it only sequences calls and applies PURE decisions.
+ * Exactly one immutable snapshot; discovery runs once; Pro runs once; Flash is a single
+ * fallback on the SAME snapshot under strict conditions.
  *
- * Each attempt is finalized EXACTLY ONCE. The SELECTED attempt's finalization result is
- * returned so the route persists precisely selectedFinalization.finalSuggestions (in
- * order) without re-finalizing. Model provenance is per-attempt and truthful: when a
- * Flash override created the batch, the selected model path is Flash — never the
- * snapshot's (Pro) modelPath.
+ * Flash is ONLY ever a REAL Flash-class model: after a proven Pro-zero + non-empty
+ * model-rescuable rescue, a Flash-class model is resolved; if the resolver fails OR
+ * returns a non-Flash-class id, Flash is NOT run (flash_unavailable). A Pro model id is
+ * NEVER used as a Flash override. The fallback budget is checked with the EXACT first
+ * Flash-round prompt (the same one synthesizeFromSnapshot would build), without
+ * consuming a call slot.
+ *
+ * Each attempt is finalized EXACTLY ONCE; the SELECTED attempt's finalization is
+ * returned so the route persists precisely selectedFinalization.finalSuggestions.
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { RunCostController } from './run-cost-controller'
 import { prepareBriefRun, synthesizeFromSnapshot, type BriefRunSnapshot, type BriefRunDiagnostics } from './generate-from-briefs'
 import { finalizeRecommendationAttempt, type FinalizedAttemptResult } from './finalize-attempt'
-import { synthesisOutputBudget } from './brief-synthesis'
+import { buildBriefSynthesisPrompt, synthesisOutputBudget } from './brief-synthesis'
 import { cloneKeywordGuard, deriveBriefOutcomes } from './smart-run-harness'
 import { computeRescueAccounting } from './smart-controller'
 import { resolveAvailableRecommendationModel } from './model-availability'
 import type { ModelPath } from './model-select'
-import { evaluateFlashFallback, selectProductionBatch, type FallbackReason, type ProductionSelected } from './production-controller'
+import { selectProductionBatch, isFlashClassModel, type FallbackReason, type ProductionSelected } from './production-controller'
 import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -31,7 +35,8 @@ type Synth = Awaited<ReturnType<typeof synthesizeFromSnapshot>>
 /** Full production provenance (Preview-only diagnostics; never shown to the customer).
  *  persistedWrites is filled by the route from the REAL persistence outcome. */
 export interface ProductionProvenance {
-  primaryModelRequested: string
+  /** The requested FIRST model — always the string 'pro' (the global policy). */
+  primaryModelRequested: 'pro'
   requestedTier: 'premium'
   proAttempted: boolean
   proRequestedModel: string
@@ -49,7 +54,10 @@ export interface ProductionProvenance {
   selectedModel: ProductionSelected
   selectedFinalizedCount: number
   selectionReason: string
+  /** Number of prepareBriefRun invocations (always 1 after a successful preparation). */
   preparationCalls: number
+  /** Provider calls made DURING preparation (0 or 1 discovery call). */
+  preparationProviderCalls: number
   discoveryCalls: number
   /** The SELECTED model id (persisted as modelUsed). Flash fallback is NEVER Pro. */
   modelUsedForPersistence: string | null
@@ -58,15 +66,9 @@ export interface ProductionProvenance {
 
 export interface ProFirstProductionResult {
   selectedModel: ProductionSelected
-  /** The SELECTED attempt's finalization (finalized ONCE). The route persists exactly
-   *  selectedFinalization.finalSuggestions and reuses its funnel/rejection counts. */
   selectedFinalization: FinalizedAttemptResult
-  /** The SELECTED attempt's engine suggestions (for engine-accepted counts + provenance
-   *  provider badges only; NOT re-finalized). */
   selectedEngineSuggestions: TopicSuggestion[]
-  /** Truthful model path of the SELECTED attempt (Flash when Flash created the batch). */
   selectedModelPath: ModelPath
-  /** The SELECTED attempt's synth diagnostics (Preview meta). */
   briefDiagnostics: BriefRunDiagnostics
   rawGenerated: number
   emptyReason: string | null
@@ -84,46 +86,52 @@ function budgetStopped(synth: Synth): boolean {
 }
 
 /**
- * Estimate-AWARE budget authorization for ONE more (Flash) call, using the SAME cost
- * estimator the provider gate uses, WITHOUT consuming a call slot: there must be a free
- * call slot AND the estimated next-call cost must fit under the remaining budget.
+ * EXACT-prompt fallback budget authorization. Rebuilds the FIRST Flash synthesis round
+ * exactly as synthesizeFromSnapshot would (same batch from workingPool, same batchSize,
+ * same buildBriefSynthesisPrompt over the snapshot's ctx/langLabel/year, same output
+ * budget) and uses the controller's own estimator on the REAL prompt length. Never
+ * consumes a call slot. Authorized only if a slot is free AND spentUsd + exact estimate
+ * ≤ the cost ceiling.
  */
-function budgetAuthorizesFlashCall(controller: RunCostController, snapshot: BriefRunSnapshot, model: string, targetCount: number): boolean {
+export function exactFlashBudgetOk(controller: RunCostController, snapshot: BriefRunSnapshot, flashModel: string): boolean {
   if (controller.callCount >= controller.budget.maxModelCallsPerRun) return false
-  const estBatch = Math.min(snapshot.workingPool.length || 1, Math.max(4, Math.ceil(targetCount * 1.5)))
-  const outputBudget = synthesisOutputBudget(estBatch)
-  // Prompt-size estimate (brief JSON + synthesis scaffold) — the gate estimates from the
-  // real prompt length; this pre-check uses a moderate estimate of the same shape.
-  const estPromptChars = 2500 + estBatch * 350
-  const est = controller.estimateNextCallUsd(model, estPromptChars, outputBudget)
+  const target = snapshot.input.targetCount
+  const deficit = target // suggestions.length is 0 at the start of a Flash attempt
+  const batchSize = Math.min(snapshot.workingPool.length, Math.max(4, Math.ceil(deficit * 1.5)))
+  const batch = snapshot.workingPool.slice(0, batchSize)
+  const prompt = buildBriefSynthesisPrompt(batch, snapshot.ctx, snapshot.langLabel, snapshot.year)
+  const outputBudget = synthesisOutputBudget(batch.length)
+  const est = controller.estimateNextCallUsd(flashModel, prompt.length, outputBudget)
   return controller.spentUsd + Math.max(0, est) <= controller.budget.maxEstimatedCostUsd
 }
 
 function emptyReasonFor(fallbackReason: FallbackReason | 'pro_unavailable' | null): string {
   if (fallbackReason === 'no_evidence' || fallbackReason === 'preparation_failure') return 'insufficient_inventory'
   if (fallbackReason === 'fallback_budget_blocked') return 'fallback_budget_blocked'
+  if (fallbackReason === 'flash_unavailable') return 'flash_unavailable'
   return 'no_safe_opportunities'
 }
 
-/** A truthful ModelPath for the SELECTED attempt: the model that ACTUALLY produced the
- *  batch (or was attempted), never the snapshot's Pro path when a Flash override ran. */
 function flashAttemptModelPath(snapshot: BriefRunSnapshot, flashModel: string): ModelPath {
   return { requestedTier: 'premium', requestedModel: snapshot.modelPath.requestedModel, model: flashModel, tierUsed: 'flash', downgraded: true, downgradeReason: null }
 }
 
-/**
- * Run the Pro-first production flow on ONE immutable snapshot. Persists nothing (the
- * route persists selectedFinalization.finalSuggestions).
- */
+/** Resolve a REAL Flash-class model, or null when none is offered / a non-Flash id is
+ *  returned (both → flash_unavailable). A Pro id is never accepted as Flash. */
+async function resolveFlashClassModel(): Promise<string | null> {
+  const fr = await resolveAvailableRecommendationModel()
+  return fr.ok && isFlashClassModel(fr.model) ? fr.model : null
+}
+
 export async function runProFirstProduction(
   admin: Admin,
   input: { projectId: string; targetCount: number; userId?: string },
   controller: RunCostController,
 ): Promise<ProFirstProductionResult> {
   const snapshot = await prepareBriefRun(admin, { projectId: input.projectId, targetCount: input.targetCount, qualityMode: 'premium', userId: input.userId }, controller)
-  const preparationCalls = controller.summary().totalCalls
+  const preparationProviderCalls = controller.summary().totalCalls
   const discoveryCalls = snapshot.discovery?.ran ? 1 : 0
-  const proRequestedModel = snapshot.modelPath.requestedModel // the PRO id premium asked for
+  const proRequestedModel = snapshot.modelPath.requestedModel
   const proResolvedModel = snapshot.modelPath.model
   const proDowngraded = snapshot.modelPath.downgraded || snapshot.modelPath.tierUsed !== 'pro'
   const finalizeOnce = (engine: TopicSuggestion[]): FinalizedAttemptResult =>
@@ -131,21 +139,48 @@ export async function runProFirstProduction(
   const emptyFinalization = (): FinalizedAttemptResult => finalizeRecommendationAttempt({ guard: cloneKeywordGuard(snapshot.guard), existingPages: snapshot.existingPages }, [])
 
   const baseProv = {
-    primaryModelRequested: proRequestedModel,
+    primaryModelRequested: 'pro' as const,
     requestedTier: 'premium' as const,
     proRequestedModel,
     proResolvedModel,
     proTierUsed: snapshot.modelPath.tierUsed,
     proDowngraded,
-    preparationCalls,
+    preparationCalls: 1,
+    preparationProviderCalls,
     discoveryCalls,
     persistedWrites: 0,
   }
+  const emptyDiag = (): BriefRunDiagnostics => ({
+    engine: 'evidence_first_briefs', modelPath: snapshot.modelPath, modelConfig: null,
+    evidence_inventory: snapshot.evidenceInventory, brief_pool: snapshot.briefPool, discovery: snapshot.discovery,
+    rounds: [], rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 0,
+    finalCount: 0, model_calls: preparationProviderCalls, stop_reason: 'insufficient_inventory',
+    brief_consumption: { effectivePoolSize: snapshot.workingPool.length, consumedBriefs: 0, remainingBriefs: snapshot.workingPool.length, callsRemaining: 0 },
+    insufficient_inventory: true, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],
+    competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [], acceptedMatches: [] },
+    cost: { estimatedRunCostUsd: 0, totalCalls: preparationProviderCalls, calls: [], totalPaidCalls: preparationProviderCalls, estimatedRunCostIls: 0, costPerAcceptedTopic: 0, configuredCostCeilingUsd: controller.budget.maxEstimatedCostUsd, remainingBudgetUsd: 0, callsPreventedByBudget: 0, configuredMaxCalls: controller.budget.maxModelCallsPerRun },
+  })
+  const noBatch = (reason: FallbackReason | 'pro_unavailable', opts: { fallbackEvaluated: boolean; fallbackTriggered: boolean; flashResolvedModel?: string | null; proAttempted: boolean; rescue?: number }): ProFirstProductionResult => ({
+    selectedModel: 'none', selectedFinalization: emptyFinalization(), selectedEngineSuggestions: [],
+    selectedModelPath: snapshot.modelPath, briefDiagnostics: emptyDiag(),
+    rawGenerated: 0, emptyReason: emptyReasonFor(reason),
+    provenance: {
+      ...baseProv, proAttempted: opts.proAttempted, proFinalizedCount: 0,
+      fallbackEvaluated: opts.fallbackEvaluated, fallbackTriggered: opts.fallbackTriggered, fallbackReason: reason,
+      fallbackRescueBriefCount: opts.rescue ?? 0,
+      flashAttempted: false, flashResolvedModel: opts.flashResolvedModel ?? null, flashFinalizedCount: null,
+      selectedModel: 'none', selectedFinalizedCount: 0, selectionReason: 'no_batch', modelUsedForPersistence: null,
+    },
+  })
 
-  // 2) Pro UNAVAILABLE before any Pro call → run Flash ONCE, recorded as Flash.
+  // 2) Pro UNAVAILABLE before any Pro call → run ONE Flash, but ONLY if the resolved
+  //    (downgraded) model is a REAL Flash-class model; else flash_unavailable (no run).
   if (proDowngraded) {
-    const flashModel = snapshot.modelPath.model ?? proRequestedModel
-    const flashSynth = await synthesizeFromSnapshot(snapshot, controller) // uses the (downgraded) model
+    const flashModel = snapshot.modelPath.model
+    if (!isFlashClassModel(flashModel)) {
+      return noBatch('flash_unavailable', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: false })
+    }
+    const flashSynth = await synthesizeFromSnapshot(snapshot, controller)
     const flashFin = finalizeOnce(flashSynth.suggestions)
     const flashFinalizedCount = flashFin.finalSuggestions.length
     const sel = selectProductionBatch(0, flashFinalizedCount)
@@ -153,13 +188,13 @@ export async function runProFirstProduction(
       selectedModel: sel.selected,
       selectedFinalization: sel.selected === 'flash' ? flashFin : emptyFinalization(),
       selectedEngineSuggestions: sel.selected === 'flash' ? flashSynth.suggestions : [],
-      selectedModelPath: snapshot.modelPath, // already truthful: downgraded Flash path
+      selectedModelPath: snapshot.modelPath,
       briefDiagnostics: flashSynth.diagnostics,
       rawGenerated: flashSynth.diagnostics.generated_opportunities,
       emptyReason: sel.selected === 'none' ? emptyReasonFor('pro_unavailable') : null,
       provenance: {
         ...baseProv, proAttempted: false, proFinalizedCount: 0,
-        fallbackEvaluated: false, fallbackTriggered: true, fallbackReason: 'pro_unavailable', fallbackRescueBriefCount: 0,
+        fallbackEvaluated: true, fallbackTriggered: true, fallbackReason: 'pro_unavailable', fallbackRescueBriefCount: 0,
         flashAttempted: true, flashResolvedModel: flashModel, flashFinalizedCount,
         selectedModel: sel.selected, selectedFinalizedCount: flashFinalizedCount, selectionReason: sel.reason,
         modelUsedForPersistence: sel.selected === 'flash' ? flashModel : null,
@@ -175,13 +210,9 @@ export async function runProFirstProduction(
 
   if (proFinalizedCount > 0) {
     return {
-      selectedModel: 'pro',
-      selectedFinalization: proFin,
-      selectedEngineSuggestions: proSynth.suggestions,
-      selectedModelPath: snapshot.modelPath, // Pro produced the batch
-      briefDiagnostics: proSynth.diagnostics,
-      rawGenerated: proSynth.diagnostics.generated_opportunities,
-      emptyReason: null,
+      selectedModel: 'pro', selectedFinalization: proFin, selectedEngineSuggestions: proSynth.suggestions,
+      selectedModelPath: snapshot.modelPath, briefDiagnostics: proSynth.diagnostics,
+      rawGenerated: proSynth.diagnostics.generated_opportunities, emptyReason: null,
       provenance: {
         ...baseProv, proAttempted: true, proFinalizedCount,
         fallbackEvaluated: false, fallbackTriggered: false, fallbackReason: 'pro_produced_batch', fallbackRescueBriefCount: 0,
@@ -192,53 +223,29 @@ export async function runProFirstProduction(
     }
   }
 
-  // 4) Pro finalized ZERO → rescue accounting + est-aware budget-gated fallback.
+  // 4) Pro finalized ZERO → the fallback path is EVALUATED. Gate order: empty pool →
+  //    no rescue (genuine exhaustion) → resolve a REAL Flash model → EXACT-prompt budget.
   const rescue = computeRescueAccounting(deriveBriefOutcomes(snapshot, proSynth, proFin), snapshot.workingPool.length)
-  const flashResolution = await resolveAvailableRecommendationModel()
-  const flashModel = flashResolution.ok ? flashResolution.model : proRequestedModel
-  const budgetOk = budgetAuthorizesFlashCall(controller, snapshot, flashModel, input.targetCount)
-  const fallback = evaluateFlashFallback({
-    proFinalizedCount: 0,
-    preparationSucceeded: true,
-    poolEmptyAfterSuccessfulPreparation: snapshot.workingPool.length === 0,
-    rescueUniqueBriefIdCount: rescue.rescuePotentialBriefIds.size,
-    proProviderFailed: providerFailed(proSynth),
-    proSynthesisFailed: synthesisFailed(proSynth),
-    budgetAuthorizesFallback: budgetOk,
-  })
+  const rescueCount = rescue.rescuePotentialBriefIds.size
+  const withProDiag = (r: ProFirstProductionResult): ProFirstProductionResult => ({ ...r, briefDiagnostics: proSynth.diagnostics, rawGenerated: proSynth.diagnostics.generated_opportunities })
 
-  const proBase = {
-    ...baseProv, proAttempted: true, proFinalizedCount: 0, fallbackEvaluated: true, fallbackRescueBriefCount: rescue.rescuePotentialBriefIds.size,
-  }
+  if (snapshot.workingPool.length === 0) return withProDiag(noBatch('no_evidence', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: true, rescue: rescueCount }))
+  if (rescueCount === 0) return withProDiag(noBatch('genuine_exhaustion', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: true, rescue: rescueCount }))
 
-  if (!fallback.runFlash) {
-    return {
-      selectedModel: 'none', selectedFinalization: emptyFinalization(), selectedEngineSuggestions: [],
-      selectedModelPath: snapshot.modelPath, briefDiagnostics: proSynth.diagnostics,
-      rawGenerated: proSynth.diagnostics.generated_opportunities, emptyReason: emptyReasonFor(fallback.reason),
-      provenance: {
-        ...proBase, fallbackTriggered: false, fallbackReason: fallback.reason,
-        flashAttempted: false, flashResolvedModel: null, flashFinalizedCount: null,
-        selectedModel: 'none', selectedFinalizedCount: 0, selectionReason: 'no_batch', modelUsedForPersistence: null,
-      },
-    }
-  }
+  // Flash is warranted by rescue → resolve a REAL Flash-class model ONLY now.
+  const flashModel = await resolveFlashClassModel()
+  if (!flashModel) return withProDiag(noBatch('flash_unavailable', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: true, rescue: rescueCount }))
 
-  // 5) Single Flash FALLBACK on the SAME snapshot.
+  // EXACT-prompt budget authorization (no slot consumed).
+  if (!exactFlashBudgetOk(controller, snapshot, flashModel)) return withProDiag(noBatch('fallback_budget_blocked', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: true, flashResolvedModel: flashModel, rescue: rescueCount }))
+
+  const reason: FallbackReason = providerFailed(proSynth) ? 'pro_provider_failure_rescue' : synthesisFailed(proSynth) ? 'pro_synthesis_failure_rescue' : 'pro_zero_marginal_yield_rescue'
+
+  // 5) Single Flash FALLBACK on the SAME snapshot, resolved Flash-class model.
   const flashSynth = await synthesizeFromSnapshot(snapshot, controller, { modelOverride: flashModel })
-  // Normalize a provider-level budget block (despite the pre-check) to a NON-run.
-  if (budgetStopped(flashSynth)) {
-    return {
-      selectedModel: 'none', selectedFinalization: emptyFinalization(), selectedEngineSuggestions: [],
-      selectedModelPath: snapshot.modelPath, briefDiagnostics: proSynth.diagnostics,
-      rawGenerated: proSynth.diagnostics.generated_opportunities, emptyReason: emptyReasonFor('fallback_budget_blocked'),
-      provenance: {
-        ...proBase, fallbackTriggered: false, fallbackReason: 'fallback_budget_blocked',
-        flashAttempted: false, flashResolvedModel: null, flashFinalizedCount: null,
-        selectedModel: 'none', selectedFinalizedCount: 0, selectionReason: 'no_batch', modelUsedForPersistence: null,
-      },
-    }
-  }
+  // A provider-level budget stop (despite the pre-check) → normalized NON-run.
+  if (budgetStopped(flashSynth)) return withProDiag(noBatch('fallback_budget_blocked', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: true, flashResolvedModel: flashModel, rescue: rescueCount }))
+
   const flashFin = finalizeOnce(flashSynth.suggestions)
   const flashFinalizedCount = flashFin.finalSuggestions.length
   const sel = selectProductionBatch(0, flashFinalizedCount)
@@ -249,9 +256,10 @@ export async function runProFirstProduction(
     selectedModelPath: sel.selected === 'flash' ? flashAttemptModelPath(snapshot, flashModel) : snapshot.modelPath,
     briefDiagnostics: sel.selected === 'flash' ? flashSynth.diagnostics : proSynth.diagnostics,
     rawGenerated: (sel.selected === 'flash' ? flashSynth : proSynth).diagnostics.generated_opportunities,
-    emptyReason: sel.selected === 'none' ? emptyReasonFor(fallback.reason) : null,
+    emptyReason: sel.selected === 'none' ? emptyReasonFor(reason) : null,
     provenance: {
-      ...proBase, fallbackTriggered: true, fallbackReason: fallback.reason,
+      ...baseProv, proAttempted: true, proFinalizedCount: 0,
+      fallbackEvaluated: true, fallbackTriggered: true, fallbackReason: reason, fallbackRescueBriefCount: rescueCount,
       flashAttempted: true, flashResolvedModel: flashModel, flashFinalizedCount,
       selectedModel: sel.selected, selectedFinalizedCount: flashFinalizedCount, selectionReason: sel.reason,
       modelUsedForPersistence: sel.selected === 'flash' ? flashModel : null,

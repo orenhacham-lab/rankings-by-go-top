@@ -13,7 +13,7 @@ import { join } from 'path'
 import { fakeAdmin } from './_reco-harness'
 import { resetModelResolutionCache } from '../recommendations/model-availability'
 import { resetRecoGenAiClient } from '../recommendations/genai-client'
-import { evaluateFlashFallback, selectProductionBatch, buildProductionRunDecision } from '../recommendations/production-controller'
+import { evaluateFlashFallback, selectProductionBatch, buildProductionRunDecision, isFlashClassModel } from '../recommendations/production-controller'
 import { suggestionFingerprint } from '../recommendations/smart-run-report'
 
 let pass = 0, fail = 0
@@ -21,7 +21,7 @@ const check = (n: string, c: boolean, d?: string) => { if (c) { pass++; console.
 const read = (rel: string) => readFileSync(join(__dirname, rel), 'utf8')
 
 // ── Model-aware fake Gemini server ───────────────────────────────────────────────
-interface SrvCfg { proAvailable: boolean; proMode: 'ok' | 'provider_fail' | 'synth_fail'; flashMode: 'ok' | 'empty' }
+interface SrvCfg { proAvailable: boolean; proMode: 'ok' | 'provider_fail' | 'synth_fail'; flashMode: 'ok' | 'empty'; flashAvailable?: boolean }
 function startServer(cfg: SrvCfg): Promise<{ server: Server; port: number; calls: { model: string; kind: string }[] }> {
   const calls: { model: string; kind: string }[] = []
   const topicsFor = (body: string, prefix: string) => {
@@ -35,7 +35,7 @@ function startServer(cfg: SrvCfg): Promise<{ server: Server; port: number; calls
     req.on('data', (c) => { body += c })
     req.on('end', () => {
       if (req.method === 'GET' && (req.url ?? '').includes('/models')) {
-        const models = ['gemini-2.5-flash', ...(cfg.proAvailable ? ['gemini-2.5-pro'] : [])]
+        const models = [...(cfg.flashAvailable === false ? [] : ['gemini-2.5-flash']), ...(cfg.proAvailable ? ['gemini-2.5-pro'] : [])]
         res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ models: models.map((m) => ({ name: `models/${m}`, supportedGenerationMethods: ['generateContent'] })) })); return
       }
       if ((req.url ?? '').includes(':generateContent')) {
@@ -98,6 +98,8 @@ async function main() {
     check('P11. Pro 0, Flash 0 → none', selectProductionBatch(0, 0).selected === 'none')
     check('P12. buildDecision: Pro unavailable → Flash run, reason pro_unavailable', buildProductionRunDecision({ proAvailable: false, proFinalizedCount: 0, fallback: null, flashFinalizedCount: 3 }).reason === 'pro_unavailable')
     check('P13. buildDecision: Pro produced → no Flash', buildProductionRunDecision({ proAvailable: true, proFinalizedCount: 5, fallback: null, flashFinalizedCount: null }).flashRan === false)
+    // isFlashClassModel — a Pro id is NEVER Flash-class.
+    check('P14. isFlashClassModel: flash ids yes; pro/null/empty no', isFlashClassModel('gemini-2.5-flash') && isFlashClassModel('gemini-flash-latest') && !isFlashClassModel('gemini-2.5-pro') && !isFlashClassModel('gemini-2.5-flash-pro') && !isFlashClassModel(null) && !isFlashClassModel(''))
   }
 
   console.log('RUN) orchestration over fake providers')
@@ -110,9 +112,9 @@ async function main() {
     const r1 = await runProFirstProduction(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, newRunCostController('premium', 'run1', 12))
     check('R1. Pro non-empty → selected pro, Flash NOT called', r1.selectedModel === 'pro' && r1.provenance.flashAttempted === false && synthCalls(s1.calls, 'flash') === 0 && r1.selectedFinalization.finalSuggestions.length > 0)
     check('R2. provenance records Pro truthfully (requested=PRO, resolved, selected pro, no fallback)', /pro/.test(r1.provenance.proRequestedModel) && !/flash/.test(r1.provenance.proRequestedModel) && /pro/.test(r1.provenance.modelUsedForPersistence ?? '') && r1.provenance.fallbackReason === 'pro_produced_batch' && r1.provenance.proFinalizedCount > 0)
-    check('R2b. requested model is the PRO id, NEVER a Flash constant', !/flash/i.test(r1.provenance.primaryModelRequested) && r1.provenance.primaryModelRequested === r1.provenance.proRequestedModel)
+    check('R2b. primaryModelRequested === "pro"; proRequestedModel is the real PRO id (not Flash)', r1.provenance.primaryModelRequested === 'pro' && /pro/i.test(r1.provenance.proRequestedModel) && !/flash/i.test(r1.provenance.proRequestedModel))
     check('R3. selected model path is Pro; finalized-once identity holds', r1.selectedModelPath.tierUsed === 'pro' && !/flash/.test(String(r1.selectedModelPath.model)) && r1.provenance.selectedFinalizedCount === r1.selectedFinalization.finalSuggestions.length)
-    check('R3b. preparation once + discovery ≤ 1 (single snapshot)', s1.calls.filter((c) => c.kind === 'discovery').length <= 1 && typeof r1.provenance.preparationCalls === 'number')
+    check('R3b. preparationCalls === 1 (prepare invocations, not model calls); discoveryCalls 0/1; preparationProviderCalls surfaced', r1.provenance.preparationCalls === 1 && (r1.provenance.discoveryCalls === 0 || r1.provenance.discoveryCalls === 1) && typeof r1.provenance.preparationProviderCalls === 'number')
     s1.server.close()
 
     // 3. Pro 0 provider-failure + rescue → single Flash attempt; recorded + model-path FLASH.
@@ -158,6 +160,52 @@ async function main() {
     check('R12. budget blocked → Flash NOT attempted; typed fallback_budget_blocked; no batch', r12.provenance.flashAttempted === false && r12.provenance.fallbackReason === 'fallback_budget_blocked' && r12.selectedModel === 'none' && synthCalls(s12.calls, 'flash') === 0)
     if (save === undefined) delete process.env.RECO_MAX_ESTIMATED_COST_USD_PREMIUM; else process.env.RECO_MAX_ESTIMATED_COST_USD_PREMIUM = save
     s12.server.close()
+
+    // 13. Flash resolver returns a NON-Flash (Pro-class) model → flash_unavailable, no synth.
+    const saveGRM = process.env.GEMINI_RECOMMENDATION_MODEL
+    process.env.GEMINI_RECOMMENDATION_MODEL = 'gemini-2.5-pro'
+    const s13 = await startServer({ proAvailable: true, proMode: 'provider_fail', flashMode: 'ok' })
+    const rr13 = await loadRun(s13.port)
+    const r13 = await rr13.runProFirstProduction(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, rr13.newRunCostController('premium', 'run13', 12))
+    check('R13. Flash resolver → Pro-class → flash_unavailable; ZERO flash synth; Pro not re-run', r13.provenance.fallbackReason === 'flash_unavailable' && r13.provenance.flashAttempted === false && synthCalls(s13.calls, 'flash') === 0 && synthCalls(s13.calls, 'pro') >= 1 && synthCalls(s13.calls, 'pro') <= 2 && r13.selectedModel === 'none' && r13.provenance.modelUsedForPersistence === null)
+    if (saveGRM === undefined) delete process.env.GEMINI_RECOMMENDATION_MODEL; else process.env.GEMINI_RECOMMENDATION_MODEL = saveGRM
+    s13.server.close()
+
+    // 14. No Flash-class model offered (resolver ok:false) → flash_unavailable, no synth.
+    const s14 = await startServer({ proAvailable: true, flashAvailable: false, proMode: 'provider_fail', flashMode: 'ok' })
+    const rr14 = await loadRun(s14.port)
+    const r14 = await rr14.runProFirstProduction(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, userId: 'u1' }, rr14.newRunCostController('premium', 'run14', 12))
+    check('R14. Flash resolver ok:false → flash_unavailable; ZERO flash synth; a Pro id is NEVER used as Flash', r14.provenance.fallbackReason === 'flash_unavailable' && r14.provenance.flashAttempted === false && synthCalls(s14.calls, 'flash') === 0 && r14.provenance.flashResolvedModel === null && r14.selectedModel === 'none')
+    s14.server.close()
+
+    // 15. EXACT-prompt budget: the OLD heuristic (2500 + batch*350) would approve, but the
+    //     EXACT synthesis prompt exceeds the cap → the provider is NOT called.
+    const s15 = await startServer({ proAvailable: true, proMode: 'ok', flashMode: 'ok' })
+    const rr15 = await loadRun(s15.port)
+    const { prepareBriefRun } = await import('../recommendations/generate-from-briefs')
+    const { buildBriefSynthesisPrompt, synthesisOutputBudget } = await import('../recommendations/brief-synthesis')
+    const { exactFlashBudgetOk } = await import('../recommendations/production-run')
+    const snap = await prepareBriefRun(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, rr15.newRunCostController('premium', 'prep15', 8))
+    const batchSize = Math.min(snap.workingPool.length, Math.max(4, Math.ceil(8 * 1.5)))
+    const batch = snap.workingPool.slice(0, batchSize)
+    const exactPrompt = buildBriefSynthesisPrompt(batch, snap.ctx, snap.langLabel, snap.year)
+    const outputBudget = synthesisOutputBudget(batch.length)
+    const measCtrl = rr15.newRunCostController('premium', 'meas15', 8)
+    const exactEst = measCtrl.estimateNextCallUsd('gemini-2.5-flash', exactPrompt.length, outputBudget)
+    const oldEst = measCtrl.estimateNextCallUsd('gemini-2.5-flash', 2500 + batch.length * 350, outputBudget)
+    // The gate follows the EXACT prompt estimate: a cap just below it blocks; just above authorizes.
+    check('R15a. exactFlashBudgetOk follows the EXACT-prompt estimate (blocks just below, authorizes above)',
+      exactFlashBudgetOk(rr15.newRunCostController('premium', 'b1', 8, { maxEstimatedCostUsd: exactEst * 0.99 }), snap, 'gemini-2.5-flash') === false &&
+      exactFlashBudgetOk(rr15.newRunCostController('premium', 'b2', 8, { maxEstimatedCostUsd: exactEst * 2 }), snap, 'gemini-2.5-flash') === true)
+    // The old char-heuristic gives a DIFFERENT (wrong) answer from the exact prompt at a
+    // cap strictly between them — proving the heuristic was inaccurate and the gate must
+    // use the exact prompt (here the heuristic over-estimated, so it would have wrongly
+    // BLOCKED a run the exact prompt authorizes).
+    const cap = (Math.min(oldEst, exactEst) + Math.max(oldEst, exactEst)) / 2
+    check('R15b. the old heuristic disagrees with the EXACT prompt at a between-cap → exact is authoritative',
+      oldEst !== exactEst && ((0 + oldEst <= cap) !== exactFlashBudgetOk(rr15.newRunCostController('premium', 'b3', 8, { maxEstimatedCostUsd: cap }), snap, 'gemini-2.5-flash')),
+      JSON.stringify({ exactLen: exactPrompt.length, heuristicLen: 2500 + batch.length * 350, oldEst, exactEst }))
+    s15.server.close()
   }
 
   console.log('GUARD) route wiring, single flag, finalize-once, provenance, engine + QA untouched')
@@ -178,21 +226,32 @@ async function main() {
     check('G7. single prepareBriefRun + single Pro + single Flash call-site each', (runSrc.match(/await prepareBriefRun\(/g) ?? []).length === 1 && (runSrc.match(/await synthesizeFromSnapshot\(/g) ?? []).length === 3)
     check('G8. idempotency guards preserved in the route (INFLIGHT + RECENT)', /INFLIGHT\.add/.test(routeSrc) && /seenRecently/.test(routeSrc))
     // Blocker 1 — requested model is the REAL Pro id, never a Flash constant.
-    check('G9. provenance requested model = snapshot.modelPath.requestedModel (not the Flash primary constant)', /proRequestedModel = snapshot\.modelPath\.requestedModel/.test(runSrc) && !/requestedModel = RECOMMENDATION_MODEL_PRIMARY/.test(runSrc) && /primaryModelRequested: proRequestedModel/.test(runSrc))
+    check('G9. proRequestedModel = snapshot.modelPath.requestedModel; primaryModelRequested is the literal "pro"', /proRequestedModel = snapshot\.modelPath\.requestedModel/.test(runSrc) && /primaryModelRequested: 'pro'/.test(runSrc) && !/primaryModelRequested: proRequestedModel/.test(runSrc))
     // Blocker 2 — the route shows the SELECTED attempt's model path, not the snapshot Pro path.
     check('G10. pipeline model_path uses the selected attempt path (Flash when Flash created the batch)', /model_path: proFirstResult \? proFirstResult\.selectedModelPath/.test(routeSrc))
     // Blocker 3 — finalize EXACTLY once for the selected output (no route re-finalize).
     check('G11. route reuses selectedFinalization (no second finalize on the selected batch)', /const finalized = proFirstResult \? proFirstResult\.selectedFinalization/.test(routeSrc) && /const fresh = finalized\.finalSuggestions/.test(routeSrc))
-    // Blocker 4 — full production provenance in Preview diagnostics + real persistedWrites.
-    check('G12. full productionProvenance surfaced in isolationDebug + persistedWrites set from the real outcome', /productionProvenance: proFirstProvenance/.test(routeSrc) && /proFirstProvenance\.persistedWrites = persistOutcome/.test(routeSrc))
+    // Blocker 4 — full provenance + persistedWrites = REAL inserted (0 when null / session-only).
+    check('G12. full productionProvenance in isolationDebug; persistedWrites = persistOutcome?.inserted ?? 0 (never fresh.length)', /productionProvenance: proFirstProvenance/.test(routeSrc) && /proFirstProvenance\.persistedWrites = persistOutcome\?\.inserted \?\? 0/.test(routeSrc) && !/persistedWrites = persistOutcome \? persistOutcome\.inserted : fresh\.length/.test(routeSrc))
     // Blocker 5 — reasons named after the PRO cause; no flash_*_rescue anywhere.
     check('G13. fallback reasons are pro_*_rescue (never flash_*_rescue)', /pro_provider_failure_rescue/.test(ctrlSrc) && !/flash_provider_failure_rescue|flash_synthesis_failure_rescue|flash_zero_marginal_yield_rescue/.test(ctrlSrc) && !/flash_.*_rescue/.test(runSrc))
     // Blocker 6 — ONE authoritative flag: server-derived prop, no NEXT_PUBLIC mirror.
     check('G14. UI reads the server prop, NOT NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER', /const PRO_FIRST = proFirst/.test(uiSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(uiSrc))
     check('G15. the flag flows server→UI (page → ContentHub → AutomationIdeas), single source', /isProFirstControllerEnabled\(\)/.test(pageSrc) && /<ContentHub proFirst=\{proFirst\}/.test(pageSrc) && /proFirst=\{proFirst\}/.test(hubSrc))
     check('G16. no residual NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER anywhere', !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(uiSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(pageSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(hubSrc))
-    // Blocker 7 — est-aware budget authorization (same estimator the gate uses).
-    check('G17. fallback budget uses the call-cost estimator (est-aware), not just spent<cap', /estimateNextCallUsd\(/.test(runSrc) && /spentUsd \+ Math\.max\(0, est\) <= /.test(runSrc) && /budgetStopped/.test(runSrc))
+    // Blocker 7/2b — EXACT-prompt budget: the same batch/prompt/output-budget the gate uses.
+    check('G17. fallback budget uses the EXACT synthesis prompt (buildBriefSynthesisPrompt + prompt.length + synthesisOutputBudget)', /buildBriefSynthesisPrompt\(batch, snapshot\.ctx, snapshot\.langLabel, snapshot\.year\)/.test(runSrc) && /estimateNextCallUsd\(flashModel, prompt\.length, outputBudget\)/.test(runSrc) && /synthesisOutputBudget\(batch\.length\)/.test(runSrc) && !/2500 \+ estBatch \* 350/.test(runSrc) && /budgetStopped/.test(runSrc))
+    // Blocker 1 — Flash is a REAL Flash-class model; resolver runs only after rescue; a
+    // Pro id is never used as a Flash override; flash_unavailable is a typed reason.
+    check('G21. Flash resolution requires a Flash-class model; resolveFlashClassModel returns null otherwise', /isFlashClassModel\(fr\.model\) \? fr\.model : null/.test(runSrc) && /'flash_unavailable'/.test(runSrc) && /flash_unavailable/.test(ctrlSrc) && !/flashResolution\.ok\s*\?\s*flashResolution\.model\s*:\s*proRequestedModel/.test(runSrc))
+    check('G22. Flash resolver is NOT called when there is no rescue (genuine_exhaustion returned first)', runSrc.indexOf('rescueCount === 0') !== -1 && runSrc.indexOf('rescueCount === 0') < runSrc.indexOf('await resolveFlashClassModel()'))
+    check('G23. pre-call Pro downgrade to a non-Flash/null model → no synthesis (flash_unavailable)', /if \(!isFlashClassModel\(flashModel\)\)[\s\S]{0,120}flash_unavailable/.test(runSrc))
+    // Blocker 4 — session-only (no ideas table → persistOutcome null): persistedWrites=0,
+    // persisted:false; the persistedWrites assignment precedes the session-only return.
+    check('G24. session-only branch: persisted:false; persistedWrites computed before it (→ 0 when null)', /persisted: false/.test(routeSrc) && routeSrc.indexOf('proFirstProvenance.persistedWrites = persistOutcome') < routeSrc.indexOf('if (pending === null)'))
+    // Blocker 3 — fallbackEvaluated true for every evaluated/triggered path (incl. Pro
+    // unavailable); fallbackTriggered true only when Flash actually started.
+    check('G25. Pro-unavailable path sets fallbackEvaluated=true + fallbackTriggered=true', /fallbackEvaluated: true, fallbackTriggered: true, fallbackReason: 'pro_unavailable'/.test(runSrc))
     check('G18. UI: flag-gated single button, selector hidden', /!PRO_FIRST && \(/.test(uiSrc) && /צור המלצות/.test(uiSrc) && /יוצר המלצות…/.test(uiSrc) && /PRO_FIRST \? \{\} : \{ qualityMode \}/.test(uiSrc))
     // Frozen surfaces untouched.
     check('G19. validated engine files unchanged by Stage D', !/production-run|production-controller|proFirst/i.test(read('../recommendations/generate-from-briefs.ts')) && !/production-run|proFirst/i.test(read('../recommendations/finalize-attempt.ts')))

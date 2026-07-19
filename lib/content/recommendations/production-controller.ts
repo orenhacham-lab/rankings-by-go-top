@@ -19,10 +19,20 @@ export type FallbackReason =
   | 'no_evidence'                   // empty pool after successful preparation
   | 'genuine_exhaustion'            // no unique rescue briefIds (structural-only / nothing to rescue)
   | 'fallback_budget_blocked'       // budget does not authorize the fallback call
+  | 'flash_unavailable'             // no Flash-class model resolved for this key (Flash NOT run)
   // The FAILURE that triggers a fallback is a PRO failure — named after the Pro cause.
   | 'pro_provider_failure_rescue'   // Pro provider-failed with rescue → Flash runs
   | 'pro_synthesis_failure_rescue'  // Pro synthesis-failed with rescue → Flash runs
   | 'pro_zero_marginal_yield_rescue'// Pro produced 0 usable with rescue → Flash runs
+
+/** Pure Flash-class guard (mirrors the resolver's classification) so production
+ *  orchestration can REJECT a non-Flash resolved model without running it — never
+ *  using a Pro model id as a Flash override. */
+export function isFlashClassModel(name: string | null | undefined): boolean {
+  if (!name) return false
+  const n = name.toLowerCase()
+  return n.includes('flash') && !n.includes('pro')
+}
 
 export interface FlashFallbackInput {
   proFinalizedCount: number
