@@ -14,9 +14,9 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { POST as comparePOST } from '../../../app/api/content/automation/reco-qa/compare/route'
-import { assembleComparisonPayload } from '../recommendations/smart-run-report'
+import { assembleComparisonPayload, validateBlindIntegrity, suggestionFingerprint } from '../recommendations/smart-run-report'
 import { parseQaCostCapUsd, authorizeQaRunCost, maxAuthorizedCostFor } from '../recommendations/smart-run-harness'
-import { computeRescueAccounting, simulatePairedSelection, selectAttemptPair, isEligibleBatch, type BriefOutcome } from '../recommendations/smart-controller'
+import { computeRescueAccounting, simulatePairedSelection, type BriefOutcome } from '../recommendations/smart-controller'
 import type { SmartComparisonResult, SmartAttemptRecord } from '../recommendations/smart-run-harness'
 import type { TopicSuggestion } from '../recommendations/types'
 
@@ -140,6 +140,48 @@ async function main() {
     const pageSrc = read('../../../app/(dashboard)/reco-qa/page.tsx')
     check('C13. UI gates the confirm button on withinAuthorizedLimit (blocked message otherwise)', /withinAuthorizedLimit/.test(pageSrc) && /reco-qa-cost-blocked/.test(pageSrc) && /within \?/.test(pageSrc))
     check('C14. UI displays the enforced authorized limit, not just the estimate', /authorizedLimitUsd/.test(pageSrc) && /תקרת QA מאושרת/.test(pageSrc))
+  }
+
+  console.log('INTEG) blind export = finalized suggestions only, fail-closed')
+  {
+    // An attempt whose engine-accepted (8) is LARGER than finalized (3): the blind
+    // export must contain exactly the 3 finalized, never the 8 engine or any rejected.
+    const finalizedSugs = [0, 1, 2].map((k) => sug(`נבחר ${k}`, `ביטוי נבחר ${k}`, 'סיבה תקינה וברורה לנושא.'))
+    const flash = [0, 1, 2].map((i) => { const a = mkAttempt('flash', i, 'gemini-2.5-flash', finalizedSugs); return { ...a, engineAcceptedCount: 8, finalizedCount: 3 } })
+    const proEmpty = [0, 1, 2].map((i) => { const a = mkAttempt('pro', i, 'gemini-2.5-pro', []); return { ...a, engineAcceptedCount: 5, finalizedCount: 0, zeroResult: true } }) // engine had topics, finalized 0
+    const res: SmartComparisonResult = { ...mkResult(), flash, pro: proEmpty, targetCount: 8,
+      selectionSimulation: simulatePairedSelection(flash.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })), proEmpty.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount }))) }
+    const { response, blindReview, mapping } = assembleComparisonPayload(res, 'sha')
+    check('I1. finalized 3 → EXACTLY 3 blind suggestions (engine 8 never leaks in)', response.exportIntegrity.ok && blindReview!.batches.filter((b) => mapping[b.batchId].role === 'flash').every((b) => b.suggestions.length === 3))
+    check('I2. finalized 0 → EMPTY blind batch even though engine had topics', blindReview!.batches.filter((b) => mapping[b.batchId].role === 'pro').every((b) => b.suggestions.length === 0))
+    check('I3. every blind batch count === its attempt finalizedCount', blindReview!.batches.every((b) => b.suggestions.length === (mapping[b.batchId].finalizedCount ?? -1)))
+    check('I4. every exported suggestion is a member of that attempt finalSuggestions (fingerprint)', blindReview!.batches.every((b) => b.suggestions.every((s) => (mapping[b.batchId].finalizedFingerprints ?? []).includes(suggestionFingerprint(s.title, s.primaryKeyword)))))
+    check('I5. a Flash batch never carries a Pro attempt (mapping resolves role correctly)', blindReview!.batches.filter((b) => mapping[b.batchId].role === 'flash').every((b) => b.suggestions.every((s) => /נבחר/.test(s.title))))
+    check('I6. blind ⇄ mapping ids aligned; one batch per attempt (bijection)', Object.keys(mapping).length === 6 && new Set(blindReview!.batches.map((b) => b.batchId)).size === 6 && blindReview!.batches.every((b) => !!mapping[b.batchId]))
+    check('I7. mapping carries internal integrity fields (finalizedCount + fingerprints); blind file does NOT', mapping[blindReview!.batches[0].batchId].finalizedFingerprints !== undefined && !/finalizedFingerprints|finalizedCount|attemptId/.test(JSON.stringify(blindReview)))
+
+    // Direct fail-closed proofs on validateBlindIntegrity.
+    const attempts = [...res.flash, ...res.pro]
+    check('I8. tampered blind COUNT (extra suggestion) → integrity FAILS', (() => {
+      const bad = { batches: blindReview!.batches.map((b, i) => i === 0 ? { ...b, suggestions: [...b.suggestions, { title: 'זייף', primaryKeyword: 'זייף', secondaryKeywords: [], searchIntent: 'informational', recommendedPageType: 'article', suggestionReason: 'x', internalLinks: [] }] } : b), suggestionsPerBatch: [] }
+      return validateBlindIntegrity(bad, mapping, attempts).ok === false
+    })())
+    check('I9. tampered blind CONTENT (swapped suggestion) → integrity FAILS', (() => {
+      const flashBatch = blindReview!.batches.find((b) => mapping[b.batchId].role === 'flash')!
+      const bad = { batches: blindReview!.batches.map((b) => b.batchId === flashBatch.batchId ? { ...b, suggestions: b.suggestions.map((s, i) => i === 0 ? { ...s, title: 'תוכן זר', primaryKeyword: 'תוכן זר' } : s) } : b), suggestionsPerBatch: [] }
+      return validateBlindIntegrity(bad, mapping, attempts).ok === false
+    })())
+    check('I10. a count/identity mismatch BLOCKS the export (fail-closed): blindReview withheld', (() => {
+      const inconsistent = [0, 1, 2].map((i) => { const a = mkAttempt('flash', i, 'gemini-2.5-flash', finalizedSugs); return { ...a, finalizedCount: 7 } }) // 7 ≠ 3 finalizedSuggestions
+      const r2: SmartComparisonResult = { ...res, flash: inconsistent }
+      const out = assembleComparisonPayload(r2, 'sha')
+      return out.response.blindAvailable === false && out.blindReview === null && out.response.blindBlocked?.reason === 'export_integrity_violation' && out.response.exportIntegrity.ok === false
+    })())
+    check('I11. leakage scan STILL runs after integrity (both must pass)', (() => {
+      const dirty = assembleComparisonPayload(mkResult('הופק על ידי gemini-2.5-pro'), 'sha')
+      return dirty.response.blindAvailable === false && dirty.response.exportIntegrity.ok === true && dirty.response.blindBlocked?.reason === 'model_identity_leakage_detected'
+    })())
+    check('I12. a clean, consistent run passes integrity AND returns the blind file', response.blindAvailable === true && blindReview !== null)
   }
 
   console.log('MODELS) the route resolves AVAILABLE flash/pro ids (not raw constants)')

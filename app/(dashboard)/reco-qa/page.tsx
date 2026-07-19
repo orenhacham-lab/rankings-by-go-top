@@ -269,6 +269,7 @@ interface CompareResponse {
   budget?: { ok: boolean; path: string; requiredAuthorizationUsd: number }
   modelResolution?: { flashRequested: string; flashResolved: boolean; flashResolutionReason: string | null; proRequested: string; proTierUsed: string; proDowngraded: boolean; proDowngradeReason: string | null }
   blindAvailable?: boolean; blindBlocked?: { reason: string; hitCount: number } | null
+  exportIntegrity?: { ok: boolean; failures: { batchId: string; invariant: string; detail: string }[] }
   blindReview?: unknown; mapping?: unknown; persist?: boolean; persistedWrites?: number
   limits?: { serverMaxAttemptsPerModel: number; serverMaxTargetCount: number }
 }
@@ -414,7 +415,12 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" data-testid="reco-qa-download-mapping">
               הורדת מיפוי פנימי
             </button>
-            {!result.blindAvailable && <span className="text-xs text-red-600 self-center">קובץ הבדיקה נחסם: {result.blindBlocked?.reason} ({result.blindBlocked?.hitCount})</span>}
+            {!result.blindAvailable && <span className="text-xs text-red-600 self-center" data-testid="reco-qa-blind-blocked">קובץ הבדיקה נחסם: {result.blindBlocked?.reason} ({result.blindBlocked?.hitCount})</span>}
+            {result.exportIntegrity && (
+              <span className={`text-xs self-center ${result.exportIntegrity.ok ? 'text-emerald-600' : 'text-red-600'}`} data-testid="reco-qa-export-integrity">
+                תקינות ייצוא: {result.exportIntegrity.ok ? 'תקין (blind = finalized לכל אצווה)' : `נכשל — ${result.exportIntegrity.failures.map((f) => `${f.batchId}:${f.invariant}`).join(' · ')}`}
+              </span>
+            )}
           </div>
 
           {result.aggregate && (

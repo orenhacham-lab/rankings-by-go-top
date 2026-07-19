@@ -243,6 +243,36 @@ async function main() {
     srv.server.close()
   }
 
+  // ── Scenario H — end-to-end: raw > engine-accepted > finalized, blind == finalized ─
+  {
+    // The model emits, per batch: a SKIP (raw≠polished), an UNKNOWN-id item (dropped),
+    // and an intra-run DUPLICATE (engine-accepted, then finalize removes it). So
+    // raw > engine-accepted > finalized — and the blind export must equal ONLY finalized.
+    const srv = await startServer({
+      models: [FLASH, PRO],
+      respond: (briefs) => {
+        const out: unknown[] = briefs.map((b, i) => (i < 2)
+          ? { briefId: b.id, title: 'אותו נושא בדיוק לבדיקה', primaryKeyword: 'אותו ביטוי בדיוק לבדיקה', secondaryKeywords: [], intent: 'informational' } // dup pair
+          : { briefId: b.id, title: genTitle(b.subject, i), primaryKeyword: b.aligned_query ?? b.subject, secondaryKeywords: [], intent: 'informational' })
+        if (briefs[2]) out.push({ briefId: briefs[2].id, skip: true, why: 'raw skip' }) // duplicate id → dropped; raw includes it
+        out.push({ briefId: 'unknown_x9', title: 'זר', primaryKeyword: 'זר', intent: 'informational' }) // unknown id → dropped
+        return out
+      },
+    })
+    const { runSmartComparison } = await loadHarness(srv.port)
+    const { assembleComparisonPayload } = await import('../recommendations/smart-run-report')
+    const r = await runSmartComparison(trappingAdmin(richTables(), () => {}), { projectId: 'p1', targetCount: 8, qualityMode: 'standard' }, { flashModel: FLASH, proModel: PRO, budgetMaxima: budgetFits })
+    const { response, blindReview } = assembleComparisonPayload(r, 'sha')
+    const blindById: Record<string, number> = {}
+    for (const b of blindReview!.batches) blindById[b.batchId] = b.suggestions.length
+    console.log('SCENARIO H) end-to-end blind = finalized (raw > engine > finalized)')
+    check('H1. export integrity holds end-to-end', response.exportIntegrity.ok === true, JSON.stringify(response.exportIntegrity.failures))
+    check('H2. EVERY blind batch count === that attempt finalizedCount', response.attempts.every((a) => blindById[a.attemptId] === a.finalizedCount), JSON.stringify(response.attempts.map((a) => [a.attemptId, a.finalizedCount, blindById[a.attemptId]])))
+    check('H3. injected RAW noise (unknown-id "זר", skip, dup) never reaches the blind file', blindReview!.batches.every((b) => !b.suggestions.some((s) => s.title === 'זר') && b.suggestions.filter((s) => s.title === 'אותו נושא בדיוק לבדיקה').length <= 1))
+    check('H4. blind file count never exceeds finalized (no engine/raw/rejected topics leak in)', response.attempts.every((a) => blindById[a.attemptId] <= a.finalizedCount))
+    srv.server.close()
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }

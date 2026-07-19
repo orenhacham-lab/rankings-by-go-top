@@ -33,8 +33,13 @@ export interface ReviewSuggestion {
 export interface BlindBatch { batchId: string; suggestions: ReviewSuggestion[] }
 /** The reviewer-facing payload — contains NO model-identifying information anywhere. */
 export interface BlindReviewExport { batches: BlindBatch[]; suggestionsPerBatch: number[] }
-/** The SEPARATE un-blinding key (never merged into the export). */
-export type BlindReviewMapping = Record<string, { role: 'flash' | 'pro'; model: string | null; attemptIndex: number }>
+/** The SEPARATE un-blinding key (never merged into the export). May be enriched by the
+ *  report layer with internal integrity fields (attempt id, finalized count, per-
+ *  suggestion fingerprints) used to verify blind ⇄ finalized correspondence. */
+export type BlindReviewMapping = Record<string, {
+  role: 'flash' | 'pro'; model: string | null; attemptIndex: number
+  attemptId?: string; finalizedCount?: number; finalizedFingerprints?: string[]
+}>
 export interface BlindReviewBundle { export: BlindReviewExport; mapping: BlindReviewMapping }
 
 export interface AttemptForReview {
