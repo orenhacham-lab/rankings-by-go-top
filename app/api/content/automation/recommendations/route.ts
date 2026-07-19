@@ -16,11 +16,9 @@ import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
 import { insertPendingIdeas, loadPendingIdeas, ideaToSuggestion, normalizeText, markIdeasDuplicate, topicIdeaFingerprint } from '@/lib/content/recommendations/topic-idea-store'
-import { buildKeywordGuard, partitionPending, keywordSourcesOf, keywordOriginsOf, coveredByExistingContent, ownedByExistingEntity, type KeywordOriginEntry } from '@/lib/content/recommendations/keyword-guard'
-import { evaluateArticleWorthiness, type ExistingPageSignal, type SearchIntent } from '@/lib/content/recommendations/opportunity'
-import { salvageLongTailKeyword } from '@/lib/content/recommendations/keyword-salvage'
-import { dedupeIntraRunSemantic } from '@/lib/content/recommendations/intra-run-dedupe'
-import { ExistingCorpus } from '@/lib/content/recommendations/dedupe'
+import { buildKeywordGuard, partitionPending } from '@/lib/content/recommendations/keyword-guard'
+import type { ExistingPageSignal } from '@/lib/content/recommendations/opportunity'
+import { finalizeRecommendationAttempt } from '@/lib/content/recommendations/finalize-attempt'
 import { domainFlags } from '@/lib/content/recommendations/domain-flags'
 import { BillingExhaustedError, RecommendationModelUnavailableError } from '@/lib/content/recommendations/model'
 import { classifyRecoRun } from '@/lib/content/recommendations/run-classify'
@@ -197,162 +195,15 @@ export async function POST(request: Request) {
     // topic keyword, generated-article topic keyword, persisted-idea keyword, or a
     // RELIABLE WordPress/site-scan focus keyword) OR whose exact normalized title
     // already exists. No fuzzy / contains / token-overlap — long-tail stays allowed.
-    let filteredPrimaryKeywordExists = 0
-    let filteredTitleExists = 0
-    let filteredCoveredByContent = 0
-    // Part 5 — keyword-collision classification (bare keyword equality is no longer
-    // a permanent rejection; it is salvaged to a narrower long-tail when possible).
-    let exactTopicDuplicates = 0
-    let trueContentCoverage = 0
-    let exactExistingKeywordOwner = 0
-    // Opportunity-model deterministic layer (domain-neutral): an entity re-expressed
-    // with no independent need added is a source-only expansion, not an opportunity.
-    let sourceOnlyEntityExpansion = 0
-    let cannibalizationReviews = 0
-    // Existing indexed commercial-entity NAME signals (from the keyword guard's
-    // entityOwners: scan product/category/page + Shopify entities). Used by the
-    // article-worthiness gate for multi-signal cannibalization + expansion checks.
+    // Route-level deterministic FINALIZATION (Increment 2) — the exact guard /
+    // salvage / coverage / keyword-collision / intra-run-dedup post-processing,
+    // extracted VERBATIM into finalizeRecommendationAttempt and called ONCE here so
+    // behavior, rule order, suggestion order, rejection counts and funnel are
+    // unchanged. Nothing is persisted inside it.
     const existingPages: ExistingPageSignal[] = Array.from(guard.entityOwners).map((n) => ({ name: n, pageType: 'unknown' as const }))
-    let keywordCollisionCandidates = 0
-    let keywordCollisionSalvaged = 0
-    let keywordCollisionStillRejected = 0
-    const salvagedExamples: { title: string; from: string; to: string }[] = []
-    // A frozen-corpus semantic guard over OWNED keywords so a salvaged keyword can
-    // never bypass semantic dedupe (Part 4.3 / Part 8.7).
-    const ownedKeywordCorpus = new ExistingCorpus()
-    for (const k of guard.keywords) ownedKeywordCorpus.add(k)
-    const salvageChecks = {
-      isOwnedKeyword: (nk: string) => guard.keywords.has(nk),
-      isSemanticKeywordDup: (kw: string) => ownedKeywordCorpus.isDuplicate(kw),
-      // A salvaged long-tail must ALSO not collide with an existing content phrase
-      // OR the exact name of an existing indexed commercial entity (cannibalization).
-      isCoveredByContent: (title: string, kw: string) => coveredByExistingContent(guard, title, kw) || ownedByExistingEntity(guard, kw),
-    }
-    const filteredExamples: { title: string; primaryKeyword: string; reason: string; sources: string[] }[] = []
-    // Phase 3I.6 — PRODUCTION evidence for primary_keyword_exists rejections:
-    // for each blocked idea, the exact originating row(s) of the blocking
-    // keyword (source table, original keyword, row status, row title/URL) and
-    // the exact rule. Owner-only response data; capped; returned only on runs
-    // that added nothing new. This exists because zero-result runs were
-    // undiagnosable in production (debug is dev-only).
-    const primaryKeywordMatches: {
-      ideaTitle: string
-      ideaPrimaryKeyword: string
-      normalizedPrimaryKeyword: string
-      /** Site-scan ideas: the model's source context is embedded in the reason. */
-      ideaSourceContext: string
-      ideaSuggestedUrl: string | null
-      rule: 'exact_normalized_primary_keyword'
-      matches: KeywordOriginEntry[]
-    }[] = []
-    let fresh = result.suggestions.filter((s) => {
-      const nt = normalizeText(s.title)
-      let nk = normalizeText(s.primaryKeyword)
-      const pushEx = (reason: string) => { if (filteredExamples.length < 10) filteredExamples.push({ title: s.title, primaryKeyword: s.primaryKeyword, reason, sources: keywordSourcesOf(guard, s.primaryKeyword) }) }
-      // 1) EXACT_TOPIC_DUPLICATE — the same title already exists/pending. Permanent.
-      if (nt && guard.titles.has(nt)) { exactTopicDuplicates++; filteredTitleExists++; pushEx('title_exists'); return false }
-      // 1b) EXACT_EXISTING_KEYWORD_OWNER — the primary keyword EXACTLY equals the
-      //    name of an existing indexed commercial entity (product / category / page /
-      //    Shopify entity). That page already owns this exact query → a new article
-      //    on it is direct keyword+intent cannibalization. HARD permanent rejection
-      //    (never salvaged), regardless of the model's declared intent or a longer
-      //    article title. EXACT match only, so genuine long-tails are unaffected.
-      if (ownedByExistingEntity(guard, s.primaryKeyword)) { exactExistingKeywordOwner++; pushEx('exact_existing_keyword_owner'); return false }
-      // 1c) OPPORTUNITY GATE (deterministic, domain-neutral): reject a candidate that
-      //    only re-expresses existing entity names (every token belongs to an entity
-      //    or is a generic modifier) — a source-only expansion, not an independent
-      //    need. Ambiguous commercial-overlap cases are counted for REVIEW but not
-      //    dropped (the model/prompt handled the nuance). No cost/model calls.
-      if (existingPages.length > 0) {
-        const w = evaluateArticleWorthiness({
-          primaryKeyword: s.primaryKeyword, title: s.title, secondaryKeywords: s.secondaryKeywords,
-          intent: (s.searchIntent as SearchIntent) || 'informational', existingPages,
-          hasEvidence: true, businessRelevant: true, // scoring-only here; not hard gates in the route
-        })
-        if (!w.ok && (w.rejection_reason === 'source_only_entity_expansion' || w.rejection_reason === 'weak_entity_modifier')) {
-          sourceOnlyEntityExpansion++; pushEx(w.rejection_reason); return false
-        }
-        if (w.cannibalization.outcome === 'review') cannibalizationReviews++
-      }
-      // 2) TRUE_CONTENT_COVERAGE — an existing PUBLISHED page already satisfies this
-      //    query (same main phrase / owned content phrase). Permanent. Catches the
-      //    real cannibalization cases (e.g. re-titled duplicate of an existing article).
-      if (coveredByExistingContent(guard, s.title, s.primaryKeyword)) { trueContentCoverage++; filteredCoveredByContent++; pushEx('covered_by_existing_content'); return false }
-      // 2b) The exact keyword is already owned by PUBLISHED content (a project /
-      //    topic / tracked / scan focus keyword — NOT a mere pending idea). A second
-      //    article on a keyword the site already targets cannibalizes it → true
-      //    coverage, permanent. (Pending-idea ownership falls through to salvage.)
-      if (nk && guard.contentKeywords.has(nk)) { trueContentCoverage++; filteredCoveredByContent++; pushEx('content_keyword_owned'); return false }
-      // 3) KEYWORD_COLLISION — the primaryKeyword is owned ONLY by another pending
-      //    idea (often a BROAD category keyword). This is NOT topic ownership: salvage
-      //    a narrower long-tail primary keyword from the candidate's own data and
-      //    re-validate. Only when salvage fails is the candidate rejected.
-      if (nk && guard.keywords.has(nk)) {
-        keywordCollisionCandidates++
-        const salv = salvageLongTailKeyword(
-          { title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords },
-          salvageChecks,
-        )
-        if (salv.ok && salv.keyword) {
-          keywordCollisionSalvaged++
-          if (salvagedExamples.length < 10) salvagedExamples.push({ title: s.title, from: s.primaryKeyword, to: salv.keyword })
-          s.primaryKeyword = salv.keyword // reassign; title/angle/intent/reason preserved
-          nk = normalizeText(salv.keyword)
-        } else {
-          keywordCollisionStillRejected++
-          filteredPrimaryKeywordExists++
-          pushEx('primary_keyword_exists')
-          if (primaryKeywordMatches.length < 20) {
-            const origins = keywordOriginsOf(guard, s.primaryKeyword)
-            primaryKeywordMatches.push({
-              ideaTitle: s.title,
-              ideaPrimaryKeyword: s.primaryKeyword,
-              normalizedPrimaryKeyword: normalizeText(s.primaryKeyword),
-              ideaSourceContext: s.suggestionReason || '',
-              ideaSuggestedUrl: s.suggestedInternalLinks[0]?.url ?? null,
-              rule: 'exact_normalized_primary_keyword',
-              matches: origins.length ? origins : [{ source: 'idea_keyword', original: s.primaryKeyword, status: 'intra_batch_earlier_idea', detail: '' }],
-            })
-          }
-          return false
-        }
-      }
-      if (nk) { guard.keywords.add(nk); ownedKeywordCorpus.add(nk) } // avoid intra-batch dupes
-      if (nt) guard.titles.add(nt)
-      // Phase 3H.1 — NO intra-batch PHRASE dedupe: many legitimate ideas for one
-      // seed share the "<core phrase>: <angle>" title pattern; adding the first
-      // idea's main phrase to contentPhrases killed every sibling in the batch
-      // (part of the systemic zero-results bug). Exact keyword/title dedupe above
-      // still prevents true intra-batch duplicates.
-      return true
-    })
-
-    // FINAL intra-run semantic dedupe (after keyword salvage, before persistence):
-    // collapse same-topic candidates from THIS run — incl. cross-source pairs whose
-    // primary keywords were changed/salvaged — to one deterministic winner, merging
-    // safe metadata. Distinct subtopics (different intent/location/lifecycle) are
-    // preserved. No model call, no filler.
-    const intraRun = dedupeIntraRunSemantic(fresh)
-    fresh = intraRun.survivors
-
-    // Part 5 — rejection classification (only exactTopicDuplicates + trueContentCoverage
-    // are PERMANENT). Surfaced in Preview diagnostics so a run is never opaque.
-    const rejectionClassification = {
-      exactTopicDuplicates,
-      trueContentCoverage,
-      exactExistingKeywordOwner,
-      sourceOnlyEntityExpansion,
-      cannibalizationReviews,
-      keywordCollisionCandidates,
-      keywordCollisionSalvaged,
-      keywordCollisionStillRejected,
-      salvagedExamples,
-      // Part D — intra-run semantic collision outcome.
-      intraRunSemanticCollisions: intraRun.collisions.length,
-      intraRunCandidatesRemoved: intraRun.removed,
-      intraRunCandidatesMerged: intraRun.merged,
-      intraRunCollisions: intraRun.collisions.slice(0, 10),
-    }
+    const finalized = finalizeRecommendationAttempt({ guard, existingPages }, result.suggestions)
+    const fresh = finalized.finalSuggestions
+    const { filteredPrimaryKeywordExists, filteredTitleExists, filteredCoveredByContent, exactExistingKeywordOwner, sourceOnlyEntityExpansion, filteredExamples, primaryKeywordMatches, intraRun, rejectionClassification } = finalized
 
     // E — one truthful stage contract. raw = model output BEFORE gates; engine-accepted
     // = engine output; the engine's removal count is ALWAYS surfaced (customer funnel)

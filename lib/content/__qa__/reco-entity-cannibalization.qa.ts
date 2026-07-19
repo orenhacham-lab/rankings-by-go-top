@@ -113,9 +113,12 @@ async function main() {
     check('G. prompt states existing pages own their exact keyword', /EXISTING PAGE OWNERSHIP:/.test(guide) && /NEVER set a new article's primaryKeyword to the exact name/.test(guide))
     check('G. prompt says entity names are link targets/context, not article keywords', /LINK TARGETS and business context, not article keywords/.test(guide))
     check('16. prompt guidance stays domain-neutral (no flower flags)', (() => { const f = domainFlags(guide); return !f.perfume && !f.lighting && !f.pet && !f.freelancer })())
-    // 14. typed observable reason present in the route.
+    // 14. typed observable reason present in the finalization the route calls
+    // (Increment 2: the post-processing moved VERBATIM into finalize-attempt.ts,
+    // which the route invokes via finalizeRecommendationAttempt).
     const routeSrc = require('fs').readFileSync(require('path').join(__dirname, '../../../app/api/content/automation/recommendations/route.ts'), 'utf8')
-    check('14. typed reason exact_existing_keyword_owner + counter surfaced', /pushEx\('exact_existing_keyword_owner'\)/.test(routeSrc) && /exactExistingKeywordOwner/.test(routeSrc))
+    const finalizeSrc = require('fs').readFileSync(require('path').join(__dirname, '../recommendations/finalize-attempt.ts'), 'utf8')
+    check('14. typed reason exact_existing_keyword_owner + counter surfaced (in finalization the route calls)', /pushEx\('exact_existing_keyword_owner'\)/.test(finalizeSrc) && /exactExistingKeywordOwner/.test(finalizeSrc) && /finalizeRecommendationAttempt/.test(routeSrc))
     check('17. cost controls unchanged (Flash-only, 4 calls, $0.15)', (() => { const b = runBudget('standard', 15); return b.maxModelCallsPerRun === 4 && b.maxEstimatedCostUsd === 0.15 })())
     // 11/12. internal-link dedupe: money target excluded from supporting + no dup URLs.
     const engineSrc = require('fs').readFileSync(require('path').join(__dirname, '../recommendations/engine.ts'), 'utf8')

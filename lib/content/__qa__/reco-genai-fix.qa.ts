@@ -81,7 +81,7 @@ async function main() {
     // would surface as CALLS_FAILED (reason model_error), never dedupe.
     check('MAX_TOKENS-empty run → CALLS_FAILED (not dedupe)', classifyRecoRun({ totalCalls: 1, rawCandidates: 0, freshPersisted: 0, reason: 'model_error' }) === 'CALLS_FAILED')
     check('healthy generation → PRODUCED_NEW', classifyRecoRun({ totalCalls: 2, rawCandidates: 18, freshPersisted: 7 }) === 'PRODUCED_NEW')
-    check('15. dedupe/pending protections still run in the route (unchanged path)', /coveredByExistingContent/.test(read('../../../app/api/content/automation/recommendations/route.ts')))
+    check('15. dedupe/pending protections still run in the route (via finalizeRecommendationAttempt)', /coveredByExistingContent/.test(read('../recommendations/finalize-attempt.ts')) && /finalizeRecommendationAttempt/.test(read('../../../app/api/content/automation/recommendations/route.ts')))
   }
 
   console.log('F) model availability — the exact live 404 is handled, not shown as 0-new')
