@@ -19,9 +19,10 @@ export type FallbackReason =
   | 'no_evidence'                   // empty pool after successful preparation
   | 'genuine_exhaustion'            // no unique rescue briefIds (structural-only / nothing to rescue)
   | 'fallback_budget_blocked'       // budget does not authorize the fallback call
-  | 'flash_provider_failure_rescue' // Pro provider-failed with rescue → Flash runs
-  | 'flash_synthesis_failure_rescue'// Pro synthesis-failed with rescue → Flash runs
-  | 'flash_zero_marginal_yield_rescue' // Pro produced 0 usable with rescue → Flash runs
+  // The FAILURE that triggers a fallback is a PRO failure — named after the Pro cause.
+  | 'pro_provider_failure_rescue'   // Pro provider-failed with rescue → Flash runs
+  | 'pro_synthesis_failure_rescue'  // Pro synthesis-failed with rescue → Flash runs
+  | 'pro_zero_marginal_yield_rescue'// Pro produced 0 usable with rescue → Flash runs
 
 export interface FlashFallbackInput {
   proFinalizedCount: number
@@ -49,9 +50,9 @@ export function evaluateFlashFallback(i: FlashFallbackInput): FlashFallbackDecis
   // genuine exhaustion ⟺ empty unique-rescue set (structural-only rejections included).
   if (i.rescueUniqueBriefIdCount <= 0) return { runFlash: false, reason: 'genuine_exhaustion' }
   if (!i.budgetAuthorizesFallback) return { runFlash: false, reason: 'fallback_budget_blocked' }
-  if (i.proProviderFailed) return { runFlash: true, reason: 'flash_provider_failure_rescue' }
-  if (i.proSynthesisFailed) return { runFlash: true, reason: 'flash_synthesis_failure_rescue' }
-  return { runFlash: true, reason: 'flash_zero_marginal_yield_rescue' }
+  if (i.proProviderFailed) return { runFlash: true, reason: 'pro_provider_failure_rescue' }
+  if (i.proSynthesisFailed) return { runFlash: true, reason: 'pro_synthesis_failure_rescue' }
+  return { runFlash: true, reason: 'pro_zero_marginal_yield_rescue' }
 }
 
 export type ProductionSelected = 'pro' | 'flash' | 'none'

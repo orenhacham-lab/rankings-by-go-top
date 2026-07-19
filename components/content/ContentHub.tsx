@@ -65,7 +65,7 @@ const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | '
   failed: 'danger',
 }
 
-export default function ContentHub() {
+export default function ContentHub({ proFirst = false }: { proFirst?: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get('projectId') || ''
@@ -829,6 +829,7 @@ export default function ContentHub() {
               {process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' && (
                 <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
                   <AutomationIdeas
+                    proFirst={proFirst}
                     projectId={projectId}
                     language={language}
                     onCreated={loadTopics}

@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled, isProFirstControllerEna
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
-import { runProFirstProduction, type ProductionProvenance } from '@/lib/content/recommendations/production-run'
+import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
@@ -137,6 +137,7 @@ export async function POST(request: Request) {
     // the normal recommendation flow: one snapshot, real Pro once, Flash only as a
     // strictly-gated single fallback. The old UI tier field is IGNORED (no Flash-first).
     let proFirstProvenance: ProductionProvenance | null = null
+    let proFirstResult: ProFirstProductionResult | null = null
     const useProFirst = isProFirstControllerEnabled()
     const useLegacy = !useProFirst && process.env.RECO_LEGACY_PATH === '1'
     // Phase 4 — the DEFAULT is the EVIDENCE-FIRST brief engine (deterministic
@@ -154,10 +155,11 @@ export async function POST(request: Request) {
       // usual, so only the selected finalized batch is stored.
       const controller = newRunCostController('premium', generationRunId, 12)
       const prod = await runProFirstProduction(auth.admin, { projectId: auth.project.id, targetCount: 12, userId: auth.user.id }, controller)
+      proFirstResult = prod
       proFirstProvenance = prod.provenance
       briefDiagnostics = prod.briefDiagnostics
       fallbackReason = prod.provenance.fallbackReason
-      result = { suggestions: prod.selectedEngineSuggestions, meta: { source, generated: prod.rawGenerated, skippedDuplicates: 0, finalCount: prod.selectedEngineSuggestions.length, attempts: prod.briefDiagnostics.rounds.length, reason: prod.selectedModel === 'none' ? (prod.emptyReason ?? 'no_safe_opportunities') : undefined, runtimeDiag: diagnostics ? { totalCalls: controller.summary().totalCalls, rawCandidates: prod.rawGenerated, path: 'pro_first_production', selectedModel: prod.selectedModel, flashRan: prod.provenance.flashRan } : undefined } }
+      result = { suggestions: prod.selectedEngineSuggestions, meta: { source, generated: prod.rawGenerated, skippedDuplicates: 0, finalCount: prod.selectedEngineSuggestions.length, attempts: prod.briefDiagnostics.rounds.length, reason: prod.selectedModel === 'none' ? (prod.emptyReason ?? 'no_safe_opportunities') : undefined, runtimeDiag: diagnostics ? { totalCalls: controller.summary().totalCalls, rawCandidates: prod.rawGenerated, path: 'pro_first_production', selectedModel: prod.selectedModel, flashAttempted: prod.provenance.flashAttempted } : undefined } }
     } else if (useLegacy) {
       // EXPLICIT operational rollback ONLY.
       generationPath = 'legacy_explicit'; legacyUsed = true; fallbackReason = 'explicit_legacy_mode'
@@ -219,7 +221,11 @@ export async function POST(request: Request) {
     // behavior, rule order, suggestion order, rejection counts and funnel are
     // unchanged. Nothing is persisted inside it.
     const existingPages: ExistingPageSignal[] = Array.from(guard.entityOwners).map((n) => ({ name: n, pageType: 'unknown' as const }))
-    const finalized = finalizeRecommendationAttempt({ guard, existingPages }, result.suggestions)
+    // Stage D — the Pro-first controller ALREADY finalized the selected attempt exactly
+    // once; reuse that result (fresh / funnel / rejection counts / persistence) so the
+    // persisted array is precisely selectedFinalization.finalSuggestions, in order. When
+    // the flag is off, the route finalizes here exactly as before.
+    const finalized = proFirstResult ? proFirstResult.selectedFinalization : finalizeRecommendationAttempt({ guard, existingPages }, result.suggestions)
     const fresh = finalized.finalSuggestions
     const { filteredPrimaryKeywordExists, filteredTitleExists, filteredCoveredByContent, exactExistingKeywordOwner, sourceOnlyEntityExpansion, filteredExamples, primaryKeywordMatches, intraRun, rejectionClassification } = finalized
 
@@ -249,6 +255,8 @@ export async function POST(request: Request) {
       return Response.json({ suggestions: [], ok: false, error: 'persistence_failed', reason: 'persistence_failed', message: 'שמירת הרעיונות נכשלה זמנית. יש לנסות שוב בעוד רגע.', meta: { source, reason: 'persistence_failed', persisted: false, newlyAddedCount: 0, ...(diagnostics ? { isolationDebug: { gitSha, vercelEnv, generationRunId, persistence_attempted: persistOutcome.attempted, persistence_inserted: 0, persistence_failed: persistOutcome.failed, persistence_failure: persistOutcome.failure ?? null } } : {}) } }, { status: 500 })
     }
 
+    // Stage D — record the REAL persisted-writes count into the production provenance.
+    if (proFirstProvenance) proFirstProvenance.persistedWrites = persistOutcome ? persistOutcome.inserted : fresh.length
     const freshFingerprints = fresh.map((s) => topicIdeaFingerprint(s.primaryKeyword, s.title))
     const persistenceTrace = diagnostics ? {
       persistence_attempted_ids: fresh.map((s) => s.id),
@@ -257,7 +265,9 @@ export async function POST(request: Request) {
       persistence_duplicate: persistOutcome?.duplicate ?? 0,
       persistence_failed: persistOutcome?.failed ?? 0,
       persistence_failure: persistOutcome?.failure ?? null,
-      pipeline: { raw_generated_count: rawGeneratedCount, engine_accepted_count: engineAcceptedCount, engine_rejected_by_reason: engineRejectedByReason, engine_shadow_rejected_by_reason: briefDiagnostics?.shadow_rejected_by_reason ?? opportunityDiagnostics?.shadow_rejected_by_reason ?? {}, model_path: briefDiagnostics?.modelPath ?? null, route_fresh_count: fresh.length, route_rejected_by_reason: routeRejectedByReason(), persistence_attempted_count: persistOutcome?.attempted ?? fresh.length, persistence_inserted_count: persistOutcome?.inserted ?? 0, persistence_duplicate_count: persistOutcome?.duplicate ?? 0, persistence_failed_count: persistOutcome?.failed ?? 0 },
+      // Stage D — when a Flash override created the batch the model path is FLASH,
+      // never the snapshot's (Pro) modelPath.
+      pipeline: { raw_generated_count: rawGeneratedCount, engine_accepted_count: engineAcceptedCount, engine_rejected_by_reason: engineRejectedByReason, engine_shadow_rejected_by_reason: briefDiagnostics?.shadow_rejected_by_reason ?? opportunityDiagnostics?.shadow_rejected_by_reason ?? {}, model_path: proFirstResult ? proFirstResult.selectedModelPath : (briefDiagnostics?.modelPath ?? null), route_fresh_count: fresh.length, route_rejected_by_reason: routeRejectedByReason(), persistence_attempted_count: persistOutcome?.attempted ?? fresh.length, persistence_inserted_count: persistOutcome?.inserted ?? 0, persistence_duplicate_count: persistOutcome?.duplicate ?? 0, persistence_failed_count: persistOutcome?.failed ?? 0 },
       contentPlan: contentPlanDiag ?? null,
     } : undefined
 
@@ -290,7 +300,7 @@ export async function POST(request: Request) {
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, ...(persistenceTrace ?? {}) } : undefined,
+        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null, ...(persistenceTrace ?? {}) } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
 
@@ -364,6 +374,9 @@ export async function POST(request: Request) {
       // worthiness → link-roles). Full safe funnel so live validation needs no DB.
       opportunityDiagnostics: opportunityDiagnostics ?? null,
       briefDiagnostics: briefDiagnostics ?? null,
+      // Stage D — the FULL Pro-first production provenance (Preview-only; never shown to
+      // the normal user). Flash fallback is never recorded as Pro.
+      productionProvenance: proFirstProvenance ?? null,
       // Idempotency (J) — this run actually executed generation (not a replay).
       inFlightHit: false,
       recentReplayHit: false,

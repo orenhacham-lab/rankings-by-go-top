@@ -65,7 +65,9 @@ async function main() {
     check('A. the tiered generator is reachable ONLY behind RECO_TIERED_OPPORTUNITIES', /RECO_TIERED_OPPORTUNITIES === '1'/.test(route) && route.split('else if (useTiered)')[1]?.split('} else ')[0]?.includes('generateOpportunities') === true)
     check('A. generateContentPlan is only reached inside the flag branch (not the default)', route.split('else if (useContentPlan)')[1]?.includes('generateContentPlan') && !route.split('} else {').pop()!.includes('generateContentPlan'))
     check('A/D10. premium is ACCEPTED (no 400) and threaded into the engine', !/premium_not_available/.test(route) && /qualityMode: 'standard' \| 'premium'/.test(route) && /qualityMode, userId: auth\.user\.id \}, controller\)|targetCount: 12, qualityMode, userId/.test(route))
-    check('A/D10. the model path is surfaced in Preview diagnostics', /model_path: briefDiagnostics\?\.modelPath/.test(route) && /briefDiagnostics: briefDiagnostics \?\? null/.test(route))
+    // Stage D (additive): non Pro-first still surfaces briefDiagnostics.modelPath; the
+    // Pro-first path surfaces the SELECTED attempt's model path instead.
+    check('A/D10. the model path is surfaced in Preview diagnostics', /model_path: proFirstResult \? proFirstResult\.selectedModelPath : \(briefDiagnostics\?\.modelPath/.test(route) && /briefDiagnostics: briefDiagnostics \?\? null/.test(route))
   }
 
   console.log('B) unsafe brand + relevance gates are diagnostics-only (source)')
@@ -140,7 +142,7 @@ async function main() {
     // EXPLICITLY; when the global Pro-first controller is active the client omits the
     // tier field (the server always runs Pro-first and ignores any legacy tier).
     check('G. body sends qualityMode EXPLICITLY on every request when NOT Pro-first (no requestedCount)', !/requestedCount: PLAN_MODES/.test(ui) && /projectId: requestProjectId, source, keyword: keyword\.trim\(\), clientRequestId, \.\.\.\(PRO_FIRST \? \{\} : \{ qualityMode \}\)/.test(ui))
-    check('G2. Pro-first omits the tier field (no client-forced Flash-first)', /const PRO_FIRST = process\.env\.NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER === 'true'/.test(ui))
+    check('G2. Pro-first flag is the server-derived prop (single authoritative source)', /const PRO_FIRST = proFirst/.test(ui))
     check('G/D10. operator quality selector exists (flag-gated) with truthful model labels', /NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'/.test(ui) && /reco-quality-mode/.test(ui) && /qualityPro/.test(ui) && /qualityDowngraded/.test(ui))
   }
 

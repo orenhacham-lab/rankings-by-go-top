@@ -64,6 +64,7 @@ interface Suggestion {
 }
 
 export default function AutomationIdeas({
+  proFirst = false,
   projectId,
   language,
   onCreated,
@@ -102,6 +103,9 @@ export default function AutomationIdeas({
   // Phase 3H — "go to queue" button in the success box (scrolls the hub to the
   // publishing-schedule section). Only the button navigates — no auto-scroll.
   onGoToQueue?: () => void
+  /** Stage D — server-derived (RECO_PRO_FIRST_CONTROLLER via isProFirstControllerEnabled).
+   *  The SINGLE authoritative flag; when true the selector is hidden and no tier is sent. */
+  proFirst?: boolean
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
@@ -131,9 +135,11 @@ export default function AutomationIdeas({
   // QUALITY_SELECTOR_ENABLED now gates ONLY the operator model-path telemetry line;
   // the model selector itself is a production customer-facing control.
   const QUALITY_SELECTOR_ENABLED = process.env.NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'
-  // Stage D (client mirror of the server RECO_PRO_FIRST_CONTROLLER flag): hide the
-  // Flash/Pro selector + all model/tier/fallback wording; one button only.
-  const PRO_FIRST = process.env.NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER === 'true'
+  // Stage D — the SINGLE authoritative flag comes from the SERVER (the `proFirst` prop,
+  // derived from RECO_PRO_FIRST_CONTROLLER via isProFirstControllerEnabled), never from a
+  // separate NEXT_PUBLIC var that could drift out of sync with the route. When true: the
+  // Flash/Pro selector + all model/tier/fallback wording are hidden and no tier is sent.
+  const PRO_FIRST = proFirst
   const [qualityMode, setQualityMode] = useState<'standard' | 'premium'>(() => {
     // Default to מהיר (standard). Remember the customer's explicit choice locally.
     if (typeof window === 'undefined') return 'standard'
