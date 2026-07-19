@@ -19,6 +19,18 @@
  *     small pool is a truthful insufficient_inventory — never filler;
  *   - EXACT accounting per round: briefs_sent = polished + skipped + missing;
  *     polished = accepted + repaired-then-accepted + rejected(by typed reason).
+ *
+ * Increment 3 (smart-controller prep, behavior-preserving) splits the run into two
+ * phases WITHOUT changing the semantic execution order:
+ *   - prepareBriefRun  → evidence inventory → deterministic pool → the SINGLE
+ *     constrained-discovery call, in that exact order, returning an immutable
+ *     BriefRunSnapshot. Discovery still runs immediately after pool construction,
+ *     under the same deficit condition, using the same controller.
+ *   - synthesizeFromSnapshot → rebuilds per-attempt state, runs the adaptive
+ *     synthesis rounds, assembles diagnostics. It never mutates the snapshot, so a
+ *     Flash attempt and a Pro attempt can synthesize from the identical pool/order.
+ *   - generateFromBriefs → the unchanged public entry: prepare then synthesize with
+ *     the same controller (behavior-identical to the pre-split single function).
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -38,7 +50,7 @@ import { generateRecommendationJSON } from './model'
 import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
 import { slugKey } from './dedupe'
-import { normalizeText, topicIdeaFingerprint } from './topic-idea-store'
+import { normalizeText } from './topic-idea-store'
 import { buildBriefPool, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
 import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, briefSynthesisResponseSchema, classifySynthesisFailure, type PolishedTopic, type SynthesisFailureType, type SynthesisResponseDiagnostics } from './brief-synthesis'
 import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
@@ -179,11 +191,24 @@ function dedupeCoverageDocs(docs: ExistingCoverageDoc[]): ExistingCoverageDoc[] 
   return out
 }
 
-export async function generateFromBriefs(
+export type BriefRunInput = { projectId: string; targetCount: number; qualityMode?: ModelTier; userId?: string }
+
+/**
+ * Phase 1 (prepare) — evidence inventory → deterministic brief pool → the SINGLE
+ * constrained-discovery call, in exactly that order. This is pure code motion out of
+ * the pre-split generateFromBriefs: discovery still runs immediately after pool
+ * construction, under the same `workingPool.length < targetCount && modelPath.model`
+ * condition, accounting through the same controller, pushing into the same
+ * workingPool. The per-attempt validation closures (which never executed during
+ * preparation — they were only DEFINED here) moved into synthesizeFromSnapshot.
+ *
+ * Returns an immutable snapshot; synthesizeFromSnapshot never mutates it.
+ */
+export async function prepareBriefRun(
   admin: Admin,
-  input: { projectId: string; targetCount: number; qualityMode?: ModelTier; userId?: string },
+  input: BriefRunInput,
   controller: RunCostController,
-): Promise<{ suggestions: TopicSuggestion[]; diagnostics: BriefRunDiagnostics }> {
+) {
   const loadErrors: string[] = []
 
   // ── 1) Evidence inventory (project-scoped; failures RECORDED, never silent) ──
@@ -362,9 +387,6 @@ export async function generateFromBriefs(
     ...Array.from(guard.entityOwners).map((k) => ({ title: k, type: null, sourceKey: `entity:${normalizeText(k)}` })),
   ])
 
-  const shadow_rejected_by_reason: Record<string, number> = {}
-  const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
-
   // ── 3) Deterministic brief pool (pre-AI validation inside) ──────────────────
   // Brief subjects must come from REAL evidence: category-derived focus areas
   // qualify, but the name+domain fallback label (used only when a project has no
@@ -391,6 +413,155 @@ export async function generateFromBriefs(
 
   const ctx: ProjectContext = { projectName: p.business_name, domain: p.target_domain, language, primaryProjectFocus: focus.primaryProjectFocus, secondaryProjectAreas: focus.secondaryProjectAreas, ownedCategories: entities.map((e) => e.name).slice(0, 15), existingTopics: publishedCoverage.slice(0, 15) }
   const year = new Date().getFullYear()
+
+  // Deterministic evidence-inventory diagnostics — fully determined by preparation
+  // (no synthesis input), so it is computed ONCE here and reused verbatim by every
+  // attempt's diagnostics.
+  const evidenceInventory: BriefRunDiagnostics['evidence_inventory'] = {
+    project_focus_terms: projectFocus.length,
+    tracked_keywords: tracked.length,
+    keyword_research_cache_rows: krCacheRows,
+    keyword_research_queries: keywordResearch.length,
+    search_volume_values: searchVolumeValues,
+    site_scan_entities: siteScanEntities,
+    shopify_entities: shopifyEntities,
+    existing_informational_coverage: publishedCoverage.length,
+    pending_topics: pendingCount,
+    generated_articles: generatedArticles,
+    competitor_queries_filtered: competitorQueriesFiltered,
+    evidence_load_errors: loadErrors,
+    ineligible_pages_excluded: ineligiblePageTitles.length,
+    stale_index_excluded: staleIndexExcluded,
+    kr_rows_loaded: krIngestion.rows_loaded,
+    kr_rows_parsed: krIngestion.rows_parsed,
+    kr_rows_skipped: krIngestion.rows_skipped,
+    kr_items_skipped: krIngestion.items_skipped,
+    kr_skipped_example_keys: krIngestion.skipped_example_keys,
+    kr_live_fetched: krLiveFetched,
+  }
+
+  // ── 4b) CONSTRAINED DISCOVERY (RC3) — ONE batched call, only for a deficit ──
+  // Runs at the EXACT pre-split point: right after pool construction, gated on the
+  // same deficit condition, accounted through the same controller, augmenting the
+  // same workingPool. (Only the per-attempt closures that used to sit textually
+  // above this block — and never executed during preparation — moved to synthesis.)
+  let discovery: BriefRunDiagnostics['discovery'] = null
+  const workingPool = [...pool]
+  if (workingPool.length < input.targetCount && modelPath.model) {
+    const deficit = input.targetCount - workingPool.length
+    // Owned anchors: category/service/product names + real focus areas (exact strings).
+    const anchorList = Array.from(new Set([
+      ...entities.filter((e) => ['category', 'service', 'product'].includes(e.type ?? '')).map((e) => e.name),
+      ...(entities.length > 0 ? projectFocus : []),
+      ...tracked,
+    ].map((a) => a.trim()).filter(Boolean))).slice(0, 30)
+    if (anchorList.length > 0) {
+      const dPrompt = buildDiscoveryPrompt({ language, ctx, year, deficit, anchors: anchorList, publishedTitles: publishedCoverage, pendingTitles: Array.from(pendingExactKeys).slice(0, 25) })
+      const dRes = await generateRecommendationJSON(
+        dPrompt,
+        { temperature: 0.6, maxOutputTokens: Math.max(1024, deficit * 120 + 600), ...(modelPath.model ? { model: modelPath.model } : {}), responseSchema: discoveryResponseSchema(anchorList) },
+        controller,
+        { source: 'brief_discovery', callPurpose: 'discovery', requestedIdeaCount: deficit },
+      )
+      if (modelConfigHolder.value === null && dRes.modelConfig) modelConfigHolder.value = { model: dRes.modelConfig.model, thinkingMode: dRes.modelConfig.thinkingMode, thinkingBudget: dRes.modelConfig.thinkingBudget, maxOutputTokens: dRes.modelConfig.maxOutputTokens }
+      if (!dRes.ok) {
+        discovery = { ran: true, deficit, provider_ok: false, parse_failed: false, emitted: 0, invalid_items: 0, unknown_anchors: [], accepted: 0, rejected_by_reason: {}, rejected_examples: [], candidates: [] }
+      } else {
+        const dRec = reconcileDiscovery(dRes.text, anchorList)
+        const dVal = validateDiscoveredCandidates(dRec.candidates, {
+          anchors: new Set(anchorList),
+          attributeTokens,
+          brandSafety,
+          isOwnedByEntity: (phrase) => ownedByExistingEntity(guard, phrase),
+          isCoveredByContent: (title, keyword) => coveredByExistingContent(guard, title, keyword),
+          pendingExactKeys,
+          pendingSignatures,
+          existingPoolSignatures: workingPool.map((b) => topicSignature(b.subject, b.intendedIntent)),
+          keywordResearch,
+          relatedEntitiesFor: (subject) => {
+            const subToks = new Set(contentTokens(subject))
+            return entities.filter((e) => contentTokens(e.name).some((t) => subToks.has(t))).map((e) => ({ name: e.name, url: e.url ?? null, type: e.type }))
+          },
+        })
+        workingPool.push(...dVal.accepted.slice(0, deficit))
+        discovery = {
+          ran: true, deficit, provider_ok: true, parse_failed: dRec.parseFailed, emitted: dRec.emitted,
+          invalid_items: dRec.invalidItems, unknown_anchors: dRec.unknownAnchors,
+          accepted: Math.min(dVal.accepted.length, deficit), rejected_by_reason: dVal.rejected_by_reason,
+          rejected_examples: dVal.rejected_examples,
+          candidates: dRec.candidates.map((c) => ({ subject: c.subject.slice(0, 100), anchor: c.anchor.slice(0, 60) })),
+        }
+      }
+    }
+  }
+
+  return {
+    input,
+    language,
+    langLabel,
+    guard,
+    existingPages,
+    coveredKeys,
+    entities,
+    linkCandidates,
+    urlTypeMap,
+    entityByTitle,
+    corpusTypeWords,
+    domainTypeWords,
+    commercialEntityTokens,
+    businessEvidenceTokens,
+    evidenceProvenance,
+    existingPageTitles,
+    existingCoverageDocs,
+    pendingExactKeys,
+    pendingSignatures,
+    brandSafety,
+    keywordResearch,
+    ctx,
+    year,
+    modelPath,
+    /** modelConfig captured by the discovery call (null when discovery did not run
+     *  or did not report a config); the first synthesis round fills it if still null. */
+    modelConfig: modelConfigHolder.value,
+    pool,
+    workingPool,
+    briefPool,
+    discovery,
+    evidenceInventory,
+  }
+}
+
+/** Immutable snapshot of everything a synthesis attempt needs — built ONCE by
+ *  prepareBriefRun (including the single constrained-discovery call). A Flash attempt
+ *  and a Pro attempt synthesize from the identical snapshot; synthesizeFromSnapshot
+ *  never mutates it (per-attempt state is rebuilt fresh each call). */
+export type BriefRunSnapshot = Awaited<ReturnType<typeof prepareBriefRun>>
+
+/**
+ * Phase 2 (synthesize) — rebuilds per-attempt validation state, runs the adaptive
+ * synthesis rounds against the snapshot's frozen workingPool, and assembles
+ * diagnostics. This is the exact post-pool logic of the pre-split function (the
+ * validation closures, the round loop, the reconciliation, the diagnostics return),
+ * unchanged. It reads the snapshot but never writes it.
+ */
+export async function synthesizeFromSnapshot(
+  snapshot: BriefRunSnapshot,
+  controller: RunCostController,
+): Promise<{ suggestions: TopicSuggestion[]; diagnostics: BriefRunDiagnostics }> {
+  const {
+    input, language, langLabel, guard, existingPages, coveredKeys, entities,
+    linkCandidates, urlTypeMap, entityByTitle, corpusTypeWords, domainTypeWords,
+    commercialEntityTokens, businessEvidenceTokens, evidenceProvenance,
+    existingPageTitles, existingCoverageDocs, pendingExactKeys, pendingSignatures,
+    brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
+    discovery, evidenceInventory,
+  } = snapshot
+  // Discovery may have captured the model config; the first synthesis round fills it
+  // when still null — a FRESH per-attempt holder so attempts never share the field.
+  const modelConfigHolder: { value: BriefRunDiagnostics['modelConfig'] } = { value: snapshot.modelConfig }
+
+  const shadow_rejected_by_reason: Record<string, number> = {}
+  const shadow = (r: string) => { shadow_rejected_by_reason[r] = (shadow_rejected_by_reason[r] ?? 0) + 1 }
 
   const rejected_by_reason: Record<string, number> = {}
   const rejectTopic = (r: string) => { rejected_by_reason[r] = (rejected_by_reason[r] ?? 0) + 1 }
@@ -717,57 +888,6 @@ export async function generateFromBriefs(
     }
   }
 
-  // ── 4b) CONSTRAINED DISCOVERY (RC3) — ONE batched call, only for a deficit ──
-  let discovery: BriefRunDiagnostics['discovery'] = null
-  const workingPool = [...pool]
-  if (workingPool.length < input.targetCount && modelPath.model) {
-    const deficit = input.targetCount - workingPool.length
-    // Owned anchors: category/service/product names + real focus areas (exact strings).
-    const anchorList = Array.from(new Set([
-      ...entities.filter((e) => ['category', 'service', 'product'].includes(e.type ?? '')).map((e) => e.name),
-      ...(entities.length > 0 ? projectFocus : []),
-      ...tracked,
-    ].map((a) => a.trim()).filter(Boolean))).slice(0, 30)
-    if (anchorList.length > 0) {
-      const dPrompt = buildDiscoveryPrompt({ language, ctx, year, deficit, anchors: anchorList, publishedTitles: publishedCoverage, pendingTitles: Array.from(pendingExactKeys).slice(0, 25) })
-      const dRes = await generateRecommendationJSON(
-        dPrompt,
-        { temperature: 0.6, maxOutputTokens: Math.max(1024, deficit * 120 + 600), ...(modelPath.model ? { model: modelPath.model } : {}), responseSchema: discoveryResponseSchema(anchorList) },
-        controller,
-        { source: 'brief_discovery', callPurpose: 'discovery', requestedIdeaCount: deficit },
-      )
-      if (modelConfigHolder.value === null && dRes.modelConfig) modelConfigHolder.value = { model: dRes.modelConfig.model, thinkingMode: dRes.modelConfig.thinkingMode, thinkingBudget: dRes.modelConfig.thinkingBudget, maxOutputTokens: dRes.modelConfig.maxOutputTokens }
-      if (!dRes.ok) {
-        discovery = { ran: true, deficit, provider_ok: false, parse_failed: false, emitted: 0, invalid_items: 0, unknown_anchors: [], accepted: 0, rejected_by_reason: {}, rejected_examples: [], candidates: [] }
-      } else {
-        const dRec = reconcileDiscovery(dRes.text, anchorList)
-        const dVal = validateDiscoveredCandidates(dRec.candidates, {
-          anchors: new Set(anchorList),
-          attributeTokens,
-          brandSafety,
-          isOwnedByEntity: (phrase) => ownedByExistingEntity(guard, phrase),
-          isCoveredByContent: (title, keyword) => coveredByExistingContent(guard, title, keyword),
-          pendingExactKeys,
-          pendingSignatures,
-          existingPoolSignatures: workingPool.map((b) => topicSignature(b.subject, b.intendedIntent)),
-          keywordResearch,
-          relatedEntitiesFor: (subject) => {
-            const subToks = new Set(contentTokens(subject))
-            return entities.filter((e) => contentTokens(e.name).some((t) => subToks.has(t))).map((e) => ({ name: e.name, url: e.url ?? null, type: e.type }))
-          },
-        })
-        workingPool.push(...dVal.accepted.slice(0, deficit))
-        discovery = {
-          ran: true, deficit, provider_ok: true, parse_failed: dRec.parseFailed, emitted: dRec.emitted,
-          invalid_items: dRec.invalidItems, unknown_anchors: dRec.unknownAnchors,
-          accepted: Math.min(dVal.accepted.length, deficit), rejected_by_reason: dVal.rejected_by_reason,
-          rejected_examples: dVal.rejected_examples,
-          candidates: dRec.candidates.map((c) => ({ subject: c.subject.slice(0, 100), anchor: c.anchor.slice(0, 60) })),
-        }
-      }
-    }
-  }
-
   // ── 5) Adaptive synthesis rounds ─────────────────────────────────────────────
   const rounds: BriefRoundDiagnostics[] = []
   const suggestions: TopicSuggestion[] = []
@@ -884,28 +1004,7 @@ export async function generateFromBriefs(
       engine: 'evidence_first_briefs',
       modelPath,
       modelConfig: modelConfigHolder.value,
-      evidence_inventory: {
-        project_focus_terms: projectFocus.length,
-        tracked_keywords: tracked.length,
-        keyword_research_cache_rows: krCacheRows,
-        keyword_research_queries: keywordResearch.length,
-        search_volume_values: searchVolumeValues,
-        site_scan_entities: siteScanEntities,
-        shopify_entities: shopifyEntities,
-        existing_informational_coverage: publishedCoverage.length,
-        pending_topics: pendingCount,
-        generated_articles: generatedArticles,
-        competitor_queries_filtered: competitorQueriesFiltered,
-        evidence_load_errors: loadErrors,
-        ineligible_pages_excluded: ineligiblePageTitles.length,
-        stale_index_excluded: staleIndexExcluded,
-        kr_rows_loaded: krIngestion.rows_loaded,
-        kr_rows_parsed: krIngestion.rows_parsed,
-        kr_rows_skipped: krIngestion.rows_skipped,
-        kr_items_skipped: krIngestion.items_skipped,
-        kr_skipped_example_keys: krIngestion.skipped_example_keys,
-        kr_live_fetched: krLiveFetched,
-      },
+      evidence_inventory: evidenceInventory,
       brief_pool: briefPool,
       discovery,
       rounds,
@@ -925,4 +1024,22 @@ export async function generateFromBriefs(
       cost: { totalCalls: summary.totalCalls, ...costTelemetry },
     },
   }
+}
+
+/**
+ * Public entry — behavior-identical to the pre-split single function: prepare the
+ * immutable snapshot (evidence → pool → the single discovery call) then synthesize
+ * with the SAME controller. The deterministic fixture comparison
+ * (reco-briefrun-snapshot-identity.qa) proves this path and the direct
+ * prepare→synthesize path produce identical suggestions, order, diagnostics,
+ * discovery decision/call-count, rejection reasons, round diagnostics, stop reason,
+ * and model-call/cost reconciliation.
+ */
+export async function generateFromBriefs(
+  admin: Admin,
+  input: BriefRunInput,
+  controller: RunCostController,
+): Promise<{ suggestions: TopicSuggestion[]; diagnostics: BriefRunDiagnostics }> {
+  const snapshot = await prepareBriefRun(admin, input, controller)
+  return synthesizeFromSnapshot(snapshot, controller)
 }
