@@ -15,6 +15,7 @@ import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { recordPublishFinalFailureAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-shopify'
+import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -63,19 +64,20 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     if (!item) return { itemId, status: 'failed', articleId: null, noop: 'item_not_found' }
     if (!item.article_id) return { itemId, status: item.status, articleId: null, noop: 'no_article' }
 
-    // Phase 4F.2 — backend selection by the project's connected platform. Only a
-    // Shopify-only project takes the Shopify path; WordPress / dual / none fall
-    // through to the WordPress path below (unchanged). Dual connection fails
-    // visibly rather than silently publishing to one side.
-    const [{ data: wpConn }, { data: shConn }] = await Promise.all([
-      admin.from('wordpress_connections').select('id').eq('project_id', item.project_id).maybeSingle(),
-      admin.from('shopify_connections').select('id').eq('project_id', item.project_id).maybeSingle(),
-    ])
-    if (wpConn && shConn) {
+    // Phase 4F.2 — backend selection by the project's ACTIVE (connected) platform, via the
+    // shared resolver. Platform is chosen by connection VALIDITY, not row existence: a
+    // stale/failed/untested WordPress row never blocks a valid Shopify connection (the live
+    // false-platform_conflict bug), and only TWO genuinely-connected platforms conflict.
+    const active = await loadActivePlatform(admin, item.project_id)
+    if (active.platform === 'conflict') {
       await finalizeItem(admin, itemId, 'quality_check_failed', 'platform_conflict')
       return { itemId, status: 'quality_check_failed', articleId: item.article_id, reason: 'platform_conflict' }
     }
-    if (shConn && !wpConn) {
+    if (active.platform === 'none') {
+      await finalizeItem(admin, itemId, 'quality_check_failed', 'no_active_publishing_platform')
+      return { itemId, status: 'quality_check_failed', articleId: item.article_id, reason: 'no_active_publishing_platform' }
+    }
+    if (active.platform === 'shopify') {
       return await publishShopifyPoolItem(admin, item)
     }
 

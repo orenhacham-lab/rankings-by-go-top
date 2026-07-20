@@ -23,6 +23,7 @@
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
 import { getCachedIndex, reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
+import { evaluateBulkSaveGate, type CacheSnapshotIdentity } from '@/lib/content/internal-link-save-gate'
 import { planFromCachedTargets, promoteManualCandidates, selectClientLinks, CACHE_PLANNER_VERSION, type DroppedSelection } from '@/lib/content/internal-link-planner-cache'
 import { savePlanBatch, approveBatchLinks, type PlanSubject } from '@/lib/content/internal-link-plan-store'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
@@ -36,12 +37,19 @@ interface TopicResult { topicId: string; ok: boolean; batchId?: string; linkCoun
 export async function POST(request: Request) {
   if (!isInternalLinkPlanningEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  let body: { projectId?: unknown; topicIds?: unknown; approve?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown; selectedLinks?: unknown }
+  let body: { projectId?: unknown; topicIds?: unknown; approve?: unknown; allowCaution?: unknown; force?: unknown; manualCandidates?: unknown; selectedLinks?: unknown; reviewedSnapshot?: unknown }
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const approve = body.approve === true
   const allowCaution = body.allowCaution === true
   const force = body.force === true
+  // The identity of the cached snapshot the user REVIEWED in the dry-run (from the GET
+  // response's scannerVersion + scanCompletedAt). When supplied, a matching-but-now-stale
+  // cache is saveable; a changed cache is refused (never silently rebound to a new scan).
+  const rs = body.reviewedSnapshot as { scannerVersion?: unknown; scanCompletedAt?: unknown } | undefined
+  const reviewedSnapshot: CacheSnapshotIdentity | null = rs && typeof rs === 'object'
+    ? { scannerVersion: typeof rs.scannerVersion === 'string' ? rs.scannerVersion : null, scanCompletedAt: typeof rs.scanCompletedAt === 'string' ? rs.scanCompletedAt : null }
+    : null
   const topicIds = Array.isArray(body.topicIds)
     ? Array.from(new Set(body.topicIds.filter((x): x is string => typeof x === 'string' && x.length > 0))).slice(0, 50)
     : []
@@ -81,20 +89,27 @@ export async function POST(request: Request) {
 
   // Cache-only: read the stored index (NEVER a live scan).
   const row = await getCachedIndex(admin, project.id)
-  if (!row) return Response.json({ ok: false, cacheState: 'missing', warning: 'no_cache_refresh_first' }, { status: 409 })
-
-  const stale = isStale(row)
-  const versionStale = isVersionStale(row)
-  const warnings: string[] = []
-  let cacheState = 'ok'
-  if (row.scan_status === 'running') { cacheState = 'running'; warnings.push('refresh_in_progress') }
-  if (row.scan_status === 'failed') { cacheState = 'failed_last_refresh'; warnings.push('last_refresh_failed') }
-  if (versionStale) { cacheState = 'version_stale'; warnings.push('cache_version_stale') }
-  if (stale) { cacheState = 'stale'; warnings.push('cache_stale') }
-  if ((stale || versionStale) && !force) {
-    return Response.json({ ok: false, cacheState, warnings, hint: 'refresh the index (force=true) or pass force=true to save anyway' }, { status: 409 })
+  const gate = evaluateBulkSaveGate({
+    present: !!row,
+    stale: row ? isStale(row) : false,
+    versionStale: row ? isVersionStale(row) : false,
+    scanStatus: row?.scan_status ?? null,
+    current: { scannerVersion: row?.scanner_version ?? null, scanCompletedAt: row?.scan_completed_at ?? null },
+    reviewed: reviewedSnapshot,
+    force,
+  })
+  const { cacheState, warnings, staleAtCreation } = gate
+  if (!row || gate.outcome === 'missing_cache') {
+    return Response.json({ ok: false, cacheState: 'missing', warning: 'no_cache_refresh_first' }, { status: 409 })
   }
-  const staleAtCreation = stale || versionStale
+  if (gate.outcome === 'cache_changed_replan_required') {
+    // The cached index changed after the user reviewed the plan — never save/approve/enqueue
+    // the stale review. The client must refresh and re-review.
+    return Response.json({ ok: false, reason: 'cache_changed_replan_required', cacheState, warnings, hint: 'the site index changed after review — refresh and review the links again' }, { status: 409 })
+  }
+  if (gate.outcome === 'stale_blocked') {
+    return Response.json({ ok: false, cacheState, warnings, hint: 'refresh the index or send the reviewed snapshot identity to save the reviewed plan' }, { status: 409 })
+  }
 
   const report = reassembleReport(row)
   const targets = (report.targets ?? []) as ScannedTarget[]

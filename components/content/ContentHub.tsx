@@ -46,14 +46,18 @@ type ArticleRow = {
   featured_image_url: string | null
   scheduled_at: string | null; published_at: string | null
   created_at: string; updated_at: string
+  shopify_article_id?: string | null; shopify_article_url?: string | null; shopify_status?: string | null; shopify_blog_id?: string | null
 }
 
+type ActivePlatform = 'wordpress' | 'shopify' | 'conflict' | 'none'
 type Overview = {
   projects: ProjectOption[]
   selected: string | null
   counts: Counts | null
   articles: ArticleRow[]
   wordpress: { connected: boolean; siteUrl: string | null; status: string | null } | null
+  shopify?: { connected: boolean; shopDomain: string | null; status: string | null; canPublish: boolean; defaultBlogId: string | null } | null
+  platform?: { platform: ActivePlatform; shopifyNeedsScope?: boolean } | null
 }
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
@@ -76,6 +80,12 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   const toast = useToasts()
 
   const [data, setData] = useState<Overview | null>(null)
+  // The project's ACTIVE publishing platform (resolved server-side by connection validity).
+  // Manual publish/draft actions route by this — a Shopify project never calls WordPress.
+  const activePlatform: ActivePlatform = data?.platform?.platform ?? 'wordpress'
+  const isShopify = activePlatform === 'shopify'
+  // Already exported on the ACTIVE platform (row eligibility + status).
+  const exportedIdOf = (a: ArticleRow): string | number | null => isShopify ? (a.shopify_article_id ?? null) : a.wp_post_id
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'articles' | 'gbp' | 'scheduled'>('articles')
   const [statusFilter, setStatusFilter] = useState('')
@@ -255,6 +265,11 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   // Reuses the SAME server route the editor uses. No WordPress logic here.
   async function exportRow(a: ArticleRow, wpStatus: 'draft' | 'publish') {
     if (rowBusy) return
+    // Route by the project's ACTIVE platform — a Shopify project publishes to Shopify, not
+    // WordPress. Two active platforms / none are explicit states, never a misleading publish.
+    if (activePlatform === 'conflict') { toast.error(t.rowShopify.conflict); return }
+    if (activePlatform === 'none') { toast.error(t.rowShopify.setup); return }
+    if (activePlatform === 'shopify') { await exportRowShopify(a, wpStatus); return }
     if (wpStatus === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
     let force = false
     if (a.wp_post_id) {
@@ -284,6 +299,43 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
       toast.error(reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric)
     } catch {
       toast.error(t.rowWp.errGeneric)
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
+  // Shopify single-row publish/draft. Idempotent server-side via the stored
+  // shopify_article_id (a retry reconciles the same article, never a duplicate). Surfaces the
+  // exact corrective action for a real Shopify prerequisite (scope / blog) — never hidden.
+  async function exportRowShopify(a: ArticleRow, status: 'draft' | 'publish') {
+    if (status === 'publish' && !window.confirm(t.rowShopify.publishConfirm)) return
+    setRowBusy({ id: a.id, action: status })
+    try {
+      const res = await fetch(`/api/content/articles/${a.id}/shopify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) {
+        patchArticle(a.id, {
+          shopify_article_id: d.shopify_article_id ?? a.shopify_article_id ?? null,
+          shopify_article_url: d.shopify_article_url ?? a.shopify_article_url ?? null,
+          shopify_status: d.shopify_status ?? (status === 'publish' ? 'published' : 'draft'),
+          ...(status === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}),
+        })
+        toast.success(status === 'publish' ? t.rowShopify.published : t.rowShopify.draftSent)
+        load()
+        return
+      }
+      const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
+      toast.error(
+        reason === 'no_shopify_connection' ? t.rowShopify.errNoConn
+          : reason === 'missing_write_content_scope' ? t.rowShopify.errScope
+            : reason === 'no_shopify_blog' ? t.rowShopify.errBlog
+              : t.rowShopify.errGeneric,
+      )
+    } catch {
+      toast.error(t.rowShopify.errGeneric)
     } finally {
       setRowBusy(null)
     }
@@ -466,37 +518,53 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   }
   function clearArticleSelection() { setSelectedArticles(new Set()) }
 
-  // One WordPress export — reuses the existing route (no confirm here; the batch
-  // confirms once). 60s client timeout.
-  async function exportOne(id: string, mode: 'publish' | 'draft'): Promise<{ ok: boolean; error?: string; data?: { wp_post_id: number; wp_post_url: string | null } }> {
+  // One export unit — routes by the ACTIVE platform (no confirm here; the batch confirms
+  // once). Returns a normalized patch so the batch loop is platform-agnostic. 60s timeout.
+  type ExportOnePatch = Partial<ArticleRow>
+  async function exportOne(id: string, mode: 'publish' | 'draft'): Promise<{ ok: boolean; error?: string; patch?: ExportOnePatch }> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 60_000)
+    const publishedPatch = (extra: ExportOnePatch): ExportOnePatch => ({ ...extra, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
     try {
+      if (activePlatform === 'shopify') {
+        const res = await fetch(`/api/content/articles/${id}/shopify`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: mode }), signal: controller.signal,
+        })
+        const d = await res.json().catch(() => ({}))
+        if (res.ok && d.ok) return { ok: true, patch: publishedPatch({ shopify_article_id: d.shopify_article_id ?? null, shopify_article_url: d.shopify_article_url ?? null, shopify_status: d.shopify_status ?? (mode === 'publish' ? 'published' : 'draft') }) }
+        const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
+        return { ok: false, error: reason === 'no_shopify_connection' ? t.rowShopify.errNoConn : reason === 'missing_write_content_scope' ? t.rowShopify.errScope : reason === 'no_shopify_blog' ? t.rowShopify.errBlog : t.rowShopify.errGeneric }
+      }
       const res = await fetch(`/api/content/articles/${id}/wordpress`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: mode, force: false }), signal: controller.signal,
       })
       const d = await res.json().catch(() => ({}))
-      if (res.ok && d.wp_post_id) return { ok: true, data: { wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null } }
+      if (res.ok && d.wp_post_id) return { ok: true, patch: publishedPatch({ wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null }) }
       const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
       return { ok: false, error: reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric }
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout }
-      return { ok: false, error: t.rowWp.errGeneric }
+      return { ok: false, error: (activePlatform === 'shopify' ? t.rowShopify.errGeneric : t.rowWp.errGeneric) }
     } finally {
       clearTimeout(timer)
     }
   }
+  // A row is already exported on the active platform (skip it in batch).
+  const alreadyExported = (a: ArticleRow): boolean => activePlatform === 'shopify' ? !!a.shopify_article_id || a.status === 'published' : !!a.wp_post_id || a.status === 'published'
 
   async function runArticleBatch(mode: 'publish' | 'draft') {
     if (articleBatchRef.current || articleBatchRunning) return // synchronous lock first
+    if (activePlatform === 'conflict') { toast.error(t.rowShopify.conflict); return }
+    if (activePlatform === 'none') { toast.error(t.rowShopify.setup); return }
     const ids = Array.from(selectedArticles).filter((id) => {
       const a = (data?.articles ?? []).find((x) => x.id === id)
-      return !!a && !a.wp_post_id && a.status !== 'published'
+      return !!a && !alreadyExported(a)
     })
     if (ids.length === 0) return
     if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
-    if (mode === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
+    if (mode === 'publish' && !window.confirm(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : t.rowWp.publishConfirm)) return
     articleBatchRef.current = true
     cancelArticleRef.current = false
     setArticleBatchRunning(true); setArticleBatchMode(mode)
@@ -509,12 +577,12 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
     for (const id of ids) {
       if (cancelArticleRef.current) break
       const a = (data?.articles ?? []).find((x) => x.id === id)
-      if (!a || a.wp_post_id || a.status === 'published') continue // changed meanwhile → skip
+      if (!a || alreadyExported(a)) continue // changed meanwhile → skip
       setArticleBatchState((s) => ({ ...s, [id]: { status: 'running' } }))
       const r = await exportOne(id, mode)
-      if (r.ok && r.data) {
+      if (r.ok && r.patch) {
         ok++
-        patchArticle(id, { wp_post_id: r.data.wp_post_id, wp_post_url: r.data.wp_post_url, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
+        patchArticle(id, r.patch)
         setArticleBatchState((s) => ({ ...s, [id]: { status: 'success' } }))
       } else {
         fail++
@@ -736,6 +804,22 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                           <Td><span className="text-xs text-slate-500">{a.published_at ? formatDate(a.published_at) : '—'}</span></Td>
                           <Td>
                             {(() => {
+                              // Platform-aware publication state — a Shopify project shows Shopify
+                              // status/URL and never WordPress wording.
+                              if (isShopify) {
+                                if (!a.shopify_article_id) return <span className="text-xs text-slate-400 dark:text-slate-500">{t.shopifyState.notSent}</span>
+                                const published = a.status === 'published' || a.shopify_status === 'published'
+                                return (
+                                  <span className="inline-flex items-center gap-2">
+                                    <Badge variant={published ? 'success' : 'neutral'}>{published ? t.shopifyState.published : t.shopifyState.exported}</Badge>
+                                    {a.shopify_article_url && (
+                                      <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+                                        {t.shopifyState.open}<ExternalLink size={12} />
+                                      </a>
+                                    )}
+                                  </span>
+                                )
+                              }
                               const s = wpState(a)
                               if (s === 'none') return <span className="text-xs text-slate-400 dark:text-slate-500">{t.wpState.notSent}</span>
                               const published = s === 'published'
@@ -773,18 +857,19 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                               }
                               return (
                                 <div className="flex flex-wrap items-center gap-2">
-                                  {/* State-based WordPress actions (reuse the editor's route). */}
-                                  {a.status !== 'published' && (a.status === 'ready' || a.wp_post_id) && (
+                                  {/* State-based publish actions — routed by the active platform
+                                      (WordPress or Shopify). Hidden entirely for conflict/none. */}
+                                  {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status !== 'published' && (a.status === 'ready' || !!exportedIdOf(a)) && (
                                     <Button size="sm" onClick={() => exportRow(a, 'publish')} loading={rowBusy?.id === a.id && rowBusy.action === 'publish'} disabled={!!rowBusy || articleBatchRunning}>
-                                      {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : t.rowWp.publish}
+                                      {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : (isShopify ? t.rowShopify.publish : t.rowWp.publish)}
                                     </Button>
                                   )}
-                                  {a.status === 'ready' && !a.wp_post_id && (
+                                  {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status === 'ready' && !exportedIdOf(a) && (
                                     <Button size="sm" variant="outline" onClick={() => exportRow(a, 'draft')} loading={rowBusy?.id === a.id && rowBusy.action === 'draft'} disabled={!!rowBusy || articleBatchRunning}>
-                                      {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : t.rowWp.sendDraft}
+                                      {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : (isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft)}
                                     </Button>
                                   )}
-                                  {a.status === 'draft' && !a.wp_post_id && (
+                                  {a.status === 'draft' && !exportedIdOf(a) && (
                                     <Button size="sm" variant="outline" onClick={() => markReadyRow(a)} loading={rowBusy?.id === a.id && rowBusy.action === 'ready'} disabled={!!rowBusy || articleBatchRunning}>
                                       {t.rowWp.markReady}
                                     </Button>
