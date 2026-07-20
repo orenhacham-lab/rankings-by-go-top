@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkSaveTopicResult } from '@/lib/content/automation/one-click-queue'
 
 type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
 type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: string }
@@ -109,10 +110,9 @@ export default function AutomationIdeas({
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
-  const [lastCreatedIds, setLastCreatedIds] = useState<string[]>([])
-  // How many of the just-created topics got a saved link plan (for the CTA
-  // link-status summary: none / some / all).
-  const [lastPlansCount, setLastPlansCount] = useState(0)
+  // The exact per-topic queue payload to RETRY (links already saved; only the enqueue
+  // step failed) — re-sent to the authoritative approve-and-queue route.
+  const [lastQueueTopics, setLastQueueTopics] = useState<{ topicId: string; expectsLinks: boolean; recommendedPageType: string }[]>([])
   const [scheduling, setScheduling] = useState(false)
   // Which approve action is running (for per-button spinners): the one-click
   // queue action or the advanced review action. Phase 3F.3.5.
@@ -393,6 +393,10 @@ export default function AutomationIdeas({
     // Phase 3G.3 — the CHECKED idea-stage links per created topic, so the review
     // panel can seed/display them even if its fresh dry-run recomputes differently.
     selectedByTopicId: Record<string, { url: string; anchor: string }[]>
+    // topicId → the idea ids that resolved to it (to remove ONLY successfully-queued ideas).
+    ideaIdsByTopicId: Record<string, string[]>
+    // topicId → the idea's recommendedPageType (passed to approve-and-queue).
+    pageTypeByTopicId: Record<string, string>
     savedPlans: { topicId: string; linkCount: number }[]
     expectedPlans: number
   }
@@ -400,7 +404,10 @@ export default function AutomationIdeas({
     const chosen = suggestions.filter((s) => selected.has(s.id))
     if (chosen.length === 0) return null
     const expectedPlans = chosen.filter((s) => selectedLinksFor(s).length > 0).length
-    const chosenPayload = chosen.map((s) => ({ ...s, selectedLinks: selectedLinksFor(s) }))
+    // topics/bulk RESOLVES/creates topics only — it is NOT the authoritative link layer, so
+    // the checked links are NOT sent here (they are persisted via the reviewed-snapshot
+    // bulk-save contract below). This removes the old best-effort double-save.
+    const chosenPayload = chosen.map((s) => ({ ...s }))
     const res = await fetch('/api/content/automation/topics/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -415,7 +422,6 @@ export default function AutomationIdeas({
       ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
       : []
     if (savedPlans.length) onPlansSaved?.(savedPlans)
-    setLastPlansCount(savedPlans.length)
     onCreated()
 
     const topicsForAction: ReviewTopic[] = []
@@ -423,10 +429,14 @@ export default function AutomationIdeas({
     const unresolved: { title: string; reason: string }[] = []
     const uncheckedByTopicId: Record<string, string[]> = {}
     const selectedByTopicId: Record<string, { url: string; anchor: string }[]> = {}
+    const ideaIdsByTopicId: Record<string, string[]> = {}
+    const pageTypeByTopicId: Record<string, string> = {}
     const seen = new Set<string>()
     const addResolved = (s: Suggestion, topicId: string, title: string, pk: string | null) => {
       if (!seen.has(topicId)) { seen.add(topicId); topicsForAction.push({ id: topicId, topic: title, primary_keyword: pk }) }
       resolvedIdeaIds.push(s.id)
+      ;(ideaIdsByTopicId[topicId] ??= []).push(s.id)
+      if (!pageTypeByTopicId[topicId]) pageTypeByTopicId[topicId] = s.recommendedPageType ?? 'article'
       const checkedLinks = selectedLinksFor(s)
       const checked = new Set(checkedLinks.map((l) => l.url))
       const unchecked = s.suggestedInternalLinks.filter((l) => !checked.has(l.url)).map((l) => l.url)
@@ -461,7 +471,7 @@ export default function AutomationIdeas({
         else unresolved.push({ title: s.title, reason: 'unresolved' })
       }
     }
-    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, savedPlans, expectedPlans }
+    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, ideaIdsByTopicId, pageTypeByTopicId, savedPlans, expectedPlans }
   }
 
   // Remove the given idea ids from the visible list + selection (called ONLY after
@@ -473,46 +483,84 @@ export default function AutomationIdeas({
     setSelected((prev) => { const n = new Set(prev); for (const id of ideaIds) n.delete(id); return n })
   }
 
-  // Ensure the project's pool exists (never flips an active pool to paused) and add
-  // the given approved topics to its publishing queue. TRUTHFUL: success only when
-  // something was actually queued (or was already queued); otherwise a reason.
-  async function enqueueTopics(ids: string[]): Promise<{ ok: boolean; reason?: string }> {
-    if (ids.length === 0) return { ok: false, reason: 'no_topics' }
+  // Ensure the project's pool exists (never flips an active pool to paused). Returns poolId.
+  async function ensurePool(): Promise<string | null> {
     try {
-      let poolId: string | null = null
-      try {
-        const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
-        if (gr.ok) { const gd = await gr.json(); poolId = gd.pool?.id ?? null }
-      } catch { /* fall through to create */ }
-      if (!poolId) {
-        const pr = await fetch('/api/content/automation/pools', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
-        })
-        if (!pr.ok) { const d = await pr.json().catch(() => ({})); return { ok: false, reason: d.error || `pool_${pr.status}` } }
-        const pd = await pr.json()
-        poolId = pd.pool?.id ?? null
-      }
-      if (!poolId) return { ok: false, reason: 'no_pool' }
-      const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
+      const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
+      if (gr.ok) { const gd = await gr.json(); if (gd.pool?.id) return gd.pool.id as string }
+    } catch { /* fall through to create */ }
+    try {
+      const pr = await fetch('/api/content/automation/pools', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicIds: ids }),
+        body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
       })
-      if (!ir.ok) { const d = await ir.json().catch(() => ({})); return { ok: false, reason: d.error || `items_${ir.status}` } }
-      const d = await ir.json().catch(() => ({}))
-      const added = typeof d.added === 'number' ? d.added : 0
-      const alreadyQueued = Array.isArray(d.alreadyQueued) ? d.alreadyQueued.length : 0
-      const notApproved = Array.isArray(d.notApproved) ? d.notApproved.length : 0
-      if (added > 0 || alreadyQueued > 0) return { ok: true }
-      if (notApproved > 0) return { ok: false, reason: 'topics_not_approved' }
-      return { ok: false, reason: 'nothing_queued' }
-    } catch {
-      return { ok: false, reason: 'network' }
-    }
+      if (pr.ok) { const pd = await pr.json(); return (pd.pool?.id ?? null) as string | null }
+    } catch { /* ignore */ }
+    return null
   }
 
-  // PRIMARY (Phase 3F.3.5) — approve + save checked links + add to the publishing
-  // queue in ONE action. No intermediate CTA / planner unless enqueue fails.
+  // Save the EXACT checked links for the given topics through the SAME reviewed-snapshot
+  // bulk-save contract the drawer/panel use (GET plan snapshot → POST bulk-save approve:true).
+  // The SERVER re-validates every link (idea-card URLs are never trusted); no force. Returns
+  // the topic ids whose links FULLY persisted + approved, and typed failures.
+  type LinkSaveOutcome = { okIds: Set<string>; failures: { topicId: string; reason: string }[]; hardReason: string | null }
+  async function saveCheckedLinks(topicIds: string[], selectedByTopicId: Record<string, { url: string; anchor: string }[]>): Promise<LinkSaveOutcome> {
+    const out: LinkSaveOutcome = { okIds: new Set(), failures: [], hardReason: null }
+    if (topicIds.length === 0) return out
+    const failAll = (reason: string) => { out.hardReason = reason; for (const id of topicIds) out.failures.push({ topicId: id, reason }); return out }
+    // 1) current plan snapshot → the reviewed-snapshot identity.
+    let reviewedSnapshot: { scannerVersion: string | null; scanCompletedAt: string | null } | undefined
+    try {
+      const gr = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topicIds.join(','))}`)
+      const gd = await gr.json().catch(() => ({}))
+      if (!gr.ok) return failAll(gd.cacheState === 'missing' ? 'no_cache' : 'plan_unavailable')
+      reviewedSnapshot = { scannerVersion: typeof gd.scannerVersion === 'string' ? gd.scannerVersion : null, scanCompletedAt: typeof gd.scanCompletedAt === 'string' ? gd.scanCompletedAt : null }
+    } catch { return failAll('plan_unavailable') }
+    // 2) exact checked selection → bulk-save (approve + reviewedSnapshot).
+    const selectedLinks = topicIds.flatMap((id) => (selectedByTopicId[id] ?? []).map((l) => ({ topicId: id, targetUrl: l.url, anchorText: l.anchor })))
+    let data: { results?: unknown[]; reason?: string; cacheState?: string } = {}
+    try {
+      const sr = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, topicIds, approve: true, selectedLinks, reviewedSnapshot }),
+      })
+      data = await sr.json().catch(() => ({}))
+      if (!sr.ok) return failAll(data.reason === 'cache_changed_replan_required' ? 'cache_changed_replan_required' : data.cacheState === 'missing' ? 'no_cache' : 'link_plan_failed')
+    } catch { return failAll('link_plan_failed') }
+    // 3) TRUTHFUL per-topic success (pure, shared with tests).
+    const results = (Array.isArray(data.results) ? data.results : []).filter((r): r is BulkSaveTopicResult => !!r && typeof (r as { topicId?: unknown }).topicId === 'string')
+    const evln = evaluateLinkSave(topicIds, selectedByTopicId, { ok: true, results })
+    for (const id of evln.okIds) out.okIds.add(id)
+    out.failures.push(...evln.failures)
+    return out
+  }
+
+  // Queue topics through the AUTHORITATIVE approve-and-queue route (which itself re-verifies a
+  // saved plan exists for every expectsLinks topic). Returns the topics actually queued.
+  type QueueTopic = { topicId: string; expectsLinks: boolean; recommendedPageType: string }
+  async function queueTopicsAuthoritative(poolId: string, queue: QueueTopic[]): Promise<{ ok: boolean; queuedIds: Set<string>; linkPlanFailedIds: Set<string>; reason?: string }> {
+    const queuedIds = new Set<string>(); const linkPlanFailedIds = new Set<string>()
+    if (queue.length === 0) return { ok: false, queuedIds, linkPlanFailedIds, reason: 'no_topics' }
+    try {
+      const ir = await fetch(`/api/content/automation/pools/${poolId}/approve-and-queue`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: queue }),
+      })
+      const d = await ir.json().catch(() => ({}))
+      if (!ir.ok && ir.status !== 207) return { ok: false, queuedIds, linkPlanFailedIds, reason: d.error || `queue_${ir.status}` }
+      for (const r of (Array.isArray(d.results) ? d.results : []) as { topicId?: string; state?: string }[]) {
+        if (!r || typeof r.topicId !== 'string') continue
+        if (r.state === 'success' || r.state === 'already_queued') queuedIds.add(r.topicId)
+        else if (r.state === 'link_plan_failed') linkPlanFailedIds.add(r.topicId)
+      }
+      return { ok: queuedIds.size > 0, queuedIds, linkPlanFailedIds }
+    } catch { return { ok: false, queuedIds, linkPlanFailedIds, reason: 'network' } }
+  }
+
+  // PRIMARY (Phase 3F.3.5, rewired) — ONE authoritative persistence + queue path:
+  //   topics/bulk (resolve topics) → GET plan snapshot → reviewed-snapshot bulk-save
+  //   (approve) → approve-and-queue. A topic whose CHECKED links did not fully persist is
+  //   NEVER queued. topics/bulk's best-effort savedPlans no longer decides anything.
   async function approveAndQueue() {
     if (creating) return
     setCreating(true); setBusyAction('queue'); setMessage(null); setQueueSuccess(null)
@@ -525,26 +573,51 @@ export default function AutomationIdeas({
         setMessage({ text: `${t.topicResolveFailed}${r.unresolved[0]?.reason ? ` (${r.unresolved[0].reason})` : ''}`, ok: false })
         return
       }
-      // Enqueue the EXACT resolved topics (newly created + existing duplicates).
-      const ids = r.topicsForAction.map((tp) => tp.id)
-      const enq = await enqueueTopics(ids)
-      if (!enq.ok) {
-        // FAILURE — do NOT remove/hide the ideas. Show the exact reason + a clear
-        // retry CTA (adds the same resolved topics to the queue).
-        setLastCreatedIds(ids)
-        onApproved?.({ topicIds: ids, plansSaved: r.savedPlans.length > 0 })
-        window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
-        setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
+      const allIds = r.topicsForAction.map((tp) => tp.id)
+      const { withLinks: withLinksIds, noLinks: noLinksIds } = partitionByCheckedLinks(allIds, r.selectedByTopicId)
+
+      // 1) Save the CHECKED links authoritatively (reviewed-snapshot bulk-save, server revalidates).
+      const save = await saveCheckedLinks(withLinksIds, r.selectedByTopicId)
+      const failedLinkCount = save.failures.length
+
+      // 2) Queue set = link-free topics (expectsLinks:false) + topics whose checked links FULLY
+      //    persisted (expectsLinks:true). Topics with checked-but-unsaved links are excluded.
+      const queue = buildQueueTopics(noLinksIds, [...save.okIds], r.pageTypeByTopicId)
+      if (queue.length === 0) {
+        // C — no topic could be queued (every checked-link topic failed to save; no link-free
+        // topic). Show an error; NEVER "topics added"; keep the ideas visible.
+        setLastQueueTopics([])
+        const reason = save.hardReason ?? save.failures[0]?.reason ?? 'link_plan_failed'
+        setMessage({ text: `${t.linkSaveAllFailed} (${reason})`, ok: false })
         return
       }
-      // SUCCESS — only now remove the ideas + show the prominent success box + refresh.
-      removeChosenIdeas(r.resolvedIdeaIds)
-      const partial = r.expectedPlans > 0 && r.savedPlans.length < r.expectedPlans
-      setLastCreatedIds([]); setLastPlansCount(0)
-      setQueueSuccess({ count: ids.length, links: r.savedPlans.length > 0 })
-      // Keep only the amber partial-save warning as an inline note; the prominent
-      // green box carries the success confirmation.
-      setMessage(partial ? { text: t.linkSavePartialWarn, ok: false } : null)
+
+      // 3) Queue via the AUTHORITATIVE route (it re-verifies the saved plan for expectsLinks topics).
+      const poolId = await ensurePool()
+      if (!poolId) { setLastQueueTopics(queue); window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80); setMessage({ text: `${t.queueFailedRetry} (no_pool)`, ok: false }); return }
+      const q = await queueTopicsAuthoritative(poolId, queue)
+      if (q.queuedIds.size === 0) {
+        // The queue step itself failed — links ARE saved; offer a retry of just the enqueue.
+        setLastQueueTopics(queue)
+        onApproved?.({ topicIds: queue.map((x) => x.topicId), plansSaved: save.okIds.size > 0 })
+        window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+        setMessage({ text: `${t.queueFailedRetry}${q.reason ? ` (${q.reason})` : ''}`, ok: false })
+        return
+      }
+
+      // 4) SUCCESS (full or partial). Remove ONLY the ideas whose topic actually queued.
+      const queuedIdeaIds = allIds.filter((id) => q.queuedIds.has(id)).flatMap((id) => r.ideaIdsByTopicId[id] ?? [])
+      removeChosenIdeas(queuedIdeaIds)
+      setLastQueueTopics([])
+      onApproved?.({ topicIds: [...q.queuedIds], plansSaved: save.okIds.size > 0 })
+      setQueueSuccess({ count: q.queuedIds.size, links: save.okIds.size > 0 })
+      if (failedLinkCount === 0) {
+        setMessage(null) // A — everything saved + queued.
+      } else {
+        // B — exact counts + typed reason; a failed-link topic stays in the topics table.
+        const reason = save.hardReason ?? save.failures[0]?.reason ?? 'link_plan_failed'
+        setMessage({ text: t.queuePartial.replace('{queued}', String(q.queuedIds.size)).replace('{failed}', String(failedLinkCount)).replace('{reason}', reason), ok: false })
+      }
       onScheduled?.()
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -577,21 +650,23 @@ export default function AutomationIdeas({
     }
   }
 
-  // Add the already-created (review-path or enqueue-failed) topics to the queue.
+  // Retry the queue step for topics whose links ALREADY saved (only the enqueue failed) —
+  // through the SAME authoritative approve-and-queue route.
   async function addCreatedToSchedule() {
-    if (scheduling || lastCreatedIds.length === 0) return
+    if (scheduling || lastQueueTopics.length === 0) return
     setScheduling(true); setMessage(null)
     try {
-      const count = lastCreatedIds.length
-      const hadLinks = lastPlansCount > 0
-      const enq = await enqueueTopics(lastCreatedIds)
-      if (enq.ok) {
-        setLastCreatedIds([]); setLastPlansCount(0)
-        setQueueSuccess({ count, links: hadLinks })
+      const hadLinks = lastQueueTopics.some((x) => x.expectsLinks)
+      const poolId = await ensurePool()
+      if (!poolId) { setMessage({ text: `${t.queueFailedRetry} (no_pool)`, ok: false }); return }
+      const q = await queueTopicsAuthoritative(poolId, lastQueueTopics)
+      if (q.queuedIds.size > 0) {
+        setLastQueueTopics([])
+        setQueueSuccess({ count: q.queuedIds.size, links: hadLinks })
         setMessage(null)
         onScheduled?.()
       } else {
-        setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
+        setMessage({ text: `${t.queueFailedRetry}${q.reason ? ` (${q.reason})` : ''}`, ok: false })
       }
     } finally {
       setScheduling(false)
@@ -852,13 +927,13 @@ export default function AutomationIdeas({
       {initialLoaded && !loading && !meta && suggestions.length === 0 && (
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.noSavedIdeas}</p>
       )}
-      {lastCreatedIds.length > 0 && (
+      {lastQueueTopics.length > 0 && (
         <div ref={ctaRef} className="mb-3 rounded-lg border-2 border-indigo-400 dark:border-indigo-500/60 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-3 scroll-mt-4">
           <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{t.ctaTitle}</p>
           <p className="mt-0.5 text-xs text-indigo-800/90 dark:text-indigo-200/90">{t.ctaBody}</p>
-          {/* Link-status summary: none / some / all of the approved topics. */}
+          {/* Link-status summary: none / some / all of the topics being queued. */}
           <p className="mt-1 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
-            {lastPlansCount === 0 ? t.linkSummaryNone : lastPlansCount >= lastCreatedIds.length ? t.linkSummaryAll : t.linkSummaryMixed}
+            {(() => { const withLinks = lastQueueTopics.filter((x) => x.expectsLinks).length; return withLinks === 0 ? t.linkSummaryNone : withLinks >= lastQueueTopics.length ? t.linkSummaryAll : t.linkSummaryMixed })()}
           </p>
           {planSavedHint && (
             <p className="mt-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">{t.planSavedNote}</p>
