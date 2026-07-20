@@ -124,7 +124,17 @@ const briefId = (subject: string) => {
  * round-robin across families so one family can never monopolize a batch.
  */
 export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead?: number }): { pool: OpportunityBrief[]; diagnostics: BriefPoolDiagnostics } {
-  const maxPerHead = opts?.maxPerSubjectHead ?? 2
+  // Per-head admission cap: OPTIONAL safeguard, no domain-blind default. When a caller
+  // does not pass maxPerSubjectHead, NO fixed per-head limit is applied — candidates that
+  // already passed the need-aware duplicate checks above (isHighConfidenceDuplicate:
+  // shared head AND ≥0.5 modifier overlap AND same intent) are admitted regardless of a
+  // shared first-token head. This removes the coarse `maxPerHead = 2` default that
+  // over-collapsed broad shared-head families (e.g. "מתנות ל<recipient>": distinct
+  // recipient/occasion needs share the head "מתנ" but have NON-overlapping modifiers, so
+  // the need-aware gate already keeps them distinct). Narrow near-duplicate variants (e.g.
+  // "תיקון ניאגרה סמויה <brand>") are still collapsed by isHighConfidenceDuplicate, which
+  // is unchanged. The cap remains available for explicit callers/tests via the option.
+  const maxPerHead = opts?.maxPerSubjectHead
   const rejected: Record<string, number> = {}
   const rejectedExamples: { subject: string; reason: string; evidenceKind: string }[] = []
   const reject = (r: string, subject: string, evidenceKind: string) => {
@@ -211,8 +221,10 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
     const sig = topicSignature(b.subject, b.intendedIntent)
     if (input.pendingSignatures.some((p) => isHighConfidenceDuplicate(sig, p))) { reject('pending_semantic_duplicate', b.subject, kind); continue }
     if (acceptedSignatures.some((a) => isHighConfidenceDuplicate(sig, a))) { reject('brief_semantic_duplicate', b.subject, kind); continue }
+    // Head cap is applied ONLY when a caller explicitly supplied maxPerSubjectHead;
+    // by default there is no per-head admission limit (need-aware dedup above governs).
     const head = sig.head ?? ''
-    if (head) {
+    if (head && maxPerHead !== undefined) {
       const n = perHead.get(head) ?? 0
       if (n >= maxPerHead) { reject('subject_head_cap', b.subject, kind); continue }
       perHead.set(head, n + 1)
