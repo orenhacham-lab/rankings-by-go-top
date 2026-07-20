@@ -18,7 +18,7 @@ import type { SearchIntent } from './opportunity'
 import { GENERIC_TOKENS } from './opportunity'
 import { deriveIntent } from './opportunity-validation'
 import { normalizePhrase } from './keyword-guard'
-import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, type TopicSignature } from './semantic-dup'
+import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
 import type { OpportunityFamily } from './opportunity-synthesis'
 
 export type SearchNeed =
@@ -79,6 +79,19 @@ export interface BriefPoolDiagnostics {
   rejected_by_reason: Record<string, number>
   /** Operator-only reviewability: up to 5 rejected candidates per reason. */
   rejected_examples: { subject: string; reason: string; evidenceKind: string }[]
+  /** Preview/operator-only: up to 5 candidates classified support_only_product (a bare/
+   *  near-bare owned-product query kept out of the ARTICLE pool but preserved as
+   *  support/link evidence). Additive + OPTIONAL (older hand-authored diagnostics may
+   *  omit it) — never shown in normal Production responses. Always populated by buildBriefPool. */
+  support_only_examples?: {
+    subject: string
+    productEntity: string
+    entityUrl: string | null
+    evidenceKind: string
+    matchedEntityTokens: string[]
+    candidateOnlyTokens: string[]
+    confidenceReason: string
+  }[]
   pool_size: number
   by_family: Record<string, number>
   with_demand: number
@@ -108,6 +121,71 @@ function intentOf(query: string, need: SearchNeed): SearchIntent {
   if (derived !== 'informational') return derived
   if (need === 'comparison' || need === 'selection') return 'comparison'
   return 'informational'
+}
+
+// ── Source role: OWNED PRODUCTS ARE SUPPORT EVIDENCE, NOT ARTICLE SUBJECTS ─────
+// GENERIC_TOKENS is stored in normalizePhrase form; project it ONCE into the
+// distinctiveTokensOf space (canonical tokens) so generic-modifier stripping shares
+// the SAME normalization the rest of this module uses (no second matcher).
+const GENERIC_CANON = new Set<string>()
+for (const g of GENERIC_TOKENS) for (const t of distinctiveTokensOf(g)) GENERIC_CANON.add(t)
+/** True when token `t` (or one of its canonical proclitic variants) is in `set`. */
+const tokenIn = (t: string, set: Set<string>): boolean => set.has(t) || canonicalVariants(t).some((v) => set.has(v))
+
+export type CandidateSourceRole = 'article_candidate' | 'support_only_product'
+export interface SourceRoleClassification {
+  role: CandidateSourceRole
+  productEntity: { name: string; url: string | null } | null
+  matchedEntityTokens: string[]
+  /** Candidate tokens NOT explained by the product entity or a generic modifier. */
+  candidateOnlyTokens: string[]
+  confidenceReason: string | null
+}
+
+/**
+ * DOMAIN-NEUTRAL source-role classifier (pure). A candidate is `support_only_product`
+ * ONLY when ALL hold, using existing helpers only (no domain/industry/project/vocabulary):
+ *   (1) it is grounded in an owned entity whose type is exactly `product` (never
+ *       category/service/page/post — those keep their current ownership semantics);
+ *   (2) it is a BARE / NEAR-BARE representation of that one product — every distinctive
+ *       candidate token is a product-name token or a generic modifier, AND the candidate
+ *       HEAD (construct-state first token) is a product token;
+ *   (3) it expresses NO independent supported need beyond the product — its searchNeed is
+ *       plain `informational` (no question/comparison/selection/care/local-commercial
+ *       marker) and it contributes no need-bearing token beyond the product.
+ * Anything ambiguous stays `article_candidate` (false negatives preferred). The product
+ * entity is never removed — it stays available for relatedEntities / links / examples.
+ */
+export function classifyCandidateSourceRole(
+  candidate: Pick<OpportunityBrief, 'subject' | 'searchNeed' | 'relatedEntities'>,
+): SourceRoleClassification {
+  const keep: SourceRoleClassification = { role: 'article_candidate', productEntity: null, matchedEntityTokens: [], candidateOnlyTokens: [], confidenceReason: null }
+  const toks = distinctiveTokensOf(candidate.subject)
+  if (toks.length < 2) return keep // single-token candidates are handled elsewhere; never suppress here
+  // (3a) an independent supported need (question/comparison/selection/care/local-commercial)
+  // is always a real article opportunity, even if a product is involved.
+  if (candidate.searchNeed !== 'informational') return keep
+  // (1) only PRODUCT-typed owned entities may make a candidate support-only.
+  const products = candidate.relatedEntities.filter((e) => e.type === 'product')
+  if (products.length === 0) return keep
+  for (const p of products) {
+    const productToks = new Set(distinctiveTokensOf(p.name))
+    if (productToks.size === 0) continue
+    // (2) the candidate HEAD must itself be a product token (strong single-product grounding).
+    if (!tokenIn(toks[0], productToks)) continue
+    // (2)+(3b) NEAR-BARE: no candidate token is need-bearing beyond the product/generics.
+    const residual = toks.filter((t) => !tokenIn(t, productToks) && !tokenIn(t, GENERIC_CANON))
+    if (residual.length === 0) {
+      return {
+        role: 'support_only_product',
+        productEntity: { name: p.name, url: p.url ?? null },
+        matchedEntityTokens: toks.filter((t) => tokenIn(t, productToks)),
+        candidateOnlyTokens: [],
+        confidenceReason: 'near_bare_product: head is a product token, every candidate token is covered by one owned product entity or a generic modifier, and no independent search need is expressed',
+      }
+    }
+  }
+  return keep
 }
 
 const briefId = (subject: string) => {
@@ -213,6 +291,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
   const pool: OpportunityBrief[] = []
   const acceptedSignatures: TopicSignature[] = []
   const perHead = new Map<string, number>()
+  const supportOnlyExamples: BriefPoolDiagnostics['support_only_examples'] = []
   for (const b of candidates) {
     const kind = b.sourceEvidence[0]?.kind ?? 'unknown'
     if (input.isOwnedByEntity(b.subject)) { reject('exact_existing_keyword_owner', b.subject, kind); continue }
@@ -228,6 +307,18 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       const n = perHead.get(head) ?? 0
       if (n >= maxPerHead) { reject('subject_head_cap', b.subject, kind); continue }
       perHead.set(head, n + 1)
+    }
+    // SOURCE ROLE (final admission gate): a bare/near-bare owned-PRODUCT query is
+    // support/link evidence, not a standalone article subject. Runs AFTER every
+    // existing gate so all their reason semantics are unchanged; the product entity
+    // itself is untouched (still available for relatedEntities / links / examples).
+    const role = classifyCandidateSourceRole(b)
+    if (role.role === 'support_only_product') {
+      reject('product_entity_support_only', b.subject, kind)
+      if (supportOnlyExamples.length < 5 && role.productEntity) {
+        supportOnlyExamples.push({ subject: b.subject.slice(0, 120), productEntity: role.productEntity.name.slice(0, 120), entityUrl: role.productEntity.url, evidenceKind: kind, matchedEntityTokens: role.matchedEntityTokens, candidateOnlyTokens: role.candidateOnlyTokens, confidenceReason: role.confidenceReason ?? '' })
+      }
+      continue
     }
     acceptedSignatures.push(sig)
     pool.push(b)
@@ -256,6 +347,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       total_raw_candidates: rawQuery + rawTracked + rawTheme,
       rejected_by_reason: rejected,
       rejected_examples: rejectedExamples,
+      support_only_examples: supportOnlyExamples,
       pool_size: interleaved.length,
       by_family,
       with_demand: interleaved.filter((b) => b.alignedDemandQuery).length,
