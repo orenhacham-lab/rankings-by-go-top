@@ -47,6 +47,9 @@ interface Suggestion {
   suggestionScore: number
   /** Phase 3F.3.4a — why there are no suggested links (for a helpful message). */
   linkPreviewReason?: string
+  /** The cached-index snapshot the CANONICAL link preview came from (server-computed via
+   *  planFromCachedTargets). Used at one-click time as the reviewed-snapshot identity. */
+  linkPreviewSnapshot?: { scannerVersion: string | null; scanCompletedAt: string | null }
   /** Phase 3F.3.6 — URL of the best commercial destination (shown first, labelled). */
   moneyTargetUrl?: string | null
   /** Phase 4C — hybrid provenance: which providers support this idea. */
@@ -397,6 +400,8 @@ export default function AutomationIdeas({
     ideaIdsByTopicId: Record<string, string[]>
     // topicId → the idea's recommendedPageType (passed to approve-and-queue).
     pageTypeByTopicId: Record<string, string>
+    // topicId → the idea's canonical link-preview snapshot (reviewed-snapshot identity).
+    snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }>
     savedPlans: { topicId: string; linkCount: number }[]
     expectedPlans: number
   }
@@ -431,12 +436,14 @@ export default function AutomationIdeas({
     const selectedByTopicId: Record<string, { url: string; anchor: string }[]> = {}
     const ideaIdsByTopicId: Record<string, string[]> = {}
     const pageTypeByTopicId: Record<string, string> = {}
+    const snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }> = {}
     const seen = new Set<string>()
     const addResolved = (s: Suggestion, topicId: string, title: string, pk: string | null) => {
       if (!seen.has(topicId)) { seen.add(topicId); topicsForAction.push({ id: topicId, topic: title, primary_keyword: pk }) }
       resolvedIdeaIds.push(s.id)
       ;(ideaIdsByTopicId[topicId] ??= []).push(s.id)
       if (!pageTypeByTopicId[topicId]) pageTypeByTopicId[topicId] = s.recommendedPageType ?? 'article'
+      if (!snapshotByTopicId[topicId] && s.linkPreviewSnapshot) snapshotByTopicId[topicId] = s.linkPreviewSnapshot
       const checkedLinks = selectedLinksFor(s)
       const checked = new Set(checkedLinks.map((l) => l.url))
       const unchecked = s.suggestedInternalLinks.filter((l) => !checked.has(l.url)).map((l) => l.url)
@@ -471,7 +478,17 @@ export default function AutomationIdeas({
         else unresolved.push({ title: s.title, reason: 'unresolved' })
       }
     }
-    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, ideaIdsByTopicId, pageTypeByTopicId, savedPlans, expectedPlans }
+    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, ideaIdsByTopicId, pageTypeByTopicId, snapshotByTopicId, savedPlans, expectedPlans }
+  }
+
+  // Re-review refresh: replace a stale/legacy idea's displayed link choices with the
+  // CANONICAL current-plan links (all checked) + update its preview snapshot, so the next
+  // attempt uses saveable links — NEVER a silent substitution that gets queued unreviewed.
+  function refreshIdeaCardLinks(ideaIds: string[], links: { url: string; anchor: string }[], snapshot: { scannerVersion: string | null; scanCompletedAt: string | null }) {
+    if (ideaIds.length === 0) return
+    const set = new Set(ideaIds)
+    setSuggestions((prev) => prev.map((s) => set.has(s.id) ? { ...s, suggestedInternalLinks: links, linkPreviewSnapshot: snapshot } : s))
+    setLinkSel((prev) => { const n = { ...prev }; for (const id of ideaIds) n[id] = new Set(links.map((l) => l.url)); return n })
   }
 
   // Remove the given idea ids from the visible list + selection (called ONLY after
@@ -499,23 +516,47 @@ export default function AutomationIdeas({
     return null
   }
 
-  // Save the EXACT checked links for the given topics through the SAME reviewed-snapshot
-  // bulk-save contract the drawer/panel use (GET plan snapshot → POST bulk-save approve:true).
-  // The SERVER re-validates every link (idea-card URLs are never trusted); no force. Returns
-  // the topic ids whose links FULLY persisted + approved, and typed failures.
-  type LinkSaveOutcome = { okIds: Set<string>; failures: { topicId: string; reason: string }[]; hardReason: string | null }
-  async function saveCheckedLinks(topicIds: string[], selectedByTopicId: Record<string, { url: string; anchor: string }[]>): Promise<LinkSaveOutcome> {
-    const out: LinkSaveOutcome = { okIds: new Set(), failures: [], hardReason: null }
+  // Save the EXACT checked (canonical) links for the given topics through the SAME
+  // reviewed-snapshot bulk-save contract the drawer/panel use. The reviewed-snapshot identity
+  // is the IDEA's canonical preview snapshot, so a card built from the current index saves
+  // with NO drops; a genuinely changed cache returns cache_changed_replan_required. The SERVER
+  // re-validates every link (idea URLs are never trusted); no force. On any drop/change the
+  // topic is NOT queued and its CANONICAL current links are returned for a re-review refresh.
+  type LinkSaveOutcome = {
+    okIds: Set<string>
+    failures: { topicId: string; reason: string }[]
+    hardReason: string | null
+    // topicId → the canonical CURRENT plan links (to refresh the card on re-review).
+    refreshedByTopic: Record<string, { url: string; anchor: string }[]>
+    needsReview: boolean
+    currentSnapshot: { scannerVersion: string | null; scanCompletedAt: string | null }
+  }
+  async function saveCheckedLinks(
+    topicIds: string[],
+    selectedByTopicId: Record<string, { url: string; anchor: string }[]>,
+    snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }>,
+  ): Promise<LinkSaveOutcome> {
+    const out: LinkSaveOutcome = { okIds: new Set(), failures: [], hardReason: null, refreshedByTopic: {}, needsReview: false, currentSnapshot: { scannerVersion: null, scanCompletedAt: null } }
     if (topicIds.length === 0) return out
-    const failAll = (reason: string) => { out.hardReason = reason; for (const id of topicIds) out.failures.push({ topicId: id, reason }); return out }
-    // 1) current plan snapshot → the reviewed-snapshot identity.
-    let reviewedSnapshot: { scannerVersion: string | null; scanCompletedAt: string | null } | undefined
+    const failAll = (reason: string, needsReview = false) => { out.hardReason = reason; out.needsReview = needsReview; for (const id of topicIds) out.failures.push({ topicId: id, reason }); return out }
+    // 1) current plan — the canonical CURRENT links (for refresh) + current snapshot.
+    let currentSnapshot: { scannerVersion: string | null; scanCompletedAt: string | null } = { scannerVersion: null, scanCompletedAt: null }
     try {
       const gr = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topicIds.join(','))}`)
       const gd = await gr.json().catch(() => ({}))
       if (!gr.ok) return failAll(gd.cacheState === 'missing' ? 'no_cache' : 'plan_unavailable')
-      reviewedSnapshot = { scannerVersion: typeof gd.scannerVersion === 'string' ? gd.scannerVersion : null, scanCompletedAt: typeof gd.scanCompletedAt === 'string' ? gd.scanCompletedAt : null }
+      currentSnapshot = { scannerVersion: typeof gd.scannerVersion === 'string' ? gd.scannerVersion : null, scanCompletedAt: typeof gd.scanCompletedAt === 'string' ? gd.scanCompletedAt : null }
+      out.currentSnapshot = currentSnapshot
+      for (const p of Array.isArray(gd.topics) ? gd.topics : []) {
+        const sel = Array.isArray(p?.selected) ? p.selected : []
+        out.refreshedByTopic[p.topicId] = sel.filter((l: { targetUrl?: string; anchorText?: string }) => l.targetUrl && l.anchorText).map((l: { targetUrl: string; anchorText: string }) => ({ url: l.targetUrl, anchor: l.anchorText }))
+      }
     } catch { return failAll('plan_unavailable') }
+    // reviewed-snapshot identity = the IDEA preview snapshot common to the batch (so a stale
+    // preview → cache_changed, not a silent drop). Falls back to the current snapshot for
+    // legacy ideas with no stored preview snapshot.
+    const distinctSnaps = Array.from(new Set(topicIds.map((id) => snapshotByTopicId[id]).filter(Boolean).map((s) => `${s!.scannerVersion}|${s!.scanCompletedAt}`)))
+    const reviewedSnapshot = distinctSnaps.length === 1 ? snapshotByTopicId[topicIds.find((id) => snapshotByTopicId[id])!] : currentSnapshot
     // 2) exact checked selection → bulk-save (approve + reviewedSnapshot).
     const selectedLinks = topicIds.flatMap((id) => (selectedByTopicId[id] ?? []).map((l) => ({ topicId: id, targetUrl: l.url, anchorText: l.anchor })))
     let data: { results?: unknown[]; reason?: string; cacheState?: string } = {}
@@ -525,13 +566,21 @@ export default function AutomationIdeas({
         body: JSON.stringify({ projectId, topicIds, approve: true, selectedLinks, reviewedSnapshot }),
       })
       data = await sr.json().catch(() => ({}))
-      if (!sr.ok) return failAll(data.reason === 'cache_changed_replan_required' ? 'cache_changed_replan_required' : data.cacheState === 'missing' ? 'no_cache' : 'link_plan_failed')
+      if (!sr.ok) return failAll(data.reason === 'cache_changed_replan_required' ? 'cache_changed_replan_required' : data.cacheState === 'missing' ? 'no_cache' : 'link_plan_failed', data.reason === 'cache_changed_replan_required')
     } catch { return failAll('link_plan_failed') }
-    // 3) TRUTHFUL per-topic success (pure, shared with tests).
+    // 3) TRUTHFUL per-topic success (pure, shared with tests) + TYPED drop reasons.
     const results = (Array.isArray(data.results) ? data.results : []).filter((r): r is BulkSaveTopicResult => !!r && typeof (r as { topicId?: unknown }).topicId === 'string')
+    const byTopic = new Map(results.map((r) => [r.topicId, r]))
     const evln = evaluateLinkSave(topicIds, selectedByTopicId, { ok: true, results })
     for (const id of evln.okIds) out.okIds.add(id)
-    out.failures.push(...evln.failures)
+    for (const f of evln.failures) {
+      // Surface the SPECIFIC dropped reason (blocked / not_in_plan / invalid_anchor /
+      // duplicate_target / duplicate_anchor) instead of collapsing to dropped_link.
+      const dl = (byTopic.get(f.topicId)?.droppedLinks ?? []) as { reason?: string; rejectedReasons?: string[] }[]
+      const specific = dl[0]?.reason
+      out.failures.push({ topicId: f.topicId, reason: specific || f.reason })
+      out.needsReview = true // a dropped/legacy link means the card must be re-reviewed
+    }
     return out
   }
 
@@ -577,18 +626,24 @@ export default function AutomationIdeas({
       const { withLinks: withLinksIds, noLinks: noLinksIds } = partitionByCheckedLinks(allIds, r.selectedByTopicId)
 
       // 1) Save the CHECKED links authoritatively (reviewed-snapshot bulk-save, server revalidates).
-      const save = await saveCheckedLinks(withLinksIds, r.selectedByTopicId)
+      const save = await saveCheckedLinks(withLinksIds, r.selectedByTopicId, r.snapshotByTopicId)
       const failedLinkCount = save.failures.length
+
+      // 1b) Any topic whose checked links did NOT fully persist (stale/legacy/changed cache) is
+      //     NOT queued — refresh its card links from the canonical current plan and require a
+      //     re-review, instead of forcing an old link or a generic dropped_link.
+      const failedTopicIds = Array.from(new Set(save.failures.map((f) => f.topicId)))
+      for (const tid of failedTopicIds) refreshIdeaCardLinks(r.ideaIdsByTopicId[tid] ?? [], save.refreshedByTopic[tid] ?? [], save.currentSnapshot)
 
       // 2) Queue set = link-free topics (expectsLinks:false) + topics whose checked links FULLY
       //    persisted (expectsLinks:true). Topics with checked-but-unsaved links are excluded.
       const queue = buildQueueTopics(noLinksIds, [...save.okIds], r.pageTypeByTopicId)
+      const dropReason = save.hardReason ?? save.failures[0]?.reason ?? 'link_plan_failed'
       if (queue.length === 0) {
-        // C — no topic could be queued (every checked-link topic failed to save; no link-free
-        // topic). Show an error; NEVER "topics added"; keep the ideas visible.
+        // C — no topic could be queued. Show a re-review message (never "topics added");
+        // the failed ideas stay visible with refreshed canonical links.
         setLastQueueTopics([])
-        const reason = save.hardReason ?? save.failures[0]?.reason ?? 'link_plan_failed'
-        setMessage({ text: `${t.linkSaveAllFailed} (${reason})`, ok: false })
+        setMessage({ text: `${save.needsReview ? t.linksReReview : t.linkSaveAllFailed} (${dropReason})`, ok: false })
         return
       }
 
@@ -614,9 +669,9 @@ export default function AutomationIdeas({
       if (failedLinkCount === 0) {
         setMessage(null) // A — everything saved + queued.
       } else {
-        // B — exact counts + typed reason; a failed-link topic stays in the topics table.
-        const reason = save.hardReason ?? save.failures[0]?.reason ?? 'link_plan_failed'
-        setMessage({ text: t.queuePartial.replace('{queued}', String(q.queuedIds.size)).replace('{failed}', String(failedLinkCount)).replace('{reason}', reason), ok: false })
+        // B — exact counts + typed reason; the failed-link ideas stay visible with refreshed
+        // canonical links for re-review (never queued with unreviewed links).
+        setMessage({ text: `${t.queuePartial.replace('{queued}', String(q.queuedIds.size)).replace('{failed}', String(failedLinkCount)).replace('{reason}', dropReason)} ${t.linksReReview}`, ok: false })
       }
       onScheduled?.()
     } catch {

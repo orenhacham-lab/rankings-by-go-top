@@ -54,6 +54,11 @@ export interface TopicSuggestion {
   /** Phase 3F.3.4a — when there are no suggested links, WHY (valid_no_match /
    *  low_confidence_only / target_type_gap / stale_index / …). Response-only. */
   linkPreviewReason?: string
+  /** The cached-index snapshot the CANONICAL link preview was computed from (the SAME
+   *  planFromCachedTargets the drawer/bulk-save use). Used at one-click time as the
+   *  reviewed-snapshot identity so canonical links save without drops when the cache is
+   *  unchanged, and trigger a re-review when it changed. Never contains secrets. */
+  linkPreviewSnapshot?: { scannerVersion: string | null; scanCompletedAt: string | null }
   /** Phase 3F.3.6 — URL of the best commercial destination among suggestedInternalLinks
    *  (null when none). The idea card shows it FIRST under "Primary commercial link". */
   moneyTargetUrl?: string | null

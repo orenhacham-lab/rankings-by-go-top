@@ -35,6 +35,8 @@ interface PersistedPlan {
   confidenceLevel?: TopicSuggestion['confidenceLevel']
   discoveryGenerated?: boolean
   businessRelevance?: TopicSuggestion['businessRelevance']
+  /** The cached-index snapshot the canonical link preview was built from. */
+  linkPreviewSnapshot?: TopicSuggestion['linkPreviewSnapshot']
   /** Model-selection provenance that must survive reload (surfaced in the QA/admin
    *  view; the customer card shows only the "improved" marker, never model names). */
   requestedTier?: 'standard' | 'premium'
@@ -92,6 +94,7 @@ export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { 
     // Role-aware fields survive the round trip when link_plan is present.
     ...(linkPlan ? { linkPlan, moneyTargetUrl: linkPlan.primaryCommercialTarget?.url ?? null } : {}),
     ...(plan?.recommendedPageType ? { recommendedPageType: plan.recommendedPageType } : {}),
+    ...(plan?.linkPreviewSnapshot ? { linkPreviewSnapshot: plan.linkPreviewSnapshot } : {}),
     ...(plan?.demandEvidence ? { demandEvidence: plan.demandEvidence } : {}),
     ...(plan?.confidenceLevel ? { confidenceLevel: plan.confidenceLevel } : {}),
     ...(plan?.discoveryGenerated ? { discoveryGenerated: true } : {}),
@@ -173,7 +176,7 @@ export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Pro
     const modelMeta = { requestedTier: input.requestedTier, modelUsed: input.modelUsed ?? s.modelUsed ?? undefined, improvedWithPro: s.improvedWithPro }
     const hasModelMeta = !!(modelMeta.requestedTier || modelMeta.modelUsed || modelMeta.improvedWithPro)
     const persistedPlan: PersistedPlan | null = (s.linkPlan || hasModelMeta)
-      ? { ...(s.linkPlan ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance } : {}), ...modelMeta }
+      ? { ...(s.linkPlan ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance } : {}), ...(s.linkPreviewSnapshot ? { linkPreviewSnapshot: s.linkPreviewSnapshot } : {}), ...modelMeta }
       : null
     return {
       user_id: input.userId,

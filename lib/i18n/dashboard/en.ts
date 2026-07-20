@@ -58,6 +58,7 @@ export const dashboardEn = {
       linkSavePartialWarn: 'The topics were added to the queue, but some links were not saved. You can edit links from the table.',
       queuePartial: '{queued} topic(s) were added to the queue. {failed} were not, because the checked links did not save ({reason}). You can edit links from the table.',
       linkSaveAllFailed: 'The links you checked were not saved, so the topics were not added to the queue. Edit the links from the table and try again.',
+      linksReReview: 'The link recommendations were updated to the current scan. Please review and approve again.',
       queueFailedRetry: 'The topics were approved but adding them to the queue failed. Click “Add to publishing queue” to try again.',
       reviewOpenFailed: 'We could not open link review for the selected topics.',
       topicResolveFailed: 'We could not resolve a topic for the selected ideas. The ideas remain in the list.',

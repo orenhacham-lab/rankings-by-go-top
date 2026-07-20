@@ -147,6 +147,13 @@ export async function POST(request: Request) {
       const sel = selectClientLinks(basePlan, selectedByTopic.get(id) ?? [])
       plan = sel.plan
       droppedLinks = sel.dropped
+      // Preview-only diagnostics for dropped checked links — safe fields only (no content,
+      // no credentials): topicId, normalized target, drop reason + rejectedReasons, and
+      // whether the reviewed (idea-preview) snapshot matched the current cache snapshot.
+      if (droppedLinks.length && process.env.RECO_ISOLATION_DIAGNOSTICS === '1') {
+        const sameSnapshot = !!reviewedSnapshot && String(reviewedSnapshot.scannerVersion ?? '') === String(row.scanner_version ?? '') && String(reviewedSnapshot.scanCompletedAt ?? '') === String(row.scan_completed_at ?? '')
+        for (const d of droppedLinks) console.warn('[ilp-bulk-save] dropped_checked_link', { topicId: id, targetUrl: d.targetUrl, reason: d.reason, rejectedReasons: d.rejectedReasons ?? [], previewSnapshotMatchesCurrent: sameSnapshot })
+      }
     } else {
       const promoted = promoteManualCandidates(basePlan, manualByTopic.get(id) ?? [])
       plan = promoted.plan

@@ -15,6 +15,9 @@ import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
+import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { canonicalizeSuggestionLinks } from '@/lib/content/recommendations/canonical-links'
+import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
@@ -263,6 +266,27 @@ export async function POST(request: Request) {
       blogReport.finalValid = kept.length
     }
 
+    // CANONICAL internal-link preview — re-derive each recommendation's selectable links
+    // from the SAME planFromCachedTargets planner that GET /internal-links/plan + bulk-save
+    // use, against the SAME cached site index. This guarantees a checked card link is a
+    // member of the authoritative plan (no not_in_plan/blocked drop at save). It changes
+    // ONLY suggestedInternalLinks (+ records the cache snapshot) — never title/keyword/
+    // secondaries/score/acceptance/count. Skipped when the project has no cached index yet.
+    let canonicalLinkPreview: { applied: boolean; scannerVersion: string | null; scanCompletedAt: string | null; topicsCanonicalized: number } = { applied: false, scannerVersion: null, scanCompletedAt: null, topicsCanonicalized: 0 }
+    try {
+      const idxRow = await getCachedIndex(auth.admin, auth.project.id)
+      if (idxRow) {
+        const rep = reassembleReport(idxRow)
+        const linkCtx = { targets: (rep.targets ?? []) as ScannedTarget[], hosts: rep.hosts ?? [], scannerVersion: idxRow.scanner_version, scanCompletedAt: idxRow.scan_completed_at }
+        fresh = fresh.map((s) => canonicalizeSuggestionLinks(s, linkCtx))
+        canonicalLinkPreview = { applied: true, scannerVersion: idxRow.scanner_version, scanCompletedAt: idxRow.scan_completed_at, topicsCanonicalized: fresh.length }
+      }
+    } catch (e) {
+      // Non-fatal: a preview canonicalization failure never blocks recommendations; the
+      // engine links remain and the one-click flow reconciles them against the live plan.
+      console.warn('[automation-recommendations] canonical link preview skipped', { message: (e as Error)?.message?.slice(0, 120) })
+    }
+
     // E — one truthful stage contract. raw = model output BEFORE gates; engine-accepted
     // = engine output; the engine's removal count is ALWAYS surfaced (customer funnel)
     // so "generated N / 0 rejections" can never happen when the engine removed some.
@@ -404,6 +428,7 @@ export async function POST(request: Request) {
       persistedCurrentRunCount: persistOutcome?.inserted ?? 0,
       // Deterministic blog-article acceptance report (Preview-only observability).
       blogArticleGate: blogReport,
+      canonicalLinkPreview,
       reload_visible_count: suggestions.length,
       ...(persistenceTrace ?? {}),
       rejectionClassification,
