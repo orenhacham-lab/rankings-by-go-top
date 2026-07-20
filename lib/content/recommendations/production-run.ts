@@ -148,9 +148,9 @@ export async function runProFirstProduction(
   // read of the snapshot's already-derived evidence. Never affects Stage-D selection.
   const acceptanceContext: BlogAcceptanceContext = {
     brandSafety: snapshot.brandSafety,
-    businessEvidenceTokens: snapshot.businessEvidenceTokens,
+    explicitBusinessEvidenceTokens: snapshot.explicitBusinessEvidenceTokens,
     domainTypeWords: snapshot.domainTypeWords,
-    pendingSignatures: snapshot.pendingSignatures,
+    blogDuplicateSignatures: snapshot.blogDuplicateSignatures,
   }
   const baseProv = {
     primaryModelRequested: 'pro' as const,

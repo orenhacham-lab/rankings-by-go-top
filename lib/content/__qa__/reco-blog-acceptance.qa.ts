@@ -9,10 +9,14 @@
  * passing — the suite proves proven-invalid topics/fields are removed WITHOUT dropping
  * nearby valid article volume.
  */
+import { createServer, type Server } from 'http'
 import { buildBrandSafety } from '../recommendations/brand-safety'
 import { topicSignature } from '../recommendations/semantic-dup'
 import { contentTokens } from '../recommendations/evidence-cluster'
 import { decideBlogArticle, type BlogAcceptanceContext, type BlogCandidate } from '../recommendations/blog-article-acceptance'
+import { fakeAdmin } from './_reco-harness'
+import { resetModelResolutionCache } from '../recommendations/model-availability'
+import { resetRecoGenAiClient } from '../recommendations/genai-client'
 import type { SearchIntent } from '../recommendations/opportunity'
 import type { RecommendedPageType } from '../recommendations/opportunity-validation'
 
@@ -27,11 +31,12 @@ function ctxOf(o: {
   domainTypeWords?: string[]; pending?: { kw: string; intent?: string }[];
 }): BlogAcceptanceContext {
   const brandSafety = buildBrandSafety({ businessName: o.businessName, entityNames: o.entityNames ?? [], ownEvidence: o.evidence ?? [] })
-  const businessEvidenceTokens = new Set<string>()
-  for (const s of [...(o.entityNames ?? []), ...(o.evidence ?? [])]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
+  // The manual fixtures pass ONLY owned evidence (entities + focus) — never keyword research.
+  const explicitBusinessEvidenceTokens = new Set<string>()
+  for (const s of [...(o.entityNames ?? []), ...(o.evidence ?? [])]) for (const t of contentTokens(s)) explicitBusinessEvidenceTokens.add(t)
   const domainTypeWords = new Set<string>((o.domainTypeWords ?? []).map((w) => contentTokens(w)[0]).filter(Boolean) as string[])
-  const pendingSignatures = (o.pending ?? []).map((p) => topicSignature(p.kw, p.intent))
-  return { brandSafety, businessEvidenceTokens, domainTypeWords, pendingSignatures }
+  const blogDuplicateSignatures = (o.pending ?? []).map((p) => ({ sig: topicSignature(p.kw, p.intent), source: 'pending' as const }))
+  return { brandSafety, explicitBusinessEvidenceTokens, domainTypeWords, blogDuplicateSignatures }
 }
 const cand = (o: Partial<BlogCandidate> & { title: string; primaryKeyword: string }): BlogCandidate => ({
   secondaryKeywords: [], intent: 'informational' as SearchIntent, recommendedPageType: 'article' as RecommendedPageType, ...o,
@@ -166,6 +171,104 @@ async function main() {
     check('CONTROL JUP choose skeleton contractor → KEEP', c1.outcome === 'keep', JSON.stringify(c1))
     const c2 = decideBlogArticle(cand({ title: 'שלבי שיפוץ דירה: המדריך המלא לתכנון', primaryKeyword: 'שלבי שיפוץ דירה', intent: 'informational' }), ctx)
     check('CONTROL JUP apartment renovation stages → KEEP', c2.outcome === 'keep', JSON.stringify(c2))
+  }
+
+  // ── INTEGRATION — the REAL prepareBriefRun context construction ──────────────
+  // These prove the CONTEXT WIRING (not a hand-built context): the blog gate is fed
+  // exactly the acceptanceContext production builds from the snapshot. If explicit
+  // evidence wrongly included keyword research, or the dedupe corpus were pending-only,
+  // these would fail.
+  console.log('INTEGRATION — real snapshot-derived acceptance context (prepareBriefRun)')
+  {
+    const KWS = (arr: string[]) => arr.map((k, i) => ({ keyword: k, avgMonthlySearches: 120 + i * 20 }))
+    const startServer = (): Promise<{ server: Server; port: number }> => {
+      const server = createServer((req, res) => {
+        req.on('data', () => {}); req.on('end', () => {
+          if (req.method === 'GET' && (req.url ?? '').includes('/models')) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ models: [{ name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }, { name: 'models/gemini-2.5-pro', supportedGenerationMethods: ['generateContent'] }] })); return }
+          // Discovery / synthesis calls: return nothing (pool comes from research/entities).
+          res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify({ needs: [], topics: [] }) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 500, candidatesTokenCount: 100, totalTokenCount: 600 } }))
+        })
+      })
+      return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, port: (server.address() as { port: number }).port })))
+    }
+    const realCtx = async (tables: Record<string, Record<string, unknown>[]>): Promise<BlogAcceptanceContext> => {
+      const s = await startServer()
+      process.env.GEMINI_API_KEY = 'test-key'; process.env.RECO_GENAI_BASE_URL = `http://127.0.0.1:${s.port}`
+      resetModelResolutionCache(); resetRecoGenAiClient()
+      const { prepareBriefRun } = await import('../recommendations/generate-from-briefs')
+      const { newRunCostController } = await import('../recommendations/run-cost-controller')
+      const snap = await prepareBriefRun(fakeAdmin(tables), { projectId: 'p1', targetCount: 4, qualityMode: 'premium' }, newRunCostController('premium', 'it', 6))
+      s.server.close()
+      // EXACTLY what production-run.ts builds from the snapshot.
+      return { brandSafety: snap.brandSafety, explicitBusinessEvidenceTokens: snap.explicitBusinessEvidenceTokens, domainTypeWords: snap.domainTypeWords, blogDuplicateSignatures: snap.blogDuplicateSignatures }
+    }
+    const baseTables = (over: Record<string, Record<string, unknown>[]> = {}) => ({
+      projects: [{ id: 'p1', business_name: 'עידו ספורט', target_domain: 'https://ido-sport.co.il', language: 'he', country: 'IL' }],
+      tracking_targets: [{ project_id: 'p1', keyword: 'ציוד כושר ביתי' }],
+      keyword_research_cache: [{ project_id: 'p1', fetched_at: '2026-07-01', results_json: KWS(['קטלבל אוניברסלי', 'משקולות יד', 'הליכון חשמלי', 'ספסל אימון', 'אימון כוח בבית', 'מזרן יוגה']) }],
+      shopify_entities: [{ project_id: 'p1', is_active: true, title: 'קטלבל אוניברסלי', handle: 'kb', entity_type: 'product', canonical_url: 'https://ido-sport.co.il/p/kb' }],
+      generated_articles: [], article_topics: [], content_topic_ideas: [], wordpress_content_index: [],
+      ...over,
+    })
+
+    // IT-A — used-goods term ONLY in keyword research, no owned evidence → REJECT.
+    const ctxA = await realCtx(baseTables({ keyword_research_cache: [{ project_id: 'p1', fetched_at: '2026-07-01', results_json: KWS(['ספת כושר יד שנייה', 'קטלבל אוניברסלי', 'אימון כוח בבית', 'ספסל אימון', 'משקולות יד', 'הליכון חשמלי']) }] }))
+    const a = decideBlogArticle(cand({ title: 'ספת כושר יד 2: מדריך לבחירה חכמה', primaryKeyword: 'ספת כושר יד 2' }), ctxA)
+    check('IT-A. used-goods term only in keyword research → REJECT (KR is not business evidence)', a.outcome === 'reject' && a.reason === 'unsupported_business_model_expansion', JSON.stringify(a))
+
+    // IT-B — legal term ONLY in keyword research, no owned legal evidence → REJECT.
+    const ctxB = await realCtx(baseTables({ keyword_research_cache: [{ project_id: 'p1', fetched_at: '2026-07-01', results_json: KWS(['אחריות קבלן חוק המכר', 'קטלבל אוניברסלי', 'אימון כוח בבית', 'ספסל אימון', 'משקולות יד', 'הליכון חשמלי']) }] }))
+    const b2 = decideBlogArticle(cand({ title: 'מה כוללת אחריות קבלן על פי חוק המכר?', primaryKeyword: 'אחריות קבלן חוק המכר' }), ctxB)
+    check('IT-B. legal term only in keyword research → REJECT (KR is not business evidence)', b2.outcome === 'reject' && b2.reason === 'unsupported_business_model_expansion', JSON.stringify(b2))
+
+    // IT-C — an OWNED entity explicitly supports used equipment → KEEP.
+    const ctxC = await realCtx(baseTables({ shopify_entities: [{ project_id: 'p1', is_active: true, title: 'ציוד כושר יד שנייה', handle: 'used', entity_type: 'category', canonical_url: 'https://ido-sport.co.il/c/used' }] }))
+    const c = decideBlogArticle(cand({ title: 'ספת כושר יד 2: מדריך לבחירה חכמה', primaryKeyword: 'ספת כושר יד 2' }), ctxC)
+    check('IT-C. owned used-equipment category → KEEP (explicit evidence authorizes)', c.outcome !== 'reject', JSON.stringify(c))
+
+    // IT-D — duplicate of a GENERATED article → REJECT with source 'generated'.
+    const ctxD = await realCtx(baseTables({ generated_articles: [{ project_id: 'p1', title: 'אימון כוח בבית' }] }))
+    const d = decideBlogArticle(cand({ title: 'אימון כוח בבית', primaryKeyword: 'אימון כוח בבית' }), ctxD)
+    check('IT-D. duplicate of generated_articles → REJECT (source generated)', d.outcome === 'reject' && d.reason === 'pending_semantic_duplicate' && d.duplicateSource === 'generated', JSON.stringify(d))
+
+    // IT-E — duplicate of an ARTICLE_TOPIC → REJECT with source 'article_topic'.
+    const ctxE = await realCtx(baseTables({ article_topics: [{ project_id: 'p1', topic: 'יתרונות אימון פונקציונלי' }] }))
+    const e = decideBlogArticle(cand({ title: 'יתרונות אימון פונקציונלי', primaryKeyword: 'יתרונות אימון פונקציונלי' }), ctxE)
+    check('IT-E. duplicate of article_topics → REJECT (source article_topic)', e.outcome === 'reject' && e.reason === 'pending_semantic_duplicate' && e.duplicateSource === 'article_topic', JSON.stringify(e))
+
+    // IT-F — duplicate of an INDEXED article/post page → REJECT with source 'indexed_article'.
+    const ctxF = await realCtx(baseTables({ shopify_entities: [{ project_id: 'p1', is_active: true, title: 'מדריך תזונת ספורטאים', handle: 'blog1', entity_type: 'blog', canonical_url: 'https://ido-sport.co.il/blog/nutrition' }] }))
+    const f = decideBlogArticle(cand({ title: 'מדריך תזונת ספורטאים', primaryKeyword: 'תזונת ספורטאים' }), ctxF)
+    check('IT-F. duplicate of an indexed article/post → REJECT (source indexed_article)', f.outcome === 'reject' && f.reason === 'pending_semantic_duplicate' && f.duplicateSource === 'indexed_article', JSON.stringify(f))
+
+    // IT-G — a genuinely DISTINCT subtype survives dedupe → KEEP.
+    const ctxG = await realCtx(baseTables({ generated_articles: [{ project_id: 'p1', title: 'אימון כוח בבית' }] }))
+    const g = decideBlogArticle(cand({ title: 'אימון כוח לנשים אחרי לידה', primaryKeyword: 'אימון כוח לנשים אחרי לידה' }), ctxG)
+    check('IT-G. distinct subtype (postpartum) vs generated general article → KEEP', g.outcome !== 'reject', JSON.stringify(g))
+  }
+
+  // ── Blocker 3 controls — legitimate qualifier queries must survive; malformed repair. ──
+  console.log('Blocker 3 — qualifier queries survive; only structured marketing sentences repair')
+  {
+    // Evidence covers used-fashion + gifting so the two REPAIRED keywords survive (the point
+    // of these two is the repair itself, not the expansion gate).
+    const ctx = ctxOf({ businessName: 'Store', entityNames: ['מזרנים', 'תאורה', 'מתנות', 'בגדי יד שנייה', 'מארז מתנה'], evidence: ['מזרן', 'תאורה', 'מתנות', 'עסק', 'דיגיטלי', 'יד שנייה', 'מארז', 'אונליין'], domainTypeWords: ['תאורה', 'מזרן'] })
+    const controls = [
+      ['מתנות לכל אירוע', 'מתנות מקוריות לכל אירוע'],
+      ['תאורה לכל חדר', 'איך לבחור תאורה לכל חדר בבית'],
+      ['פתרונות דיגיטליים לכל עסק', 'פתרונות דיגיטליים לכל עסק קטן'],
+      ['בחירת המזרן המושלם', 'איך לבחור את המזרן המושלם'],
+      ['מארז מתנה מושלם ליולדת', 'מארז מתנה מושלם ליולדת'],
+    ]
+    for (const [kw, title] of controls) {
+      const d = decideBlogArticle(cand({ title, primaryKeyword: kw, intent: 'informational' }), ctx)
+      check(`CONTROL qualifier query survives (not malformed): "${kw}"`, d.outcome !== 'reject', JSON.stringify({ outcome: d.outcome, reason: d.reason }))
+    }
+    // The two proven marketing SENTENCES still repair (opener + tail together).
+    const m1 = decideBlogArticle(cand({ title: 'קניית בגדי יד שנייה אונליין', primaryKeyword: 'לקניית בגדי יד שנייה אונליין בבטחה ובסטייל', supportedQuery: 'קניית בגדי יד שנייה אונליין' }), ctx)
+    check('marketing sentence "לקניית … בבטחה ובסטייל" → REPAIR_AND_KEEP', m1.outcome === 'repair_and_keep' && m1.primaryKeyword === 'קניית בגדי יד שנייה אונליין', JSON.stringify(m1))
+    const m2 = decideBlogArticle(cand({ title: 'איך להרכיב מארז מתנה אישי', primaryKeyword: 'להרכיב מארז מתנה אישי ומרגש לכל אירוע', supportedQuery: 'מארז מתנה אישי' }), ctx)
+    check('marketing sentence "להרכיב … ומרגש לכל אירוע" → REPAIR_AND_KEEP', m2.outcome === 'repair_and_keep' && m2.primaryKeyword === 'מארז מתנה אישי', JSON.stringify(m2))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

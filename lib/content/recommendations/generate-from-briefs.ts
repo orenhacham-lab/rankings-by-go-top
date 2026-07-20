@@ -302,9 +302,13 @@ export async function prepareBriefRun(
   } catch (e) { loadErrors.push(`shopify_entities:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
 
   const publishedCoverage: string[] = []
+  // Kept source-identified for the blog-article DUPLICATE corpus (Blocker 2) — a new blog
+  // topic must dedupe against generated articles + article topics, not only pending ideas.
+  const generatedArticleTitles: string[] = []
+  const articleTopicTitles: string[] = []
   let generatedArticles = 0
-  try { const { data } = await admin.from('generated_articles').select('title').eq('project_id', input.projectId); for (const r of (data ?? []) as { title: string | null }[]) if (r.title) { publishedCoverage.push(r.title); generatedArticles++ } } catch (e) { loadErrors.push(`generated_articles:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
-  try { const { data } = await admin.from('article_topics').select('topic').eq('project_id', input.projectId); for (const r of (data ?? []) as { topic: string | null }[]) if (r.topic) publishedCoverage.push(r.topic) } catch (e) { loadErrors.push(`article_topics:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
+  try { const { data } = await admin.from('generated_articles').select('title').eq('project_id', input.projectId); for (const r of (data ?? []) as { title: string | null }[]) if (r.title) { publishedCoverage.push(r.title); generatedArticleTitles.push(r.title); generatedArticles++ } } catch (e) { loadErrors.push(`generated_articles:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
+  try { const { data } = await admin.from('article_topics').select('topic').eq('project_id', input.projectId); for (const r of (data ?? []) as { topic: string | null }[]) if (r.topic) { publishedCoverage.push(r.topic); articleTopicTitles.push(r.topic) } } catch (e) { loadErrors.push(`article_topics:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
 
   // PENDING ideas — exact keys + signatures for identity, AND need-aware coverage
   // docs so a synonym-equivalent pending idea (מזון≈תזונה) blocks/converts a new
@@ -357,6 +361,12 @@ export async function prepareBriefRun(
   for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
   for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
+  // EXPLICIT owned business-model evidence — owned entities + explicit project focus +
+  // tracked keywords ONLY. Keyword-research queries / search volume are NOT positive
+  // business-model evidence (Blocker 1): they keep supporting discovery + demand, but must
+  // NEVER authorize a used-goods or specialist-legal expansion in the blog gate.
+  const explicitBusinessEvidenceTokens = new Set<string>(commercialEntityTokens)
+  for (const s of [...projectFocus, ...tracked]) for (const t of contentTokens(s)) explicitBusinessEvidenceTokens.add(t)
   // PROVENANCE — which INDEPENDENT source contributed each evidence token, so a
   // coverage document cannot corroborate its OWN unmatched entity (a horse article
   // placing "סוסים" in the vocab and then proving it is on-domain). Per-source keys
@@ -386,6 +396,19 @@ export async function prepareBriefRun(
     ...Array.from(guard.keywords).map((k) => ({ title: k, type: null, sourceKey: `guard:${normalizeText(k)}` })),
     ...Array.from(guard.entityOwners).map((k) => ({ title: k, type: null, sourceKey: `entity:${normalizeText(k)}` })),
   ])
+
+  // Blog-article DUPLICATE corpus (Blocker 2) — INFORMATIONAL article/post sources ONLY:
+  // pending content_topic_ideas + generated_articles + article_topics + indexed article/
+  // post pages. Commercial product/category/service entities are NEVER blog-article
+  // duplicates (ownership / cannibalization handle those, unchanged). Article sources carry
+  // the 'informational' cluster so the narrow head+need rule matches informational needs.
+  const INDEXED_INFORMATIONAL_TYPES = new Set(['post', 'page'])
+  const blogDuplicateSignatures: { sig: TopicSignature; source: 'pending' | 'generated' | 'article_topic' | 'indexed_article' }[] = [
+    ...pendingSignatures.map((sig) => ({ sig, source: 'pending' as const })),
+    ...generatedArticleTitles.map((t) => ({ sig: topicSignature(t, 'informational'), source: 'generated' as const })),
+    ...articleTopicTitles.map((t) => ({ sig: topicSignature(t, 'informational'), source: 'article_topic' as const })),
+    ...existingCoverageDocs.filter((d) => d.type != null && INDEXED_INFORMATIONAL_TYPES.has(d.type)).map((d) => ({ sig: topicSignature(d.focusKeyword || d.title, 'informational'), source: 'indexed_article' as const })),
+  ]
 
   // ── 3) Deterministic brief pool (pre-AI validation inside) ──────────────────
   // Brief subjects must come from REAL evidence: category-derived focus areas
@@ -510,6 +533,8 @@ export async function prepareBriefRun(
     domainTypeWords,
     commercialEntityTokens,
     businessEvidenceTokens,
+    explicitBusinessEvidenceTokens,
+    blogDuplicateSignatures,
     evidenceProvenance,
     existingPageTitles,
     existingCoverageDocs,

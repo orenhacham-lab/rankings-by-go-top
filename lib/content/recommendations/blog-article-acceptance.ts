@@ -53,15 +53,21 @@ export interface BlogCandidate {
   supportedQuery?: string | null
 }
 
+export type BlogDupSource = 'pending' | 'generated' | 'article_topic' | 'indexed_article'
+export interface BlogDuplicateSignature { sig: TopicSignature; source: BlogDupSource }
+
 export interface BlogAcceptanceContext {
   brandSafety: BrandSafety
-  /** Every token present in the project's OWN evidence (entities + focus + tracked + KR). */
-  businessEvidenceTokens: Set<string>
-  /** Domain TYPE words (lighting/room/etc.) — a candidate that only ADDS these over a
-   *  pending topic is the same need, not a distinct article. */
+  /** EXPLICIT owned business-model evidence ONLY — owned entities + project focus + tracked
+   *  keywords. Keyword-research queries / search volume are NEVER positive business-model
+   *  evidence, so they can't authorize a used-goods / specialist expansion (Blocker 1). */
+  explicitBusinessEvidenceTokens: Set<string>
+  /** Domain TYPE words (lighting/room/etc.) — a candidate that only ADDS these over an
+   *  existing topic is the same need, not a distinct article. */
   domainTypeWords: Set<string>
-  /** Signatures of pending / generated / existing article subjects to dedupe against. */
-  pendingSignatures: TopicSignature[]
+  /** Blog-article duplicate corpus — pending ideas + generated articles + article topics +
+   *  indexed article/post pages (informational only; never commercial entities). */
+  blogDuplicateSignatures: BlogDuplicateSignature[]
 }
 
 export interface BlogAcceptanceDecision {
@@ -77,24 +83,31 @@ export interface BlogAcceptanceDecision {
   removedSecondaries: { keyword: string; reason: string; primarySubject: string }[]
   /** The candidate's normalized primary subject (for diagnostics). */
   primarySubject: string
+  /** Which corpus a semantic-duplicate rejection matched (diagnostics; null otherwise). */
+  duplicateSource?: BlogDupSource | null
 }
 
 // ── keyword-as-search-phrase (beyond the engine's isSearchPhraseQuality) ──────
-// Marketing SENTENCES the engine's structural check passes but that are not real
-// queries: a leading infinitive verb ("לקניית …", "להרכיב …") and/or a coordinated
-// adjective/adverb marketing tail ("… בבטחה ובסטייל", "… ומרגש לכל אירוע").
-const MARKETING_QUALIFIER_RE = /(?:^|\s)(?:בבטחה|בסטייל|ובסטייל|ובבטחה|ומרגש|ומרגשת|המושלם|המושלמת|המושלמים|בקלות ובנוחות|לכל אירוע|לכל עסק|לכל בית|לכל חדר|לכל הזדמנות)(?:\s|$)/
-const INFINITIVE_MARKETING_OPENER_RE = /^(?:לקניית|לרכישת|להרכבת|להרכיב|לבחירת|ליצירת|להשגת|לעיצוב)\b/
+// A marketing SENTENCE (not a real query) has a DETERMINISTIC structure the engine's
+// structural check misses: a long infinitive opener ("לקניית …", "להרכיב …") COMBINED WITH
+// a coordinated marketing tail ("… בבטחה ובסטייל", "… ומרגש לכל אירוע"). Neither signal on
+// its OWN is disqualifying — "מתנות לכל אירוע" / "המזרן המושלם" / "פתרונות … לכל עסק" are
+// perfectly natural queries and must survive (Blocker 3). Only the two together (or a real
+// structural failure) mark a malformed phrase.
+const MARKETING_TAIL_RE = /(?:^|\s)(?:בבטחה|בסטייל|ובסטייל|ובבטחה|ומרגש|ומרגשת|בקלות ובנוחות|לכל אירוע|לכל עסק|לכל בית|לכל חדר|לכל הזדמנות)(?:\s|$)/
+// NOTE: a trailing \b does NOT work after Hebrew letters (\b is ASCII-word-boundary only),
+// so the boundary is an explicit space-or-end lookahead.
+const INFINITIVE_MARKETING_OPENER_RE = /^(?:לקניית|לרכישת|להרכבת|להרכיב|לבחירת|ליצירת|להשגת|לעיצוב)(?=\s|$)/
 
-/** True when a keyword reads as a natural standalone search phrase — the engine's
- *  structural gate PLUS a marketing-sentence guard. */
+/** True when a keyword reads as a natural standalone search phrase. It is malformed ONLY
+ *  when the engine's structural gate fails, OR it has BOTH a long infinitive marketing
+ *  opener AND a marketing tail (a full marketing sentence) — never for a qualifier alone. */
 export function isNaturalSearchPhrase(keyword: string): boolean {
   const k = (keyword || '').trim()
   if (!k) return false
   if (!isSearchPhraseQuality(k)) return false
-  if (MARKETING_QUALIFIER_RE.test(k)) return false
   const toks = k.split(/\s+/).filter(Boolean)
-  if (INFINITIVE_MARKETING_OPENER_RE.test(k) && toks.length >= 5) return false
+  if (INFINITIVE_MARKETING_OPENER_RE.test(k) && MARKETING_TAIL_RE.test(k) && toks.length >= 5) return false
   return true
 }
 
@@ -129,7 +142,8 @@ const LEGAL_EXPANSION_RE = /(?:חוק\s?המכר|אחריות\s?קבלן|אכי�
 const LEGAL_EVIDENCE = ['עורך', 'דין', 'משפטי', 'משפטית', 'ייעוץ', 'עו״ד', 'עוד', 'חוק', 'תביעות', 'ליטיגציה']
 
 function evidenceHasAny(ctx: BlogAcceptanceContext, tokens: string[]): boolean {
-  for (const t of tokens) if (ctx.businessEvidenceTokens.has(normalizePhrase(t))) return true
+  // ONLY explicit owned evidence authorizes an expansion — never keyword research.
+  for (const t of tokens) if (ctx.explicitBusinessEvidenceTokens.has(normalizePhrase(t))) return true
   return false
 }
 
@@ -183,8 +197,8 @@ const COMMERCIAL_PAGE_TYPES = new Set<RecommendedPageType>(['commercial_landing_
 export function decideBlogArticle(cand: BlogCandidate, ctx: BlogAcceptanceContext): BlogAcceptanceDecision {
   const primarySubject = normalizePhrase(cand.primaryKeyword)
   const base = { removedSecondaries: [] as { keyword: string; reason: string; primarySubject: string }[], primarySubject }
-  const reject = (reason: BlogRejectionReason): BlogAcceptanceDecision =>
-    ({ outcome: 'reject', reason, primaryKeyword: cand.primaryKeyword, secondaryKeywords: cand.secondaryKeywords, recommendedPageType: cand.recommendedPageType, ...base })
+  const reject = (reason: BlogRejectionReason, duplicateSource: BlogDupSource | null = null): BlogAcceptanceDecision =>
+    ({ outcome: 'reject', reason, primaryKeyword: cand.primaryKeyword, secondaryKeywords: cand.secondaryKeywords, recommendedPageType: cand.recommendedPageType, duplicateSource, ...base })
 
   // (1) MALFORMED primary keyword → deterministic repair from evidence, else reject.
   let primaryKeyword = cand.primaryKeyword
@@ -206,10 +220,11 @@ export function decideBlogArticle(cand: BlogCandidate, ctx: BlogAcceptanceContex
   //     explicit owned evidence — keyword volume is not business evidence.
   if (isUnsupportedExpansion(primaryKeyword, cand.title, ctx)) return reject('unsupported_business_model_expansion')
 
-  // (4) SEMANTIC DUPLICATE of a pending/generated/existing article (before persistence,
-  //     never relying on the DB unique constraint).
+  // (4) SEMANTIC DUPLICATE of a pending idea / generated article / article topic / indexed
+  //     article (before persistence, never relying on the DB unique constraint).
   const sig = topicSignature(primaryKeyword, cand.intent)
-  if (ctx.pendingSignatures.some((ps) => isBlogDuplicate(sig, ps, ctx))) return reject('pending_semantic_duplicate')
+  const dupMatch = ctx.blogDuplicateSignatures.find((ps) => isBlogDuplicate(sig, ps.sig, ctx))
+  if (dupMatch) return reject('pending_semantic_duplicate', dupMatch.source)
 
   // (5) SECONDARY KEYWORD coherence — remove only proven-incoherent secondaries; an
   //     empty secondary array is valid (never rejects the topic for that).
@@ -234,5 +249,5 @@ export function decideBlogArticle(cand: BlogCandidate, ctx: BlogAcceptanceContex
     : repaired ? 'repair_and_keep'
     : removedSecondaries.length > 0 ? 'keep_secondaries_removed'
     : 'keep'
-  return { outcome, reason: null, primaryKeyword, secondaryKeywords: sec.kept, recommendedPageType, removedSecondaries, primarySubject }
+  return { outcome, reason: null, primaryKeyword, secondaryKeywords: sec.kept, recommendedPageType, removedSecondaries, primarySubject, duplicateSource: null }
 }
