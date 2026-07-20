@@ -13,6 +13,8 @@ import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
+import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
+import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
 import { generateContentPlan } from '@/lib/content/recommendations/content-plan'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import type { RecommendationSource } from '@/lib/content/recommendations/types'
@@ -226,8 +228,40 @@ export async function POST(request: Request) {
     // persisted array is precisely selectedFinalization.finalSuggestions, in order. When
     // the flag is off, the route finalizes here exactly as before.
     const finalized = proFirstResult ? proFirstResult.selectedFinalization : finalizeRecommendationAttempt({ guard, existingPages }, result.suggestions)
-    const fresh = finalized.finalSuggestions
+    const engineFresh = finalized.finalSuggestions
     const { filteredPrimaryKeywordExists, filteredTitleExists, filteredCoveredByContent, exactExistingKeywordOwner, sourceOnlyEntityExpansion, filteredExamples, primaryKeywordMatches, intraRun, rejectionClassification } = finalized
+
+    // BLOG-ONLY persistence gate (production Pro-first path only). The normal workflow
+    // generates NEW blog articles ONLY — never homepage/about/service/category/product or
+    // existing-content edits. Every persisted item must be recommendedPageType='article'.
+    // Non-aggressive: repair a malformed keyword, drop an incoherent secondary, reclassify
+    // a genuinely informational commercial candidate to an article, keep distinct topics;
+    // reject only own-brand pitches, unsupported business-model expansions, semantic
+    // duplicates, existing-page edits, or real commercial pages. Runs ONLY here (after the
+    // engine finalized) so the shared engine / /reco-qa / blind export are unchanged.
+    const blogReport = { baseline: engineFresh.length, acceptedUnchanged: 0, acceptedAfterRepair: 0, reclassifiedToArticle: 0, secondaryKeywordsRemoved: 0, semanticDuplicateRejected: 0, unsupportedTopicRejected: 0, rejectedByReason: {} as Record<string, number>, finalValid: engineFresh.length }
+    let fresh = engineFresh
+    if (proFirstResult?.acceptanceContext) {
+      const ctx = proFirstResult.acceptanceContext
+      const kept: typeof engineFresh = []
+      for (const s of engineFresh) {
+        const d = decideBlogArticle({ title: s.title, primaryKeyword: s.primaryKeyword, secondaryKeywords: s.secondaryKeywords ?? [], intent: (s.searchIntent as SearchIntent) ?? 'informational', recommendedPageType: s.recommendedPageType ?? 'article', supportedQuery: s.demandEvidence?.demandQuery ?? null }, ctx)
+        if (d.outcome === 'reject') {
+          const r = d.reason ?? 'reject'
+          blogReport.rejectedByReason[r] = (blogReport.rejectedByReason[r] ?? 0) + 1
+          if (r === 'pending_semantic_duplicate') blogReport.semanticDuplicateRejected++
+          else blogReport.unsupportedTopicRejected++
+          continue
+        }
+        if (d.outcome === 'keep') blogReport.acceptedUnchanged++
+        if (d.outcome === 'repair_and_keep') blogReport.acceptedAfterRepair++
+        if (d.outcome === 'reclassify_to_article') blogReport.reclassifiedToArticle++
+        blogReport.secondaryKeywordsRemoved += d.removedSecondaries.length
+        kept.push({ ...s, primaryKeyword: d.primaryKeyword, secondaryKeywords: d.secondaryKeywords, recommendedPageType: 'article' })
+      }
+      fresh = kept
+      blogReport.finalValid = kept.length
+    }
 
     // E — one truthful stage contract. raw = model output BEFORE gates; engine-accepted
     // = engine output; the engine's removal count is ALWAYS surfaced (customer funnel)
@@ -365,7 +399,11 @@ export async function POST(request: Request) {
       freshCurrentRunDomainFlags: suggestionsDomainFlags(fresh),
       accumulatedPendingCount: suggestions.length,
       accumulatedPendingDomainFlags: suggestionsDomainFlags(suggestions),
-      persistedCurrentRunCount: fresh.length,
+      // TRUTHFUL persisted-writes count — the rows actually inserted, never the pre-insert
+      // fresh count (a DB fingerprint duplicate is never counted as newly added).
+      persistedCurrentRunCount: persistOutcome?.inserted ?? 0,
+      // Deterministic blog-article acceptance report (Preview-only observability).
+      blogArticleGate: blogReport,
       reload_visible_count: suggestions.length,
       ...(persistenceTrace ?? {}),
       rejectionClassification,

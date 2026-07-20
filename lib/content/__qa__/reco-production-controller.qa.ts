@@ -315,7 +315,7 @@ async function main() {
     // Blocker 2 — the route shows the SELECTED attempt's model path, not the snapshot Pro path.
     check('G10. pipeline model_path uses the selected attempt path (Flash when Flash created the batch)', /model_path: proFirstResult \? proFirstResult\.selectedModelPath/.test(routeSrc))
     // Blocker 3 — finalize EXACTLY once for the selected output (no route re-finalize).
-    check('G11. route reuses selectedFinalization (no second finalize on the selected batch)', /const finalized = proFirstResult \? proFirstResult\.selectedFinalization/.test(routeSrc) && /const fresh = finalized\.finalSuggestions/.test(routeSrc))
+    check('G11. route reuses selectedFinalization (no second finalize on the selected batch)', /const finalized = proFirstResult \? proFirstResult\.selectedFinalization/.test(routeSrc) && /const engineFresh = finalized\.finalSuggestions/.test(routeSrc))
     // Blocker 4 — full provenance + persistedWrites = REAL inserted (0 when null / session-only).
     check('G12. full productionProvenance in isolationDebug; persistedWrites = persistOutcome?.inserted ?? 0 (never fresh.length)', /productionProvenance: proFirstProvenance/.test(routeSrc) && /proFirstProvenance\.persistedWrites = persistOutcome\?\.inserted \?\? 0/.test(routeSrc) && !/persistedWrites = persistOutcome \? persistOutcome\.inserted : fresh\.length/.test(routeSrc))
     // Blocker 5 — reasons named after the PRO cause; no flash_*_rescue anywhere.

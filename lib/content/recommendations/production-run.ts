@@ -27,6 +27,7 @@ import { computeRescueAccounting } from './smart-controller'
 import { resolveAvailableRecommendationModel } from './model-availability'
 import type { ModelPath } from './model-select'
 import { selectProductionBatch, isFlashClassModel, type FallbackReason, type ProductionSelected } from './production-controller'
+import type { BlogAcceptanceContext } from './blog-article-acceptance'
 import type { TopicSuggestion } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -73,6 +74,9 @@ export interface ProFirstProductionResult {
   rawGenerated: number
   emptyReason: string | null
   provenance: ProductionProvenance
+  /** ADDITIVE (Stage-D-neutral): the snapshot-derived context the production route uses
+   *  for the blog-article persistence gate. Never affects selection/finalize/budget. */
+  acceptanceContext?: BlogAcceptanceContext
 }
 
 function providerFailed(synth: Synth): boolean {
@@ -140,6 +144,14 @@ export async function runProFirstProduction(
     finalizeRecommendationAttempt({ guard: cloneKeywordGuard(snapshot.guard), existingPages: snapshot.existingPages }, engine)
   const emptyFinalization = (): FinalizedAttemptResult => finalizeRecommendationAttempt({ guard: cloneKeywordGuard(snapshot.guard), existingPages: snapshot.existingPages }, [])
 
+  // ADDITIVE context for the production route's blog-article persistence gate — a pure
+  // read of the snapshot's already-derived evidence. Never affects Stage-D selection.
+  const acceptanceContext: BlogAcceptanceContext = {
+    brandSafety: snapshot.brandSafety,
+    businessEvidenceTokens: snapshot.businessEvidenceTokens,
+    domainTypeWords: snapshot.domainTypeWords,
+    pendingSignatures: snapshot.pendingSignatures,
+  }
   const baseProv = {
     primaryModelRequested: 'pro' as const,
     requestedTier: 'premium' as const,
@@ -164,7 +176,7 @@ export async function runProFirstProduction(
   })
   const noBatch = (reason: FallbackReason | 'pro_unavailable', opts: { fallbackEvaluated: boolean; fallbackTriggered: boolean; flashResolvedModel?: string | null; proAttempted: boolean; rescue?: number }): ProFirstProductionResult => ({
     selectedModel: 'none', selectedFinalization: emptyFinalization(), selectedEngineSuggestions: [],
-    selectedModelPath: snapshot.modelPath, briefDiagnostics: emptyDiag(),
+    selectedModelPath: snapshot.modelPath, briefDiagnostics: emptyDiag(), acceptanceContext,
     rawGenerated: 0, emptyReason: emptyReasonFor(reason),
     provenance: {
       ...baseProv, proAttempted: opts.proAttempted, proFinalizedCount: 0,
@@ -205,7 +217,7 @@ export async function runProFirstProduction(
       selectedModel: sel.selected,
       selectedFinalization: sel.selected === 'flash' ? flashFin : emptyFinalization(),
       selectedEngineSuggestions: sel.selected === 'flash' ? flashSynth.suggestions : [],
-      selectedModelPath: snapshot.modelPath,
+      selectedModelPath: snapshot.modelPath, acceptanceContext,
       briefDiagnostics: flashSynth.diagnostics,
       rawGenerated: flashSynth.diagnostics.generated_opportunities,
       emptyReason: sel.selected === 'none' ? emptyReasonFor('pro_unavailable') : null,
@@ -228,7 +240,7 @@ export async function runProFirstProduction(
   if (proFinalizedCount > 0) {
     return {
       selectedModel: 'pro', selectedFinalization: proFin, selectedEngineSuggestions: proSynth.suggestions,
-      selectedModelPath: snapshot.modelPath, briefDiagnostics: proSynth.diagnostics,
+      selectedModelPath: snapshot.modelPath, briefDiagnostics: proSynth.diagnostics, acceptanceContext,
       rawGenerated: proSynth.diagnostics.generated_opportunities, emptyReason: null,
       provenance: {
         ...baseProv, proAttempted: true, proFinalizedCount,
@@ -270,7 +282,7 @@ export async function runProFirstProduction(
     selectedModel: sel.selected,
     selectedFinalization: sel.selected === 'flash' ? flashFin : emptyFinalization(),
     selectedEngineSuggestions: sel.selected === 'flash' ? flashSynth.suggestions : [],
-    selectedModelPath: sel.selected === 'flash' ? flashAttemptModelPath(snapshot, flashModel) : snapshot.modelPath,
+    selectedModelPath: sel.selected === 'flash' ? flashAttemptModelPath(snapshot, flashModel) : snapshot.modelPath, acceptanceContext,
     briefDiagnostics: sel.selected === 'flash' ? flashSynth.diagnostics : proSynth.diagnostics,
     rawGenerated: (sel.selected === 'flash' ? flashSynth : proSynth).diagnostics.generated_opportunities,
     emptyReason: sel.selected === 'none' ? emptyReasonFor(reason) : null,
