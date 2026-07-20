@@ -245,6 +245,44 @@ async function main() {
     const ctxG = await realCtx(baseTables({ generated_articles: [{ project_id: 'p1', title: 'אימון כוח בבית' }] }))
     const g = decideBlogArticle(cand({ title: 'אימון כוח לנשים אחרי לידה', primaryKeyword: 'אימון כוח לנשים אחרי לידה' }), ctxG)
     check('IT-G. distinct subtype (postpartum) vs generated general article → KEEP', g.outcome !== 'reject', JSON.stringify(g))
+
+    const prod = { project_id: 'p1', is_active: true, title: 'קטלבל אוניברסלי', handle: 'kb', entity_type: 'product', canonical_url: 'https://ido-sport.co.il/p/kb' }
+
+    // ── Defect 1 — explicit business evidence must EXCLUDE post/article/page entities ──
+    // D1-A — an indexed POST mentioning "חוק המכר" (no legal product/category/service/tracked)
+    //        must NOT authorize a distinct legal-enforcement candidate.
+    const ctxD1A = await realCtx(baseTables({ shopify_entities: [prod, { project_id: 'p1', is_active: true, title: 'מדריך חוק המכר לצרכנים', handle: 'law', entity_type: 'blog', canonical_url: 'https://ido-sport.co.il/blog/law' }] }))
+    const d1a = decideBlogArticle(cand({ title: 'מה כוללת אחריות קבלן על פי חוק המכר?', primaryKeyword: 'אחריות קבלן חוק המכר' }), ctxD1A)
+    check('D1-A. indexed post mentioning "חוק המכר" does NOT authorize a legal expansion → REJECT', d1a.outcome === 'reject' && d1a.reason === 'unsupported_business_model_expansion', JSON.stringify(d1a))
+
+    // D1-B — an indexed POST mentioning "ציוד יד שנייה" (no owned used product/category/
+    //        service/tracked) must NOT authorize a distinct used-goods candidate.
+    const ctxD1B = await realCtx(baseTables({ shopify_entities: [prod, { project_id: 'p1', is_active: true, title: 'טיפים לקניית ציוד יד שנייה', handle: 'usedpost', entity_type: 'post', canonical_url: 'https://ido-sport.co.il/blog/used' }] }))
+    const d1b = decideBlogArticle(cand({ title: 'ספת כושר יד 2: מדריך חכם', primaryKeyword: 'ספת כושר יד 2' }), ctxD1B)
+    check('D1-B. indexed post mentioning "ציוד יד שנייה" does NOT authorize a used-goods expansion → REJECT', d1b.outcome === 'reject' && d1b.reason === 'unsupported_business_model_expansion', JSON.stringify(d1b))
+
+    // D1-C — an OWNED product/category/service explicitly supports the model → NOT rejected.
+    const ctxD1C = await realCtx(baseTables({ shopify_entities: [{ project_id: 'p1', is_active: true, title: 'ציוד כושר יד שנייה', handle: 'usedcat', entity_type: 'category', canonical_url: 'https://ido-sport.co.il/c/used' }] }))
+    const d1c = decideBlogArticle(cand({ title: 'ספת כושר יד 2: מדריך חכם', primaryKeyword: 'ספת כושר יד 2' }), ctxD1C)
+    check('D1-C. owned used-equipment CATEGORY authorizes the model → not rejected as expansion', d1c.outcome !== 'reject', JSON.stringify(d1c))
+
+    // ── Defect 2 — blog dedupe corpus uses TRUE article types (post/article), never page ──
+    // D2-B — a duplicate of an indexed ARTICLE-type page → REJECT (source indexed_article).
+    const ctxD2B = await realCtx(baseTables({ shopify_entities: [prod, { project_id: 'p1', is_active: true, title: 'יתרונות אימון אינטרוולים', handle: 'art', entity_type: 'article', canonical_url: 'https://ido-sport.co.il/a/int' }] }))
+    const d2b = decideBlogArticle(cand({ title: 'יתרונות אימון אינטרוולים', primaryKeyword: 'יתרונות אימון אינטרוולים' }), ctxD2B)
+    check('D2-B. duplicate of an indexed ARTICLE page → REJECT (source indexed_article)', d2b.outcome === 'reject' && d2b.reason === 'pending_semantic_duplicate' && d2b.duplicateSource === 'indexed_article', JSON.stringify(d2b))
+
+    // D2-C — a generic SERVICE page sharing a broad subject, distinct informational need →
+    //        the service page is NOT a blog duplicate; the candidate survives the gate.
+    const ctxD2C = await realCtx(baseTables({ shopify_entities: [prod, { project_id: 'p1', is_active: true, title: 'שירותי אימון אישי', handle: 'svc', entity_type: 'service', canonical_url: 'https://ido-sport.co.il/s/pt' }] }))
+    const d2c = decideBlogArticle(cand({ title: 'איך לבחור מאמן אישי מתאים', primaryKeyword: 'בחירת מאמן אישי' }), ctxD2C)
+    check('D2-C. generic service page (same broad subject) is NOT a blog duplicate → KEEP', d2c.outcome !== 'reject', JSON.stringify(d2c))
+
+    // D2-D — a homepage / generic PAGE entity must NEVER enter the blog duplicate corpus,
+    //        even for an identical subject (it would dedupe only if wrongly included).
+    const ctxD2D = await realCtx(baseTables({ shopify_entities: [prod, { project_id: 'p1', is_active: true, title: 'ציוד כושר ביתי', handle: 'home', entity_type: 'page', canonical_url: 'https://ido-sport.co.il/' }] }))
+    const d2d = decideBlogArticle(cand({ title: 'מדריך לרכישת ציוד כושר ביתי', primaryKeyword: 'ציוד כושר ביתי' }), ctxD2D)
+    check('D2-D. homepage / generic page never enters the blog duplicate corpus → KEEP', d2d.outcome !== 'reject', JSON.stringify(d2d))
   }
 
   // ── Blocker 3 controls — legitimate qualifier queries must survive; malformed repair. ──

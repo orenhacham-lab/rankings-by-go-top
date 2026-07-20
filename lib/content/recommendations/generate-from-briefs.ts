@@ -361,12 +361,19 @@ export async function prepareBriefRun(
   for (const e of entities) for (const t of contentTokens(e.name)) commercialEntityTokens.add(t)
   const businessEvidenceTokens = new Set<string>(commercialEntityTokens)
   for (const s of [...projectFocus, ...tracked, ...keywordResearch.map((k) => k.query)]) for (const t of contentTokens(s)) businessEvidenceTokens.add(t)
-  // EXPLICIT owned business-model evidence — owned entities + explicit project focus +
-  // tracked keywords ONLY. Keyword-research queries / search volume are NOT positive
-  // business-model evidence (Blocker 1): they keep supporting discovery + demand, but must
-  // NEVER authorize a used-goods or specialist-legal expansion in the blog gate.
-  const explicitBusinessEvidenceTokens = new Set<string>(commercialEntityTokens)
-  for (const s of [...projectFocus, ...tracked]) for (const t of contentTokens(s)) explicitBusinessEvidenceTokens.add(t)
+  // EXPLICIT owned business-model evidence — ONLY genuinely COMMERCIAL/OPERATIONAL owned
+  // entity types that prove the business offers the model (product / category / service),
+  // plus tracked keywords + a project focus DERIVED FROM COMMERCIAL ENTITIES ONLY. A post /
+  // article / generic page / homepage / existing article title must NEVER authorize a
+  // used-goods or specialist-legal expansion — neither directly nor by leaking through the
+  // full project focus (which is derived from every owned category incl. article titles).
+  // Keyword-research queries are excluded too (search volume is not business evidence).
+  const OWNED_COMMERCIAL_TYPES = new Set<EntityPageType>(['product', 'category', 'service'])
+  const commercialEntityNames = entities.filter((e) => e.type != null && OWNED_COMMERCIAL_TYPES.has(e.type)).map((e) => e.name)
+  const commercialFocus = deriveProjectFocus({ projectName: p.business_name, domain: p.target_domain, ownedCategories: commercialEntityNames, existingTopics: [] })
+  const explicitBusinessEvidenceTokens = new Set<string>()
+  for (const name of commercialEntityNames) for (const t of contentTokens(name)) explicitBusinessEvidenceTokens.add(t)
+  for (const s of [...tracked, commercialFocus.primaryProjectFocus, ...commercialFocus.secondaryProjectAreas].filter(Boolean)) for (const t of contentTokens(s)) explicitBusinessEvidenceTokens.add(t)
   // PROVENANCE — which INDEPENDENT source contributed each evidence token, so a
   // coverage document cannot corroborate its OWN unmatched entity (a horse article
   // placing "סוסים" in the vocab and then proving it is on-domain). Per-source keys
@@ -397,17 +404,18 @@ export async function prepareBriefRun(
     ...Array.from(guard.entityOwners).map((k) => ({ title: k, type: null, sourceKey: `entity:${normalizeText(k)}` })),
   ])
 
-  // Blog-article DUPLICATE corpus (Blocker 2) — INFORMATIONAL article/post sources ONLY:
-  // pending content_topic_ideas + generated_articles + article_topics + indexed article/
-  // post pages. Commercial product/category/service entities are NEVER blog-article
+  // Blog-article DUPLICATE corpus (Blocker 2) — TRUE informational article sources ONLY:
+  // pending content_topic_ideas + generated_articles + article_topics + indexed pages whose
+  // explicit scanner role is a real article/post. Generic 'page' (WordPress pages / service
+  // pages / homepage), and product/category/service entities, are NEVER blog-article
   // duplicates (ownership / cannibalization handle those, unchanged). Article sources carry
   // the 'informational' cluster so the narrow head+need rule matches informational needs.
-  const INDEXED_INFORMATIONAL_TYPES = new Set(['post', 'page'])
+  const INDEXED_ARTICLE_TYPES = new Set<EntityPageType>(['post', 'article'])
   const blogDuplicateSignatures: { sig: TopicSignature; source: 'pending' | 'generated' | 'article_topic' | 'indexed_article' }[] = [
     ...pendingSignatures.map((sig) => ({ sig, source: 'pending' as const })),
     ...generatedArticleTitles.map((t) => ({ sig: topicSignature(t, 'informational'), source: 'generated' as const })),
     ...articleTopicTitles.map((t) => ({ sig: topicSignature(t, 'informational'), source: 'article_topic' as const })),
-    ...existingCoverageDocs.filter((d) => d.type != null && INDEXED_INFORMATIONAL_TYPES.has(d.type)).map((d) => ({ sig: topicSignature(d.focusKeyword || d.title, 'informational'), source: 'indexed_article' as const })),
+    ...entities.filter((e) => e.type != null && INDEXED_ARTICLE_TYPES.has(e.type)).map((e) => ({ sig: topicSignature(e.name, 'informational'), source: 'indexed_article' as const })),
   ]
 
   // ── 3) Deterministic brief pool (pre-AI validation inside) ──────────────────
