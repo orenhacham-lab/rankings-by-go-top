@@ -30,7 +30,7 @@ import type {
   WordPressListOptions,
   SeoKeywordSource,
 } from './types'
-import { seoPluginFromNamespaces, seoMetaKeys, verifySeoMeta, type SeoPlugin, type SeoMetaStatus } from '@/lib/content/wordpress-taxonomy'
+import { seoPluginFromNamespaces, seoMetaKeys, verifySeoMeta, verifySeoMetaPerField, hasSeoBridgeNamespace, type SeoPlugin, type SeoMetaStatus } from '@/lib/content/wordpress-taxonomy'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_RESPONSE_BYTES = 2_000_000
@@ -511,17 +511,51 @@ export async function updatePost(
  * Rank Math → rankmath/v1). Never throws — returns a clear state.
  */
 export async function detectSeoPlugin(creds: WordPressCredentials): Promise<SeoPlugin> {
+  return (await detectSeoCapabilities(creds)).plugin
+}
+
+/**
+ * Detect BOTH the SEO plugin and whether the site exposes the GO TOP SEO companion bridge
+ * (namespace gotop/v1) — from a single REST-root namespaces probe. The bridge is what makes
+ * protected Yoast/Rank Math meta actually writable+verifiable when core REST cannot.
+ */
+export async function detectSeoCapabilities(creds: WordPressCredentials): Promise<{ plugin: SeoPlugin; hasBridge: boolean }> {
   try {
     const origin = await assertSafeSiteUrl(creds.siteUrl)
     const target = new URL(`${origin}/wp-json/?_fields=namespaces`)
     const { status, body } = await httpsGet(target, buildAuthHeader(creds))
-    if (status === 401 || status === 403) return 'permission_error'
-    if (status < 200 || status >= 300) return 'unknown'
+    if (status === 401 || status === 403) return { plugin: 'permission_error', hasBridge: false }
+    if (status < 200 || status >= 300) return { plugin: 'unknown', hasBridge: false }
     let parsed: { namespaces?: unknown }
-    try { parsed = JSON.parse(body) } catch { return 'unknown' }
-    return seoPluginFromNamespaces(parsed?.namespaces)
+    try { parsed = JSON.parse(body) } catch { return { plugin: 'unknown', hasBridge: false } }
+    return { plugin: seoPluginFromNamespaces(parsed?.namespaces), hasBridge: hasSeoBridgeNamespace(parsed?.namespaces) }
   } catch {
-    return 'unknown'
+    return { plugin: 'unknown', hasBridge: false }
+  }
+}
+
+/**
+ * Write SEO meta through the GO TOP SEO companion bridge (POST /wp-json/gotop/v1/seo-meta),
+ * which updates ONLY the detected plugin's exact keys server-side (edit_posts required) and
+ * returns per-field verification. Returns 'verified' only when every requested key is
+ * confirmed applied. Never throws.
+ */
+async function writeSeoViaBridge(creds: WordPressCredentials, postId: number, plugin: SeoPlugin, meta: Record<string, string>): Promise<{ status: SeoMetaStatus; detail?: string }> {
+  try {
+    const origin = await assertSafeSiteUrl(creds.siteUrl)
+    const target = new URL(`${origin}/wp-json/gotop/v1/seo-meta`)
+    const payload = Buffer.from(JSON.stringify({ post_id: postId, plugin, meta }), 'utf8')
+    const { status, body } = await httpsSend(target, buildAuthHeader(creds), payload, { 'Content-Type': 'application/json' })
+    if (status === 401 || status === 403) return { status: 'permission_error' }
+    if (status === 404) return { status: 'seo_bridge_required' }
+    if (status < 200 || status >= 300) return { status: 'exact_failure', detail: `bridge_http_${status}` }
+    let parsed: { fields?: Record<string, unknown> }
+    try { parsed = JSON.parse(body) } catch { return { status: 'written_not_verifiable' } }
+    // The bridge returns the applied values; verify per field against what we requested.
+    const readback = parsed?.fields && typeof parsed.fields === 'object' ? (parsed.fields as Record<string, unknown>) : null
+    return { status: verifySeoMeta(meta, readback) }
+  } catch {
+    return { status: 'exact_failure', detail: 'bridge_unreachable' }
   }
 }
 
@@ -539,31 +573,58 @@ export async function writeVerifiedSeoMeta(
   seo: { metaTitle?: string | null; metaDescription?: string | null; focusKeyword?: string | null },
   knownPlugin?: SeoPlugin,
 ): Promise<{ plugin: SeoPlugin; status: SeoMetaStatus; detail?: string }> {
-  const plugin = knownPlugin && knownPlugin !== 'unknown' ? knownPlugin : await detectSeoPlugin(creds)
+  // ONE capability probe → plugin + whether the GO TOP SEO bridge is installed.
+  const caps = knownPlugin && knownPlugin !== 'unknown'
+    ? { plugin: knownPlugin, hasBridge: false as boolean, probed: false }
+    : { ...(await detectSeoCapabilities(creds)), probed: true }
+  const plugin = caps.plugin
   if (plugin === 'permission_error') return { plugin, status: 'permission_error' }
   if (plugin === 'none' || plugin === 'unknown') return { plugin, status: 'plugin_unavailable' }
 
   const meta = seoMetaKeys(plugin, seo)
   if (Object.keys(meta).length === 0) return { plugin, status: 'plugin_unavailable' }
 
+  // 1) Try core REST first (works when the site registered these keys in REST).
+  let coreStatus: SeoMetaStatus
   try {
     await wpPostJson(creds, `/posts/${postId}`, { meta })
+    let readback: Record<string, unknown> | null = null
+    try {
+      const obj = await wpGet<{ meta?: Record<string, unknown> }>(creds, `/posts/${postId}?_fields=meta`)
+      readback = obj && typeof obj.meta === 'object' ? (obj.meta as Record<string, unknown>) : null
+    } catch { readback = null }
+    coreStatus = verifySeoMeta(meta, readback)
   } catch (err) {
     const msg = err instanceof WordPressClientError ? err.message : 'SEO meta write failed.'
     if (/authentication failed/i.test(msg)) return { plugin, status: 'permission_error', detail: msg }
-    return { plugin, status: 'exact_failure', detail: msg }
+    coreStatus = 'exact_failure'
   }
+  if (coreStatus === 'verified') return { plugin, status: 'verified' }
 
-  // Verify by reading the meta back (protected meta is often not exposed → then
-  // we honestly report written_not_verifiable rather than claiming success).
-  let readback: Record<string, unknown> | null = null
+  // 2) Core could not persist/verify the PROTECTED meta. The COMPANION BRIDGE is the
+  //    supported write/read contract — use it when present; else report the setup state
+  //    (seo_bridge_required) truthfully. Never claim success on written_not_verifiable.
+  const hasBridge = caps.probed ? caps.hasBridge : (await detectSeoCapabilities(creds)).hasBridge
+  if (hasBridge) {
+    const bridged = await writeSeoViaBridge(creds, postId, plugin, meta)
+    if (bridged.status === 'verified') return { plugin, status: 'verified' }
+    // A bridge that exists but did not verify → surface its exact status (not a success).
+    return { plugin, status: bridged.status === 'seo_bridge_required' ? 'written_not_verifiable' : bridged.status, detail: bridged.detail }
+  }
+  return { plugin, status: coreStatus === 'exact_failure' ? 'exact_failure' : 'seo_bridge_required' }
+}
+
+/** Per-field verification of the CURRENT persisted SEO meta (SAFE — key names + present/
+ *  verified booleans only, never values). Used for Preview diagnostics / update-in-place. */
+export async function readSeoMetaVerification(creds: WordPressCredentials, postId: number, plugin: SeoPlugin, seo: { metaTitle?: string | null; metaDescription?: string | null; focusKeyword?: string | null }): Promise<{ key: string; present: boolean; verified: boolean }[]> {
+  const meta = seoMetaKeys(plugin, seo)
+  if (Object.keys(meta).length === 0) return []
   try {
     const obj = await wpGet<{ meta?: Record<string, unknown> }>(creds, `/posts/${postId}?_fields=meta`)
-    readback = obj && typeof obj.meta === 'object' ? (obj.meta as Record<string, unknown>) : null
+    return verifySeoMetaPerField(meta, obj && typeof obj.meta === 'object' ? (obj.meta as Record<string, unknown>) : null)
   } catch {
-    readback = null
+    return verifySeoMetaPerField(meta, null)
   }
-  return { plugin, status: verifySeoMeta(meta, readback) }
 }
 
 /**

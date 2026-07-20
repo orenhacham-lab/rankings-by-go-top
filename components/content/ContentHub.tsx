@@ -103,6 +103,9 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   // panel seeds them (they don't disappear when its fresh dry-run differs).
   const [newTopicsSelected, setNewTopicsSelected] = useState<Record<string, { url: string; anchor: string }[]>>({})
   const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
+  // True while topic plan-summaries are being (re)hydrated — the row badge shows a neutral
+  // "checking links" state instead of the "add links" default so unknown never reads missing.
+  const [topicsLoading, setTopicsLoading] = useState(true)
   // Phase 3F.3.3a/b — after approving ideas, briefly highlight the new "ready"
   // rows. The truthful next-step CTA lives in the ideas card (which scrolls
   // itself into view) so approval does NOT scroll away. The explicit "review
@@ -223,15 +226,24 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   }, [projectId])
 
   const loadTopics = useCallback(async () => {
-    if (!projectId) { setTopics([]); return }
+    if (!projectId) { setTopics([]); setPlanStatus({}); setTopicsLoading(false); return }
+    setTopicsLoading(true)
     try {
       const res = await fetch(`/api/content/topics?projectId=${encodeURIComponent(projectId)}`)
       if (res.ok) {
         const json = await res.json()
         setTopics(json.topics || [])
+        // TRUTHFUL hydration on load/refresh — one-shot saved-plan summaries for every topic
+        // (server-derived from the latest active batch), so the row badges are correct even
+        // for plans saved in a PRIOR session. Merges over any in-session seeds.
+        if (json.planStatus && typeof json.planStatus === 'object') {
+          setPlanStatus((prev) => ({ ...prev, ...(json.planStatus as Record<string, TopicPlanSummary>) }))
+        }
       }
     } catch {
       // Non-fatal: the topics section simply shows its empty state.
+    } finally {
+      setTopicsLoading(false)
     }
   }, [projectId])
 
@@ -289,6 +301,12 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
           ...(wpStatus === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}),
         })
         toast.success(wpStatus === 'publish' ? t.rowWp.published : t.rowWp.draftSent)
+        // TRUTHFUL SEO status — the post succeeded, but warn when the SEO meta was NOT applied
+        // (never a silent full-success). 'verified' / no-SEO-plugin are fine.
+        const seoStatus = typeof d.seoStatus === 'string' ? d.seoStatus : 'verified'
+        if (seoStatus !== 'verified' && seoStatus !== 'plugin_unavailable') {
+          toast.error(seoStatus === 'seo_bridge_required' ? t.rowWp.seoBridgeRequired : seoStatus === 'permission_error' ? t.rowWp.seoPermission : t.rowWp.seoNotVerified)
+        }
         // Phase 3E.1 — surface the keyword-added feedback in the list flow too
         // (only when the publish actually added a new project keyword).
         if (wpStatus === 'publish' && d.keywordAdded) toast.success(t.rowWp.keywordAdded)
@@ -521,7 +539,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   // One export unit — routes by the ACTIVE platform (no confirm here; the batch confirms
   // once). Returns a normalized patch so the batch loop is platform-agnostic. 60s timeout.
   type ExportOnePatch = Partial<ArticleRow>
-  async function exportOne(id: string, mode: 'publish' | 'draft'): Promise<{ ok: boolean; error?: string; patch?: ExportOnePatch }> {
+  async function exportOne(id: string, mode: 'publish' | 'draft'): Promise<{ ok: boolean; error?: string; patch?: ExportOnePatch; seoStatus?: string }> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 60_000)
     const publishedPatch = (extra: ExportOnePatch): ExportOnePatch => ({ ...extra, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
@@ -541,7 +559,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
         body: JSON.stringify({ status: mode, force: false }), signal: controller.signal,
       })
       const d = await res.json().catch(() => ({}))
-      if (res.ok && d.wp_post_id) return { ok: true, patch: publishedPatch({ wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null }) }
+      if (res.ok && d.wp_post_id) return { ok: true, patch: publishedPatch({ wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null }), seoStatus: typeof d.seoStatus === 'string' ? d.seoStatus : 'verified' }
       const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
       return { ok: false, error: reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric }
     } catch (e) {
@@ -573,7 +591,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
     const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
     window.addEventListener('beforeunload', onUnload)
 
-    let ok = 0, fail = 0
+    let ok = 0, fail = 0, seoUnverified = 0
     for (const id of ids) {
       if (cancelArticleRef.current) break
       const a = (data?.articles ?? []).find((x) => x.id === id)
@@ -582,6 +600,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
       const r = await exportOne(id, mode)
       if (r.ok && r.patch) {
         ok++
+        if (activePlatform !== 'shopify' && r.seoStatus && r.seoStatus !== 'verified' && r.seoStatus !== 'plugin_unavailable') seoUnverified++
         patchArticle(id, r.patch)
         setArticleBatchState((s) => ({ ...s, [id]: { status: 'success' } }))
       } else {
@@ -597,6 +616,8 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
     await load()
     if (wasCancelled) toast.success(t.batch.cancelled)
     else toast.success((mode === 'publish' ? t.batch.publishSummary : t.batch.draftSummary).replace('{ok}', String(ok)).replace('{fail}', String(fail)))
+    // TRUTHFUL: some posts succeeded but their SEO metadata was not applied.
+    if (seoUnverified > 0) toast.error(t.rowWp.seoNotVerified)
   }
 
   function cancelArticleBatch() { cancelArticleRef.current = true }
@@ -920,7 +941,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                     onCreated={loadTopics}
                     onScheduled={handleScheduled}
                     onTopicsCreated={(created, unchecked, selected) => { if (created.length) { setNewTopicsUnchecked(unchecked ?? {}); setNewTopicsSelected(selected ?? {}); setNewTopics(created) } }}
-                    onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: true, linkCount: p.linkCount, approvedCount: 0, stale: false }])) }))}
+                    onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: p.exists, linkCount: p.linkCount, approvedCount: p.approvedCount, stale: p.stale }])) }))}
                     onApproved={handleTopicsQueued}
                     onReviewLinks={handleReviewLinks}
                     planSavedHint={linkPlanSavedHint}
@@ -1023,6 +1044,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                       batchRunning={batchRunning}
                       onRetry={retryTopic}
                       planStatus={planStatus}
+                      planStatusLoading={topicsLoading}
                       onPlanStatusChange={(id, summary) => setPlanStatus((prev) => ({ ...prev, [id]: summary }))}
                       highlightIds={highlightTopicIds}
                       onReturnToQueue={handleReturnToQueue}

@@ -19,7 +19,8 @@
 import { randomUUID } from 'crypto'
 import { authContentProject, isContentModuleEnabled, loadWordPressCredentials } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { writeVerifiedSeoMeta, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
+import { WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
+import { publishArticleSeo } from '@/lib/content/seo-publish'
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { classifyWordPressError, hebrewMessageFor, httpStatusFor, safeRemoteDiagnostics, type WpFailureStage, type WpPublishErrorCode } from '@/lib/content/wordpress-error'
@@ -297,26 +298,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const featuredMedia = created.featuredMediaId ?? undefined
     featuredMediaForLog = created.featuredMediaId ?? null
 
-  // Phase 4E — SEO meta: detect the site's SEO plugin and write ONLY its keys,
-  // then verify. Never fatal to the post; the exact status is surfaced so the UI
-  // can warn (never a silent success). The article's focus keyword is the linked
-  // topic's primary keyword (best-effort lookup).
-  let focusKeyword: string | null = null
-  if (a.topic_id && typeof a.topic_id === 'string') {
-    try {
-      const { data: t } = await auth.admin.from('article_topics').select('primary_keyword').eq('id', a.topic_id).maybeSingle()
-      const kw = (t as { primary_keyword?: string } | null)?.primary_keyword
-      focusKeyword = kw ? String(kw) : null
-    } catch { /* focus keyword is optional */ }
-  }
+  // Phase 4E — SEO meta through the ONE shared verifying service (bridge-aware): loads the
+  // focus keyword (topic primary_keyword), writes ONLY the detected plugin's keys, verifies
+  // by read-back, and PERSISTS the truthful outcome. Never fatal to the post; the exact
+  // status is surfaced so the UI can warn — never a silent success. Idempotent on wp_post_id.
   let seoPlugin: string = 'unknown'
   let seoStatus: string = 'plugin_unavailable'
   let seoDetail: string | undefined
   try {
-    const seo = await writeVerifiedSeoMeta(loaded.creds, created.wpPostId, {
+    const seo = await publishArticleSeo(auth.admin, loaded.creds, created.wpPostId, {
+      articleId: id,
       metaTitle: (a.meta_title as string) || title,
       metaDescription: (a.meta_description as string) || null,
-      focusKeyword,
+      topicId: (a.topic_id as string | null) ?? null,
     })
     seoPlugin = seo.plugin
     seoStatus = seo.status

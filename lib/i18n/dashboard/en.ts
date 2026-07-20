@@ -467,6 +467,7 @@ export const dashboardEn = {
       noManualOptions: 'No additional manual options passed the quality filter.',
       badgeAction: 'Add links',
       badgeNoPlan: 'Add links',
+      badgeChecking: 'Checking links…',
       badgeZero: 'Add links',
       badgePlanned: 'Review links ({n})',
       badgePlannedOne: 'Review links (1)',
@@ -560,6 +561,9 @@ export const dashboardEn = {
       errImage: 'Publishing failed due to a featured-image problem. Regenerate the image or send as a draft.',
       errNoConn: 'No active WordPress connection for this project.',
       errGeneric: 'The WordPress action failed. Please try again.',
+      seoNotVerified: 'The post was published, but the SEO data (description and focus keyword) could not be verified. Check it in the editor and install the GO TOP SEO bridge if needed.',
+      seoBridgeRequired: 'The post was published, but saving the Yoast/Rank Math data requires installing the GO TOP SEO plugin on the site — then retry.',
+      seoPermission: 'The post was published, but there was no permission to update SEO data. Check the WordPress user permissions.',
     },
     rowShopify: {
       publish: 'Publish to store',

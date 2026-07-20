@@ -35,6 +35,7 @@ export default function TopicsList({
   batchRunning = false,
   onRetry,
   planStatus: planStatusExternal,
+  planStatusLoading = false,
   onPlanStatusChange,
   highlightIds = [],
   onReturnToQueue,
@@ -56,6 +57,9 @@ export default function TopicsList({
   // Phase 2F.1: optional CONTROLLED plan-status map (so the "new topics" panel
   // can seed row badges). Falls back to internal state when not provided.
   planStatus?: Record<string, TopicPlanSummary>
+  // True while the plan summaries are (re)hydrating — badges without a summary yet show a
+  // neutral "checking" state instead of "add links".
+  planStatusLoading?: boolean
   onPlanStatusChange?: (id: string, summary: TopicPlanSummary) => void
   // Phase 3F.3.3 — topic ids to highlight briefly (just added to the queue).
   highlightIds?: string[]
@@ -283,7 +287,7 @@ export default function TopicsList({
                       {/* Internal-link planning entry point (flag-gated). Opens the
                           drawer; status is loaded there, never per row. */}
                       {planningOn && (
-                        <TopicPlanBadge summary={planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} highlight={highlighted} />
+                        <TopicPlanBadge summary={planStatus[topic.id]} checking={planStatusLoading && !planStatus[topic.id]} onClick={() => setPlanTopic({ id: topic.id, topic: topic.topic, primary_keyword: topic.primary_keyword })} t={c.topicPlan} highlight={highlighted} />
                       )}
                       {/* Visible feedback while (re)generating — the primary button
                           may be "Edit article" during a regenerate. */}

@@ -48,6 +48,41 @@ export async function getLatestBatchForTopic(admin: Admin, projectId: string, to
   }
 }
 
+export interface TopicPlanBatchSummary { exists: boolean; linkCount: number; approvedCount: number; stale: boolean }
+
+/**
+ * ONE-SHOT owner-scoped saved-plan summaries for EVERY topic in a project (no N+1). Two
+ * queries: the latest active batch per topic, then the approved-link counts for those
+ * batches. `stale` uses the persisted stale_at_creation (the drawer recomputes live
+ * staleness on open). Never throws — a load failure yields an empty map.
+ */
+export async function loadPlanSummariesForProject(admin: Admin, projectId: string): Promise<Record<string, TopicPlanBatchSummary>> {
+  const out: Record<string, TopicPlanBatchSummary> = {}
+  try {
+    const { data: batchData } = await admin
+      .from(BATCHES)
+      .select('id, topic_id, link_count, stale_at_creation, created_at')
+      .eq('project_id', projectId)
+      .in('status', ACTIVE as unknown as string[])
+      .order('created_at', { ascending: false })
+    const rows = (batchData ?? []) as { id: string; topic_id: string | null; link_count: number | null; stale_at_creation: boolean | null }[]
+    // latest active batch per topic (rows are created_at desc → first seen wins).
+    const latestByTopic = new Map<string, { id: string; linkCount: number; stale: boolean }>()
+    for (const b of rows) {
+      if (!b.topic_id || latestByTopic.has(b.topic_id)) continue
+      latestByTopic.set(b.topic_id, { id: b.id, linkCount: b.link_count ?? 0, stale: !!b.stale_at_creation })
+    }
+    const batchIds = [...latestByTopic.values()].map((b) => b.id)
+    const approvedByBatch = new Map<string, number>()
+    if (batchIds.length) {
+      const { data: linkData } = await admin.from(LINKS).select('batch_id').eq('status', 'approved').in('batch_id', batchIds)
+      for (const l of (linkData ?? []) as { batch_id: string }[]) approvedByBatch.set(l.batch_id, (approvedByBatch.get(l.batch_id) ?? 0) + 1)
+    }
+    for (const [topicId, b] of latestByTopic) out[topicId] = { exists: true, linkCount: b.linkCount, approvedCount: approvedByBatch.get(b.id) ?? 0, stale: b.stale }
+  } catch { /* best-effort → empty map */ }
+  return out
+}
+
 /**
  * Approve (review-status only) the still-'planned' links of a saved batch. Sets
  * status planned→approved. NEVER touches article content / generation / apply.

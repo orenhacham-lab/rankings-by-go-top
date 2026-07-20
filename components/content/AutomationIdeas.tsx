@@ -88,9 +88,9 @@ export default function AutomationIdeas({
   // Phase 2F.1 — fires with the newly-created topics so the hub can offer the
   // internal-link planning step for exactly those new topic IDs.
   onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[], uncheckedByTopicId?: Record<string, string[]>, selectedByTopicId?: Record<string, { url: string; anchor: string }[]>) => void
-  // Phase 3F.3.2a — fires with per-topic saved planned-link counts (from idea-stage
-  // selection) so the hub can seed the topic-row plan badge immediately.
-  onPlansSaved?: (plans: { topicId: string; linkCount: number }[]) => void
+  // Fires with the REAL per-topic saved-plan summary (from the authoritative bulk-save
+  // result) so the hub seeds the topic-row link badge truthfully (approved count + stale).
+  onPlansSaved?: (plans: { topicId: string; exists: boolean; linkCount: number; approvedCount: number; stale: boolean }[]) => void
   // Phase 3F.3.3 — fires after approval so the hub can scroll to the queue,
   // highlight the new rows, and show the "queued for scheduled creation" notice.
   onApproved?: (info: { topicIds: string[]; plansSaved: boolean }) => void
@@ -402,13 +402,10 @@ export default function AutomationIdeas({
     pageTypeByTopicId: Record<string, string>
     // topicId → the idea's canonical link-preview snapshot (reviewed-snapshot identity).
     snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }>
-    savedPlans: { topicId: string; linkCount: number }[]
-    expectedPlans: number
   }
   async function createTopics(): Promise<CreateResult | null> {
     const chosen = suggestions.filter((s) => selected.has(s.id))
     if (chosen.length === 0) return null
-    const expectedPlans = chosen.filter((s) => selectedLinksFor(s).length > 0).length
     // topics/bulk RESOLVES/creates topics only — it is NOT the authoritative link layer, so
     // the checked links are NOT sent here (they are persisted via the reviewed-snapshot
     // bulk-save contract below). This removes the old best-effort double-save.
@@ -423,10 +420,8 @@ export default function AutomationIdeas({
       setMessage({ text: data?.error === 'automation_migration_required' ? 'automation_migration_required' : (data?.error || 'error'), ok: false })
       return null
     }
-    const savedPlans = Array.isArray(data.savedPlans)
-      ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
-      : []
-    if (savedPlans.length) onPlansSaved?.(savedPlans)
+    // topics/bulk no longer persists links (the authoritative bulk-save does); the row badge
+    // is seeded from the REAL bulk-save summaries in approveAndQueue, not from savedPlans.
     onCreated()
 
     const topicsForAction: ReviewTopic[] = []
@@ -478,7 +473,7 @@ export default function AutomationIdeas({
         else unresolved.push({ title: s.title, reason: 'unresolved' })
       }
     }
-    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, ideaIdsByTopicId, pageTypeByTopicId, snapshotByTopicId, savedPlans, expectedPlans }
+    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, ideaIdsByTopicId, pageTypeByTopicId, snapshotByTopicId }
   }
 
   // Re-review refresh: replace a stale/legacy idea's displayed link choices with the
@@ -530,13 +525,15 @@ export default function AutomationIdeas({
     refreshedByTopic: Record<string, { url: string; anchor: string }[]>
     needsReview: boolean
     currentSnapshot: { scannerVersion: string | null; scanCompletedAt: string | null }
+    // REAL per-topic saved-plan summary for every topic that persisted (seeds the row badge).
+    summaries: { topicId: string; exists: boolean; linkCount: number; approvedCount: number; stale: boolean }[]
   }
   async function saveCheckedLinks(
     topicIds: string[],
     selectedByTopicId: Record<string, { url: string; anchor: string }[]>,
     snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }>,
   ): Promise<LinkSaveOutcome> {
-    const out: LinkSaveOutcome = { okIds: new Set(), failures: [], hardReason: null, refreshedByTopic: {}, needsReview: false, currentSnapshot: { scannerVersion: null, scanCompletedAt: null } }
+    const out: LinkSaveOutcome = { okIds: new Set(), failures: [], hardReason: null, refreshedByTopic: {}, needsReview: false, currentSnapshot: { scannerVersion: null, scanCompletedAt: null }, summaries: [] }
     if (topicIds.length === 0) return out
     const failAll = (reason: string, needsReview = false) => { out.hardReason = reason; out.needsReview = needsReview; for (const id of topicIds) out.failures.push({ topicId: id, reason }); return out }
     // 1) current plan — the canonical CURRENT links (for refresh) + current snapshot.
@@ -573,6 +570,11 @@ export default function AutomationIdeas({
     const byTopic = new Map(results.map((r) => [r.topicId, r]))
     const evln = evaluateLinkSave(topicIds, selectedByTopicId, { ok: true, results })
     for (const id of evln.okIds) out.okIds.add(id)
+    // REAL per-topic summary (from the authoritative bulk-save result) for the row badge.
+    for (const id of evln.okIds) {
+      const r = byTopic.get(id)
+      out.summaries.push({ topicId: id, exists: true, linkCount: r?.linkCount ?? 0, approvedCount: r?.approvedCount ?? 0, stale: !!(r as { staleAtCreation?: boolean } | undefined)?.staleAtCreation })
+    }
     for (const f of evln.failures) {
       // Surface the SPECIFIC dropped reason (blocked / not_in_plan / invalid_anchor /
       // duplicate_target / duplicate_anchor) instead of collapsing to dropped_link.
@@ -628,6 +630,10 @@ export default function AutomationIdeas({
       // 1) Save the CHECKED links authoritatively (reviewed-snapshot bulk-save, server revalidates).
       const save = await saveCheckedLinks(withLinksIds, r.selectedByTopicId, r.snapshotByTopicId)
       const failedLinkCount = save.failures.length
+      // Seed the topic-row link badge with the REAL saved-plan summary (link + approved
+      // counts) — a topic with no checked links records an auditable zero-link plan too.
+      const planSummaries = [...save.summaries, ...noLinksIds.map((id) => ({ topicId: id, exists: true, linkCount: 0, approvedCount: 0, stale: false }))]
+      if (planSummaries.length) onPlansSaved?.(planSummaries)
 
       // 1b) Any topic whose checked links did NOT fully persist (stale/legacy/changed cache) is
       //     NOT queued — refresh its card links from the canonical current plan and require a

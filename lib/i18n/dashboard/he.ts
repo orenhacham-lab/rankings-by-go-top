@@ -471,6 +471,7 @@ export const dashboardHe = {
       droppedShort: 'לא נשמרו',
       noManualOptions: 'לא נמצאו אפשרויות ידניות נוספות שעומדות בסינון האיכות.',
       badgeAction: 'הוסף קישורים',
+      badgeChecking: 'טוען סטטוס קישורים…',
       badgeNoPlan: 'הוסף קישורים',
       badgeZero: 'הוסף קישורים',
       badgePlanned: 'בדוק קישורים ({n})',
@@ -566,6 +567,9 @@ export const dashboardHe = {
       errImage: 'הפרסום נכשל בגלל בעיה בתמונה הראשית. נסו ליצור תמונה מחדש או שלחו כטיוטה.',
       errNoConn: 'אין חיבור WordPress פעיל לפרויקט הזה.',
       errGeneric: 'הפעולה מול WordPress נכשלה. נסו שוב.',
+      seoNotVerified: 'הפוסט פורסם, אך נתוני ה-SEO (תיאור ומילת מפתח) לא אומתו. יש לבדוק בעורך ולהתקין את חיבור GO TOP SEO אם צריך.',
+      seoBridgeRequired: 'הפוסט פורסם, אך כדי לשמור את נתוני ה-Yoast/Rank Math יש להתקין את תוסף GO TOP SEO באתר ולנסות שוב.',
+      seoPermission: 'הפוסט פורסם, אך אין הרשאה לעדכן נתוני SEO. בדקו את הרשאות המשתמש ב-WordPress.',
     },
     rowShopify: {
       publish: 'פרסם לחנות',

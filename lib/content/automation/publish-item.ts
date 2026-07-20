@@ -8,7 +8,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadWordPressCredentials } from '@/lib/content/api-auth'
-import { updatePostSeoMeta } from '@/lib/wordpress/client'
+import { publishArticleSeo } from '@/lib/content/seo-publish'
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
@@ -199,10 +199,15 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       return { itemId, status: 'failed', articleId: article.id, reason: 'db_persist_failed_after_wp_publish', wpPostUrl: created.wpPostUrl }
     }
 
-    // Best-effort SEO meta (never fails the publish).
+    // SEO meta through the SHARED verifying service — WITH the focus keyword (loaded from the
+    // topic's primary_keyword) and PERSISTED truthfully. Never swallowed, never a silent
+    // publish without complete SEO data. Non-fatal to the post itself.
     try {
-      await updatePostSeoMeta(loaded.creds, created.wpPostId, { metaTitle: article.meta_title || String(article.title || ''), metaDescription: article.meta_description || null })
-    } catch { /* best-effort */ }
+      const seo = await publishArticleSeo(admin, loaded.creds, created.wpPostId, {
+        articleId: article.id, metaTitle: article.meta_title || String(article.title || ''), metaDescription: article.meta_description || null, topicId: article.topic_id,
+      })
+      if (seo.status !== 'verified') console.warn('[automation-publish] seo_not_verified', { itemId, articleId: article.id, plugin: seo.plugin, status: seo.status })
+    } catch (e) { console.warn('[automation-publish] seo write failed', { itemId, message: (e as Error)?.message?.slice(0, 120) }) }
 
     // Finalize: article + item published.
     await admin.from('generated_articles').update({ status: 'published', published_at: nowIso(), last_error: null, updated_at: nowIso() }).eq('id', article.id)

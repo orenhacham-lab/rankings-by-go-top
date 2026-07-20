@@ -24,12 +24,16 @@ interface Strings {
   badgeApproved: string
   badgeStaleSuffix: string
   badgeTooltip: string
+  badgeChecking: string
 }
 
-export default function TopicPlanBadge({ summary, onClick, t, highlight = false }: { summary?: TopicPlanSummary; onClick: () => void; t: Strings; highlight?: boolean }) {
+export default function TopicPlanBadge({ summary, checking = false, onClick, t, highlight = false }: { summary?: TopicPlanSummary; checking?: boolean; onClick: () => void; t: Strings; highlight?: boolean }) {
   let label = t.badgeAction
   // Actionable by default (indigo), so it reads as a button, not muted metadata.
   let tone = 'border-indigo-300 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-300 bg-white dark:bg-transparent'
+  // NEUTRAL while the saved-plan status is still (re)hydrating — an unknown status must never
+  // read as "add links / missing".
+  if (!summary && checking) { label = t.badgeChecking; tone = 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 bg-white dark:bg-transparent' }
   if (summary) {
     if (!summary.exists) { label = t.badgeNoPlan }
     else if (summary.linkCount === 0) { label = t.badgeZero }
