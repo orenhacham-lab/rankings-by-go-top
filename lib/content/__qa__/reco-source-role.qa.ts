@@ -49,16 +49,25 @@ function main() {
   check('no related product → article_candidate', cls('מנורת פלזמה', 'informational', []).role === 'article_candidate')
   check('a commercial/local need (שירות/חנות/משלוח) is never product support-only', cls('משלוח מתנות', 'local_commercial', [prod('מארז מתנה')]).role === 'article_candidate')
 
-  console.log('GATE) buildBriefPool — support-only excluded from ARTICLE pool; product preserved')
+  check('false-positive guard: 1 shared token (מארז ⟵ מארז כוסות וויסקי) → article_candidate (never product-affine)',
+    cls('מארזים למשלוח', 'informational', [prod('מארז כוסות וויסקי')]).role === 'article_candidate')
+
+  console.log('SOFT) buildBriefPool — product-shaped query STAYS in the pool (Tier 2), pillar need ranks ahead')
   {
-    const r = buildBriefPool(base({ keywordResearch: kr(['מנורת פלזמה', 'איך פועלת מנורת פלזמה']), entities: [{ name: 'מנורת פלזמה כדור חשמלי RGB', url: '/p/1', type: 'product' }] }))
-    check('bare product query is NOT admitted; the informational-need query IS', !subs(r).includes('מנורת פלזמה') && subs(r).includes('איך פועלת מנורת פלזמה'))
-    check('typed reason recorded: product_entity_support_only', (rej(r).product_entity_support_only ?? 0) === 1)
-    const ex = (r.diagnostics.support_only_examples ?? [])[0]
-    check('diagnostic example exposes subject/product/url/evidenceKind/tokens/reason',
-      !!ex && ex.subject === 'מנורת פלזמה' && ex.productEntity.includes('מנורת פלזמה') && ex.entityUrl === '/p/1' && ex.evidenceKind === 'keyword_research' && ex.matchedEntityTokens.length >= 2 && !!ex.confidenceReason)
-    const art = r.pool.find((b) => b.subject.includes('איך'))
-    check('EVIDENCE products remain: the admitted article still lists the product in relatedEntities',
+    const r = buildBriefPool(base({
+      keywordResearch: kr(['מנורת פלזמה', 'מנורת שולחן מעוצבת', 'מתנות לגבר']),
+      entities: [{ name: 'מנורת פלזמה כדור חשמלי RGB', url: '/p/1', type: 'product' }, { name: 'מתנות', url: '/c/gifts', type: 'category' }],
+    }))
+    check('all three queries REMAIN in the pool (no hard product rejection)', ['מנורת פלזמה', 'מנורת שולחן מעוצבת', 'מתנות לגבר'].every((q) => subs(r).includes(q)))
+    check('product_entity_support_only is no longer a rejection reason', !('product_entity_support_only' in rej(r)))
+    const bp = r.diagnostics.brief_priority ?? []
+    const bare = bp.find((p) => p.subject === 'מנורת פלזמה')
+    const gift = bp.find((p) => p.subject === 'מתנות לגבר')
+    check('bare product → productAffinity + Tier 2', !!bare && bare.tier === 2 && bare.productAffinity === true)
+    check('pillar-aligned gift need → Tier 0 (category pillar), ranks AHEAD of the Tier-2 product',
+      !!gift && gift.tier === 0 && gift.matchedPillarType === 'category' && (gift.finalSynthesisRank < (bare?.finalSynthesisRank ?? 99)))
+    const art = r.pool.find((b) => b.subject === 'מנורת שולחן מעוצבת')
+    check('EVIDENCE products remain: an article sharing a token still lists the product in relatedEntities',
       !!art && (art.relatedEntities ?? []).some((e) => e.type === 'product' && e.name.includes('מנורת פלזמה')))
   }
 
@@ -103,15 +112,19 @@ function main() {
       (rej(r).product_entity_support_only ?? 0) === 0 && fashionKr.every((q) => subs(r).includes(q)), JSON.stringify({ pool: subs(r), rejected: rej(r) }))
   }
 
-  console.log('GUARD) source: gate is the FINAL admission check, product-type only, typed reason')
+  console.log('GUARD) source: NO hard product rejection; SOFT tier priority; helpers reused; dd492b7 intact')
   {
     const ob = readFileSync(join(__dirname, '../recommendations/opportunity-brief.ts'), 'utf8')
+    check('product affinity is a SIGNAL only — product_entity_support_only is NEVER a rejection reason',
+      !/reject\('product_entity_support_only'/.test(ob) && !/support_only_examples/.test(ob))
+    check('SOFT ordering: tier (0<1<2) → existing briefScore → opportunityId, family round-robin INSIDE each tier',
+      /export function prioritizeBriefsForSynthesis/.test(ob) && /for \(const tier of \[0, 1, 2\] as const\)/.test(ob) && /b\.briefScore - a\.briefScore \|\| \(a\.opportunityId < b\.opportunityId/.test(ob) && /familyInterleave\(group\)/.test(ob))
+    check('pillars from OWNED NON-product evidence only (tracked/category/service/homepage/corroborated focus)',
+      /type: 'tracked_keyword'/.test(ob) && /type: 'category'/.test(ob) && /type: 'service'/.test(ob) && /type: 'homepage'/.test(ob) && /corroborated_project_focus/.test(ob))
+    check('productAffinity signal requires ≥2 shared product tokens (kills the מארז single-token false positive)',
+      /if \(matched\.length < 2\) continue/.test(ob))
     check('classifier reuses existing helpers only (distinctiveTokensOf / canonicalVariants / GENERIC_TOKENS / searchNeed / entity.type)',
       /distinctiveTokensOf\(candidate\.subject\)/.test(ob) && /GENERIC_CANON/.test(ob) && /e\.type === 'product'/.test(ob) && /candidate\.searchNeed !== 'informational'/.test(ob) && /canonicalVariants/.test(ob))
-    check('gate runs AFTER all existing admission gates, records product_entity_support_only, preserves entity',
-      /reject\('product_entity_support_only'/.test(ob) && ob.indexOf("reject('product_entity_support_only'") > ob.indexOf("reject('brief_semantic_duplicate'"))
-    check('conservative: ambiguous → article_candidate (returns keep on <2 tokens, need, no-product)',
-      /if \(toks\.length < 2\) return keep/.test(ob) && /if \(candidate\.searchNeed !== 'informational'\) return keep/.test(ob) && /if \(products\.length === 0\) return keep/.test(ob))
     const gfb = readFileSync(join(__dirname, '../recommendations/generate-from-briefs.ts'), 'utf8')
     check('FROZEN: production still calls buildBriefPool without a head-cap option (dd492b7 intact)',
       /buildBriefPool\(\{/.test(gfb) && !/buildBriefPool\([^)]*maxPerSubjectHead/.test(gfb))

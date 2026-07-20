@@ -47,6 +47,25 @@ export interface OpportunityBrief {
   publishedCoverage: string[]
   confidence: number
   briefScore: number
+  /** SOFT synthesis-batch priority (additive; set by prioritizeBriefsForSynthesis). Never
+   *  affects pool membership — only the ORDER briefs are handed to synthesis rounds. */
+  priority?: BriefPriority
+}
+
+export type PillarType = 'tracked_keyword' | 'category' | 'service' | 'homepage' | 'corroborated_project_focus'
+/** A verified NON-product business pillar (owned business evidence). */
+export interface BusinessPillar { source: string; type: PillarType; tokens: Set<string> }
+export interface BriefPriority {
+  /** 0 = pillar-aligned distinct need · 1 = other independent article need · 2 = commercial/product-shaped. */
+  tier: 0 | 1 | 2
+  reason: string
+  matchedPillar: string | null
+  matchedPillarType: PillarType | null
+  matchedPillarTokens: string[]
+  distinctModifierTokens: string[]
+  productAffinity: boolean
+  /** Index of this brief in the final tier-ordered pool (0-based). */
+  finalSynthesisRank: number
 }
 
 export interface BriefPoolInput {
@@ -79,18 +98,21 @@ export interface BriefPoolDiagnostics {
   rejected_by_reason: Record<string, number>
   /** Operator-only reviewability: up to 5 rejected candidates per reason. */
   rejected_examples: { subject: string; reason: string; evidenceKind: string }[]
-  /** Preview/operator-only: up to 5 candidates classified support_only_product (a bare/
-   *  near-bare owned-product query kept out of the ARTICLE pool but preserved as
-   *  support/link evidence). Additive + OPTIONAL (older hand-authored diagnostics may
-   *  omit it) — never shown in normal Production responses. Always populated by buildBriefPool. */
-  support_only_examples?: {
+  /** Preview/operator-only: SOFT synthesis-batch priority for EVERY admitted brief (one
+   *  entry per pool member, in final tier order). Additive + OPTIONAL — never shown in
+   *  normal Production responses; always populated by buildBriefPool. No brief is ever
+   *  removed by priority; this only records the deterministic tier/order. */
+  brief_priority?: {
+    opportunityId: string
     subject: string
-    productEntity: string
-    entityUrl: string | null
-    evidenceKind: string
-    matchedEntityTokens: string[]
-    candidateOnlyTokens: string[]
-    confidenceReason: string
+    tier: 0 | 1 | 2
+    priorityReason: string
+    matchedPillar: string | null
+    matchedPillarType: PillarType | null
+    matchedPillarTokens: string[]
+    distinctModifierTokens: string[]
+    productAffinity: boolean
+    finalSynthesisRank: number
   }[]
   pool_size: number
   by_family: Record<string, number>
@@ -143,18 +165,20 @@ export interface SourceRoleClassification {
 }
 
 /**
- * DOMAIN-NEUTRAL source-role classifier (pure). A candidate is `support_only_product`
- * ONLY when ALL hold, using existing helpers only (no domain/industry/project/vocabulary):
+ * DOMAIN-NEUTRAL product-affinity SIGNAL (pure). Returns `support_only_product` ONLY when
+ * ALL hold, using existing helpers only (no domain/industry/project/vocabulary). This is a
+ * SOFT signal used ONLY for synthesis-batch priority (Tier 2) — it NEVER removes a brief
+ * from the pool. A candidate is product-affine when:
  *   (1) it is grounded in an owned entity whose type is exactly `product` (never
- *       category/service/page/post — those keep their current ownership semantics);
+ *       category/service/page/post);
  *   (2) it is a BARE / NEAR-BARE representation of that one product — every distinctive
- *       candidate token is a product-name token or a generic modifier, AND the candidate
- *       HEAD (construct-state first token) is a product token;
- *   (3) it expresses NO independent supported need beyond the product — its searchNeed is
- *       plain `informational` (no question/comparison/selection/care/local-commercial
- *       marker) and it contributes no need-bearing token beyond the product.
- * Anything ambiguous stays `article_candidate` (false negatives preferred). The product
- * entity is never removed — it stays available for relatedEntities / links / examples.
+ *       candidate token is a product-name token or a generic modifier, the HEAD
+ *       (construct-state first token) is a product token, AND it shares at least TWO
+ *       tokens with the product (so a single incidental shared token — the false-positive
+ *       "מארז" ⟵ "מארז כוסות וויסקי" — never qualifies);
+ *   (3) it expresses NO independent supported need beyond the product — plain
+ *       `informational` searchNeed and no need-bearing token beyond the product.
+ * Anything ambiguous → `article_candidate`. The product entity is never removed.
  */
 export function classifyCandidateSourceRole(
   candidate: Pick<OpportunityBrief, 'subject' | 'searchNeed' | 'relatedEntities'>,
@@ -165,7 +189,7 @@ export function classifyCandidateSourceRole(
   // (3a) an independent supported need (question/comparison/selection/care/local-commercial)
   // is always a real article opportunity, even if a product is involved.
   if (candidate.searchNeed !== 'informational') return keep
-  // (1) only PRODUCT-typed owned entities may make a candidate support-only.
+  // (1) only PRODUCT-typed owned entities may make a candidate product-affine.
   const products = candidate.relatedEntities.filter((e) => e.type === 'product')
   if (products.length === 0) return keep
   for (const p of products) {
@@ -173,19 +197,125 @@ export function classifyCandidateSourceRole(
     if (productToks.size === 0) continue
     // (2) the candidate HEAD must itself be a product token (strong single-product grounding).
     if (!tokenIn(toks[0], productToks)) continue
+    const matched = toks.filter((t) => tokenIn(t, productToks))
+    // (2b) require ≥2 shared tokens — a lone incidental token (מארז) never qualifies.
+    if (matched.length < 2) continue
     // (2)+(3b) NEAR-BARE: no candidate token is need-bearing beyond the product/generics.
     const residual = toks.filter((t) => !tokenIn(t, productToks) && !tokenIn(t, GENERIC_CANON))
     if (residual.length === 0) {
       return {
         role: 'support_only_product',
         productEntity: { name: p.name, url: p.url ?? null },
-        matchedEntityTokens: toks.filter((t) => tokenIn(t, productToks)),
+        matchedEntityTokens: matched,
         candidateOnlyTokens: [],
-        confidenceReason: 'near_bare_product: head is a product token, every candidate token is covered by one owned product entity or a generic modifier, and no independent search need is expressed',
+        confidenceReason: 'near_bare_product: head is a product token, ≥2 tokens covered by one owned product entity, and no independent search need is expressed',
       }
     }
   }
   return keep
+}
+
+// ── SOFT synthesis-batch priority: business pillars + tiering + tier-ordered interleave ──
+/** Root/homepage URL heuristic: pathname is empty or "/". */
+function isHomepageUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  try { const u = new URL(url); return u.pathname === '' || u.pathname === '/' } catch { const s = String(url).trim(); return s === '/' || /^https?:\/\/[^/]+\/?$/.test(s) }
+}
+
+/**
+ * Verified NON-product business pillars, from OWNED business evidence only (never
+ * individual products, never generic pages, never keyword-research alone): tracked
+ * keywords, category entities, service entities, the homepage subject (root URL), and
+ * project-focus terms ONLY when corroborated by one of the former.
+ */
+export function buildBusinessPillars(input: Pick<BriefPoolInput, 'trackedKeywords' | 'projectFocus' | 'entities'>): BusinessPillar[] {
+  const pillars: BusinessPillar[] = []
+  const toks = (s: string) => new Set(distinctiveTokensOf(s))
+  for (const k of input.trackedKeywords) { const t = toks(k); if (t.size) pillars.push({ source: k, type: 'tracked_keyword', tokens: t }) }
+  for (const e of input.entities) {
+    if (e.type === 'category') { const t = toks(e.name); if (t.size) pillars.push({ source: e.name, type: 'category', tokens: t }) }
+    else if (e.type === 'service') { const t = toks(e.name); if (t.size) pillars.push({ source: e.name, type: 'service', tokens: t }) }
+    else if (isHomepageUrl(e.url)) { const t = toks(e.name); if (t.size) pillars.push({ source: e.name, type: 'homepage', tokens: t }) }
+  }
+  // corroborated project focus: a focus term is a pillar ONLY when it shares a token with
+  // an already-verified NON-focus pillar (tracked/category/service/homepage).
+  const corroborating = new Set<string>()
+  for (const p of pillars) for (const t of p.tokens) corroborating.add(t)
+  for (const f of input.projectFocus) {
+    const t = toks(f)
+    if (t.size && Array.from(t).some((x) => corroborating.has(x) || canonicalVariants(x).some((v) => corroborating.has(v)))) {
+      pillars.push({ source: f, type: 'corroborated_project_focus', tokens: t })
+    }
+  }
+  return pillars
+}
+
+/** Best pillar a brief extends (shares ≥1 token AND adds ≥1 distinct modifier). */
+function matchPillar(subjectToks: string[], pillars: BusinessPillar[]): { pillar: BusinessPillar; shared: string[]; distinct: string[] } | null {
+  let best: { pillar: BusinessPillar; shared: string[]; distinct: string[] } | null = null
+  for (const p of pillars) {
+    const shared = subjectToks.filter((t) => p.tokens.has(t) || canonicalVariants(t).some((v) => p.tokens.has(v)))
+    if (shared.length === 0) continue
+    const distinct = subjectToks.filter((t) => !p.tokens.has(t) && !canonicalVariants(t).some((v) => p.tokens.has(v)))
+    if (distinct.length === 0) continue // a bare pillar restatement adds no new need
+    if (!best || shared.length > best.shared.length) best = { pillar: p, shared, distinct }
+  }
+  return best
+}
+
+/**
+ * Assign exactly ONE synthesis priority tier to a brief (pure). NEVER removes a brief.
+ *   TIER 0 — from KR/tracked/focus, shares a token with a verified non-product pillar AND
+ *            adds a distinct modifier, and is not a local-commercial/store/price/delivery.
+ *   TIER 2 — product-shaped (product-affine) or a direct commercial/local query.
+ *   TIER 1 — any other independent article opportunity.
+ */
+export function classifyBriefPriority(b: OpportunityBrief, pillars: BusinessPillar[]): BriefPriority {
+  const kind = b.sourceEvidence[0]?.kind ?? 'unknown'
+  const fromQueryOrFocus = kind === 'keyword_research' || kind === 'project_data'
+  const toks = distinctiveTokensOf(b.subject)
+  const productAffinity = classifyCandidateSourceRole(b).role === 'support_only_product'
+  const isLocalCommercial = b.searchNeed === 'local_commercial'
+  const best = matchPillar(toks, pillars)
+  const meta = { matchedPillar: best?.pillar.source ?? null, matchedPillarType: best?.pillar.type ?? null, matchedPillarTokens: best?.shared ?? [], distinctModifierTokens: best?.distinct ?? [], productAffinity, finalSynthesisRank: -1 }
+  if (fromQueryOrFocus && best && !isLocalCommercial) {
+    return { tier: 0, reason: `pillar_aligned_distinct_need:${best.pillar.type}`, ...meta }
+  }
+  if (productAffinity || isLocalCommercial || b.family === 'commercial') {
+    return { tier: 2, reason: productAffinity ? 'product_shaped' : 'direct_commercial', ...meta }
+  }
+  return { tier: 1, reason: 'independent_article_need', ...meta }
+}
+
+/** Existing family round-robin (extracted verbatim) — applied INSIDE a single tier. */
+function familyInterleave(briefs: OpportunityBrief[]): OpportunityBrief[] {
+  const byFamily = new Map<OpportunityFamily, OpportunityBrief[]>()
+  for (const b of briefs) { const l = byFamily.get(b.family) ?? []; l.push(b); byFamily.set(b.family, l) }
+  const families: OpportunityFamily[] = ['informational', 'comparison', 'commercial']
+  const out: OpportunityBrief[] = []
+  let added = true
+  while (added) { added = false; for (const f of families) { const l = byFamily.get(f); if (l && l.length) { out.push(l.shift() as OpportunityBrief); added = true } } }
+  return out
+}
+
+/**
+ * SOFT priority ordering at the pool→synthesis boundary. Returns the SAME briefs (no
+ * additions, no removals) ordered by the tuple: (priorityTier 0<1<2) → existing briefScore
+ * desc → existing opportunityId — with the existing family round-robin applied INSIDE each
+ * tier (never one global interleave that lets a Tier-2 query jump ahead of Tier-0). Sets
+ * each brief's priority + finalSynthesisRank. Identical to the pre-patch order when all
+ * briefs share one tier.
+ */
+export function prioritizeBriefsForSynthesis(pool: OpportunityBrief[], context: { pillars: BusinessPillar[] }): OpportunityBrief[] {
+  for (const b of pool) b.priority = classifyBriefPriority(b, context.pillars)
+  const ordered: OpportunityBrief[] = []
+  for (const tier of [0, 1, 2] as const) {
+    const group = pool.filter((b) => b.priority?.tier === tier)
+    group.sort((a, b) => b.briefScore - a.briefScore || (a.opportunityId < b.opportunityId ? -1 : 1))
+    ordered.push(...familyInterleave(group))
+  }
+  ordered.forEach((b, i) => { if (b.priority) b.priority.finalSynthesisRank = i })
+  return ordered
 }
 
 const briefId = (subject: string) => {
@@ -288,10 +418,13 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
   }
 
   // ── Pre-AI validation (counted) ────────────────────────────────────────────
+  // NO product-affinity REJECTION: every brief that passes ownership / coverage / pending
+  // / semantic-duplicate (and the optional explicit head cap) stays in the pool. Owned
+  // products are demoted only SOFTLY at synthesis-batch ordering below (Tier 2), never
+  // removed — they also remain available for relatedEntities / internal links.
   const pool: OpportunityBrief[] = []
   const acceptedSignatures: TopicSignature[] = []
   const perHead = new Map<string, number>()
-  const supportOnlyExamples: BriefPoolDiagnostics['support_only_examples'] = []
   for (const b of candidates) {
     const kind = b.sourceEvidence[0]?.kind ?? 'unknown'
     if (input.isOwnedByEntity(b.subject)) { reject('exact_existing_keyword_owner', b.subject, kind); continue }
@@ -308,33 +441,16 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       if (n >= maxPerHead) { reject('subject_head_cap', b.subject, kind); continue }
       perHead.set(head, n + 1)
     }
-    // SOURCE ROLE (final admission gate): a bare/near-bare owned-PRODUCT query is
-    // support/link evidence, not a standalone article subject. Runs AFTER every
-    // existing gate so all their reason semantics are unchanged; the product entity
-    // itself is untouched (still available for relatedEntities / links / examples).
-    const role = classifyCandidateSourceRole(b)
-    if (role.role === 'support_only_product') {
-      reject('product_entity_support_only', b.subject, kind)
-      if (supportOnlyExamples.length < 5 && role.productEntity) {
-        supportOnlyExamples.push({ subject: b.subject.slice(0, 120), productEntity: role.productEntity.name.slice(0, 120), entityUrl: role.productEntity.url, evidenceKind: kind, matchedEntityTokens: role.matchedEntityTokens, candidateOnlyTokens: role.candidateOnlyTokens, confidenceReason: role.confidenceReason ?? '' })
-      }
-      continue
-    }
     acceptedSignatures.push(sig)
     pool.push(b)
   }
 
-  // ── Rank + family round-robin ──────────────────────────────────────────────
-  pool.sort((a, b) => b.briefScore - a.briefScore || (a.opportunityId < b.opportunityId ? -1 : 1))
-  const byFamily = new Map<OpportunityFamily, OpportunityBrief[]>()
-  for (const b of pool) { const l = byFamily.get(b.family) ?? []; l.push(b); byFamily.set(b.family, l) }
-  const families: OpportunityFamily[] = ['informational', 'comparison', 'commercial']
-  const interleaved: OpportunityBrief[] = []
-  let added = true
-  while (added) {
-    added = false
-    for (const f of families) { const l = byFamily.get(f); if (l && l.length) { interleaved.push(l.shift() as OpportunityBrief); added = true } }
-  }
+  // ── Rank + SOFT priority ordering + per-tier family round-robin ─────────────
+  // Tier 0 (pillar-aligned distinct need) → Tier 1 (other independent article) → Tier 2
+  // (product-shaped / commercial), each ordered by the existing briefScore/opportunityId
+  // and family round-robin. No brief is added or removed; only the order changes.
+  const pillars = buildBusinessPillars(input)
+  const interleaved = prioritizeBriefsForSynthesis(pool, { pillars })
 
   const by_family: Record<string, number> = {}
   for (const b of interleaved) by_family[b.family] = (by_family[b.family] ?? 0) + 1
@@ -347,7 +463,18 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       total_raw_candidates: rawQuery + rawTracked + rawTheme,
       rejected_by_reason: rejected,
       rejected_examples: rejectedExamples,
-      support_only_examples: supportOnlyExamples,
+      brief_priority: interleaved.map((b) => ({
+        opportunityId: b.opportunityId,
+        subject: b.subject,
+        tier: b.priority?.tier ?? 1,
+        priorityReason: b.priority?.reason ?? 'independent_article_need',
+        matchedPillar: b.priority?.matchedPillar ?? null,
+        matchedPillarType: b.priority?.matchedPillarType ?? null,
+        matchedPillarTokens: b.priority?.matchedPillarTokens ?? [],
+        distinctModifierTokens: b.priority?.distinctModifierTokens ?? [],
+        productAffinity: b.priority?.productAffinity ?? false,
+        finalSynthesisRank: b.priority?.finalSynthesisRank ?? -1,
+      })),
       pool_size: interleaved.length,
       by_family,
       with_demand: interleaved.filter((b) => b.alignedDemandQuery).length,

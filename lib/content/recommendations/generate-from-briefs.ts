@@ -185,6 +185,20 @@ export interface BriefRunDiagnostics {
     kr_live_fetched: number
   }
   brief_pool: BriefPoolDiagnostics
+  /** SOFT synthesis-priority trace (Preview/operator-only, additive). One record per
+   *  brief in the ordered working pool: its tier, final rank, and whether/where it was
+   *  consumed. Proves admitted-count-in === admitted-count-out, one rank each, one
+   *  round+position per consumed brief, and unconsumed briefs stay explicitly present.
+   *  Additive + OPTIONAL (older hand-authored diagnostics omit it); always set by the run. */
+  synthesis_brief_trace?: {
+    opportunityId: string
+    subject: string
+    priorityTier: 0 | 1 | 2 | null
+    finalSynthesisRank: number
+    consumed: boolean
+    consumedRound: number | null
+    roundPosition: number | null
+  }[]
   /** RC3 — constrained discovery accounting (ran only to fill a pool deficit). */
   discovery: {
     ran: boolean
@@ -1116,6 +1130,8 @@ export async function synthesizeFromSnapshot(
   })
   const briefById = new Map(workingPool.map((b) => [b.opportunityId, b]))
   let cursor = 0
+  // SOFT-priority consumption trace: which round + position consumed each brief (additive).
+  const consumptionByBriefId = new Map<string, { consumedRound: number; roundPosition: number }>()
   let stop: BriefRunDiagnostics['stop_reason'] | null = null
 
   // Paid-call cap: discovery + synthesis together may never exceed TWO calls.
@@ -1131,6 +1147,7 @@ export async function synthesizeFromSnapshot(
     const batchSize = Math.min(workingPool.length - cursor, Math.max(4, Math.ceil(deficit * 1.5)))
     if (batchSize <= 0) { stop = suggestions.length > 0 ? 'true_pool_exhausted' : 'insufficient_inventory'; break }
     const batch = workingPool.slice(cursor, cursor + batchSize)
+    batch.forEach((bb, pos) => { if (!consumptionByBriefId.has(bb.opportunityId)) consumptionByBriefId.set(bb.opportunityId, { consumedRound: round, roundPosition: pos }) })
     cursor += batchSize
 
     const prompt = buildBriefSynthesisPrompt(batch, ctx, langLabel, year)
@@ -1264,6 +1281,10 @@ export async function synthesizeFromSnapshot(
       modelConfig: modelConfigHolder.value,
       evidence_inventory: evidenceInventory,
       brief_pool: briefPool,
+      synthesis_brief_trace: workingPool.map((bb, idx) => {
+        const c = consumptionByBriefId.get(bb.opportunityId)
+        return { opportunityId: bb.opportunityId, subject: bb.subject, priorityTier: bb.priority?.tier ?? null, finalSynthesisRank: bb.priority?.finalSynthesisRank ?? idx, consumed: !!c, consumedRound: c?.consumedRound ?? null, roundPosition: c?.roundPosition ?? null }
+      }),
       discovery,
       rounds,
       candidateOutcomes,
