@@ -76,6 +76,14 @@ export async function POST(request: Request) {
   const clientRequestId = typeof body.clientRequestId === 'string' ? body.clientRequestId : null
   const diagnostics = process.env.RECO_ISOLATION_DIAGNOSTICS === '1'
   const excludePendingContext = diagnostics && body.excludePendingContext === true
+  // Scope A — Preview-only NO-WRITE diagnostics mode. Runs the EXACT normal pipeline
+  // (preparation → snapshot → Pro-first controller → synthesis → deterministic
+  // validation → finalization → blog gate) but SKIPS every persistence/mutation once
+  // the final result is known, and returns the full accepted + rejected candidate
+  // accounting. Allowed ONLY when isolation diagnostics are enabled AND this is not a
+  // Production deployment; owner-authenticated + project-scoped like any normal run.
+  const requestedDiagnosticsOnly = body.diagnosticsOnly === true
+  const diagnosticsOnly = requestedDiagnosticsOnly && diagnostics && (process.env.VERCEL_ENV ?? null) !== 'production'
   // Model tier (Phase 2 — explicit, truthful): 'standard' = Flash-class,
   // 'premium' = a VALIDATED Pro-class model for the (single) synthesis call.
   // When the key does not offer a Pro-class model the run proceeds on standard
@@ -295,6 +303,32 @@ export async function POST(request: Request) {
     const engineFiltered = Math.max(0, rawGeneratedCount - engineAcceptedCount)
     const engineRejectedByReason = briefDiagnostics?.rejected_by_reason ?? opportunityDiagnostics?.rejected_by_reason ?? {}
     const routeRejectedByReason = () => ({ title_exists: filteredTitleExists, exact_existing_keyword_owner: exactExistingKeywordOwner, source_only_entity_expansion: sourceOnlyEntityExpansion, covered_by_existing_content: filteredCoveredByContent, primary_keyword_exists: filteredPrimaryKeywordExists, intra_run_removed: intraRun.removed, intra_run_merged: intraRun.merged })
+
+    // Scope A — DIAGNOSTICS-ONLY (dry-run) EXIT. `fresh` here is byte-identical to what
+    // the normal path would persist (identical code above; only the branch below
+    // differs). Return the full accounting and perform ZERO writes: no insertPendingIdeas,
+    // no markIdeasDuplicate, no queue/approve/reject — nothing after the final result.
+    if (diagnosticsOnly) {
+      const { gitSha, vercelEnv } = runtimeInfo()
+      const co = briefDiagnostics?.candidateOutcomes ?? []
+      return Response.json({
+        ok: true,
+        dryRun: true,
+        // The generated set that WOULD be persisted (accepted candidates), in order.
+        suggestions: fresh,
+        wouldPersistCount: fresh.length,
+        acceptedCandidates: co.filter((o) => o.outcome === 'accepted'),
+        rejectedCandidates: co.filter((o) => o.outcome === 'rejected'),
+        candidateAccounting: briefDiagnostics?.candidateAccounting ?? null,
+        meta: {
+          source, projectId: auth.project.id, generationRunId, clientRequestId,
+          persisted: false, dryRun: true, newlyAddedCount: 0, wouldPersistCount: fresh.length,
+          ...pathContract,
+          funnel: { generated: rawGeneratedCount, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
+          isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
+        },
+      })
+    }
 
     // F/B — persist the EXACT fresh array; capture the typed persistence outcome.
     // Persist the customer's SELECTED tier + the actual model the run used, so the

@@ -167,7 +167,8 @@ export async function runProFirstProduction(
   const emptyDiag = (): BriefRunDiagnostics => ({
     engine: 'evidence_first_briefs', modelPath: snapshot.modelPath, modelConfig: null,
     evidence_inventory: snapshot.evidenceInventory, brief_pool: snapshot.briefPool, discovery: snapshot.discovery,
-    rounds: [], rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 0,
+    rounds: [], candidateOutcomes: [], candidateAccounting: { generated: 0, accepted: 0, rejected: 0, not_processed: 0, dropped: 0, outcomesCapped: false, reconciles: true },
+    rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 0,
     finalCount: 0, model_calls: preparationProviderCalls, stop_reason: 'insufficient_inventory',
     brief_consumption: { effectivePoolSize: snapshot.workingPool.length, consumedBriefs: 0, remainingBriefs: snapshot.workingPool.length, callsRemaining: 0 },
     insufficient_inventory: true, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],

@@ -160,7 +160,13 @@ export default function AutomationIdeas({
   const [creating, setCreating] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [ideasExpanded, setIdeasExpanded] = useState(false)
+  // Pending-list pagination (B). Initial 3; "show more" reveals +5; "show all"
+  // reveals the rest. ALWAYS starts at 3 on mount/refresh/project-switch/new
+  // generation — never restored from storage/URL/prior mount (a fresh useState
+  // default IS the reset on remount; the effects below reset it on the other events).
+  const INITIAL_VISIBLE = 3
+  const PAGE_STEP = 5
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[] } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
@@ -186,7 +192,7 @@ export default function AutomationIdeas({
   // user clicking generate again (survives page refresh). Best-effort/read-only.
   useEffect(() => {
     let cancelled = false
-    setInitialLoaded(false); setSuggestions([]); setSelected(new Set()); setMeta(null); setMessage(null)
+    setInitialLoaded(false); setSuggestions([]); setSelected(new Set()); setMeta(null); setMessage(null); setVisibleCount(INITIAL_VISIBLE)
     ;(async () => {
       try {
         const res = await fetch(`/api/content/automation/topic-ideas?projectId=${encodeURIComponent(projectId)}`)
@@ -286,6 +292,8 @@ export default function AutomationIdeas({
       }
       const list: Suggestion[] = Array.isArray(data.suggestions) ? data.suggestions : []
       setSuggestions(list)
+      // A newly completed generation response resets the view to the newest first 3.
+      setVisibleCount(INITIAL_VISIBLE)
       // No auto-select: persisted ideas accumulate, so approval must be explicit
       // to avoid bulk-approving previously-seen ideas.
       setSelected(new Set())
@@ -1035,7 +1043,7 @@ export default function AutomationIdeas({
           <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.linksOptionalNote}</p>
 
           <div className="space-y-2">
-            {(ideasExpanded ? suggestions : suggestions.slice(0, 3)).map((s) => (
+            {suggestions.slice(0, visibleCount).map((s) => (
               <div key={s.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
                 <label className="flex items-start gap-2">
                   <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="mt-1 h-4 w-4 accent-indigo-600" />
@@ -1164,14 +1172,28 @@ export default function AutomationIdeas({
                 </label>
               </div>
             ))}
-            {suggestions.length > 3 && (
-              <div className="pt-1">
+            {/* Pagination (B): shown only when more than the initial 3 exist AND some
+                are still hidden. "הצג עוד" reveals +5; "הצג הכל" reveals the rest.
+                Both hide once everything is visible. Buttons stay adjacent and wrap
+                cleanly on mobile. The rendered list is actually sliced (above) — no
+                hidden-via-CSS cards. */}
+            {suggestions.length > INITIAL_VISIBLE && visibleCount < suggestions.length && (
+              <div className="pt-1 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIdeasExpanded((v) => !v)}
+                  data-testid="ideas-show-more"
+                  onClick={() => setVisibleCount((v) => Math.min(suggestions.length, v + PAGE_STEP))}
                   className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
                 >
-                  {ideasExpanded ? t.showLess : `${t.showMoreIdeas} (${suggestions.length - 3})`}
+                  {`${t.showMoreIdeas} (${Math.min(PAGE_STEP, suggestions.length - visibleCount)})`}
+                </button>
+                <button
+                  type="button"
+                  data-testid="ideas-show-all"
+                  onClick={() => setVisibleCount(suggestions.length)}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-slate-200 dark:border-slate-600 px-3.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors"
+                >
+                  {`${t.showAllIdeas} (${suggestions.length})`}
                 </button>
               </div>
             )}

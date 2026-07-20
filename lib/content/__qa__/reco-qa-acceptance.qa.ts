@@ -26,6 +26,7 @@ const cleanDiag = (over: Partial<BriefRunDiagnostics> = {}): BriefRunDiagnostics
   brief_pool: { raw_query_candidates: 6, raw_theme_candidates: 0, raw_tracked_candidates: 1, total_raw_candidates: 7, rejected_by_reason: { subject_too_generic: 1 }, rejected_examples: [{ subject: 'מגנזיום', reason: 'subject_too_generic', evidenceKind: 'keyword_research' }], pool_size: 6, by_family: { informational: 6 }, with_demand: 5 },
   rounds: [{ round: 1, model: 'gemini-2.5-pro', briefs_sent: 6, provider_ok: true, provider_failed_briefs: 0, providerStatus: 'ok', providerErrorType: null, sanitizedProviderMessage: null, finishReason: 'STOP', textPresent: true, textLength: 1200, emitted: 6, polished: 5, skipped_by_model: 1, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 5, repaired: 0, rejected_by_reason: {}, marginal_yield: 0.833, synthesis_failure: null, synthesisResponse: null }],
   discovery: null,
+  candidateOutcomes: [], candidateAccounting: { generated: 5, accepted: 5, rejected: 0, not_processed: 0, dropped: 0, outcomesCapped: false, reconciles: true },
   rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 5, finalCount: 5, model_calls: 1,
   stop_reason: 'true_pool_exhausted', insufficient_inventory: false, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],
   brief_consumption: { effectivePoolSize: 6, consumedBriefs: 6, remainingBriefs: 0, callsRemaining: 1 },

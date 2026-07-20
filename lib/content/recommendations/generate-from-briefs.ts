@@ -36,7 +36,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
-import { buildKeywordGuard, coveredByExistingContent, ownedByExistingEntity, normalizePhrase } from './keyword-guard'
+import { buildKeywordGuard, coveredByExistingContent, ownedByExistingEntity, normalizePhrase, titleMainPhrase, keywordOriginsOf, type KeywordOriginEntry } from './keyword-guard'
 import { flattenKeywordResearchCacheDetailed, contentTokens, type EntityNode, type KeywordResearchIngestion } from './evidence-cluster'
 import { getCachedKeywordResults, setCachedKeywordResults } from '@/lib/content/keyword-research-cache'
 import { generateKeywordIdeas } from '@/lib/google-ads/keyword-ideas'
@@ -99,6 +99,62 @@ export interface BriefRoundDiagnostics {
   synthesisResponse: SynthesisResponseDiagnostics | null
 }
 
+/**
+ * Scope A — the concrete BLOCKER that stopped a rejected candidate (Preview/operator
+ * only; SAFE — key names, statuses, titles/keywords/urls, never article bodies or
+ * credentials). blockingSource is the guard-origin family or a resolved match source
+ * (existing article/topic, product/category/page entity, pending/approved/rejected/
+ * generated idea, same-run accepted). For a persisted idea it also carries the row
+ * status, so an OLD status='rejected' idea blocking a new candidate is explicit.
+ */
+export interface CandidateBlocker {
+  blockingSource:
+    | 'tracking_keyword' | 'topic_keyword' | 'idea_keyword' | 'scan_focus_keyword'
+    | 'existing_article' | 'existing_topic' | 'existing_content'
+    | 'entity' | 'pending_idea' | 'intra_run_accepted' | null
+  /** Persisted-idea rows: the row status (pending/approved/rejected/generated/…); else null. */
+  blockingRecordStatus: string | null
+  blockingTitle: string | null
+  blockingPrimaryKeyword: string | null
+  blockingUrl: string | null
+  /** How the block matched: exact_keyword / entity_owner / content_phrase / owns_need /
+   *  exact / improve / pending / pending_semantic / same_run / local_owner. */
+  matchType: string | null
+}
+
+/**
+ * Scope A — a complete per-candidate accounting record. EVERY polished candidate that
+ * enters validation is recorded EXACTLY once, so the invariant
+ * `generated = accepted + rejected (+ not_processed + dropped)` is provable. Additive
+ * and observational — recording it never changes acceptance, order, or return values.
+ */
+export interface CandidateOutcome {
+  briefId: string | null
+  opportunityId: string | null
+  /** brief.family — the source/opportunity family. */
+  sourceFamily: string | null
+  briefSubject: string | null
+  alignedDemandQuery: string | null
+  modelTitle: string | null
+  modelPrimaryKeyword: string | null
+  /** Final primary keyword after deterministic repair/normalization. */
+  finalPrimaryKeyword: string | null
+  keywordRepaired: boolean
+  finalIntent: string | null
+  outcome: 'accepted' | 'rejected' | 'not_processed' | 'dropped'
+  rejectionReason: string | null
+  /** The validation stage that produced the outcome (e.g. keyword_quality,
+   *  cannibalization, entity_ownership, pending_exact, intra_run). */
+  rejectionStage: string | null
+  blocker: CandidateBlocker | null
+  matchedExistingContentTitle: string | null
+  matchedExistingContentUrl: string | null
+  matchedCommercialEntity: string | null
+  matchedPendingIdea: string | null
+  matchedSameRunAccepted: string | null
+  coverageMatchType: string | null
+}
+
 export interface BriefRunDiagnostics {
   engine: 'evidence_first_briefs'
   modelPath: ModelPath
@@ -144,6 +200,20 @@ export interface BriefRunDiagnostics {
     candidates: { subject: string; anchor: string }[]
   } | null
   rounds: BriefRoundDiagnostics[]
+  /** Scope A — one record per polished candidate (accepted OR rejected, plus
+   *  not_processed/dropped edge buckets), bounded but ≥ the run target. */
+  candidateOutcomes: CandidateOutcome[]
+  /** Scope A — the provable accounting invariant. reconciles === true means every
+   *  generated candidate appears exactly once in candidateOutcomes. */
+  candidateAccounting: {
+    generated: number
+    accepted: number
+    rejected: number
+    not_processed: number
+    dropped: number
+    outcomesCapped: boolean
+    reconciles: boolean
+  }
   rejected_by_reason: Record<string, number>
   shadow_rejected_by_reason: Record<string, number>
   /** raw_generated = Σ rounds.polished (model output that entered validation). */
@@ -548,6 +618,8 @@ export async function prepareBriefRun(
     existingCoverageDocs,
     pendingExactKeys,
     pendingSignatures,
+    /** Scope A — pending idea docs (title + focus keyword) for blocker resolution. */
+    pendingCoverageDocs,
     brandSafety,
     keywordResearch,
     ctx,
@@ -587,7 +659,7 @@ export async function synthesizeFromSnapshot(
     linkCandidates, urlTypeMap, entityByTitle, corpusTypeWords, domainTypeWords,
     commercialEntityTokens, businessEvidenceTokens, evidenceProvenance,
     existingPageTitles, existingCoverageDocs, pendingExactKeys, pendingSignatures,
-    brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
+    pendingCoverageDocs, brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
     discovery, evidenceInventory,
   } = snapshot
   // Synthesis model: the snapshot's resolved model by default. The QA/admin smart-run
@@ -626,10 +698,69 @@ export async function synthesizeFromSnapshot(
     return parts.join(' ')
   }
 
+  // ── Scope A — blocker resolution (Preview/operator diagnostics ONLY) ─────────
+  // These helpers translate a rejection into the concrete record/page/idea that
+  // blocked it, WITHOUT touching the acceptance decision. They read the SAME guard
+  // origins / entities / pending docs / coverage matches the gates already used.
+  // A secondary phrase→origins index recovers a keyword blocker even when the guard
+  // key normalized differently (guard origins are keyed by normalizeText; the
+  // worthiness gate matches via normalizePhrase).
+  const originsByPhrase = new Map<string, KeywordOriginEntry[]>()
+  for (const [k, list] of guard.origins) { const p = normalizePhrase(k); if (p && !originsByPhrase.has(p)) originsByPhrase.set(p, list) }
+  const guardOriginsOf = (kw: string): KeywordOriginEntry[] => {
+    const direct = keywordOriginsOf(guard, kw)
+    return direct.length ? direct : (originsByPhrase.get(normalizePhrase(kw)) ?? [])
+  }
+  const blockerFromOrigin = (kw: string): CandidateBlocker | null => {
+    const o = guardOriginsOf(kw)[0]
+    if (!o) return null
+    return { blockingSource: o.source, blockingRecordStatus: o.status, blockingTitle: o.detail || null, blockingPrimaryKeyword: o.original || kw, blockingUrl: null, matchType: 'exact_keyword' }
+  }
+  const entityBlocker = (kw: string): CandidateBlocker | null => {
+    const nk = normalizePhrase(kw)
+    const e = entities.find((en) => normalizePhrase(en.name) === nk)
+    if (e) return { blockingSource: 'entity', blockingRecordStatus: e.type ?? null, blockingTitle: e.name, blockingPrimaryKeyword: e.name, blockingUrl: e.url ?? null, matchType: 'entity_owner' }
+    return blockerFromOrigin(kw)
+  }
+  const contentBlocker = (title: string, kw: string): CandidateBlocker | null => {
+    const main = titleMainPhrase(title); const nk = normalizePhrase(kw)
+    const doc = existingCoverageDocs.find((d) => { const dp = normalizePhrase(d.title); return (!!main && (dp === main || titleMainPhrase(d.title) === main)) || (!!nk && dp === nk) })
+    if (!doc) return blockerFromOrigin(kw)
+    const isArticle = doc.sourceKey?.startsWith('cov:') || doc.type === 'article' || doc.type === 'post'
+    return { blockingSource: isArticle ? 'existing_article' : 'existing_content', blockingRecordStatus: null, blockingTitle: doc.title, blockingPrimaryKeyword: doc.focusKeyword ?? null, blockingUrl: doc.url ?? null, matchType: 'content_phrase' }
+  }
+  const pendingDocFor = (title: string, kw: string) => {
+    const nk = normalizePhrase(kw); const nt = normalizePhrase(title)
+    return pendingCoverageDocs.find((d) => normalizePhrase(d.title) === nk || normalizePhrase(d.focusKeyword ?? '') === nk || normalizePhrase(d.title) === nt) ?? null
+  }
+
+  /** Preview/operator-only rejection detail (SAFE — never article bodies/credentials). */
+  interface RejectionDetail {
+    stage: string
+    blocker: CandidateBlocker | null
+    matchedExistingContentTitle?: string | null
+    matchedExistingContentUrl?: string | null
+    matchedCommercialEntity?: string | null
+    matchedPendingIdea?: string | null
+    matchedSameRunAccepted?: string | null
+    coverageMatchType?: string | null
+  }
+  type ValidateResult = { suggestion?: TopicSuggestion; rejectionReason?: string; repaired?: boolean; finalPrimaryKeyword?: string; finalIntent?: string; detail?: RejectionDetail }
+
   // ── Per-topic deterministic validation (+ brief-anchored repair) ────────────
   const acceptedSignatures: TopicSignature[] = []
   const acceptedNeeds: TopicNeed[] = []
-  const validatePolished = (t: PolishedTopic, brief: OpportunityBrief): { suggestion?: TopicSuggestion; rejectionReason?: string; repaired?: boolean } => {
+  const validatePolished = (t: PolishedTopic, brief: OpportunityBrief): ValidateResult => {
+    // Scope A — a rejection helper that ATTACHES the current final keyword/intent +
+    // stage + blocker to the SAME typed rejectionReason the loop already reads. It
+    // never changes the reason string, the order, or the control flow.
+    const rej = (reason: string, stage: string, detail?: Partial<RejectionDetail>): ValidateResult => ({
+      rejectionReason: reason,
+      repaired,
+      finalPrimaryKeyword: primaryKeyword,
+      finalIntent: intent,
+      detail: { stage, blocker: detail?.blocker ?? null, ...detail },
+    })
     let repaired = false
     let primaryKeyword = t.primaryKeyword
 
@@ -660,12 +791,12 @@ export async function synthesizeFromSnapshot(
 
     // (1) keyword quality (truncation/generic) — repair from the BRIEF, not the title.
     const quality = validatePrimaryKeywordQuality(primaryKeyword, t.title, corpusTypeWords)
-    if (!quality.ok) { if (!tryRepair()) return { rejectionReason: 'invalid_primary_keyword' } }
+    if (!quality.ok) { if (!tryRepair()) return rej('invalid_primary_keyword', 'keyword_quality') }
     else if (quality.repairedKeyword) { primaryKeyword = quality.repairedKeyword; repaired = true }
 
     // (2) title–keyword–intent consistency (incl. the subject-HEAD rule).
     const consistency = validateIntentKeywordConsistency({ primaryKeyword, title: t.title, intent }, commercialEntityTokens)
-    if (!consistency.ok) { if (!tryRepair()) return { rejectionReason: 'intent_keyword_mismatch' } }
+    if (!consistency.ok) { if (!tryRepair()) return rej('intent_keyword_mismatch', 'title_keyword_intent') }
     else if (consistency.repairedKeyword) { primaryKeyword = consistency.repairedKeyword; repaired = true }
     intent = deriveIntent(primaryKeyword, t.title, intent)
 
@@ -684,12 +815,12 @@ export async function synthesizeFromSnapshot(
     // fail (preserving the title need), else reject.
     if (sp.changed) {
       const q2 = validatePrimaryKeywordQuality(primaryKeyword, t.title, corpusTypeWords)
-      if (!q2.ok) { if (!tryRepair()) return { rejectionReason: 'invalid_primary_keyword' } }
+      if (!q2.ok) { if (!tryRepair()) return rej('invalid_primary_keyword', 'keyword_quality_revalidate') }
       else if (q2.repairedKeyword) { primaryKeyword = q2.repairedKeyword; repaired = true }
       const c2 = validateIntentKeywordConsistency({ primaryKeyword, title: t.title, intent }, commercialEntityTokens)
-      if (!c2.ok) { if (!tryRepair()) return { rejectionReason: 'intent_keyword_mismatch' } }
+      if (!c2.ok) { if (!tryRepair()) return rej('intent_keyword_mismatch', 'intent_consistency_revalidate') }
       else if (c2.repairedKeyword) { primaryKeyword = c2.repairedKeyword; repaired = true }
-      if (!isTitleKeywordAligned(primaryKeyword, t.title)) { if (!tryRepair()) return { rejectionReason: 'intent_keyword_mismatch' } }
+      if (!isTitleKeywordAligned(primaryKeyword, t.title)) { if (!tryRepair()) return rej('intent_keyword_mismatch', 'title_alignment_revalidate') }
       intent = deriveIntent(primaryKeyword, t.title, intent)
     }
 
@@ -701,12 +832,12 @@ export async function synthesizeFromSnapshot(
     if (!keywordPreservesSubject(primaryKeyword, brief.subject, alignedQ)) {
       const subjectRepairs = [alignedQ, brief.subject, conciseSubject(t.title)].filter((x): x is string => !!x)
       const fixedTo = subjectRepairs.find((c) => keywordHasRealSubject(c) && isSearchPhraseQuality(c) && keywordPreservesSubject(c, brief.subject, alignedQ))
-      if (!fixedTo) return { rejectionReason: 'final_keyword_lost_subject' }
+      if (!fixedTo) return rej('final_keyword_lost_subject', 'subject_preservation')
       primaryKeyword = fixedTo
       repaired = true
       intent = deriveIntent(primaryKeyword, t.title, intent)
     }
-    if (!isSearchPhraseQuality(primaryKeyword)) return { rejectionReason: 'primary_keyword_not_search_phrase' }
+    if (!isSearchPhraseQuality(primaryKeyword)) return rej('primary_keyword_not_search_phrase', 'search_phrase_quality')
 
     // (2.8) FINAL TITLE↔KEYWORD ALIGNMENT — UNCONDITIONAL. Even when nothing above
     // changed the model's keyword, it can be OFF-SUBJECT vs the title ("מזכירות
@@ -719,22 +850,30 @@ export async function synthesizeFromSnapshot(
       const alignQ = brief.alignedDemandQuery?.query ?? null
       const alignRepairs = [alignQ, brief.subject].filter((x): x is string => !!x)
       const fixedTo = alignRepairs.find((c) => isTitleKeywordAligned(c, t.title) && isSearchPhraseQuality(c) && keywordHasRealSubject(c) && keywordPreservesSubject(c, brief.subject, alignQ))
-      if (!fixedTo) return { rejectionReason: 'title_keyword_mismatch' }
+      if (!fixedTo) return rej('title_keyword_mismatch', 'final_title_keyword_alignment')
       primaryKeyword = fixedTo
       repaired = true
       intent = deriveIntent(primaryKeyword, t.title, intent)
     }
 
     // (3) SAFE brand gate — exact named-entity mutation only (hard, proven safe).
-    if (detectUnsafeNamedEntityMutation(t.title, primaryKeyword, brandSafety)) return { rejectionReason: 'unsafe_named_entity_mutation' }
+    if (detectUnsafeNamedEntityMutation(t.title, primaryKeyword, brandSafety)) return rej('unsafe_named_entity_mutation', 'brand_safety', { blocker: { blockingSource: null, blockingRecordStatus: null, blockingTitle: t.title, blockingPrimaryKeyword: primaryKeyword, blockingUrl: null, matchType: 'named_entity_mutation' } })
     if (classifyKeywordEntity(primaryKeyword, brandSafety) === 'suspected_external_business') shadow('competitor_brand_leakage')
 
     // (4) ownership / coverage / cannibalization — ALWAYS on the FINAL keyword
     // (the old engine validated the pre-repair keyword only — proven gap).
     const w = evaluateArticleWorthiness({ primaryKeyword, title: t.title, secondaryKeywords: t.secondaryKeywords, intent, existingPages, hasEvidence: true, businessRelevant: true, coveredKeys })
-    if (!w.ok) return { rejectionReason: w.rejection_reason || 'already_covered' }
-    if (ownedByExistingEntity(guard, primaryKeyword)) return { rejectionReason: 'exact_existing_keyword_owner' }
-    if (coveredByExistingContent(guard, t.title, primaryKeyword)) return { rejectionReason: 'covered_by_existing_content' }
+    if (!w.ok) {
+      const reason = w.rejection_reason || 'already_covered'
+      // 'already_covered' = the FINAL keyword collides with a guard key (project/topic/
+      // idea/scan keyword). This is the path an OLD status='rejected' idea blocks
+      // through — the blocker carries that row's source + status + title, so it is
+      // explicit whether a rejected idea (not a live page) caused the rejection.
+      const blk = reason === 'already_covered' ? blockerFromOrigin(primaryKeyword) : null
+      return rej(reason, 'article_worthiness', { blocker: blk, matchedExistingContentTitle: blk?.blockingTitle ?? null, matchedPendingIdea: blk?.blockingSource === 'idea_keyword' ? blk.blockingTitle : null })
+    }
+    if (ownedByExistingEntity(guard, primaryKeyword)) { const blk = entityBlocker(primaryKeyword); return rej('exact_existing_keyword_owner', 'entity_ownership', { blocker: blk, matchedCommercialEntity: blk?.blockingSource === 'entity' ? blk.blockingTitle : null }) }
+    if (coveredByExistingContent(guard, t.title, primaryKeyword)) { const blk = contentBlocker(t.title, primaryKeyword); return rej('covered_by_existing_content', 'existing_content', { blocker: blk, matchedExistingContentTitle: blk?.blockingTitle ?? null, matchedExistingContentUrl: blk?.blockingUrl ?? null }) }
 
     // (4.5) EXISTING-CONTENT cannibalization (P0-2, synonym + NEED aware): an
     // existing page that already owns the need is not a NEW separate page. exact
@@ -744,7 +883,10 @@ export async function synthesizeFromSnapshot(
     // exact wording (wedding-floral pricing: סידור vs עיצוב פרחוני).
     const cann = assessNeedCannibalization({ primaryKeyword, title: t.title, intent }, existingCoverageDocs, businessEvidenceTokens, evidenceProvenance, domainTypeWords)
     const coverageMatches: CoverageMatch[] = [...cann.matches]
-    if (cann.matchType === 'exact') return { rejectionReason: 'existing_content_owns_need' }
+    if (cann.matchType === 'exact') {
+      const m = cann.matches[0]
+      return rej('existing_content_owns_need', 'cannibalization', { blocker: m ? { blockingSource: 'existing_content', blockingRecordStatus: null, blockingTitle: m.existingTitle, blockingPrimaryKeyword: null, blockingUrl: m.url ?? null, matchType: 'exact' } : null, matchedExistingContentTitle: m?.existingTitle ?? null, matchedExistingContentUrl: m?.url ?? null, coverageMatchType: 'exact' })
+    }
     // PAGE-ROLE / INTENT compatibility (ONE shared helper for EVERY conversion
     // path): existing_page_improvement requires an EXISTING basis whose page role
     // matches the DESIRED role of the opportunity's real need (a buy/category need
@@ -764,19 +906,28 @@ export async function synthesizeFromSnapshot(
     // overlap, and only when roles are compatible (an informational owner does not
     // own a commercial buy need). Narrow by design, so distinct topics are not
     // over-rejected against broad title-only owners.
-    if (!cannibalImprovement && isImprovementBasisCompatible(desiredRole, 'informational') &&
-        ownsMatches.some((m) => basisRoleFor(m) === 'unresolved' && isSameNeedDuplicate({ primaryKeyword, title: t.title, intent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent }, domainTypeWords))) {
-      return { rejectionReason: 'existing_content_owns_need' }
+    const synonymOwner = (!cannibalImprovement && isImprovementBasisCompatible(desiredRole, 'informational'))
+      ? ownsMatches.find((m) => basisRoleFor(m) === 'unresolved' && isSameNeedDuplicate({ primaryKeyword, title: t.title, intent }, { primaryKeyword: m.existingTitle, title: m.existingTitle, intent }, domainTypeWords))
+      : undefined
+    if (synonymOwner) {
+      return rej('existing_content_owns_need', 'cannibalization_synonym', { blocker: { blockingSource: 'existing_content', blockingRecordStatus: null, blockingTitle: synonymOwner.existingTitle, blockingPrimaryKeyword: null, blockingUrl: synonymOwner.url ?? null, matchType: 'owns_need' }, matchedExistingContentTitle: synonymOwner.existingTitle, matchedExistingContentUrl: synonymOwner.url ?? null, coverageMatchType: 'owns_need' })
     }
 
     // (5) pending-idea ownership: exact + PROVEN high-confidence semantic only.
     const sig = topicSignature(primaryKeyword, intent)
-    if (pendingExactKeys.has(normalizePhrase(primaryKeyword)) || pendingExactKeys.has(normalizePhrase(t.title))) return { rejectionReason: 'primary_keyword_exists' }
-    if (pendingSignatures.some((ps) => isHighConfidenceDuplicate(sig, ps))) return { rejectionReason: 'pending_semantic_duplicate' }
+    if (pendingExactKeys.has(normalizePhrase(primaryKeyword)) || pendingExactKeys.has(normalizePhrase(t.title))) {
+      const doc = pendingDocFor(t.title, primaryKeyword)
+      return rej('primary_keyword_exists', 'pending_exact', { blocker: { blockingSource: 'pending_idea', blockingRecordStatus: 'pending', blockingTitle: doc?.title ?? null, blockingPrimaryKeyword: doc?.focusKeyword ?? null, blockingUrl: null, matchType: 'pending' }, matchedPendingIdea: doc?.title ?? null })
+    }
+    if (pendingSignatures.some((ps) => isHighConfidenceDuplicate(sig, ps))) {
+      const doc = pendingDocFor(t.title, primaryKeyword)
+      return rej('pending_semantic_duplicate', 'pending_semantic', { blocker: { blockingSource: 'pending_idea', blockingRecordStatus: 'pending', blockingTitle: doc?.title ?? null, blockingPrimaryKeyword: doc?.focusKeyword ?? null, blockingUrl: null, matchType: 'pending_semantic' }, matchedPendingIdea: doc?.title ?? null })
+    }
     // (6) within-run NEED dedupe: strict semantic dup OR same subject-head + same
     // coarse search-need (catches the transactional/informational price-page pair).
     const thisNeed: TopicNeed = { primaryKeyword, title: t.title, intent }
-    if (acceptedNeeds.some((a) => isSameNeedDuplicate(thisNeed, a, domainTypeWords))) return { rejectionReason: 'intra_run_need_duplicate' }
+    const sameRunDup = acceptedNeeds.find((a) => isSameNeedDuplicate(thisNeed, a, domainTypeWords))
+    if (sameRunDup) return rej('intra_run_need_duplicate', 'intra_run', { blocker: { blockingSource: 'intra_run_accepted', blockingRecordStatus: 'accepted', blockingTitle: sameRunDup.title, blockingPrimaryKeyword: sameRunDup.primaryKeyword, blockingUrl: null, matchType: 'same_run' }, matchedSameRunAccepted: sameRunDup.title })
 
     // (7) local ownership (existing local/commercial page already owns the intent)
     // + the coverage owns_need/improve signal → recommend improving the existing
@@ -795,7 +946,10 @@ export async function synthesizeFromSnapshot(
       const localBasisOwns = (basis: string): boolean =>
         sharesSubjectHead(`${primaryKeyword} ${t.title}`, basis, domainTypeWords) &&
         !hasIncompatibleSubtype(`${primaryKeyword} ${t.title}`, basis, domainTypeWords)
-      if (own.outcome === 'owns' && own.matchedTitle && localBasisOwns(own.matchedTitle)) return { rejectionReason: 'exact_existing_keyword_owner' }
+      if (own.outcome === 'owns' && own.matchedTitle && localBasisOwns(own.matchedTitle)) {
+        const ent = entityByTitle.get(normalizeText(own.matchedTitle))
+        return rej('exact_existing_keyword_owner', 'local_ownership', { blocker: { blockingSource: 'entity', blockingRecordStatus: ent?.type ?? null, blockingTitle: own.matchedTitle, blockingPrimaryKeyword: own.matchedTitle, blockingUrl: ent?.url ?? null, matchType: 'local_owner' }, matchedCommercialEntity: own.matchedTitle })
+      }
       if (own.outcome === 'improve' && own.matchedTitle && localBasisOwns(own.matchedTitle)) {
         // Route through the SAME basis-compatibility helper: resolve the matched
         // title to its actionable entity (URL + page type) and require a compatible
@@ -930,6 +1084,36 @@ export async function synthesizeFromSnapshot(
   // ── 5) Adaptive synthesis rounds ─────────────────────────────────────────────
   const rounds: BriefRoundDiagnostics[] = []
   const suggestions: TopicSuggestion[] = []
+  // Scope A — one accounting record per polished candidate. Bounded well above the
+  // run target (targetCount ≤ 12; generated ≤ ~2 batches) so all real candidates are
+  // captured; `outcomesCapped` flags the (never-in-practice) overflow so the invariant
+  // stays honest. Additive — building it never affects acceptance or order.
+  const MAX_CANDIDATE_OUTCOMES = 200
+  const candidateOutcomes: CandidateOutcome[] = []
+  let outcomesCapped = false
+  const recordOutcome = (o: CandidateOutcome) => { if (candidateOutcomes.length < MAX_CANDIDATE_OUTCOMES) candidateOutcomes.push(o); else outcomesCapped = true }
+  const baseOutcome = (t: PolishedTopic, brief: OpportunityBrief | undefined): CandidateOutcome => ({
+    briefId: t.briefId ?? null,
+    opportunityId: brief?.opportunityId ?? null,
+    sourceFamily: brief?.family ?? null,
+    briefSubject: brief?.subject ?? null,
+    alignedDemandQuery: brief?.alignedDemandQuery?.query ?? null,
+    modelTitle: t.title ?? null,
+    modelPrimaryKeyword: t.primaryKeyword ?? null,
+    finalPrimaryKeyword: t.primaryKeyword ?? null,
+    keywordRepaired: false,
+    finalIntent: null,
+    outcome: 'rejected',
+    rejectionReason: null,
+    rejectionStage: null,
+    blocker: null,
+    matchedExistingContentTitle: null,
+    matchedExistingContentUrl: null,
+    matchedCommercialEntity: null,
+    matchedPendingIdea: null,
+    matchedSameRunAccepted: null,
+    coverageMatchType: null,
+  })
   const briefById = new Map(workingPool.map((b) => [b.opportunityId, b]))
   let cursor = 0
   let stop: BriefRunDiagnostics['stop_reason'] | null = null
@@ -983,23 +1167,58 @@ export async function synthesizeFromSnapshot(
     for (let idx = 0; idx < rec.polished.length; idx++) {
       const t = rec.polished[idx]
       const brief = briefById.get(t.briefId)
-      if (!brief) { rd.dropped_items++; continue }
+      if (!brief) {
+        rd.dropped_items++
+        // Scope A — a polished item whose brief is unknown is 'dropped' (a data
+        // reconciliation bucket, never a quality rejection). Recorded so the
+        // accounting still sees every generated candidate exactly once.
+        recordOutcome({ ...baseOutcome(t, undefined), outcome: 'dropped', rejectionStage: 'brief_not_found' })
+        continue
+      }
       // Title-pattern diversity (SAFE, never artificial): when one mega-guide
       // title is already accepted, a later "המדריך המלא: X" is reduced to its
       // standalone core X — subject and keyword alignment preserved; anything
       // not safely strippable stays untouched (the acceptance rule reports it).
       const dedupedTitle = dedupeMegaGuideTitle(t.title, suggestions.map((s) => s.title))
-      const r = validatePolished(dedupedTitle === t.title ? t : { ...t, title: dedupedTitle }, brief)
+      const polishedT = dedupedTitle === t.title ? t : { ...t, title: dedupedTitle }
+      const r = validatePolished(polishedT, brief)
       if (r.suggestion) {
         suggestions.push(r.suggestion)
         rd.accepted++
         if (r.repaired) rd.repaired++
+        recordOutcome({ ...baseOutcome(polishedT, brief), outcome: 'accepted', finalPrimaryKeyword: r.suggestion.primaryKeyword, finalIntent: r.suggestion.searchIntent ?? null, keywordRepaired: !!r.repaired })
       } else {
         const reason = r.rejectionReason || 'insufficient_independent_need'
         rd.rejected_by_reason[reason] = (rd.rejected_by_reason[reason] ?? 0) + 1
         rejectTopic(reason)
+        recordOutcome({
+          ...baseOutcome(polishedT, brief),
+          outcome: 'rejected',
+          finalPrimaryKeyword: r.finalPrimaryKeyword ?? polishedT.primaryKeyword ?? null,
+          finalIntent: r.finalIntent ?? null,
+          keywordRepaired: !!r.repaired,
+          rejectionReason: reason,
+          rejectionStage: r.detail?.stage ?? null,
+          blocker: r.detail?.blocker ?? null,
+          matchedExistingContentTitle: r.detail?.matchedExistingContentTitle ?? null,
+          matchedExistingContentUrl: r.detail?.matchedExistingContentUrl ?? null,
+          matchedCommercialEntity: r.detail?.matchedCommercialEntity ?? null,
+          matchedPendingIdea: r.detail?.matchedPendingIdea ?? null,
+          matchedSameRunAccepted: r.detail?.matchedSameRunAccepted ?? null,
+          coverageMatchType: r.detail?.coverageMatchType ?? null,
+        })
       }
-      if (suggestions.length >= input.targetCount) { rd.not_processed = rec.polished.length - idx - 1; break }
+      if (suggestions.length >= input.targetCount) {
+        rd.not_processed = rec.polished.length - idx - 1
+        // Scope A — polished items NOT validated because the target was reached
+        // mid-response are recorded as 'not_processed' (a typed non-rejection), so
+        // the accounting reconciles to the full generated count.
+        for (let j = idx + 1; j < rec.polished.length; j++) {
+          const nt = rec.polished[j]
+          recordOutcome({ ...baseOutcome(nt, briefById.get(nt.briefId)), outcome: 'not_processed', rejectionStage: 'target_reached' })
+        }
+        break
+      }
     }
     rd.marginal_yield = rd.briefs_sent > 0 ? Number((rd.accepted / rd.briefs_sent).toFixed(3)) : 0
 
@@ -1047,6 +1266,15 @@ export async function synthesizeFromSnapshot(
       brief_pool: briefPool,
       discovery,
       rounds,
+      candidateOutcomes,
+      candidateAccounting: (() => {
+        const generated = rounds.reduce((s, r) => s + r.polished, 0)
+        const accepted = candidateOutcomes.filter((o) => o.outcome === 'accepted').length
+        const rejected = candidateOutcomes.filter((o) => o.outcome === 'rejected').length
+        const not_processed = candidateOutcomes.filter((o) => o.outcome === 'not_processed').length
+        const dropped = candidateOutcomes.filter((o) => o.outcome === 'dropped').length
+        return { generated, accepted, rejected, not_processed, dropped, outcomesCapped, reconciles: !outcomesCapped && generated === accepted + rejected + not_processed + dropped }
+      })(),
       rejected_by_reason,
       shadow_rejected_by_reason,
       generated_opportunities: rounds.reduce((s, r) => s + r.polished, 0),
