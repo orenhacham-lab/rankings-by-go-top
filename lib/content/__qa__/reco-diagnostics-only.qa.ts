@@ -49,6 +49,30 @@ async function main() {
   check('enabled ONLY when isolation diagnostics on AND VERCEL_ENV !== production',
     /const diagnosticsOnly = requestedDiagnosticsOnly && diagnostics && \(process\.env\.VERCEL_ENV \?\? null\) !== 'production'/.test(route))
 
+  console.log('FAIL-CLOSED) a requested dry-run that cannot be honored is a typed 403 (never a silent write)')
+  const iAuth = route.indexOf("const auth = await authContentProject")
+  const i403 = route.indexOf('requestedDiagnosticsOnly && !diagnosticsOnly')
+  const iInflightAdd = route.indexOf('INFLIGHT.add(inflightKey)')
+  const iGenerate = route.indexOf('await generateFromBriefs(')
+  const iInsert0 = route.indexOf('insertPendingIdeas(auth.admin')
+  check('403 guard exists: if (requestedDiagnosticsOnly && !diagnosticsOnly) return 403', i403 > 0 && /diagnostics_only_unavailable/.test(route))
+  check('403 guard is AFTER authentication', i403 > iAuth && iAuth > 0)
+  check('403 guard is BEFORE INFLIGHT.add', i403 < iInflightAdd && iInflightAdd > 0)
+  check('403 guard is BEFORE any generation call', i403 < iGenerate && iGenerate > 0)
+  check('403 guard is BEFORE any persistence', i403 < iInsert0 && iInsert0 > 0)
+  const guardBody = route.slice(i403 - 60, i403 + 260)
+  check('403 body is typed: ok:false, diagnostics_only_unavailable, persisted:false, status 403',
+    /ok: false/.test(guardBody) && /error: 'diagnostics_only_unavailable'/.test(guardBody) && /persisted: false/.test(guardBody) && /status: 403/.test(guardBody))
+  // Pure gate-resolution model (A–D): the exact boolean the route evaluates.
+  const resolve = (requested: boolean, diagEnabled: boolean, vercelEnv: string | null) => ({
+    diagnosticsOnly: requested && diagEnabled && vercelEnv !== 'production',
+    failClosed403: requested && !(requested && diagEnabled && vercelEnv !== 'production'),
+  })
+  check('A. diagnosticsOnly=true + Preview + diagnostics enabled → runs dry (no 403)', (() => { const r = resolve(true, true, 'preview'); return r.diagnosticsOnly === true && r.failClosed403 === false })())
+  check('B. diagnosticsOnly=true + diagnostics DISABLED → 403 (no dry, no writes)', (() => { const r = resolve(true, false, 'preview'); return r.diagnosticsOnly === false && r.failClosed403 === true })())
+  check('C. diagnosticsOnly=true + Production → 403 (no dry, no writes)', (() => { const r = resolve(true, true, 'production'); return r.diagnosticsOnly === false && r.failClosed403 === true })())
+  check('D. no diagnosticsOnly → normal (no dry, no 403)', (() => { const r = resolve(false, true, 'preview'); return r.diagnosticsOnly === false && r.failClosed403 === false })())
+
   console.log('NO-WRITE) the dry-run branch returns BEFORE any persistence/mutation')
   const iBranch = route.indexOf('if (diagnosticsOnly) {')
   const iInsert = route.indexOf('insertPendingIdeas(auth.admin')
@@ -60,7 +84,19 @@ async function main() {
   check('branch body performs NO insertPendingIdeas / markIdeasDuplicate / approve / reject / queue write',
     branchBody.length > 0 && !/insertPendingIdeas\(/.test(branchBody) && !/markIdeasDuplicate\(/.test(branchBody) && !/\.insert\(|\.update\(|\.upsert\(|\.delete\(/.test(branchBody))
   check('branch returns dryRun:true + wouldPersistCount + accepted/rejected candidates + accounting',
-    /dryRun: true/.test(branchBody) && /wouldPersistCount: fresh\.length/.test(branchBody) && /acceptedCandidates: co\.filter/.test(branchBody) && /rejectedCandidates: co\.filter/.test(branchBody) && /candidateAccounting: briefDiagnostics\?\.candidateAccounting/.test(branchBody))
+    /dryRun: true/.test(branchBody) && /wouldPersistCount: fresh\.length/.test(branchBody) && /acceptedCandidates: engineCandidateOutcomes\.filter/.test(branchBody) && /rejectedCandidates: engineCandidateOutcomes\.filter/.test(branchBody) && /candidateAccounting: briefDiagnostics\?\.candidateAccounting/.test(branchBody))
+
+  console.log('STAGE-AWARE) engine view kept + final view added separately (both responses)')
+  check('route builds finalCandidateOutcomes from the engine outcomes + engineFresh + fresh',
+    /buildFinalCandidateOutcomes\(\{ engineOutcomes: engineCandidateOutcomes, engineFresh, fresh, blogRejectedByTitle \}\)/.test(route))
+  check('dry-run response exposes engineCandidateOutcomes AND finalCandidateOutcomes + finalCandidateAccounting (separate)',
+    /engineCandidateOutcomes,/.test(branchBody) && /finalCandidateOutcomes,/.test(branchBody) && /finalCandidateAccounting,/.test(branchBody))
+  check('NORMAL response isolationDebug also carries the engine + final views',
+    /engineCandidateOutcomes,\n\s*finalCandidateOutcomes,\n\s*finalCandidateAccounting,/.test(route))
+  check('per-item blog-gate reason captured by title (exact final blog reason)',
+    /blogRejectedByTitle\.set\(normalizeText\(s\.title\), r\)/.test(route))
+  check('engine diagnostics NOT renamed/removed (candidateOutcomes/candidateAccounting still present)',
+    /candidateOutcomes: CandidateOutcome\[\]/.test(readFileSync(join(__dirname, '../../../lib/content/recommendations/generate-from-briefs.ts'), 'utf8')))
 
   console.log('IDENTITY) normal + dry-run read the SAME final `fresh`; normal path still persists')
   check('the dry-run response returns the SAME `fresh` array normal mode would persist', /suggestions: fresh,/.test(branchBody))

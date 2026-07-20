@@ -12,6 +12,7 @@ import { authContentProject, isContentAutomationEnabled, isProFirstControllerEna
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
+import { buildFinalCandidateOutcomes } from '@/lib/content/recommendations/final-outcomes'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
@@ -92,6 +93,18 @@ export async function POST(request: Request) {
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  // FAIL-CLOSED (Scope 1): a REQUESTED dry run that could not be honored (isolation
+  // diagnostics disabled OR Production) must NEVER silently continue as a normal,
+  // write-enabled generation. Reject with a typed 403 HERE — after authentication but
+  // BEFORE INFLIGHT.add, any model/provider call, generation, or persistence — so a
+  // dry-run request can never become a write.
+  if (requestedDiagnosticsOnly && !diagnosticsOnly) {
+    return Response.json(
+      { ok: false, error: 'diagnostics_only_unavailable', reason: 'diagnostics_only_unavailable', persisted: false },
+      { status: 403 },
+    )
+  }
 
   // Duplicate-click protection: reject a concurrent identical run for the same
   // project+source (idempotency) so one accidental double-click can't pay twice.
@@ -251,6 +264,9 @@ export async function POST(request: Request) {
     // duplicates, existing-page edits, or real commercial pages. Runs ONLY here (after the
     // engine finalized) so the shared engine / /reco-qa / blind export are unchanged.
     const blogReport = { baseline: engineFresh.length, acceptedUnchanged: 0, acceptedAfterRepair: 0, reclassifiedToArticle: 0, secondaryKeywordsRemoved: 0, semanticDuplicateRejected: 0, unsupportedTopicRejected: 0, rejectedByReason: {} as Record<string, number>, finalValid: engineFresh.length }
+    // Scope 2 — per-item blog-gate reject reason keyed by normalized title, so the
+    // stage-aware final view can report the EXACT blog-gate reason (additive only).
+    const blogRejectedByTitle = new Map<string, string>()
     let fresh = engineFresh
     if (proFirstResult?.acceptanceContext) {
       const ctx = proFirstResult.acceptanceContext
@@ -260,6 +276,7 @@ export async function POST(request: Request) {
         if (d.outcome === 'reject') {
           const r = d.reason ?? 'reject'
           blogReport.rejectedByReason[r] = (blogReport.rejectedByReason[r] ?? 0) + 1
+          blogRejectedByTitle.set(normalizeText(s.title), r)
           if (r === 'pending_semantic_duplicate') blogReport.semanticDuplicateRejected++
           else blogReport.unsupportedTopicRejected++
           continue
@@ -304,28 +321,39 @@ export async function POST(request: Request) {
     const engineRejectedByReason = briefDiagnostics?.rejected_by_reason ?? opportunityDiagnostics?.rejected_by_reason ?? {}
     const routeRejectedByReason = () => ({ title_exists: filteredTitleExists, exact_existing_keyword_owner: exactExistingKeywordOwner, source_only_entity_expansion: sourceOnlyEntityExpansion, covered_by_existing_content: filteredCoveredByContent, primary_keyword_exists: filteredPrimaryKeywordExists, intra_run_removed: intraRun.removed, intra_run_merged: intraRun.merged })
 
+    // Scope 2 — STAGE-AWARE final outcomes. engineCandidateOutcomes stop at ENGINE
+    // acceptance; this traces each generated candidate through route finalization + the
+    // blog gate to the exact `fresh` set that WOULD persist. Separate from (never replaces)
+    // the engine view. Computed for both the dry-run and normal responses.
+    const engineCandidateOutcomes = briefDiagnostics?.candidateOutcomes ?? []
+    const { finalCandidateOutcomes, finalCandidateAccounting } = buildFinalCandidateOutcomes({ engineOutcomes: engineCandidateOutcomes, engineFresh, fresh, blogRejectedByTitle })
+
     // Scope A — DIAGNOSTICS-ONLY (dry-run) EXIT. `fresh` here is byte-identical to what
     // the normal path would persist (identical code above; only the branch below
     // differs). Return the full accounting and perform ZERO writes: no insertPendingIdeas,
     // no markIdeasDuplicate, no queue/approve/reject — nothing after the final result.
     if (diagnosticsOnly) {
       const { gitSha, vercelEnv } = runtimeInfo()
-      const co = briefDiagnostics?.candidateOutcomes ?? []
       return Response.json({
         ok: true,
         dryRun: true,
         // The generated set that WOULD be persisted (accepted candidates), in order.
         suggestions: fresh,
         wouldPersistCount: fresh.length,
-        acceptedCandidates: co.filter((o) => o.outcome === 'accepted'),
-        rejectedCandidates: co.filter((o) => o.outcome === 'rejected'),
+        // ENGINE view (unchanged) — accepted/rejected BY THE ENGINE.
+        engineCandidateOutcomes,
+        acceptedCandidates: engineCandidateOutcomes.filter((o) => o.outcome === 'accepted'),
+        rejectedCandidates: engineCandidateOutcomes.filter((o) => o.outcome === 'rejected'),
         candidateAccounting: briefDiagnostics?.candidateAccounting ?? null,
+        // FINAL (stage-aware) view — one record per candidate through persistence.
+        finalCandidateOutcomes,
+        finalCandidateAccounting,
         meta: {
           source, projectId: auth.project.id, generationRunId, clientRequestId,
           persisted: false, dryRun: true, newlyAddedCount: 0, wouldPersistCount: fresh.length,
           ...pathContract,
           funnel: { generated: rawGeneratedCount, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-          isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
+          isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
         },
       })
     }
@@ -394,7 +422,7 @@ export async function POST(request: Request) {
         // Phase 3I.3 — PRODUCTION-safe funnel counts so a 0-result run explains
         // its exact bottleneck in the UI (counts only, no content).
         funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null, ...(persistenceTrace ?? {}) } : undefined,
+        isolationDebug: diagnostics ? { gitSha: rtInfo.gitSha, vercelEnv: rtInfo.vercelEnv, generationRunId, clientRequestId, runtimeClass, runtimeDiag: result.meta.runtimeDiag ?? null, freshCurrentRunCount: fresh.length, inFlightHit: false, recentReplayHit: false, rejectionClassification, ...pathContract, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, productionProvenance: proFirstProvenance ?? null, ...(persistenceTrace ?? {}) } : undefined,
         debug: buildDebug({ persisted: false }) } })
     }
 
@@ -473,6 +501,11 @@ export async function POST(request: Request) {
       // worthiness → link-roles). Full safe funnel so live validation needs no DB.
       opportunityDiagnostics: opportunityDiagnostics ?? null,
       briefDiagnostics: briefDiagnostics ?? null,
+      // Scope 2 — stage-aware final-outcome view (separate from the engine view). In the
+      // NORMAL (persisting) run wouldPersist === the rows actually inserted.
+      engineCandidateOutcomes,
+      finalCandidateOutcomes,
+      finalCandidateAccounting,
       // Stage D — the FULL Pro-first production provenance (Preview-only; never shown to
       // the normal user). Flash fallback is never recorded as Pro.
       productionProvenance: proFirstProvenance ?? null,
