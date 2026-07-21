@@ -1723,7 +1723,14 @@ export const dashboardHe = {
         reauthHint: 'הרשאת Google פגה או בוטלה. התחברו מחדש כדי להמשיך.',
         revoke: 'ניתוק',
         revoking: 'מנתק…',
-        confirmRevoke: 'לנתק את חשבון ה-Google?\n\n• נתוני ביצועים שסונכרנו בעבר יישמרו.\n• סנכרון עתידי ייעצר עד שתחברו מחדש.\n\nלהמשיך?',
+        // ניתוק ברמת הפרויקט (הסרת שיוך הנכס בלבד) — הפעולה הראשית.
+        unassignProperty: 'ניתוק הנכס מהפרויקט',
+        unassigning: 'מנתק…',
+        unassignConfirm: 'לנתק את נכס ה-Search Console מהפרויקט הזה?\n\n• נתוני העבר יישמרו.\n• חיבור ה-Google עצמו יישאר פעיל עבור פרויקטים אחרים.\n\nלהמשיך?',
+        // ביטול הרשאה גלובלי — פעולה נפרדת ומודגשת פחות.
+        globalRevoke: 'ביטול הרשאת Google לכל החשבון',
+        confirmRevoke: 'לבטל את הרשאת ה-Google לכל החשבון?\n\n• פעולה זו משפיעה על כל הפרויקטים המשתמשים בחיבור.\n• נתוני ביצועים שסונכרנו בעבר יישמרו.\n\nלהמשיך?',
+        connectionInUse: (count: number) => `לא ניתן לבטל את ההרשאה: ${count} פרויקטים עדיין משתמשים בחיבור זה. נתקו את הנכס מכל פרויקט תחילה.`,
         connectedAccount: 'חשבון Google מחובר',
         // בחירת נכס.
         selectPropertyTitle: 'בחירת נכס Search Console',
@@ -1787,7 +1794,10 @@ export const dashboardHe = {
           no_property_assigned: 'לא שויך נכס Search Console.',
           property_not_accessible: 'הנכס אינו נגיש עוד בחשבון המחובר.',
           property_unverified: 'הנכס אינו מאומת ולא ניתן לשיוך.',
-          property_url_mismatch: 'הנכס אינו תואם לדומיין הפרויקט.',
+          property_does_not_cover_project: 'הנכס אינו כולל את דומיין הפרויקט ולכן לא ניתן לשיוך.',
+          connection_in_use: 'החיבור עדיין בשימוש על ידי פרויקטים אחרים.',
+          unassign_failed: 'ניתוק הנכס נכשל. נסו שוב.',
+          connection_store_failed: 'שמירת החיבור נכשלה. נסו שוב.',
           reauth_required: 'הרשאת Google פגה. התחברו מחדש.',
           connection_revoked: 'החיבור בוטל. התחברו מחדש.',
           sync_in_progress: 'סנכרון כבר פועל לפרויקט הזה.',

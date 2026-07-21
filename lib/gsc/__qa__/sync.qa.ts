@@ -25,7 +25,9 @@ class FakeStore implements SyncStore {
   runs: { id: string; windowDays: number; status: string }[] = []
   finishes: Record<string, FinishPatch> = {}
   metrics: Record<string, GscMetricRow[]> = {}
+  reclaimCalls: { projectId: string; leaseMs: number }[] = []
   private n = 0
+  async reclaimStaleRuns(projectId: string, leaseMs: number) { this.reclaimCalls.push({ projectId, leaseMs }); return 0 }
   async createRun(run: { windowDays: 28 | 90 }) { const id = `run-${++this.n}`; this.runs.push({ id, windowDays: run.windowDays, status: 'running' }); return { id } }
   async insertMetricsBatch(runId: string, _p: string, rows: GscMetricRow[]) { (this.metrics[runId] ??= []).push(...rows) }
   async finishRun(runId: string, patch: FinishPatch) { this.finishes[runId] = patch; const r = this.runs.find((x) => x.id === runId); if (r) r.status = patch.status }
@@ -60,6 +62,7 @@ async function main() {
     fetchWindow: async (): Promise<WindowFetchResult> => ({ rows, apiBatches: 1, truncated: false }),
   }
   const res = await executeManualSync({ store, client, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'g', maxRows: 50000, batchSize: 1000 })
+  check('reclaims stale runs BEFORE creating new runs', store.reclaimCalls.length === 1 && store.reclaimCalls[0].projectId === 'p')
   check('produces two runs (28 + 90) — separate immutable snapshots', res.windows.length === 2 && res.windows[0].windowDays === 28 && res.windows[1].windowDays === 90)
   check('both windows succeeded', res.windows.every((w) => w.status === 'succeeded'))
   const f0 = store.finishes[res.windows[0].runId]
@@ -116,11 +119,28 @@ async function main() {
 
   // Concurrency: a unique-active-run violation (23505) → sync_in_progress.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = new FakeAdmin({}, { gsc_sync_runs: () => ({ code: '23505' }) }) as any
+  const admin = new FakeAdmin({}, { gsc_sync_runs: { insert: () => ({ code: '23505' }) } }) as any
   const realStore = makeSyncStore(admin)
   let concErr: GscServiceError | null = null
   try { await realStore.createRun({ syncGroupId: 'g', projectId: 'p', connectionId: 'c', siteUrl: 's', windowDays: 28 }) } catch (e) { concErr = e instanceof GscServiceError ? e : null }
   check('concurrent sync rejected → sync_in_progress (409)', concErr?.code === 'sync_in_progress' && concErr?.status === 409)
+
+  // Stale-run recovery: a run stuck 'running' past the lease is reclaimed as failed; a
+  // recent running run for the same project is left untouched.
+  const staleIso = new Date(Date.now() - 30 * 60 * 1000).toISOString()  // 30 min ago (> 15 min lease)
+  const freshIso = new Date(Date.now() - 60 * 1000).toISOString()       // 1 min ago (in-flight)
+  const staleTables = { gsc_sync_runs: [
+    { id: 'old', project_id: 'p', status: 'running', started_at: staleIso },
+    { id: 'recent', project_id: 'p', status: 'running', started_at: freshIso },
+    { id: 'other', project_id: 'q', status: 'running', started_at: staleIso },
+  ] }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const staleAdmin = new FakeAdmin(staleTables) as any
+  const reclaimed = await makeSyncStore(staleAdmin).reclaimStaleRuns('p', 15 * 60 * 1000)
+  check('reclaims exactly the stale run for this project', reclaimed === 1)
+  check('stale run marked failed with stale_run_recovered', staleTables.gsc_sync_runs.find((r) => r.id === 'old')!.status === 'failed' && (staleTables.gsc_sync_runs.find((r) => r.id === 'old') as { sanitized_error_code?: string }).sanitized_error_code === 'stale_run_recovered')
+  check('recent in-flight run is NOT touched', staleTables.gsc_sync_runs.find((r) => r.id === 'recent')!.status === 'running')
+  check('another project\'s stale run is NOT touched by this project\'s reclaim', staleTables.gsc_sync_runs.find((r) => r.id === 'other')!.status === 'running')
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

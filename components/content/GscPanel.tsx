@@ -51,6 +51,7 @@ export default function GscPanel({ projectId }: { projectId: string }) {
 
   const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [unassigning, setUnassigning] = useState(false)
   const [revoking, setRevoking] = useState(false)
 
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -136,17 +137,29 @@ export default function GscPanel({ projectId }: { projectId: string }) {
   }
 
   async function handleAssign(view: PropertyView) {
-    // Verified-but-non-covering needs an explicit confirmation (matches the server).
-    const confirmMismatch = !view.covers
-    if (confirmMismatch && !window.confirm(t.mismatchWarning)) return
+    // Non-covering or unverified properties are never assignable (button is disabled);
+    // guard here too so a stale render can't POST one. No mismatch override exists.
+    if (!view.covers || view.permissionLevel === 'siteUnverifiedUser') return
     setAssigning(view.siteUrl); setMessage(null)
     try {
-      const res = await fetch('/api/gsc/property', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, siteUrl: view.siteUrl, confirmMismatch }) })
+      const res = await fetch('/api/gsc/property', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, siteUrl: view.siteUrl }) })
       const data = await res.json()
       if (data.ok) { setPickerOpen(false); await loadStatus() }
-      else if (data.requiresConfirmation) setMessage({ text: t.mismatchWarning, ok: false })
       else setMessage({ text: errText(data.error), ok: false })
     } catch { setMessage({ text: t.genericError, ok: false }) } finally { setAssigning(null) }
+  }
+
+  // Normal project-level disconnect: removes ONLY this project's property assignment.
+  // Historical metrics and the shared Google connection are preserved.
+  async function handleUnassign() {
+    if (!window.confirm(t.unassignConfirm)) return
+    setUnassigning(true); setMessage(null)
+    try {
+      const res = await fetch(`/api/gsc/property?projectId=${projectId}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok) await loadStatus()
+      else setMessage({ text: errText(data.error), ok: false })
+    } catch { setMessage({ text: t.genericError, ok: false }) } finally { setUnassigning(false) }
   }
 
   async function handleSync() {
@@ -164,13 +177,17 @@ export default function GscPanel({ projectId }: { projectId: string }) {
     } catch { setMessage({ text: t.syncFail, ok: false }) } finally { setSyncing(false) }
   }
 
-  async function handleRevoke() {
+  // GLOBAL, destructive: revokes the user's Google authorization for the WHOLE account.
+  // Fails closed (409 connection_in_use) while any project still uses the connection.
+  async function handleGlobalRevoke() {
     if (!window.confirm(t.confirmRevoke)) return
     setRevoking(true); setMessage(null)
     try {
       const res = await fetch(`/api/gsc/connection?projectId=${projectId}`, { method: 'DELETE' })
-      if (res.ok) { setPickerOpen(false); await loadStatus() }
-      else setMessage({ text: t.genericError, ok: false })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok) { setPickerOpen(false); await loadStatus() }
+      else if (res.status === 409 && data.error === 'connection_in_use') setMessage({ text: t.connectionInUse(data.dependentProjectCount ?? 0), ok: false })
+      else setMessage({ text: errText(data.error), ok: false })
     } catch { setMessage({ text: t.genericError, ok: false }) } finally { setRevoking(false) }
   }
 
@@ -208,22 +225,25 @@ export default function GscPanel({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Connection row */}
+          {/* Connection row. The GLOBAL Google-authorization revoke is intentionally
+              de-emphasized (a small text link, not a primary button) — the normal
+              per-project disconnect lives on the property row below. */}
           <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-slate-700 dark:text-slate-200">{t.connectedAccount}</span>
-              <div className="flex flex-wrap items-center gap-2 ms-auto">
-                {connection?.status === 'reauth_required' && (
-                  <Button size="sm" onClick={handleConnect} loading={connecting} disabled={connecting}>{t.reconnect}</Button>
-                )}
-                <Button size="sm" variant="outline" onClick={handleRevoke} loading={revoking} disabled={revoking} className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">
-                  {revoking ? t.revoking : t.revoke}
-                </Button>
-              </div>
+              {connection?.status === 'reauth_required' && (
+                <Button size="sm" className="ms-auto" onClick={handleConnect} loading={connecting} disabled={connecting}>{t.reconnect}</Button>
+              )}
             </div>
             {connection?.status === 'reauth_required' && (
               <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t.reauthHint}</p>
             )}
+            <div className="mt-2">
+              <button type="button" onClick={handleGlobalRevoke} disabled={revoking}
+                className="text-xs text-red-600/80 dark:text-red-400/80 hover:underline disabled:opacity-50">
+                {revoking ? t.revoking : t.globalRevoke}
+              </button>
+            </div>
           </div>
 
           {/* Property assignment / picker */}
@@ -253,7 +273,8 @@ export default function GscPanel({ projectId }: { projectId: string }) {
                           <Badge variant="warning">{t.notCovers}</Badge>
                         )}
                         <div className="ms-auto">
-                          <Button size="sm" variant="outline" disabled={isUnverified || assigning === p.siteUrl} loading={assigning === p.siteUrl} onClick={() => handleAssign(p)}>
+                          {/* Non-covering or unverified → visible for diagnostics but NOT assignable. */}
+                          <Button size="sm" variant="outline" disabled={isUnverified || !p.covers || assigning === p.siteUrl} loading={assigning === p.siteUrl} onClick={() => handleAssign(p)}>
                             {assigning === p.siteUrl ? t.assigning : t.assign}
                           </Button>
                         </div>
@@ -276,6 +297,9 @@ export default function GscPanel({ projectId }: { projectId: string }) {
                 <div className="flex flex-wrap items-center gap-2 ms-auto">
                   <Button size="sm" onClick={handleSync} loading={syncing} disabled={syncing || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
                   <Button size="sm" variant="outline" onClick={openPicker}>{t.changeProperty}</Button>
+                  <Button size="sm" variant="outline" onClick={handleUnassign} loading={unassigning} disabled={unassigning} className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">
+                    {unassigning ? t.unassigning : t.unassignProperty}
+                  </Button>
                 </div>
               </div>
             </div>

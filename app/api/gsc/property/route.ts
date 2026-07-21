@@ -4,8 +4,9 @@
  *         (historical metrics are preserved; the shared connection is untouched).
  *
  * Assignment requires: the connection is owned by the user, the property is still
- * accessible, is verified (not siteUnverifiedUser), and either covers the project URL or
- * the caller explicitly confirms a mismatch (per-request confirmation, no stored override).
+ * accessible, is verified (not siteUnverifiedUser), AND covers the project URL. A property
+ * that does not cover the project URL is NEVER assignable in Stage E1 — there is no
+ * mismatch override (no admin bypass, and a browser-supplied confirmation is never trusted).
  */
 import { authContentProject } from '@/lib/content/api-auth'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
@@ -21,7 +22,6 @@ export async function POST(request: Request) {
   try { body = await request.json() } catch { return Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   const projectId = typeof body.projectId === 'string' ? body.projectId : null
   const siteUrl = typeof body.siteUrl === 'string' ? body.siteUrl.trim() : ''
-  const confirmMismatch = body.confirmMismatch === true
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
   if (!siteUrl) return Response.json({ ok: false, error: 'site_url_required' }, { status: 400 })
@@ -38,8 +38,9 @@ export async function POST(request: Request) {
     const match = sites.find((s) => s.siteUrl === siteUrl)
     if (!match) return Response.json({ ok: false, error: 'property_not_accessible' }, { status: 409 })
     if (isUnverifiedPermission(match.permissionLevel)) return Response.json({ ok: false, error: 'property_unverified' }, { status: 409 })
-    if (!propertyCoversProjectUrl(siteUrl, projectUrl) && !confirmMismatch) {
-      return Response.json({ ok: false, error: 'property_url_mismatch', requiresConfirmation: true }, { status: 409 })
+    // A property that does not cover the project URL is never assignable — no override.
+    if (!propertyCoversProjectUrl(siteUrl, projectUrl)) {
+      return Response.json({ ok: false, error: 'property_does_not_cover_project' }, { status: 409 })
     }
     const nowIso = new Date().toISOString()
     const { error } = await auth.admin.from('project_gsc_properties').upsert({
@@ -61,6 +62,7 @@ export async function DELETE(request: Request) {
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
   // Remove ONLY the project↔property assignment. Historical metrics + shared connection stay.
-  await auth.admin.from('project_gsc_properties').delete().eq('project_id', auth.project.id)
+  const { error } = await auth.admin.from('project_gsc_properties').delete().eq('project_id', auth.project.id)
+  if (error) return Response.json({ ok: false, error: 'unassign_failed' }, { status: 500 })
   return Response.json({ ok: true })
 }

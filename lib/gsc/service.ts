@@ -9,7 +9,7 @@
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { GscConnection, ProjectGscProperty } from '@/lib/supabase/types'
-import { decryptGscToken } from './token-crypto'
+import { decryptGscToken, encryptGscToken, GSC_ENCRYPTION_VERSION } from './token-crypto'
 import { refreshAccessToken, GscOAuthError } from './oauth'
 import { listSites, probeLatestAvailableDate, fetchQueryPageWindow } from './api'
 import type { SyncStore, SyncClient, GscWindowDays } from './sync'
@@ -34,6 +34,41 @@ export async function loadUserConnection(admin: Admin, userId: string): Promise<
 export async function loadProjectProperty(admin: Admin, projectId: string): Promise<ProjectGscProperty | null> {
   const { data } = await admin.from('project_gsc_properties').select('*').eq('project_id', projectId).maybeSingle()
   return (data as ProjectGscProperty | null) ?? null
+}
+
+/** How many projects still assign this connection (dependents that block a global revoke). */
+export async function countProjectsUsingConnection(admin: Admin, connectionId: string): Promise<number> {
+  const { count, error } = await admin.from('project_gsc_properties').select('project_id', { count: 'exact', head: true }).eq('connection_id', connectionId)
+  if (error) throw new GscServiceError('dependent_count_failed', 500, 'Could not check connection dependents.')
+  return count ?? 0
+}
+
+/**
+ * Store the user's single Google connection from a fresh token exchange, via a REAL
+ * onConflict(user_id) upsert (backed by uq_gsc_connections_user) — never a race-prone
+ * select-then-write. EVERY database result is inspected and surfaced (fail closed):
+ * a lookup or upsert error throws so the callback can redirect with a sanitized error
+ * rather than falsely reporting `connected`. When Google omits a refresh_token the
+ * previously stored encrypted token is PRESERVED. Tokens/ciphertext are never logged.
+ */
+export async function storeConnectionFromTokens(admin: Admin, userId: string, tokens: { refreshToken?: string; scope?: string }): Promise<void> {
+  const { data: existingRow, error: lookupErr } = await admin.from('gsc_connections').select('*').eq('user_id', userId).maybeSingle()
+  if (lookupErr) throw new GscServiceError('connection_store_failed', 500, 'Could not read the existing connection.')
+  const existing = existingRow as GscConnection | null
+  const encryptedRefresh = tokens.refreshToken ? encryptGscToken(tokens.refreshToken) : (existing?.encrypted_refresh_token ?? null)
+  if (!encryptedRefresh) throw new GscServiceError('no_refresh_token', 400, 'No refresh token available for this connection.')
+  const patch = {
+    user_id: userId,
+    encrypted_refresh_token: encryptedRefresh,
+    encryption_version: GSC_ENCRYPTION_VERSION,
+    granted_scope: tokens.scope || existing?.granted_scope || null,
+    status: 'connected' as const,
+    last_error_code: null,
+    last_error_message: null,
+    updated_at: new Date().toISOString(),
+  }
+  const { error: upsertErr } = await admin.from('gsc_connections').upsert(existing ? { ...patch, id: existing.id } : patch, { onConflict: 'user_id' })
+  if (upsertErr) throw new GscServiceError('connection_store_failed', 500, 'Could not store the connection.')
 }
 
 /**
@@ -81,6 +116,21 @@ export function makeSyncClient(accessToken: string, siteUrl: string, maxRows: nu
 /** SyncStore backed by admin-client writes to gsc_sync_runs + gsc_query_page_metrics. */
 export function makeSyncStore(admin: Admin): SyncStore {
   return {
+    /**
+     * Recover crashed syncs: a Vercel timeout / process kill can leave a run stuck at
+     * status='running' forever, which the unique-active-run index would then treat as a
+     * live sync and block EVERY future manual sync. Before starting, mark only THIS
+     * project's running rows older than the lease as failed (stale_run_recovered). Recent
+     * active runs are untouched; the unique partial index remains the final concurrency guard.
+     */
+    async reclaimStaleRuns(projectId: string, leaseMs: number) {
+      const cutoff = new Date(Date.now() - leaseMs).toISOString()
+      const { data, error } = await admin.from('gsc_sync_runs')
+        .update({ status: 'failed', sanitized_error_code: 'stale_run_recovered', sanitized_error_message: 'Recovered a sync run that never finalized.', finished_at: new Date().toISOString() })
+        .eq('project_id', projectId).eq('status', 'running').lt('started_at', cutoff).select('id')
+      if (error) throw new GscServiceError('stale_reclaim_failed', 500, 'Could not reclaim stale sync runs.')
+      return (data as { id: string }[] | null)?.length ?? 0
+    },
     async createRun(run: { syncGroupId: string; projectId: string; connectionId: string; siteUrl: string; windowDays: GscWindowDays }) {
       const { data, error } = await admin.from('gsc_sync_runs').insert({ sync_group_id: run.syncGroupId, project_id: run.projectId, connection_id: run.connectionId, site_url: run.siteUrl, window_days: run.windowDays, status: 'running' }).select('id').single()
       if (error) {
@@ -97,13 +147,16 @@ export function makeSyncStore(admin: Admin): SyncStore {
       if (error) throw new GscServiceError('metrics_insert_failed', 500, 'Could not store Search Console rows.')
     },
     async finishRun(runId, patch) {
-      await admin.from('gsc_sync_runs').update({
+      const { error } = await admin.from('gsc_sync_runs').update({
         status: patch.status, rows_fetched: patch.rowsFetched, api_batches: patch.apiBatches, truncated: patch.truncated,
         start_date: patch.startDate, end_date: patch.endDate, latest_available_date: patch.latestAvailableDate,
         total_clicks: patch.totalClicks, total_impressions: patch.totalImpressions, weighted_position_sum: patch.weightedPositionSum,
         sanitized_error_code: patch.errorCode ?? null, sanitized_error_message: patch.errorMessage ?? null,
         finished_at: new Date().toISOString(),
       }).eq('id', runId)
+      // Never silently swallow a finalize failure: a run left 'running' would block future
+      // syncs (until stale recovery). Surface it so the orchestrator can react.
+      if (error) throw new GscServiceError('run_finalize_failed', 500, 'Could not finalize the sync run.')
     },
   }
 }

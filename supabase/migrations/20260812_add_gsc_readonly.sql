@@ -41,7 +41,10 @@ CREATE TABLE IF NOT EXISTS public.gsc_connections (
   updated_at               timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_gsc_connections_user ON public.gsc_connections (user_id);
+-- One Google connection per user. A REAL unique constraint (not just an index) so the
+-- OAuth callback can perform a safe onConflict upsert instead of a race-prone
+-- select-then-insert/update. Also serves as the user_id lookup index.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_gsc_connections_user ON public.gsc_connections (user_id);
 
 ALTER TABLE public.gsc_connections ENABLE ROW LEVEL SECURITY;
 

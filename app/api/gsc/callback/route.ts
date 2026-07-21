@@ -12,8 +12,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { consumeOAuthState } from '@/lib/gsc/state-store'
 import { exchangeCodeForTokens, GscOAuthError } from '@/lib/gsc/oauth'
-import { encryptGscToken, GSC_ENCRYPTION_VERSION } from '@/lib/gsc/token-crypto'
-import type { GscConnection } from '@/lib/supabase/types'
+import { storeConnectionFromTokens, GscServiceError } from '@/lib/gsc/service'
 
 export const runtime = 'nodejs'
 
@@ -52,25 +51,16 @@ export async function GET(request: NextRequest) {
     return back(origin, projectId, { gsc_error: codeStr })
   }
 
-  // Upsert the user's single connection. Preserve the existing refresh token when the
-  // reconnect response omits one.
-  const { data: existingRow } = await admin.from('gsc_connections').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  const existing = existingRow as GscConnection | null
-  const encryptedRefresh = tokens.refreshToken ? encryptGscToken(tokens.refreshToken) : (existing?.encrypted_refresh_token ?? null)
-  if (!encryptedRefresh) return back(origin, projectId, { gsc_error: 'no_refresh_token' })
-
-  const patch = {
-    user_id: user.id,
-    encrypted_refresh_token: encryptedRefresh,
-    encryption_version: GSC_ENCRYPTION_VERSION,
-    granted_scope: tokens.scope || existing?.granted_scope || null,
-    status: 'connected' as const,
-    last_error_code: null,
-    last_error_message: null,
-    updated_at: new Date().toISOString(),
+  // Store the user's single connection via a real onConflict(user_id) upsert. This inspects
+  // EVERY database result and throws on failure — so we only report `connected` when the
+  // row was actually stored. Preserves the previous encrypted refresh token when Google
+  // omits a new one. Never logs the code/tokens/ciphertext or the raw DB message.
+  try {
+    await storeConnectionFromTokens(admin, user.id, { refreshToken: tokens.refreshToken, scope: tokens.scope })
+  } catch (e) {
+    const codeStr = e instanceof GscServiceError && e.code === 'no_refresh_token' ? 'no_refresh_token' : 'connection_store_failed'
+    return back(origin, projectId, { gsc_error: codeStr })
   }
-  if (existing) await admin.from('gsc_connections').update(patch).eq('id', existing.id)
-  else await admin.from('gsc_connections').insert(patch)
 
   return back(origin, projectId, { gsc: 'connected' })
 }
