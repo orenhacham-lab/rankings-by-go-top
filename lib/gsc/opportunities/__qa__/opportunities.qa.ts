@@ -152,7 +152,8 @@ async function main() {
     const rows = [row('running shoes', 'https://x.co/blog/a', 3, 600, 7), row('running shoes', 'https://x.co/blog/b', 1, 400, 12)]
     const opps = buildOpportunities(rows, EMPTY_EVIDENCE, META)
     const mp = opps.find((o) => o.distinctPageCount > 1)
-    check('(17) a query on 2 pages → multi_page_signal', mp?.opportunityType === 'multi_page_signal' && mp.distinctPageCount === 2)
+    const PRIMARY = ['improve_existing_page', 'improve_title_meta_ctr', 'supporting_content_candidate', 'internal_link_support_candidate']
+    check('(17) a query on 2 pages → multi_page is a SIGNAL with a PRIMARY actionable type', !!mp && mp.signals.includes('multi_page_signal') && PRIMARY.includes(mp.opportunityType) && mp.distinctPageCount === 2)
     // Any mention of cannibalization must be NEGATED ("not confirmed cannibalization"); never asserted as confirmed.
     const unnegated = opps.some((o) => /confirmed cannibaliz/i.test(JSON.stringify(o.reasons).replace(/not confirmed cannibaliz/gi, 'X')))
     const typeMentionsCannibalization = opps.some((o) => /cannibaliz/i.test(o.opportunityType))
@@ -283,6 +284,59 @@ async function main() {
     const uiCode = ui.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
     check('F4(14) UI performs no mutating fetches', !/method:\s*'(POST|PUT|DELETE|PATCH)'/.test(uiCode))
     check('F4(14) UI has no create/approve/reject/queue/generate/publish actions', !/(createTopic|handleApprove|handleReject|addToQueue|generateArticle|handlePublish|markIrrelevant)/i.test(uiCode))
+  }
+
+  // ── LIVE FIX 1: multi-page is a secondary SIGNAL, never the primary type ────
+  {
+    const PRIMARY = ['improve_existing_page', 'improve_title_meta_ctr', 'supporting_content_candidate', 'internal_link_support_candidate']
+    // informational + no match + 6 pages → supporting_content_candidate + signal.
+    const infoRows = Array.from({ length: 6 }, (_, i) => row('how to choose running shoes', `https://x.co/blog/p${i}`, 1, 100, 8))
+    const info = buildOpportunities(infoRows, EMPTY_EVIDENCE, META).find((o) => o.distinctPageCount > 1)!
+    check('LF1(1) multi-page never becomes the primary type', PRIMARY.includes(info.opportunityType))
+    check('LF1(2) informational + multi-page → supporting_content_candidate', info.opportunityType === 'supporting_content_candidate' && info.signals.includes('multi_page_signal') && info.distinctPageCount === 6)
+    // commercial + no match + 5 pages → improve_existing_page + signal.
+    const commRows = Array.from({ length: 5 }, (_, i) => row('best running shoes review', `https://x.co/blog/c${i}`, 1, 100, 8))
+    const comm = buildOpportunities(commRows, EMPTY_EVIDENCE, META).find((o) => o.distinctPageCount > 1)!
+    check('LF1(3) commercial + multi-page → improve_existing_page', comm.opportunityType === 'improve_existing_page' && comm.signals.includes('multi_page_signal'))
+    // CTR opportunity + 2 pages → improve_title_meta_ctr + signal (two clusters give a band median).
+    const ctrRows = [row('gamma widget', 'https://x.co/blog/g1', 1, 1000, 8), row('gamma widget', 'https://x.co/blog/g2', 0, 800, 8), row('delta gadget', 'https://x.co/blog/d', 300, 1000, 8)]
+    const ctr = buildOpportunities(ctrRows, EMPTY_EVIDENCE, META).find((o) => o.primaryQuery === 'gamma widget')!
+    check('LF1(4) CTR + multi-page → improve_title_meta_ctr', ctr.opportunityType === 'improve_title_meta_ctr' && ctr.signals.includes('multi_page_signal') && ctr.distinctPageCount === 2)
+    check('LF1(5) multi-page signal present in signals[]', info.signals.includes('multi_page_signal') && comm.signals.includes('multi_page_signal') && ctr.signals.includes('multi_page_signal'))
+    check('LF1(5b) multi_page_signal reason retained (not confirmed cannibalization)', info.reasons.some((r) => r.code === 'multi_page_signal' && /not confirmed cannibalization/i.test(r.detail)))
+    check('LF1(5c) distinctPageSignal score component retained', typeof info.scoreComponents.distinctPageSignal === 'number' && info.scoreComponents.distinctPageSignal > 0)
+  }
+
+  // ── LIVE FIX 1: route filtering + counting by signal (static contract) ─────
+  {
+    const route = read('app/api/gsc/opportunities/route.ts')
+    check('LF1(6) route filters type=multi_page_signal by signals[]', /typeFilter === 'multi_page_signal'[\s\S]{0,120}signals\.includes\('multi_page_signal'\)/.test(route))
+    check('LF1(7) route counts multi_page_signal over signal-bearing opportunities', /for \(const s of o\.signals\) typeCounts\[s\]/.test(route))
+    check('LF1(6b) multi_page_signal remains a valid filter value', /VALID_FILTERS[\s\S]{0,160}'multi_page_signal'/.test(route))
+    const ui = read('components/content/GscOpportunities.tsx')
+    check('LF1(8) card renders primary type badge AND secondary multi-page badge', /typeLabel\(o\.opportunityType\)/.test(ui) && /o\.signals\.includes\('multi_page_signal'\)[\s\S]{0,160}typeLabel\('multi_page_signal'\)/.test(ui))
+    check('LF1 the multi-page chip is preserved', /allTypes[\s\S]{0,200}'multi_page_signal'/.test(ui))
+  }
+
+  // ── LIVE FIX 2: actionable empty-state CTAs (project page only) ─────────────
+  {
+    const ui = read('components/content/GscOpportunities.tsx')
+    check('LF2(9) not_connected shows a project-page CTA', /not_connected[\s\S]{0,120}ctaFor\('not_connected'\)/.test(ui) && /t\.ctaConnect/.test(ui))
+    check('LF2(10) no_property shows a project-page CTA', /no_property[\s\S]{0,120}ctaFor\('no_property'\)/.test(ui) && /t\.ctaSelectProperty/.test(ui))
+    check('LF2(11) never_synced shows a project-page CTA', /never_synced[\s\S]{0,120}ctaFor\('never_synced'\)/.test(ui) && /t\.ctaSync/.test(ui))
+    check('LF2 CTA links to the project GSC section preserving project', /\/projects\/\$\{projectId\}#gsc-section/.test(ui))
+    check('LF2(12) NO OAuth/connect implementation duplicated in Content Hub', !/api\/gsc\/connect|buildAuthUrl|oauth|access_type|listSites/i.test(ui) && !/api\/gsc\/property/.test(ui))
+  }
+
+  // ── LIVE FIX 3: URL display + hidden unknown badges (static contract) ───────
+  {
+    const ui = read('components/content/GscOpportunities.tsx')
+    check('LF3(13) encoded URLs decoded for display (decodeURI in try/catch)', /function safeDecodeUrl[\s\S]{0,120}decodeURI\(u\)[\s\S]{0,60}catch/.test(ui))
+    check('LF3(13b) page rendered as an external link with decoded text', /<a href=\{o\.page\}[\s\S]{0,140}safeDecodeUrl\(o\.page\)/.test(ui))
+    check('LF3(14) raw URL remains the href (o.page, not decoded)', /href=\{o\.page\}/.test(ui) && /target="_blank" rel="noopener noreferrer"/.test(ui))
+    check('LF3(15) unknown intent badge hidden', /o\.queryIntent !== 'unknown' &&/.test(ui))
+    check('LF3(15) unknown pageType badge hidden', /o\.pageType !== 'unknown' &&/.test(ui))
+    check('LF3(16) no action/create/queue/generate/publish control added', (() => { const c = ui.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''); return !/method:\s*'(POST|PUT|DELETE|PATCH)'/.test(c) && !/(createTopic|handleApprove|handleReject|addToQueue|generateArticle|handlePublish|markIrrelevant)/i.test(c) })())
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

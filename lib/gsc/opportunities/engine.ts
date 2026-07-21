@@ -14,7 +14,7 @@ import { classifyIntent, type QueryIntent } from './query-intent'
 import { clusterQueries } from './cluster'
 import { urlKey, matchExistingContent } from './content-match'
 import { scoreOpportunity, positionBand, median, type ScoreContext, type PositionBand } from './score'
-import type { Opportunity, OpportunityType, ContentEvidence, ContentMatch, OpportunityRunMeta, ScoreComponents, ReasonCode } from './types'
+import type { Opportunity, OpportunityType, OpportunitySignal, ContentEvidence, ContentMatch, OpportunityRunMeta, ScoreComponents, ReasonCode } from './types'
 
 /**
  * Stable id: deterministic for a given PROJECT + window + cluster + normalized page — and
@@ -33,18 +33,17 @@ interface Candidate {
 }
 
 /**
- * Assign exactly one opportunity type by deterministic precedence. Query intent GUIDES the
- * type but never removes an opportunity. Precedence:
- *   1. multiple distinct pages → multi_page_signal (signal only)
- *   2. meaningful CTR gap + sufficient project-relative demand → improve_title_meta_ctr
+ * Assign exactly one PRIMARY, actionable opportunity type by deterministic precedence.
+ * multi_page is NOT a type — it is added separately as a secondary signal. Query intent
+ * GUIDES the type but never removes an opportunity. Precedence:
+ *   1. meaningful CTR gap + sufficient project-relative demand → improve_title_meta_ctr
  *      (the GSC ranking page IS an existing page — no separate content match required)
- *   3. strong content match → same page: improve_existing_page / other page: internal_link_support_candidate
- *   4. no strong match → intent decides: informational → supporting_content_candidate;
+ *   2. strong content match → same page: improve_existing_page / other page: internal_link_support_candidate
+ *   3. no strong match → intent decides: informational → supporting_content_candidate;
  *      product/commercial/branded_or_service/support → improve_existing_page;
  *      unknown → article/unknown page: supporting_content_candidate; else improve_existing_page.
  */
 function determineType(c: Candidate, components: ScoreComponents): { type: OpportunityType; reason?: string } {
-  if (c.distinctPageCount > 1) return { type: 'multi_page_signal' } // never "confirmed cannibalization"
   if (components.ctrGap > 0 && components.demandStrength >= 0.3) return { type: 'improve_title_meta_ctr', reason: 'ctr_opportunity_on_ranking_page' }
   if (c.match && c.match.confidence >= 0.5) {
     const thisPage = c.match.matchType === 'url' || (!!c.match.matchedUrl && urlKey(c.match.matchedUrl) === urlKey(c.page))
@@ -112,6 +111,9 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
     )
     const typed = determineType(c, components)
     const allReasons: ReasonCode[] = typed.reason ? [...reasons, { code: typed.reason, detail: INTENT_REASON_DETAIL[typed.reason] ?? typed.reason }] : reasons
+    // Secondary diagnostic signals — independent of the primary type. multi_page is a signal
+    // only (never confirmed cannibalization); the reason code + warning stay on the record.
+    const signals: OpportunitySignal[] = c.distinctPageCount > 1 ? ['multi_page_signal'] : []
     return {
       id: opportunityId(runMeta.projectId, runMeta.windowDays, c.clusterKey, c.page),
       primaryQuery: c.primaryQuery,
@@ -125,6 +127,7 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
       averagePosition: c.averagePosition,
       distinctPageCount: c.distinctPageCount,
       opportunityType: typed.type,
+      signals,
       opportunityScore: score,
       scoreComponents: components,
       reasons: allReasons,

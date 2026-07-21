@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Lightbulb, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -21,14 +22,18 @@ type WindowDays = 28 | 90
 const WINDOWS: WindowDays[] = [28, 90]
 const PAGE_SIZE = 25
 
-type OpportunityType = 'improve_existing_page' | 'improve_title_meta_ctr' | 'supporting_content_candidate' | 'internal_link_support_candidate' | 'multi_page_signal'
+type OpportunityType = 'improve_existing_page' | 'improve_title_meta_ctr' | 'supporting_content_candidate' | 'internal_link_support_candidate'
+type FilterValue = OpportunityType | 'multi_page_signal'
 interface ReasonCode { code: string; detail: string; value?: number }
 interface ContentMatch { source: string; matchType: string; confidence: number; reference: string; matchedUrl: string | null }
 interface Opportunity {
   id: string; primaryQuery: string; relatedQueries: string[]; page: string; pageType: string; queryIntent: string
   clicks: number; impressions: number; ctr: number; averagePosition: number; distinctPageCount: number
-  opportunityType: OpportunityType; opportunityScore: number; reasons: ReasonCode[]; existingContentMatch: ContentMatch | null
+  opportunityType: OpportunityType; signals: string[]; opportunityScore: number; reasons: ReasonCode[]; existingContentMatch: ContentMatch | null
 }
+
+/** Decode a percent-encoded URL for display only (raw URL stays the href). */
+function safeDecodeUrl(u: string): string { try { return decodeURI(u) } catch { return u } }
 interface ApiResponse {
   ok: boolean; state?: 'not_connected' | 'no_property' | 'never_synced' | 'ok'; error?: string
   window?: number; run?: { syncRunId: string; dateStart: string | null; dateEnd: string | null }
@@ -46,7 +51,7 @@ export default function GscOpportunities({ projectId }: { projectId: string }) {
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gscOpportunities, [language])
 
   const [activeWindow, setActiveWindow] = useState<WindowDays>(28)
-  const [typeFilter, setTypeFilter] = useState<OpportunityType | null>(null)
+  const [typeFilter, setTypeFilter] = useState<FilterValue | null>(null)
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<ApiResponse | null>(null)
@@ -77,7 +82,20 @@ export default function GscOpportunities({ projectId }: { projectId: string }) {
   const opportunities = data?.opportunities ?? []
   const total = data?.total ?? 0
   const typeCounts = data?.typeCounts ?? {}
-  const allTypes: OpportunityType[] = ['improve_existing_page', 'improve_title_meta_ctr', 'supporting_content_candidate', 'internal_link_support_candidate', 'multi_page_signal']
+  // 4 primary types + the multi_page_signal SIGNAL chip (kept for backward compatibility).
+  const allTypes: FilterValue[] = ['improve_existing_page', 'improve_title_meta_ctr', 'supporting_content_candidate', 'internal_link_support_candidate', 'multi_page_signal']
+
+  // State-specific CTA linking to the project page (connection/property/sync live there only).
+  const gscHref = `/projects/${projectId}#gsc-section`
+  const ctaFor = (s: string): string | null => (s === 'not_connected' ? t.ctaConnect : s === 'no_property' ? t.ctaSelectProperty : s === 'never_synced' ? t.ctaSync : null)
+  const renderStateCta = (message: string, ctaText: string) => (
+    <div className="py-4">
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{message}</p>
+      <Link href={gscHref} className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">
+        {ctaText}
+      </Link>
+    </div>
+  )
 
   const scoreBadgeVariant = (s: number): 'success' | 'info' | 'neutral' => (s >= 66 ? 'success' : s >= 33 ? 'info' : 'neutral')
 
@@ -107,11 +125,11 @@ export default function GscOpportunities({ projectId }: { projectId: string }) {
       ) : errored ? (
         <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">{t.apiError}</div>
       ) : state === 'not_connected' ? (
-        <div className="text-sm text-slate-500 dark:text-slate-400 py-4">{t.notConnected}</div>
+        renderStateCta(t.notConnected, ctaFor('not_connected')!)
       ) : state === 'no_property' ? (
-        <div className="text-sm text-slate-500 dark:text-slate-400 py-4">{t.noProperty}</div>
+        renderStateCta(t.noProperty, ctaFor('no_property')!)
       ) : state === 'never_synced' ? (
-        <div className="text-sm text-slate-500 dark:text-slate-400 py-4">{t.neverSynced}</div>
+        renderStateCta(t.neverSynced, ctaFor('never_synced')!)
       ) : (
         <div className="space-y-3">
           {/* Type filter chips (with counts) */}
@@ -136,17 +154,24 @@ export default function GscOpportunities({ projectId }: { projectId: string }) {
                 <li key={o.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <Badge variant={scoreBadgeVariant(o.opportunityScore)}>{t.scoreLabel}: {o.opportunityScore}</Badge>
+                    {/* Primary actionable type */}
                     <Badge variant="info">{typeLabel(o.opportunityType)}</Badge>
-                    <Badge variant="neutral">{intentLabel(o.queryIntent)}</Badge>
-                    <Badge variant="neutral">{pageTypeLabel(o.pageType)}</Badge>
-                    {o.distinctPageCount > 1 && <Badge variant="warning">{t.distinctPages}: {o.distinctPageCount}</Badge>}
+                    {/* Hide meaningless "unknown" badges (classifier unchanged) */}
+                    {o.queryIntent !== 'unknown' && <Badge variant="neutral">{intentLabel(o.queryIntent)}</Badge>}
+                    {o.pageType !== 'unknown' && <Badge variant="neutral">{pageTypeLabel(o.pageType)}</Badge>}
+                    {/* Secondary diagnostic signal — not the primary action */}
+                    {o.signals.includes('multi_page_signal') && <Badge variant="warning">{typeLabel('multi_page_signal')}: {o.distinctPageCount}</Badge>}
                   </div>
 
                   <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{o.primaryQuery}</div>
                   {o.relatedQueries.length > 0 && (
                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.colRelated}: {o.relatedQueries.join(' · ')}</div>
                   )}
-                  <div className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-1 truncate" dir="ltr">{o.page}</div>
+                  {/* Raw URL is the href; decoded for readable display; LTR + truncated + full in title. */}
+                  <a href={o.page} target="_blank" rel="noopener noreferrer" title={safeDecodeUrl(o.page)} dir="ltr"
+                    className="block text-xs font-mono text-indigo-600 dark:text-indigo-400 hover:underline mt-1 truncate">
+                    {safeDecodeUrl(o.page)}
+                  </a>
 
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300 mt-2">
                     <span>{t.colClicks}: <span className="tabular-nums font-medium">{fmtInt(o.clicks)}</span></span>
@@ -165,7 +190,7 @@ export default function GscOpportunities({ projectId }: { projectId: string }) {
                         </li>
                       ))}
                     </ul>
-                    {o.opportunityType === 'multi_page_signal' && (
+                    {o.signals.includes('multi_page_signal') && (
                       <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 inline-flex items-center gap-1"><AlertTriangle size={11} />{t.multiPageNote}</div>
                     )}
                   </div>

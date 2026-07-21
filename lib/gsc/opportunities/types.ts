@@ -9,12 +9,15 @@ import type { QueryIntent } from './query-intent'
 export type { PageType } from './page-classify'
 export type { QueryIntent } from './query-intent'
 
+/** Primary, actionable opportunity type. Every opportunity has exactly one. */
 export type OpportunityType =
   | 'improve_existing_page'
   | 'improve_title_meta_ctr'
   | 'supporting_content_candidate'
   | 'internal_link_support_candidate'
-  | 'multi_page_signal'
+
+/** Secondary diagnostic signals attached to an opportunity (not the primary action). */
+export type OpportunitySignal = 'multi_page_signal'
 
 /** A single explainable reason with its underlying component value (never a guarantee). */
 export interface ReasonCode { code: string; detail: string; value?: number }
@@ -53,6 +56,7 @@ export interface Opportunity {
   averagePosition: number
   distinctPageCount: number
   opportunityType: OpportunityType
+  signals: OpportunitySignal[]
   opportunityScore: number
   scoreComponents: ScoreComponents
   reasons: ReasonCode[]

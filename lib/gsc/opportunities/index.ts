@@ -11,6 +11,6 @@ export { matchExistingContent, urlKey } from './content-match'
 export { scoreOpportunity, positionBand, median } from './score'
 export { normalizeQuery, tokenize, contentTokens, contentTokenSet } from './normalize'
 export type {
-  Opportunity, OpportunityType, ReasonCode, ScoreComponents,
+  Opportunity, OpportunityType, OpportunitySignal, ReasonCode, ScoreComponents,
   ContentMatch, ContentMatchSource, ContentMatchType, ContentEvidence, OpportunityRunMeta,
 } from './types'

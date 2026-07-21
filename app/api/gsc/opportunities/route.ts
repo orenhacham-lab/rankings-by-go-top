@@ -18,7 +18,10 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const MAX_PAGE_SIZE = 100
-const VALID_TYPES = new Set<OpportunityType>([
+// Filterable values: the 4 primary types PLUS the multi_page_signal SIGNAL (which filters on
+// signals[], not opportunityType) — backward-compatible with the existing chip.
+type FilterValue = OpportunityType | 'multi_page_signal'
+const VALID_FILTERS = new Set<FilterValue>([
   'improve_existing_page', 'improve_title_meta_ctr', 'supporting_content_candidate', 'internal_link_support_candidate', 'multi_page_signal',
 ])
 
@@ -33,7 +36,7 @@ export async function GET(request: Request) {
   if (windowDays !== 28 && windowDays !== 90) return Response.json({ ok: false, error: 'invalid_window' }, { status: 400 })
 
   const typeParam = url.searchParams.get('type')
-  const typeFilter = typeParam && VALID_TYPES.has(typeParam as OpportunityType) ? (typeParam as OpportunityType) : null
+  const typeFilter = typeParam && VALID_FILTERS.has(typeParam as FilterValue) ? (typeParam as FilterValue) : null
   if (typeParam && !typeFilter) return Response.json({ ok: false, error: 'invalid_type' }, { status: 400 })
   const page = Math.max(0, Number(url.searchParams.get('page')) || 0)
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(url.searchParams.get('pageSize')) || 25))
@@ -49,11 +52,17 @@ export async function GET(request: Request) {
     if (inputs.state === 'never_synced') return Response.json({ ok: true, state: 'never_synced', window: windowDays })
 
     const all = buildOpportunities(inputs.rows, inputs.evidence, inputs.runMeta)
-    // minScore first (default 0 keeps analyzable opportunities), then optional type filter.
+    // minScore first (default 0 keeps analyzable opportunities), then optional type/signal filter.
     const scoped = all.filter((o) => o.opportunityScore >= minScore)
     const typeCounts: Record<string, number> = {}
-    for (const o of scoped) typeCounts[o.opportunityType] = (typeCounts[o.opportunityType] ?? 0) + 1
-    const filtered = typeFilter ? scoped.filter((o) => o.opportunityType === typeFilter) : scoped
+    for (const o of scoped) {
+      typeCounts[o.opportunityType] = (typeCounts[o.opportunityType] ?? 0) + 1
+      // multi_page_signal is a SIGNAL count over signal-bearing opportunities, not a type.
+      for (const s of o.signals) typeCounts[s] = (typeCounts[s] ?? 0) + 1
+    }
+    const filtered = !typeFilter ? scoped
+      : typeFilter === 'multi_page_signal' ? scoped.filter((o) => o.signals.includes('multi_page_signal'))
+        : scoped.filter((o) => o.opportunityType === typeFilter)
     const from = page * pageSize
     const pageItems = filtered.slice(from, from + pageSize)
 
