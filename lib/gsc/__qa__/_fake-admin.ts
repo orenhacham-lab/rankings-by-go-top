@@ -13,6 +13,9 @@ class FakeQuery {
   private mutation: null | { type: 'insert' | 'update' | 'delete' | 'upsert'; payload?: Row | Row[]; conflict?: string } = null
   private wantSelect = false
   private wantCount = false
+  private orderSpec: { col: string; ascending: boolean }[] = []
+  private limitN: number | null = null
+  private rangeSpec: { from: number; to: number } | null = null
   constructor(private rows: Row[], private hooks?: ErrorHooks) {}
 
   select(_cols?: string, opts?: { count?: string; head?: boolean }) { this.wantSelect = true; if (opts?.count) this.wantCount = true; return this }
@@ -24,8 +27,9 @@ class FakeQuery {
   is(col: string, val: unknown) { this.filters.push({ kind: 'is', col, val }); return this }
   gt(col: string, val: unknown) { this.filters.push({ kind: 'gt', col, val }); return this }
   lt(col: string, val: unknown) { this.filters.push({ kind: 'lt', col, val }); return this }
-  order() { return this }
-  limit() { return this }
+  order(col: string, opts?: { ascending?: boolean }) { this.orderSpec.push({ col, ascending: opts?.ascending !== false }); return this }
+  limit(n: number) { this.limitN = n; return this }
+  range(from: number, to: number) { this.rangeSpec = { from, to }; return this }
 
   private match(r: Row): boolean {
     return this.filters.every((f) =>
@@ -69,7 +73,19 @@ class FakeQuery {
     }
     const selErr = this.hooks?.select?.() ?? null
     if (selErr) return { data: null, error: selErr }
-    return { data: matched.map((r) => ({ ...r })), error: null, count: this.wantCount ? matched.length : undefined }
+    let out = matched.map((r) => ({ ...r }))
+    // Apply ordering (stable, multi-key), then range, then limit — mirroring PostgREST.
+    for (const spec of this.orderSpec.slice().reverse()) {
+      out = out.slice().sort((a, b) => {
+        const av = a[spec.col] as string | number, bv = b[spec.col] as string | number
+        const cmp = av < bv ? -1 : av > bv ? 1 : 0
+        return spec.ascending ? cmp : -cmp
+      })
+    }
+    const count = this.wantCount ? out.length : undefined
+    if (this.rangeSpec) out = out.slice(this.rangeSpec.from, this.rangeSpec.to + 1)
+    if (this.limitN != null) out = out.slice(0, this.limitN)
+    return { data: out, error: null, count }
   }
 
   async maybeSingle() { const { data, error } = this.run(); return { data: (data && data[0]) ?? null, error } }
