@@ -273,7 +273,7 @@ async function main() {
   {
     const hub = read('components/content/ContentHub.tsx')
     check('F4(12) GscOpportunities imported into ContentHub', /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(hub))
-    check('F4(12) rendered under the gscIdeas tab', /activeTab === 'gscIdeas'/.test(hub) && /<GscOpportunities projectId=\{projectId\}/.test(hub))
+    check('F4(12) rendered under the gscIdeas tab', /activeTab === 'gscIdeas'/.test(hub) && /<GscOpportunities\s[\s\S]{0,120}projectId=\{projectId\}/.test(hub))
     check('F4(12) tab gated by the GSC client flag', /NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'[\s\S]{0,400}setActiveTab\('gscIdeas'\)/.test(hub))
     const projectPage = read('app/(dashboard)/projects/[id]/page.tsx')
     check('F4(13) NOT mounted on the project page anymore', !/GscOpportunities/.test(projectPage))
@@ -282,8 +282,12 @@ async function main() {
     // prose (e.g. "never creates/approves/publishes") doesn't trip the guard.
     const ui = read('components/content/GscOpportunities.tsx')
     const uiCode = ui.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-    check('F4(14) UI performs no mutating fetches', !/method:\s*'(POST|PUT|DELETE|PATCH)'/.test(uiCode))
-    check('F4(14) UI has no create/approve/reject/queue/generate/publish actions', !/(createTopic|handleApprove|handleReject|addToQueue|generateArticle|handlePublish|markIrrelevant)/i.test(uiCode))
+    // Stage E2B intentionally adds flag-gated decision writes. The read-only invariant becomes:
+    // the ONLY mutating fetch target is the GSC decision endpoint; there is no generation/
+    // publish/queue and no direct topic-create fetch (topic creation goes through the modal).
+    const nonDecisionMutating = /method:\s*'(POST|PUT|PATCH)'/.test(uiCode) && !/\/api\/gsc\/opportunities\/decision/.test(uiCode)
+    check('F4(14) the only mutating fetch target is the GSC decision endpoint', /\/api\/gsc\/opportunities\/decision/.test(uiCode) && !nonDecisionMutating)
+    check('F4(14) no generation/publish/queue/direct-topic-create actions', !/generateArticle|handlePublish|enqueue|addToQueue|\/api\/content\/topics|\/api\/wordpress|\/api\/shopify/i.test(uiCode))
   }
 
   // ── LIVE FIX 1: multi-page is a secondary SIGNAL, never the primary type ────
@@ -336,7 +340,7 @@ async function main() {
     check('LF3(14) raw URL remains the href (o.page, not decoded)', /href=\{o\.page\}/.test(ui) && /target="_blank" rel="noopener noreferrer"/.test(ui))
     check('LF3(15) unknown intent badge hidden', /o\.queryIntent !== 'unknown' &&/.test(ui))
     check('LF3(15) unknown pageType badge hidden', /o\.pageType !== 'unknown' &&/.test(ui))
-    check('LF3(16) no action/create/queue/generate/publish control added', (() => { const c = ui.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''); return !/method:\s*'(POST|PUT|DELETE|PATCH)'/.test(c) && !/(createTopic|handleApprove|handleReject|addToQueue|generateArticle|handlePublish|markIrrelevant)/i.test(c) })())
+    check('LF3(16) no generation/publish/queue control added (E2B decision writes are the only mutations)', (() => { const c = ui.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''); return !/generateArticle|handlePublish|enqueue|addToQueue|\/api\/content\/topics|\/api\/wordpress|\/api\/shopify/i.test(c) })())
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

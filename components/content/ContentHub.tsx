@@ -720,8 +720,13 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
               {t.selectProjectMessage}
             </Card>
           ) : activeTab === 'gscIdeas' ? (
-            /* Stage E2A — read-only Search Console ideas surface (no actions, no writes). */
-            <GscOpportunities projectId={projectId} />
+            /* Stage E2A read-only surface + Stage E2B controlled decisions (flag-gated). */
+            <GscOpportunities
+              projectId={projectId}
+              projects={projects}
+              onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+              onTopicsChanged={loadTopics}
+            />
           ) : (
             <>
               {/* Primary action */}

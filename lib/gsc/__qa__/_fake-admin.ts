@@ -51,9 +51,9 @@ class FakeQuery {
       const err = this.hooks?.upsert?.() ?? null
       if (err) return { data: null, error: err }
       const items = Array.isArray(this.mutation.payload) ? this.mutation.payload : [this.mutation.payload!]
-      const conflict = this.mutation.conflict
+      const cols = this.mutation.conflict ? this.mutation.conflict.split(',').map((c) => c.trim()) : []
       for (const it of items) {
-        const existing = conflict ? this.rows.find((r) => r[conflict] === it[conflict]) : undefined
+        const existing = cols.length ? this.rows.find((r) => cols.every((c) => r[c] === it[c])) : undefined
         if (existing) Object.assign(existing, it); else this.rows.push({ ...it })
       }
       return { data: this.wantSelect ? items.map((r) => ({ ...r })) : null, error: null }

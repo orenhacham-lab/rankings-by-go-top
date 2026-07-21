@@ -15,6 +15,16 @@ export function isGscReadOnlyEnabled(): boolean {
   return process.env.GSC_READ_ONLY_ENABLED === 'true'
 }
 
+/**
+ * Stage E2B — controlled, human-triggered decision WRITES (create reviewed topic /
+ * already-covered / irrelevant). Server-authoritative, default false, and gated ON TOP OF
+ * the read-only prerequisite: actions require BOTH GSC_READ_ONLY_ENABLED and
+ * GSC_ACTIONS_ENABLED. When false, Stage E2A stays fully read-only and unchanged.
+ */
+export function isGscActionsEnabled(): boolean {
+  return isGscReadOnlyEnabled() && process.env.GSC_ACTIONS_ENABLED === 'true'
+}
+
 export interface GscOAuthConfig {
   clientId: string
   clientSecret: string

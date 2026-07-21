@@ -88,6 +88,7 @@ export default function ArticleBriefModal({
   projects,
   defaultProjectId,
   editing,
+  prefill,
   onSaved,
   onToast,
   onTopicsCreated,
@@ -97,6 +98,11 @@ export default function ArticleBriefModal({
   projects: ProjectOption[]
   defaultProjectId: string
   editing?: ArticleTopic | null
+  // Stage E2B — CREATE-mode prefill (reused by the GSC "create reviewed topic" flow). Seeds
+  // topic/primary keyword/secondary keywords/search intent; every field stays fully editable
+  // and the create still goes through the normal POST /api/content/topics (source='manual').
+  // Ignored when `editing` is set. Never triggers any save on its own.
+  prefill?: { topic?: string; primaryKeyword?: string; secondaryKeywords?: string[]; searchIntent?: string } | null
   onSaved: () => void
   onToast?: (kind: 'success' | 'error', text: string) => void
   // Phase 2F.1 — fires with the newly-created topics (create flow only) so the
@@ -166,7 +172,7 @@ export default function ArticleBriefModal({
     if (!open) { initKeyRef.current = null; return }
     // Only initialize once per open session (or when switching which topic is
     // being edited) — NOT on every parent re-render / prop identity change.
-    const initKey = editing ? `edit:${editing.id}` : 'new'
+    const initKey = editing ? `edit:${editing.id}` : (prefill ? `new:${prefill.topic ?? ''}|${prefill.primaryKeyword ?? ''}` : 'new')
     if (initKeyRef.current === initKey) return
     initKeyRef.current = initKey
     if (editing) {
@@ -195,9 +201,17 @@ export default function ArticleBriefModal({
       setInternalLinks([]); setLinkChoice({}); setLinkManual({})
       setAdvancedOpen(false)
       setKeywordFit(null)
+      // Stage E2B create-mode prefill (reviewable + editable; no auto-save).
+      if (prefill) {
+        if (prefill.topic) setManualTopic(prefill.topic)
+        if (prefill.primaryKeyword) setPrimaryKeyword(prefill.primaryKeyword)
+        if (prefill.secondaryKeywords && prefill.secondaryKeywords.length) setSecondaryText(prefill.secondaryKeywords.join('\n'))
+        if (prefill.searchIntent) setSearchIntent(oneOf(prefill.searchIntent, INTENT_KEYS, DEFAULT_INTENT))
+      }
     }
     setError(null); setFormError(null); setErrProject(false); setErrTopic(false); setBadAnchors(new Set()); setLinksExpanded(false)
-  }, [open, editing, defaultProjectId, projects])
+    // initKeyRef guards against re-init on identity changes; prefill only seeds create-mode once.
+  }, [open, editing, defaultProjectId, projects, prefill])
 
   useEffect(() => {
     if (open && !editing) setBriefLang(normalizeLang(projectLang))

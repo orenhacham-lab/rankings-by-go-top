@@ -9,10 +9,11 @@
  * opportunityScore DESC, impressions DESC, id ASC.
  */
 import { authContentProject } from '@/lib/content/api-auth'
-import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
+import { isGscReadOnlyEnabled, isGscActionsEnabled } from '@/lib/gsc/config'
 import { loadUserConnection, loadProjectProperty, GscServiceError } from '@/lib/gsc/service'
 import { loadOpportunityInputs, OpportunityLoadError } from '@/lib/gsc/opportunities/load'
 import { buildOpportunities, type OpportunityType } from '@/lib/gsc/opportunities'
+import { loadDecisionsMap, annotate, DecisionError } from '@/lib/gsc/opportunities/decisions'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,6 +42,11 @@ export async function GET(request: Request) {
   const page = Math.max(0, Number(url.searchParams.get('page')) || 0)
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(url.searchParams.get('pageSize')) || 25))
   const minScore = Math.max(0, Math.min(100, Number(url.searchParams.get('minScore')) || 0))
+  // Stage E2B annotation/filter — only when the actions flag is on (else E2A behavior is preserved).
+  const actionsOn = isGscActionsEnabled()
+  const decisionStateParam = url.searchParams.get('decisionState')
+  const decisionState = decisionStateParam && ['open', 'decided', 'all'].includes(decisionStateParam) ? decisionStateParam : 'open'
+  if (decisionStateParam && !['open', 'decided', 'all'].includes(decisionStateParam)) return Response.json({ ok: false, error: 'invalid_decision_state' }, { status: 400 })
 
   try {
     const connection = await loadUserConnection(auth.admin, auth.user.id)
@@ -51,18 +57,31 @@ export async function GET(request: Request) {
     const inputs = await loadOpportunityInputs(auth.admin, auth.project.id, windowDays)
     if (inputs.state === 'never_synced') return Response.json({ ok: true, state: 'never_synced', window: windowDays })
 
+    // Stage E2A engine — unchanged (scoring/type/signals/ids/ordering identical).
     const all = buildOpportunities(inputs.rows, inputs.evidence, inputs.runMeta)
-    // minScore first (default 0 keeps analyzable opportunities), then optional type/signal filter.
     const scoped = all.filter((o) => o.opportunityScore >= minScore)
-    const typeCounts: Record<string, number> = {}
-    for (const o of scoped) {
-      typeCounts[o.opportunityType] = (typeCounts[o.opportunityType] ?? 0) + 1
-      // multi_page_signal is a SIGNAL count over signal-bearing opportunities, not a type.
-      for (const s of o.signals) typeCounts[s] = (typeCounts[s] ?? 0) + 1
+
+    // Annotate with decisions ONLY when the actions flag is on; otherwise return the exact
+    // accepted Stage E2A response (no decisions table query).
+    let annotatedScoped: (typeof scoped[number] & { decision?: unknown })[] = scoped
+    let decisionCounts: import('@/lib/gsc/opportunities/decisions').DecisionCounts | undefined
+    if (actionsOn) {
+      const decisions = await loadDecisionsMap(auth.admin, auth.project.id) // fail closed on DB error
+      const { annotated, counts } = annotate(scoped, decisions)
+      decisionCounts = counts
+      annotatedScoped = decisionState === 'open' ? annotated.filter((o) => o.decision === null)
+        : decisionState === 'decided' ? annotated.filter((o) => o.decision !== null)
+          : annotated
     }
-    const filtered = !typeFilter ? scoped
-      : typeFilter === 'multi_page_signal' ? scoped.filter((o) => o.signals.includes('multi_page_signal'))
-        : scoped.filter((o) => o.opportunityType === typeFilter)
+
+    const typeCounts: Record<string, number> = {}
+    for (const o of annotatedScoped) {
+      typeCounts[o.opportunityType] = (typeCounts[o.opportunityType] ?? 0) + 1
+      for (const s of o.signals) typeCounts[s] = (typeCounts[s] ?? 0) + 1 // signal count, not a type
+    }
+    const filtered = !typeFilter ? annotatedScoped
+      : typeFilter === 'multi_page_signal' ? annotatedScoped.filter((o) => o.signals.includes('multi_page_signal'))
+        : annotatedScoped.filter((o) => o.opportunityType === typeFilter)
     const from = page * pageSize
     const pageItems = filtered.slice(from, from + pageSize)
 
@@ -76,10 +95,12 @@ export async function GET(request: Request) {
       pageSize,
       typeCounts,
       opportunities: pageItems,
+      ...(actionsOn ? { decisionState, decisionCounts, actionsEnabled: true } : {}),
     })
   } catch (e) {
     if (e instanceof GscServiceError) return Response.json({ ok: false, error: e.code }, { status: e.status })
     if (e instanceof OpportunityLoadError) return Response.json({ ok: false, error: e.code }, { status: e.status })
+    if (e instanceof DecisionError) return Response.json({ ok: false, error: e.code }, { status: e.status })
     return Response.json({ ok: false, error: 'opportunities_failed' }, { status: 500 })
   }
 }
