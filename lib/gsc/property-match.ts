@@ -50,11 +50,23 @@ function domainCovers(domain: string, projectUrl: string): boolean {
   return h === d || h.endsWith(`.${d}`)
 }
 
+/**
+ * A stored project target_domain is often scheme-less (e.g. 'www.gotop.co.il'). For
+ * URL-prefix comparison we assume https:// — the default for a Search Console URL-prefix
+ * property — but ONLY when the value has no explicit scheme. An explicit scheme is left
+ * untouched, so 'http://…' stays http and will not match an https:// property.
+ */
+function assumeHttpsIfSchemeless(input: string): string {
+  const raw = (input || '').trim()
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`
+}
+
 /** A URL-prefix property covers a project URL iff same protocol+host and the project
- *  path is inside the (trailing-slash-normalized) prefix path. */
+ *  path is inside the (trailing-slash-normalized) prefix path. A scheme-less project value
+ *  is normalized to https:// first (see assumeHttpsIfSchemeless). */
 function urlPrefixCovers(prefix: string, projectUrl: string): boolean {
   const pp = parseFullUrl(prefix)
-  const pj = parseFullUrl(projectUrl)
+  const pj = parseFullUrl(assumeHttpsIfSchemeless(projectUrl))
   if (!pp || !pj) return false
   if (pp.protocol !== pj.protocol) return false // HTTP and HTTPS are NOT interchangeable
   if (pp.host !== pj.host) return false // exact host[:port]; unrelated subdomains differ

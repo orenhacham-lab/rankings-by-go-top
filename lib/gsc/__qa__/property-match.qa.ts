@@ -59,6 +59,24 @@ function main() {
   const other = views.find((v) => v.siteUrl === 'https://other.com/')!
   check('non-covering property is not assignable', other.covers === false && other.assignable === false)
 
+  // ── Scheme-less project target_domain vs URL-prefix property (live defect fix) ──
+  // A stored target_domain without a scheme is assumed https:// for URL-prefix matching.
+  check('scheme-less root domain matches https URL-prefix property', propertyCoversProjectUrl('https://www.gotop.co.il/', 'www.gotop.co.il'))
+  check('scheme-less domain WITH path matches deeper URL-prefix property', propertyCoversProjectUrl('https://www.gotop.co.il/blog/', 'www.gotop.co.il/blog'))
+  check('scheme-less apex matches https apex URL-prefix property', propertyCoversProjectUrl('https://gotop.co.il/', 'gotop.co.il'))
+  // www vs non-www still differ after normalization.
+  check('scheme-less www does NOT match apex URL-prefix property', !propertyCoversProjectUrl('https://gotop.co.il/', 'www.gotop.co.il'))
+  // Explicit scheme is preserved: http stays http.
+  check('explicit http:// does NOT match https URL-prefix property', !propertyCoversProjectUrl('https://www.gotop.co.il/', 'http://www.gotop.co.il'))
+  // Explicit https retains existing correct behavior.
+  check('explicit https:// matches https URL-prefix property (unchanged)', propertyCoversProjectUrl('https://www.gotop.co.il/', 'https://www.gotop.co.il'))
+  // Path-prefix strictness unchanged after normalization.
+  check('scheme-less /blog does NOT match /blogging boundary', !propertyCoversProjectUrl('https://www.gotop.co.il/blog', 'www.gotop.co.il/blogging'))
+  check('scheme-less path OUTSIDE the prefix is not covered', !propertyCoversProjectUrl('https://www.gotop.co.il/shop/', 'www.gotop.co.il/blog'))
+  // Domain (sc-domain:) coverage is unaffected by the URL-prefix normalization.
+  check('Domain property still covers scheme-less subdomain', propertyCoversProjectUrl('sc-domain:gotop.co.il', 'www.gotop.co.il'))
+  check('Domain property still rejects a scheme-less lookalike', !propertyCoversProjectUrl('sc-domain:gotop.co.il', 'notgotop.co.il'))
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }
