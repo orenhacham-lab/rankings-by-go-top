@@ -28,7 +28,7 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 const row = (query: string, page: string, clicks: number, impressions: number, position: number): GscMetricRow =>
   ({ query, page, clicks, impressions, ctr: impressions > 0 ? clicks / impressions : 0, position })
 const EMPTY_EVIDENCE: ContentEvidence = { topics: [], articles: [], indexedUrls: [] }
-const META: OpportunityRunMeta = { windowDays: 28, syncRunId: 'run-1', dateStart: '2026-06-13', dateEnd: '2026-07-10' }
+const META: OpportunityRunMeta = { projectId: 'proj-x', windowDays: 28, syncRunId: 'run-1', dateStart: '2026-06-13', dateEnd: '2026-07-10' }
 
 async function main() {
   console.log('GSC Stage E2A — opportunity intelligence')
@@ -207,6 +207,82 @@ async function main() {
       .map((f) => read(`lib/gsc/opportunities/${f}.ts`))
     check('(19) no import of the recommendation engine', moduleFiles.every((s) => importLines(s).every((l) => !/recommendation/i.test(l))))
     check('(19) engine core does not import lib/content', ['engine', 'score', 'cluster', 'content-match', 'page-classify', 'query-intent', 'normalize', 'types'].map((f) => read(`lib/gsc/opportunities/${f}.ts`)).every((s) => importLines(s).every((l) => !/@\/lib\/content/.test(l))))
+  }
+
+  // ── FIX 1: intent guides opportunity type (no match) ───────────────────────
+  {
+    const onePage = (query: string, page: string) => buildOpportunities([row(query, page, 1, 500, 8)], EMPTY_EVIDENCE, META)[0]
+    check('F1(1) informational + no match → supporting_content_candidate', onePage('how to choose shoes', 'https://x.co/blog/a').opportunityType === 'supporting_content_candidate')
+    check('F1(2) product + no match → NOT supporting_content_candidate', onePage('buy running shoes', 'https://x.co/product/s').opportunityType !== 'supporting_content_candidate')
+    check('F1(3) commercial + no match → NOT supporting_content_candidate', onePage('best running shoes review', 'https://x.co/blog/a').opportunityType !== 'supporting_content_candidate')
+    check('F1(4) branded_or_service + no match → NOT supporting_content_candidate', onePage('plumber near me', 'https://x.co/blog/a').opportunityType !== 'supporting_content_candidate')
+    check('F1(5) support + no match → NOT supporting_content_candidate', onePage('shoes warranty repair', 'https://x.co/blog/a').opportunityType !== 'supporting_content_candidate')
+    // non-supporting intents get improve_existing_page + an explainable reason.
+    const prod = onePage('buy running shoes', 'https://x.co/product/s')
+    check('F1 product → improve_existing_page + intent_prefers_existing_page reason', prod.opportunityType === 'improve_existing_page' && prod.reasons.some((r) => r.code === 'intent_prefers_existing_page'))
+    check('F1 informational reason is intent_supports_new_content', onePage('how to choose shoes', 'https://x.co/blog/a').reasons.some((r) => r.code === 'intent_supports_new_content'))
+    // (6) CTR opportunity works with NO separate content evidence (ranking page IS existing).
+    const ctrRows = [row('alpha widget', 'https://x.co/blog/a', 1, 1000, 8), row('beta gadget', 'https://x.co/blog/b', 100, 1000, 8)]
+    const ctrOpps = buildOpportunities(ctrRows, EMPTY_EVIDENCE, META)
+    const low = ctrOpps.find((o) => o.primaryQuery === 'alpha widget')!
+    check('F1(6) CTR gap on ranking page → improve_title_meta_ctr without content evidence', low.opportunityType === 'improve_title_meta_ctr' && low.existingContentMatch === null && low.reasons.some((r) => r.code === 'ctr_opportunity_on_ranking_page'))
+    // (7) intent never removes an opportunity — every intent still yields exactly one.
+    const intents = ['how to run', 'buy shoes', 'best shoes review', 'plumber near me', 'shoes warranty', 'zzqq unknownterm']
+    check('F1(7) intent never removes an opportunity', intents.every((q) => buildOpportunities([row(q, 'https://x.co/blog/a', 1, 300, 9)], EMPTY_EVIDENCE, META).length === 1))
+  }
+
+  // ── FIX 2: content-evidence reads fail closed ──────────────────────────────
+  {
+    const base = () => ({
+      gsc_sync_runs: [{ id: 'r1', project_id: 'p', window_days: 28, status: 'succeeded', started_at: '2026-07-10T00:00:00Z', start_date: '2026-06-13', end_date: '2026-07-10' }],
+      gsc_query_page_metrics: [{ sync_run_id: 'r1', project_id: 'p', query: 'q', page: 'https://x.co/blog/a', clicks: 1, impressions: 100, ctr: 0.01, position: 8 }],
+    })
+    const expectLoadCode = async (hooks: Record<string, { select?: () => { message: string } }>) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const admin = new FakeAdmin(base(), hooks) as any
+      try { await loadOpportunityInputs(admin, 'p', 28); return null } catch (e) { return (e as { code?: string }).code ?? null }
+    }
+    check('F2(8) topics read failure → topics_read_failed', (await expectLoadCode({ article_topics: { select: () => ({ message: 'db down' }) } })) === 'topics_read_failed')
+    check('F2(8) articles read failure → articles_read_failed', (await expectLoadCode({ generated_articles: { select: () => ({ message: 'db down' }) } })) === 'articles_read_failed')
+    check('F2(8) content index read failure → content_index_read_failed', (await expectLoadCode({ wordpress_content_index: { select: () => ({ message: 'db down' }) } })) === 'content_index_read_failed')
+    // (9) an evidence read failure THROWS (never returns a fabricated no-match result).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = new FakeAdmin(base(), { article_topics: { select: () => ({ message: 'db down' }) } }) as any
+    let threw = false
+    try { await loadOpportunityInputs(admin, 'p', 28) } catch { threw = true }
+    check('F2(9) evidence failure never becomes no_close_content_match', threw)
+  }
+
+  // ── FIX 3: opportunity id is stable across re-syncs, isolated by project/window ─
+  {
+    const rows = [row('running shoes', 'https://x.co/blog/a', 2, 500, 8)]
+    const idFor = (m: Partial<OpportunityRunMeta>) => buildOpportunities(rows, EMPTY_EVIDENCE, { ...META, ...m })[0].id
+    const base = idFor({ syncRunId: 'run-1' })
+    check('F3(10) same project/window/cluster/page, different syncRunId → SAME id', base === idFor({ syncRunId: 'run-2' }))
+    check('F3(10) syncRunId still returned for traceability', buildOpportunities(rows, EMPTY_EVIDENCE, { ...META, syncRunId: 'run-9' })[0].syncRunId === 'run-9')
+    check('F3(11) different project → different id', base !== idFor({ projectId: 'other-project' }))
+    check('F3(11) different window → different id', base !== idFor({ windowDays: 90 }))
+    const diffPage = buildOpportunities([row('running shoes', 'https://x.co/blog/OTHER', 2, 500, 8)], EMPTY_EVIDENCE, META)[0].id
+    check('F3(11) different page → different id', base !== diffPage)
+    const diffCluster = buildOpportunities([row('trail sandals', 'https://x.co/blog/a', 2, 500, 8)], EMPTY_EVIDENCE, META)[0].id
+    check('F3(11) different cluster → different id', base !== diffCluster)
+  }
+
+  // ── FIX 4: mounted inside ContentHub, not the project page; still read-only ─
+  {
+    const hub = read('components/content/ContentHub.tsx')
+    check('F4(12) GscOpportunities imported into ContentHub', /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(hub))
+    check('F4(12) rendered under the gscIdeas tab', /activeTab === 'gscIdeas'/.test(hub) && /<GscOpportunities projectId=\{projectId\}/.test(hub))
+    check('F4(12) tab gated by the GSC client flag', /NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'[\s\S]{0,400}setActiveTab\('gscIdeas'\)/.test(hub))
+    const projectPage = read('app/(dashboard)/projects/[id]/page.tsx')
+    check('F4(13) NOT mounted on the project page anymore', !/GscOpportunities/.test(projectPage))
+    check('F4(13) Stage E1 GscPanel is untouched on the project page', /<GscPanel projectId=\{id\}/.test(projectPage))
+    // (14) no Stage E2B actions / no writes in the UI. Strip comments first so descriptive
+    // prose (e.g. "never creates/approves/publishes") doesn't trip the guard.
+    const ui = read('components/content/GscOpportunities.tsx')
+    const uiCode = ui.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    check('F4(14) UI performs no mutating fetches', !/method:\s*'(POST|PUT|DELETE|PATCH)'/.test(uiCode))
+    check('F4(14) UI has no create/approve/reject/queue/generate/publish actions', !/(createTopic|handleApprove|handleReject|addToQueue|generateArticle|handlePublish|markIrrelevant)/i.test(uiCode))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

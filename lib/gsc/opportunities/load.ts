@@ -39,23 +39,27 @@ async function fetchRunRows(admin: Admin, runId: string, projectId: string): Pro
   return rows
 }
 
-/** Read project-owned content evidence (best-effort: an unavailable source yields no matches,
- *  never a false "no data" for the metrics themselves). */
+/** Read project-owned content evidence. FAIL CLOSED: a database/read/schema error is thrown
+ *  as a typed error and never silently degraded to empty evidence (which would fabricate a
+ *  false "no_close_content_match"). A genuinely empty table is fine and yields no matches. */
 async function loadEvidence(admin: Admin, projectId: string): Promise<ContentEvidence> {
   const evidence: ContentEvidence = { topics: [], articles: [], indexedUrls: [] }
 
-  const { data: topics } = await admin.from('article_topics').select('topic,primary_keyword,secondary_keywords').eq('project_id', projectId)
+  const { data: topics, error: topicsErr } = await admin.from('article_topics').select('topic,primary_keyword,secondary_keywords').eq('project_id', projectId)
+  if (topicsErr) throw new OpportunityLoadError('topics_read_failed', 500, 'Could not read content topics.')
   for (const t of (topics ?? []) as { topic: string | null; primary_keyword: string | null; secondary_keywords: string[] | null }[]) {
     evidence.topics.push({ topic: t.topic ?? '', primaryKeyword: t.primary_keyword ?? null, secondaryKeywords: Array.isArray(t.secondary_keywords) ? t.secondary_keywords : [] })
   }
 
-  const { data: articles } = await admin.from('generated_articles').select('title,slug,wp_post_url,shopify_article_url').eq('project_id', projectId)
+  const { data: articles, error: articlesErr } = await admin.from('generated_articles').select('title,slug,wp_post_url,shopify_article_url').eq('project_id', projectId)
+  if (articlesErr) throw new OpportunityLoadError('articles_read_failed', 500, 'Could not read generated articles.')
   for (const a of (articles ?? []) as { title: string | null; slug: string | null; wp_post_url: string | null; shopify_article_url: string | null }[]) {
     evidence.articles.push({ title: a.title ?? '', slug: a.slug ?? '', url: a.wp_post_url ?? a.shopify_article_url ?? null })
   }
 
   // Indexed internal URLs from the WordPress content index (targets[].targetUrl), if present.
-  const { data: idx } = await admin.from('wordpress_content_index').select('targets').eq('project_id', projectId).maybeSingle()
+  const { data: idx, error: idxErr } = await admin.from('wordpress_content_index').select('targets').eq('project_id', projectId).maybeSingle()
+  if (idxErr) throw new OpportunityLoadError('content_index_read_failed', 500, 'Could not read the content index.')
   const targets = (idx as { targets?: unknown[] } | null)?.targets
   if (Array.isArray(targets)) {
     for (const tgt of targets) {
@@ -72,5 +76,5 @@ export async function loadOpportunityInputs(admin: Admin, projectId: string, win
   if (!run) return { state: 'never_synced' }
   const rows = await fetchRunRows(admin, run.id, projectId)
   const evidence = await loadEvidence(admin, projectId)
-  return { state: 'ok', rows, evidence, runMeta: { windowDays, syncRunId: run.id, dateStart: run.start_date, dateEnd: run.end_date } }
+  return { state: 'ok', rows, evidence, runMeta: { projectId, windowDays, syncRunId: run.id, dateStart: run.start_date, dateEnd: run.end_date } }
 }

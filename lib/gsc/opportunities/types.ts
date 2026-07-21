@@ -71,6 +71,7 @@ export interface ContentEvidence {
 }
 
 export interface OpportunityRunMeta {
+  projectId: string
   windowDays: number
   syncRunId: string
   dateStart: string | null

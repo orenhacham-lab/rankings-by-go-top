@@ -10,36 +10,59 @@
 import crypto from 'crypto'
 import type { GscMetricRow } from '../summary'
 import { classifyPage, isActionablePageType, type PageType } from './page-classify'
-import { classifyIntent } from './query-intent'
+import { classifyIntent, type QueryIntent } from './query-intent'
 import { clusterQueries } from './cluster'
 import { urlKey, matchExistingContent } from './content-match'
 import { scoreOpportunity, positionBand, median, type ScoreContext, type PositionBand } from './score'
-import type { Opportunity, OpportunityType, ContentEvidence, ContentMatch, OpportunityRunMeta, ScoreComponents } from './types'
+import type { Opportunity, OpportunityType, ContentEvidence, ContentMatch, OpportunityRunMeta, ScoreComponents, ReasonCode } from './types'
 
-/** Stable id: deterministic for a given run + cluster + page. */
-function opportunityId(runMeta: OpportunityRunMeta, clusterKey: string, page: string): string {
-  const h = crypto.createHash('sha1').update(`${runMeta.syncRunId}|${runMeta.windowDays}|${clusterKey}|${urlKey(page)}`).digest('hex')
+/**
+ * Stable id: deterministic for a given PROJECT + window + cluster + normalized page — and
+ * INDEPENDENT of syncRunId, so the same opportunity keeps its id across re-syncs. syncRunId
+ * is still returned on the opportunity for traceability.
+ */
+function opportunityId(projectId: string, windowDays: number, clusterKey: string, page: string): string {
+  const h = crypto.createHash('sha1').update(`${projectId}|${windowDays}|${clusterKey}|${urlKey(page)}`).digest('hex')
   return `opp_${h.slice(0, 16)}`
 }
 
 interface Candidate {
-  clusterKey: string; primaryQuery: string; relatedQueries: string[]; page: string; pageType: PageType
+  clusterKey: string; primaryQuery: string; relatedQueries: string[]; page: string; pageType: PageType; queryIntent: QueryIntent
   clicks: number; impressions: number; ctr: number; averagePosition: number; distinctPageCount: number
   match: ContentMatch | null
 }
 
-/** Assign exactly one opportunity type by deterministic precedence. */
-function determineType(c: Candidate, components: ScoreComponents): OpportunityType {
-  if (c.distinctPageCount > 1) return 'multi_page_signal' // signal only — never "confirmed cannibalization"
+/**
+ * Assign exactly one opportunity type by deterministic precedence. Query intent GUIDES the
+ * type but never removes an opportunity. Precedence:
+ *   1. multiple distinct pages → multi_page_signal (signal only)
+ *   2. meaningful CTR gap + sufficient project-relative demand → improve_title_meta_ctr
+ *      (the GSC ranking page IS an existing page — no separate content match required)
+ *   3. strong content match → same page: improve_existing_page / other page: internal_link_support_candidate
+ *   4. no strong match → intent decides: informational → supporting_content_candidate;
+ *      product/commercial/branded_or_service/support → improve_existing_page;
+ *      unknown → article/unknown page: supporting_content_candidate; else improve_existing_page.
+ */
+function determineType(c: Candidate, components: ScoreComponents): { type: OpportunityType; reason?: string } {
+  if (c.distinctPageCount > 1) return { type: 'multi_page_signal' } // never "confirmed cannibalization"
+  if (components.ctrGap > 0 && components.demandStrength >= 0.3) return { type: 'improve_title_meta_ctr', reason: 'ctr_opportunity_on_ranking_page' }
   if (c.match && c.match.confidence >= 0.5) {
     const thisPage = c.match.matchType === 'url' || (!!c.match.matchedUrl && urlKey(c.match.matchedUrl) === urlKey(c.page))
-    if (thisPage) {
-      if (components.ctrGap > 0 && components.demandStrength >= 0.3) return 'improve_title_meta_ctr'
-      return 'improve_existing_page'
-    }
-    return 'internal_link_support_candidate' // a relevant page exists, but not the ranking one
+    return thisPage ? { type: 'improve_existing_page' } : { type: 'internal_link_support_candidate' }
   }
-  return 'supporting_content_candidate'
+  // No strong content match — intent guides (never destructive).
+  if (c.queryIntent === 'informational') return { type: 'supporting_content_candidate', reason: 'intent_supports_new_content' }
+  if (c.queryIntent === 'product' || c.queryIntent === 'commercial' || c.queryIntent === 'branded_or_service' || c.queryIntent === 'support')
+    return { type: 'improve_existing_page', reason: 'intent_prefers_existing_page' }
+  // unknown intent → page type decides.
+  if (c.pageType === 'article' || c.pageType === 'unknown') return { type: 'supporting_content_candidate', reason: 'intent_supports_new_content' }
+  return { type: 'improve_existing_page', reason: 'intent_prefers_existing_page' }
+}
+
+const INTENT_REASON_DETAIL: Record<string, string> = {
+  intent_supports_new_content: 'Query intent suggests new supporting content rather than an existing page.',
+  intent_prefers_existing_page: 'Query intent points to strengthening the existing ranking page.',
+  ctr_opportunity_on_ranking_page: 'The page already ranks — a CTR (title/meta) gain is available without new content.',
 }
 
 export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEvidence, runMeta: OpportunityRunMeta): Opportunity[] {
@@ -68,7 +91,9 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
     const ctr = impressions > 0 ? clicks / impressions : 0
     const averagePosition = impressions > 0 ? weightedPos / impressions : 0
     const match = matchExistingContent(page, cluster.primaryQuery, evidence)
-    candidates.push({ clusterKey: cluster.key, primaryQuery: cluster.primaryQuery, relatedQueries: cluster.relatedQueries, page, pageType, clicks, impressions, ctr, averagePosition, distinctPageCount, match })
+    // Intent is computed BEFORE type selection so it can guide (never remove) the type.
+    const queryIntent = classifyIntent(cluster.primaryQuery)
+    candidates.push({ clusterKey: cluster.key, primaryQuery: cluster.primaryQuery, relatedQueries: cluster.relatedQueries, page, pageType, queryIntent, clicks, impressions, ctr, averagePosition, distinctPageCount, match })
   }
 
   // Project-relative scoring context: max impressions + per-band median CTR (this dataset only).
@@ -85,22 +110,24 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
       { impressions: c.impressions, ctr: c.ctr, averagePosition: c.averagePosition, distinctPageCount: c.distinctPageCount, contentMatchConfidence: c.match?.confidence ?? 0 },
       ctx,
     )
+    const typed = determineType(c, components)
+    const allReasons: ReasonCode[] = typed.reason ? [...reasons, { code: typed.reason, detail: INTENT_REASON_DETAIL[typed.reason] ?? typed.reason }] : reasons
     return {
-      id: opportunityId(runMeta, c.clusterKey, c.page),
+      id: opportunityId(runMeta.projectId, runMeta.windowDays, c.clusterKey, c.page),
       primaryQuery: c.primaryQuery,
       relatedQueries: c.relatedQueries,
       page: c.page,
       pageType: c.pageType,
-      queryIntent: classifyIntent(c.primaryQuery),
+      queryIntent: c.queryIntent,
       clicks: c.clicks,
       impressions: c.impressions,
       ctr: c.ctr,
       averagePosition: c.averagePosition,
       distinctPageCount: c.distinctPageCount,
-      opportunityType: determineType(c, components),
+      opportunityType: typed.type,
       opportunityScore: score,
       scoreComponents: components,
-      reasons,
+      reasons: allReasons,
       existingContentMatch: c.match,
       windowDays: runMeta.windowDays,
       syncRunId: runMeta.syncRunId,

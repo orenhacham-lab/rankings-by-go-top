@@ -17,7 +17,6 @@ import TrackingTargetForm from '@/components/keywords/TrackingTargetForm'
 import AIVisibilitySection from '@/components/ai-visibility/AIVisibilitySection'
 import ContentSection from '@/components/content/ContentSection'
 import GscPanel from '@/components/content/GscPanel'
-import GscOpportunities from '@/components/content/GscOpportunities'
 import ProjectSwitcher from '@/components/projects/ProjectSwitcher'
 import Link from 'next/link'
 import { formatDate, formatDateTime } from '@/lib/utils'
@@ -424,14 +423,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true' && (
         <div id="gsc-section" className="mb-6 scroll-mt-6">
           <GscPanel projectId={id} />
-        </div>
-      )}
-
-      {/* Stage E2A — read-only Search Console opportunity intelligence (diagnostic only). */}
-      {/* Same authoritative GSC flag; the route re-checks GSC_READ_ONLY_ENABLED server-side. */}
-      {process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true' && (
-        <div id="gsc-opportunities-section" className="mb-6 scroll-mt-6">
-          <GscOpportunities projectId={id} />
         </div>
       )}
 

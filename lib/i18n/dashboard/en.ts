@@ -278,6 +278,7 @@ export const dashboardEn = {
       articles: 'Articles',
       gbpPosts: 'Google Maps Posts',
       scheduled: 'Scheduled content',
+      gscIdeas: 'Search Console ideas',
       comingSoon: 'Coming soon',
     },
     stats: {
@@ -1865,6 +1866,9 @@ export const dashboardEn = {
           has_existing_content_match: 'A matching existing page/topic was found',
           no_close_content_match: 'No sufficiently close content was found',
           multi_page_signal: 'Query appears on multiple pages (signal only)',
+          intent_supports_new_content: 'Query intent suggests new supporting content rather than an existing page',
+          intent_prefers_existing_page: 'Query intent points to strengthening the existing ranking page',
+          ctr_opportunity_on_ranking_page: 'The page already ranks — a CTR (title/meta) gain is available without new content',
         },
       },
     },

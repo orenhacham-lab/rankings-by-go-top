@@ -278,6 +278,7 @@ export const dashboardHe = {
       articles: 'מאמרים',
       gbpPosts: 'פוסטים בגוגל מפות',
       scheduled: 'תוכן מתוזמן',
+      gscIdeas: 'רעיונות מ-Search Console',
       comingSoon: 'בקרוב',
     },
     stats: {
@@ -1876,6 +1877,9 @@ export const dashboardHe = {
           has_existing_content_match: 'נמצאה התאמת תוכן קיימת',
           no_close_content_match: 'לא נמצאה התאמת תוכן קרובה',
           multi_page_signal: 'השאילתה מופיעה במספר עמודים (אות בלבד)',
+          intent_supports_new_content: 'הכוונה מרמזת על תוכן תומך חדש ולא על עמוד קיים',
+          intent_prefers_existing_page: 'הכוונה מצביעה על חיזוק העמוד המדורג הקיים',
+          ctr_opportunity_on_ranking_page: 'העמוד כבר מדורג — יש פוטנציאל לשיפור CTR (כותרת/תיאור) ללא תוכן חדש',
         },
       },
     },
