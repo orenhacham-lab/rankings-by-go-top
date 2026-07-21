@@ -59,6 +59,21 @@ async function main() {
     globalThis.fetch = (async () => ({ ok: true, status: 200, async text() { return JSON.stringify({ rows: [], responseAggregationType: 'byProperty' }) } })) as unknown as typeof fetch
     const zero = await fetchPropertySummary('tok', 'sc-domain:x', '2026-06-13', '2026-07-10', 'final')
     check('(20) zero-data property → zero byProperty summary', zero.clicks === 0 && zero.impressions === 0 && zero.aggregationType === 'byProperty')
+
+    // FIX C — preserve Google's response `metadata` object when present (sanitized).
+    globalThis.fetch = (async () => ({ ok: true, status: 200, async text() { return JSON.stringify({ rows: [{ clicks: 5, impressions: 10, ctr: 0.5, position: 3 }], responseAggregationType: 'byProperty', metadata: { first_incomplete_date: '2026-07-09', foo: 'bar' } }) } })) as unknown as typeof fetch
+    const withMeta = await fetchPropertySummary('tok', 'sc-domain:x', '2026-06-13', '2026-07-10', 'final')
+    const md = withMeta.responseMetadata as { metadata?: Record<string, unknown>; responseAggregationType?: string; rowCount?: number }
+    check('FC(13) Google metadata is persisted when present', !!md.metadata && md.metadata.first_incomplete_date === '2026-07-09' && md.metadata.foo === 'bar')
+    check('FC(13) responseAggregationType + rowCount still kept', md.responseAggregationType === 'byProperty' && md.rowCount === 1)
+    check('FC(13) displayed metrics unchanged by metadata', withMeta.clicks === 5 && withMeta.impressions === 10 && withMeta.position === 3)
+    // FIX C — malformed / non-object metadata is ignored safely.
+    for (const bad of [JSON.stringify(['a', 'b']), JSON.stringify('a string'), JSON.stringify(42)]) {
+      globalThis.fetch = (async () => ({ ok: true, status: 200, async text() { return `{"rows":[{"clicks":5,"impressions":10,"ctr":0.5,"position":3}],"responseAggregationType":"byProperty","metadata":${bad}}` } })) as unknown as typeof fetch
+      const s = await fetchPropertySummary('tok', 'sc-domain:x', '2026-06-13', '2026-07-10', 'final')
+      const m = s.responseMetadata as { metadata?: unknown }
+      check(`FC(14) malformed metadata (${bad}) is ignored + metrics intact`, m.metadata === undefined && s.clicks === 5)
+    }
   } finally { globalThis.fetch = orig }
 
   // ── Top-card contract (FIX 8): use stored property totals, never detail-row sums ──

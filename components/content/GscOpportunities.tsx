@@ -159,14 +159,21 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
   }
 
   // Fires after the existing modal creates the topic(s). Only THEN do we write the GSC decision.
+  // MUST resolve normally (never reject) even on a transport failure — the topic already exists,
+  // so a thrown error must not make the modal report a topic-creation failure. The modal's
+  // onSaved is the single topic-list refresh; this does not refresh topics again.
   async function handleTopicsCreated(created: { id: string; topic: string; primary_keyword: string | null }[]) {
-    onTopicsChanged?.() // the topic WAS created — refresh the hub's topic list regardless
     const opp = actingOpp
     if (!created.length || !opp) return
     const createdTopicId = created[0].id
-    const r = await postDecision(opp.id, 'created_topic', createdTopicId)
-    if (r.ok) { onToast?.('success', t.toastTopicTracked); setActingOpp(null); setPartialRetry(null); await load() }
-    else { setPartialRetry({ opportunityId: opp.id, createdTopicId }); onToast?.('error', t.partialSuccess) } // topic created, decision failed
+    try {
+      const r = await postDecision(opp.id, 'created_topic', createdTopicId)
+      if (r.ok) { onToast?.('success', t.toastTopicTracked); setActingOpp(null); setPartialRetry(null); await load() }
+      else { setPartialRetry({ opportunityId: opp.id, createdTopicId }); onToast?.('error', t.partialSuccess) } // topic created, decision failed
+    } catch {
+      // Network/transport failure after the topic was created → partial success + decision-only retry.
+      setPartialRetry({ opportunityId: opp.id, createdTopicId }); onToast?.('error', t.partialSuccess)
+    }
   }
 
   async function handleRetryDecision() {

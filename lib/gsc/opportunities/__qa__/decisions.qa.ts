@@ -194,7 +194,7 @@ async function main() {
   check('(40) decision + window CHECK constraints', /decision IN \('already_covered', 'irrelevant', 'created_topic'\)/.test(mig) && /window_days IN \(28, 90\)/.test(mig))
   check('(40) required indexes present', /project_id, decision, updated_at DESC/.test(mig) && /created_topic_id\) WHERE created_topic_id IS NOT NULL/.test(mig))
   check('(40) RLS requires user_id = auth.uid() AND project ownership (not UUID secrecy)', /user_id = auth\.uid\(\)\s*\n\s*AND project_id IN \(SELECT id FROM public\.projects WHERE user_id = auth\.uid\(\)\)/.test(mig))
-  check('(40) created_topic_id FK to article_topics ON DELETE SET NULL', /created_topic_id[\s\S]{0,80}REFERENCES public\.article_topics\(id\) ON DELETE SET NULL/.test(mig))
+  check('(40) created_topic_id FK to article_topics ON DELETE CASCADE (FIX A)', /created_topic_id[\s\S]{0,80}REFERENCES public\.article_topics\(id\) ON DELETE CASCADE/.test(mig))
 
   // ── FIX 3/2 — created_topic linkage + DB-guarantee error mapping ────────────
   {
@@ -245,6 +245,40 @@ async function main() {
     check('(9-11) migration has the atomic created_topic lock trigger', /CREATE TRIGGER trg_gsc_opp_decisions_lock/.test(mig) && /OLD\.decision = 'created_topic'/.test(mig) && /NEW\.created_topic_id IS DISTINCT FROM OLD\.created_topic_id/.test(mig))
     check('(FIX3) migration has the UNIQUE partial created_topic_id index', /CREATE UNIQUE INDEX IF NOT EXISTS uq_gsc_opp_decisions_created_topic[\s\S]{0,120}WHERE created_topic_id IS NOT NULL/.test(mig))
     check('(17) migration CHECK enforces decision/created_topic_id consistency', /ck_gsc_opp_decisions_topic_consistency CHECK[\s\S]{0,200}created_topic' AND created_topic_id IS NOT NULL[\s\S]{0,160}IN \('already_covered', 'irrelevant'\) AND created_topic_id IS NULL/.test(mig))
+  }
+
+  // ── FIX A — created_topic FK is ON DELETE CASCADE (resolves the FK/CHECK contradiction) ──
+  {
+    const mig = read('supabase/migrations/20260813_add_gsc_opportunity_decisions.sql')
+    check('FA(1) migration no longer uses ON DELETE SET NULL for created_topic_id', !/created_topic_id[\s\S]{0,80}ON DELETE SET NULL/.test(mig))
+    check('FA(2) created_topic_id uses ON DELETE CASCADE', /created_topic_id\s+uuid\s+REFERENCES public\.article_topics\(id\) ON DELETE CASCADE/.test(mig))
+    check('FA(3) created_topic/created_topic_id CHECK remains', /ck_gsc_opp_decisions_topic_consistency CHECK/.test(mig))
+    check('FA(4/5) the ONLY article_topics FK is created_topic_id (deleting a topic cascades only to its decision row)', (mig.match(/REFERENCES public\.article_topics/g) || []).length === 1)
+    // GSC ingestion tables (E1) never reference article_topics → topic deletion can't touch them.
+    const e1 = read('supabase/migrations/20260812_add_gsc_readonly.sql')
+    check('FA(5) E1 GSC tables (metrics/sync_runs/etc) do not reference article_topics', !/article_topics/.test(e1))
+    // FA(6)(7) already proven functionally above: (17) undo refuses created_topic; (19) undo never
+    // touches article_topics. Re-assert the migration keeps the unique index + lock trigger.
+    check('FA keeps the unique partial created_topic_id index + lock trigger', /uq_gsc_opp_decisions_created_topic/.test(mig) && /trg_gsc_opp_decisions_lock/.test(mig))
+  }
+
+  // ── FIX B — truthful async topic→decision result flow (static contracts) ────
+  {
+    const modal = read('components/content/ArticleBriefModal.tsx')
+    check('FB(1) modal AWAITS an async onTopicsCreated before closing', /await onTopicsCreated\?\.\(created\)/.test(modal))
+    check('FB onTopicsCreated type allows Promise<void>', /onTopicsCreated\?:[\s\S]{0,140}=> void \| Promise<void>/.test(modal))
+    check('FB(2) default mode still shows the success toast', /if \(!gscMode\) onToast\?\.\('success', editing \? t\.toasts\.topicUpdated : t\.toasts\.topicSaved\)/.test(modal))
+    check('FB(3) gsc_reviewed_topic mode shows NO generic success toast', /if \(!gscMode\) onToast\?\.\('success'/.test(modal))
+    check('FB(11) topic-creation failure keeps the modal error + writes no decision (returns before callback)', /const failed = results\.find[\s\S]{0,260}setError\(t\.genericError\)[\s\S]{0,80}return/.test(modal))
+    check('FB(9/10) modal closes after the awaited callback (both success + partial)', modal.indexOf('await onTopicsCreated?.(created)') < modal.indexOf('onClose()'))
+
+    const ui = read('components/content/GscOpportunities.tsx')
+    check('FB(4) GSC full success only after decision persists (await postDecision → success toast)', /await postDecision\(opp\.id, 'created_topic', createdTopicId\)[\s\S]{0,120}r\.ok[\s\S]{0,80}toastTopicTracked/.test(ui))
+    check('FB(5/6) network failure after topic creation → partialRetry (catch), no full-success', /try \{[\s\S]{0,400}catch \{[\s\S]{0,140}setPartialRetry\(\{ opportunityId: opp\.id, createdTopicId \}\)/.test(ui))
+    check('FB(6) handleTopicsCreated has try/catch and never throws (resolves normally)', (() => { const body = ui.split('async function handleTopicsCreated')[1]?.split('async function handleRetryDecision')[0] ?? ''; return /try \{/.test(body) && /catch \{/.test(body) && !/throw /.test(body) })())
+    check('FB(7) retry writes ONLY the decision (never recreates the topic)', /function handleRetryDecision[\s\S]{0,260}postDecision\(partialRetry\.opportunityId, 'created_topic', partialRetry\.createdTopicId\)/.test(ui) && !/handleRetryDecision[\s\S]{0,260}ArticleBriefModal/.test(ui))
+    check('FB(8) topic refresh happens ONCE: handleTopicsCreated does NOT call onTopicsChanged', !/handleTopicsCreated[\s\S]{0,600}onTopicsChanged/.test(ui.split('async function handleTopicsCreated')[1]?.split('async function handleRetryDecision')[0] ?? ''))
+    check('FB(8) the modal onSaved is the single topic-refresh path', /onSaved=\{\(\) => \{ onTopicsChanged\?\.\(\) \}\}/.test(ui))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

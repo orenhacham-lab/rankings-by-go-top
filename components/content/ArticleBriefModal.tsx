@@ -112,9 +112,10 @@ export default function ArticleBriefModal({
   prefill?: { topic?: string; primaryKeyword?: string; secondaryKeywords?: string[]; searchIntent?: string } | null
   onSaved: () => void
   onToast?: (kind: 'success' | 'error', text: string) => void
-  // Phase 2F.1 — fires with the newly-created topics (create flow only) so the
-  // hub can offer an internal-link planning step. Never fires when editing.
-  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[]) => void
+  // Phase 2F.1 — fires with the newly-created topics (create flow only) so the hub can offer
+  // an internal-link planning step. Never fires when editing. May be async (the GSC flow
+  // persists a created_topic decision here) — handleSave awaits it before closing.
+  onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[]) => void | Promise<void>
 }) {
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).contentHub.brief
@@ -462,10 +463,14 @@ export default function ArticleBriefModal({
           .map((r) => r.topic as { id?: string; topic?: string; primary_keyword?: string | null } | null)
           .filter((tp): tp is { id: string; topic: string; primary_keyword: string | null } => !!tp && typeof tp.id === 'string')
           .map((tp) => ({ id: tp.id, topic: tp.topic ?? '', primary_keyword: tp.primary_keyword ?? null }))
-        if (created.length) onTopicsCreated?.(created)
+        // Await the callback so an async consumer (the GSC created_topic decision write) can
+        // finish before we close and report a result. It never rejects (the consumer catches).
+        if (created.length) await onTopicsCreated?.(created)
       }
-      onSaved()
-      onToast?.('success', editing ? t.toasts.topicUpdated : t.toasts.topicSaved)
+      onSaved() // the single topic-list refresh path (both modes)
+      // In strict GSC mode the onTopicsCreated callback is authoritative for the final result
+      // (full / partial success) — the modal must NOT show the generic "topic saved" toast.
+      if (!gscMode) onToast?.('success', editing ? t.toasts.topicUpdated : t.toasts.topicSaved)
       onClose()
     } catch {
       setError(t.genericError); setFormError(t.genericError)

@@ -26,8 +26,11 @@ CREATE TABLE IF NOT EXISTS public.gsc_opportunity_decisions (
   opportunity_id       text NOT NULL,
   window_days          integer NOT NULL CHECK (window_days IN (28, 90)),
   decision             text NOT NULL CHECK (decision IN ('already_covered', 'irrelevant', 'created_topic')),
-  -- Set ONLY for a created_topic decision; cleared if the referenced topic is deleted.
-  created_topic_id     uuid REFERENCES public.article_topics(id) ON DELETE SET NULL,
+  -- Set ONLY for a created_topic decision. ON DELETE CASCADE (not SET NULL): the Content Hub
+  -- supports hard-deleting a topic, and SET NULL would violate the created_topic/created_topic_id
+  -- CHECK below. Deleting the topic therefore removes only its linked decision row (never GSC
+  -- metrics / sync runs / opportunities / other topics); the recomputed opportunity re-opens.
+  created_topic_id     uuid REFERENCES public.article_topics(id) ON DELETE CASCADE,
   sync_run_id          uuid,
   primary_query        text NOT NULL,
   page_url             text NOT NULL,

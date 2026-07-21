@@ -81,9 +81,14 @@ export async function fetchPropertySummary(accessToken: string, siteUrl: string,
   const rows = Array.isArray(json.rows) ? (json.rows as SaRow[]) : []
   const r = rows[0] ?? {}
   const aggregationType = typeof json.responseAggregationType === 'string' ? json.responseAggregationType : ''
+  // Preserve Google's Search Analytics `metadata` object when it is a plain object. Only the
+  // response body's metadata is kept — never headers, tokens, credentials or raw HTTP data.
+  const metadata = json.metadata && typeof json.metadata === 'object' && !Array.isArray(json.metadata)
+    ? (json.metadata as Record<string, unknown>) : undefined
   return {
     clicks: Number(r.clicks ?? 0), impressions: Number(r.impressions ?? 0), ctr: Number(r.ctr ?? 0), position: Number(r.position ?? 0),
-    aggregationType, dataState, responseMetadata: { responseAggregationType: aggregationType, rowCount: rows.length },
+    aggregationType, dataState,
+    responseMetadata: { responseAggregationType: aggregationType, rowCount: rows.length, ...(metadata ? { metadata } : {}) },
   }
 }
 
