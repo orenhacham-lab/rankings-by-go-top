@@ -33,10 +33,17 @@ export class DecisionError extends Error {
 
 export type RecomputeResult = { state: 'never_synced' } | { state: 'ok'; opportunities: Opportunity[]; runMeta: { syncRunId: string; windowDays: number } }
 
-/** Recompute the current Stage E2A opportunities for (project, window) using the latest
- *  succeeded run + the accepted engine. Pure passthrough — no scoring/type/id change. */
-export async function recomputeOpportunities(admin: Admin, projectId: string, windowDays: 28 | 90): Promise<RecomputeResult> {
-  const inputs = await loadOpportunityInputs(admin, projectId, windowDays) // throws typed on DB error
+/**
+ * Recompute the current Stage E2A opportunities for (project, window) using the latest
+ * succeeded run + the accepted engine. Pure passthrough — no scoring/type/id change.
+ *
+ * `opts.excludeArticleTopicIds` is a SERVER-ONLY content-evidence exclusion (never
+ * browser-supplied). It is used ONLY by the created_topic decision path to evaluate the
+ * opportunity in its PRE-created-topic state, so that a just-created topic does not flip the
+ * type away from supporting_content_candidate. No other evidence is excluded.
+ */
+export async function recomputeOpportunities(admin: Admin, projectId: string, windowDays: 28 | 90, opts?: { excludeArticleTopicIds?: string[] }): Promise<RecomputeResult> {
+  const inputs = await loadOpportunityInputs(admin, projectId, windowDays, opts) // throws typed on DB error
   if (inputs.state === 'never_synced') return { state: 'never_synced' }
   const opportunities = buildOpportunities(inputs.rows, inputs.evidence, inputs.runMeta)
   return { state: 'ok', opportunities, runMeta: { syncRunId: inputs.runMeta.syncRunId, windowDays } }

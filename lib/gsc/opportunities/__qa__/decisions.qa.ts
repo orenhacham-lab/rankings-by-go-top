@@ -227,7 +227,7 @@ async function main() {
   // ── FIX 4 (route) + FIX 1/2/5 (static contracts) ────────────────────────────
   {
     const route = read('app/api/gsc/opportunities/decision/route.ts')
-    check('(15) route rejects created_topic for a non-supporting type', /opportunity\.opportunityType !== 'supporting_content_candidate'[\s\S]{0,120}created_topic_not_allowed_for_opportunity_type/.test(route))
+    check('(15) route rejects created_topic for a non-supporting type', /opportunity\.opportunityType !== 'supporting_content_candidate'[\s\S]{0,320}created_topic_not_allowed_for_opportunity_type/.test(route))
     check('(16) route still allows created_topic (eligibility checked, not removed)', /decision === 'created_topic'[\s\S]{0,500}validateCreatedTopic/.test(route))
 
     const modal = read('components/content/ArticleBriefModal.tsx')
@@ -279,6 +279,48 @@ async function main() {
     check('FB(7) retry writes ONLY the decision (never recreates the topic)', /function handleRetryDecision[\s\S]{0,260}postDecision\(partialRetry\.opportunityId, 'created_topic', partialRetry\.createdTopicId\)/.test(ui) && !/handleRetryDecision[\s\S]{0,260}ArticleBriefModal/.test(ui))
     check('FB(8) topic refresh happens ONCE: handleTopicsCreated does NOT call onTopicsChanged', !/handleTopicsCreated[\s\S]{0,600}onTopicsChanged/.test(ui.split('async function handleTopicsCreated')[1]?.split('async function handleRetryDecision')[0] ?? ''))
     check('FB(8) the modal onSaved is the single topic-refresh path', /onSaved=\{\(\) => \{ onTopicsChanged\?\.\(\) \}\}/.test(ui))
+  }
+
+  // ── PART A — pre-created-topic recompute (the confirmed 409 fix) ────────────
+  {
+    // A metric row whose query would match an article topic once that topic exists.
+    const metricsRow = { sync_run_id: 'run-1', project_id: 'p', query: 'how to choose a folding treadmill', page: 'https://x.co/blog/guide', clicks: 1, impressions: 400, ctr: 0.0025, position: 8 }
+    // WITHOUT the topic → supporting_content_candidate (no strong content match).
+    const before = seedAdmin({ gsc_query_page_metrics: [metricsRow] })
+    const rcBefore = await recomputeOpportunities(before.admin, 'p', 28)
+    const oppBefore = (rcBefore as { opportunities: Opportunity[] }).opportunities[0]
+    check('PA(5) opportunity is supporting_content_candidate before the topic exists', oppBefore.opportunityType === 'supporting_content_candidate')
+
+    // WITH the just-created matching topic in evidence → type flips (no longer supporting).
+    const topicRow = { id: 'topic-new', project_id: 'p', user_id: 'u', topic: 'Folding treadmill guide', primary_keyword: 'how to choose a folding treadmill', secondary_keywords: [] }
+    const withTopic = seedAdmin({ gsc_query_page_metrics: [metricsRow], article_topics: [topicRow] })
+    const rcWith = await recomputeOpportunities(withTopic.admin, 'p', 28)
+    const oppWith = (rcWith as { opportunities: Opportunity[] }).opportunities[0]
+    check('PA(root-cause) with the new topic present, the type is no longer supporting', oppWith.opportunityType !== 'supporting_content_candidate')
+
+    // (3)(4)(5) EXCLUDING only the new topic restores the pre-created-topic supporting view.
+    const rcExcluded = await recomputeOpportunities(withTopic.admin, 'p', 28, { excludeArticleTopicIds: ['topic-new'] })
+    const oppExcluded = (rcExcluded as { opportunities: Opportunity[] }).opportunities[0]
+    check('PA(3)(5) excluding only the created topic restores supporting_content_candidate', oppExcluded.opportunityType === 'supporting_content_candidate')
+    check('PA(3) same stable id before/after exclusion', oppExcluded.id === oppBefore.id)
+    // (4) other evidence still active: a DIFFERENT matching topic still suppresses (proves we
+    // exclude only the one id, not all topics).
+    const withTwo = seedAdmin({ gsc_query_page_metrics: [metricsRow], article_topics: [topicRow, { ...topicRow, id: 'topic-other' }] })
+    const rcTwo = await recomputeOpportunities(withTwo.admin, 'p', 28, { excludeArticleTopicIds: ['topic-new'] })
+    check('PA(4) other topics remain active (only the created id is excluded)', (rcTwo as { opportunities: Opportunity[] }).opportunities[0].opportunityType !== 'supporting_content_candidate')
+
+    // (6)(7)(11)(12) upsert created_topic in the excluded view succeeds + idempotent; topic untouched.
+    await upsertDecision(withTopic.admin, { userId: 'u', projectId: 'p', opportunity: oppExcluded, windowDays: 28, syncRunId: 'run-1', decision: 'created_topic', createdTopicId: 'topic-new' })
+    await upsertDecision(withTopic.admin, { userId: 'u', projectId: 'p', opportunity: oppExcluded, windowDays: 28, syncRunId: 'run-1', decision: 'created_topic', createdTopicId: 'topic-new' })
+    check('PA(6)(7) created_topic persists + identical retry is idempotent (one row)', withTopic.tables.gsc_opportunity_decisions.length === 1)
+    check('PA(11)(12) the created topic row is neither deleted nor modified', withTopic.tables.article_topics.length === 1 && (withTopic.tables.article_topics.find((t) => (t as { id: string }).id === 'topic-new') as { topic: string }).topic === 'Folding treadmill guide')
+
+    // (10) irrelevant/already_covered recompute uses NO exclusion (default path).
+    const routeSrc = read('app/api/gsc/opportunities/decision/route.ts')
+    check('(1)(2) route validates the topic BEFORE deriving the exclusion (server-only)', /validateCreatedTopic\(auth\.admin, auth\.project\.id, auth\.user\.id, createdTopicId\)[\s\S]{0,120}excludeArticleTopicIds = \[createdTopicId\]/.test(routeSrc))
+    check('(2) browser cannot supply excluded topic ids (not read from body)', !/body\.excludeArticleTopicIds|excludeArticleTopicIds.*body/.test(routeSrc))
+    check('(10) irrelevant/already_covered use no exclusion (exclude stays [])', /let excludeArticleTopicIds: string\[\] = \[\]/.test(routeSrc))
+    check('(3) recompute receives the server-derived exclusion', /recomputeOpportunities\(auth\.admin, auth\.project\.id, windowDays, \{ excludeArticleTopicIds \}\)/.test(routeSrc))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

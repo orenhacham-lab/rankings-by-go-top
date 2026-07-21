@@ -47,19 +47,27 @@ export async function POST(request: Request) {
   if (!opportunityId) return Response.json({ ok: false, error: 'opportunity_id_required' }, { status: 400 })
 
   try {
-    // Recompute server-side and match by the STABLE server id — never trust the client payload.
-    const recomputed = await recomputeOpportunities(auth.admin, auth.project.id, windowDays)
+    // For created_topic: validate the topic FIRST (ownership), then recompute the opportunity
+    // in its PRE-created-topic state by excluding ONLY the validated topic id from evidence —
+    // otherwise the just-created topic flips the type away from supporting_content_candidate
+    // (the confirmed 409). The exclusion is derived server-side from the validated topic id;
+    // the browser never supplies excluded ids. irrelevant/already_covered use NO exclusion.
+    let excludeArticleTopicIds: string[] = []
+    if (decision === 'created_topic') {
+      if (!createdTopicId) return Response.json({ ok: false, error: 'created_topic_id_required' }, { status: 400 })
+      await validateCreatedTopic(auth.admin, auth.project.id, auth.user.id, createdTopicId) // exists + same project + same user
+      excludeArticleTopicIds = [createdTopicId]
+    }
+
+    const recomputed = await recomputeOpportunities(auth.admin, auth.project.id, windowDays, { excludeArticleTopicIds })
     if (recomputed.state === 'never_synced') return Response.json({ ok: false, error: 'never_synced' }, { status: 409 })
     const opportunity = recomputed.opportunities.find((o) => o.id === opportunityId)
     if (!opportunity) return Response.json({ ok: false, error: 'opportunity_not_found' }, { status: 404 })
 
-    if (decision === 'created_topic') {
-      if (!createdTopicId) return Response.json({ ok: false, error: 'created_topic_id_required' }, { status: 400 })
-      // Server-side eligibility — never rely on the browser hiding the button.
-      if (opportunity.opportunityType !== 'supporting_content_candidate') {
-        return Response.json({ ok: false, error: 'created_topic_not_allowed_for_opportunity_type' }, { status: 409 })
-      }
-      await validateCreatedTopic(auth.admin, auth.project.id, auth.user.id, createdTopicId) // same project + user
+    if (decision === 'created_topic' && opportunity.opportunityType !== 'supporting_content_candidate') {
+      // Still enforce server-side eligibility (in the pre-created-topic view). A genuinely
+      // non-supporting opportunity is rejected; the browser type is never trusted.
+      return Response.json({ ok: false, error: 'created_topic_not_allowed_for_opportunity_type' }, { status: 409 })
     }
 
     const annotation = await upsertDecision(auth.admin, {

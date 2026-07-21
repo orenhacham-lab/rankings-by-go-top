@@ -41,13 +41,19 @@ async function fetchRunRows(admin: Admin, runId: string, projectId: string): Pro
 
 /** Read project-owned content evidence. FAIL CLOSED: a database/read/schema error is thrown
  *  as a typed error and never silently degraded to empty evidence (which would fabricate a
- *  false "no_close_content_match"). A genuinely empty table is fine and yields no matches. */
-async function loadEvidence(admin: Admin, projectId: string): Promise<ContentEvidence> {
+ *  false "no_close_content_match"). A genuinely empty table is fine and yields no matches.
+ *
+ *  `excludeTopicIds` is a SERVER-ONLY exclusion (never browser-supplied): the created_topic
+ *  decision recompute excludes exactly the just-created topic so the opportunity is evaluated
+ *  in its pre-created-topic state. NO other evidence (articles/indexed URLs/other topics) is
+ *  ever excluded. */
+async function loadEvidence(admin: Admin, projectId: string, excludeTopicIds: Set<string> = new Set()): Promise<ContentEvidence> {
   const evidence: ContentEvidence = { topics: [], articles: [], indexedUrls: [] }
 
-  const { data: topics, error: topicsErr } = await admin.from('article_topics').select('topic,primary_keyword,secondary_keywords').eq('project_id', projectId)
+  const { data: topics, error: topicsErr } = await admin.from('article_topics').select('id,topic,primary_keyword,secondary_keywords').eq('project_id', projectId)
   if (topicsErr) throw new OpportunityLoadError('topics_read_failed', 500, 'Could not read content topics.')
-  for (const t of (topics ?? []) as { topic: string | null; primary_keyword: string | null; secondary_keywords: string[] | null }[]) {
+  for (const t of (topics ?? []) as { id: string; topic: string | null; primary_keyword: string | null; secondary_keywords: string[] | null }[]) {
+    if (excludeTopicIds.has(t.id)) continue // server-only: exclude only the validated created topic
     evidence.topics.push({ topic: t.topic ?? '', primaryKeyword: t.primary_keyword ?? null, secondaryKeywords: Array.isArray(t.secondary_keywords) ? t.secondary_keywords : [] })
   }
 
@@ -70,11 +76,12 @@ async function loadEvidence(admin: Admin, projectId: string): Promise<ContentEvi
   return evidence
 }
 
-/** Load the opportunity inputs, or the never_synced state when no succeeded run exists. */
-export async function loadOpportunityInputs(admin: Admin, projectId: string, windowDays: 28 | 90): Promise<OpportunityInputs> {
+/** Load the opportunity inputs, or the never_synced state when no succeeded run exists.
+ *  `opts.excludeArticleTopicIds` is server-only (see loadEvidence). */
+export async function loadOpportunityInputs(admin: Admin, projectId: string, windowDays: 28 | 90, opts?: { excludeArticleTopicIds?: string[] }): Promise<OpportunityInputs> {
   const run = await latestSucceededRun(admin, projectId, windowDays) // throws (typed) on DB error
   if (!run) return { state: 'never_synced' }
   const rows = await fetchRunRows(admin, run.id, projectId)
-  const evidence = await loadEvidence(admin, projectId)
+  const evidence = await loadEvidence(admin, projectId, new Set(opts?.excludeArticleTopicIds ?? []))
   return { state: 'ok', rows, evidence, runMeta: { projectId, windowDays, syncRunId: run.id, dateStart: run.start_date, dateEnd: run.end_date } }
 }
