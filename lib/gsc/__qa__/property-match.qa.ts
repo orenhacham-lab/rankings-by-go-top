@@ -34,8 +34,9 @@ function main() {
   // HTTP ≠ HTTPS.
   check('URL-prefix HTTP does NOT cover HTTPS', !propertyCoversProjectUrl('http://www.example.com/', 'https://www.example.com/'))
   // Different host / subdomain not equivalent under URL-prefix.
-  check('URL-prefix www does NOT cover apex', !propertyCoversProjectUrl('https://www.example.com/', 'https://example.com/'))
-  check('URL-prefix apex does NOT cover www', !propertyCoversProjectUrl('https://example.com/', 'https://www.example.com/'))
+  // FIX 6 — controlled www/apex equivalence (product-contract change): one leading www alias matches.
+  check('URL-prefix www NOW covers apex (single-www alias)', propertyCoversProjectUrl('https://www.example.com/', 'https://example.com/'))
+  check('URL-prefix apex NOW covers www (single-www alias)', propertyCoversProjectUrl('https://example.com/', 'https://www.example.com/'))
   // Port sensitivity.
   check('URL-prefix default vs explicit :8080 differ', !propertyCoversProjectUrl('https://www.example.com/', 'https://www.example.com:8080/'))
 
@@ -64,8 +65,8 @@ function main() {
   check('scheme-less root domain matches https URL-prefix property', propertyCoversProjectUrl('https://www.gotop.co.il/', 'www.gotop.co.il'))
   check('scheme-less domain WITH path matches deeper URL-prefix property', propertyCoversProjectUrl('https://www.gotop.co.il/blog/', 'www.gotop.co.il/blog'))
   check('scheme-less apex matches https apex URL-prefix property', propertyCoversProjectUrl('https://gotop.co.il/', 'gotop.co.il'))
-  // www vs non-www still differ after normalization.
-  check('scheme-less www does NOT match apex URL-prefix property', !propertyCoversProjectUrl('https://gotop.co.il/', 'www.gotop.co.il'))
+  // FIX 6 — scheme-less www now aliases apex.
+  check('scheme-less www NOW matches apex URL-prefix property (single-www alias)', propertyCoversProjectUrl('https://gotop.co.il/', 'www.gotop.co.il'))
   // Explicit scheme is preserved: http stays http.
   check('explicit http:// does NOT match https URL-prefix property', !propertyCoversProjectUrl('https://www.gotop.co.il/', 'http://www.gotop.co.il'))
   // Explicit https retains existing correct behavior.
@@ -74,6 +75,22 @@ function main() {
   check('scheme-less /blog does NOT match /blogging boundary', !propertyCoversProjectUrl('https://www.gotop.co.il/blog', 'www.gotop.co.il/blogging'))
   check('scheme-less path OUTSIDE the prefix is not covered', !propertyCoversProjectUrl('https://www.gotop.co.il/shop/', 'www.gotop.co.il/blog'))
   // Domain (sc-domain:) coverage is unaffected by the URL-prefix normalization.
+  // ── FIX 6 — controlled www/apex equivalence (dedicated) ────────────────────
+  check('F6 apex project → www property', propertyCoversProjectUrl('https://www.jup.co.il/', 'jup.co.il'))
+  check('F6 www project → apex property', propertyCoversProjectUrl('https://jup.co.il/', 'www.jup.co.il'))
+  check('F6 scheme-less apex → https www property', propertyCoversProjectUrl('https://www.jup.co.il/', 'jup.co.il'))
+  check('F6 apex path → www path property', propertyCoversProjectUrl('https://www.jup.co.il/blog/', 'jup.co.il/blog'))
+  check('F6 explicit http → https still mismatches', !propertyCoversProjectUrl('https://www.jup.co.il/', 'http://jup.co.il'))
+  check('F6 arbitrary subdomain shop. is NOT aliased', !propertyCoversProjectUrl('https://jup.co.il/', 'shop.jup.co.il'))
+  check('F6 www2. is NOT aliased', !propertyCoversProjectUrl('https://jup.co.il/', 'www2.jup.co.il'))
+  check('F6 blog. is NOT aliased to www', !propertyCoversProjectUrl('https://www.jup.co.il/', 'blog.jup.co.il'))
+  check('F6 lookalike notjup.co.il rejected', !propertyCoversProjectUrl('https://www.jup.co.il/', 'notjup.co.il'))
+  check('F6 lookalike jup.co.il.evil.example rejected', !propertyCoversProjectUrl('https://www.jup.co.il/', 'jup.co.il.evil.example'))
+  check('F6 path boundary preserved under alias (/blog vs /blogging)', !propertyCoversProjectUrl('https://www.jup.co.il/blog', 'jup.co.il/blogging'))
+  check('F6 port preserved under alias', !propertyCoversProjectUrl('https://www.jup.co.il/', 'jup.co.il:8080'))
+  check('F6 sc-domain behavior unchanged (covers subdomain)', propertyCoversProjectUrl('sc-domain:jup.co.il', 'shop.jup.co.il'))
+  check('F6 sc-domain still rejects lookalike', !propertyCoversProjectUrl('sc-domain:jup.co.il', 'notjup.co.il'))
+
   check('Domain property still covers scheme-less subdomain', propertyCoversProjectUrl('sc-domain:gotop.co.il', 'www.gotop.co.il'))
   check('Domain property still rejects a scheme-less lookalike', !propertyCoversProjectUrl('sc-domain:gotop.co.il', 'notgotop.co.il'))
 

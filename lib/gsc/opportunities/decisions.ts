@@ -83,8 +83,18 @@ export async function upsertDecision(admin: Admin, params: {
   const { data: existingRow, error: readErr } = await admin.from(TABLE).select('*').eq('project_id', params.projectId).eq('opportunity_id', params.opportunity.id).maybeSingle()
   if (readErr) throw new DecisionError('decisions_read_failed', 500, 'Could not read the existing decision.')
   const existing = existingRow as DecisionRow | null
+  // App-level fast path for the created_topic lock (DB trigger is the authoritative guard).
   if (existing?.decision === 'created_topic' && params.decision !== 'created_topic') {
     throw new DecisionError('decision_locked_by_created_topic', 409, 'This opportunity already has a created topic.')
+  }
+  // FIX 3 fast path — a created topic may link to at most ONE opportunity (UNIQUE index is
+  // the authoritative guard). Same-opportunity retry is allowed (idempotent).
+  if (params.decision === 'created_topic' && params.createdTopicId) {
+    const { data: linkedRows, error: linkErr } = await admin.from(TABLE).select('opportunity_id').eq('created_topic_id', params.createdTopicId)
+    if (linkErr) throw new DecisionError('decisions_read_failed', 500, 'Could not check topic linkage.')
+    if (((linkedRows ?? []) as { opportunity_id: string }[]).some((r) => r.opportunity_id !== params.opportunity.id)) {
+      throw new DecisionError('created_topic_already_linked', 409, 'This topic is already linked to another opportunity.')
+    }
   }
 
   const nowIso = new Date().toISOString()
@@ -103,7 +113,14 @@ export async function upsertDecision(admin: Admin, params: {
     opportunity_snapshot: snapshot, updated_at: nowIso,
   }
   const { error: upsertErr } = await admin.from(TABLE).upsert(payload, { onConflict: 'project_id,opportunity_id' })
-  if (upsertErr) throw new DecisionError('decision_write_failed', 500, 'Could not record the decision.')
+  if (upsertErr) {
+    const msg = (upsertErr as { message?: string }).message ?? ''
+    const code = (upsertErr as { code?: string }).code
+    // DB-authoritative guards (survive concurrent requests):
+    if (msg.includes('decision_locked_by_created_topic')) throw new DecisionError('decision_locked_by_created_topic', 409, 'This opportunity already has a created topic.')
+    if (code === '23505') throw new DecisionError('created_topic_already_linked', 409, 'This topic is already linked to another opportunity.')
+    throw new DecisionError('decision_write_failed', 500, 'Could not record the decision.')
+  }
   return { decision: params.decision, createdTopicId: payload.created_topic_id, createdAt: existing?.created_at ?? nowIso, updatedAt: nowIso }
 }
 

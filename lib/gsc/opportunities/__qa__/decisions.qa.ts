@@ -196,6 +196,57 @@ async function main() {
   check('(40) RLS requires user_id = auth.uid() AND project ownership (not UUID secrecy)', /user_id = auth\.uid\(\)\s*\n\s*AND project_id IN \(SELECT id FROM public\.projects WHERE user_id = auth\.uid\(\)\)/.test(mig))
   check('(40) created_topic_id FK to article_topics ON DELETE SET NULL', /created_topic_id[\s\S]{0,80}REFERENCES public\.article_topics\(id\) ON DELETE SET NULL/.test(mig))
 
+  // ── FIX 3/2 — created_topic linkage + DB-guarantee error mapping ────────────
+  {
+    // (12) identical created_topic retry is idempotent (one row).
+    const { admin, tables } = seedAdmin({ article_topics: [{ id: 'topic-1', project_id: 'p', user_id: 'u' }] })
+    const rc = await recomputeOpportunities(admin, 'p', 28); const o = (rc as { opportunities: Opportunity[] }).opportunities[0]
+    await upsertDecision(admin, { userId: 'u', projectId: 'p', opportunity: o, windowDays: 28, syncRunId: 'run-1', decision: 'created_topic', createdTopicId: 'topic-1' })
+    await upsertDecision(admin, { userId: 'u', projectId: 'p', opportunity: o, windowDays: 28, syncRunId: 'run-1', decision: 'created_topic', createdTopicId: 'topic-1' })
+    check('(12) identical created_topic retry is idempotent (one row)', tables.gsc_opportunity_decisions.length === 1)
+    // (13) the same created_topic_id cannot be linked to a second opportunity.
+    tables.gsc_opportunity_decisions.push({ project_id: 'p', opportunity_id: 'other-opp', decision: 'created_topic', created_topic_id: 'topic-1' })
+    const e13 = await expectError(() => upsertDecision(admin, { userId: 'u', projectId: 'p', opportunity: { ...o, id: 'opp_second' } as Opportunity, windowDays: 28, syncRunId: 'run-1', decision: 'created_topic', createdTopicId: 'topic-1' }))
+    check('(13) one created_topic_id cannot link to two opportunities', e13?.code === 'created_topic_already_linked' && e13?.status === 409)
+  }
+  {
+    // (14) DB unique violation (23505) maps to created_topic_already_linked.
+    const tables = { gsc_opportunity_decisions: [], article_topics: [{ id: 'topic-1', project_id: 'p', user_id: 'u' }] }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = new FakeAdmin(tables, { gsc_opportunity_decisions: { upsert: () => ({ code: '23505' }) } }) as any
+    const o = { id: 'opp_x', primaryQuery: 'q', relatedQueries: [], page: 'https://x/1', pageType: 'article', queryIntent: 'informational', opportunityType: 'supporting_content_candidate', signals: [], opportunityScore: 10, clicks: 0, impressions: 1, ctr: 0, averagePosition: 8, distinctPageCount: 1, windowDays: 28, syncRunId: 'run-1' } as unknown as Opportunity
+    const e14 = await expectError(() => upsertDecision(admin, { userId: 'u', projectId: 'p', opportunity: o, windowDays: 28, syncRunId: 'run-1', decision: 'created_topic', createdTopicId: 'topic-1' }))
+    check('(14) DB unique violation maps to created_topic_already_linked', e14?.code === 'created_topic_already_linked' && e14?.status === 409)
+    // (9)(10)(11) DB trigger message maps to decision_locked_by_created_topic (concurrent-safe).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin2 = new FakeAdmin({ gsc_opportunity_decisions: [], article_topics: [{ id: 'topic-1', project_id: 'p', user_id: 'u' }] }, { gsc_opportunity_decisions: { upsert: () => ({ message: 'decision_locked_by_created_topic' }) } }) as any
+    const e9 = await expectError(() => upsertDecision(admin2, { userId: 'u', projectId: 'p', opportunity: o, windowDays: 28, syncRunId: 'run-1', decision: 'created_topic', createdTopicId: 'topic-1' }))
+    check('(9)(10)(11) DB trigger message maps to decision_locked_by_created_topic', e9?.code === 'decision_locked_by_created_topic' && e9?.status === 409)
+  }
+
+  // ── FIX 4 (route) + FIX 1/2/5 (static contracts) ────────────────────────────
+  {
+    const route = read('app/api/gsc/opportunities/decision/route.ts')
+    check('(15) route rejects created_topic for a non-supporting type', /opportunity\.opportunityType !== 'supporting_content_candidate'[\s\S]{0,120}created_topic_not_allowed_for_opportunity_type/.test(route))
+    check('(16) route still allows created_topic (eligibility checked, not removed)', /decision === 'created_topic'[\s\S]{0,500}validateCreatedTopic/.test(route))
+
+    const modal = read('components/content/ArticleBriefModal.tsx')
+    check('(1) normal modal still exposes the suggestion flow', /\{!editing && !gscMode && \(/.test(modal) && /handleSuggest/.test(modal))
+    check('(2) gsc_reviewed_topic mode exposes NO suggest button', /!editing && !gscMode/.test(modal))
+    check('(3) gsc mode performs NO topic-suggestions request', /function handleSuggest\(\)\s*\{\s*\n\s*if \(gscMode\) return/.test(modal))
+    check('(4) gsc mode submits exactly one manual topic', /gscMode \? \(manualTopic\.trim\(\) \? \[manualTopic\.trim\(\)\] : \[\]\)/.test(modal))
+    check('(5) gsc mode locks the project select', /disabled=\{gscMode\}/.test(modal))
+    check('(6) GSC flow still POSTs the existing /api/content/topics', /fetch\('\/api\/content\/topics'/.test(modal))
+    check('(8) gsc mode never calls Gemini (suggest guarded)', /if \(gscMode\) return/.test(modal))
+    const ui = read('components/content/GscOpportunities.tsx')
+    check('GscOpportunities opens the modal in gsc_reviewed_topic mode', /mode="gsc_reviewed_topic"/.test(ui))
+
+    const mig = read('supabase/migrations/20260813_add_gsc_opportunity_decisions.sql')
+    check('(9-11) migration has the atomic created_topic lock trigger', /CREATE TRIGGER trg_gsc_opp_decisions_lock/.test(mig) && /OLD\.decision = 'created_topic'/.test(mig) && /NEW\.created_topic_id IS DISTINCT FROM OLD\.created_topic_id/.test(mig))
+    check('(FIX3) migration has the UNIQUE partial created_topic_id index', /CREATE UNIQUE INDEX IF NOT EXISTS uq_gsc_opp_decisions_created_topic[\s\S]{0,120}WHERE created_topic_id IS NOT NULL/.test(mig))
+    check('(17) migration CHECK enforces decision/created_topic_id consistency', /ck_gsc_opp_decisions_topic_consistency CHECK[\s\S]{0,200}created_topic' AND created_topic_id IS NOT NULL[\s\S]{0,160}IN \('already_covered', 'irrelevant'\) AND created_topic_id IS NULL/.test(mig))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }

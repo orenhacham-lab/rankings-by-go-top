@@ -61,15 +61,27 @@ function assumeHttpsIfSchemeless(input: string): string {
   return /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`
 }
 
-/** A URL-prefix property covers a project URL iff same protocol+host and the project
- *  path is inside the (trailing-slash-normalized) prefix path. A scheme-less project value
- *  is normalized to https:// first (see assumeHttpsIfSchemeless). */
+/**
+ * Controlled www/apex equivalence: a host and the SAME host with exactly ONE leading `www.`
+ * are treated as equivalent (product decision). Only one exact leading `www.` is stripped —
+ * arbitrary subdomains (shop., blog., www2.) are never removed, and lookalike domains never
+ * match. The port (kept in host) is preserved, so different ports still differ.
+ */
+function hostWwwAliasEqual(a: string, b: string): boolean {
+  if (a === b) return true // exact comparison first
+  const stripOneWww = (h: string) => (h.startsWith('www.') ? h.slice(4) : h)
+  return stripOneWww(a) === stripOneWww(b)
+}
+
+/** A URL-prefix property covers a project URL iff same protocol, host (www/apex-alias-aware)
+ *  and the project path is inside the (trailing-slash-normalized) prefix path. A scheme-less
+ *  project value is normalized to https:// first (see assumeHttpsIfSchemeless). */
 function urlPrefixCovers(prefix: string, projectUrl: string): boolean {
   const pp = parseFullUrl(prefix)
   const pj = parseFullUrl(assumeHttpsIfSchemeless(projectUrl))
   if (!pp || !pj) return false
   if (pp.protocol !== pj.protocol) return false // HTTP and HTTPS are NOT interchangeable
-  if (pp.host !== pj.host) return false // exact host[:port]; unrelated subdomains differ
+  if (!hostWwwAliasEqual(pp.host, pj.host)) return false // exact host[:port], or a single-www alias
   const prefixPath = pp.pathname.endsWith('/') ? pp.pathname : `${pp.pathname}/`
   const projPath = pj.pathname.endsWith('/') ? pj.pathname : `${pj.pathname}/`
   return projPath.startsWith(prefixPath)

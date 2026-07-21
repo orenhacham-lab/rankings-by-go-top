@@ -349,6 +349,7 @@ export default function GscOpportunities({ projectId, projects = [], onToast, on
           projects={projects}
           defaultProjectId={projectId}
           editing={null}
+          mode="gsc_reviewed_topic"
           prefill={{ topic: actingOpp.primaryQuery, primaryKeyword: actingOpp.primaryQuery, secondaryKeywords: actingOpp.relatedQueries, searchIntent: mapIntent(actingOpp.queryIntent) }}
           onSaved={() => { onTopicsChanged?.() }}
           onToast={onToast}

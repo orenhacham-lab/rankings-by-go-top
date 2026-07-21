@@ -64,6 +64,29 @@ export async function probeLatestAvailableDate(accessToken: string, siteUrl: str
   return latest
 }
 
+export interface GscPropertySummary {
+  clicks: number; impressions: number; ctr: number; position: number
+  aggregationType: string; dataState: string; responseMetadata: Record<string, unknown>
+}
+
+/**
+ * Authoritative PROPERTY-LEVEL summary — a SEPARATE Search Analytics request with NO
+ * dimensions and aggregationType='byProperty' so query-anonymized traffic is included.
+ * Uses the SAME property/date range/type/dataState as the detail request. An empty property
+ * returns zeros (not a failure). The caller validates responseAggregationType === 'byProperty'.
+ */
+export async function fetchPropertySummary(accessToken: string, siteUrl: string, startDate: string, endDate: string, dataState: string): Promise<GscPropertySummary> {
+  const body = { startDate, endDate, type: 'web', dataState, aggregationType: 'byProperty' } // NO dimensions
+  const json = await authedFetch(SA_QUERY(siteUrl), accessToken, { method: 'POST', body: JSON.stringify(body) })
+  const rows = Array.isArray(json.rows) ? (json.rows as SaRow[]) : []
+  const r = rows[0] ?? {}
+  const aggregationType = typeof json.responseAggregationType === 'string' ? json.responseAggregationType : ''
+  return {
+    clicks: Number(r.clicks ?? 0), impressions: Number(r.impressions ?? 0), ctr: Number(r.ctr ?? 0), position: Number(r.position ?? 0),
+    aggregationType, dataState, responseMetadata: { responseAggregationType: aggregationType, rowCount: rows.length },
+  }
+}
+
 export interface WindowFetchResult { rows: GscMetricRow[]; apiBatches: number; truncated: boolean }
 
 /** Fetch query+page rows for [startDate, endDate] (inclusive), startRow-paginated up to a
@@ -80,7 +103,9 @@ export async function fetchQueryPageWindow(
   const rows: GscMetricRow[] = []
   let startRow = 0, apiBatches = 0, truncated = false
   for (;;) {
-    const body = { startDate, endDate, dimensions: ['query', 'page'], rowLimit: pageSize, startRow, dataState: 'final' }
+    // type:'web' is explicit so the detail request matches the property-summary request exactly
+    // (it is also the API default, so the returned rows are unchanged).
+    const body = { startDate, endDate, type: 'web', dimensions: ['query', 'page'], rowLimit: pageSize, startRow, dataState: 'final' }
     const json = await authedFetch(SA_QUERY(siteUrl), accessToken, { method: 'POST', body: JSON.stringify(body) })
     apiBatches++
     const batch = Array.isArray(json.rows) ? (json.rows as SaRow[]) : []

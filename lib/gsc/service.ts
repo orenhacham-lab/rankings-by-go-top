@@ -11,8 +11,8 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import type { GscConnection, ProjectGscProperty } from '@/lib/supabase/types'
 import { decryptGscToken, encryptGscToken, GSC_ENCRYPTION_VERSION } from './token-crypto'
 import { refreshAccessToken, GscOAuthError } from './oauth'
-import { listSites, probeLatestAvailableDate, fetchQueryPageWindow } from './api'
-import type { SyncStore, SyncClient, GscWindowDays } from './sync'
+import { listSites, probeLatestAvailableDate, fetchQueryPageWindow, fetchPropertySummary } from './api'
+import { GSC_DETAIL_DATA_STATE, type SyncStore, type SyncClient, type GscWindowDays } from './sync'
 import type { GscMetricRow } from './summary'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -118,6 +118,7 @@ export function makeSyncClient(accessToken: string, siteUrl: string, maxRows: nu
   return {
     probeLatestDate: () => probeLatestAvailableDate(accessToken, siteUrl),
     fetchWindow: (startDate, endDate) => fetchQueryPageWindow(accessToken, siteUrl, startDate, endDate, { maxRows }),
+    fetchSummary: (startDate, endDate) => fetchPropertySummary(accessToken, siteUrl, startDate, endDate, GSC_DETAIL_DATA_STATE),
   }
 }
 
@@ -159,6 +160,14 @@ export function makeSyncStore(admin: Admin): SyncStore {
         status: patch.status, rows_fetched: patch.rowsFetched, api_batches: patch.apiBatches, truncated: patch.truncated,
         start_date: patch.startDate, end_date: patch.endDate, latest_available_date: patch.latestAvailableDate,
         total_clicks: patch.totalClicks, total_impressions: patch.totalImpressions, weighted_position_sum: patch.weightedPositionSum,
+        // Authoritative property summary (FIX 8) — the top cards read ONLY these fields.
+        summary_total_clicks: patch.summary?.clicks ?? null,
+        summary_total_impressions: patch.summary?.impressions ?? null,
+        summary_total_ctr: patch.summary?.ctr ?? null,
+        summary_average_position: patch.summary?.position ?? null,
+        summary_aggregation_type: patch.summary?.aggregationType ?? null,
+        summary_data_state: patch.summary?.dataState ?? null,
+        summary_response_metadata: patch.summary?.responseMetadata ?? null,
         sanitized_error_code: patch.errorCode ?? null, sanitized_error_message: patch.errorMessage ?? null,
         finished_at: new Date().toISOString(),
       }).eq('id', runId)

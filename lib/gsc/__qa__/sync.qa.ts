@@ -7,7 +7,7 @@
  * pagination stops on a short page; the safety cap sets truncated=true; and a concurrent
  * sync is rejected (unique-active-run → sync_in_progress).
  */
-import { executeManualSync, computeInclusiveWindow, dedupeRows, type SyncStore, type SyncClient } from '../sync'
+import { executeManualSync, computeInclusiveWindow, dedupeRows, type SyncStore, type SyncClient, type PropertySummaryPatch } from '../sync'
 import { fetchQueryPageWindow } from '../api'
 import { makeSyncStore, GscServiceError } from '../service'
 import { FakeAdmin } from './_fake-admin'
@@ -20,7 +20,8 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000)
 
-interface FinishPatch { status: string; rowsFetched: number; truncated: boolean; startDate: string | null; endDate: string | null; totalClicks: number; totalImpressions: number; weightedPositionSum: number }
+interface FinishPatch { status: string; rowsFetched: number; truncated: boolean; startDate: string | null; endDate: string | null; totalClicks: number; totalImpressions: number; weightedPositionSum: number; summary: PropertySummaryPatch | null }
+const okSummary = (over: Partial<PropertySummaryPatch> = {}): PropertySummaryPatch => ({ clicks: 4880, impressions: 238000, ctr: 0.0205, position: 10.7, aggregationType: 'byProperty', dataState: 'final', responseMetadata: {}, ...over })
 class FakeStore implements SyncStore {
   runs: { id: string; windowDays: number; status: string }[] = []
   finishes: Record<string, FinishPatch> = {}
@@ -57,9 +58,11 @@ async function main() {
     { query: 'k2', page: 'https://x/2', clicks: 5, impressions: 900, ctr: 0.0055, position: 8 },
   ]
   const store = new FakeStore()
+  let summaryCalls = 0
   const client: SyncClient = {
     probeLatestDate: async () => '2026-07-10',
     fetchWindow: async (): Promise<WindowFetchResult> => ({ rows, apiBatches: 1, truncated: false }),
+    fetchSummary: async () => { summaryCalls++; return okSummary() },
   }
   const res = await executeManualSync({ store, client, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'g', maxRows: 50000, batchSize: 1000 })
   check('reclaims stale runs BEFORE creating new runs', store.reclaimCalls.length === 1 && store.reclaimCalls[0].projectId === 'p')
@@ -72,15 +75,34 @@ async function main() {
   // weightedPositionSum = 4*100 + 8*900 = 7600
   check('weighted position sum stored (impression-weighted)', f0.weightedPositionSum === 7600)
   check('latest date detected from returned data, not hardcoded today', res.latestAvailableDate === '2026-07-10')
+  // FIX 8 — authoritative property summary fetched (byProperty) + stored, NOT detail-row sums.
+  check('property summary requested once per window', summaryCalls === 2)
+  check('property summary stored on the run (byProperty)', f0.summary?.aggregationType === 'byProperty' && f0.summary?.clicks === 4880 && f0.summary?.impressions === 238000)
+  check('property summary clicks differ from detail-row sum (Ido Sport pattern)', f0.summary?.clicks !== f0.totalClicks)
 
   // Empty snapshot: probe returns null → valid empty succeeded runs, no fetch.
   const emptyStore = new FakeStore()
   let fetchCalled = false
-  const emptyClient: SyncClient = { probeLatestDate: async () => null, fetchWindow: async () => { fetchCalled = true; return { rows: [], apiBatches: 0, truncated: false } } }
+  let emptySummaryCalls = 0
+  const emptyClient: SyncClient = { probeLatestDate: async () => null, fetchWindow: async () => { fetchCalled = true; return { rows: [], apiBatches: 0, truncated: false } }, fetchSummary: async () => { emptySummaryCalls++; return okSummary() } }
   const emptyRes = await executeManualSync({ store: emptyStore, client: emptyClient, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'g2', maxRows: 50000, batchSize: 1000 })
   check('no data → still two succeeded EMPTY runs', emptyRes.windows.length === 2 && emptyRes.windows.every((w) => w.status === 'succeeded' && w.rowsFetched === 0))
   check('no data → noData flag set, no fetch attempted', emptyRes.noData === true && !fetchCalled)
   check('empty run aggregates are zero', emptyStore.finishes[emptyRes.windows[0].runId].totalImpressions === 0)
+  check('zero-data property → zero byProperty summary, no summary API call', emptySummaryCalls === 0 && emptyStore.finishes[emptyRes.windows[0].runId].summary?.aggregationType === 'byProperty' && emptyStore.finishes[emptyRes.windows[0].runId].summary?.impressions === 0)
+
+  // FIX 8 — a summary aggregation MISMATCH fails the window (never succeeds, no detail fallback).
+  const misStore = new FakeStore()
+  const misClient: SyncClient = { probeLatestDate: async () => '2026-07-10', fetchWindow: async () => ({ rows, apiBatches: 1, truncated: false }), fetchSummary: async () => okSummary({ aggregationType: 'byPage' }) }
+  const misRes = await executeManualSync({ store: misStore, client: misClient, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'gm', maxRows: 50000, batchSize: 1000 })
+  check('summary aggregation mismatch → run FAILED', misRes.windows.every((w) => w.status === 'failed') && misRes.windows[0].errorCode === 'gsc_summary_aggregation_mismatch')
+  check('mismatch → no succeeded run persisted', misStore.finishes[misRes.windows[0].runId].status === 'failed' && misStore.finishes[misRes.windows[0].runId].summary === null)
+
+  // FIX 8 — a summary REQUEST failure prevents succeeded status.
+  const failStore = new FakeStore()
+  const failClient: SyncClient = { probeLatestDate: async () => '2026-07-10', fetchWindow: async () => ({ rows, apiBatches: 1, truncated: false }), fetchSummary: async () => { throw Object.assign(new Error('boom'), { code: 'api_http_error' }) } }
+  const failRes = await executeManualSync({ store: failStore, client: failClient, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'gf', maxRows: 50000, batchSize: 1000 })
+  check('summary request failure → run FAILED (no succeeded fallback)', failRes.windows.every((w) => w.status === 'failed'))
 
   // Per-window failure isolation: 28 fails, 90 still runs; failed run is marked failed.
   const mixStore = new FakeStore()
@@ -88,6 +110,7 @@ async function main() {
   const mixClient: SyncClient = {
     probeLatestDate: async () => '2026-07-10',
     fetchWindow: async () => { call++; if (call === 1) throw Object.assign(new Error('boom'), { code: 'rate_limited' }); return { rows, apiBatches: 1, truncated: false } },
+    fetchSummary: async () => okSummary(),
   }
   const mixRes = await executeManualSync({ store: mixStore, client: mixClient, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'g3', maxRows: 50000, batchSize: 1000 })
   check('a failing window does NOT abort the other window', mixRes.windows.length === 2)

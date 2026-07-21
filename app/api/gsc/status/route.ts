@@ -14,14 +14,16 @@ import type { GscSyncRun } from '@/lib/supabase/types'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-/** Summary card from a run's precomputed aggregates. ctr = clicks/impressions;
- *  avgPosition = weighted_position_sum/impressions (impression-weighted). */
+/**
+ * Summary card built ONLY from the authoritative property-level summary (FIX 8) — never from
+ * summing the query+page detail rows. A run that predates the summary migration (or a run with
+ * an unexpected aggregation) has no summary and returns summaryResyncRequired=true; the UI then
+ * shows a resync prompt instead of misleading detail-row sums. rows_fetched (query/page row
+ * count) is always returned separately.
+ */
 function summaryCard(run: GscSyncRun | null) {
   if (!run) return null
-  const clicks = Number(run.total_clicks ?? 0)
-  const impressions = Number(run.total_impressions ?? 0)
-  const weighted = Number(run.weighted_position_sum ?? 0)
-  return {
+  const base = {
     runId: run.id,
     windowDays: run.window_days,
     startDate: run.start_date,
@@ -30,10 +32,18 @@ function summaryCard(run: GscSyncRun | null) {
     rowsFetched: run.rows_fetched,
     truncated: run.truncated,
     finishedAt: run.finished_at,
-    clicks,
-    impressions,
-    ctr: impressions > 0 ? clicks / impressions : 0,
-    avgPosition: impressions > 0 ? weighted / impressions : 0,
+  }
+  // No authoritative property summary → resync required (never fall back to detail-row sums).
+  if (run.summary_total_clicks === null || run.summary_aggregation_type !== 'byProperty') {
+    return { ...base, summaryResyncRequired: true, clicks: null, impressions: null, ctr: null, avgPosition: null }
+  }
+  return {
+    ...base,
+    summaryResyncRequired: false,
+    clicks: Number(run.summary_total_clicks),
+    impressions: Number(run.summary_total_impressions ?? 0),
+    ctr: Number(run.summary_total_ctr ?? 0),
+    avgPosition: run.summary_average_position == null ? null : Number(run.summary_average_position),
   }
 }
 

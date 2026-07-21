@@ -1772,6 +1772,10 @@ export const dashboardHe = {
         cardImpressions: 'חשיפות',
         cardCtr: 'CTR',
         cardAvgPosition: 'מיקום ממוצע',
+        // Stage E1 FIX 8 — authoritative property summary.
+        propertySummaryLabel: 'סיכום כולל של הנכס',
+        detailVsSummaryNote: 'נתוני השאילתות והעמודים כוללים רק שורות ש-Google חושפת. נתוני הסיכום הכוללים מגיעים מבקשת נכס נפרדת.',
+        summaryResyncRequired: 'נדרש סנכרון חדש כדי להציג נתוני סיכום מלאים של Search Console.',
         // טבלאות.
         tabQueries: 'שאילתות ועמודים',
         tabOpportunities: 'הזדמנויות (מיקום 4–20)',
@@ -1905,6 +1909,8 @@ export const dashboardHe = {
         genericError: 'משהו השתבש. נסו שוב.',
         errors: {
           decision_locked_by_created_topic: 'כבר נוצר נושא תוכן להזדמנות זו ולכן לא ניתן לשנות את ההחלטה.',
+          created_topic_already_linked: 'הנושא כבר משויך להזדמנות אחרת.',
+          created_topic_not_allowed_for_opportunity_type: 'לא ניתן ליצור נושא תוכן לסוג ההזדמנות הזה.',
           created_topic_decision_cannot_be_undone_here: 'לא ניתן לבטל החלטה של יצירת נושא כאן. נהלו את הנושא במרכז התוכן.',
           invalid_created_topic: 'הנושא שנוצר אינו שייך לפרויקט/משתמש הזה.',
           created_topic_id_required: 'נדרש מזהה נושא שנוצר.',

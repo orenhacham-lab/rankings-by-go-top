@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search as SearchIcon, AlertTriangle } from 'lucide-react'
+import { Search as SearchIcon, AlertTriangle, ExternalLink } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -26,7 +26,7 @@ const WINDOWS: WindowDays[] = [28, 90]
 type ConnStatus = 'connected' | 'reauth_required' | 'revoked' | 'error'
 interface SanitizedConnection { id: string; status: ConnStatus; grantedScope: string | null; lastErrorCode: string | null; updatedAt: string }
 interface AssignedProperty { siteUrl: string; permissionLevel: string | null; selectedAt: string }
-interface SummaryCard { runId: string; windowDays: number; startDate: string | null; endDate: string | null; latestAvailableDate: string | null; rowsFetched: number; truncated: boolean; finishedAt: string | null; clicks: number; impressions: number; ctr: number; avgPosition: number }
+interface SummaryCard { runId: string; windowDays: number; startDate: string | null; endDate: string | null; latestAvailableDate: string | null; rowsFetched: number; truncated: boolean; finishedAt: string | null; summaryResyncRequired?: boolean; clicks: number | null; impressions: number | null; ctr: number | null; avgPosition: number | null }
 interface StatusResponse { ok: boolean; oauthConfigured: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows: Record<string, SummaryCard | null> }
 
 interface PropertyView { siteUrl: string; permissionLevel: string; kind: 'domain' | 'url_prefix'; covers: boolean; assignable: boolean }
@@ -40,6 +40,8 @@ const PAGE_SIZE = 25
 function fmtInt(n: number): string { return Math.round(n).toLocaleString() }
 function fmtCtr(n: number): string { return `${(n * 100).toFixed(2)}%` }
 function fmtPos(n: number): string { return n.toFixed(1) }
+/** Decode a URL for display only (raw URL stays the href). Fails safe to the original. */
+function safeDecodeUrl(u: string): string { try { return decodeURI(u) } catch { return u } }
 
 export default function GscPanel({ projectId }: { projectId: string }) {
   const { language } = useDashboardLanguage()
@@ -327,15 +329,26 @@ export default function GscPanel({ projectId }: { projectId: string }) {
               {(() => {
                 const card = status?.windows?.[String(activeWindow)] ?? null
                 if (!card) return <div className="text-sm text-slate-500 dark:text-slate-400 py-2">{t.neverSynced}</div>
+                // A run created before the property-summary migration has no authoritative totals.
+                if (card.summaryResyncRequired) {
+                  return (
+                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-3 text-sm text-amber-800 dark:text-amber-300 flex flex-wrap items-center gap-2">
+                      <AlertTriangle size={14} /><span>{t.summaryResyncRequired}</span>
+                      <Button size="sm" className="ms-auto" onClick={handleSync} loading={syncing} disabled={syncing || connection?.status === 'reauth_required'}>{syncing ? t.syncing : t.syncNow}</Button>
+                    </div>
+                  )
+                }
                 const empty = card.rowsFetched === 0
                 return (
                   <>
+                    {/* Authoritative property-level summary (separate byProperty request). */}
+                    <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.propertySummaryLabel}</div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                       {[
-                        { label: t.cardClicks, value: fmtInt(card.clicks) },
-                        { label: t.cardImpressions, value: fmtInt(card.impressions) },
-                        { label: t.cardCtr, value: fmtCtr(card.ctr) },
-                        { label: t.cardAvgPosition, value: card.impressions > 0 ? fmtPos(card.avgPosition) : '—' },
+                        { label: t.cardClicks, value: fmtInt(card.clicks ?? 0) },
+                        { label: t.cardImpressions, value: fmtInt(card.impressions ?? 0) },
+                        { label: t.cardCtr, value: fmtCtr(card.ctr ?? 0) },
+                        { label: t.cardAvgPosition, value: card.avgPosition != null ? fmtPos(card.avgPosition) : '—' },
                       ].map((c) => (
                         <div key={c.label} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
                           <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{c.label}</div>
@@ -349,6 +362,8 @@ export default function GscPanel({ projectId }: { projectId: string }) {
                       <span>{t.rowsFetched}: {fmtInt(card.rowsFetched)}</span>
                       {card.truncated && <span className="text-amber-600 dark:text-amber-400 inline-flex items-center gap-1"><AlertTriangle size={12} />{t.truncatedNote}</span>}
                     </div>
+                    {/* Detail vs summary provenance note. */}
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">{t.detailVsSummaryNote}</p>
                     {empty && <div className="text-sm text-slate-500 dark:text-slate-400">{t.emptySnapshot}</div>}
                   </>
                 )
@@ -412,7 +427,15 @@ export default function GscPanel({ projectId }: { projectId: string }) {
                       {(rows as MetricRow[]).map((r, i) => (
                         <tr key={`${r.query}-${r.page}-${i}`} className="border-b border-slate-100 dark:border-slate-800">
                           <td className="py-2 pe-3 text-slate-800 dark:text-slate-100">{r.query}</td>
-                          <td className="py-2 px-3 font-mono text-xs text-slate-500 dark:text-slate-400 truncate max-w-[16rem]" dir="ltr">{r.page}</td>
+                          <td className="py-2 px-3 max-w-[20rem]">
+                            {/* Raw URL is the href; decoded for readable display; wraps up to two
+                                lines; full decoded URL in the title; opens externally. */}
+                            <a href={r.page} target="_blank" rel="noopener noreferrer" title={safeDecodeUrl(r.page)} dir="ltr"
+                              className="inline-flex items-start gap-1 font-mono text-xs text-indigo-600 dark:text-indigo-400 hover:underline [overflow-wrap:anywhere] break-all line-clamp-2">
+                              <ExternalLink size={11} className="mt-0.5 shrink-0" />
+                              <span>{safeDecodeUrl(r.page)}</span>
+                            </a>
+                          </td>
                           <td className="py-2 px-3 text-end tabular-nums">{fmtInt(r.clicks)}</td>
                           <td className="py-2 px-3 text-end tabular-nums">{fmtInt(r.impressions)}</td>
                           <td className="py-2 px-3 text-end tabular-nums">{fmtCtr(r.ctr)}</td>

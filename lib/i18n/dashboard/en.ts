@@ -1762,6 +1762,10 @@ export const dashboardEn = {
         cardImpressions: 'Impressions',
         cardCtr: 'CTR',
         cardAvgPosition: 'Avg. position',
+        // Stage E1 FIX 8 — authoritative property summary.
+        propertySummaryLabel: 'Overall property summary',
+        detailVsSummaryNote: 'Query and page data includes only rows exposed by Google. Overall summary metrics come from a separate property-level request.',
+        summaryResyncRequired: 'A new sync is required to show full Search Console summary metrics.',
         tabQueries: 'Queries & pages',
         tabOpportunities: 'Opportunities (position 4–20)',
         tabMultipage: 'Multi-page queries',
@@ -1894,6 +1898,8 @@ export const dashboardEn = {
         genericError: 'Something went wrong. Please try again.',
         errors: {
           decision_locked_by_created_topic: 'This opportunity already has a created topic, so its decision cannot be changed.',
+          created_topic_already_linked: 'This topic is already linked to another opportunity.',
+          created_topic_not_allowed_for_opportunity_type: 'A content topic cannot be created for this opportunity type.',
           created_topic_decision_cannot_be_undone_here: 'A created-topic decision cannot be undone here. Manage the topic in the Content Hub.',
           invalid_created_topic: 'The created topic does not belong to this project/user.',
           created_topic_id_required: 'A created topic id is required.',

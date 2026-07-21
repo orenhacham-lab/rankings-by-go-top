@@ -175,6 +175,15 @@ export interface GscSyncRun {
   total_clicks: number
   total_impressions: number
   weighted_position_sum: number
+  // Stage E1 FIX 8 — authoritative property-level summary (nullable; null on historical runs
+  // predating the 20260814 migration and on failed runs). The top cards read ONLY these.
+  summary_total_clicks: number | null
+  summary_total_impressions: number | null
+  summary_total_ctr: number | null
+  summary_average_position: number | null
+  summary_aggregation_type: string | null
+  summary_data_state: string | null
+  summary_response_metadata: Record<string, unknown> | null
   started_at: string
   finished_at: string | null
   sanitized_error_code: string | null

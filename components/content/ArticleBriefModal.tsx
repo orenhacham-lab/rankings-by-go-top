@@ -89,6 +89,7 @@ export default function ArticleBriefModal({
   defaultProjectId,
   editing,
   prefill,
+  mode = 'default',
   onSaved,
   onToast,
   onTopicsCreated,
@@ -98,6 +99,12 @@ export default function ArticleBriefModal({
   projects: ProjectOption[]
   defaultProjectId: string
   editing?: ArticleTopic | null
+  // Stage E2B — STRICT reviewed-topic mode for the GSC "create reviewed topic" flow. In
+  // 'gsc_reviewed_topic' the Gemini "Suggest topics" flow is fully hidden/disabled (no
+  // /api/content/topic-suggestions call), exactly ONE manually reviewed topic is submitted,
+  // and the project is locked to the supplied one. Every other field stays editable. Default
+  // 'default' preserves the existing create/edit behavior unchanged.
+  mode?: 'default' | 'gsc_reviewed_topic'
   // Stage E2B — CREATE-mode prefill (reused by the GSC "create reviewed topic" flow). Seeds
   // topic/primary keyword/secondary keywords/search intent; every field stays fully editable
   // and the create still goes through the normal POST /api/content/topics (source='manual').
@@ -112,6 +119,8 @@ export default function ArticleBriefModal({
   const { language } = useDashboardLanguage()
   const t = getDashboardDictionary(language).contentHub.brief
   const isHebrew = language === 'he'
+  // Stage E2B strict reviewed-topic mode: no Gemini suggestions, one manual topic, locked project.
+  const gscMode = mode === 'gsc_reviewed_topic'
 
   const [projectId, setProjectId] = useState(defaultProjectId)
   const [primaryKeyword, setPrimaryKeyword] = useState('')
@@ -291,6 +300,7 @@ export default function ArticleBriefModal({
   }
 
   async function handleSuggest() {
+    if (gscMode) return // strict reviewed-topic mode never calls Gemini/topic-suggestions
     if (!projectId || !primaryKeyword.trim()) return
     setSuggesting(true)
     setSuggestError(null)
@@ -393,9 +403,10 @@ export default function ArticleBriefModal({
     }
 
     const topics = new Set<string>()
-    selected.forEach((s) => topics.add(s))
+    // Strict GSC mode: exactly ONE manually reviewed topic — never any selected suggestions.
+    if (!gscMode) selected.forEach((s) => topics.add(s))
     if (manualTopic.trim()) topics.add(manualTopic.trim())
-    const topicList = Array.from(topics)
+    const topicList = gscMode ? (manualTopic.trim() ? [manualTopic.trim()] : []) : Array.from(topics)
     if (topicList.length === 0) {
       setErrTopic(true); setFormError(t.fixErrors)
       topicRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); topicRef.current?.focus()
@@ -478,14 +489,21 @@ export default function ArticleBriefModal({
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.project}</label>
-          <select ref={projectRef} value={projectId} onChange={(e) => { setProjectId(e.target.value); setErrProject(false) }} className={`${inputCls} ${errProject ? 'border-red-400 dark:border-red-500' : ''}`}>
+          {/* Strict GSC mode locks the project to the one supplied by the opportunity. */}
+          <select ref={projectRef} value={projectId} disabled={gscMode} onChange={(e) => { setProjectId(e.target.value); setErrProject(false) }} className={`${inputCls} ${errProject ? 'border-red-400 dark:border-red-500' : ''} ${gscMode ? 'opacity-70 cursor-not-allowed' : ''}`}>
             <option value="">{t.selectProject}</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           {errProject && <p className="text-xs text-red-600 dark:text-red-400">{t.projectRequired}</p>}
         </div>
 
-        {!editing && (
+        {/* Strict GSC mode keeps the primary keyword editable but WITHOUT the Gemini suggest flow. */}
+        {gscMode && (
+          <Input label={t.primaryKeyword} value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder={t.primaryKeywordPlaceholder} />
+        )}
+
+        {/* Strict GSC reviewed-topic mode hides the whole Gemini "Suggest topics" flow. */}
+        {!editing && !gscMode && (
           <div className="flex flex-col gap-2">
             <div className="flex items-end gap-2">
               <div className="flex-1">

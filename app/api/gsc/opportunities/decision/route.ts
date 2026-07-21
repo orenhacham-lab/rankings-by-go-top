@@ -55,6 +55,10 @@ export async function POST(request: Request) {
 
     if (decision === 'created_topic') {
       if (!createdTopicId) return Response.json({ ok: false, error: 'created_topic_id_required' }, { status: 400 })
+      // Server-side eligibility — never rely on the browser hiding the button.
+      if (opportunity.opportunityType !== 'supporting_content_candidate') {
+        return Response.json({ ok: false, error: 'created_topic_not_allowed_for_opportunity_type' }, { status: 409 })
+      }
       await validateCreatedTopic(auth.admin, auth.project.id, auth.user.id, createdTopicId) // same project + user
     }
 
