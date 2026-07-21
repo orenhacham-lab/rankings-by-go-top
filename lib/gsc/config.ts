@@ -25,6 +25,17 @@ export function isGscActionsEnabled(): boolean {
   return isGscReadOnlyEnabled() && process.env.GSC_ACTIONS_ENABLED === 'true'
 }
 
+/**
+ * Stage E3A — GSC as an optional, additive evidence SOURCE inside the existing automatic
+ * article-idea recommendation flow. Server-authoritative, default false, and layered on the
+ * read-only prerequisite: requires BOTH GSC_READ_ONLY_ENABLED and
+ * GSC_AUTO_RECOMMENDATIONS_ENABLED. When false, the recommendation flow performs ZERO GSC
+ * reads and behaves exactly as before (no pool/order/prompt/target-count change).
+ */
+export function isGscAutoRecommendationsEnabled(): boolean {
+  return isGscReadOnlyEnabled() && process.env.GSC_AUTO_RECOMMENDATIONS_ENABLED === 'true'
+}
+
 export interface GscOAuthConfig {
   clientId: string
   clientSecret: string

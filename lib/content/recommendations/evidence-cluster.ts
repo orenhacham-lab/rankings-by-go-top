@@ -12,7 +12,9 @@
 import { tokens } from './dedupe'
 import { normalizePhrase } from './keyword-guard'
 
-export type EvidenceSourceKind = 'keyword_research' | 'project_data' | 'site_scan' | 'existing_content' | 'pending'
+// 'gsc' — Stage E3A additive Search Console evidence provenance (flag-gated). Additive only:
+// it never changes how the existing kinds are tiered/validated.
+export type EvidenceSourceKind = 'keyword_research' | 'project_data' | 'site_scan' | 'existing_content' | 'pending' | 'gsc'
 export type EntityPageType = 'product' | 'category' | 'service' | 'page' | 'post' | 'article' | 'unknown'
 
 export interface KeywordResearchNode { query: string; volume?: number | null }

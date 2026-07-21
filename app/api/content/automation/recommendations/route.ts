@@ -353,7 +353,7 @@ export async function POST(request: Request) {
           persisted: false, dryRun: true, newlyAddedCount: 0, wouldPersistCount: fresh.length,
           ...pathContract,
           funnel: { generated: rawGeneratedCount, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-          isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
+          isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, gscInput: briefDiagnostics?.gscInput ?? null, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
         },
       })
     }
@@ -480,6 +480,8 @@ export async function POST(request: Request) {
       generationRunId,
       clientRequestId,
       runtimeClass,
+      // Stage E3A — GSC input summary (also nested under briefDiagnostics). {enabled:false} when off.
+      gscInput: briefDiagnostics?.gscInput ?? null,
       runtimeDiag: result.meta.runtimeDiag ?? null,
       freshCurrentRunCount: fresh.length,
       freshCurrentRunDomainFlags: suggestionsDomainFlags(fresh),

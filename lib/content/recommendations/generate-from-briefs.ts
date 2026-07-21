@@ -52,6 +52,9 @@ import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
 import { slugKey } from './dedupe'
 import { normalizeText } from './topic-idea-store'
 import { buildBriefPool, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
+import { integrateGscBriefs } from './gsc-briefs'
+import { isGscAutoRecommendationsEnabled } from '@/lib/gsc/config'
+import type { GscInputDiagnostics } from '@/lib/gsc/recommendations/types'
 import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, briefSynthesisResponseSchema, classifySynthesisFailure, type PolishedTopic, type SynthesisFailureType, type SynthesisResponseDiagnostics } from './brief-synthesis'
 import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
@@ -157,6 +160,8 @@ export interface CandidateOutcome {
 
 export interface BriefRunDiagnostics {
   engine: 'evidence_first_briefs'
+  /** Stage E3A — additive GSC input summary (present even when disabled: {enabled:false}). */
+  gscInput?: GscInputDiagnostics
   modelPath: ModelPath
   /** EXACT generation config of the synthesis calls (model-aware thinking). */
   modelConfig: { model: string; thinkingMode: string; thinkingBudget: number; maxOutputTokens: number } | null
@@ -610,11 +615,30 @@ export async function prepareBriefRun(
     }
   }
 
+  // ── Stage E3A — additive, flag-gated GSC evidence source ────────────────────
+  // When disabled: zero GSC reads, no pool/order/prompt/target change (byte-identical).
+  // When enabled: eligible GSC content-gap opportunities are re-guarded, merged into an
+  // existing brief (attaching provenance) or appended as new GSC-origin briefs within a
+  // deterministic source budget. GSC never bypasses a safeguard.
+  const gscIntegration = await integrateGscBriefs({
+    admin,
+    projectId: input.projectId,
+    userId: input.userId ?? '',
+    enabled: isGscAutoRecommendationsEnabled(),
+    targetCount: input.targetCount,
+    existingPool: workingPool,
+    isCoveredByContent: (subject) => coveredByExistingContent(guard, subject, subject),
+    isOwnedByEntity: (subject) => ownedByExistingEntity(guard, subject),
+    blogDuplicateSignatures,
+  })
+  workingPool.push(...gscIntegration.gscBriefs)
+
   return {
     input,
     language,
     langLabel,
     guard,
+    gscInput: gscIntegration.diagnostics,
     existingPages,
     coveredKeys,
     entities,
@@ -1277,6 +1301,9 @@ export async function synthesizeFromSnapshot(
     suggestions,
     diagnostics: {
       engine: 'evidence_first_briefs',
+      // Stage E3A — GSC input summary carried from the snapshot (present in both the direct
+      // prepare→synthesize path and generateFromBriefs, so diagnostics stay identical).
+      gscInput: snapshot.gscInput,
       modelPath,
       modelConfig: modelConfigHolder.value,
       evidence_inventory: evidenceInventory,
