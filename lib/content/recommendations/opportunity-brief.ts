@@ -63,6 +63,11 @@ export interface BriefPriority {
   matchedPillarType: PillarType | null
   matchedPillarTokens: string[]
   distinctModifierTokens: string[]
+  /** The pillar's CORE anchor head that the candidate had to contain for Tier 0. */
+  matchedPillarAnchorHead: string | null
+  /** Whether that anchor head was corroborated by an independent owned non-product source
+   *  (required for a single-token pillar or a project-focus pillar to grant Tier 0). */
+  pillarAnchorCorroborated: boolean
   productAffinity: boolean
   /** Index of this brief in the final tier-ordered pool (0-based). */
   finalSynthesisRank: number
@@ -111,6 +116,8 @@ export interface BriefPoolDiagnostics {
     matchedPillarType: PillarType | null
     matchedPillarTokens: string[]
     distinctModifierTokens: string[]
+    matchedPillarAnchorHead: string | null
+    pillarAnchorCorroborated: boolean
     productAffinity: boolean
     finalSynthesisRank: number
   }[]
@@ -250,25 +257,70 @@ export function buildBusinessPillars(input: Pick<BriefPoolInput, 'trackedKeyword
   return pillars
 }
 
-/** Best pillar a brief extends (shares ≥1 token AND adds ≥1 distinct modifier). */
-function matchPillar(subjectToks: string[], pillars: BusinessPillar[]): { pillar: BusinessPillar; shared: string[]; distinct: string[] } | null {
-  let best: { pillar: BusinessPillar; shared: string[]; distinct: string[] } | null = null
+/** A pillar's CORE anchor head — the first distinctive (construct-state) token. */
+function anchorHeadOf(pillar: BusinessPillar): string | null {
+  return topicSignature(pillar.source, 'informational').head
+}
+/** Two canonical tokens are the same head (proclitic-tolerant, existing helper only). */
+function sameHead(a: string, b: string): boolean {
+  return a === b || canonicalVariants(a).includes(b) || canonicalVariants(b).includes(a)
+}
+/** Owned NON-product source types that may corroborate a single-token / focus anchor. */
+const CORROBORATING_PILLAR_TYPES = new Set<PillarType>(['tracked_keyword', 'category', 'service', 'homepage'])
+/**
+ * True when `anchor` ALSO appears in at least one OTHER owned non-product source (a distinct
+ * row of type tracked/category/service/homepage). corroborated_project_focus never counts
+ * (it cannot corroborate itself or others); products / keyword-research / posts are not
+ * pillar sources at all. Deduped by unique source string (repeated duplicate rows count once).
+ */
+function anchorCorroborated(anchor: string, self: BusinessPillar, pillars: BusinessPillar[]): boolean {
+  const sources = new Set<string>()
+  for (const q of pillars) {
+    if (q === self || q.source === self.source) continue
+    if (!CORROBORATING_PILLAR_TYPES.has(q.type)) continue
+    if (Array.from(q.tokens).some((t) => sameHead(t, anchor))) sources.add(q.source)
+  }
+  return sources.size >= 1
+}
+/** May this pillar grant Tier 0? A SINGLE-token pillar or a project-focus pillar
+ *  additionally requires its anchor head to be independently corroborated. */
+function pillarEligibleForTier0(pillar: BusinessPillar, anchor: string | null, pillars: BusinessPillar[]): boolean {
+  if (!anchor) return false
+  const needsCorroboration = pillar.type === 'corroborated_project_focus' || pillar.tokens.size <= 1
+  return needsCorroboration ? anchorCorroborated(anchor, pillar, pillars) : true
+}
+/**
+ * Best VALID CORE-HEAD pillar match. Tier-0 alignment requires the candidate to contain the
+ * pillar's CORE ANCHOR HEAD (never merely a shared modifier/recipient/audience/attribute
+ * token), to add ≥1 distinctive token beyond that anchor, and the pillar to be eligible (a
+ * single-token or project-focus pillar must be independently corroborated). Reuses existing
+ * topicSignature / distinctiveTokensOf / canonicalVariants only — no new matcher.
+ */
+function matchCorePillar(subjectToks: string[], pillars: BusinessPillar[]): { pillar: BusinessPillar; anchor: string; shared: string[]; distinct: string[]; corroborated: boolean } | null {
+  let best: { pillar: BusinessPillar; anchor: string; shared: string[]; distinct: string[]; corroborated: boolean } | null = null
   for (const p of pillars) {
-    const shared = subjectToks.filter((t) => p.tokens.has(t) || canonicalVariants(t).some((v) => p.tokens.has(v)))
-    if (shared.length === 0) continue
-    const distinct = subjectToks.filter((t) => !p.tokens.has(t) && !canonicalVariants(t).some((v) => p.tokens.has(v)))
-    if (distinct.length === 0) continue // a bare pillar restatement adds no new need
-    if (!best || shared.length > best.shared.length) best = { pillar: p, shared, distinct }
+    const anchor = anchorHeadOf(p)
+    if (!anchor || !pillarEligibleForTier0(p, anchor, pillars)) continue
+    // (2) the candidate must CONTAIN the pillar core anchor head (bidirectional canonical
+    // equivalence — a proclitic-prefixed candidate token like "בניאגרה" folds to "ניאגרה").
+    if (!subjectToks.some((t) => sameHead(t, anchor))) continue
+    // (3) it must add ≥1 distinctive token BEYOND that anchor (not a bare anchor restatement).
+    const distinct = subjectToks.filter((t) => !sameHead(t, anchor))
+    if (distinct.length === 0) continue
+    const cand = { pillar: p, anchor, shared: [anchor], distinct, corroborated: anchorCorroborated(anchor, p, pillars) }
+    // Prefer the most specific pillar (more tokens) for stable, informative diagnostics.
+    if (!best || p.tokens.size > best.pillar.tokens.size) best = cand
   }
   return best
 }
 
 /**
  * Assign exactly ONE synthesis priority tier to a brief (pure). NEVER removes a brief.
- *   TIER 0 — from KR/tracked/focus, shares a token with a verified non-product pillar AND
- *            adds a distinct modifier, and is not a local-commercial/store/price/delivery.
- *   TIER 2 — product-shaped (product-affine) or a direct commercial/local query.
- *   TIER 1 — any other independent article opportunity.
+ * Decision order (products/commercial precede pillar alignment):
+ *   (1) productAffinity=true                  → Tier 2 / product_shaped
+ *   (2) local-commercial OR commercial family → Tier 2 / direct_commercial
+ *   (3) valid CORE-HEAD pillar match + query/focus source → Tier 0 / pillar_aligned_distinct_need
+ *   (4) otherwise                             → Tier 1 / independent_article_need
  */
 export function classifyBriefPriority(b: OpportunityBrief, pillars: BusinessPillar[]): BriefPriority {
   const kind = b.sourceEvidence[0]?.kind ?? 'unknown'
@@ -276,14 +328,24 @@ export function classifyBriefPriority(b: OpportunityBrief, pillars: BusinessPill
   const toks = distinctiveTokensOf(b.subject)
   const productAffinity = classifyCandidateSourceRole(b).role === 'support_only_product'
   const isLocalCommercial = b.searchNeed === 'local_commercial'
-  const best = matchPillar(toks, pillars)
-  const meta = { matchedPillar: best?.pillar.source ?? null, matchedPillarType: best?.pillar.type ?? null, matchedPillarTokens: best?.shared ?? [], distinctModifierTokens: best?.distinct ?? [], productAffinity, finalSynthesisRank: -1 }
-  if (fromQueryOrFocus && best && !isLocalCommercial) {
-    return { tier: 0, reason: `pillar_aligned_distinct_need:${best.pillar.type}`, ...meta }
+  const best = matchCorePillar(toks, pillars)
+  const meta = {
+    matchedPillar: best?.pillar.source ?? null,
+    matchedPillarType: best?.pillar.type ?? null,
+    matchedPillarTokens: best?.shared ?? [],
+    distinctModifierTokens: best?.distinct ?? [],
+    matchedPillarAnchorHead: best?.anchor ?? null,
+    pillarAnchorCorroborated: best?.corroborated ?? false,
+    productAffinity,
+    finalSynthesisRank: -1,
   }
-  if (productAffinity || isLocalCommercial || b.family === 'commercial') {
-    return { tier: 2, reason: productAffinity ? 'product_shaped' : 'direct_commercial', ...meta }
-  }
+  // (1) product precedence — a product-shaped candidate is NEVER Tier 0.
+  if (productAffinity) return { tier: 2, reason: 'product_shaped', ...meta }
+  // (2) direct commercial / local precedence.
+  if (isLocalCommercial || b.family === 'commercial') return { tier: 2, reason: 'direct_commercial', ...meta }
+  // (3) only NOW: a VALID core-head pillar match from a query/focus source → Tier 0.
+  if (fromQueryOrFocus && best) return { tier: 0, reason: `pillar_aligned_distinct_need:${best.pillar.type}`, ...meta }
+  // (4) otherwise.
   return { tier: 1, reason: 'independent_article_need', ...meta }
 }
 
@@ -472,6 +534,8 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
         matchedPillarType: b.priority?.matchedPillarType ?? null,
         matchedPillarTokens: b.priority?.matchedPillarTokens ?? [],
         distinctModifierTokens: b.priority?.distinctModifierTokens ?? [],
+        matchedPillarAnchorHead: b.priority?.matchedPillarAnchorHead ?? null,
+        pillarAnchorCorroborated: b.priority?.pillarAnchorCorroborated ?? false,
         productAffinity: b.priority?.productAffinity ?? false,
         finalSynthesisRank: b.priority?.finalSynthesisRank ?? -1,
       })),

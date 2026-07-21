@@ -1,13 +1,15 @@
 /**
- * SOFT synthesis-batch priority (Best Gifts follow-up) — non-destructive tiering.
+ * SOFT synthesis-batch priority — CORE-HEAD pillar correction (two proven defects).
  *
- * Replaces the hard product-admission rejection with a pure deterministic REORDER at the
- * pool→synthesis boundary. No brief is added or removed: every brief that passes the
- * existing ownership/coverage/pending/semantic-duplicate gates stays in the pool. Order:
- * Tier 0 (pillar-aligned distinct need) → Tier 1 (other independent article) → Tier 2
- * (product-shaped/commercial), each ordered by the existing briefScore desc → opportunityId,
- * with the existing family round-robin applied INSIDE each tier. Pillars come only from
- * owned NON-product evidence (tracked/category/service/homepage/corroborated focus).
+ * (A) Product/commercial precedence now runs BEFORE Tier-0 pillar alignment, so a
+ *     productAffinity=true candidate is never Tier 0. (B) Tier-0 pillar alignment now
+ *     requires the candidate to contain the pillar's CORE ANCHOR HEAD — a shared
+ *     recipient/audience/attribute modifier (לילד / לגבר) can no longer create Tier 0.
+ *     (C) A single-token category/service/homepage pillar (or a project-focus pillar)
+ *     grants Tier 0 only when its anchor head is independently corroborated by another
+ *     owned non-product source. Non-destructive: no brief is added or removed; pool
+ *     membership and all frozen gates are unchanged. Reuses topicSignature /
+ *     distinctiveTokensOf / canonicalVariants only.
  */
 import { buildBriefPool, prioritizeBriefsForSynthesis, buildBusinessPillars } from '../recommendations/opportunity-brief'
 
@@ -26,87 +28,97 @@ const base = (o: Opts = {}): Parameters<typeof buildBriefPool>[0] => ({
 const subs = (r: ReturnType<typeof buildBriefPool>) => r.pool.map((b) => b.subject)
 const rej = (r: ReturnType<typeof buildBriefPool>) => r.diagnostics.rejected_by_reason
 const bp = (r: ReturnType<typeof buildBriefPool>) => r.diagnostics.brief_priority ?? []
-const tierOf = (r: ReturnType<typeof buildBriefPool>, subject: string) => bp(r).find((p) => p.subject === subject)?.tier
-const rankOf = (r: ReturnType<typeof buildBriefPool>, subject: string) => bp(r).find((p) => p.subject === subject)?.finalSynthesisRank ?? -1
+const rec = (r: ReturnType<typeof buildBriefPool>, s: string) => bp(r).find((p) => p.subject === s)
 
 function main() {
-  console.log('A) BROAD ECOMMERCE PILLAR — recipient long-tails Tier 0, products/store/delivery Tier 2')
+  console.log('A) PRODUCT PRECEDENCE — a productAffinity candidate is never Tier 0')
   {
-    const gifts = ['מתנות לגבר', 'מתנות לאישה', 'מתנות לילדים', 'מתנות לעסקים', 'מתנות לסבא', 'מתנות לאמא בת 60']
-    const all = [...gifts, 'חנות מתנות', 'משלוח מתנות', 'מכונת סוכר ביתית', 'גלובוס כדור הארץ']
-    const r = buildBriefPool(base({ keywordResearch: kr(all), entities: [{ name: 'מתנות', url: '/c/gifts', type: 'category' }, { name: 'מכונת סוכר ביתית מקצועית', url: '/p/1', type: 'product' }, { name: 'גלובוס כדור הארץ מואר', url: '/p/2', type: 'product' }] }))
-    check('A. all 10 distinct candidates REMAIN in the pool (no hard rejection)', all.every((q) => subs(r).includes(q)) && r.pool.length === 10)
-    check('A. no subject_head_cap and no product_entity_support_only rejection', !('subject_head_cap' in rej(r)) && !('product_entity_support_only' in rej(r)))
-    check('A. the six recipient/audience needs are Tier 0', gifts.every((g) => tierOf(r, g) === 0))
-    check('A. חנות מתנות and משלוח מתנות are NOT Tier 0 (local-commercial)', tierOf(r, 'חנות מתנות') !== 0 && tierOf(r, 'משלוח מתנות') !== 0)
-    check('A. bare product candidates are Tier 2 (strongly product-affiliated)', tierOf(r, 'מכונת סוכר ביתית') === 2 && tierOf(r, 'גלובוס כדור הארץ') === 2)
-    const maxTier0 = Math.max(...gifts.map((g) => rankOf(r, g)))
-    const minTier2 = Math.min(rankOf(r, 'מכונת סוכר ביתית'), rankOf(r, 'גלובוס כדור הארץ'), rankOf(r, 'חנות מתנות'), rankOf(r, 'משלוח מתנות'))
-    check('A. every Tier-0 candidate ranks before every Tier-2 candidate', maxTier0 < minTier2, `maxT0=${maxTier0} minT2=${minTier2}`)
+    const r = buildBriefPool(base({ keywordResearch: kr(['רחפן לילדים עם מצלמה']), trackedKeywords: ['מתנות קטנות לילדות'], entities: [{ name: 'רחפן עם מצלמה לילדים', url: '/p/1', type: 'product' }] }))
+    const p = rec(r, 'רחפן לילדים עם מצלמה')
+    check('A. candidate remains in the pool', subs(r).includes('רחפן לילדים עם מצלמה'))
+    check('A. productAffinity=true → Tier 2 / product_shaped, never Tier 0', !!p && p.productAffinity === true && p.tier === 2 && p.priorityReason === 'product_shaped')
+    check('A. product remains available in relatedEntities', (r.pool.find((b) => b.subject === 'רחפן לילדים עם מצלמה')?.relatedEntities ?? []).some((e) => e.type === 'product'))
+    check('A. no new rejection', !('product_entity_support_only' in rej(r)))
   }
 
-  console.log('B) FALSE-POSITIVE REGRESSION — מארזים למשלוח stays in the pool, never product-rejected')
+  console.log('B) MODIFIER-ONLY — a shared recipient/audience modifier cannot grant Tier 0')
   {
-    const r = buildBriefPool(base({ keywordResearch: kr(['מארזים למשלוח']), entities: [{ name: 'מארז כוסות וויסקי', url: '/p/1', type: 'product' }] }))
-    check('B. candidate remains in the pool; not rejected because of the product', subs(r).includes('מארזים למשלוח') && !('product_entity_support_only' in rej(r)))
-    check('B. productAffinity is FALSE (single shared token מארז never qualifies)', bp(r).find((p) => p.subject === 'מארזים למשלוח')?.productAffinity === false)
+    const r = buildBriefPool(base({ keywordResearch: kr(['מכונת שערות סבתא לילדים', 'מוצרים לגבר']), trackedKeywords: ['מתנות קטנות לילדות'], entities: [{ name: 'מתנות לגבר', url: '/c/men', type: 'category' }] }))
+    const a = rec(r, 'מכונת שערות סבתא לילדים'); const b2 = rec(r, 'מוצרים לגבר')
+    check('B. both remain in the pool', subs(r).includes('מכונת שערות סבתא לילדים') && subs(r).includes('מוצרים לגבר'))
+    check('B. neither is Tier 0 (modifier-only לילד / לגבר)', a?.tier !== 0 && b2?.tier !== 0)
+    check('B. matchedPillarAnchorHead is not satisfied (null)', a?.matchedPillarAnchorHead === null && b2?.matchedPillarAnchorHead === null)
   }
 
-  console.log('C) INDEPENDENT PRODUCT-RELATED NEED — question outranks bare product; product preserved')
+  console.log('C) VALID GIFT CORE — candidates that contain the מתנות anchor + a distinct token → Tier 0')
   {
-    const bare = buildBriefPool(base({ keywordResearch: kr(['מנורת פלזמה']), entities: [{ name: 'מנורת פלזמה כדור חשמלי RGB', url: '/p/1', type: 'product' }] }))
-    check('C. bare product phrase remains eligible and is Tier 2 (product-affine)', subs(bare).includes('מנורת פלזמה') && tierOf(bare, 'מנורת פלזמה') === 2)
-    const q = buildBriefPool(base({ keywordResearch: kr(['איך פועלת מנורת פלזמה', 'מנורת שולחן']), entities: [{ name: 'מנורת פלזמה כדור חשמלי RGB', url: '/p/1', type: 'product' }] }))
-    check('C. the independent question is a higher tier (0/1) than a bare product', (tierOf(q, 'איך פועלת מנורת פלזמה') ?? 2) < 2)
-    check('C. an admitted product-related article keeps the product in relatedEntities', (q.pool.find((b) => b.subject === 'איך פועלת מנורת פלזמה')?.relatedEntities ?? []).some((e) => e.type === 'product'))
-    // NOTE: bare phrase + "איך פועלת …" together collapse via the FROZEN semantic-dup — an
-    // EXISTING blocker, not the product rule; here they are tested apart to show eligibility.
+    const cands = ['מתנות שאפשר להכין בבית', 'מתנות לאמא בת 60', 'מתנות לעסקים', 'מתנות לחינה', 'מתנות מגניבות לגבר']
+    const r = buildBriefPool(base({ keywordResearch: kr([...cands, 'מכונת סוכר ביתית']), trackedKeywords: ['מתנות קטנות לילדות'], entities: [{ name: 'מתנות לגבר', url: '/c/men', type: 'category' }, { name: 'מכונת סוכר ביתית פרו', url: '/p/1', type: 'product' }] }))
+    check('C. all 5 gift core extensions are Tier 0 and match the מתנ anchor', cands.every((c) => { const p = rec(r, c); return p?.tier === 0 && p?.matchedPillarAnchorHead === 'מתנ' }), JSON.stringify(cands.map((c) => [c, rec(r, c)?.tier])))
+    check('C. all remain in the pool', cands.every((c) => subs(r).includes(c)))
+    const maxT0 = Math.max(...cands.map((c) => rec(r, c)!.finalSynthesisRank))
+    const t2 = rec(r, 'מכונת סוכר ביתית')
+    check('C. Tier-0 gift extensions rank before the Tier-2 product', !!t2 && t2.tier === 2 && maxT0 < t2.finalSynthesisRank)
   }
 
-  console.log('D) NARROW SERVICE — brand variants still collapse; distinct needs separate; no product logic')
+  console.log('D) SINGLE-WORD NOISE PILLAR — uncorroborated single-token category never grants Tier 0')
   {
-    const r = buildBriefPool(base({ keywordResearch: kr(['תיקון ניאגרה סמויה jomo', 'תיקון ניאגרה סמויה oli', 'תיקון ניאגרה סמויה פלסאון', 'נזילה באסלה', 'מצוף ניאגרה', 'כפתור ניאגרה', 'החלפת ניאגרה']), entities: [{ name: 'ניאגרה סמויה', url: '/c/n', type: 'category' }] }))
-    check('D. brand variants still collapse via semantic-dup (2 rejected), no product rule used', (rej(r).brief_semantic_duplicate ?? 0) === 2 && !('product_entity_support_only' in rej(r)))
-    check('D. distinct problem/task needs remain separate in the pool', ['מצוף ניאגרה', 'כפתור ניאגרה', 'החלפת ניאגרה', 'נזילה באסלה'].every((q) => subs(r).includes(q)))
+    const cands = ['one sport', 'sport live streaming', 'sport center', '808 sport']
+    const r = buildBriefPool(base({ keywordResearch: kr(cands), entities: [{ name: 'sport', url: '/c/sport', type: 'category' }] }))
+    check('D. all remain in the pool', cands.every((c) => subs(r).includes(c)))
+    check('D. none receives Tier 0 from the uncorroborated single-word pillar; matchedPillar null', cands.every((c) => { const p = rec(r, c); return p?.tier !== 0 && p?.matchedPillar === null }))
+    check('D. no off-domain rejection introduced', Object.keys(rej(r)).length === 0)
   }
 
-  console.log('E) FASHION — relevant briefs Tier 0/1; off-domain sport/Ronaldo get NO pillar priority')
+  console.log('E) RELEVANT FASHION CORE — בגדי core is verified; sport noise does not gain the same priority')
   {
-    const r = buildBriefPool(base({ keywordResearch: kr(['בגדי נשים אונליין', 'שמלות כלה יד שנייה', 'איך לשלב בגד גוף', 'sport live 365', 'ronaldo messi']), entities: [{ name: 'בגדי נשים', url: '/c/women', type: 'category' }, { name: 'בגדי יד שנייה', url: '/c/second', type: 'category' }] }))
-    check('E. no fashion candidate lost; all 5 remain in the pool', r.pool.length === 5)
-    check('E. relevant fashion briefs rank in Tier 0/1', (tierOf(r, 'בגדי נשים אונליין') ?? 9) <= 1 && (tierOf(r, 'שמלות כלה יד שנייה') ?? 9) <= 1 && (tierOf(r, 'איך לשלב בגד גוף') ?? 9) <= 1)
-    check('E. off-domain sport/Ronaldo evidence gets NO pillar alignment (matchedPillar null, never Tier 0)',
-      bp(r).find((p) => p.subject === 'sport live 365')?.matchedPillar === null && tierOf(r, 'sport live 365') !== 0 && bp(r).find((p) => p.subject === 'ronaldo messi')?.matchedPillar === null && tierOf(r, 'ronaldo messi') !== 0)
+    const r = buildBriefPool(base({ keywordResearch: kr(['בגדי ספורט נשים', 'בגדי ספורט לנשים', 'שמלות כלה יד שנייה', 'sport live streaming']), trackedKeywords: ['חנות בגדי יד שנייה'], entities: [{ name: 'בגדי נשים', url: '/c/women', type: 'category' }, { name: 'sport', url: '/c/sport', type: 'category' }] }))
+    check('E. בגדי ספורט candidates receive Tier 0 through the verified בגדי core', rec(r, 'בגדי ספורט נשים')?.tier === 0 && rec(r, 'בגדי ספורט לנשים')?.tier === 0)
+    check('E. relevant fashion retained at Tier 0/1 (not demoted to Tier 2)', (rec(r, 'שמלות כלה יד שנייה')?.tier ?? 9) <= 1)
+    check('E. off-domain sport does NOT gain בגדי/pillar priority (not Tier 0)', rec(r, 'sport live streaming')?.tier !== 0)
+    check('E. no fashion candidate lost', ['בגדי ספורט נשים', 'בגדי ספורט לנשים', 'שמלות כלה יד שנייה'].every((c) => subs(r).includes(c)))
   }
 
-  console.log('F) POOL IDENTITY — prioritize returns the SAME briefs, same count, only order changes')
+  console.log('F) SERVICE DOMAIN — multi-token pillar core head; brand variants still collapse (frozen)')
   {
-    const r = buildBriefPool(base({ keywordResearch: kr(['מתנות לגבר', 'מכונת סוכר ביתית', 'איך לבחור רחפן', 'חנות מתנות', 'מתנות לאישה']), entities: [{ name: 'מתנות', url: '/c/g', type: 'category' }, { name: 'מכונת סוכר ביתית פרו', url: '/p/1', type: 'product' }] }))
+    const r = buildBriefPool(base({ keywordResearch: kr(['מצוף ניאגרה', 'כפתור ניאגרה', 'מנגנון ניאגרה ישן', 'נזילה בניאגרה סמויה', 'תיקון ניאגרה סמויה jomo', 'תיקון ניאגרה סמויה oli', 'תיקון ניאגרה סמויה פלסאון']), entities: [{ name: 'ניאגרה סמויה', url: '/c/n', type: 'category' }] }))
+    check('F. distinct problem/component needs are Tier 0 via the ניאגרה core head', ['מצוף ניאגרה', 'כפתור ניאגרה', 'מנגנון ניאגרה ישן', 'נזילה בניאגרה סמויה'].every((c) => rec(r, c)?.tier === 0))
+    check('F. Jomo/OLI/Plasson brand variants still collapse via semantic-dup (unchanged)', (rej(r).brief_semantic_duplicate ?? 0) === 2)
+  }
+
+  console.log('G) PRODUCT QUESTION — productAffinity does not force a genuine question to Tier 2')
+  {
+    const bareR = buildBriefPool(base({ keywordResearch: kr(['מתנה בקופסה']), entities: [{ name: 'מתנה בקופסה מיוחדת', url: '/p/1', type: 'product' }] }))
+    check('G. a bare product phrase is Tier 2 when productAffinity=true', rec(bareR, 'מתנה בקופסה')?.tier === 2 && rec(bareR, 'מתנה בקופסה')?.productAffinity === true)
+    // The genuine question, with a corroborated מתנות core (category + tracked), is NOT forced
+    // to Tier 2 by productAffinity (it is not product-affine) and validly contains the core.
+    const qR = buildBriefPool(base({ keywordResearch: kr(['איך לבחור מתנה בקופסה']), trackedKeywords: ['מתנות מקוריות'], entities: [{ name: 'מתנות לכל אירוע', url: '/c/gifts', type: 'category' }, { name: 'מתנה בקופסה מיוחדת', url: '/p/1', type: 'product' }] }))
+    const q = rec(qR, 'איך לבחור מתנה בקופסה')
+    check('G. the genuine question is NOT Tier 2 (not forced by productAffinity)', !!q && q.tier !== 2 && q.productAffinity === false)
+    check('G. neither candidate removed', subs(bareR).includes('מתנה בקופסה') && subs(qR).includes('איך לבחור מתנה בקופסה'))
+  }
+
+  console.log('H) POOL IDENTITY — same opportunityId set + count; only tier/order metadata changes')
+  {
+    const r = buildBriefPool(base({ keywordResearch: kr(['מתנות לגבר', 'מכונת סוכר ביתית', 'איך לבחור רחפן', 'חנות מתנות', 'מתנות מגניבות לילדים']), trackedKeywords: ['מתנות קטנות לילדות'], entities: [{ name: 'מתנות לגבר', url: '/c/g', type: 'category' }, { name: 'מכונת סוכר ביתית פרו', url: '/p/1', type: 'product' }] }))
     const before = r.pool.map((b) => b.opportunityId)
-    const pillars = buildBusinessPillars({ trackedKeywords: [], projectFocus: [], entities: [{ name: 'מתנות', url: '/c/g', type: 'category' }] })
+    const pillars = buildBusinessPillars({ trackedKeywords: ['מתנות קטנות לילדות'], projectFocus: [], entities: [{ name: 'מתנות לגבר', url: '/c/g', type: 'category' }] })
     const reordered = prioritizeBriefsForSynthesis(r.pool.slice().reverse(), { pillars })
     const after = reordered.map((b) => b.opportunityId)
-    check('F. exact same SET of pool member ids before/after prioritization', before.length === after.length && new Set(before).size === new Set([...before, ...after]).size)
-    check('F. exact same COUNT (no additions, no removals)', before.length === after.length && after.length === 5)
-    check('F. every brief has exactly one rank (0..n-1, unique)', (() => { const ranks = reordered.map((b) => b.priority?.finalSynthesisRank); return new Set(ranks).size === ranks.length && ranks.every((x) => typeof x === 'number' && x >= 0 && x < ranks.length) })())
-    check('F. every brief carries exactly one tier ∈ {0,1,2}', reordered.every((b) => [0, 1, 2].includes(b.priority?.tier as number)))
+    check('H. exact same SET of opportunityIds before/after', new Set(before).size === new Set([...before, ...after]).size && before.length === after.length)
+    check('H. exact same COUNT, no new rejection', before.length === after.length && !('product_entity_support_only' in rej(r)))
+    check('H. every brief has exactly one unique rank 0..n-1 and one tier', (() => { const rk = reordered.map((b) => b.priority?.finalSynthesisRank); return new Set(rk).size === rk.length && rk.every((x) => typeof x === 'number' && x! >= 0 && x! < rk.length) && reordered.every((b) => [0, 1, 2].includes(b.priority?.tier as number)) })())
   }
 
-  console.log('PILLARS) built only from owned NON-product evidence (never products / KR-alone)')
+  console.log('CORROBORATION) single-token pillar needs an independent owned non-product source')
   {
-    const pillars = buildBusinessPillars({ trackedKeywords: ['מתנות מקוריות'], projectFocus: ['מתנות', 'משהו לא קשור'], entities: [{ name: 'מתנות לגבר', url: '/c/men', type: 'category' }, { name: 'שירות עטיפה', url: '/s/wrap', type: 'service' }, { name: 'מנורת פלזמה', url: '/p/1', type: 'product' }, { name: 'דף הבית', url: 'https://shop.example.co.il/', type: 'page' }] })
-    check('includes tracked_keyword / category / service / homepage', pillars.some((p) => p.type === 'tracked_keyword') && pillars.some((p) => p.type === 'category') && pillars.some((p) => p.type === 'service') && pillars.some((p) => p.type === 'homepage'))
-    check('a PRODUCT is NEVER a pillar', !pillars.some((p) => p.source === 'מנורת פלזמה'))
-    check('project focus is a pillar ONLY when corroborated (מתנות corroborated; unrelated term excluded)',
-      pillars.some((p) => p.type === 'corroborated_project_focus' && p.source === 'מתנות') && !pillars.some((p) => p.source === 'משהו לא קשור'))
-  }
-
-  console.log('TRACE) generate-from-briefs would prove admitted-in === admitted-out (rank/consumed fields present)')
-  {
-    // finalSynthesisRank is contiguous over the whole pool → in===out by construction.
-    const r = buildBriefPool(base({ keywordResearch: kr(['מתנות לגבר', 'מתנות לאישה', 'מכונת סוכר ביתית']), entities: [{ name: 'מתנות', url: '/c/g', type: 'category' }] }))
-    const ranks = bp(r).map((p) => p.finalSynthesisRank).sort((a, b) => a - b)
-    check('every admitted brief has a unique contiguous rank 0..n-1', ranks.length === r.pool.length && ranks.every((x, i) => x === i))
+    // ריהוט (single-token category) IS corroborated by the tracked keyword "ריהוט משרדי"
+    // (same canonical anchor ריהוט); the single-token category "sport" has NO corroborator.
+    const pillars = buildBusinessPillars({ trackedKeywords: ['ריהוט משרדי'], projectFocus: [], entities: [{ name: 'ריהוט', url: '/c/f', type: 'category' }, { name: 'sport', url: '/c/s', type: 'category' }] })
+    const r = buildBriefPool(base({ keywordResearch: kr(['ריהוט לחדר ילדים', 'sport live streaming']), trackedKeywords: ['ריהוט משרדי'], entities: [{ name: 'ריהוט', url: '/c/f', type: 'category' }, { name: 'sport', url: '/c/s', type: 'category' }] }))
+    check('corroborated single-token ריהוט → its extension is Tier 0 (anchor independently corroborated)', rec(r, 'ריהוט לחדר ילדים')?.tier === 0 && rec(r, 'ריהוט לחדר ילדים')?.pillarAnchorCorroborated === true)
+    check('uncorroborated single-token sport → its extension is NOT Tier 0', rec(r, 'sport live streaming')?.tier !== 0)
+    check('pillars built from owned non-product sources (category + tracked present)', pillars.some((p) => p.type === 'category') && pillars.some((p) => p.type === 'tracked_keyword'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
