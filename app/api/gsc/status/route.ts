@@ -7,7 +7,7 @@
  */
 import { authContentProject } from '@/lib/content/api-auth'
 import { isGscReadOnlyEnabled, isGscOAuthConfigured } from '@/lib/gsc/config'
-import { loadUserConnection, loadProjectProperty, latestSucceededRun, sanitizeConnection } from '@/lib/gsc/service'
+import { loadUserConnection, loadProjectProperty, latestSucceededRun, sanitizeConnection, GscServiceError } from '@/lib/gsc/service'
 import { GSC_WINDOWS, type GscWindowDays } from '@/lib/gsc/sync'
 import type { GscSyncRun } from '@/lib/supabase/types'
 
@@ -43,20 +43,26 @@ export async function GET(request: Request) {
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  const connection = await loadUserConnection(auth.admin, auth.user.id)
-  const property = await loadProjectProperty(auth.admin, auth.project.id)
+  try {
+    const connection = await loadUserConnection(auth.admin, auth.user.id)
+    const property = await loadProjectProperty(auth.admin, auth.project.id)
 
-  const windows: Record<string, ReturnType<typeof summaryCard>> = {}
-  if (property) {
-    const runs = await Promise.all(GSC_WINDOWS.map((w) => latestSucceededRun(auth.admin, auth.project.id, w as GscWindowDays)))
-    GSC_WINDOWS.forEach((w, i) => { windows[String(w)] = summaryCard(runs[i]) })
+    const windows: Record<string, ReturnType<typeof summaryCard>> = {}
+    if (property) {
+      const runs = await Promise.all(GSC_WINDOWS.map((w) => latestSucceededRun(auth.admin, auth.project.id, w as GscWindowDays)))
+      GSC_WINDOWS.forEach((w, i) => { windows[String(w)] = summaryCard(runs[i]) })
+    }
+
+    return Response.json({
+      ok: true,
+      oauthConfigured: isGscOAuthConfigured(),
+      connection: sanitizeConnection(connection),
+      property: property ? { siteUrl: property.site_url, permissionLevel: property.permission_level, selectedAt: property.selected_at } : null,
+      windows,
+    })
+  } catch (e) {
+    // A DB read failure must NOT be shown as "no connection / no property / empty windows".
+    if (e instanceof GscServiceError) return Response.json({ ok: false, error: e.code }, { status: e.status })
+    return Response.json({ ok: false, error: 'gsc_error' }, { status: 500 })
   }
-
-  return Response.json({
-    ok: true,
-    oauthConfigured: isGscOAuthConfigured(),
-    connection: sanitizeConnection(connection),
-    property: property ? { siteUrl: property.site_url, permissionLevel: property.permission_level, selectedAt: property.selected_at } : null,
-    windows,
-  })
 }

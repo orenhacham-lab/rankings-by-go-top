@@ -26,7 +26,14 @@ export async function POST(request: Request) {
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
   if (!siteUrl) return Response.json({ ok: false, error: 'site_url_required' }, { status: 400 })
 
-  const connection = await loadUserConnection(auth.admin, auth.user.id)
+  let connection
+  try {
+    // A DB read failure throws here (never silently reported as not_connected).
+    connection = await loadUserConnection(auth.admin, auth.user.id)
+  } catch (e) {
+    if (e instanceof GscServiceError) return Response.json({ ok: false, error: e.code }, { status: e.status })
+    return Response.json({ ok: false, error: 'gsc_error' }, { status: 500 })
+  }
   if (!connection) return Response.json({ ok: false, error: 'not_connected' }, { status: 409 })
 
   const { data: proj } = await auth.admin.from('projects').select('target_domain').eq('id', auth.project.id).maybeSingle()

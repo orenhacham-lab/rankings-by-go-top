@@ -24,15 +24,19 @@ export class GscServiceError extends Error {
   constructor(code: string, status: number, message: string) { super(message); this.name = 'GscServiceError'; this.code = code; this.status = status }
 }
 
-/** The single Google connection owned by this user (E1: one connection per user). */
+/** The single Google connection owned by this user (E1: one connection per user). A NULL
+ *  return means "no connection"; a DATABASE error is surfaced (never conflated with none). */
 export async function loadUserConnection(admin: Admin, userId: string): Promise<GscConnection | null> {
-  const { data } = await admin.from('gsc_connections').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  const { data, error } = await admin.from('gsc_connections').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw new GscServiceError('connection_read_failed', 500, 'Could not read the Google connection.')
   return (data as GscConnection | null) ?? null
 }
 
-/** The project's assigned property (or null). */
+/** The project's assigned property, or NULL when none. A DATABASE error is surfaced
+ *  (never interpreted as "no property assigned"). */
 export async function loadProjectProperty(admin: Admin, projectId: string): Promise<ProjectGscProperty | null> {
-  const { data } = await admin.from('project_gsc_properties').select('*').eq('project_id', projectId).maybeSingle()
+  const { data, error } = await admin.from('project_gsc_properties').select('*').eq('project_id', projectId).maybeSingle()
+  if (error) throw new GscServiceError('property_read_failed', 500, 'Could not read the assigned property.')
   return (data as ProjectGscProperty | null) ?? null
 }
 
@@ -86,7 +90,10 @@ export async function getAccessTokenForConnection(admin: Admin, connection: GscC
     return tok.accessToken
   } catch (e) {
     if (e instanceof GscOAuthError && e.code === 'reauth_required') {
-      await admin.from('gsc_connections').update({ status: 'reauth_required', last_error_code: 'invalid_grant', last_error_message: 'Google authorization expired or was revoked.', updated_at: new Date().toISOString() }).eq('id', connection.id)
+      // Persist the reauth state. We never return a token after invalid_grant; if we cannot
+      // even record the state, surface a sanitized server error (no token/DB message logged).
+      const { error: updErr } = await admin.from('gsc_connections').update({ status: 'reauth_required', last_error_code: 'invalid_grant', last_error_message: 'Google authorization expired or was revoked.', updated_at: new Date().toISOString() }).eq('id', connection.id)
+      if (updErr) throw new GscServiceError('reauth_state_store_failed', 500, 'Could not record the reauthorization state.')
       throw new GscServiceError('reauth_required', 409, 'Google authorization expired; reconnect required.')
     }
     const code = e instanceof GscOAuthError ? e.code : 'oauth_error'
@@ -98,7 +105,8 @@ export async function getAccessTokenForConnection(admin: Admin, connection: GscC
 export async function authorizeProjectGsc(admin: Admin, projectId: string, userId: string): Promise<{ property: ProjectGscProperty; connection: GscConnection }> {
   const property = await loadProjectProperty(admin, projectId)
   if (!property) throw new GscServiceError('no_property_assigned', 409, 'No Search Console property is assigned to this project.')
-  const { data: conn } = await admin.from('gsc_connections').select('*').eq('id', property.connection_id).maybeSingle()
+  const { data: conn, error: connErr } = await admin.from('gsc_connections').select('*').eq('id', property.connection_id).maybeSingle()
+  if (connErr) throw new GscServiceError('connection_read_failed', 500, 'Could not read the Google connection.')
   const connection = conn as GscConnection | null
   if (!connection) throw new GscServiceError('connection_missing', 409, 'The Google connection no longer exists.')
   if (connection.user_id !== userId) throw new GscServiceError('forbidden', 403, 'This connection does not belong to you.')
@@ -161,9 +169,11 @@ export function makeSyncStore(admin: Admin): SyncStore {
   }
 }
 
-/** Latest SUCCEEDED run for a project+window (diagnostics read only these). */
+/** Latest SUCCEEDED run for a project+window (diagnostics read only these). A NULL return
+ *  means "no succeeded run yet"; a DATABASE error is surfaced (never shown as empty data). */
 export async function latestSucceededRun(admin: Admin, projectId: string, windowDays: GscWindowDays) {
-  const { data } = await admin.from('gsc_sync_runs').select('*').eq('project_id', projectId).eq('window_days', windowDays).eq('status', 'succeeded').order('started_at', { ascending: false }).limit(1).maybeSingle()
+  const { data, error } = await admin.from('gsc_sync_runs').select('*').eq('project_id', projectId).eq('window_days', windowDays).eq('status', 'succeeded').order('started_at', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw new GscServiceError('run_read_failed', 500, 'Could not read the latest sync run.')
   return (data as import('@/lib/supabase/types').GscSyncRun | null) ?? null
 }
 

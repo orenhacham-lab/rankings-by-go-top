@@ -78,11 +78,24 @@ ALTER TABLE public.project_gsc_properties ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY project_gsc_properties_select ON public.project_gsc_properties
   FOR SELECT USING (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
+-- INSERT/UPDATE enforce that the caller owns the project AND the connection AND is the
+-- selector — so a browser client that learns another user's connection UUID can NEVER
+-- attach that connection to its own project (ownership, not UUID secrecy).
 CREATE POLICY project_gsc_properties_insert ON public.project_gsc_properties
-  FOR INSERT WITH CHECK (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (
+    project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    AND connection_id IN (SELECT id FROM public.gsc_connections WHERE user_id = auth.uid())
+    AND selected_by = auth.uid()
+  );
+-- USING guards ownership of the EXISTING row; WITH CHECK enforces all three conditions on
+-- the RESULTING row (so an update can't repoint connection_id to a foreign connection).
 CREATE POLICY project_gsc_properties_update ON public.project_gsc_properties
   FOR UPDATE USING (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()))
-  WITH CHECK (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
+  WITH CHECK (
+    project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
+    AND connection_id IN (SELECT id FROM public.gsc_connections WHERE user_id = auth.uid())
+    AND selected_by = auth.uid()
+  );
 CREATE POLICY project_gsc_properties_delete ON public.project_gsc_properties
   FOR DELETE USING (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
 CREATE POLICY project_gsc_properties_service ON public.project_gsc_properties
@@ -106,13 +119,19 @@ CREATE INDEX IF NOT EXISTS idx_gsc_oauth_states_expires ON public.gsc_oauth_stat
 
 ALTER TABLE public.gsc_oauth_states ENABLE ROW LEVEL SECURITY;
 
+-- The state row is bound to the INITIATING user; a browser client cannot create or mutate
+-- a state whose user_id is not its own (defense-in-depth over the server-side user binding).
 CREATE POLICY gsc_oauth_states_select ON public.gsc_oauth_states
-  FOR SELECT USING (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
+  FOR SELECT USING (user_id = auth.uid()
+    AND project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
 CREATE POLICY gsc_oauth_states_insert ON public.gsc_oauth_states
-  FOR INSERT WITH CHECK (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (user_id = auth.uid()
+    AND project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
 CREATE POLICY gsc_oauth_states_update ON public.gsc_oauth_states
-  FOR UPDATE USING (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()))
-  WITH CHECK (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
+  FOR UPDATE USING (user_id = auth.uid()
+    AND project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()))
+  WITH CHECK (user_id = auth.uid()
+    AND project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
 CREATE POLICY gsc_oauth_states_service ON public.gsc_oauth_states
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 

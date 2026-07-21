@@ -11,7 +11,7 @@
  */
 import { authContentProject } from '@/lib/content/api-auth'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
-import { latestSucceededRun } from '@/lib/gsc/service'
+import { latestSucceededRun, GscServiceError } from '@/lib/gsc/service'
 import { GSC_WINDOWS, type GscWindowDays } from '@/lib/gsc/sync'
 import { multiPageQueries, type GscMetricRow } from '@/lib/gsc/summary'
 
@@ -34,7 +34,14 @@ export async function GET(request: Request) {
   const page = Math.max(0, Number(url.searchParams.get('page')) || 0)
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(url.searchParams.get('pageSize')) || 50))
 
-  const run = await latestSucceededRun(auth.admin, auth.project.id, windowDays)
+  let run
+  try {
+    run = await latestSucceededRun(auth.admin, auth.project.id, windowDays)
+  } catch (e) {
+    // A DB failure must NOT masquerade as "no run / empty metrics".
+    if (e instanceof GscServiceError) return Response.json({ ok: false, error: e.code }, { status: e.status })
+    return Response.json({ ok: false, error: 'metrics_read_failed' }, { status: 500 })
+  }
   if (!run) return Response.json({ ok: true, run: null, rows: [], total: 0, page, pageSize })
 
   const runMeta = { runId: run.id, windowDays: run.window_days, startDate: run.start_date, endDate: run.end_date, truncated: run.truncated, latestAvailableDate: run.latest_available_date }

@@ -17,7 +17,14 @@ export async function GET(request: Request) {
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  const connection = await loadUserConnection(auth.admin, auth.user.id)
+  let connection
+  try {
+    // A DB read failure here throws (never silently "no connection").
+    connection = await loadUserConnection(auth.admin, auth.user.id)
+  } catch (e) {
+    if (e instanceof GscServiceError) return Response.json({ ok: false, error: e.code }, { status: e.status })
+    return Response.json({ ok: false, error: 'gsc_error' }, { status: 500 })
+  }
   if (!connection) return Response.json({ ok: true, connection: null, properties: [] })
 
   const { data: proj } = await auth.admin.from('projects').select('target_domain').eq('id', auth.project.id).maybeSingle()
