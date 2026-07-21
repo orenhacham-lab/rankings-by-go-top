@@ -93,8 +93,103 @@ export interface Database {
         Insert: Partial<Omit<ArticleInlineImage, 'id' | 'created_at' | 'updated_at'>> & { user_id: string; project_id: string; article_id: string; section_id: string }
         Update: Partial<Omit<ArticleInlineImage, 'id' | 'created_at'>>
       }
+      // Stage E1 — Google Search Console read-only ingestion (disconnected from recommendations).
+      gsc_connections: {
+        Row: GscConnection
+        Insert: Partial<Omit<GscConnection, 'id' | 'created_at' | 'updated_at'>> & { user_id: string }
+        Update: Partial<Omit<GscConnection, 'id' | 'created_at'>>
+      }
+      project_gsc_properties: {
+        Row: ProjectGscProperty
+        Insert: Partial<Omit<ProjectGscProperty, 'selected_at' | 'updated_at'>> & { project_id: string; connection_id: string; site_url: string; selected_by: string }
+        Update: Partial<Omit<ProjectGscProperty, 'project_id'>>
+      }
+      gsc_oauth_states: {
+        Row: GscOAuthState
+        Insert: Partial<Omit<GscOAuthState, 'created_at'>> & { state_hash: string; user_id: string; project_id: string; expires_at: string }
+        Update: Partial<GscOAuthState>
+      }
+      gsc_sync_runs: {
+        Row: GscSyncRun
+        Insert: Partial<Omit<GscSyncRun, 'id' | 'started_at'>> & { sync_group_id: string; project_id: string; connection_id: string; site_url: string; window_days: 28 | 90 }
+        Update: Partial<Omit<GscSyncRun, 'id'>>
+      }
+      gsc_query_page_metrics: {
+        Row: GscQueryPageMetric
+        Insert: Partial<Omit<GscQueryPageMetric, 'created_at'>> & { sync_run_id: string; project_id: string; query: string; page: string }
+        Update: Partial<GscQueryPageMetric>
+      }
     }
   }
+}
+
+// ── Stage E1 — Google Search Console read-only ingestion types ────────────────
+export type GscConnectionStatus = 'connected' | 'reauth_required' | 'revoked' | 'error'
+export interface GscConnection {
+  id: string
+  user_id: string
+  /** AES-256-GCM encrypted OAuth refresh token (iv:tag:ciphertext hex). Never sent to the client. */
+  encrypted_refresh_token: string | null
+  encryption_version: number
+  granted_scope: string | null
+  status: GscConnectionStatus
+  last_error_code: string | null
+  last_error_message: string | null
+  created_at: string
+  updated_at: string
+}
+export interface ProjectGscProperty {
+  project_id: string
+  connection_id: string
+  /** Exact Search Console property id, e.g. 'sc-domain:example.com' or 'https://www.example.com/'. */
+  site_url: string
+  permission_level: string | null
+  selected_by: string
+  selected_at: string
+  updated_at: string
+}
+export interface GscOAuthState {
+  /** sha256 hex of the opaque one-time state (raw state never stored). */
+  state_hash: string
+  user_id: string
+  project_id: string
+  created_at: string
+  expires_at: string
+  consumed_at: string | null
+}
+export type GscSyncStatus = 'running' | 'succeeded' | 'failed'
+export interface GscSyncRun {
+  id: string
+  sync_group_id: string
+  project_id: string
+  connection_id: string
+  site_url: string
+  window_days: 28 | 90
+  start_date: string | null
+  end_date: string | null
+  status: GscSyncStatus
+  rows_fetched: number
+  api_batches: number
+  truncated: boolean
+  latest_available_date: string | null
+  total_clicks: number
+  total_impressions: number
+  weighted_position_sum: number
+  started_at: string
+  finished_at: string | null
+  sanitized_error_code: string | null
+  sanitized_error_message: string | null
+}
+export interface GscQueryPageMetric {
+  sync_run_id: string
+  project_id: string
+  query: string
+  page: string
+  clicks: number
+  impressions: number
+  ctr: number
+  position: number
+  created_at: string
 }
 
 // Phase 4D — persisted editable inline article image (owner/project scoped).
