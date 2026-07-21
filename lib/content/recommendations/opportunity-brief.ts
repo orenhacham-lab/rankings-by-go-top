@@ -265,51 +265,64 @@ function anchorHeadOf(pillar: BusinessPillar): string | null {
 function sameHead(a: string, b: string): boolean {
   return a === b || canonicalVariants(a).includes(b) || canonicalVariants(b).includes(a)
 }
-/** Owned NON-product source types that may corroborate a single-token / focus anchor. */
+/** Owned NON-product source TYPES that may corroborate an anchor head. */
 const CORROBORATING_PILLAR_TYPES = new Set<PillarType>(['tracked_keyword', 'category', 'service', 'homepage'])
+/** Source-authority order when several valid pillars share the same anchor (lower wins). */
+const PILLAR_AUTHORITY_ORDER: Record<PillarType, number> = { tracked_keyword: 0, category: 1, service: 2, homepage: 3, corroborated_project_focus: 4 }
 /**
- * True when `anchor` ALSO appears in at least one OTHER owned non-product source (a distinct
- * row of type tracked/category/service/homepage). corroborated_project_focus never counts
- * (it cannot corroborate itself or others); products / keyword-research / posts are not
- * pillar sources at all. Deduped by unique source string (repeated duplicate rows count once).
+ * INDEPENDENT anchor corroboration by a DIFFERENT owned non-product source TYPE. A
+ * corroborating source must (a) be one of tracked_keyword/category/service/homepage, (b) be
+ * a DIFFERENT type from the pillar being evaluated (two category rows never corroborate each
+ * other), and (c) carry the SAME anchor as ITS OWN topic head. project_focus / products /
+ * keyword-research / posts never corroborate. Counts independent TYPES, not source strings.
  */
-function anchorCorroborated(anchor: string, self: BusinessPillar, pillars: BusinessPillar[]): boolean {
-  const sources = new Set<string>()
+function anchorCorroboratedByType(anchor: string, self: BusinessPillar, pillars: BusinessPillar[]): boolean {
   for (const q of pillars) {
     if (q === self || q.source === self.source) continue
-    if (!CORROBORATING_PILLAR_TYPES.has(q.type)) continue
-    if (Array.from(q.tokens).some((t) => sameHead(t, anchor))) sources.add(q.source)
+    if (!CORROBORATING_PILLAR_TYPES.has(q.type) || q.type === self.type) continue
+    const qAnchor = anchorHeadOf(q)
+    if (qAnchor && sameHead(qAnchor, anchor)) return true
   }
-  return sources.size >= 1
+  return false
 }
-/** May this pillar grant Tier 0? A SINGLE-token pillar or a project-focus pillar
- *  additionally requires its anchor head to be independently corroborated. */
-function pillarEligibleForTier0(pillar: BusinessPillar, anchor: string | null, pillars: BusinessPillar[]): boolean {
-  if (!anchor) return false
-  const needsCorroboration = pillar.type === 'corroborated_project_focus' || pillar.tokens.size <= 1
-  return needsCorroboration ? anchorCorroborated(anchor, pillar, pillars) : true
+/** More authoritative pillar for the same anchor: source authority → specificity → stable. */
+function morePillarAuthority(a: BusinessPillar, b: BusinessPillar): boolean {
+  const ra = PILLAR_AUTHORITY_ORDER[a.type]; const rb = PILLAR_AUTHORITY_ORDER[b.type]
+  if (ra !== rb) return ra < rb
+  if (a.tokens.size !== b.tokens.size) return a.tokens.size > b.tokens.size
+  return a.source < b.source
 }
 /**
- * Best VALID CORE-HEAD pillar match. Tier-0 alignment requires the candidate to contain the
- * pillar's CORE ANCHOR HEAD (never merely a shared modifier/recipient/audience/attribute
- * token), to add ≥1 distinctive token beyond that anchor, and the pillar to be eligible (a
- * single-token or project-focus pillar must be independently corroborated). Reuses existing
- * topicSignature / distinctiveTokensOf / canonicalVariants only — no new matcher.
+ * Best VALID AUTHORITATIVE core-head pillar match. Tier-0 requires the candidate to contain
+ * the pillar's CORE ANCHOR HEAD (never merely a shared modifier/recipient/attribute token)
+ * and add ≥1 distinctive token beyond it, AND at least one authority condition:
+ *   (A) STRONG PILLAR OVERLAP — the candidate shares ≥2 distinctive pillar tokens (incl. the
+ *       anchor); OR
+ *   (B) INDEPENDENT ANCHOR CORROBORATION — the anchor is confirmed by another owned
+ *       non-product source of a DIFFERENT type (same anchor as ITS own head).
+ * A multi-token pillar is NO LONGER auto-trusted. Among valid matches, prefer source
+ * authority (tracked > category > service > homepage > project_focus), then specificity, then
+ * stable order. Reuses topicSignature / distinctiveTokensOf / canonicalVariants only.
  */
-function matchCorePillar(subjectToks: string[], pillars: BusinessPillar[]): { pillar: BusinessPillar; anchor: string; shared: string[]; distinct: string[]; corroborated: boolean } | null {
-  let best: { pillar: BusinessPillar; anchor: string; shared: string[]; distinct: string[]; corroborated: boolean } | null = null
+function matchCorePillar(subjectToks: string[], pillars: BusinessPillar[]): { pillar: BusinessPillar; anchor: string; shared: string[]; distinct: string[]; corroborated: boolean; authority: string } | null {
+  let best: { pillar: BusinessPillar; anchor: string; shared: string[]; distinct: string[]; corroborated: boolean; authority: string } | null = null
   for (const p of pillars) {
     const anchor = anchorHeadOf(p)
-    if (!anchor || !pillarEligibleForTier0(p, anchor, pillars)) continue
-    // (2) the candidate must CONTAIN the pillar core anchor head (bidirectional canonical
+    if (!anchor) continue
+    // (1) the candidate must CONTAIN the pillar core anchor head (bidirectional canonical
     // equivalence — a proclitic-prefixed candidate token like "בניאגרה" folds to "ניאגרה").
     if (!subjectToks.some((t) => sameHead(t, anchor))) continue
-    // (3) it must add ≥1 distinctive token BEYOND that anchor (not a bare anchor restatement).
+    // (2) it must add ≥1 distinctive token BEYOND that anchor (not a bare anchor restatement).
     const distinct = subjectToks.filter((t) => !sameHead(t, anchor))
     if (distinct.length === 0) continue
-    const cand = { pillar: p, anchor, shared: [anchor], distinct, corroborated: anchorCorroborated(anchor, p, pillars) }
-    // Prefer the most specific pillar (more tokens) for stable, informative diagnostics.
-    if (!best || p.tokens.size > best.pillar.tokens.size) best = cand
+    // (3) AUTHORITY: strong pillar overlap (≥2 shared pillar tokens incl. anchor) OR the
+    // anchor is independently corroborated by a different owned non-product source type.
+    const sharedPillarTokens = Array.from(p.tokens).filter((pt) => subjectToks.some((t) => sameHead(t, pt)))
+    const strongOverlap = sharedPillarTokens.length >= 2
+    const corroborated = anchorCorroboratedByType(anchor, p, pillars)
+    if (!strongOverlap && !corroborated) continue
+    const cand = { pillar: p, anchor, shared: strongOverlap ? sharedPillarTokens : [anchor], distinct, corroborated, authority: strongOverlap ? 'strong_pillar_overlap' : 'anchor_corroborated' }
+    if (!best || morePillarAuthority(cand.pillar, best.pillar)) best = cand
   }
   return best
 }

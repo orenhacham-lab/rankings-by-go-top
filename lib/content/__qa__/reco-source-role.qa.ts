@@ -55,9 +55,11 @@ function main() {
   console.log('SOFT) buildBriefPool — product-shaped query STAYS in the pool (Tier 2), pillar need ranks ahead')
   {
     const r = buildBriefPool(base({
-      // Category is a MULTI-TOKEN core ("מתנות לכל אירוע", anchor מתנ) — a single-token
-      // uncorroborated pillar no longer grants Tier 0 (core-head correction).
+      // The מתנ anchor is independently corroborated across two source TYPES (tracked keyword
+      // "מתנות מקוריות" + category "מתנות לכל אירוע"), so a gift extension sharing only the
+      // anchor is authoritatively Tier 0 under the pillar-authority contract.
       keywordResearch: kr(['מנורת פלזמה', 'מנורת שולחן מעוצבת', 'מתנות לגבר']),
+      trackedKeywords: ['מתנות מקוריות'],
       entities: [{ name: 'מנורת פלזמה כדור חשמלי RGB', url: '/p/1', type: 'product' }, { name: 'מתנות לכל אירוע', url: '/c/gifts', type: 'category' }],
     }))
     check('all three queries REMAIN in the pool (no hard product rejection)', ['מנורת פלזמה', 'מנורת שולחן מעוצבת', 'מתנות לגבר'].every((q) => subs(r).includes(q)))
@@ -66,8 +68,8 @@ function main() {
     const bare = bp.find((p) => p.subject === 'מנורת פלזמה')
     const gift = bp.find((p) => p.subject === 'מתנות לגבר')
     check('bare product → productAffinity + Tier 2', !!bare && bare.tier === 2 && bare.productAffinity === true)
-    check('pillar-aligned gift need (contains the מתנ core anchor) → Tier 0, ranks AHEAD of the Tier-2 product',
-      !!gift && gift.tier === 0 && gift.matchedPillarType === 'category' && gift.matchedPillarAnchorHead === 'מתנ' && (gift.finalSynthesisRank < (bare?.finalSynthesisRank ?? 99)))
+    check('pillar-aligned gift need (מתנ anchor corroborated across types) → Tier 0, ranks AHEAD of the Tier-2 product',
+      !!gift && gift.tier === 0 && gift.pillarAnchorCorroborated === true && gift.matchedPillarAnchorHead === 'מתנ' && gift.matchedPillarType === 'tracked_keyword' && (gift.finalSynthesisRank < (bare?.finalSynthesisRank ?? 99)))
     const art = r.pool.find((b) => b.subject === 'מנורת שולחן מעוצבת')
     check('EVIDENCE products remain: an article sharing a token still lists the product in relatedEntities',
       !!art && (art.relatedEntities ?? []).some((e) => e.type === 'product' && e.name.includes('מנורת פלזמה')))
