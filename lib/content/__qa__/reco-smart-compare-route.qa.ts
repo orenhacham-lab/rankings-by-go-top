@@ -1,0 +1,244 @@
+/**
+ * SMART-COMPARE ROUTE + REPORT QA (Stage B, Increment 6) — offline.
+ *
+ * Proves the QA/admin comparison endpoint's protections and the report assembly:
+ *   - the endpoint is double-gated (404 outside QA) and requires project ownership;
+ *   - persist:false is server-enforced and NOT client-controllable;
+ *   - the endpoint / harness / report perform no insert/update/delete;
+ *   - the normal recommendations route does not import or invoke the smart controller,
+ *     and no automatic escalation is wired (a single synthesis call-site);
+ *   - the report keeps the blind file and the mapping SEPARATE, gates the blind file on
+ *     the leakage scan, exposes model only in the QA rows (never the raw suggestions),
+ *     and passes aggregates through unchanged.
+ */
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { POST as comparePOST } from '../../../app/api/content/automation/reco-qa/compare/route'
+import { assembleComparisonPayload, validateBlindIntegrity, suggestionFingerprint } from '../recommendations/smart-run-report'
+import { parseQaCostCapUsd, authorizeQaRunCost, maxAuthorizedCostFor } from '../recommendations/smart-run-harness'
+import { computeRescueAccounting, simulatePairedSelection, type BriefOutcome } from '../recommendations/smart-controller'
+import type { SmartComparisonResult, SmartAttemptRecord } from '../recommendations/smart-run-harness'
+import type { TopicSuggestion } from '../recommendations/types'
+
+let pass = 0, fail = 0
+const check = (n: string, c: boolean, d?: string) => { if (c) { pass++; console.log(`  ✓ ${n}`) } else { fail++; console.log(`  ✗ ${n}${d ? ` — ${d}` : ''}`) } }
+const read = (rel: string) => readFileSync(join(__dirname, rel), 'utf8')
+
+const sug = (title: string, kw: string, reason: string): TopicSuggestion => ({
+  id: `opportunity:${title}`, title, primaryKeyword: kw, secondaryKeywords: [], searchIntent: 'informational',
+  recommendedWordCount: 1000, angle: '', suggestedInternalLinks: [], source: 'hybrid', suggestionReason: reason,
+  suggestionScore: 0.8, modelUsed: 'gemini-2.5-flash', requestedTier: 'standard', recommendedPageType: 'article',
+})
+
+function mkAttempt(role: 'flash' | 'pro', attemptIndex: number, model: string, sugs: TopicSuggestion[]): SmartAttemptRecord {
+  const rescue = computeRescueAccounting(sugs.map((_, i): BriefOutcome => ({ briefId: `${role}_b${i}`, stage: 'finalized_accepted' })), sugs.length)
+  return {
+    model, role, attemptIndex, engineAcceptedCount: sugs.length, finalizedCount: sugs.length, zeroResult: sugs.length === 0,
+    providerOk: true, synthesisFailure: null, stopReason: 'target_reached',
+    finalized: { poolSize: sugs.length, finalUserFacingCount: sugs.length, preparation: { preparationStarted: true, preparationSucceeded: true, discoveryRequired: false, discoveryAttempted: false, discoverySucceeded: false, discoveryFailureType: null, poolBuiltSuccessfully: true, poolEmptyAfterSuccessfulPreparation: false }, rounds: [{ providerOk: true, synthesisFailure: null }], stopReason: 'target_reached', rescue },
+    escalation: { escalate: false, reason: 'target_met' }, reconciled: rescue.reconciled, failed: false, error: null,
+    estimatedCostUsd: 0.02, tokenUsage: { input: 1000, output: 400, thinking: 0 }, callCount: 1, latencyMs: 1234,
+    uniqueAcceptedBriefIds: Array.from(rescue.finalizedAcceptedBriefIds), rescueCounts: rescue.counts, finalizedSuggestions: sugs,
+    providerDiagnostics: { requestedModel: model, providerStatus: 'ok', providerErrorType: null, sanitizedProviderMessage: null, finishReason: 'STOP', httpStatus: null, retryCount: 0, threw: false },
+  }
+}
+
+function mkResult(proReason = 'סיבה תקינה וברורה לנושא.'): SmartComparisonResult {
+  const flash = [0, 1, 2].map((i) => mkAttempt('flash', i, 'gemini-2.5-flash', [sug(`נושא פלאש ${i}`, `ביטוי פלאש ${i}`, 'סיבה תקינה וברורה לנושא.')]))
+  const pro = [0, 1, 2].map((i) => mkAttempt('pro', i, 'gemini-2.5-pro', [sug(`נושא פרו ${i}`, `ביטוי פרו ${i}`, proReason), sug(`נושא פרו נוסף ${i}`, `ביטוי פרו נוסף ${i}`, 'סיבה תקינה וברורה לנושא.')]))
+  const agg = (m: string, n: number) => ({ model: m, totalAttempts: 3, targetCompletionRate: 0, nonEmptyRate: 1, zeroResultRate: 0, meanFinalized: n, medianFinalized: n, minFinalized: n, maxFinalized: n, averageCostUsd: 0.02, costPerNonEmptyBatchUsd: 0.02, costPerFinalizedAcceptedUsd: 0.01, averageLatencyMs: 1234, p95LatencyMs: 1234, providerFailureRate: 0, synthesisFailureRate: 0 })
+  return {
+    snapshotId: 'snap_test', poolSize: 6, orderedBriefIds: ['a', 'b', 'c', 'd', 'e', 'f'], discoveryRan: false,
+    preparationProviderCalls: 0, targetCount: 12, flash, pro,
+    aggregate: { flash: agg('gemini-2.5-flash', 1), pro: agg('gemini-2.5-pro', 2) },
+    selectionSimulation: simulatePairedSelection(
+      flash.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+      pro.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+    ),
+    budget: { ok: true, path: 'flash_first', requiredAuthorizationUsd: 0.5, reason: 'full_smart_path_authorized' },
+    maxAuthorizedCostUsd: 0.9, actualCostUsd: 0.12, persistedWrites: 0,
+  }
+}
+
+async function main() {
+  console.log('ROUTE) double gate — unreachable outside QA')
+  {
+    const save = { c: process.env.ENABLE_CONTENT, a: process.env.ENABLE_CONTENT_AUTOMATION, d: process.env.RECO_ISOLATION_DIAGNOSTICS }
+    process.env.ENABLE_CONTENT = 'true'; process.env.ENABLE_CONTENT_AUTOMATION = 'true'; delete process.env.RECO_ISOLATION_DIAGNOSTICS
+    const r404 = await comparePOST(new Request('http://x/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: 'p1' }) }))
+    check('R1. diagnostics OFF → 404 (endpoint unreachable)', r404.status === 404)
+    process.env.ENABLE_CONTENT_AUTOMATION = 'false'; process.env.RECO_ISOLATION_DIAGNOSTICS = '1'
+    const r404b = await comparePOST(new Request('http://x/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: 'p1' }) }))
+    check('R2. automation OFF → 404', r404b.status === 404)
+    // Gate passed, but a missing projectId short-circuits BEFORE any Supabase call.
+    process.env.ENABLE_CONTENT_AUTOMATION = 'true'; process.env.RECO_ISOLATION_DIAGNOSTICS = '1'
+    const r400 = await comparePOST(new Request('http://x/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }))
+    check('R3. gate open + no projectId → 400 (auth/ownership required)', r400.status === 400)
+    process.env.ENABLE_CONTENT = save.c; process.env.ENABLE_CONTENT_AUTOMATION = save.a; if (save.d === undefined) delete process.env.RECO_ISOLATION_DIAGNOSTICS; else process.env.RECO_ISOLATION_DIAGNOSTICS = save.d
+  }
+
+  console.log('ROUTE) source guarantees — auth, persist:false, no writes, no auto-escalation')
+  {
+    const routeSrc = read('../../../app/api/content/automation/reco-qa/compare/route.ts')
+    const harnessSrc = read('../recommendations/smart-run-harness.ts')
+    const reportSrc = read('../recommendations/smart-run-report.ts')
+    const normalRouteSrc = read('../../../app/api/content/automation/recommendations/route.ts')
+    check('R4. endpoint keeps the exact double gate + ownership', /isContentAutomationEnabled\(\)/.test(routeSrc) && /RECO_ISOLATION_DIAGNOSTICS !== '1'/.test(routeSrc) && /authContentProject/.test(routeSrc))
+    check('R5. persist:false is server-set and NOT read from the client body', /persist: false/.test(routeSrc) && !/body\.persist/.test(routeSrc))
+    // Ignore the in-memory concurrency Set's .add/.delete/.has — only DB writes count.
+    const noSet = (s: string) => s.replace(/inFlightProjects\.(add|delete|has)\(/g, '')
+    check('R6. endpoint + harness + report perform NO DB write ops', ![routeSrc, harnessSrc, reportSrc].some((s) => /\.insert\(|\.update\(|\.upsert\(|\.delete\(/.test(noSet(s))))
+    check('R7. server-side attempt maximum + clamp are enforced', /SERVER_MAX_ATTEMPTS_PER_MODEL\s*=/.test(routeSrc) && /clampInt\(/.test(routeSrc))
+    check('R8. confirm gate (preflight cost before any spend)', /confirm = body\.confirm === true/.test(routeSrc) && /if \(!confirm\)/.test(routeSrc) && /maxAuthorizedCostUsd/.test(routeSrc))
+    check('R9. best-effort concurrency guard per project', /inFlightProjects/.test(routeSrc) && /comparison_already_running/.test(routeSrc))
+    // No automatic escalation: escalation is decision-only — a SINGLE synthesis
+    // call-site exists in the harness (never re-invoked based on the escalate flag).
+    const synthCalls = (harnessSrc.match(/await synthesizeFromSnapshot\(/g) ?? []).length
+    check('R10. exactly ONE synthesizeFromSnapshot call-site (no escalation-triggered re-run)', synthCalls === 1, `found ${synthCalls}`)
+    check('R11. normal recommendations route does NOT import/invoke the smart controller', !/smart-controller|smart-run-harness|smart-run-report|synthesizeFromSnapshot|prepareBriefRun|escalateToPro|runSmartComparison/.test(normalRouteSrc) && /generateFromBriefs/.test(normalRouteSrc))
+  }
+
+  console.log('REPORT) blind file + mapping separate; leakage gate; QA-only model')
+  {
+    const clean = assembleComparisonPayload(mkResult(), 'abc123')
+    check('R12. mapping is a SEPARATE artifact (never inside the blind file)', clean.mapping && clean.blindReview !== null && !('mapping' in (clean.blindReview as object)), JSON.stringify(Object.keys(clean.blindReview ?? {})))
+    check('R13. clean blind export is available + one batch per attempt', clean.response.blindAvailable === true && (clean.blindReview?.batches.length ?? 0) === 6)
+    check('R14. every QA row carries an anon batchId resolvable in the mapping', clean.response.attempts.every((a) => !!clean.mapping[a.attemptId]))
+    check('R15. QA rows show model (QA-only) but the response carries NO raw suggestions/modelUsed', clean.response.attempts.some((a) => a.model === 'gemini-2.5-pro') && !/modelUsed|finalizedSuggestions|requestedTier/.test(JSON.stringify(clean.response)))
+    check('R16. aggregates pass through unchanged', JSON.stringify(clean.response.aggregate) === JSON.stringify(mkResult().aggregate))
+    check('R17. persist:false + zero writes surfaced in the response', clean.response.persist === false && clean.response.persistedWrites === 0)
+
+    // Leakage gate: a model-identity token in review content withholds the blind file.
+    const dirty = assembleComparisonPayload(mkResult('הנושא הופק על ידי gemini-2.5-pro'), 'abc123')
+    check('R18. injected model-id leak → blind file WITHHELD (not returned)', dirty.blindReview === null && dirty.response.blindAvailable === false && !!dirty.response.blindBlocked)
+    check('R19. even when blocked, the SEPARATE mapping is still produced', Object.keys(dirty.mapping).length === 6)
+  }
+
+  console.log('COST) authorized-cap parse, enforcement + honest preflight display')
+  {
+    // 1. the env cap is read correctly; invalid/missing/≤0 fall back to the default.
+    check('C1. valid cap parses ($0.75)', parseQaCostCapUsd('0.75', 5) === 0.75)
+    check('C2. missing cap → default', parseQaCostCapUsd(undefined, 5) === 5)
+    check('C3. non-numeric cap → default (never NaN)', parseQaCostCapUsd('abc', 5) === 5 && !Number.isNaN(parseQaCostCapUsd('abc', 5)))
+    check('C4. zero/negative cap → default', parseQaCostCapUsd('0', 5) === 5 && parseQaCostCapUsd('-1', 5) === 5)
+    // 2. a run above the cap is NOT authorized; equal/under is.
+    check('C5. worst-case $3.50 over cap $0.75 → not within limit', authorizeQaRunCost(3.5, 0.75).withinAuthorizedLimit === false)
+    check('C6. worst-case equal to cap → within', authorizeQaRunCost(0.75, 0.75).withinAuthorizedLimit === true)
+    check('C7. worst-case under cap → within', authorizeQaRunCost(0.30, 0.75).withinAuthorizedLimit === true)
+    // 3. the worst-case estimate recalculates with ATTEMPTS (its applicable driver);
+    //    it is a per-run ceiling, so it does NOT vary with target count — documented.
+    check('C8. estimate recalculates with attempts (3 < 6)', maxAuthorizedCostFor(3, 0.5, 0.5) < maxAuthorizedCostFor(6, 0.5, 0.5))
+    check('C9. the observed $3.50 reproduces exactly (0.5 + 0.5×3×2)', maxAuthorizedCostFor(3, 0.5, 0.5) === 3.5)
+
+    // 4. route wiring: preflight exposes the ENFORCED limit + within flag and gates
+    //    the confirm on it; a confirmed over-cap run is rejected 402 BEFORE spend.
+    const routeSrc = read('../../../app/api/content/automation/reco-qa/compare/route.ts')
+    check('C10. cap is safe-parsed from RECO_QA_MAX_RUN_COST_USD (no bare Number(?? ))', /parseQaCostCapUsd\(process\.env\.RECO_QA_MAX_RUN_COST_USD/.test(routeSrc) && !/Number\(process\.env\.RECO_QA_MAX_RUN_COST_USD/.test(routeSrc))
+    check('C11. preflight returns the enforced limit + within flag + gated confirm', /authorizedLimitUsd/.test(routeSrc) && /withinAuthorizedLimit/.test(routeSrc) && /requiresConfirmation: withinAuthorizedLimit/.test(routeSrc))
+    check('C12. confirmed over-cap run is rejected 402 before prep/spend', /if \(!withinAuthorizedLimit\)/.test(routeSrc) && /cost_exceeds_authorized_limit/.test(routeSrc) && /status: 402/.test(routeSrc) && routeSrc.indexOf('cost_exceeds_authorized_limit') < routeSrc.indexOf('inFlightProjects.add'))
+    // 5. UI shows no actionable confirm above the cap.
+    const pageSrc = read('../../../app/(dashboard)/reco-qa/page.tsx')
+    check('C13. UI gates the confirm button on withinAuthorizedLimit (blocked message otherwise)', /withinAuthorizedLimit/.test(pageSrc) && /reco-qa-cost-blocked/.test(pageSrc) && /within \?/.test(pageSrc))
+    check('C14. UI displays the enforced authorized limit, not just the estimate', /authorizedLimitUsd/.test(pageSrc) && /תקרת QA מאושרת/.test(pageSrc))
+  }
+
+  console.log('INTEG) blind export = finalized suggestions only, fail-closed')
+  {
+    // An attempt whose engine-accepted (8) is LARGER than finalized (3): the blind
+    // export must contain exactly the 3 finalized, never the 8 engine or any rejected.
+    const finalizedSugs = [0, 1, 2].map((k) => sug(`נבחר ${k}`, `ביטוי נבחר ${k}`, 'סיבה תקינה וברורה לנושא.'))
+    const flash = [0, 1, 2].map((i) => { const a = mkAttempt('flash', i, 'gemini-2.5-flash', finalizedSugs); return { ...a, engineAcceptedCount: 8, finalizedCount: 3 } })
+    const proEmpty = [0, 1, 2].map((i) => { const a = mkAttempt('pro', i, 'gemini-2.5-pro', []); return { ...a, engineAcceptedCount: 5, finalizedCount: 0, zeroResult: true } }) // engine had topics, finalized 0
+    const res: SmartComparisonResult = { ...mkResult(), flash, pro: proEmpty, targetCount: 8,
+      selectionSimulation: simulatePairedSelection(flash.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })), proEmpty.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount }))) }
+    const { response, blindReview, mapping } = assembleComparisonPayload(res, 'sha')
+    check('I1. finalized 3 → EXACTLY 3 blind suggestions (engine 8 never leaks in)', response.exportIntegrity.ok && blindReview!.batches.filter((b) => mapping[b.batchId].role === 'flash').every((b) => b.suggestions.length === 3))
+    check('I2. finalized 0 → EMPTY blind batch even though engine had topics', blindReview!.batches.filter((b) => mapping[b.batchId].role === 'pro').every((b) => b.suggestions.length === 0))
+    check('I3. every blind batch count === its attempt finalizedCount', blindReview!.batches.every((b) => b.suggestions.length === (mapping[b.batchId].finalizedCount ?? -1)))
+    check('I4. every exported suggestion is a member of that attempt finalSuggestions (fingerprint)', blindReview!.batches.every((b) => b.suggestions.every((s) => (mapping[b.batchId].finalizedFingerprints ?? []).includes(suggestionFingerprint(s.title, s.primaryKeyword)))))
+    check('I5. a Flash batch never carries a Pro attempt (mapping resolves role correctly)', blindReview!.batches.filter((b) => mapping[b.batchId].role === 'flash').every((b) => b.suggestions.every((s) => /נבחר/.test(s.title))))
+    check('I6. blind ⇄ mapping ids aligned; one batch per attempt (bijection)', Object.keys(mapping).length === 6 && new Set(blindReview!.batches.map((b) => b.batchId)).size === 6 && blindReview!.batches.every((b) => !!mapping[b.batchId]))
+    check('I7. mapping carries internal integrity fields (finalizedCount + fingerprints); blind file does NOT', mapping[blindReview!.batches[0].batchId].finalizedFingerprints !== undefined && !/finalizedFingerprints|finalizedCount|attemptId/.test(JSON.stringify(blindReview)))
+
+    // Direct fail-closed proofs on validateBlindIntegrity.
+    const attempts = [...res.flash, ...res.pro]
+    check('I8. tampered blind COUNT (extra suggestion) → integrity FAILS', (() => {
+      const bad = { batches: blindReview!.batches.map((b, i) => i === 0 ? { ...b, suggestions: [...b.suggestions, { title: 'זייף', primaryKeyword: 'זייף', secondaryKeywords: [], searchIntent: 'informational', recommendedPageType: 'article', suggestionReason: 'x', internalLinks: [] }] } : b), suggestionsPerBatch: [] }
+      return validateBlindIntegrity(bad, mapping, attempts).ok === false
+    })())
+    check('I9. tampered blind CONTENT (swapped suggestion) → integrity FAILS', (() => {
+      const flashBatch = blindReview!.batches.find((b) => mapping[b.batchId].role === 'flash')!
+      const bad = { batches: blindReview!.batches.map((b) => b.batchId === flashBatch.batchId ? { ...b, suggestions: b.suggestions.map((s, i) => i === 0 ? { ...s, title: 'תוכן זר', primaryKeyword: 'תוכן זר' } : s) } : b), suggestionsPerBatch: [] }
+      return validateBlindIntegrity(bad, mapping, attempts).ok === false
+    })())
+    check('I10. a count/identity mismatch BLOCKS the export (fail-closed): blindReview withheld', (() => {
+      const inconsistent = [0, 1, 2].map((i) => { const a = mkAttempt('flash', i, 'gemini-2.5-flash', finalizedSugs); return { ...a, finalizedCount: 7 } }) // 7 ≠ 3 finalizedSuggestions
+      const r2: SmartComparisonResult = { ...res, flash: inconsistent }
+      const out = assembleComparisonPayload(r2, 'sha')
+      return out.response.blindAvailable === false && out.blindReview === null && out.response.blindBlocked?.reason === 'export_integrity_violation' && out.response.exportIntegrity.ok === false
+    })())
+    check('I11. leakage scan STILL runs after integrity (both must pass)', (() => {
+      const dirty = assembleComparisonPayload(mkResult('הופק על ידי gemini-2.5-pro'), 'sha')
+      return dirty.response.blindAvailable === false && dirty.response.exportIntegrity.ok === true && dirty.response.blindBlocked?.reason === 'model_identity_leakage_detected'
+    })())
+    check('I12. a clean, consistent run passes integrity AND returns the blind file', response.blindAvailable === true && blindReview !== null)
+  }
+
+  console.log('MODELS) the route resolves AVAILABLE flash/pro ids (not raw constants)')
+  {
+    const routeSrc = read('../../../app/api/content/automation/reco-qa/compare/route.ts')
+    check('M1. flash id comes from resolveAvailableRecommendationModel (engine availability resolution)', /resolveAvailableRecommendationModel\(\)/.test(routeSrc) && /const flashModel = flashResolution\.ok \? flashResolution\.model/.test(routeSrc))
+    check('M2. pro id comes from resolveRunModel (premium path, with downgrade info)', /resolveRunModel\('premium'\)/.test(routeSrc) && /proModel = proPath\.model/.test(routeSrc))
+    check('M3. the run passes the RESOLVED ids (raw constants only as fallback)', /flashModel,\n\s*proModel,/.test(routeSrc) && !/flashModel: RECOMMENDATION_MODEL_PRIMARY/.test(routeSrc))
+    check('M4. modelResolution (requested ids + pro downgrade) is surfaced to QA', /modelResolution/.test(routeSrc) && /proDowngraded: proPath\.downgraded/.test(routeSrc))
+  }
+
+  console.log('SEL) selector-reporting — no arbitrary top-level winner; failed never wins')
+  {
+    // The EXACT Rightfit live shape: Flash 0/0/0 all FAILED, Pro finalized 3/0/4.
+    const flashFailed = [0, 1, 2].map((i) => {
+      const a = mkAttempt('flash', i, 'gemini-2.5-flash', [])
+      return { ...a, failed: true, providerOk: false, finalizedCount: 0, zeroResult: true, engineAcceptedCount: 0, stopReason: 'provider_failed', providerDiagnostics: { requestedModel: 'gemini-2.5-flash', providerStatus: 'error', providerErrorType: 'model_unavailable', sanitizedProviderMessage: 'This model models/gemini-2.5-flash is no longer available to new users.', finishReason: null, httpStatus: 404, retryCount: 0, threw: true } }
+    })
+    const proBatches = [3, 0, 4].map((n, i) => {
+      const a = mkAttempt('pro', i, 'gemini-2.5-pro', Array.from({ length: n }, (_, k) => sug(`פרו ${i}-${k}`, `ביטוי פרו ${i}-${k}`, 'סיבה תקינה וברורה לנושא.')))
+      return { ...a, finalizedCount: n, zeroResult: n === 0 }
+    })
+    const rightfit: SmartComparisonResult = { ...mkResult(), flash: flashFailed, pro: proBatches, targetCount: 8,
+      selectionSimulation: simulatePairedSelection(
+        flashFailed.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+        proBatches.map((a) => ({ failed: a.failed, providerOk: a.providerOk, synthesisFailure: a.synthesisFailure, finalizedCount: a.finalizedCount })),
+      ) }
+    const { response, blindReview, mapping } = assembleComparisonPayload(rightfit, 'abc123')
+    check('S1. NO single arbitrary top-level "selection" field is emitted', !('selection' in response) && !!response.selectionSimulation)
+    check('S2. the simulation is LABELED simulated + explains its inputs (paired by attempt index)', response.selectionSimulation.simulated === true && response.selectionSimulation.policy === 'per_attempt_pair' && response.selectionSimulation.pairedBy === 'attempt_index')
+    check('S3. Rightfit shape NEVER yields flash — Pro wins every eligible pair, Flash 0', response.selectionSimulation.summary.flashWins === 0 && response.selectionSimulation.summary.proWins === 3 && response.selectionSimulation.pairs.every((p) => p.decision !== 'flash'), JSON.stringify(response.selectionSimulation.summary))
+    check('S4. failed Flash attempts remain PRESENT in the report (never summarized away)', response.attempts.filter((a) => a.role === 'flash' && a.failed).length === 3)
+    check('S5. QA exposes exact provider diagnostics per failed attempt (model + http + message)', response.attempts.filter((a) => a.failed).every((a) => a.providerDiagnostics.requestedModel === 'gemini-2.5-flash' && a.providerDiagnostics.httpStatus === 404 && (a.providerDiagnostics.sanitizedProviderMessage ?? '').includes('no longer available')))
+    check('S6. blind export EXCLUDES all provider/technical telemetry + model identity', blindReview !== null && !/providerDiagnostics|requestedModel|httpStatus|gemini|provider_failed|latencyMs|estimatedCostUsd/.test(JSON.stringify(blindReview)))
+    check('S7. the SEPARATE mapping still round-trips (unblinding intact)', Object.keys(mapping).length === response.attempts.length)
+  }
+
+  console.log('UI) ComparisonSection — independent loading states, no stuck preflight')
+  {
+    const pageSrc = read('../../../app/(dashboard)/reco-qa/page.tsx')
+    // Isolate the ComparisonSection (the outer acceptance runner has its own `running`).
+    const sec = pageSrc.slice(pageSrc.indexOf('function ComparisonSection'))
+    check('U1. two INDEPENDENT loading states (isCalculatingCost + isRunningComparison)', /const \[isCalculatingCost, setIsCalculatingCost\] = useState\(false\)/.test(sec) && /const \[isRunningComparison, setIsRunningComparison\] = useState\(false\)/.test(sec))
+    check('U2. the section no longer uses a shared derived running boolean or a stage machine', !/const running =/.test(sec) && !/useState<'idle'/.test(sec) && !/stage/.test(sec))
+    check('U3. doPreflight ALWAYS clears isCalculatingCost in finally', /async function doPreflight\(\)[\s\S]*?finally \{[\s\S]*?setIsCalculatingCost\(false\)[\s\S]*?\}/.test(sec))
+    check('U4. doRun ALWAYS clears isRunningComparison in finally', /async function doRun\(\)[\s\S]*?finally \{[\s\S]*?setIsRunningComparison\(false\)[\s\S]*?\}/.test(sec))
+    check('U5. preflight success path does NOT leave a loading flag set (no early return before finally)', /setPreflight\(d\)\s*\n\s*\} catch/.test(sec))
+    check('U6. confirm enabled only when preflight+within+!calculating+!running', /const canConfirm = !!preflight && within && !isCalculatingCost && !isRunningComparison/.test(sec))
+    check('U7. doRun refuses a stale/absent/over-cap preflight (guard)', /if \(!preflight \|\| preflight\.withinAuthorizedLimit === false \|\| busy\) return/.test(sec))
+    check('U8. changing project/target/attempts invalidates the preflight', (sec.match(/invalidatePreflight\(\)/g) ?? []).length >= 4 && /function invalidatePreflight\(\) \{ setPreflight\(null\)/.test(sec))
+    check('U9. preflight label ← isCalculatingCost; confirm label ← isRunningComparison', /isCalculatingCost \? 'מחשב…'/.test(sec) && /isRunningComparison \? 'מריץ השוואה…'/.test(sec))
+    check('U10. buttons are type="button" (no accidental form submit)', /<button type="button" onClick=\{doPreflight\}/.test(sec) && /<button type="button" onClick=\{doRun\}/.test(sec) && (sec.match(/type="button"/g) ?? []).length >= 4)
+    check('U11. preflight button disabled ONLY by busy; confirm disabled by !canConfirm', /onClick=\{doPreflight\} disabled=\{busy\}/.test(sec) && /onClick=\{doRun\} disabled=\{!canConfirm\}/.test(sec))
+    check('U12. no <form> wraps the controls (no submit path to swallow the click)', !/<form/.test(sec))
+  }
+
+  console.log(`\n${pass} passed, ${fail} failed`)
+  if (fail > 0) process.exitCode = 1
+}
+main().catch((e) => { console.error(e); process.exitCode = 1 })

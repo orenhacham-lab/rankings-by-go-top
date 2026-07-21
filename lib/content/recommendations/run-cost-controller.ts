@@ -59,9 +59,14 @@ export class RunCostController {
   private _inFlight = 0
   private _stopReason?: CallStopReason
 
-  constructor(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number) {
+  constructor(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number, budgetOverride?: { maxModelCallsPerRun?: number; maxEstimatedCostUsd?: number }) {
     this.generationRunId = generationRunId
-    this.budget = runBudget(mode, targetFreshIdeas)
+    const base = runBudget(mode, targetFreshIdeas)
+    // ADDITIVE: mode-specific content-plan ceilings (H). Without an override the budget
+    // is IDENTICAL to before — the single-scan behavior is unchanged.
+    this.budget = budgetOverride
+      ? { ...base, maxModelCallsPerRun: budgetOverride.maxModelCallsPerRun ?? base.maxModelCallsPerRun, maxEstimatedCostUsd: budgetOverride.maxEstimatedCostUsd ?? base.maxEstimatedCostUsd }
+      : base
   }
 
   get billingExhausted(): boolean { return this._billingExhausted }
@@ -85,11 +90,47 @@ export class RunCostController {
     return estimateCallCostUsd({ model, inputTokens, outputTokens: maxOutputTokens })
   }
 
-  /** Record a completed (or failed) call with ACTUAL usage. */
+  /** Record a completed (or failed) call with ACTUAL usage. THINKING tokens are
+   *  billable output — they are added to the output-token count for costing so a
+   *  Pro run's thinking budget is never under-costed. */
   recordCall(rec: Omit<CallRecord, 'estimatedCostUsd'> & { estimatedCostUsd?: number }): void {
     if (this._inFlight > 0) this._inFlight--
-    const estimatedCostUsd = rec.estimatedCostUsd ?? estimateCallCostUsd({ model: rec.model, inputTokens: rec.inputTokens, outputTokens: rec.outputTokens })
+    const billableOutput = rec.outputTokens + (rec.thinkingTokens || 0)
+    const estimatedCostUsd = rec.estimatedCostUsd ?? estimateCallCostUsd({ model: rec.model, inputTokens: rec.inputTokens, outputTokens: billableOutput })
     this.records.push({ ...rec, estimatedCostUsd })
+  }
+
+  /** Full per-call + run cost telemetry for the authenticated QA report. Thinking
+   *  tokens are billable output. Never customer-facing. */
+  costTelemetry(acceptedTopics: number): {
+    calls: { model: string; source: string; callPurpose: string; inputTokens: number; answerOutputTokens: number; thinkingTokens: number; totalBillableOutputTokens: number; estimatedCostUsd: number; success: boolean }[]
+    totalPaidCalls: number
+    estimatedRunCostUsd: number
+    estimatedRunCostIls: number
+    costPerAcceptedTopic: number
+    configuredCostCeilingUsd: number
+    remainingBudgetUsd: number
+    callsPreventedByBudget: number
+    configuredMaxCalls: number
+  } {
+    const calls = this.records.map((r) => ({
+      model: r.model, source: r.source, callPurpose: r.callPurpose,
+      inputTokens: r.inputTokens, answerOutputTokens: r.outputTokens, thinkingTokens: r.thinkingTokens,
+      totalBillableOutputTokens: r.outputTokens + r.thinkingTokens,
+      estimatedCostUsd: Number(r.estimatedCostUsd.toFixed(6)), success: r.success,
+    }))
+    const usd = this.spentUsd
+    return {
+      calls,
+      totalPaidCalls: this.records.length,
+      estimatedRunCostUsd: Number(usd.toFixed(6)),
+      estimatedRunCostIls: Number((usd * USD_TO_ILS).toFixed(4)),
+      costPerAcceptedTopic: Number((usd / Math.max(1, acceptedTopics)).toFixed(6)),
+      configuredCostCeilingUsd: this.budget.maxEstimatedCostUsd,
+      remainingBudgetUsd: Number(Math.max(0, this.budget.maxEstimatedCostUsd - usd).toFixed(6)),
+      callsPreventedByBudget: this._preventedByBudget,
+      configuredMaxCalls: this.budget.maxModelCallsPerRun,
+    }
   }
 
   /** Trip the billing circuit breaker: no later call may start. Captures how many
@@ -128,8 +169,8 @@ export class RunCostController {
 }
 
 /** Convenience — build a controller for a run. */
-export function newRunCostController(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number): RunCostController {
-  return new RunCostController(mode, generationRunId, targetFreshIdeas)
+export function newRunCostController(mode: 'standard' | 'premium', generationRunId: string, targetFreshIdeas: number, budgetOverride?: { maxModelCallsPerRun?: number; maxEstimatedCostUsd?: number }): RunCostController {
+  return new RunCostController(mode, generationRunId, targetFreshIdeas, budgetOverride)
 }
 
 export type { CallUsage }

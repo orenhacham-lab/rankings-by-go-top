@@ -8,13 +8,14 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadWordPressCredentials } from '@/lib/content/api-auth'
-import { updatePostSeoMeta } from '@/lib/wordpress/client'
+import { publishArticleSeo } from '@/lib/content/seo-publish'
 import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { recordPublishFinalFailureAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-shopify'
+import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -63,19 +64,20 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     if (!item) return { itemId, status: 'failed', articleId: null, noop: 'item_not_found' }
     if (!item.article_id) return { itemId, status: item.status, articleId: null, noop: 'no_article' }
 
-    // Phase 4F.2 — backend selection by the project's connected platform. Only a
-    // Shopify-only project takes the Shopify path; WordPress / dual / none fall
-    // through to the WordPress path below (unchanged). Dual connection fails
-    // visibly rather than silently publishing to one side.
-    const [{ data: wpConn }, { data: shConn }] = await Promise.all([
-      admin.from('wordpress_connections').select('id').eq('project_id', item.project_id).maybeSingle(),
-      admin.from('shopify_connections').select('id').eq('project_id', item.project_id).maybeSingle(),
-    ])
-    if (wpConn && shConn) {
+    // Phase 4F.2 — backend selection by the project's ACTIVE (connected) platform, via the
+    // shared resolver. Platform is chosen by connection VALIDITY, not row existence: a
+    // stale/failed/untested WordPress row never blocks a valid Shopify connection (the live
+    // false-platform_conflict bug), and only TWO genuinely-connected platforms conflict.
+    const active = await loadActivePlatform(admin, item.project_id)
+    if (active.platform === 'conflict') {
       await finalizeItem(admin, itemId, 'quality_check_failed', 'platform_conflict')
       return { itemId, status: 'quality_check_failed', articleId: item.article_id, reason: 'platform_conflict' }
     }
-    if (shConn && !wpConn) {
+    if (active.platform === 'none') {
+      await finalizeItem(admin, itemId, 'quality_check_failed', 'no_active_publishing_platform')
+      return { itemId, status: 'quality_check_failed', articleId: item.article_id, reason: 'no_active_publishing_platform' }
+    }
+    if (active.platform === 'shopify') {
       return await publishShopifyPoolItem(admin, item)
     }
 
@@ -197,10 +199,15 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       return { itemId, status: 'failed', articleId: article.id, reason: 'db_persist_failed_after_wp_publish', wpPostUrl: created.wpPostUrl }
     }
 
-    // Best-effort SEO meta (never fails the publish).
+    // SEO meta through the SHARED verifying service — WITH the focus keyword (loaded from the
+    // topic's primary_keyword) and PERSISTED truthfully. Never swallowed, never a silent
+    // publish without complete SEO data. Non-fatal to the post itself.
     try {
-      await updatePostSeoMeta(loaded.creds, created.wpPostId, { metaTitle: article.meta_title || String(article.title || ''), metaDescription: article.meta_description || null })
-    } catch { /* best-effort */ }
+      const seo = await publishArticleSeo(admin, loaded.creds, created.wpPostId, {
+        articleId: article.id, metaTitle: article.meta_title || String(article.title || ''), metaDescription: article.meta_description || null, topicId: article.topic_id,
+      })
+      if (seo.status !== 'verified') console.warn('[automation-publish] seo_not_verified', { itemId, articleId: article.id, plugin: seo.plugin, status: seo.status })
+    } catch (e) { console.warn('[automation-publish] seo write failed', { itemId, message: (e as Error)?.message?.slice(0, 120) }) }
 
     // Finalize: article + item published.
     await admin.from('generated_articles').update({ status: 'published', published_at: nowIso(), last_error: null, updated_at: nowIso() }).eq('id', article.id)

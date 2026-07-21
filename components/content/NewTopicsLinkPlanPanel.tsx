@@ -115,6 +115,10 @@ export default function NewTopicsLinkPlanPanel({
     return () => window.clearTimeout(id)
   }, [])
 
+  // Identity of the cached snapshot the user is reviewing (from the dry-run GET). Echoed
+  // on bulk-save so the server can save THIS exact reviewed plan (even if the cache is now
+  // TTL-stale) and refuse (typed 409) only if the cache actually changed under the user.
+  const reviewedSnapshotRef = useRef<{ scannerVersion: string | null; scanCompletedAt: string | null } | null>(null)
   // Single dry-run on mount (this component only mounts after topic creation).
   const ran = useRef(false)
   useEffect(() => {
@@ -126,6 +130,7 @@ export default function NewTopicsLinkPlanPanel({
         const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(ids)}`)
         const data = await res.json().catch(() => ({}))
         if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.loadError); return }
+        reviewedSnapshotRef.current = { scannerVersion: typeof data.scannerVersion === 'string' ? data.scannerVersion : null, scanCompletedAt: typeof data.scanCompletedAt === 'string' ? data.scanCompletedAt : null }
         if (Array.isArray(data.warnings) && (data.warnings.includes('cache_stale') || data.warnings.includes('cache_version_stale'))) setWarnNote(t.cacheStale)
         const map: Record<string, DryPlan> = {}
         const initLinkSel: Record<string, Set<string>> = {}
@@ -214,10 +219,15 @@ export default function NewTopicsLinkPlanPanel({
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // Phase 3G — "Save + add to queue" APPROVES the checked links (the user
       // explicitly selected them), so article generation inserts them automatically.
-      body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: forceApprove || autoApprove, selectedLinks }),
+      body: JSON.stringify({ projectId, topicIds: topicIdsToSave, approve: forceApprove || autoApprove, selectedLinks, reviewedSnapshot: reviewedSnapshotRef.current ?? undefined }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) { setError(data.cacheState === 'missing' ? t.cacheMissing : t.saveError); return null }
+    if (!res.ok) {
+      // The cached index changed after the user reviewed the plan → ask for a refresh; nothing
+      // was saved/approved/enqueued.
+      setError(data.reason === 'cache_changed_replan_required' ? t.cacheChanged : data.cacheState === 'missing' ? t.cacheMissing : t.saveError)
+      return null
+    }
     const results: BulkResult[] = Array.isArray(data.results) ? data.results : []
     const nextStatus: Record<string, 'saved' | 'approved' | 'zero' | 'failed'> = {}
     const nextDropped: Record<string, DroppedLink[]> = {}
@@ -264,8 +274,10 @@ export default function NewTopicsLinkPlanPanel({
       // Phase 3G — approve the checked links so generation inserts them automatically.
       const r = await runSave(true)
       if (r === null) return
-      const idsToQueue = r.okIds.length > 0 ? r.okIds : topicIdsToSave
-      const queued = await onEnqueue(idsToQueue)
+      // TRUTHFUL enqueue — only topics whose plan actually SAVED are queued (never a blind
+      // fallback to all requested ids). If none saved, do not enqueue or claim success.
+      if (r.okIds.length === 0) { setError(t.saveError); return }
+      const queued = await onEnqueue(r.okIds)
       // Links were saved regardless. If the enqueue itself failed, KEEP the panel
       // open and show the exact failure — never claim a false success. A dropped
       // link also keeps the panel open so the warning is actually seen.

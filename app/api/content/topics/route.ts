@@ -11,6 +11,7 @@
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createClient } from '@/lib/supabase/server'
 import { validateTopicBrief } from '@/lib/content/topic-brief'
+import { loadPlanSummariesForProject } from '@/lib/content/internal-link-plan-store'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) {
@@ -38,7 +39,10 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Failed to load topics' }, { status: 500 })
   }
 
-  return Response.json({ topics: data || [] })
+  // ONE-SHOT saved-plan status for every topic (no N+1) so the row link badges are TRUTHFUL
+  // after a full page refresh — not just within the session that saved them.
+  const planStatus = await loadPlanSummariesForProject(auth.admin, auth.project.id)
+  return Response.json({ topics: data || [], planStatus })
 }
 
 export async function POST(request: Request) {

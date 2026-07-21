@@ -15,13 +15,36 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ContentTopicIdeaRow } from '@/lib/supabase/types'
-import type { TopicSuggestion, RecommendationSource } from './types'
+import type { TopicSuggestion, RecommendationSource, LinkPlan } from './types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 const TABLE = 'content_topic_ideas'
 /** Postgres "relation does not exist" — the migration has not been applied yet. */
 const MISSING_TABLE = '42P01'
+/** PostgREST "column not found in schema cache" / undefined column — the additive
+ *  link_plan migration has not been applied yet. */
+const MISSING_COLUMN = new Set(['PGRST204', '42703'])
+
+/** Serialized shape of the additive link_plan JSONB — the canonical role-aware plan
+ *  plus the metadata that must survive persistence + reload. */
+interface PersistedPlan {
+  linkPlan?: LinkPlan
+  recommendedPageType?: TopicSuggestion['recommendedPageType']
+  demandEvidence?: TopicSuggestion['demandEvidence']
+  confidenceLevel?: TopicSuggestion['confidenceLevel']
+  discoveryGenerated?: boolean
+  businessRelevance?: TopicSuggestion['businessRelevance']
+  /** The cached-index snapshot the canonical link preview was built from. */
+  linkPreviewSnapshot?: TopicSuggestion['linkPreviewSnapshot']
+  /** Model-selection provenance that must survive reload (surfaced in the QA/admin
+   *  view; the customer card shows only the "improved" marker, never model names). */
+  requestedTier?: 'standard' | 'premium'
+  modelUsed?: string
+  improvedWithPro?: boolean
+  /** The Pro model that produced the per-item improvement (diagnostic). */
+  improvedModel?: string
+}
 
 /**
  * Conservative normalized form: lowercase, collapse whitespace, strip edge
@@ -40,20 +63,60 @@ export function topicIdeaFingerprint(primaryKeyword: string | null | undefined, 
 
 /** Map a persisted idea row to the UI/engine TopicSuggestion shape (id = row id). */
 export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { ideaId: string } {
+  const primaryKeyword = row.primary_keyword || row.title
+  const primNorm = normalizeText(primaryKeyword)
+  // F — the user-visible secondary list must NEVER contain the primary keyword,
+  // regardless of what was persisted upstream (belt-and-suspenders round-trip guard).
+  const secondaryKeywords = (Array.isArray(row.secondary_keywords) ? row.secondary_keywords : []).filter((k) => normalizeText(k) !== primNorm)
+
+  // E — reconstruct the CANONICAL role-aware plan from the persisted link_plan JSONB.
+  // Old rows (pre-migration) have no link_plan → roles are unavailable, so we degrade
+  // exactly as before (flat links, null primary) without crashing.
+  const plan = (row.link_plan && typeof row.link_plan === 'object') ? (row.link_plan as PersistedPlan) : null
+  const linkPlan = plan?.linkPlan
+  const suggestedInternalLinks = linkPlan
+    ? linkPlanToOrderedFromPlan(linkPlan)
+    : (Array.isArray(row.suggested_internal_links) ? row.suggested_internal_links : [])
+
   return {
     id: row.id,
     ideaId: row.id,
     title: row.title,
-    primaryKeyword: row.primary_keyword || row.title,
-    secondaryKeywords: Array.isArray(row.secondary_keywords) ? row.secondary_keywords : [],
+    primaryKeyword,
+    secondaryKeywords,
     searchIntent: row.search_intent || 'informational',
     recommendedWordCount: typeof row.recommended_word_count === 'number' ? row.recommended_word_count : 1000,
     angle: row.angle || '',
-    suggestedInternalLinks: Array.isArray(row.suggested_internal_links) ? row.suggested_internal_links : [],
+    suggestedInternalLinks,
     source: (row.source as RecommendationSource) || 'project_data',
     suggestionReason: row.suggestion_reason || '',
     suggestionScore: typeof row.score === 'number' ? row.score : 0,
+    // Role-aware fields survive the round trip when link_plan is present.
+    ...(linkPlan ? { linkPlan, moneyTargetUrl: linkPlan.primaryCommercialTarget?.url ?? null } : {}),
+    ...(plan?.recommendedPageType ? { recommendedPageType: plan.recommendedPageType } : {}),
+    ...(plan?.linkPreviewSnapshot ? { linkPreviewSnapshot: plan.linkPreviewSnapshot } : {}),
+    ...(plan?.demandEvidence ? { demandEvidence: plan.demandEvidence } : {}),
+    ...(plan?.confidenceLevel ? { confidenceLevel: plan.confidenceLevel } : {}),
+    ...(plan?.discoveryGenerated ? { discoveryGenerated: true } : {}),
+    ...(plan?.businessRelevance ? { businessRelevance: plan.businessRelevance } : {}),
+    // Model-selection provenance (survives reload). requestedTier / modelUsed are
+    // diagnostic-only; improvedWithPro drives the visible per-item "improved" marker.
+    ...(plan?.requestedTier ? { requestedTier: plan.requestedTier } : {}),
+    ...(plan?.modelUsed ? { modelUsed: plan.modelUsed } : {}),
+    ...(plan?.improvedWithPro ? { improvedWithPro: true } : {}),
   }
+}
+
+/** Flatten a persisted LinkPlan to the ordered {url,anchor} list (primary first). */
+function linkPlanToOrderedFromPlan(plan: LinkPlan): { url: string; anchor: string }[] {
+  const out: { url: string; anchor: string }[] = []
+  const seen = new Set<string>()
+  const push = (t: { url: string; title: string } | null) => { if (!t) return; const k = (t.url || '').trim().toLowerCase().replace(/\/+$/, ''); if (!k || seen.has(k)) return; seen.add(k); out.push({ url: t.url, anchor: t.title }) }
+  push(plan.primaryCommercialTarget)
+  for (const t of plan.secondaryCommercialTargets || []) push(t)
+  for (const t of plan.supportingInformationalLinks || []) push(t)
+  for (const t of plan.sourceReferences || []) push(t)
+  return out
 }
 
 /**
@@ -86,39 +149,72 @@ export interface NewIdeaInput {
   batchId: string
   source: string
   suggestions: TopicSuggestion[]
+  /** The tier the customer EXPLICITLY selected for this batch, and the actual model
+   *  the run used — stored per row so the QA/admin view can show them later. */
+  requestedTier?: 'standard' | 'premium'
+  modelUsed?: string | null
 }
+
+/** Persistence outcome (F) — attempted vs actually inserted (the rest were duplicate
+ *  fingerprints skipped by ON CONFLICT DO NOTHING) + a typed failure when it errored. */
+export interface PersistOutcome { attempted: number; inserted: number; duplicate: number; failed: number; failure?: string }
 
 /**
  * Insert NEW pending ideas (fingerprinted). Uses upsert with ignoreDuplicates on
- * (project_id, fingerprint) so a concurrent generation never errors. Returns the
- * number of rows sent, or null when the table is missing.
+ * (project_id, fingerprint) so a concurrent generation never errors. Returns a typed
+ * persistence outcome (attempted/inserted/duplicate/failed), or null when the table is
+ * missing.
  */
-export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Promise<number | null> {
-  if (input.suggestions.length === 0) return 0
+export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Promise<PersistOutcome | null> {
+  if (input.suggestions.length === 0) return { attempted: 0, inserted: 0, duplicate: 0, failed: 0 }
   const nowIso = new Date().toISOString()
-  const rows = input.suggestions.map((s) => ({
-    user_id: input.userId,
-    project_id: input.projectId,
-    source: input.source,
-    batch_id: input.batchId,
-    title: s.title,
-    primary_keyword: s.primaryKeyword || null,
-    secondary_keywords: s.secondaryKeywords ?? [],
-    search_intent: s.searchIntent || null,
-    angle: s.angle || null,
-    recommended_word_count: typeof s.recommendedWordCount === 'number' ? s.recommendedWordCount : null,
-    suggested_internal_links: s.suggestedInternalLinks ?? [],
-    suggestion_reason: s.suggestionReason || null,
-    source_context: null,
-    source_url: s.suggestedInternalLinks?.[0]?.url ?? null,
-    score: typeof s.suggestionScore === 'number' ? s.suggestionScore : null,
-    fingerprint: topicIdeaFingerprint(s.primaryKeyword, s.title),
-    status: 'pending' as const,
-    updated_at: nowIso,
-  }))
-  const { error } = await admin.from(TABLE).upsert(rows, { onConflict: 'project_id,fingerprint', ignoreDuplicates: true })
-  if (error) { if ((error as { code?: string }).code === MISSING_TABLE) return null; console.warn('[topic-idea-store] insert failed', { message: error.message }); return 0 }
-  return rows.length
+  const rows = input.suggestions.map((s) => {
+    // The additive JSONB link_plan carries the canonical role-aware plan + metadata so
+    // roles survive persistence + reload (never re-inferred in the UI).
+    // The bundle is persisted whenever there is a link plan OR model-selection
+    // provenance to preserve (a zero-link idea still records its tier/model).
+    const modelMeta = { requestedTier: input.requestedTier, modelUsed: input.modelUsed ?? s.modelUsed ?? undefined, improvedWithPro: s.improvedWithPro }
+    const hasModelMeta = !!(modelMeta.requestedTier || modelMeta.modelUsed || modelMeta.improvedWithPro)
+    const persistedPlan: PersistedPlan | null = (s.linkPlan || hasModelMeta)
+      ? { ...(s.linkPlan ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance } : {}), ...(s.linkPreviewSnapshot ? { linkPreviewSnapshot: s.linkPreviewSnapshot } : {}), ...modelMeta }
+      : null
+    return {
+      user_id: input.userId,
+      project_id: input.projectId,
+      source: input.source,
+      batch_id: input.batchId,
+      title: s.title,
+      primary_keyword: s.primaryKeyword || null,
+      secondary_keywords: s.secondaryKeywords ?? [],
+      search_intent: s.searchIntent || null,
+      angle: s.angle || null,
+      recommended_word_count: typeof s.recommendedWordCount === 'number' ? s.recommendedWordCount : null,
+      suggested_internal_links: s.suggestedInternalLinks ?? [],
+      link_plan: persistedPlan,
+      suggestion_reason: s.suggestionReason || null,
+      source_context: null,
+      source_url: s.suggestedInternalLinks?.[0]?.url ?? null,
+      score: typeof s.suggestionScore === 'number' ? s.suggestionScore : null,
+      fingerprint: topicIdeaFingerprint(s.primaryKeyword, s.title),
+      status: 'pending' as const,
+      updated_at: nowIso,
+    }
+  })
+  // .select('id') → ON CONFLICT DO NOTHING RETURNING returns only the ROWS ACTUALLY
+  // INSERTED, so inserted = returned.length and duplicate = attempted - inserted.
+  const upsert = (payload: Record<string, unknown>[]) => admin.from(TABLE).upsert(payload, { onConflict: 'project_id,fingerprint', ignoreDuplicates: true }).select('id')
+  let { data, error } = await upsert(rows)
+  if (error && MISSING_COLUMN.has((error as { code?: string }).code ?? '')) {
+    const stripped = rows.map(({ link_plan: _omit, ...rest }) => rest)
+    ;({ data, error } = await upsert(stripped))
+  }
+  if (error) {
+    if ((error as { code?: string }).code === MISSING_TABLE) return null
+    console.warn('[topic-idea-store] insert failed', { message: error.message })
+    return { attempted: rows.length, inserted: 0, duplicate: 0, failed: rows.length, failure: (error as { code?: string }).code || 'insert_failed' }
+  }
+  const inserted = Array.isArray(data) ? data.length : 0
+  return { attempted: rows.length, inserted, duplicate: Math.max(0, rows.length - inserted), failed: 0 }
 }
 
 /**
@@ -140,6 +236,35 @@ export async function markIdeasDuplicate(admin: Admin, projectId: string, ideaId
       .select('id')
     return ((data ?? []) as { id: string }[]).length
   } catch { return 0 }
+}
+
+/** Load ONE pending idea by id (project-scoped). Null when missing/rejected/table absent. */
+export async function loadPendingIdeaById(admin: Admin, projectId: string, ideaId: string): Promise<ContentTopicIdeaRow | null> {
+  const { data, error } = await admin.from(TABLE).select('*').eq('project_id', projectId).eq('id', ideaId).eq('status', 'pending').maybeSingle()
+  if (error || !data) return null
+  return data as ContentTopicIdeaRow
+}
+
+/** Persist a per-item Pro improvement: replaces the human-facing title + reason,
+ *  marks the row improvedWithPro, and records the Pro model — the primary keyword,
+ *  intent, page type, links and coverage are NOT touched (the validated engine
+ *  decisions are preserved; only the wording is refined). Best-effort; on a missing
+ *  link_plan column it still updates the visible title/reason. Returns the reloaded
+ *  suggestion, or null when the row is gone. */
+export async function applyProImprovement(admin: Admin, projectId: string, ideaId: string, update: { title: string; suggestionReason: string; improvedModel: string }): Promise<(TopicSuggestion & { ideaId: string }) | null> {
+  const row = await loadPendingIdeaById(admin, projectId, ideaId)
+  if (!row) return null
+  const prevPlan = (row.link_plan && typeof row.link_plan === 'object') ? (row.link_plan as PersistedPlan) : {}
+  const mergedPlan: PersistedPlan = { ...prevPlan, improvedWithPro: true, improvedModel: update.improvedModel, modelUsed: prevPlan.modelUsed ?? update.improvedModel }
+  const nowIso = new Date().toISOString()
+  const base = { title: update.title, suggestion_reason: update.suggestionReason, updated_at: nowIso }
+  const doUpdate = (payload: Record<string, unknown>) => admin.from(TABLE).update(payload).eq('project_id', projectId).eq('id', ideaId).eq('status', 'pending').select('*').maybeSingle()
+  let { data, error } = await doUpdate({ ...base, link_plan: mergedPlan })
+  if (error && MISSING_COLUMN.has((error as { code?: string }).code ?? '')) {
+    ;({ data, error } = await doUpdate(base)) // link_plan column absent → still persist the visible wording
+  }
+  if (error || !data) return null
+  return ideaToSuggestion(data as ContentTopicIdeaRow)
 }
 
 /** Durably reject pending ideas by id. Returns count rejected (0 on missing table). */

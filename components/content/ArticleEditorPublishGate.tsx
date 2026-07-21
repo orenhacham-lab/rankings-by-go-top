@@ -21,6 +21,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { resolveActivePlatform, type ActivePlatform } from '@/lib/content/platform/active-platform'
 
 export default function ArticleEditorPublishGate({ projectId, children, shopifyPanel }: { projectId: string | null; children: React.ReactNode; shopifyPanel?: React.ReactNode }) {
   const { language } = useDashboardLanguage()
@@ -28,8 +29,7 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
   const dir: 'rtl' | 'ltr' = language === 'he' ? 'rtl' : 'ltr'
 
   const [loading, setLoading] = useState(true)
-  const [wpConnected, setWpConnected] = useState(false)
-  const [shopifyConnected, setShopifyConnected] = useState(false)
+  const [platform, setPlatform] = useState<ActivePlatform>('none')
 
   const load = useCallback(async () => {
     if (!projectId) { setLoading(false); return }
@@ -40,9 +40,13 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
       ])
       const wp = wpRes.ok ? await wpRes.json().catch(() => ({})) : {}
       const sh = shRes.ok ? await shRes.json().catch(() => ({})) : {}
-      setWpConnected(!!wp.connection)
-      setShopifyConnected(!!sh.connection)
-    } catch { /* leave both false */ } finally { setLoading(false) }
+      // Platform by connection VALIDITY (shared resolver), not row existence — a
+      // stale/failed WordPress row never masks a valid Shopify connection.
+      setPlatform(resolveActivePlatform({
+        wordpress: { present: !!wp.connection, connectionStatus: (wp.connection as { connection_status?: string } | null)?.connection_status ?? null },
+        shopify: { present: !!sh.connection, connectionStatus: (sh.connection as { connection_status?: string } | null)?.connection_status ?? null, canPublish: !!(sh.connection as { can_publish?: boolean } | null)?.can_publish },
+      }).platform)
+    } catch { /* leave none */ } finally { setLoading(false) }
   }, [projectId])
 
   useEffect(() => { load() }, [load])
@@ -58,8 +62,8 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
     )
   }
 
-  // Both connected → conflict; never render a publishing flow.
-  if (wpConnected && shopifyConnected) {
+  // Both GENUINELY connected → conflict; never render a publishing flow.
+  if (platform === 'conflict') {
     return (
       <Card className="hover:translate-y-0 border-amber-300 dark:border-amber-700" >
         <div className="flex items-start gap-2" dir={dir}>
@@ -74,12 +78,12 @@ export default function ArticleEditorPublishGate({ projectId, children, shopifyP
     )
   }
 
-  // WordPress connected → the existing WordPress publishing subtree, unchanged.
-  if (wpConnected) return <>{children}</>
+  // WordPress active → the existing WordPress publishing subtree, unchanged.
+  if (platform === 'wordpress') return <>{children}</>
 
-  // Shopify connected → the Shopify publishing panel (Phase 4F.2). Falls back to
+  // Shopify active → the Shopify publishing panel (Phase 4F.2). Falls back to
   // an informational card only when no panel is supplied.
-  if (shopifyConnected) {
+  if (platform === 'shopify') {
     if (shopifyPanel) return <>{shopifyPanel}</>
     return (
       <Card className="hover:translate-y-0" >

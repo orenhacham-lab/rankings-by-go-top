@@ -46,14 +46,18 @@ type ArticleRow = {
   featured_image_url: string | null
   scheduled_at: string | null; published_at: string | null
   created_at: string; updated_at: string
+  shopify_article_id?: string | null; shopify_article_url?: string | null; shopify_status?: string | null; shopify_blog_id?: string | null
 }
 
+type ActivePlatform = 'wordpress' | 'shopify' | 'conflict' | 'none'
 type Overview = {
   projects: ProjectOption[]
   selected: string | null
   counts: Counts | null
   articles: ArticleRow[]
   wordpress: { connected: boolean; siteUrl: string | null; status: string | null } | null
+  shopify?: { connected: boolean; shopDomain: string | null; status: string | null; canPublish: boolean; defaultBlogId: string | null } | null
+  platform?: { platform: ActivePlatform; shopifyNeedsScope?: boolean } | null
 }
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
@@ -65,7 +69,7 @@ const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | '
   failed: 'danger',
 }
 
-export default function ContentHub() {
+export default function ContentHub({ proFirst = false }: { proFirst?: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get('projectId') || ''
@@ -76,6 +80,12 @@ export default function ContentHub() {
   const toast = useToasts()
 
   const [data, setData] = useState<Overview | null>(null)
+  // The project's ACTIVE publishing platform (resolved server-side by connection validity).
+  // Manual publish/draft actions route by this — a Shopify project never calls WordPress.
+  const activePlatform: ActivePlatform = data?.platform?.platform ?? 'wordpress'
+  const isShopify = activePlatform === 'shopify'
+  // Already exported on the ACTIVE platform (row eligibility + status).
+  const exportedIdOf = (a: ArticleRow): string | number | null => isShopify ? (a.shopify_article_id ?? null) : a.wp_post_id
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'articles' | 'gbp' | 'scheduled'>('articles')
   const [statusFilter, setStatusFilter] = useState('')
@@ -93,6 +103,9 @@ export default function ContentHub() {
   // panel seeds them (they don't disappear when its fresh dry-run differs).
   const [newTopicsSelected, setNewTopicsSelected] = useState<Record<string, { url: string; anchor: string }[]>>({})
   const [planStatus, setPlanStatus] = useState<Record<string, TopicPlanSummary>>({})
+  // True while topic plan-summaries are being (re)hydrated — the row badge shows a neutral
+  // "checking links" state instead of the "add links" default so unknown never reads missing.
+  const [topicsLoading, setTopicsLoading] = useState(true)
   // Phase 3F.3.3a/b — after approving ideas, briefly highlight the new "ready"
   // rows. The truthful next-step CTA lives in the ideas card (which scrolls
   // itself into view) so approval does NOT scroll away. The explicit "review
@@ -150,16 +163,24 @@ export default function ContentHub() {
         const pd = await pr.json(); poolId = pd.pool?.id ?? null
       }
       if (!poolId) return false
-      const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
+      // ONE authoritative call (Part G): validate + verify saved link plan + approve
+      // + enqueue per topic, with typed per-topic results. Never reports full success
+      // when a topic's links did not persist. expectsLinks=true → the server confirms
+      // the review-panel's saved link plan (a zero-link topic still has a batch).
+      // P0 Part J — NO unconditional allowNonArticle override: an article topic
+      // enqueues normally (server defaults page type to 'article'); a non-article
+      // recommendation is blocked server-side and requires a deliberate, visible
+      // user override, never an invisible client flag.
+      const ir = await fetch(`/api/content/automation/pools/${poolId}/approve-and-queue`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicIds }),
+        body: JSON.stringify({ topics: topicIds.map((topicId) => ({ topicId, expectsLinks: true })) }),
       })
-      if (!ir.ok) return false
-      // Truthful success: only when something was actually queued or already queued.
+      if (!ir.ok && ir.status !== 207) return false
       const d = await ir.json().catch(() => ({}))
       const added = typeof d.added === 'number' ? d.added : 0
-      const alreadyQueued = Array.isArray(d.alreadyQueued) ? d.alreadyQueued.length : 0
-      if (added <= 0 && alreadyQueued <= 0) return false
+      const alreadyQueued = typeof d.alreadyQueued === 'number' ? d.alreadyQueued : 0
+      // Truthful: full success requires EVERY topic to be added/queued (no partial).
+      if (d.ok !== true || (added <= 0 && alreadyQueued <= 0)) return false
       handleScheduled()
       // Surface the success in the Automatic Ideas section (drawer/panel path).
       setIdeasSuccessSignal((prev) => ({ n: (prev?.n ?? 0) + 1, count: topicIds.length }))
@@ -205,15 +226,24 @@ export default function ContentHub() {
   }, [projectId])
 
   const loadTopics = useCallback(async () => {
-    if (!projectId) { setTopics([]); return }
+    if (!projectId) { setTopics([]); setPlanStatus({}); setTopicsLoading(false); return }
+    setTopicsLoading(true)
     try {
       const res = await fetch(`/api/content/topics?projectId=${encodeURIComponent(projectId)}`)
       if (res.ok) {
         const json = await res.json()
         setTopics(json.topics || [])
+        // TRUTHFUL hydration on load/refresh — one-shot saved-plan summaries for every topic
+        // (server-derived from the latest active batch), so the row badges are correct even
+        // for plans saved in a PRIOR session. Merges over any in-session seeds.
+        if (json.planStatus && typeof json.planStatus === 'object') {
+          setPlanStatus((prev) => ({ ...prev, ...(json.planStatus as Record<string, TopicPlanSummary>) }))
+        }
       }
     } catch {
       // Non-fatal: the topics section simply shows its empty state.
+    } finally {
+      setTopicsLoading(false)
     }
   }, [projectId])
 
@@ -247,6 +277,11 @@ export default function ContentHub() {
   // Reuses the SAME server route the editor uses. No WordPress logic here.
   async function exportRow(a: ArticleRow, wpStatus: 'draft' | 'publish') {
     if (rowBusy) return
+    // Route by the project's ACTIVE platform — a Shopify project publishes to Shopify, not
+    // WordPress. Two active platforms / none are explicit states, never a misleading publish.
+    if (activePlatform === 'conflict') { toast.error(t.rowShopify.conflict); return }
+    if (activePlatform === 'none') { toast.error(t.rowShopify.setup); return }
+    if (activePlatform === 'shopify') { await exportRowShopify(a, wpStatus); return }
     if (wpStatus === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
     let force = false
     if (a.wp_post_id) {
@@ -266,6 +301,12 @@ export default function ContentHub() {
           ...(wpStatus === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}),
         })
         toast.success(wpStatus === 'publish' ? t.rowWp.published : t.rowWp.draftSent)
+        // TRUTHFUL SEO status — the post succeeded, but warn when the SEO meta was NOT applied
+        // (never a silent full-success). 'verified' / no-SEO-plugin are fine.
+        const seoStatus = typeof d.seoStatus === 'string' ? d.seoStatus : 'verified'
+        if (seoStatus !== 'verified' && seoStatus !== 'plugin_unavailable') {
+          toast.error(seoStatus === 'seo_bridge_required' ? t.rowWp.seoBridgeRequired : seoStatus === 'permission_error' ? t.rowWp.seoPermission : t.rowWp.seoNotVerified)
+        }
         // Phase 3E.1 — surface the keyword-added feedback in the list flow too
         // (only when the publish actually added a new project keyword).
         if (wpStatus === 'publish' && d.keywordAdded) toast.success(t.rowWp.keywordAdded)
@@ -276,6 +317,43 @@ export default function ContentHub() {
       toast.error(reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric)
     } catch {
       toast.error(t.rowWp.errGeneric)
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
+  // Shopify single-row publish/draft. Idempotent server-side via the stored
+  // shopify_article_id (a retry reconciles the same article, never a duplicate). Surfaces the
+  // exact corrective action for a real Shopify prerequisite (scope / blog) — never hidden.
+  async function exportRowShopify(a: ArticleRow, status: 'draft' | 'publish') {
+    if (status === 'publish' && !window.confirm(t.rowShopify.publishConfirm)) return
+    setRowBusy({ id: a.id, action: status })
+    try {
+      const res = await fetch(`/api/content/articles/${a.id}/shopify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) {
+        patchArticle(a.id, {
+          shopify_article_id: d.shopify_article_id ?? a.shopify_article_id ?? null,
+          shopify_article_url: d.shopify_article_url ?? a.shopify_article_url ?? null,
+          shopify_status: d.shopify_status ?? (status === 'publish' ? 'published' : 'draft'),
+          ...(status === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}),
+        })
+        toast.success(status === 'publish' ? t.rowShopify.published : t.rowShopify.draftSent)
+        load()
+        return
+      }
+      const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
+      toast.error(
+        reason === 'no_shopify_connection' ? t.rowShopify.errNoConn
+          : reason === 'missing_write_content_scope' ? t.rowShopify.errScope
+            : reason === 'no_shopify_blog' ? t.rowShopify.errBlog
+              : t.rowShopify.errGeneric,
+      )
+    } catch {
+      toast.error(t.rowShopify.errGeneric)
     } finally {
       setRowBusy(null)
     }
@@ -458,37 +536,53 @@ export default function ContentHub() {
   }
   function clearArticleSelection() { setSelectedArticles(new Set()) }
 
-  // One WordPress export — reuses the existing route (no confirm here; the batch
-  // confirms once). 60s client timeout.
-  async function exportOne(id: string, mode: 'publish' | 'draft'): Promise<{ ok: boolean; error?: string; data?: { wp_post_id: number; wp_post_url: string | null } }> {
+  // One export unit — routes by the ACTIVE platform (no confirm here; the batch confirms
+  // once). Returns a normalized patch so the batch loop is platform-agnostic. 60s timeout.
+  type ExportOnePatch = Partial<ArticleRow>
+  async function exportOne(id: string, mode: 'publish' | 'draft'): Promise<{ ok: boolean; error?: string; patch?: ExportOnePatch; seoStatus?: string }> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 60_000)
+    const publishedPatch = (extra: ExportOnePatch): ExportOnePatch => ({ ...extra, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
     try {
+      if (activePlatform === 'shopify') {
+        const res = await fetch(`/api/content/articles/${id}/shopify`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: mode }), signal: controller.signal,
+        })
+        const d = await res.json().catch(() => ({}))
+        if (res.ok && d.ok) return { ok: true, patch: publishedPatch({ shopify_article_id: d.shopify_article_id ?? null, shopify_article_url: d.shopify_article_url ?? null, shopify_status: d.shopify_status ?? (mode === 'publish' ? 'published' : 'draft') }) }
+        const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
+        return { ok: false, error: reason === 'no_shopify_connection' ? t.rowShopify.errNoConn : reason === 'missing_write_content_scope' ? t.rowShopify.errScope : reason === 'no_shopify_blog' ? t.rowShopify.errBlog : t.rowShopify.errGeneric }
+      }
       const res = await fetch(`/api/content/articles/${id}/wordpress`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: mode, force: false }), signal: controller.signal,
       })
       const d = await res.json().catch(() => ({}))
-      if (res.ok && d.wp_post_id) return { ok: true, data: { wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null } }
+      if (res.ok && d.wp_post_id) return { ok: true, patch: publishedPatch({ wp_post_id: d.wp_post_id, wp_post_url: d.wp_post_url ?? null }), seoStatus: typeof d.seoStatus === 'string' ? d.seoStatus : 'verified' }
       const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
       return { ok: false, error: reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric }
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return { ok: false, error: t.batch.timeout }
-      return { ok: false, error: t.rowWp.errGeneric }
+      return { ok: false, error: (activePlatform === 'shopify' ? t.rowShopify.errGeneric : t.rowWp.errGeneric) }
     } finally {
       clearTimeout(timer)
     }
   }
+  // A row is already exported on the active platform (skip it in batch).
+  const alreadyExported = (a: ArticleRow): boolean => activePlatform === 'shopify' ? !!a.shopify_article_id || a.status === 'published' : !!a.wp_post_id || a.status === 'published'
 
   async function runArticleBatch(mode: 'publish' | 'draft') {
     if (articleBatchRef.current || articleBatchRunning) return // synchronous lock first
+    if (activePlatform === 'conflict') { toast.error(t.rowShopify.conflict); return }
+    if (activePlatform === 'none') { toast.error(t.rowShopify.setup); return }
     const ids = Array.from(selectedArticles).filter((id) => {
       const a = (data?.articles ?? []).find((x) => x.id === id)
-      return !!a && !a.wp_post_id && a.status !== 'published'
+      return !!a && !alreadyExported(a)
     })
     if (ids.length === 0) return
     if (ids.length > BATCH_LIMIT) { toast.error(t.batch.tooMany); return }
-    if (mode === 'publish' && !window.confirm(t.rowWp.publishConfirm)) return
+    if (mode === 'publish' && !window.confirm(activePlatform === 'shopify' ? t.rowShopify.publishConfirm : t.rowWp.publishConfirm)) return
     articleBatchRef.current = true
     cancelArticleRef.current = false
     setArticleBatchRunning(true); setArticleBatchMode(mode)
@@ -497,16 +591,17 @@ export default function ContentHub() {
     const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
     window.addEventListener('beforeunload', onUnload)
 
-    let ok = 0, fail = 0
+    let ok = 0, fail = 0, seoUnverified = 0
     for (const id of ids) {
       if (cancelArticleRef.current) break
       const a = (data?.articles ?? []).find((x) => x.id === id)
-      if (!a || a.wp_post_id || a.status === 'published') continue // changed meanwhile → skip
+      if (!a || alreadyExported(a)) continue // changed meanwhile → skip
       setArticleBatchState((s) => ({ ...s, [id]: { status: 'running' } }))
       const r = await exportOne(id, mode)
-      if (r.ok && r.data) {
+      if (r.ok && r.patch) {
         ok++
-        patchArticle(id, { wp_post_id: r.data.wp_post_id, wp_post_url: r.data.wp_post_url, ...(mode === 'publish' ? { status: 'published', published_at: new Date().toISOString() } : {}) })
+        if (activePlatform !== 'shopify' && r.seoStatus && r.seoStatus !== 'verified' && r.seoStatus !== 'plugin_unavailable') seoUnverified++
+        patchArticle(id, r.patch)
         setArticleBatchState((s) => ({ ...s, [id]: { status: 'success' } }))
       } else {
         fail++
@@ -521,6 +616,8 @@ export default function ContentHub() {
     await load()
     if (wasCancelled) toast.success(t.batch.cancelled)
     else toast.success((mode === 'publish' ? t.batch.publishSummary : t.batch.draftSummary).replace('{ok}', String(ok)).replace('{fail}', String(fail)))
+    // TRUTHFUL: some posts succeeded but their SEO metadata was not applied.
+    if (seoUnverified > 0) toast.error(t.rowWp.seoNotVerified)
   }
 
   function cancelArticleBatch() { cancelArticleRef.current = true }
@@ -728,6 +825,22 @@ export default function ContentHub() {
                           <Td><span className="text-xs text-slate-500">{a.published_at ? formatDate(a.published_at) : '—'}</span></Td>
                           <Td>
                             {(() => {
+                              // Platform-aware publication state — a Shopify project shows Shopify
+                              // status/URL and never WordPress wording.
+                              if (isShopify) {
+                                if (!a.shopify_article_id) return <span className="text-xs text-slate-400 dark:text-slate-500">{t.shopifyState.notSent}</span>
+                                const published = a.status === 'published' || a.shopify_status === 'published'
+                                return (
+                                  <span className="inline-flex items-center gap-2">
+                                    <Badge variant={published ? 'success' : 'neutral'}>{published ? t.shopifyState.published : t.shopifyState.exported}</Badge>
+                                    {a.shopify_article_url && (
+                                      <a href={a.shopify_article_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+                                        {t.shopifyState.open}<ExternalLink size={12} />
+                                      </a>
+                                    )}
+                                  </span>
+                                )
+                              }
                               const s = wpState(a)
                               if (s === 'none') return <span className="text-xs text-slate-400 dark:text-slate-500">{t.wpState.notSent}</span>
                               const published = s === 'published'
@@ -765,18 +878,19 @@ export default function ContentHub() {
                               }
                               return (
                                 <div className="flex flex-wrap items-center gap-2">
-                                  {/* State-based WordPress actions (reuse the editor's route). */}
-                                  {a.status !== 'published' && (a.status === 'ready' || a.wp_post_id) && (
+                                  {/* State-based publish actions — routed by the active platform
+                                      (WordPress or Shopify). Hidden entirely for conflict/none. */}
+                                  {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status !== 'published' && (a.status === 'ready' || !!exportedIdOf(a)) && (
                                     <Button size="sm" onClick={() => exportRow(a, 'publish')} loading={rowBusy?.id === a.id && rowBusy.action === 'publish'} disabled={!!rowBusy || articleBatchRunning}>
-                                      {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : t.rowWp.publish}
+                                      {rowBusy?.id === a.id && rowBusy.action === 'publish' ? t.rowWp.publishing : (isShopify ? t.rowShopify.publish : t.rowWp.publish)}
                                     </Button>
                                   )}
-                                  {a.status === 'ready' && !a.wp_post_id && (
+                                  {activePlatform !== 'conflict' && activePlatform !== 'none' && a.status === 'ready' && !exportedIdOf(a) && (
                                     <Button size="sm" variant="outline" onClick={() => exportRow(a, 'draft')} loading={rowBusy?.id === a.id && rowBusy.action === 'draft'} disabled={!!rowBusy || articleBatchRunning}>
-                                      {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : t.rowWp.sendDraft}
+                                      {rowBusy?.id === a.id && rowBusy.action === 'draft' ? t.rowWp.sending : (isShopify ? t.rowShopify.sendDraft : t.rowWp.sendDraft)}
                                     </Button>
                                   )}
-                                  {a.status === 'draft' && !a.wp_post_id && (
+                                  {a.status === 'draft' && !exportedIdOf(a) && (
                                     <Button size="sm" variant="outline" onClick={() => markReadyRow(a)} loading={rowBusy?.id === a.id && rowBusy.action === 'ready'} disabled={!!rowBusy || articleBatchRunning}>
                                       {t.rowWp.markReady}
                                     </Button>
@@ -821,12 +935,13 @@ export default function ContentHub() {
               {process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' && (
                 <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
                   <AutomationIdeas
+                    proFirst={proFirst}
                     projectId={projectId}
                     language={language}
                     onCreated={loadTopics}
                     onScheduled={handleScheduled}
                     onTopicsCreated={(created, unchecked, selected) => { if (created.length) { setNewTopicsUnchecked(unchecked ?? {}); setNewTopicsSelected(selected ?? {}); setNewTopics(created) } }}
-                    onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: true, linkCount: p.linkCount, approvedCount: 0, stale: false }])) }))}
+                    onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: p.exists, linkCount: p.linkCount, approvedCount: p.approvedCount, stale: p.stale }])) }))}
                     onApproved={handleTopicsQueued}
                     onReviewLinks={handleReviewLinks}
                     planSavedHint={linkPlanSavedHint}
@@ -929,6 +1044,7 @@ export default function ContentHub() {
                       batchRunning={batchRunning}
                       onRetry={retryTopic}
                       planStatus={planStatus}
+                      planStatusLoading={topicsLoading}
                       onPlanStatusChange={(id, summary) => setPlanStatus((prev) => ({ ...prev, [id]: summary }))}
                       highlightIds={highlightTopicIds}
                       onReturnToQueue={handleReturnToQueue}

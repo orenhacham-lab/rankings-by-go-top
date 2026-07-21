@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkSaveTopicResult } from '@/lib/content/automation/one-click-queue'
 
 type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
 type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: string }
@@ -46,13 +47,28 @@ interface Suggestion {
   suggestionScore: number
   /** Phase 3F.3.4a — why there are no suggested links (for a helpful message). */
   linkPreviewReason?: string
+  /** The cached-index snapshot the CANONICAL link preview came from (server-computed via
+   *  planFromCachedTargets). Used at one-click time as the reviewed-snapshot identity. */
+  linkPreviewSnapshot?: { scannerVersion: string | null; scanCompletedAt: string | null }
   /** Phase 3F.3.6 — URL of the best commercial destination (shown first, labelled). */
   moneyTargetUrl?: string | null
   /** Phase 4C — hybrid provenance: which providers support this idea. */
   supportingSources?: Source[]
+  /** P0 — canonical role-aware link plan (roles rendered from here, never re-inferred). */
+  linkPlan?: {
+    primaryCommercialTarget: { url: string; title: string; pageType: string } | null
+    secondaryCommercialTargets: { url: string; title: string; pageType: string }[]
+    supportingInformationalLinks: { url: string; title: string; pageType: string }[]
+    sourceReferences: { url: string; title: string; pageType: string }[]
+  }
+  /** P0 — recommended destination type; badge shown on the card. */
+  recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
+  /** This single idea was refined with the Pro model via "שפר עם Gemini Pro". */
+  improvedWithPro?: boolean
 }
 
 export default function AutomationIdeas({
+  proFirst = false,
   projectId,
   language,
   onCreated,
@@ -72,9 +88,9 @@ export default function AutomationIdeas({
   // Phase 2F.1 — fires with the newly-created topics so the hub can offer the
   // internal-link planning step for exactly those new topic IDs.
   onTopicsCreated?: (topics: { id: string; topic: string; primary_keyword: string | null }[], uncheckedByTopicId?: Record<string, string[]>, selectedByTopicId?: Record<string, { url: string; anchor: string }[]>) => void
-  // Phase 3F.3.2a — fires with per-topic saved planned-link counts (from idea-stage
-  // selection) so the hub can seed the topic-row plan badge immediately.
-  onPlansSaved?: (plans: { topicId: string; linkCount: number }[]) => void
+  // Fires with the REAL per-topic saved-plan summary (from the authoritative bulk-save
+  // result) so the hub seeds the topic-row link badge truthfully (approved count + stale).
+  onPlansSaved?: (plans: { topicId: string; exists: boolean; linkCount: number; approvedCount: number; stale: boolean }[]) => void
   // Phase 3F.3.3 — fires after approval so the hub can scroll to the queue,
   // highlight the new rows, and show the "queued for scheduled creation" notice.
   onApproved?: (info: { topicIds: string[]; plansSaved: boolean }) => void
@@ -91,13 +107,15 @@ export default function AutomationIdeas({
   // Phase 3H — "go to queue" button in the success box (scrolls the hub to the
   // publishing-schedule section). Only the button navigates — no auto-scroll.
   onGoToQueue?: () => void
+  /** Stage D — server-derived (RECO_PRO_FIRST_CONTROLLER via isProFirstControllerEnabled).
+   *  The SINGLE authoritative flag; when true the selector is hidden and no tier is sent. */
+  proFirst?: boolean
 }) {
   const t = getDashboardDictionary(language).contentHub.autoIdeas
   const isHebrew = language === 'he'
-  const [lastCreatedIds, setLastCreatedIds] = useState<string[]>([])
-  // How many of the just-created topics got a saved link plan (for the CTA
-  // link-status summary: none / some / all).
-  const [lastPlansCount, setLastPlansCount] = useState(0)
+  // The exact per-topic queue payload to RETRY (links already saved; only the enqueue
+  // step failed) — re-sent to the authoritative approve-and-queue route.
+  const [lastQueueTopics, setLastQueueTopics] = useState<{ topicId: string; expectsLinks: boolean; recommendedPageType: string }[]>([])
   const [scheduling, setScheduling] = useState(false)
   // Which approve action is running (for per-button spinners): the one-click
   // queue action or the advanced review action. Phase 3F.3.5.
@@ -114,16 +132,48 @@ export default function AutomationIdeas({
   // any individual source). Selection only; nothing runs until the user clicks.
   const [source, setSource] = useState<Source>('hybrid')
   const [keyword, setKeyword] = useState('')
+  // Model tier (Phase 2 — explicit, truthful): sent on EVERY generate request.
+  // The selector is OPERATOR-facing (Preview / flag-gated); customers never see
+  // model names or costs. The choice is remembered locally per operator.
+  // QUALITY_SELECTOR_ENABLED now gates ONLY the operator model-path telemetry line;
+  // the model selector itself is a production customer-facing control.
+  const QUALITY_SELECTOR_ENABLED = process.env.NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'
+  // Stage D — the SINGLE authoritative flag comes from the SERVER (the `proFirst` prop,
+  // derived from RECO_PRO_FIRST_CONTROLLER via isProFirstControllerEnabled), never from a
+  // separate NEXT_PUBLIC var that could drift out of sync with the route. When true: the
+  // Flash/Pro selector + all model/tier/fallback wording are hidden and no tier is sent.
+  const PRO_FIRST = proFirst
+  const [qualityMode, setQualityMode] = useState<'standard' | 'premium'>(() => {
+    // Default to מהיר (standard). Remember the customer's explicit choice locally.
+    if (typeof window === 'undefined') return 'standard'
+    const saved = window.localStorage.getItem('reco-quality-mode')
+    return saved === 'premium' || saved === 'standard' ? saved : 'standard'
+  })
+  const chooseQuality = (m: 'standard' | 'premium') => {
+    setQualityMode(m)
+    try { window.localStorage.setItem('reco-quality-mode', m) } catch { /* private mode */ }
+  }
+  // Preview-only truthfulness: the ACTUAL model path of the last run (never shown
+  // to customers — present only when server diagnostics are enabled).
+  const [modelPath, setModelPath] = useState<{ requestedTier: string; model: string | null; tierUsed: string; downgraded: boolean; downgradeReason: string | null } | null>(null)
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [ideasExpanded, setIdeasExpanded] = useState(false)
+  // Pending-list pagination (B). Initial 3; "show more" reveals +5; "show all"
+  // reveals the rest. ALWAYS starts at 3 on mount/refresh/project-switch/new
+  // generation — never restored from storage/URL/prior mount (a fresh useState
+  // default IS the reset on remount; the effects below reset it on the other events).
+  const INITIAL_VISIBLE = 3
+  const PAGE_STEP = 5
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[] } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[] } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
+  // Per-item "שפר עם Gemini Pro": the id currently being improved (spinner + disable).
+  const [improvingId, setImprovingId] = useState<string | null>(null)
   // Phase 3F.3.2 — per-idea suggested-link selection (keyed by suggestion id →
   // set of selected link URLs). Undefined for an idea means "all checked".
   const [linkSel, setLinkSel] = useState<Record<string, Set<string>>>({})
@@ -142,7 +192,7 @@ export default function AutomationIdeas({
   // user clicking generate again (survives page refresh). Best-effort/read-only.
   useEffect(() => {
     let cancelled = false
-    setInitialLoaded(false); setSuggestions([]); setSelected(new Set()); setMeta(null); setMessage(null)
+    setInitialLoaded(false); setSuggestions([]); setSelected(new Set()); setMeta(null); setMessage(null); setVisibleCount(INITIAL_VISIBLE)
     ;(async () => {
       try {
         const res = await fetch(`/api/content/automation/topic-ideas?projectId=${encodeURIComponent(projectId)}`)
@@ -185,6 +235,18 @@ export default function AutomationIdeas({
   // Monotonic request id: only the latest generate() call is allowed to write
   // state, so a slow earlier response can never overwrite a newer one.
   const reqRef = useRef(0)
+  // LIVE project scope (cross-project display-leak fix): the closure-captured
+  // `projectId` inside generate() is frozen at click time, so comparing it to
+  // itself can never detect a mid-flight project switch. This ref always holds
+  // the CURRENT project; switching projects also invalidates in-flight requests.
+  const currentProjectRef = useRef(projectId)
+  useEffect(() => {
+    if (currentProjectRef.current !== projectId) {
+      currentProjectRef.current = projectId
+      reqRef.current++ // any in-flight response for the previous project is stale
+      setLoading(false)
+    }
+  }, [projectId])
 
   async function generate() {
     if (loading) return
@@ -201,14 +263,16 @@ export default function AutomationIdeas({
       const res = await fetch('/api/content/automation/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId }),
+        // Stage D — when the Pro-first controller owns the flow the client sends NO
+        // tier: the server always runs Pro-first and ignores any legacy tier field.
+        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId, ...(PRO_FIRST ? {} : { qualityMode }) }),
       })
       const data = await res.json().catch(() => ({}))
       if (reqId !== reqRef.current) return // a newer request superseded this one
       // Hard scope check: reject a response bound to a different project / request.
       if (res.ok && ((data?.meta?.projectId && data.meta.projectId !== requestProjectId) ||
                      (data?.meta?.clientRequestId && data.meta.clientRequestId !== clientRequestId) ||
-                     requestProjectId !== projectId)) {
+                     requestProjectId !== currentProjectRef.current)) {
         return // stale/cross-project response — discard, never write another project's list
       }
       if (!res.ok) {
@@ -228,6 +292,8 @@ export default function AutomationIdeas({
       }
       const list: Suggestion[] = Array.isArray(data.suggestions) ? data.suggestions : []
       setSuggestions(list)
+      // A newly completed generation response resets the view to the newest first 3.
+      setVisibleCount(INITIAL_VISIBLE)
       // No auto-select: persisted ideas accumulate, so approval must be explicit
       // to avoid bulk-approving previously-seen ideas.
       setSelected(new Set())
@@ -245,6 +311,10 @@ export default function AutomationIdeas({
         // Phase 4C — per-provider status for a hybrid run (partial-failure transparency).
         providers: Array.isArray(data.meta?.providers) ? data.meta.providers : undefined,
       })
+      // TRUTHFUL model path (operator/Preview only — present only when server
+      // diagnostics are enabled; customers never receive it).
+      const mp = data.meta?.isolationDebug?.briefDiagnostics?.modelPath
+      setModelPath(mp && typeof mp === 'object' ? mp : null)
     } catch {
       if (reqId !== reqRef.current) return
       setMeta({ skippedDuplicates: 0, finalCount: 0, reason: 'http_error', newlyAdded: 0 })
@@ -285,6 +355,37 @@ export default function AutomationIdeas({
     try { await rejectIds([id]) } finally { setRejectingId(null) }
   }
 
+  // Per-item "שפר עם Gemini Pro": polish only THIS recommendation's wording with Pro
+  // and mark it. The server preserves the keyword/intent/links/coverage; only the
+  // title + reason may change. The item is never degraded (server keeps the original
+  // wording if the polish is off-subject) and stays in place.
+  async function improveOne(s: Suggestion) {
+    const ideaId = s.ideaId ?? s.id
+    if (improvingId || !ideaId) return
+    setImprovingId(s.id); setMessage(null)
+    try {
+      const res = await fetch('/api/content/automation/topic-ideas/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, ideaId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.ok) {
+        setMessage({ text: data?.reason === 'pro_model_unavailable' ? t.improveUnavailable : t.improveFailed, ok: false })
+        return
+      }
+      if (data.changed === false) { setMessage({ text: t.improveNoChange, ok: true }); return }
+      const updated = data.suggestion as Suggestion | undefined
+      if (updated) {
+        setSuggestions((prev) => prev.map((x) => (x.id === s.id ? { ...x, ...updated, id: s.id, improvedWithPro: true } : x)))
+      }
+    } catch {
+      setMessage({ text: t.improveFailed, ok: false })
+    } finally {
+      setImprovingId(null)
+    }
+  }
+
   function rejectSelected() {
     void rejectIds(suggestions.filter((s) => selected.has(s.id)).map((s) => s.id))
   }
@@ -303,14 +404,20 @@ export default function AutomationIdeas({
     // Phase 3G.3 — the CHECKED idea-stage links per created topic, so the review
     // panel can seed/display them even if its fresh dry-run recomputes differently.
     selectedByTopicId: Record<string, { url: string; anchor: string }[]>
-    savedPlans: { topicId: string; linkCount: number }[]
-    expectedPlans: number
+    // topicId → the idea ids that resolved to it (to remove ONLY successfully-queued ideas).
+    ideaIdsByTopicId: Record<string, string[]>
+    // topicId → the idea's recommendedPageType (passed to approve-and-queue).
+    pageTypeByTopicId: Record<string, string>
+    // topicId → the idea's canonical link-preview snapshot (reviewed-snapshot identity).
+    snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }>
   }
   async function createTopics(): Promise<CreateResult | null> {
     const chosen = suggestions.filter((s) => selected.has(s.id))
     if (chosen.length === 0) return null
-    const expectedPlans = chosen.filter((s) => selectedLinksFor(s).length > 0).length
-    const chosenPayload = chosen.map((s) => ({ ...s, selectedLinks: selectedLinksFor(s) }))
+    // topics/bulk RESOLVES/creates topics only — it is NOT the authoritative link layer, so
+    // the checked links are NOT sent here (they are persisted via the reviewed-snapshot
+    // bulk-save contract below). This removes the old best-effort double-save.
+    const chosenPayload = chosen.map((s) => ({ ...s }))
     const res = await fetch('/api/content/automation/topics/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -321,11 +428,8 @@ export default function AutomationIdeas({
       setMessage({ text: data?.error === 'automation_migration_required' ? 'automation_migration_required' : (data?.error || 'error'), ok: false })
       return null
     }
-    const savedPlans = Array.isArray(data.savedPlans)
-      ? (data.savedPlans as unknown[]).map((p) => p as { topicId?: unknown; linkCount?: unknown }).filter((p) => typeof p.topicId === 'string' && typeof p.linkCount === 'number').map((p) => ({ topicId: p.topicId as string, linkCount: p.linkCount as number }))
-      : []
-    if (savedPlans.length) onPlansSaved?.(savedPlans)
-    setLastPlansCount(savedPlans.length)
+    // topics/bulk no longer persists links (the authoritative bulk-save does); the row badge
+    // is seeded from the REAL bulk-save summaries in approveAndQueue, not from savedPlans.
     onCreated()
 
     const topicsForAction: ReviewTopic[] = []
@@ -333,10 +437,16 @@ export default function AutomationIdeas({
     const unresolved: { title: string; reason: string }[] = []
     const uncheckedByTopicId: Record<string, string[]> = {}
     const selectedByTopicId: Record<string, { url: string; anchor: string }[]> = {}
+    const ideaIdsByTopicId: Record<string, string[]> = {}
+    const pageTypeByTopicId: Record<string, string> = {}
+    const snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }> = {}
     const seen = new Set<string>()
     const addResolved = (s: Suggestion, topicId: string, title: string, pk: string | null) => {
       if (!seen.has(topicId)) { seen.add(topicId); topicsForAction.push({ id: topicId, topic: title, primary_keyword: pk }) }
       resolvedIdeaIds.push(s.id)
+      ;(ideaIdsByTopicId[topicId] ??= []).push(s.id)
+      if (!pageTypeByTopicId[topicId]) pageTypeByTopicId[topicId] = s.recommendedPageType ?? 'article'
+      if (!snapshotByTopicId[topicId] && s.linkPreviewSnapshot) snapshotByTopicId[topicId] = s.linkPreviewSnapshot
       const checkedLinks = selectedLinksFor(s)
       const checked = new Set(checkedLinks.map((l) => l.url))
       const unchecked = s.suggestedInternalLinks.filter((l) => !checked.has(l.url)).map((l) => l.url)
@@ -371,7 +481,17 @@ export default function AutomationIdeas({
         else unresolved.push({ title: s.title, reason: 'unresolved' })
       }
     }
-    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, savedPlans, expectedPlans }
+    return { topicsForAction, resolvedIdeaIds, unresolved, uncheckedByTopicId, selectedByTopicId, ideaIdsByTopicId, pageTypeByTopicId, snapshotByTopicId }
+  }
+
+  // Re-review refresh: replace a stale/legacy idea's displayed link choices with the
+  // CANONICAL current-plan links (all checked) + update its preview snapshot, so the next
+  // attempt uses saveable links — NEVER a silent substitution that gets queued unreviewed.
+  function refreshIdeaCardLinks(ideaIds: string[], links: { url: string; anchor: string }[], snapshot: { scannerVersion: string | null; scanCompletedAt: string | null }) {
+    if (ideaIds.length === 0) return
+    const set = new Set(ideaIds)
+    setSuggestions((prev) => prev.map((s) => set.has(s.id) ? { ...s, suggestedInternalLinks: links, linkPreviewSnapshot: snapshot } : s))
+    setLinkSel((prev) => { const n = { ...prev }; for (const id of ideaIds) n[id] = new Set(links.map((l) => l.url)); return n })
   }
 
   // Remove the given idea ids from the visible list + selection (called ONLY after
@@ -383,46 +503,123 @@ export default function AutomationIdeas({
     setSelected((prev) => { const n = new Set(prev); for (const id of ideaIds) n.delete(id); return n })
   }
 
-  // Ensure the project's pool exists (never flips an active pool to paused) and add
-  // the given approved topics to its publishing queue. TRUTHFUL: success only when
-  // something was actually queued (or was already queued); otherwise a reason.
-  async function enqueueTopics(ids: string[]): Promise<{ ok: boolean; reason?: string }> {
-    if (ids.length === 0) return { ok: false, reason: 'no_topics' }
+  // Ensure the project's pool exists (never flips an active pool to paused). Returns poolId.
+  async function ensurePool(): Promise<string | null> {
     try {
-      let poolId: string | null = null
-      try {
-        const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
-        if (gr.ok) { const gd = await gr.json(); poolId = gd.pool?.id ?? null }
-      } catch { /* fall through to create */ }
-      if (!poolId) {
-        const pr = await fetch('/api/content/automation/pools', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
-        })
-        if (!pr.ok) { const d = await pr.json().catch(() => ({})); return { ok: false, reason: d.error || `pool_${pr.status}` } }
-        const pd = await pr.json()
-        poolId = pd.pool?.id ?? null
-      }
-      if (!poolId) return { ok: false, reason: 'no_pool' }
-      const ir = await fetch(`/api/content/automation/pools/${poolId}/items`, {
+      const gr = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
+      if (gr.ok) { const gd = await gr.json(); if (gd.pool?.id) return gd.pool.id as string }
+    } catch { /* fall through to create */ }
+    try {
+      const pr = await fetch('/api/content/automation/pools', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicIds: ids }),
+        body: JSON.stringify({ projectId, cadence: 'weekly', intervalDays: 7, isActive: false }),
       })
-      if (!ir.ok) { const d = await ir.json().catch(() => ({})); return { ok: false, reason: d.error || `items_${ir.status}` } }
-      const d = await ir.json().catch(() => ({}))
-      const added = typeof d.added === 'number' ? d.added : 0
-      const alreadyQueued = Array.isArray(d.alreadyQueued) ? d.alreadyQueued.length : 0
-      const notApproved = Array.isArray(d.notApproved) ? d.notApproved.length : 0
-      if (added > 0 || alreadyQueued > 0) return { ok: true }
-      if (notApproved > 0) return { ok: false, reason: 'topics_not_approved' }
-      return { ok: false, reason: 'nothing_queued' }
-    } catch {
-      return { ok: false, reason: 'network' }
-    }
+      if (pr.ok) { const pd = await pr.json(); return (pd.pool?.id ?? null) as string | null }
+    } catch { /* ignore */ }
+    return null
   }
 
-  // PRIMARY (Phase 3F.3.5) — approve + save checked links + add to the publishing
-  // queue in ONE action. No intermediate CTA / planner unless enqueue fails.
+  // Save the EXACT checked (canonical) links for the given topics through the SAME
+  // reviewed-snapshot bulk-save contract the drawer/panel use. The reviewed-snapshot identity
+  // is the IDEA's canonical preview snapshot, so a card built from the current index saves
+  // with NO drops; a genuinely changed cache returns cache_changed_replan_required. The SERVER
+  // re-validates every link (idea URLs are never trusted); no force. On any drop/change the
+  // topic is NOT queued and its CANONICAL current links are returned for a re-review refresh.
+  type LinkSaveOutcome = {
+    okIds: Set<string>
+    failures: { topicId: string; reason: string }[]
+    hardReason: string | null
+    // topicId → the canonical CURRENT plan links (to refresh the card on re-review).
+    refreshedByTopic: Record<string, { url: string; anchor: string }[]>
+    needsReview: boolean
+    currentSnapshot: { scannerVersion: string | null; scanCompletedAt: string | null }
+    // REAL per-topic saved-plan summary for every topic that persisted (seeds the row badge).
+    summaries: { topicId: string; exists: boolean; linkCount: number; approvedCount: number; stale: boolean }[]
+  }
+  async function saveCheckedLinks(
+    topicIds: string[],
+    selectedByTopicId: Record<string, { url: string; anchor: string }[]>,
+    snapshotByTopicId: Record<string, { scannerVersion: string | null; scanCompletedAt: string | null }>,
+  ): Promise<LinkSaveOutcome> {
+    const out: LinkSaveOutcome = { okIds: new Set(), failures: [], hardReason: null, refreshedByTopic: {}, needsReview: false, currentSnapshot: { scannerVersion: null, scanCompletedAt: null }, summaries: [] }
+    if (topicIds.length === 0) return out
+    const failAll = (reason: string, needsReview = false) => { out.hardReason = reason; out.needsReview = needsReview; for (const id of topicIds) out.failures.push({ topicId: id, reason }); return out }
+    // 1) current plan — the canonical CURRENT links (for refresh) + current snapshot.
+    let currentSnapshot: { scannerVersion: string | null; scanCompletedAt: string | null } = { scannerVersion: null, scanCompletedAt: null }
+    try {
+      const gr = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topicIds.join(','))}`)
+      const gd = await gr.json().catch(() => ({}))
+      if (!gr.ok) return failAll(gd.cacheState === 'missing' ? 'no_cache' : 'plan_unavailable')
+      currentSnapshot = { scannerVersion: typeof gd.scannerVersion === 'string' ? gd.scannerVersion : null, scanCompletedAt: typeof gd.scanCompletedAt === 'string' ? gd.scanCompletedAt : null }
+      out.currentSnapshot = currentSnapshot
+      for (const p of Array.isArray(gd.topics) ? gd.topics : []) {
+        const sel = Array.isArray(p?.selected) ? p.selected : []
+        out.refreshedByTopic[p.topicId] = sel.filter((l: { targetUrl?: string; anchorText?: string }) => l.targetUrl && l.anchorText).map((l: { targetUrl: string; anchorText: string }) => ({ url: l.targetUrl, anchor: l.anchorText }))
+      }
+    } catch { return failAll('plan_unavailable') }
+    // reviewed-snapshot identity = the IDEA preview snapshot common to the batch (so a stale
+    // preview → cache_changed, not a silent drop). Falls back to the current snapshot for
+    // legacy ideas with no stored preview snapshot.
+    const distinctSnaps = Array.from(new Set(topicIds.map((id) => snapshotByTopicId[id]).filter(Boolean).map((s) => `${s!.scannerVersion}|${s!.scanCompletedAt}`)))
+    const reviewedSnapshot = distinctSnaps.length === 1 ? snapshotByTopicId[topicIds.find((id) => snapshotByTopicId[id])!] : currentSnapshot
+    // 2) exact checked selection → bulk-save (approve + reviewedSnapshot).
+    const selectedLinks = topicIds.flatMap((id) => (selectedByTopicId[id] ?? []).map((l) => ({ topicId: id, targetUrl: l.url, anchorText: l.anchor })))
+    let data: { results?: unknown[]; reason?: string; cacheState?: string } = {}
+    try {
+      const sr = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, topicIds, approve: true, selectedLinks, reviewedSnapshot }),
+      })
+      data = await sr.json().catch(() => ({}))
+      if (!sr.ok) return failAll(data.reason === 'cache_changed_replan_required' ? 'cache_changed_replan_required' : data.cacheState === 'missing' ? 'no_cache' : 'link_plan_failed', data.reason === 'cache_changed_replan_required')
+    } catch { return failAll('link_plan_failed') }
+    // 3) TRUTHFUL per-topic success (pure, shared with tests) + TYPED drop reasons.
+    const results = (Array.isArray(data.results) ? data.results : []).filter((r): r is BulkSaveTopicResult => !!r && typeof (r as { topicId?: unknown }).topicId === 'string')
+    const byTopic = new Map(results.map((r) => [r.topicId, r]))
+    const evln = evaluateLinkSave(topicIds, selectedByTopicId, { ok: true, results })
+    for (const id of evln.okIds) out.okIds.add(id)
+    // REAL per-topic summary (from the authoritative bulk-save result) for the row badge.
+    for (const id of evln.okIds) {
+      const r = byTopic.get(id)
+      out.summaries.push({ topicId: id, exists: true, linkCount: r?.linkCount ?? 0, approvedCount: r?.approvedCount ?? 0, stale: !!(r as { staleAtCreation?: boolean } | undefined)?.staleAtCreation })
+    }
+    for (const f of evln.failures) {
+      // Surface the SPECIFIC dropped reason (blocked / not_in_plan / invalid_anchor /
+      // duplicate_target / duplicate_anchor) instead of collapsing to dropped_link.
+      const dl = (byTopic.get(f.topicId)?.droppedLinks ?? []) as { reason?: string; rejectedReasons?: string[] }[]
+      const specific = dl[0]?.reason
+      out.failures.push({ topicId: f.topicId, reason: specific || f.reason })
+      out.needsReview = true // a dropped/legacy link means the card must be re-reviewed
+    }
+    return out
+  }
+
+  // Queue topics through the AUTHORITATIVE approve-and-queue route (which itself re-verifies a
+  // saved plan exists for every expectsLinks topic). Returns the topics actually queued.
+  type QueueTopic = { topicId: string; expectsLinks: boolean; recommendedPageType: string }
+  async function queueTopicsAuthoritative(poolId: string, queue: QueueTopic[]): Promise<{ ok: boolean; queuedIds: Set<string>; linkPlanFailedIds: Set<string>; reason?: string }> {
+    const queuedIds = new Set<string>(); const linkPlanFailedIds = new Set<string>()
+    if (queue.length === 0) return { ok: false, queuedIds, linkPlanFailedIds, reason: 'no_topics' }
+    try {
+      const ir = await fetch(`/api/content/automation/pools/${poolId}/approve-and-queue`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: queue }),
+      })
+      const d = await ir.json().catch(() => ({}))
+      if (!ir.ok && ir.status !== 207) return { ok: false, queuedIds, linkPlanFailedIds, reason: d.error || `queue_${ir.status}` }
+      for (const r of (Array.isArray(d.results) ? d.results : []) as { topicId?: string; state?: string }[]) {
+        if (!r || typeof r.topicId !== 'string') continue
+        if (r.state === 'success' || r.state === 'already_queued') queuedIds.add(r.topicId)
+        else if (r.state === 'link_plan_failed') linkPlanFailedIds.add(r.topicId)
+      }
+      return { ok: queuedIds.size > 0, queuedIds, linkPlanFailedIds }
+    } catch { return { ok: false, queuedIds, linkPlanFailedIds, reason: 'network' } }
+  }
+
+  // PRIMARY (Phase 3F.3.5, rewired) — ONE authoritative persistence + queue path:
+  //   topics/bulk (resolve topics) → GET plan snapshot → reviewed-snapshot bulk-save
+  //   (approve) → approve-and-queue. A topic whose CHECKED links did not fully persist is
+  //   NEVER queued. topics/bulk's best-effort savedPlans no longer decides anything.
   async function approveAndQueue() {
     if (creating) return
     setCreating(true); setBusyAction('queue'); setMessage(null); setQueueSuccess(null)
@@ -435,26 +632,61 @@ export default function AutomationIdeas({
         setMessage({ text: `${t.topicResolveFailed}${r.unresolved[0]?.reason ? ` (${r.unresolved[0].reason})` : ''}`, ok: false })
         return
       }
-      // Enqueue the EXACT resolved topics (newly created + existing duplicates).
-      const ids = r.topicsForAction.map((tp) => tp.id)
-      const enq = await enqueueTopics(ids)
-      if (!enq.ok) {
-        // FAILURE — do NOT remove/hide the ideas. Show the exact reason + a clear
-        // retry CTA (adds the same resolved topics to the queue).
-        setLastCreatedIds(ids)
-        onApproved?.({ topicIds: ids, plansSaved: r.savedPlans.length > 0 })
-        window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
-        setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
+      const allIds = r.topicsForAction.map((tp) => tp.id)
+      const { withLinks: withLinksIds, noLinks: noLinksIds } = partitionByCheckedLinks(allIds, r.selectedByTopicId)
+
+      // 1) Save the CHECKED links authoritatively (reviewed-snapshot bulk-save, server revalidates).
+      const save = await saveCheckedLinks(withLinksIds, r.selectedByTopicId, r.snapshotByTopicId)
+      const failedLinkCount = save.failures.length
+      // Seed the topic-row link badge with the REAL saved-plan summary (link + approved
+      // counts) — a topic with no checked links records an auditable zero-link plan too.
+      const planSummaries = [...save.summaries, ...noLinksIds.map((id) => ({ topicId: id, exists: true, linkCount: 0, approvedCount: 0, stale: false }))]
+      if (planSummaries.length) onPlansSaved?.(planSummaries)
+
+      // 1b) Any topic whose checked links did NOT fully persist (stale/legacy/changed cache) is
+      //     NOT queued — refresh its card links from the canonical current plan and require a
+      //     re-review, instead of forcing an old link or a generic dropped_link.
+      const failedTopicIds = Array.from(new Set(save.failures.map((f) => f.topicId)))
+      for (const tid of failedTopicIds) refreshIdeaCardLinks(r.ideaIdsByTopicId[tid] ?? [], save.refreshedByTopic[tid] ?? [], save.currentSnapshot)
+
+      // 2) Queue set = link-free topics (expectsLinks:false) + topics whose checked links FULLY
+      //    persisted (expectsLinks:true). Topics with checked-but-unsaved links are excluded.
+      const queue = buildQueueTopics(noLinksIds, [...save.okIds], r.pageTypeByTopicId)
+      const dropReason = save.hardReason ?? save.failures[0]?.reason ?? 'link_plan_failed'
+      if (queue.length === 0) {
+        // C — no topic could be queued. Show a re-review message (never "topics added");
+        // the failed ideas stay visible with refreshed canonical links.
+        setLastQueueTopics([])
+        setMessage({ text: `${save.needsReview ? t.linksReReview : t.linkSaveAllFailed} (${dropReason})`, ok: false })
         return
       }
-      // SUCCESS — only now remove the ideas + show the prominent success box + refresh.
-      removeChosenIdeas(r.resolvedIdeaIds)
-      const partial = r.expectedPlans > 0 && r.savedPlans.length < r.expectedPlans
-      setLastCreatedIds([]); setLastPlansCount(0)
-      setQueueSuccess({ count: ids.length, links: r.savedPlans.length > 0 })
-      // Keep only the amber partial-save warning as an inline note; the prominent
-      // green box carries the success confirmation.
-      setMessage(partial ? { text: t.linkSavePartialWarn, ok: false } : null)
+
+      // 3) Queue via the AUTHORITATIVE route (it re-verifies the saved plan for expectsLinks topics).
+      const poolId = await ensurePool()
+      if (!poolId) { setLastQueueTopics(queue); window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80); setMessage({ text: `${t.queueFailedRetry} (no_pool)`, ok: false }); return }
+      const q = await queueTopicsAuthoritative(poolId, queue)
+      if (q.queuedIds.size === 0) {
+        // The queue step itself failed — links ARE saved; offer a retry of just the enqueue.
+        setLastQueueTopics(queue)
+        onApproved?.({ topicIds: queue.map((x) => x.topicId), plansSaved: save.okIds.size > 0 })
+        window.setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+        setMessage({ text: `${t.queueFailedRetry}${q.reason ? ` (${q.reason})` : ''}`, ok: false })
+        return
+      }
+
+      // 4) SUCCESS (full or partial). Remove ONLY the ideas whose topic actually queued.
+      const queuedIdeaIds = allIds.filter((id) => q.queuedIds.has(id)).flatMap((id) => r.ideaIdsByTopicId[id] ?? [])
+      removeChosenIdeas(queuedIdeaIds)
+      setLastQueueTopics([])
+      onApproved?.({ topicIds: [...q.queuedIds], plansSaved: save.okIds.size > 0 })
+      setQueueSuccess({ count: q.queuedIds.size, links: save.okIds.size > 0 })
+      if (failedLinkCount === 0) {
+        setMessage(null) // A — everything saved + queued.
+      } else {
+        // B — exact counts + typed reason; the failed-link ideas stay visible with refreshed
+        // canonical links for re-review (never queued with unreviewed links).
+        setMessage({ text: `${t.queuePartial.replace('{queued}', String(q.queuedIds.size)).replace('{failed}', String(failedLinkCount)).replace('{reason}', dropReason)} ${t.linksReReview}`, ok: false })
+      }
       onScheduled?.()
     } catch {
       setMessage({ text: 'error', ok: false })
@@ -487,21 +719,23 @@ export default function AutomationIdeas({
     }
   }
 
-  // Add the already-created (review-path or enqueue-failed) topics to the queue.
+  // Retry the queue step for topics whose links ALREADY saved (only the enqueue failed) —
+  // through the SAME authoritative approve-and-queue route.
   async function addCreatedToSchedule() {
-    if (scheduling || lastCreatedIds.length === 0) return
+    if (scheduling || lastQueueTopics.length === 0) return
     setScheduling(true); setMessage(null)
     try {
-      const count = lastCreatedIds.length
-      const hadLinks = lastPlansCount > 0
-      const enq = await enqueueTopics(lastCreatedIds)
-      if (enq.ok) {
-        setLastCreatedIds([]); setLastPlansCount(0)
-        setQueueSuccess({ count, links: hadLinks })
+      const hadLinks = lastQueueTopics.some((x) => x.expectsLinks)
+      const poolId = await ensurePool()
+      if (!poolId) { setMessage({ text: `${t.queueFailedRetry} (no_pool)`, ok: false }); return }
+      const q = await queueTopicsAuthoritative(poolId, lastQueueTopics)
+      if (q.queuedIds.size > 0) {
+        setLastQueueTopics([])
+        setQueueSuccess({ count: q.queuedIds.size, links: hadLinks })
         setMessage(null)
         onScheduled?.()
       } else {
-        setMessage({ text: `${t.queueFailedRetry}${enq.reason ? ` (${enq.reason})` : ''}`, ok: false })
+        setMessage({ text: `${t.queueFailedRetry}${q.reason ? ` (${q.reason})` : ''}`, ok: false })
       }
     } finally {
       setScheduling(false)
@@ -586,9 +820,57 @@ export default function AutomationIdeas({
           />
         )}
         <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
-          {loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate)}
+          {PRO_FIRST
+            ? (loading ? 'יוצר המלצות…' : 'צור המלצות')
+            : (loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate))}
         </Button>
       </div>
+
+      {/* PRODUCTION model selector — two clear options with a short explanation each.
+          Default מהיר. No model names / tiers / costs here (telemetry lives in QA). The
+          chosen tier is sent EXPLICITLY on every request; one tier per generation run.
+          Stage D: HIDDEN entirely when the global Pro-first controller is active. */}
+      {!PRO_FIRST && (
+      <div className="mb-3" data-testid="reco-quality-selector">
+        <span id="reco-quality-label" className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">{t.qualityChooseLabel}</span>
+        <div role="radiogroup" aria-labelledby="reco-quality-label" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {([
+            { m: 'standard' as const, label: t.qualityFastLabel, desc: t.qualityFastDesc },
+            { m: 'premium' as const, label: t.qualityProLabel, desc: t.qualityProDesc },
+          ]).map(({ m, label, desc }) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={qualityMode === m}
+              aria-label={m === 'premium' ? `${label} — Gemini Pro` : `${label} — Gemini Flash`}
+              onClick={() => chooseQuality(m)}
+              disabled={loading}
+              className={`text-start rounded-lg border px-3 py-2 transition-colors disabled:opacity-60 ${qualityMode === m
+                ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/50'
+                : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}
+            >
+              <span className={`flex items-center gap-1.5 text-sm font-medium ${qualityMode === m ? 'text-indigo-800 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-200'}`}>
+                <span className={`inline-block h-3.5 w-3.5 rounded-full border-2 ${qualityMode === m ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-600'}`} aria-hidden />
+                {label}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      )}
+
+      {/* Operator-only (flag-gated) model-path truthfulness — NEVER shown to customers.
+          Model name / tier / downgrade state stay out of the normal UI (QA/admin only).
+          Stage D: also hidden whenever the Pro-first controller is active. */}
+      {modelPath && QUALITY_SELECTOR_ENABLED && !PRO_FIRST && !loading && (
+        <p className={`text-[11px] mb-2 ${modelPath.downgraded ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`} data-testid="reco-model-path">
+          {modelPath.downgraded
+            ? t.qualityDowngraded.replace('{model}', String(modelPath.model ?? '—'))
+            : t.qualityModelUsed.replace('{model}', String(modelPath.model ?? '—'))}
+        </p>
+      )}
 
       {message && (
         <p className={`text-xs mb-2 ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{message.text}</p>
@@ -673,6 +955,7 @@ export default function AutomationIdeas({
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
           {t.funnelLine
             .replace('{g}', String(meta.funnel.generated))
+            .replace('{e}', String(meta.funnel.engineFiltered ?? 0))
             .replace('{d}', String(meta.funnel.corpusDuplicates))
             .replace('{q}', String(meta.funnel.qualityFiltered))
             .replace('{k}', String(meta.funnel.keywordExists + meta.funnel.titleExists))
@@ -713,13 +996,13 @@ export default function AutomationIdeas({
       {initialLoaded && !loading && !meta && suggestions.length === 0 && (
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t.noSavedIdeas}</p>
       )}
-      {lastCreatedIds.length > 0 && (
+      {lastQueueTopics.length > 0 && (
         <div ref={ctaRef} className="mb-3 rounded-lg border-2 border-indigo-400 dark:border-indigo-500/60 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-3 scroll-mt-4">
           <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{t.ctaTitle}</p>
           <p className="mt-0.5 text-xs text-indigo-800/90 dark:text-indigo-200/90">{t.ctaBody}</p>
-          {/* Link-status summary: none / some / all of the approved topics. */}
+          {/* Link-status summary: none / some / all of the topics being queued. */}
           <p className="mt-1 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
-            {lastPlansCount === 0 ? t.linkSummaryNone : lastPlansCount >= lastCreatedIds.length ? t.linkSummaryAll : t.linkSummaryMixed}
+            {(() => { const withLinks = lastQueueTopics.filter((x) => x.expectsLinks).length; return withLinks === 0 ? t.linkSummaryNone : withLinks >= lastQueueTopics.length ? t.linkSummaryAll : t.linkSummaryMixed })()}
           </p>
           {planSavedHint && (
             <p className="mt-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">{t.planSavedNote}</p>
@@ -760,13 +1043,28 @@ export default function AutomationIdeas({
           <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2">{t.linksOptionalNote}</p>
 
           <div className="space-y-2">
-            {(ideasExpanded ? suggestions : suggestions.slice(0, 3)).map((s) => (
+            {suggestions.slice(0, visibleCount).map((s) => (
               <div key={s.id} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
                 <label className="flex items-start gap-2">
                   <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="mt-1 h-4 w-4 accent-indigo-600" />
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.title}</span>
+                      {/* Per-item "improved with Pro" marker (survives reload). */}
+                      {s.improvedWithPro && (
+                        <Badge variant="success" data-testid="reco-improved-badge">{t.improvedWithProBadge}</Badge>
+                      )}
+                      {/* P0 — recommended destination type (visible, survives reload). */}
+                      {s.recommendedPageType && (
+                        <Badge variant={s.recommendedPageType === 'article' ? 'default' : 'warning'}>
+                          {s.recommendedPageType === 'article' ? t.pageTypeArticle
+                            : s.recommendedPageType === 'commercial_landing_page' ? t.pageTypeCommercialLanding
+                              : s.recommendedPageType === 'category_page' ? t.pageTypeCategory
+                                : s.recommendedPageType === 'service_page' ? t.pageTypeService
+                                  : s.recommendedPageType === 'existing_page_improvement' ? t.pageTypeExistingImprovement
+                                    : t.pageTypeProductImprovement}
+                        </Badge>
+                      )}
                       {/* Phase 4C — hybrid provenance: show each supporting source
                           as a badge + a count when >1 (multi-source agreement). */}
                       {s.supportingSources && s.supportingSources.length > 0 ? (
@@ -784,14 +1082,26 @@ export default function AutomationIdeas({
                       {typeof s.suggestionScore === 'number' && (
                         <span className="text-[10px] text-slate-400">{Math.round(s.suggestionScore * 100)}%</span>
                       )}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); rejectOne(s.id) }}
-                        disabled={rejectingId === s.id}
-                        className="ms-auto text-[11px] text-slate-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
-                      >
-                        {rejectingId === s.id ? t.rejecting : t.reject}
-                      </button>
+                      <span className="ms-auto flex items-center gap-2">
+                        {/* Optional per-item Pro polish — refines only this item's wording. */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); improveOne(s) }}
+                          disabled={improvingId === s.id || !!improvingId}
+                          data-testid="reco-improve-one"
+                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 disabled:opacity-50"
+                        >
+                          {improvingId === s.id ? t.improvingWithPro : t.improveWithPro}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); rejectOne(s.id) }}
+                          disabled={rejectingId === s.id}
+                          className="text-[11px] text-slate-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                        >
+                          {rejectingId === s.id ? t.rejecting : t.reject}
+                        </button>
+                      </span>
                     </div>
                     <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">
                       {t.keywordLabel}: <span className="font-medium">{s.primaryKeyword}</span>
@@ -804,33 +1114,48 @@ export default function AutomationIdeas({
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{t.reasonLabel}: {s.suggestionReason}</div>
                     )}
                     {s.suggestedInternalLinks.length > 0 && (() => {
-                      // Phase 3F.3.6 — split into the PRIMARY commercial link (money
-                      // target) and SUPPORTING links, each with its own heading.
-                      const money = s.moneyTargetUrl ? s.suggestedInternalLinks.find((l) => l.url === s.moneyTargetUrl) : null
-                      const supporting = s.suggestedInternalLinks.filter((l) => !money || l.url !== money.url)
+                      // P0 — render role sections from the CANONICAL linkPlan (roles are
+                      // NEVER re-inferred here). Fallback to the legacy money/supporting
+                      // split for old rows without a link_plan.
                       const linkRow = (l: { url: string; anchor: string }) => (
                         <label key={l.url} className="flex items-start gap-1.5 text-[11px] cursor-pointer">
                           <input type="checkbox" checked={isLinkChecked(s, l.url)} onChange={() => toggleLink(s, l.url)} className="mt-0.5 h-3.5 w-3.5 accent-indigo-600" />
                           <span className="text-slate-600 dark:text-slate-300 break-words">{l.anchor || l.url}</span>
                         </label>
                       )
+                      const asRow = (x: { url: string; title: string }) => linkRow({ url: x.url, anchor: x.title })
+                      const lp = s.linkPlan
+                      const section = (label: string, items: { url: string; title: string }[], cls: string) => items.length > 0 && (
+                        <div className="mt-1.5">
+                          <div className={`text-[10px] font-semibold ${cls}`}>{label}</div>
+                          <div className="mt-0.5 space-y-0.5">{items.map(asRow)}</div>
+                        </div>
+                      )
                       return (
                         <div className="mt-1" dir={isHebrew ? 'rtl' : 'ltr'}>
                           <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{t.internalLinksLabel}</div>
-                          {money ? (
-                            <div className="mt-1">
-                              <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div>
-                              <div className="mt-0.5">{linkRow(money)}</div>
-                            </div>
-                          ) : (
-                            <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>
-                          )}
-                          {supporting.length > 0 && (
-                            <div className="mt-1.5">
-                              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{t.supportingLinks}</div>
-                              <div className="mt-0.5 space-y-0.5">{supporting.map(linkRow)}</div>
-                            </div>
-                          )}
+                          {lp ? (
+                            <>
+                              {lp.primaryCommercialTarget
+                                ? <div className="mt-1">
+                                    <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div>
+                                    <div className="mt-0.5">{asRow(lp.primaryCommercialTarget)}</div>
+                                  </div>
+                                : <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
+                              {section(t.secondaryCommercialLinks, lp.secondaryCommercialTargets, 'text-teal-700 dark:text-teal-300')}
+                              {section(t.supportingLinks, lp.supportingInformationalLinks, 'text-slate-500 dark:text-slate-400')}
+                              {section(t.sourceReferencesLabel, lp.sourceReferences, 'text-slate-400 dark:text-slate-500')}
+                            </>
+                          ) : (() => {
+                            const money = s.moneyTargetUrl ? s.suggestedInternalLinks.find((l) => l.url === s.moneyTargetUrl) : null
+                            const supporting = s.suggestedInternalLinks.filter((l) => !money || l.url !== money.url)
+                            return (<>
+                              {money
+                                ? <div className="mt-1"><div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.primaryCommercialLink}</div><div className="mt-0.5">{linkRow(money)}</div></div>
+                                : <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">{t.noMoneyTargetNote}</p>}
+                              {supporting.length > 0 && <div className="mt-1.5"><div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{t.supportingLinks}</div><div className="mt-0.5 space-y-0.5">{supporting.map(linkRow)}</div></div>}
+                            </>)
+                          })()}
                           <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{t.linksSelectHint}</p>
                         </div>
                       )
@@ -847,14 +1172,28 @@ export default function AutomationIdeas({
                 </label>
               </div>
             ))}
-            {suggestions.length > 3 && (
-              <div className="pt-1">
+            {/* Pagination (B): shown only when more than the initial 3 exist AND some
+                are still hidden. "הצג עוד" reveals +5; "הצג הכל" reveals the rest.
+                Both hide once everything is visible. Buttons stay adjacent and wrap
+                cleanly on mobile. The rendered list is actually sliced (above) — no
+                hidden-via-CSS cards. */}
+            {suggestions.length > INITIAL_VISIBLE && visibleCount < suggestions.length && (
+              <div className="pt-1 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIdeasExpanded((v) => !v)}
+                  data-testid="ideas-show-more"
+                  onClick={() => setVisibleCount((v) => Math.min(suggestions.length, v + PAGE_STEP))}
                   className="inline-flex items-center justify-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-500/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
                 >
-                  {ideasExpanded ? t.showLess : `${t.showMoreIdeas} (${suggestions.length - 3})`}
+                  {`${t.showMoreIdeas} (${Math.min(PAGE_STEP, suggestions.length - visibleCount)})`}
+                </button>
+                <button
+                  type="button"
+                  data-testid="ideas-show-all"
+                  onClick={() => setVisibleCount(suggestions.length)}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-slate-200 dark:border-slate-600 px-3.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors"
+                >
+                  {`${t.showAllIdeas} (${suggestions.length})`}
                 </button>
               </div>
             )}

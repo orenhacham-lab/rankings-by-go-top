@@ -41,13 +41,24 @@ const SEGMENT_SPLIT = /\s+[–—-]\s+|\s*\|\s*|:\s+/
  * Derive one narrower, distinct, supported long-tail primary keyword for a
  * candidate whose primaryKeyword collided with an owned keyword. Returns ok:false
  * when no distinct, non-covered, non-duplicate long-tail can be formed.
+ *
+ * TITLE AFFINITY (proven live defect): the salvaged keyword replaces the primary
+ * while the TITLE stays unchanged, so a secondary about a different subject (groom
+ * SHOES on a groom-SUIT article) must never be promoted — a salvage result must
+ * share a non-trivial content token with the candidate's own title.
  */
 export function salvageLongTailKeyword(candidate: SalvageCandidate, checks: SalvageChecks): SalvageResult {
   const broad = normalizePhrase(candidate.primaryKeyword)
+  const titleToks = new Set(normalizePhrase(candidate.title).split(' ').filter((t) => t.length > 2))
+  const sharesTitle = (kw: string): boolean => {
+    const ts = normalizePhrase(kw).split(' ').filter((t) => t.length > 2)
+    return ts.length === 0 || ts.some((t) => titleToks.has(t))
+  }
   const acceptable = (kw: string): boolean => {
     const nk = normalizePhrase(kw)
     if (!nk || nk === broad) return false
     if (nk.split(' ').length < 2) return false // long-tail must be multi-word
+    if (!sharesTitle(kw)) return false // keyword may not drift off the title's subject
     if (checks.isOwnedKeyword(nk)) return false
     if (checks.isSemanticKeywordDup(kw)) return false
     if (checks.isCoveredByContent(candidate.title, kw)) return false

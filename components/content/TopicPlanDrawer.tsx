@@ -99,6 +99,9 @@ export default function TopicPlanDrawer({
   // responses; abortRef cancels an in-flight load when topic/open changes.
   const reqIdRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
+  // Identity of the cached snapshot under review (from the dry-run GET), echoed on save so
+  // the server persists THIS reviewed plan and refuses (typed 409) only if the cache changed.
+  const reviewedSnapshotRef = useRef<{ scannerVersion: string | null; scanCompletedAt: string | null } | null>(null)
 
   const emitStatus = useCallback((s: { exists: boolean; links: SavedLink[]; batch: SavedBatch | null; stale: boolean }) => {
     if (!topic) return
@@ -163,6 +166,7 @@ export default function TopicPlanDrawer({
       const res = await fetch(`/api/content/automation/internal-links/plan?projectId=${encodeURIComponent(projectId)}&topicIds=${encodeURIComponent(topic.id)}`)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setDry({ selected: [], rejected: [], summary: '', cacheState: data.cacheState || 'missing', warnings: data.warnings || [data.warning].filter(Boolean), moneyTargetUrl: null }); return }
+      reviewedSnapshotRef.current = { scannerVersion: typeof data.scannerVersion === 'string' ? data.scannerVersion : null, scanCompletedAt: typeof data.scanCompletedAt === 'string' ? data.scanCompletedAt : null }
       const plan = Array.isArray(data.topics) ? data.topics[0] : null
       const selected: DryItem[] = plan?.selected ?? []
       setManualSel(new Set())
@@ -205,9 +209,9 @@ export default function TopicPlanDrawer({
       const checkedCount = recommended.length + manual.length
       res = await fetch('/api/content/automation/internal-links/plan/bulk-save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve }),
+        body: JSON.stringify({ projectId, topicIds: [topic.id], selectedLinks: [...recommended, ...manual], approve, reviewedSnapshot: reviewedSnapshotRef.current ?? undefined }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.warning || d.error || t.saveError); return { ok: false, warning: null } }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.reason === 'cache_changed_replan_required' ? t.cacheChanged : (d.warning || d.error || t.saveError)); return { ok: false, warning: null } }
       if (approve) {
         const d = await res.json().catch(() => ({}))
         const r0 = Array.isArray(d.results) ? d.results[0] : null

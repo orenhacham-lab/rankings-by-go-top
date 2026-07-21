@@ -13,6 +13,9 @@ export type SeoMetaStatus =
   | 'plugin_unavailable'
   | 'permission_error'
   | 'exact_failure'
+  // Core REST could not persist the protected SEO meta and the connected site does NOT expose
+  // the GO TOP SEO companion endpoint — the values were NOT applied (never a success).
+  | 'seo_bridge_required'
 
 export interface TaxonomySelection {
   primaryCategoryId: number | null
@@ -132,4 +135,37 @@ export function verifySeoMeta(written: Record<string, string>, readback: Record<
     if (String(val).trim() !== written[key]) return 'written_not_verifiable'
   }
   return 'verified'
+}
+
+/** Per-field verification (SAFE for diagnostics — reports key names + present/matches only,
+ *  never the values). Used by the companion-bridge readback and Preview logging. */
+export function verifySeoMetaPerField(written: Record<string, string>, readback: Record<string, unknown> | null): { key: string; present: boolean; verified: boolean }[] {
+  return Object.keys(written).map((key) => {
+    const got = readback && typeof readback === 'object' ? readback[key] : undefined
+    const val = typeof got === 'string' ? got : Array.isArray(got) && typeof got[0] === 'string' ? got[0] : ''
+    const present = got !== undefined && got !== null && String(val).length > 0
+    return { key, present, verified: present && String(val).trim() === written[key] }
+  })
+}
+
+/** Whether the detected site exposes the GO TOP SEO companion bridge namespace. */
+export function hasSeoBridgeNamespace(namespaces: unknown): boolean {
+  return Array.isArray(namespaces) && namespaces.map((n) => String(n).toLowerCase()).includes('gotop/v1')
+}
+
+/**
+ * TRUTHFUL classification of an SEO-meta outcome for the UI. success ONLY when the values
+ * were confirmed applied (verified). Everything else is a warning/setup/error — never a
+ * silent success.
+ */
+export function classifySeoStatus(status: SeoMetaStatus): { success: boolean; severity: 'success' | 'warning' | 'setup' | 'error' } {
+  switch (status) {
+    case 'verified': return { success: true, severity: 'success' }
+    case 'plugin_unavailable': return { success: false, severity: 'setup' }
+    case 'seo_bridge_required': return { success: false, severity: 'setup' }
+    case 'permission_error': return { success: false, severity: 'error' }
+    case 'written_not_verifiable': return { success: false, severity: 'warning' }
+    case 'exact_failure': return { success: false, severity: 'error' }
+    default: return { success: false, severity: 'error' }
+  }
 }
