@@ -51,15 +51,18 @@ async function main() {
     check('retry is idempotent → alreadyMatching, no new rows', r2.updated === 0 && r2.alreadyMatching === 2 && r2.failed === 0 && tables[TABLE].length === 2)
   }
 
-  // Mixed: one new, one already-matching, one locked by created_topic (failed, never overwritten).
+  // FIX 2 — ALL-OR-NOTHING: one created_topic lock among several → ZERO writes + typed 409;
+  // no unlocked opportunity is changed.
   {
     const { admin, tables } = mkAdmin({ [TABLE]: [
-      { project_id: 'p', opportunity_id: 'o2', decision: 'irrelevant', created_topic_id: null },
       { project_id: 'p', opportunity_id: 'o3', decision: 'created_topic', created_topic_id: 't1' },
     ] })
-    const r = await upsertHideDecisionsBatch(admin, base({ userId: 'u', projectId: 'p', windowDays: 90, syncRunId: 'run-90', decision: 'irrelevant', opportunities: [opp('o1'), opp('o2'), opp('o3')] }))
-    check('mixed: 1 updated, 1 alreadyMatching, 1 failed (locked)', r.updated === 1 && r.alreadyMatching === 1 && r.failed === 1 && r.failedOpportunityIds.join(',') === 'o3')
-    check('created_topic lock never overwritten', tables[TABLE].find((x) => x.opportunity_id === 'o3')?.decision === 'created_topic')
+    let code: string | null = null; let status = 0
+    try {
+      await upsertHideDecisionsBatch(admin, base({ userId: 'u', projectId: 'p', windowDays: 90, syncRunId: 'run-90', decision: 'irrelevant', opportunities: [opp('o1'), opp('o2'), opp('o3')] }))
+    } catch (e) { code = (e as { code?: string }).code ?? null; status = (e as { status?: number }).status ?? 0 }
+    check('(FIX2) one lock → throws decision_locked_by_created_topic 409', code === 'decision_locked_by_created_topic' && status === 409)
+    check('(FIX2) zero writes: no unlocked opportunity was changed (o1/o2 absent, o3 intact)', tables[TABLE].length === 1 && tables[TABLE][0].opportunity_id === 'o3' && tables[TABLE][0].decision === 'created_topic')
   }
 
   // Failure is truthful (no silent success): a DB error on upsert → all failed.

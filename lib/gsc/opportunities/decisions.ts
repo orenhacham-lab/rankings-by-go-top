@@ -136,10 +136,12 @@ export interface GroupedDecisionResult { updated: number; alreadyMatching: numbe
 
 /**
  * Stage E2C — apply ONE hide/handled decision ('already_covered' | 'irrelevant') to EVERY
- * opportunity of a client recommendation, as a single authoritative server operation. Opportunities
- * are the SERVER-recomputed set (never trusted from the browser). Idempotent (array upsert on
- * (project_id, opportunity_id)); a created_topic-locked opportunity is reported as failed and never
- * silently overwritten. Never writes created_topic and never touches article_topics.
+ * opportunity of a client recommendation, as a single authoritative, ALL-OR-NOTHING server
+ * operation. Opportunities are the SERVER-recomputed set (never trusted from the browser). If ANY
+ * related opportunity is locked by a created_topic decision, ZERO writes are performed and a typed
+ * 409 is thrown (no partial update). Otherwise the remaining rows are written in one array upsert
+ * (idempotent on (project_id, opportunity_id)). Never writes created_topic; never touches
+ * article_topics.
  */
 export async function upsertHideDecisionsBatch(admin: Admin, params: {
   userId: string; projectId: string; windowDays: 28 | 90; syncRunId: string
@@ -152,13 +154,18 @@ export async function upsertHideDecisionsBatch(admin: Admin, params: {
   const existing = new Map<string, DecisionKind>()
   for (const r of (existingRows ?? []) as { opportunity_id: string; decision: DecisionKind }[]) existing.set(r.opportunity_id, r.decision)
 
+  // ALL-OR-NOTHING: a single created_topic lock aborts the whole group BEFORE any write.
+  for (const o of params.opportunities) {
+    if (existing.get(o.id) === 'created_topic') {
+      throw new DecisionError('decision_locked_by_created_topic', 409, 'This recommendation includes an opportunity that already has a created topic.')
+    }
+  }
+
   const failedOpportunityIds: string[] = []
   let alreadyMatching = 0
   const toApply: Opportunity[] = []
   for (const o of params.opportunities) {
-    const prev = existing.get(o.id)
-    if (prev === 'created_topic') { failedOpportunityIds.push(o.id); continue } // locked — never overwrite
-    if (prev === params.decision) { alreadyMatching++; continue }
+    if (existing.get(o.id) === params.decision) { alreadyMatching++; continue }
     toApply.push(o)
   }
 

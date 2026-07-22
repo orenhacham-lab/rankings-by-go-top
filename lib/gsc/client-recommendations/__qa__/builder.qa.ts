@@ -40,22 +40,43 @@ function main() {
 
   // ── Page-owned consolidation + distinct-need preservation ────────────────────────
   {
+    // FIX 1 — word-order variants with EQUAL content-token identity consolidate into one card.
     const res = build([
-      opp({ id: 'p1', opportunityType: 'improve_existing_page', page: 'https://x.co/kango/', primaryQuery: 'אימון קונגו', queryIntent: 'informational', impressions: 2000, clicks: 10 }),
-      opp({ id: 'p2', opportunityType: 'improve_existing_page', page: 'https://x.co/kango/', primaryQuery: 'קנגו ספורט', queryIntent: 'informational', impressions: 1000, clicks: 5 }),
+      opp({ id: 'p1', opportunityType: 'improve_existing_page', page: 'https://x.co/chest/', primaryQuery: 'תרגילי חזה משקולות', queryIntent: 'informational', impressions: 2000, clicks: 10 }),
+      opp({ id: 'p2', opportunityType: 'improve_existing_page', page: 'https://x.co/chest/', primaryQuery: 'משקולות תרגילי חזה', queryIntent: 'informational', impressions: 1000, clicks: 5 }),
     ])
     const card = res.recommendations[0]
-    check('page-owned consolidation: same page+category+intent → ONE card', res.recommendations.length === 1)
-    check('distinct needs preserved as needGroups', card.needGroups.length === 2 && card.relatedOpportunityIds.join(',') === 'p1,p2')
-    check('metrics aggregated (impressions 3000, clicks 15)', card.metrics.impressions === 3000 && card.metrics.clicks === 15)
+    check('(FIX1) equal-token word-order variants merge → ONE card', res.recommendations.length === 1)
+    check('(FIX1) distinct needs preserved as needGroups', card.needGroups.length === 2 && card.relatedOpportunityIds.join(',') === 'p1,p2')
+    check('(FIX1) metrics aggregated (impressions 3000, clicks 15)', card.metrics.impressions === 3000 && card.metrics.clicks === 15)
+  }
+  {
+    // FIX 1 — unrelated informational needs on the SAME page + category stay SEPARATE.
+    const res = build([
+      opp({ id: 'u1', opportunityType: 'improve_existing_page', page: 'https://x.co/tread/', primaryQuery: 'איך לבחור הליכון לדירה קטנה', queryIntent: 'informational', impressions: 900 }),
+      opp({ id: 'u2', opportunityType: 'improve_existing_page', page: 'https://x.co/tread/', primaryQuery: 'הליכון לשיקום לאחר ניתוח', queryIntent: 'informational', impressions: 800 }),
+    ])
+    check('(FIX1) unrelated same-page informational needs stay separate (2 cards)', res.recommendations.length === 2)
+    check('(FIX1) stable ids differ for different needs', res.recommendations[0].id !== res.recommendations[1].id)
+    check('(FIX1) same page + category + intent is NOT sufficient to merge', res.recommendations.every((r) => r.category === 'improve_page' && r.affectedPage === 'https://x.co/tread/'))
   }
   {
     // different intent cluster on the same page → separate cards (distinct need)
     const res = build([
-      opp({ id: 'i1', opportunityType: 'improve_existing_page', page: 'https://x.co/shared/', queryIntent: 'informational', impressions: 900 }),
-      opp({ id: 'i2', opportunityType: 'improve_existing_page', page: 'https://x.co/shared/', queryIntent: 'commercial', impressions: 800 }),
+      opp({ id: 'i1', opportunityType: 'improve_existing_page', page: 'https://x.co/shared/', primaryQuery: 'מדריך שירות', queryIntent: 'informational', impressions: 900 }),
+      opp({ id: 'i2', opportunityType: 'improve_existing_page', page: 'https://x.co/shared/', primaryQuery: 'מדריך שירות', queryIntent: 'commercial', impressions: 800 }),
     ])
     check('distinct intent on same page → 2 cards (capped at 2/page)', res.recommendations.length === 2 && res.recommendations.every((r) => r.category === 'improve_page'))
+  }
+  {
+    // FIX 1 — 2-per-page cap keeps the TWO STRONGEST distinct needs (by priority → impressions → id).
+    const res = build([
+      opp({ id: 'w', opportunityType: 'improve_existing_page', page: 'https://x.co/hub/', primaryQuery: 'צורך חלש', queryIntent: 'informational', impressions: 100, opportunityScore: 10 }),
+      opp({ id: 'm', opportunityType: 'improve_existing_page', page: 'https://x.co/hub/', primaryQuery: 'צורך בינוני', queryIntent: 'informational', impressions: 2000, opportunityScore: 40 }),
+      opp({ id: 's', opportunityType: 'improve_existing_page', page: 'https://x.co/hub/', primaryQuery: 'צורך חזק', queryIntent: 'informational', impressions: 5000, opportunityScore: 60 }),
+    ])
+    const kept = res.recommendations.filter((r) => r.affectedPage === 'https://x.co/hub/')
+    check('(FIX1) 2-per-page keeps the two strongest needs', kept.length === 2 && kept[0].relatedOpportunityIds.includes('s') && kept[1].relatedOpportunityIds.includes('m') && !res.recommendations.some((r) => r.relatedOpportunityIds.includes('w')))
   }
 
   // ── Overlap (D) + primary-page threshold ─────────────────────────────────────────

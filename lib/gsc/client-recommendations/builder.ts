@@ -153,7 +153,12 @@ export function buildClientRecommendations(params: {
       category = baseCategory(o)
       if (!category) continue
       pageKey = urlKey(o.page)
-      needSig = intentCluster(o.queryIntent) // page-owned consolidation groups by intent cluster
+      // Distinct-need identity: intent cluster + the deterministic GSC content-token set. Same
+      // page + category + intent is NOT sufficient — only opportunities whose MEANINGFUL token set is
+      // equal (e.g. pure word-order variants) consolidate; materially different needs stay separate.
+      // Preserves location/audience/timing/subtype/problem/comparison/use-case modifiers (any
+      // distinguishing content token changes the signature). No fuzzy/edit-distance/LLM/stemming.
+      needSig = `${intentCluster(o.queryIntent)}|${contentTokenSet(o.primaryQuery).join(' ')}`
       affectedPage = o.page
     }
     const key = `${category}|${pageKey}|${needSig}`
