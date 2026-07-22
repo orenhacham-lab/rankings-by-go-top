@@ -171,6 +171,8 @@ export async function runProFirstProduction(
     rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 0,
     finalCount: 0, model_calls: preparationProviderCalls, stop_reason: 'insufficient_inventory',
     brief_consumption: { effectivePoolSize: snapshot.workingPool.length, consumedBriefs: 0, remainingBriefs: snapshot.workingPool.length, callsRemaining: 0 },
+    thirdRefillEligible: false,
+    thirdRefillUsed: false,
     insufficient_inventory: true, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],
     competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [], acceptedMatches: [] },
     cost: { estimatedRunCostUsd: 0, totalCalls: preparationProviderCalls, calls: [], totalPaidCalls: preparationProviderCalls, estimatedRunCostIls: 0, costPerAcceptedTopic: 0, configuredCostCeilingUsd: controller.budget.maxEstimatedCostUsd, remainingBudgetUsd: 0, callsPreventedByBudget: 0, configuredMaxCalls: controller.budget.maxModelCallsPerRun },

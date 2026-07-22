@@ -98,7 +98,7 @@ function main() {
   check('(16) consumedGscBriefIds derived from the real consumption map', /consumedGscBriefIds = workingPool\.filter\(\(b\) => b\.opportunityId\.startsWith\('gsc:'\) && consumptionByBriefId\.has/.test(gen))
   check('(17) acceptedGscBriefIds derived from accepted candidate outcomes', /acceptedGscBriefIds = candidateOutcomes\.filter\(\(o\) => o\.outcome === 'accepted' && \(o\.opportunityId \?\? ''\)\.startsWith\('gsc:'\)\)/.test(gen))
   check('(18) selected ≠ consumed (distinct fields carried)', /combinedPoolSizeBeforeDiscovery/.test(gen) && /consumedGscBriefCount/.test(gen))
-  check('(20) paid-call cap unchanged (MAX_ROUNDS = 2)', /const MAX_ROUNDS = 2/.test(gen))
+  check('(20) paid-call cap = 3 total (bounded third refill)', /const PAID_CALL_CAP = 3/.test(gen))
   check('(discoverySkip) skip-because-GSC flag set truthfully', /discoverySkippedBecauseGscFilledDeficit = gscInput\.enabled && pool\.length < input\.targetCount && workingPool\.length >= input\.targetCount/.test(gen))
 
   const gscBriefs = read('lib/content/recommendations/gsc-briefs.ts')

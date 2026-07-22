@@ -243,6 +243,9 @@ export interface BriefRunDiagnostics {
   stop_reason: 'target_reached' | 'true_pool_exhausted' | 'call_cap_reached' | 'zero_marginal_yield' | 'insufficient_inventory' | 'provider_failed' | 'budget_stopped' | 'synthesis_failed'
   /** consumedBriefs + remainingBriefs = effectivePoolSize (stop-reason reconciliation). */
   brief_consumption: { effectivePoolSize: number; consumedBriefs: number; remainingBriefs: number; callsRemaining: number }
+  /** Bounded third-refill throughput diagnostics (Preview/operator only via the route). */
+  thirdRefillEligible: boolean
+  thirdRefillUsed: boolean
   insufficient_inventory: boolean
   secondary_keywords_filtered: number
   /** Per-project corpus-derived domain/type/container words (the DISCRIMINATIVE
@@ -264,7 +267,10 @@ export interface BriefRunDiagnostics {
   }
 }
 
-const MAX_ROUNDS = 2
+// Paid-call cap for the evidence-first preparation/synthesis flow (discovery + synthesis together):
+// at most THREE. Without discovery → up to 3 synthesis rounds; with discovery → up to 2. The third
+// (bounded refill) call is additionally gated by strict throughput conditions (see the loop).
+const PAID_CALL_CAP = 3
 
 /** A genuinely-new GSC-origin brief carries the `gsc:` opportunityId prefix (merged GSC evidence
  *  lives on a normal brief and is NOT one of these). */
@@ -1249,12 +1255,31 @@ export async function synthesizeFromSnapshot(
   let participationNaturalGscInFirstBatch = 0
   let participationAppendedIds: string[] = []
 
-  // Paid-call cap: discovery + synthesis together may never exceed TWO calls.
-  const maxSynthesisRounds = discovery?.ran ? 1 : MAX_ROUNDS
+  // Paid-call cap: discovery + synthesis together may never exceed THREE calls (no discovery → up
+  // to 3 synthesis rounds; discovery used → up to 2). The round making total paid calls === 3 is the
+  // BOUNDED REFILL and runs only under strict throughput conditions.
+  const maxSynthesisRounds = PAID_CALL_CAP - (discovery?.ran ? 1 : 0)
+  let thirdRefillEligible = false
+  let thirdRefillUsed = false
+  // Bounded-refill gate (conditions 1-4, 6, 7 — 5 "no failure" is guaranteed by !stop). Pure,
+  // non-mutating read of current state + the authoritative controller.
+  const canRunBoundedRefill = (): boolean => {
+    const shortfall = input.targetCount - suggestions.length
+    const unconsumed = workingPool.length - consumptionByBriefId.size
+    const controllerOk = !controller.billingExhausted && controller.callCount < controller.budget.maxModelCallsPerRun
+    return suggestions.length > 0 && shortfall >= 3 && unconsumed >= 8 && controllerOk
+  }
 
   if (workingPool.length === 0) stop = 'insufficient_inventory'
 
   for (let round = 1; round <= maxSynthesisRounds && !stop; round++) {
+    // The round that would be the 3rd total paid call is the bounded refill — gate it strictly.
+    const isBoundedRefillRound = (round - 1) + (discovery?.ran ? 1 : 0) >= 2
+    if (isBoundedRefillRound) {
+      if (!canRunBoundedRefill()) break // conditions not met → stop at the cap (no extra call)
+      thirdRefillEligible = true
+      thirdRefillUsed = true
+    }
     const deficit = input.targetCount - suggestions.length
     if (deficit <= 0) { stop = 'target_reached'; break }
     // Batch size: the deficit + a small validation allowance (bounded) — never
@@ -1362,7 +1387,15 @@ export async function synthesizeFromSnapshot(
     rd.marginal_yield = rd.briefs_sent > 0 ? Number((rd.accepted / rd.briefs_sent).toFixed(3)) : 0
 
     if (suggestions.length >= input.targetCount) { stop = 'target_reached'; break }
-    if (rd.accepted === 0) { stop = suggestions.length > 0 ? 'zero_marginal_yield' : (cursor >= workingPool.length ? 'insufficient_inventory' : 'zero_marginal_yield'); break }
+    if (rd.accepted === 0) {
+      // A zero-yield round no longer stops immediately IF earlier rounds already accepted ≥1 and a
+      // single bounded refill round is still available (conditions met) — proceed once to that
+      // final refill using the next unconsumed briefs. Otherwise stop as before.
+      const nextPriorPaidCalls = round + (discovery?.ran ? 1 : 0)
+      const nextIsBoundedRefill = (round + 1) <= maxSynthesisRounds && nextPriorPaidCalls >= 2
+      if (nextIsBoundedRefill && canRunBoundedRefill()) { thirdRefillEligible = true; continue }
+      stop = suggestions.length > 0 ? 'zero_marginal_yield' : (cursor >= workingPool.length ? 'insufficient_inventory' : 'zero_marginal_yield'); break
+    }
     if (cursor >= workingPool.length) { stop = suggestions.length > 0 ? 'true_pool_exhausted' : 'insufficient_inventory'; break }
   }
   // The loop ended without an in-loop stop only because the CALL CAP was reached
@@ -1488,7 +1521,9 @@ export async function synthesizeFromSnapshot(
       // TOTAL paid calls: synthesis rounds + the (single) discovery call.
       model_calls: rounds.length + (discovery?.ran ? 1 : 0),
       stop_reason: stop,
-      brief_consumption: { effectivePoolSize, consumedBriefs, remainingBriefs, callsRemaining: Math.max(0, 2 - totalPaidCalls) },
+      brief_consumption: { effectivePoolSize, consumedBriefs, remainingBriefs, callsRemaining: Math.max(0, PAID_CALL_CAP - totalPaidCalls) },
+      thirdRefillEligible,
+      thirdRefillUsed,
       insufficient_inventory: stop === 'insufficient_inventory',
       secondary_keywords_filtered: secondaryKeywordsFiltered,
       domainTypeWords: Array.from(domainTypeWords),

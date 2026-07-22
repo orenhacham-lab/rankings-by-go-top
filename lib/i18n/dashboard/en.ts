@@ -117,6 +117,7 @@ export const dashboardEn = {
         label: 'Preview diagnostics',
         pool: 'pool', evaluated: 'evaluated', generated: 'generated', engine: 'engine-accepted', final: 'final-ready',
         saved: 'saved', stop: 'stop', callsLeft: 'calls left', gscConsumed: 'GSC evaluated', gscSupported: 'GSC supported',
+        remaining: 'remaining', rounds: 'rounds', refill: 'third-refill', topRejections: 'top rejections',
       },
       gscStatus: {
         supported: (supported: number) => supported === 1

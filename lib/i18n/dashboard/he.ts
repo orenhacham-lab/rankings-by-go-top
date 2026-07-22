@@ -115,6 +115,7 @@ export const dashboardHe = {
         label: 'אבחון Preview',
         pool: 'מאגר', evaluated: 'נבדקו', generated: 'נוצרו', engine: 'עברו מנוע', final: 'עברו סינון סופי',
         saved: 'נשמרו', stop: 'סיום', callsLeft: 'קריאות שנותרו', gscConsumed: 'GSC נבדקו', gscSupported: 'GSC נתמכו',
+        remaining: 'נותרו במאגר', rounds: 'סבבים', refill: 'רענון שלישי', topRejections: 'דחיות מובילות',
       },
       gscStatus: {
         supported: (supported: number) => supported === 1

@@ -21,7 +21,7 @@ type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: str
 type ScanSources = { projectData: boolean; websiteScan: boolean; keywordResearch: boolean; searchConsole: boolean }
 type GscRunState = 'supported' | 'evaluated_none_accepted' | 'eligible_not_consumed' | 'no_eligible' | 'not_connected' | 'no_property' | 'never_synced' | 'read_failed' | 'disabled'
 type GscRunSummary = { state: GscRunState; evaluatedCount: number; supportedResultCount: number }
-type OperatorRunDiag = { pool: number | null; evaluated: number | null; generated: number; engineAccepted: number; finalReady: number; persisted: number; stopReason: string | null; callsRemaining: number | null; gscConsumed: number; gscSupported: number }
+type OperatorRunDiag = { pool: number | null; evaluated: number | null; generated: number; engineAccepted: number; finalReady: number; persisted: number; stopReason: string | null; callsRemaining: number | null; gscConsumed: number; gscSupported: number; remainingPool?: number | null; synthesisRounds?: number | null; thirdRefillEligible?: boolean; thirdRefillUsed?: boolean; topRejectionReasons?: { reason: string; count: number }[] }
 
 /** Phase 3I.6 — per-rejected-idea evidence of WHAT blocked it (from
  *  meta.debug.primaryKeywordMatches; returned on runs that added nothing new). */
@@ -899,8 +899,14 @@ export default function AutomationIdeas({
       {/* Preview/operator-only low-yield diagnostic — present in the response ONLY when isolation
           diagnostics are on and this is not Production. Small muted text; existing counts only. */}
       {meta?.operatorRunDiag && !loading && (
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-1" dir="rtl">
+          {t.opDiag.label}: {t.opDiag.pool} {meta.operatorRunDiag.pool ?? '—'} · {t.opDiag.evaluated} {meta.operatorRunDiag.evaluated ?? '—'} · {meta.operatorRunDiag.remainingPool != null ? `${t.opDiag.remaining} ${meta.operatorRunDiag.remainingPool} · ` : ''}{t.opDiag.generated} {meta.operatorRunDiag.generated} · {t.opDiag.engine} {meta.operatorRunDiag.engineAccepted} · {t.opDiag.final} {meta.operatorRunDiag.finalReady} · {t.opDiag.saved} {meta.operatorRunDiag.persisted}{meta.operatorRunDiag.synthesisRounds != null ? ` · ${t.opDiag.rounds} ${meta.operatorRunDiag.synthesisRounds}` : ''} · {t.opDiag.refill} {meta.operatorRunDiag.thirdRefillUsed ? '✓' : meta.operatorRunDiag.thirdRefillEligible ? '~' : '✗'} · {t.opDiag.gscConsumed} {meta.operatorRunDiag.gscConsumed} · {t.opDiag.gscSupported} {meta.operatorRunDiag.gscSupported}{meta.operatorRunDiag.callsRemaining != null ? ` · ${t.opDiag.callsLeft} ${meta.operatorRunDiag.callsRemaining}` : ''}{meta.operatorRunDiag.stopReason ? ` · ${t.opDiag.stop}: ${meta.operatorRunDiag.stopReason}` : ''}
+        </p>
+      )}
+      {/* Part 2 — Preview/operator-only top rejection reasons (count-only, deterministic). */}
+      {meta?.operatorRunDiag?.topRejectionReasons && meta.operatorRunDiag.topRejectionReasons.length > 0 && !loading && (
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2" dir="rtl">
-          {t.opDiag.label}: {t.opDiag.pool} {meta.operatorRunDiag.pool ?? '—'} · {t.opDiag.evaluated} {meta.operatorRunDiag.evaluated ?? '—'} · {t.opDiag.generated} {meta.operatorRunDiag.generated} · {t.opDiag.engine} {meta.operatorRunDiag.engineAccepted} · {t.opDiag.final} {meta.operatorRunDiag.finalReady} · {t.opDiag.saved} {meta.operatorRunDiag.persisted} · {t.opDiag.gscConsumed} {meta.operatorRunDiag.gscConsumed} · {t.opDiag.gscSupported} {meta.operatorRunDiag.gscSupported}{meta.operatorRunDiag.callsRemaining != null ? ` · ${t.opDiag.callsLeft} ${meta.operatorRunDiag.callsRemaining}` : ''}{meta.operatorRunDiag.stopReason ? ` · ${t.opDiag.stop}: ${meta.operatorRunDiag.stopReason}` : ''}
+          {t.opDiag.topRejections}: {meta.operatorRunDiag.topRejectionReasons.map((r) => `${r.reason} ${r.count}`).join(' · ')}
         </p>
       )}
       {/* Phase 4C — hybrid per-provider transparency: which sources ran, and a

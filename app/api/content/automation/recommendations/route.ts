@@ -585,6 +585,15 @@ export async function POST(request: Request) {
             callsRemaining: briefDiagnostics?.brief_consumption?.callsRemaining ?? null,
             gscConsumed: gscInputForSummary?.consumedGscBriefCount ?? 0,
             gscSupported: gscBackedFingerprints.size,
+            // Part 2 — throughput + rejection transparency (count-only; no prompts/ids/queries/bodies).
+            remainingPool: briefDiagnostics?.brief_consumption?.remainingBriefs ?? null,
+            synthesisRounds: briefDiagnostics?.rounds?.length ?? null,
+            thirdRefillEligible: briefDiagnostics?.thirdRefillEligible ?? false,
+            thirdRefillUsed: briefDiagnostics?.thirdRefillUsed ?? false,
+            topRejectionReasons: Object.entries(briefDiagnostics?.rejected_by_reason ?? {})
+              .map(([reason, count]) => ({ reason, count: count as number }))
+              .sort((a, b) => b.count - a.count || (a.reason < b.reason ? -1 : a.reason > b.reason ? 1 : 0))
+              .slice(0, 5),
           },
         } : {}),
         // Back-compat aliases.
