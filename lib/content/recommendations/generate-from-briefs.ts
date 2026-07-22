@@ -51,7 +51,7 @@ import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
 import { slugKey } from './dedupe'
 import { normalizeText } from './topic-idea-store'
-import { buildBriefPool, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
+import { buildBriefPool, buildBusinessPillars, prioritizeBriefsForSynthesis, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
 import { integrateGscBriefs } from './gsc-briefs'
 import { isGscAutoRecommendationsEnabled } from '@/lib/gsc/config'
 import type { GscInputDiagnostics } from '@/lib/gsc/recommendations/types'
@@ -560,13 +560,43 @@ export async function prepareBriefRun(
     kr_live_fetched: krLiveFetched,
   }
 
+  // ── 4a) Stage E3A — additive, flag-gated GSC evidence, BEFORE constrained discovery ──
+  // Disabled → zero GSC reads, no mutation, and prioritizedPool = pool (byte-identical to
+  // today). Enabled → eligible GSC content-gap opportunities are re-guarded, merged into an
+  // existing normal brief (attaching provenance) or admitted as new GSC-origin briefs within
+  // the accepted source budget, and the COMBINED normal+GSC pool passes through the SAME
+  // priority + family-round-robin (no GSC-specific tier). This lets GSC fill a deficit so an
+  // unnecessary constrained-discovery call is not spent, and lets a GSC brief reach a batch by
+  // its own earned priority.
+  const gscIntegration = await integrateGscBriefs({
+    admin,
+    projectId: input.projectId,
+    userId: input.userId ?? '',
+    enabled: isGscAutoRecommendationsEnabled(),
+    targetCount: input.targetCount,
+    existingPool: pool,
+    isCoveredByContent: (subject) => coveredByExistingContent(guard, subject, subject),
+    isOwnedByEntity: (subject) => ownedByExistingEntity(guard, subject),
+    blogDuplicateSignatures,
+  })
+  const gscContributed = gscIntegration.gscBriefs.length > 0
+  const prioritizedPool = gscContributed
+    ? prioritizeBriefsForSynthesis([...pool, ...gscIntegration.gscBriefs], { pillars: buildBusinessPillars({ trackedKeywords: tracked, projectFocus: projectFocusForBriefs, entities }) })
+    : pool
+
   // ── 4b) CONSTRAINED DISCOVERY (RC3) — ONE batched call, only for a deficit ──
-  // Runs at the EXACT pre-split point: right after pool construction, gated on the
-  // same deficit condition, accounted through the same controller, augmenting the
-  // same workingPool. (Only the per-attempt closures that used to sit textually
-  // above this block — and never executed during preparation — moved to synthesis.)
+  // Runs at the EXACT pre-split point: right after pool construction (now the COMBINED
+  // normal+GSC pool), gated on the same deficit condition, accounted through the same
+  // controller, augmenting the same workingPool. Discovery duplicate signatures are taken
+  // from workingPool below, so they include admitted GSC briefs.
   let discovery: BriefRunDiagnostics['discovery'] = null
-  const workingPool = [...pool]
+  const workingPool = [...prioritizedPool]
+  const gscInput = gscIntegration.diagnostics
+  gscInput.combinedPoolSizeBeforeDiscovery = workingPool.length
+  gscInput.discoveryDeficitAfterGsc = Math.max(0, input.targetCount - workingPool.length)
+  // Discovery is skipped-thanks-to-GSC when the normal pool alone was below target but the
+  // combined normal+GSC pool reaches it.
+  gscInput.discoverySkippedBecauseGscFilledDeficit = gscInput.enabled && pool.length < input.targetCount && workingPool.length >= input.targetCount
   if (workingPool.length < input.targetCount && modelPath.model) {
     const deficit = input.targetCount - workingPool.length
     // Owned anchors: category/service/product names + real focus areas (exact strings).
@@ -615,30 +645,15 @@ export async function prepareBriefRun(
     }
   }
 
-  // ── Stage E3A — additive, flag-gated GSC evidence source ────────────────────
-  // When disabled: zero GSC reads, no pool/order/prompt/target change (byte-identical).
-  // When enabled: eligible GSC content-gap opportunities are re-guarded, merged into an
-  // existing brief (attaching provenance) or appended as new GSC-origin briefs within a
-  // deterministic source budget. GSC never bypasses a safeguard.
-  const gscIntegration = await integrateGscBriefs({
-    admin,
-    projectId: input.projectId,
-    userId: input.userId ?? '',
-    enabled: isGscAutoRecommendationsEnabled(),
-    targetCount: input.targetCount,
-    existingPool: workingPool,
-    isCoveredByContent: (subject) => coveredByExistingContent(guard, subject, subject),
-    isOwnedByEntity: (subject) => ownedByExistingEntity(guard, subject),
-    blogDuplicateSignatures,
-  })
-  workingPool.push(...gscIntegration.gscBriefs)
+  // GSC was integrated BEFORE discovery (§4a); record the post-discovery combined size.
+  gscInput.combinedPoolSizeAfterDiscovery = workingPool.length
 
   return {
     input,
     language,
     langLabel,
     guard,
-    gscInput: gscIntegration.diagnostics,
+    gscInput,
     existingPages,
     coveredKeys,
     entities,
@@ -1297,13 +1312,21 @@ export async function synthesizeFromSnapshot(
     acceptedLinkTarget: suggestions.flatMap((s) => (s.suggestedInternalLinks ?? []).filter((l) => namedHit('linkTarget', l.anchor)).map((l) => l.anchor)),
     acceptedMatches,
   }
+  // Stage E3A FIX 3 — truthful consumption/acceptance for GSC-origin briefs (opportunityId
+  // 'gsc:…'). Derived from the SAME consumption map + candidate outcomes as every other brief;
+  // GSC evidence merged into a normal brief keeps mergedIntoExistingCount (not counted here as a
+  // new GSC-origin brief). The snapshot is never mutated (a fresh gscInput object is returned).
+  const consumedGscBriefIds = workingPool.filter((b) => b.opportunityId.startsWith('gsc:') && consumptionByBriefId.has(b.opportunityId)).map((b) => b.opportunityId)
+  const acceptedGscBriefIds = candidateOutcomes.filter((o) => o.outcome === 'accepted' && (o.opportunityId ?? '').startsWith('gsc:')).map((o) => o.opportunityId as string)
+  const gscInputOut = { ...snapshot.gscInput, consumedGscBriefIds, consumedGscBriefCount: consumedGscBriefIds.length, acceptedGscBriefIds, acceptedGscSuggestionCount: acceptedGscBriefIds.length }
   return {
     suggestions,
     diagnostics: {
       engine: 'evidence_first_briefs',
-      // Stage E3A — GSC input summary carried from the snapshot (present in both the direct
-      // prepare→synthesize path and generateFromBriefs, so diagnostics stay identical).
-      gscInput: snapshot.gscInput,
+      // Stage E3A — GSC input summary (adapter+order counts from the snapshot, augmented with
+      // truthful consumed/accepted here). Identical across the direct prepare→synthesize path
+      // and generateFromBriefs.
+      gscInput: gscInputOut,
       modelPath,
       modelConfig: modelConfigHolder.value,
       evidence_inventory: evidenceInventory,

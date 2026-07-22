@@ -49,8 +49,21 @@ export interface GscInputDiagnostics {
   mergedIntoExistingCount: number
   addedAsNewBriefCount: number
   deferredByBudgetCount: number
+  /** GSC evidence admitted by the adapter + source budget (merged ids + new gsc:<id> ids). */
   selectedBriefIds: string[]
   rejectionCounts: Record<string, number>
+  // ── FIX 1 — integration order (GSC before constrained discovery) ──
+  combinedPoolSizeBeforeDiscovery: number
+  combinedPoolSizeAfterDiscovery: number
+  discoveryDeficitAfterGsc: number
+  discoverySkippedBecauseGscFilledDeficit: boolean
+  // ── FIX 3 — truthful consumption/acceptance (filled during synthesis) ──
+  /** GSC-origin briefs actually included in a synthesis batch. */
+  consumedGscBriefCount: number
+  consumedGscBriefIds: string[]
+  /** GSC-origin briefs whose polished result passed validation and became a recommendation. */
+  acceptedGscSuggestionCount: number
+  acceptedGscBriefIds: string[]
 }
 
 export interface GscBriefLoad {

@@ -122,7 +122,7 @@ function main() {
     check('(49)(50) read failure → state read_failed (visible), never fabricated as zero', failRes.diagnostics.state === 'read_failed' && failRes.candidates.length === 0)
 
     // ── Map / merge / budget (28-39) ──────────────────────────────────────────
-    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {} })
+    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [] })
     const noGuards = { enabled: true, targetCount: 12, existingPool: [] as ReturnType<typeof brief>[], isCoveredByContent: () => false, isOwnedByEntity: () => false, blogDuplicateSignatures: [] as { sig: ReturnType<typeof topicSignature>; source: string }[] }
 
     check('(28) existing-content coverage suppresses a new GSC brief', applyGscBriefIntegration([cand({ opportunityId: 'o1', primaryQuery: 'folding treadmill guide home' })], diag(), { ...noGuards, isCoveredByContent: () => true }).gscBriefs.length === 0)
@@ -154,7 +154,7 @@ function main() {
   function staticGuards() {
     const gen = read('lib/content/recommendations/generate-from-briefs.ts')
     check('(2)(3) integration is flag-gated by isGscAutoRecommendationsEnabled', /enabled: isGscAutoRecommendationsEnabled\(\)/.test(gen))
-    check('(40) GSC briefs are APPENDED to workingPool (additive, existing order untouched)', /workingPool\.push\(\.\.\.gscIntegration\.gscBriefs\)/.test(gen))
+    check('(40) GSC briefs enter the COMBINED pool via the existing prioritizer (FIX 2, not a tail)', /prioritizeBriefsForSynthesis\(\[\.\.\.pool, \.\.\.gscIntegration\.gscBriefs\]/.test(gen) && !/workingPool\.push\(\.\.\.gscIntegration\.gscBriefs\)/.test(gen))
     check('(41) no prompt prose change for GSC (integration adds briefs, not prompt text)', !/Search Console/i.test(gen.split('buildDiscoveryPrompt')[0] ?? gen) || true) // integration never edits prompt builders
     const route = read('app/api/content/automation/recommendations/route.ts')
     check('(K) route surfaces gscInput in diagnostics', /gscInput: briefDiagnostics\?\.gscInput/.test(route))
