@@ -246,6 +246,8 @@ export interface BriefRunDiagnostics {
   /** Bounded third-refill throughput diagnostics (Preview/operator only via the route). */
   thirdRefillEligible: boolean
   thirdRefillUsed: boolean
+  /** Real synthesis calls THIS attempt made on the shared controller (excludes blocked rounds). */
+  synthesisCallsMade: number
   insufficient_inventory: boolean
   secondary_keywords_filtered: number
   /** Per-project corpus-derived domain/type/container words (the DISCRIMINATIVE
@@ -774,7 +776,7 @@ export type BriefRunSnapshot = Awaited<ReturnType<typeof prepareBriefRun>>
 export async function synthesizeFromSnapshot(
   snapshot: BriefRunSnapshot,
   controller: RunCostController,
-  opts?: { modelOverride?: string | null },
+  opts?: { modelOverride?: string | null; allowBoundedThirdRefill?: boolean },
 ): Promise<{ suggestions: TopicSuggestion[]; diagnostics: BriefRunDiagnostics }> {
   const {
     input, language, langLabel, guard, existingPages, coveredKeys, entities,
@@ -1255,10 +1257,18 @@ export async function synthesizeFromSnapshot(
   let participationNaturalGscInFirstBatch = 0
   let participationAppendedIds: string[] = []
 
-  // Paid-call cap: discovery + synthesis together may never exceed THREE calls (no discovery → up
-  // to 3 synthesis rounds; discovery used → up to 2). The round making total paid calls === 3 is the
-  // BOUNDED REFILL and runs only under strict throughput conditions.
-  const maxSynthesisRounds = PAID_CALL_CAP - (discovery?.ran ? 1 : 0)
+  // GLOBAL paid-call cap: discovery + synthesis (across a SHARED controller — Pro attempt + a later
+  // Flash fallback both invoke this) may never exceed THREE real paid calls for the whole action.
+  // Capture the controller's count at attempt start so a later invocation subtracts calls already
+  // spent (e.g. discovery + the Pro attempt) instead of re-deriving the budget from discovery alone.
+  const paidCallsAtAttemptStart = controller.callCount
+  const remainingGlobalCalls = Math.max(0, PAID_CALL_CAP - paidCallsAtAttemptStart)
+  // The pre-refill per-attempt allowance (unchanged): 1 synthesis round when discovery ran, else 2.
+  const legacyAttemptRounds = discovery?.ran ? 1 : 2
+  // The bounded third refill is opt-out via allowBoundedThirdRefill (the Pro-zero Flash fallback
+  // passes false so it never gains the new extra round). Bounded by the GLOBAL remaining calls.
+  const allowRefill = opts?.allowBoundedThirdRefill ?? true
+  const maxSynthesisRounds = Math.min(legacyAttemptRounds + (allowRefill ? 1 : 0), remainingGlobalCalls)
   let thirdRefillEligible = false
   let thirdRefillUsed = false
   // Bounded-refill gate (conditions 1-4, 6, 7 — 5 "no failure" is guaranteed by !stop). Pure,
@@ -1273,12 +1283,13 @@ export async function synthesizeFromSnapshot(
   if (workingPool.length === 0) stop = 'insufficient_inventory'
 
   for (let round = 1; round <= maxSynthesisRounds && !stop; round++) {
-    // The round that would be the 3rd total paid call is the bounded refill — gate it strictly.
-    const isBoundedRefillRound = (round - 1) + (discovery?.ran ? 1 : 0) >= 2
+    // The bounded refill is the round BEYOND the per-attempt allowance (round 3 no-discovery, round 2
+    // with discovery). The Flash fallback (allowRefill=false) never has one. Uses the per-attempt
+    // ordinal — NEVER the global call ordinal — so the Flash fallback's first call is never a refill.
+    const isBoundedRefillRound = allowRefill && round > legacyAttemptRounds
     if (isBoundedRefillRound) {
       if (!canRunBoundedRefill()) break // conditions not met → stop at the cap (no extra call)
-      thirdRefillEligible = true
-      thirdRefillUsed = true
+      thirdRefillEligible = true // eligible; USED is set only after the controller authorizes the call
     }
     const deficit = input.targetCount - suggestions.length
     if (deficit <= 0) { stop = 'target_reached'; break }
@@ -1307,7 +1318,11 @@ export async function synthesizeFromSnapshot(
     const rd: BriefRoundDiagnostics = { round, model: res.modelUsed ?? effectiveModel, briefs_sent: batch.length, provider_ok: res.ok, provider_failed_briefs: 0, providerStatus: res.providerStatus ?? null, providerErrorType: res.errorType ?? null, sanitizedProviderMessage: res.errorMessage ?? null, finishReason: res.finishReason ?? null, textPresent: res.textPresent ?? false, textLength: res.textLength ?? 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
     rounds.push(rd)
     if (modelConfigHolder.value === null && res.modelConfig) modelConfigHolder.value = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
+    // A controller-refused call (res.stopped) is NOT a real paid call: thirdRefillUsed stays false and
+    // it never increases the shared count. stop_reason remains budget_stopped.
     if (res.stopped) { stop = 'budget_stopped'; break }
+    // Authorized real call (may still fail below — that still counts as an actual call).
+    if (isBoundedRefillRound) thirdRefillUsed = true
     if (!res.ok) {
       // The provider rejected the request before returning content — EVERY brief
       // in this batch is a provider failure, not a quality rejection.
@@ -1391,8 +1406,7 @@ export async function synthesizeFromSnapshot(
       // A zero-yield round no longer stops immediately IF earlier rounds already accepted ≥1 and a
       // single bounded refill round is still available (conditions met) — proceed once to that
       // final refill using the next unconsumed briefs. Otherwise stop as before.
-      const nextPriorPaidCalls = round + (discovery?.ran ? 1 : 0)
-      const nextIsBoundedRefill = (round + 1) <= maxSynthesisRounds && nextPriorPaidCalls >= 2
+      const nextIsBoundedRefill = allowRefill && (round + 1) > legacyAttemptRounds && (round + 1) <= maxSynthesisRounds
       if (nextIsBoundedRefill && canRunBoundedRefill()) { thirdRefillEligible = true; continue }
       stop = suggestions.length > 0 ? 'zero_marginal_yield' : (cursor >= workingPool.length ? 'insufficient_inventory' : 'zero_marginal_yield'); break
     }
@@ -1411,7 +1425,9 @@ export async function synthesizeFromSnapshot(
   const consumedBriefs = consumptionByBriefId.size
   const remainingBriefs = Math.max(0, effectivePoolSize - consumedBriefs)
   const summary = controller.summary()
-  const totalPaidCalls = rounds.length + (discovery?.ran ? 1 : 0)
+  // ACTUAL calls this attempt made on the shared controller (excludes a blocked/non-started round
+  // that was appended to `rounds`). A provider-authorized call that later failed still counts.
+  const synthesisCallsMade = controller.callCount - paidCallsAtAttemptStart
   const costTelemetry = controller.costTelemetry(suggestions.length)
 
   // Competitor leakage — GROUPED by location (P1). Rejected research/discovery
@@ -1518,12 +1534,13 @@ export async function synthesizeFromSnapshot(
       shadow_rejected_by_reason,
       generated_opportunities: rounds.reduce((s, r) => s + r.polished, 0),
       finalCount: suggestions.length,
-      // TOTAL paid calls: synthesis rounds + the (single) discovery call.
-      model_calls: rounds.length + (discovery?.ran ? 1 : 0),
+      // GLOBAL paid calls on the shared controller (discovery + every synthesis call across attempts).
+      model_calls: controller.callCount,
       stop_reason: stop,
-      brief_consumption: { effectivePoolSize, consumedBriefs, remainingBriefs, callsRemaining: Math.max(0, PAID_CALL_CAP - totalPaidCalls) },
+      brief_consumption: { effectivePoolSize, consumedBriefs, remainingBriefs, callsRemaining: Math.max(0, PAID_CALL_CAP - controller.callCount) },
       thirdRefillEligible,
       thirdRefillUsed,
+      synthesisCallsMade,
       insufficient_inventory: stop === 'insufficient_inventory',
       secondary_keywords_filtered: secondaryKeywordsFiltered,
       domainTypeWords: Array.from(domainTypeWords),

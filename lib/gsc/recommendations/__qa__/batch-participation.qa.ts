@@ -203,7 +203,7 @@ function main() {
   const composerBody = (gen.match(/export function composeSynthesisBatch\([\s\S]*?\n}\n/) ?? [''])[0]
   check('(13) provider call count unchanged (composer is pure — no model call / await / controller)', composerBody.length > 0 && !/generateRecommendationJSON|await|controller/.test(composerBody))
   check('(13b) exactly one synthesis provider call per round (loop unchanged)', /for \(let round = 1; round <= maxSynthesisRounds/.test(gen) && (genCode.match(/generateRecommendationJSON\(/g) ?? []).length === 2)
-  check('(14) paid-call cap = 3 total (discovery reduces synthesis rounds)', /const PAID_CALL_CAP = 3/.test(gen) && /const maxSynthesisRounds = PAID_CALL_CAP - \(discovery\?\.ran \? 1 : 0\)/.test(gen))
+  check('(14) global paid-call cap = 3 (min of per-attempt allowance + refill and remaining global calls)', /const PAID_CALL_CAP = 3/.test(gen) && /const maxSynthesisRounds = Math\.min\(legacyAttemptRounds \+ \(allowRefill \? 1 : 0\), remainingGlobalCalls\)/.test(gen))
   check('(15) targetCount unchanged (deficit still from input.targetCount)', /const deficit = input\.targetCount - suggestions\.length/.test(gen))
   check('(16) prompt receives the SAME batch object (incl. the two appended briefs)', /const prompt = buildBriefSynthesisPrompt\(batch, ctx, langLabel, year\)/.test(gen))
   check('(17)(19) appended GSC briefs enter the SAME validation batch (no forced-accept path)', /reconcileSynthesis\(res\.text, batch\)/.test(gen) && !/gsc[\s_]*accept|force.*accept|acceptGsc/i.test(genCode))

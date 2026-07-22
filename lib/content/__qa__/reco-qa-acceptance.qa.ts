@@ -29,7 +29,7 @@ const cleanDiag = (over: Partial<BriefRunDiagnostics> = {}): BriefRunDiagnostics
   candidateOutcomes: [], candidateAccounting: { generated: 5, accepted: 5, rejected: 0, not_processed: 0, dropped: 0, outcomesCapped: false, reconciles: true },
   rejected_by_reason: {}, shadow_rejected_by_reason: {}, generated_opportunities: 5, finalCount: 5, model_calls: 1,
   stop_reason: 'true_pool_exhausted', insufficient_inventory: false, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],
-  brief_consumption: { effectivePoolSize: 6, consumedBriefs: 6, remainingBriefs: 0, callsRemaining: 1 }, thirdRefillEligible: false, thirdRefillUsed: false,
+  brief_consumption: { effectivePoolSize: 6, consumedBriefs: 6, remainingBriefs: 0, callsRemaining: 1 }, thirdRefillEligible: false, thirdRefillUsed: false, synthesisCallsMade: 0,
   competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [], acceptedMatches: [] },
   cost: { totalCalls: 1, calls: [{ model: 'gemini-2.5-pro', source: 'brief_synthesis', callPurpose: 'primary', inputTokens: 1000, answerOutputTokens: 400, thinkingTokens: 1024, totalBillableOutputTokens: 1424, estimatedCostUsd: 0.02, success: true }], totalPaidCalls: 1, estimatedRunCostUsd: 0.02, estimatedRunCostIls: 0.074, costPerAcceptedTopic: 0.004, configuredCostCeilingUsd: 0.5, remainingBudgetUsd: 0.48, callsPreventedByBudget: 0, configuredMaxCalls: 6 },
   ...over,
@@ -65,7 +65,8 @@ async function main() {
       return !!rule && !rule.pass && !r.passed
     }
     check('premium on Flash (downgrade) → premium_uses_real_pro FAILS', failsRule(base({ diagnostics: cleanDiag({ modelPath: { requestedTier: 'premium', requestedModel: 'gemini-2.5-pro', model: 'gemini-2.5-flash', tierUsed: 'flash', downgraded: true, downgradeReason: 'premium_model_unavailable' } }) }), 'premium_uses_real_pro'))
-    check('3 calls → max_two_synthesis_calls FAILS', failsRule(base({ diagnostics: cleanDiag({ model_calls: 3 }) }), 'max_two_synthesis_calls'))
+    check('3 paid calls → within cap (max_three_paid_calls holds)', !failsRule(base({ diagnostics: cleanDiag({ model_calls: 3 }) }), 'max_three_paid_calls'))
+    check('4 calls → max_three_paid_calls FAILS', failsRule(base({ diagnostics: cleanDiag({ model_calls: 4 }) }), 'max_three_paid_calls'))
     check('broken round math → exact_reconciliation FAILS', failsRule(base({ diagnostics: cleanDiag({ rounds: [{ round: 1, model: 'x', briefs_sent: 6, provider_ok: true, provider_failed_briefs: 0, providerStatus: 'ok', providerErrorType: null, sanitizedProviderMessage: null, finishReason: 'STOP', textPresent: true, textLength: 900, emitted: 6, polished: 5, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 3, rejected_by_reason: {}, repaired: 0, marginal_yield: 0.5, synthesis_failure: null, synthesisResponse: null }] }) }), 'exact_reconciliation'))
     check('truncated keyword → no_truncated_keyword FAILS', failsRule(base({ suggestions: [goodTopic('זר פרחים ואיך', 'זר פרחים ואיך לבחור')] , diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } })}), 'no_truncated_keyword'))
     check('malformed reason → no_malformed_reason FAILS', failsRule(base({ suggestions: [goodTopic('מגנזיום לילדים מינון', 'מדריך', { suggestionReason: 'נושא זה עונה על של' })], diagnostics: cleanDiag({ brief_pool: { ...cleanDiag().brief_pool, pool_size: 1 } }) }), 'no_malformed_reason'))

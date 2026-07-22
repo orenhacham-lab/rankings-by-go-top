@@ -587,7 +587,7 @@ export async function POST(request: Request) {
             gscSupported: gscBackedFingerprints.size,
             // Part 2 — throughput + rejection transparency (count-only; no prompts/ids/queries/bodies).
             remainingPool: briefDiagnostics?.brief_consumption?.remainingBriefs ?? null,
-            synthesisRounds: briefDiagnostics?.rounds?.length ?? null,
+            synthesisRounds: briefDiagnostics?.synthesisCallsMade ?? null,
             thirdRefillEligible: briefDiagnostics?.thirdRefillEligible ?? false,
             thirdRefillUsed: briefDiagnostics?.thirdRefillUsed ?? false,
             topRejectionReasons: Object.entries(briefDiagnostics?.rejected_by_reason ?? {})

@@ -96,7 +96,7 @@ export function evaluateRunAcceptance(input: RunAcceptanceInput): RunAcceptanceR
   add('model_path_explicit', !!d.modelPath && typeof d.modelPath.downgraded === 'boolean', JSON.stringify(d.modelPath))
 
   // ── Efficiency ──
-  add('max_two_synthesis_calls', d.model_calls <= 2, `model_calls=${d.model_calls}`)
+  add('max_three_paid_calls', d.model_calls <= 3, `model_calls=${d.model_calls}`)
 
   // ── Provider health: a provider rejection is a typed FAILURE, never silent
   // and never mislabeled as quality rejection or "model unavailable".

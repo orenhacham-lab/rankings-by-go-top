@@ -173,6 +173,7 @@ export async function runProFirstProduction(
     brief_consumption: { effectivePoolSize: snapshot.workingPool.length, consumedBriefs: 0, remainingBriefs: snapshot.workingPool.length, callsRemaining: 0 },
     thirdRefillEligible: false,
     thirdRefillUsed: false,
+    synthesisCallsMade: 0,
     insufficient_inventory: true, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],
     competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [], acceptedMatches: [] },
     cost: { estimatedRunCostUsd: 0, totalCalls: preparationProviderCalls, calls: [], totalPaidCalls: preparationProviderCalls, estimatedRunCostIls: 0, costPerAcceptedTopic: 0, configuredCostCeilingUsd: controller.budget.maxEstimatedCostUsd, remainingBudgetUsd: 0, callsPreventedByBudget: 0, configuredMaxCalls: controller.budget.maxModelCallsPerRun },
@@ -274,7 +275,9 @@ export async function runProFirstProduction(
   const reason: FallbackReason = providerFailed(proSynth) ? 'pro_provider_failure_rescue' : synthesisFailed(proSynth) ? 'pro_synthesis_failure_rescue' : 'pro_zero_marginal_yield_rescue'
 
   // 5) Single Flash FALLBACK on the SAME snapshot, resolved Flash-class model.
-  const flashSynth = await synthesizeFromSnapshot(snapshot, controller, { modelOverride: flashModel })
+  // Pro-zero Flash fallback — never gains the new bounded third refill, and is bounded by the GLOBAL
+  // 3-call ceiling (calls already spent by discovery + the Pro attempt are subtracted inside).
+  const flashSynth = await synthesizeFromSnapshot(snapshot, controller, { modelOverride: flashModel, allowBoundedThirdRefill: false })
   // A provider-level budget stop (despite the pre-check) → normalized NON-run.
   if (budgetStopped(flashSynth)) return withProDiag(noBatch('fallback_budget_blocked', { fallbackEvaluated: true, fallbackTriggered: false, proAttempted: true, flashResolvedModel: flashModel, rescue: rescueCount }))
 
