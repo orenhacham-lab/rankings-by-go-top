@@ -57,6 +57,12 @@ import { isGscAutoRecommendationsEnabled } from '@/lib/gsc/config'
 import type { GscInputDiagnostics, SelectedGscBriefDetail, GscParticipation } from '@/lib/gsc/recommendations/types'
 import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, briefSynthesisResponseSchema, classifySynthesisFailure, type PolishedTopic, type SynthesisFailureType, type SynthesisResponseDiagnostics } from './brief-synthesis'
 import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
+import {
+  buildSeedInventory, fallbackResponseSchema, buildFallbackPrompt, reconcileFallback,
+  buildBlockerContext, evaluateLowYieldTrigger, relatedEntitiesForSubject,
+  emptyLowYieldFallbackDiagnostics, MAX_SEEDS_SENT,
+  type RawSeedCandidate, type LowYieldFallbackDiagnostics, type ThirdCallStrategy,
+} from './low-yield-fallback'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
 import { dedupeMegaGuideTitle } from './title-diversity'
 import { normalizeToSearchPhrase, isSearchPhraseQuality, keywordPreservesSubject, keywordHasRealSubject, conciseSubject } from './search-phrase'
@@ -248,6 +254,12 @@ export interface BriefRunDiagnostics {
   thirdRefillUsed: boolean
   /** Real synthesis calls THIS attempt made on the shared controller (excludes blocked rounds). */
   synthesisCallsMade: number
+  /** Which strategy the FINAL (third) available paid call used — mutually exclusive.
+   *  'not_used' = the third slot never happened; 'blocked' = the slot was reached but
+   *  neither strategy ran. Preview/operator only via the route. */
+  thirdCallStrategy: ThirdCallStrategy
+  /** Low-final-yield discovery-synthesis fallback accounting (Preview/operator only). */
+  lowYieldFallback: LowYieldFallbackDiagnostics
   insufficient_inventory: boolean
   secondary_keywords_filtered: number
   /** Per-project corpus-derived domain/type/container words (the DISCRIMINATIVE
@@ -746,6 +758,12 @@ export async function prepareBriefRun(
     pendingCoverageDocs,
     brandSafety,
     keywordResearch,
+    /** Raw tracked keywords + corroborated project-focus terms + attribute tokens —
+     *  seed sources for the low-yield discovery-synthesis fallback (additive; never
+     *  used by the normal path). */
+    tracked,
+    projectFocus: projectFocusForBriefs,
+    attributeTokens,
     ctx,
     year,
     modelPath,
@@ -784,7 +802,7 @@ export async function synthesizeFromSnapshot(
     commercialEntityTokens, businessEvidenceTokens, evidenceProvenance,
     existingPageTitles, existingCoverageDocs, pendingExactKeys, pendingSignatures,
     pendingCoverageDocs, brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
-    discovery, evidenceInventory,
+    discovery, evidenceInventory, tracked, projectFocus, attributeTokens,
   } = snapshot
   // Synthesis model: the snapshot's resolved model by default. The QA/admin smart-run
   // harness (Increment 4) passes a modelOverride so a Flash attempt and a Pro attempt
@@ -1271,6 +1289,9 @@ export async function synthesizeFromSnapshot(
   const maxSynthesisRounds = Math.min(legacyAttemptRounds + (allowRefill ? 1 : 0), remainingGlobalCalls)
   let thirdRefillEligible = false
   let thirdRefillUsed = false
+  // Which strategy the FINAL (third) available paid call used (mutually exclusive).
+  let thirdCallStrategy: ThirdCallStrategy = 'not_used'
+  let lowYieldFallback: LowYieldFallbackDiagnostics = emptyLowYieldFallbackDiagnostics()
   // Bounded-refill gate (conditions 1-4, 6, 7 — 5 "no failure" is guaranteed by !stop). Pure,
   // non-mutating read of current state + the authoritative controller.
   const canRunBoundedRefill = (): boolean => {
@@ -1278,6 +1299,135 @@ export async function synthesizeFromSnapshot(
     const unconsumed = workingPool.length - consumptionByBriefId.size
     const controllerOk = !controller.billingExhausted && controller.callCount < controller.budget.maxModelCallsPerRun
     return suggestions.length > 0 && shortfall >= 3 && unconsumed >= 8 && controllerOk
+  }
+
+  // ── LOW-FINAL-YIELD DISCOVERY-SYNTHESIS fallback (the ALTERNATIVE final call) ──
+  // Builds the UNUSED-evidence seed inventory, evaluates the low-yield trigger, and —
+  // only when ALL conditions hold and the controller authorizes — spends the ONE
+  // remaining paid call on a materially different combined discovery+synthesis strategy.
+  // Every produced topic passes through the SAME validatePolished path (no bypass). This
+  // is mutually exclusive with the normal bounded refill: it either replaces it (in-loop)
+  // or fills the final slot the exhausted pool could not (post-loop). NEVER a fourth call —
+  // the caller only invokes it when a global slot remains, and the trigger re-checks the
+  // controller. Returns 'ran' (an authorized call was made), 'blocked' (controller refused),
+  // or 'not_triggered' (conditions unmet; no call, no state change beyond diagnostics).
+  const isFailureStop = (s: BriefRunDiagnostics['stop_reason'] | null): boolean =>
+    s === 'provider_failed' || s === 'synthesis_failed' || s === 'budget_stopped'
+  const runLowYieldFallback = async (round: number): Promise<'ran' | 'blocked' | 'not_triggered'> => {
+    if (!effectiveModel) return 'not_triggered'
+    // Seed sources — real evidence NOT already consumed by the deterministic pool.
+    const consumedBriefSignatures = workingPool.filter((b) => consumptionByBriefId.has(b.opportunityId)).map((b) => topicSignature(b.subject, b.intendedIntent))
+    const commercialEntities = entities.filter((e) => ['product', 'category', 'service'].includes(e.type ?? ''))
+    const rawSeeds: RawSeedCandidate[] = [
+      ...keywordResearch.map((k) => ({ phrase: k.query, source: 'keywordResearch' as const, volume: k.volume ?? null })),
+      // Unused GSC evidence: admitted GSC-origin briefs that never reached a synthesis batch.
+      ...workingPool.filter((b) => isGscOriginBrief(b) && !consumptionByBriefId.has(b.opportunityId)).map((b) => ({ phrase: b.subject, source: 'searchConsole' as const, volume: b.alignedDemandQuery?.volume ?? null })),
+      ...tracked.map((t) => ({ phrase: t, source: 'tracked' as const })),
+      ...commercialEntities.map((e) => ({ phrase: e.name, source: 'entity' as const })),
+      ...projectFocus.map((f) => ({ phrase: f, source: 'projectFocus' as const })),
+    ]
+    const inventory = buildSeedInventory({
+      rawSeeds,
+      isExactContentKeyword: (phrase) => guard.keywords.has(normalizeText(phrase)),
+      isEntityOwner: (phrase) => ownedByExistingEntity(guard, phrase),
+      isCoveredByContent: (phrase) => coveredByExistingContent(guard, phrase, phrase),
+      pendingExactKeys,
+      publishedSignatures: existingPageTitles.map((t) => topicSignature(t, 'informational')),
+      pendingSignatures,
+      acceptedRunSignatures: acceptedSignatures,
+      consumedBriefSignatures,
+      attributeTokens,
+      brandSafety,
+      relatedEntitiesFor: (phrase) => relatedEntitiesForSubject(phrase, entities),
+      ideaStatusesOf: (phrase) => guardOriginsOf(phrase).filter((o) => o.source === 'idea_keyword').map((o) => o.status ?? 'other'),
+      maxSeeds: MAX_SEEDS_SENT,
+    })
+    const trigger = evaluateLowYieldTrigger({
+      acceptedCount: suggestions.length,
+      targetCount: input.targetCount,
+      eligibleSeedCount: inventory.eligibleSeedCount,
+      rejectionCounts: rejected_by_reason,
+      controllerAuthorizes: !controller.billingExhausted && controller.callCount < controller.budget.maxModelCallsPerRun && controller.callCount < PAID_CALL_CAP,
+      finalSlotAvailable: controller.callCount < PAID_CALL_CAP,
+      noFailure: !isFailureStop(stop),
+    })
+    // Diagnostics are populated whether or not the call is made (eligibility is observable).
+    lowYieldFallback = {
+      ...lowYieldFallback,
+      eligible: trigger.triggered,
+      triggerAcceptedCount: suggestions.length,
+      coverageRejectionRatio: Number(trigger.coverageRejectionRatio.toFixed(3)),
+      rawSeedCount: inventory.rawSeedCount,
+      eligibleSeedCount: inventory.eligibleSeedCount,
+      seedsSent: inventory.seedsSent,
+      excludedBySource: inventory.excludedBySource,
+      excludedByReason: inventory.excludedByReason,
+      ideaStatusBlocks: inventory.ideaStatusBlocks,
+    }
+    if (!trigger.triggered) return 'not_triggered'
+
+    const seeds = inventory.eligibleSeeds
+    const blocker = buildBlockerContext({
+      publishedNeedPhrases: [...existingPageTitles, ...pendingCoverageDocs.map((d) => d.title)],
+      blockedExactKeywords: Array.from(guard.keywords),
+      acceptedRunTitles: suggestions.map((s) => s.title),
+      acceptedRunKeywords: suggestions.map((s) => s.primaryKeyword),
+      rejectionCounts: rejected_by_reason,
+    })
+    const prompt = buildFallbackPrompt({ language, ctx, year, seeds, ownedCommercialEntities: commercialEntities.map((e) => e.name), blocker })
+    const rd: BriefRoundDiagnostics = { round, model: effectiveModel, briefs_sent: seeds.length, provider_ok: false, provider_failed_briefs: 0, providerStatus: null, providerErrorType: null, sanitizedProviderMessage: null, finishReason: null, textPresent: false, textLength: 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
+    rounds.push(rd)
+    const res = await generateRecommendationJSON(
+      prompt,
+      { temperature: 0.5, maxOutputTokens: synthesisOutputBudget(seeds.length), ...(effectiveModel ? { model: effectiveModel } : {}), responseSchema: fallbackResponseSchema(seeds.map((s) => s.seedId)) },
+      controller,
+      { source: 'brief_synthesis', callPurpose: 'low_yield_fallback', requestedIdeaCount: seeds.length },
+    )
+    rd.provider_ok = res.ok; rd.providerStatus = res.providerStatus ?? null; rd.providerErrorType = res.errorType ?? null
+    rd.sanitizedProviderMessage = res.errorMessage ?? null; rd.finishReason = res.finishReason ?? null
+    rd.textPresent = res.textPresent ?? false; rd.textLength = res.textLength ?? 0
+    if (modelConfigHolder.value === null && res.modelConfig) modelConfigHolder.value = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
+    // A controller-refused call is NOT a real paid call: the strategy is 'blocked', not used.
+    if (res.stopped) { stop = 'budget_stopped'; thirdCallStrategy = 'blocked'; return 'blocked' }
+    // Authorized real call — this attempt has now spent the low-yield strategy on the final slot.
+    lowYieldFallback.used = true
+    thirdCallStrategy = 'low_yield_discovery_synthesis'
+    if (!res.ok) { rd.provider_failed_briefs = seeds.length; stop = 'provider_failed'; return 'ran' }
+
+    const recon = reconcileFallback(res.text, seeds)
+    rd.emitted = recon.emitted
+    rd.polished = recon.pairs.length
+    rd.dropped_items = recon.invalidItems
+    let accepted = 0
+    for (let idx = 0; idx < recon.pairs.length; idx++) {
+      const pair = recon.pairs[idx]
+      // Register the synthetic brief so blocker-resolution/outcome accounting can find it.
+      briefById.set(pair.brief.opportunityId, pair.brief)
+      const dedupedTitle = dedupeMegaGuideTitle(pair.topic.title, suggestions.map((s) => s.title))
+      const polishedT = dedupedTitle === pair.topic.title ? pair.topic : { ...pair.topic, title: dedupedTitle }
+      // SAME validatePolished path as every other candidate — no relaxed validator, no bypass.
+      const r = validatePolished(polishedT, pair.brief)
+      if (r.suggestion) {
+        suggestions.push(r.suggestion); rd.accepted++; accepted++
+        if (r.repaired) rd.repaired++
+        recordOutcome({ ...baseOutcome(polishedT, pair.brief), outcome: 'accepted', finalPrimaryKeyword: r.suggestion.primaryKeyword, finalIntent: r.suggestion.searchIntent ?? null, keywordRepaired: !!r.repaired })
+      } else {
+        const reason = r.rejectionReason || 'insufficient_independent_need'
+        rd.rejected_by_reason[reason] = (rd.rejected_by_reason[reason] ?? 0) + 1
+        rejectTopic(reason)
+        recordOutcome({ ...baseOutcome(polishedT, pair.brief), outcome: 'rejected', finalPrimaryKeyword: r.finalPrimaryKeyword ?? polishedT.primaryKeyword ?? null, finalIntent: r.finalIntent ?? null, keywordRepaired: !!r.repaired, rejectionReason: reason, rejectionStage: r.detail?.stage ?? null, blocker: r.detail?.blocker ?? null, matchedExistingContentTitle: r.detail?.matchedExistingContentTitle ?? null, matchedExistingContentUrl: r.detail?.matchedExistingContentUrl ?? null, matchedCommercialEntity: r.detail?.matchedCommercialEntity ?? null, matchedPendingIdea: r.detail?.matchedPendingIdea ?? null, matchedSameRunAccepted: r.detail?.matchedSameRunAccepted ?? null, coverageMatchType: r.detail?.coverageMatchType ?? null })
+      }
+      if (suggestions.length >= input.targetCount) {
+        rd.not_processed = recon.pairs.length - idx - 1
+        for (let j = idx + 1; j < recon.pairs.length; j++) recordOutcome({ ...baseOutcome(recon.pairs[j].topic, recon.pairs[j].brief), outcome: 'not_processed', rejectionStage: 'target_reached' })
+        break
+      }
+    }
+    rd.marginal_yield = rd.briefs_sent > 0 ? Number((accepted / rd.briefs_sent).toFixed(3)) : 0
+    lowYieldFallback.emitted = recon.emitted
+    lowYieldFallback.engineAccepted = accepted
+    lowYieldFallback.finalReady = accepted
+    return 'ran'
   }
 
   if (workingPool.length === 0) stop = 'insufficient_inventory'
@@ -1288,7 +1438,16 @@ export async function synthesizeFromSnapshot(
     // ordinal — NEVER the global call ordinal — so the Flash fallback's first call is never a refill.
     const isBoundedRefillRound = allowRefill && round > legacyAttemptRounds
     if (isBoundedRefillRound) {
-      if (!canRunBoundedRefill()) break // conditions not met → stop at the cap (no extra call)
+      // FINAL available paid call — choose ONE strategy. Low-yield discovery-synthesis
+      // (poor yield + unused evidence) takes PRECEDENCE over the normal bounded refill;
+      // the two are mutually exclusive for this single slot.
+      const fb = await runLowYieldFallback(round)
+      if (fb === 'ran' || fb === 'blocked') {
+        if (!stop) stop = suggestions.length >= input.targetCount ? 'target_reached' : (cursor >= workingPool.length ? 'true_pool_exhausted' : 'call_cap_reached')
+        break
+      }
+      // Not triggered → the normal bounded refill (unchanged gate + behavior).
+      if (!canRunBoundedRefill()) { if (thirdCallStrategy === 'not_used') thirdCallStrategy = 'blocked'; break }
       thirdRefillEligible = true // eligible; USED is set only after the controller authorizes the call
     }
     const deficit = input.targetCount - suggestions.length
@@ -1320,9 +1479,9 @@ export async function synthesizeFromSnapshot(
     if (modelConfigHolder.value === null && res.modelConfig) modelConfigHolder.value = { model: res.modelConfig.model, thinkingMode: res.modelConfig.thinkingMode, thinkingBudget: res.modelConfig.thinkingBudget, maxOutputTokens: res.modelConfig.maxOutputTokens }
     // A controller-refused call (res.stopped) is NOT a real paid call: thirdRefillUsed stays false and
     // it never increases the shared count. stop_reason remains budget_stopped.
-    if (res.stopped) { stop = 'budget_stopped'; break }
+    if (res.stopped) { stop = 'budget_stopped'; if (isBoundedRefillRound) thirdCallStrategy = 'blocked'; break }
     // Authorized real call (may still fail below — that still counts as an actual call).
-    if (isBoundedRefillRound) thirdRefillUsed = true
+    if (isBoundedRefillRound) { thirdRefillUsed = true; thirdCallStrategy = 'normal_refill' }
     if (!res.ok) {
       // The provider rejected the request before returning content — EVERY brief
       // in this batch is a provider failure, not a quality rejection.
@@ -1415,6 +1574,16 @@ export async function synthesizeFromSnapshot(
   // The loop ended without an in-loop stop only because the CALL CAP was reached
   // (a paid-call limit, NOT an exhausted pool) — this was the false pool_exhausted.
   if (!stop) stop = suggestions.length >= input.targetCount ? 'target_reached' : (cursor >= workingPool.length ? 'true_pool_exhausted' : 'call_cap_reached')
+
+  // POST-LOOP low-yield fallback: the deterministic pool could not even REACH the third-call
+  // decision (it exhausted / zero-yielded before round 3), so the final paid slot is still
+  // free. If the low-yield trigger holds and a global slot remains, spend that one slot on the
+  // discovery-synthesis strategy the exhausted pool could never have filled. Guarded so it can
+  // never become a fourth call and never runs for the Pro-zero Flash fallback (allowRefill=false).
+  if (thirdCallStrategy === 'not_used' && allowRefill && !isFailureStop(stop) && !controller.billingExhausted && controller.callCount < PAID_CALL_CAP && controller.callCount < controller.budget.maxModelCallsPerRun) {
+    const fb = await runLowYieldFallback(rounds.length + 1)
+    if (fb === 'ran' && suggestions.length >= input.targetCount) stop = 'target_reached'
+  }
 
   // Brief-consumption reconciliation: consumed + remaining = effective pool size.
   const effectivePoolSize = workingPool.length
@@ -1541,6 +1710,8 @@ export async function synthesizeFromSnapshot(
       thirdRefillEligible,
       thirdRefillUsed,
       synthesisCallsMade,
+      thirdCallStrategy,
+      lowYieldFallback,
       insufficient_inventory: stop === 'insufficient_inventory',
       secondary_keywords_filtered: secondaryKeywordsFiltered,
       domainTypeWords: Array.from(domainTypeWords),

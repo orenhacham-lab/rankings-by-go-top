@@ -202,7 +202,11 @@ function main() {
   const genCode = gen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
   const composerBody = (gen.match(/export function composeSynthesisBatch\([\s\S]*?\n}\n/) ?? [''])[0]
   check('(13) provider call count unchanged (composer is pure — no model call / await / controller)', composerBody.length > 0 && !/generateRecommendationJSON|await|controller/.test(composerBody))
-  check('(13b) exactly one synthesis provider call per round (loop unchanged)', /for \(let round = 1; round <= maxSynthesisRounds/.test(gen) && (genCode.match(/generateRecommendationJSON\(/g) ?? []).length === 2)
+  // Three provider call SITES in the engine now: constrained discovery, the per-round brief
+  // synthesis, and the low-yield discovery-synthesis fallback (the ALTERNATIVE final call).
+  // All three share the ONE controller and the global PAID_CALL_CAP of 3 — the fallback never
+  // adds a fourth real call (it only ever replaces/fills the single third slot).
+  check('(13b) synthesis loop unchanged + bounded provider call sites (discovery + per-round synth + low-yield fallback)', /for \(let round = 1; round <= maxSynthesisRounds/.test(gen) && (genCode.match(/generateRecommendationJSON\(/g) ?? []).length === 3)
   check('(14) global paid-call cap = 3 (min of per-attempt allowance + refill and remaining global calls)', /const PAID_CALL_CAP = 3/.test(gen) && /const maxSynthesisRounds = Math\.min\(legacyAttemptRounds \+ \(allowRefill \? 1 : 0\), remainingGlobalCalls\)/.test(gen))
   check('(15) targetCount unchanged (deficit still from input.targetCount)', /const deficit = input\.targetCount - suggestions\.length/.test(gen))
   check('(16) prompt receives the SAME batch object (incl. the two appended briefs)', /const prompt = buildBriefSynthesisPrompt\(batch, ctx, langLabel, year\)/.test(gen))

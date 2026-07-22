@@ -594,6 +594,10 @@ export async function POST(request: Request) {
               .map(([reason, count]) => ({ reason, count: count as number }))
               .sort((a, b) => b.count - a.count || (a.reason < b.reason ? -1 : a.reason > b.reason ? 1 : 0))
               .slice(0, 5),
+            // Low-final-yield discovery-synthesis fallback — which strategy the final paid
+            // call used + count-only fallback accounting (never prompts/ids/queries/bodies).
+            thirdCallStrategy: briefDiagnostics?.thirdCallStrategy ?? 'not_used',
+            lowYieldFallback: briefDiagnostics?.lowYieldFallback ?? null,
           },
         } : {}),
         // Back-compat aliases.

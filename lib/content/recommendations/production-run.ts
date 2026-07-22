@@ -22,6 +22,7 @@ import type { RunCostController } from './run-cost-controller'
 import { prepareBriefRun, synthesizeFromSnapshot, type BriefRunSnapshot, type BriefRunDiagnostics } from './generate-from-briefs'
 import { finalizeRecommendationAttempt, type FinalizedAttemptResult } from './finalize-attempt'
 import { buildBriefSynthesisPrompt, synthesisOutputBudget } from './brief-synthesis'
+import { emptyLowYieldFallbackDiagnostics } from './low-yield-fallback'
 import { cloneKeywordGuard, deriveBriefOutcomes } from './smart-run-harness'
 import { computeRescueAccounting } from './smart-controller'
 import { resolveAvailableRecommendationModel } from './model-availability'
@@ -174,6 +175,8 @@ export async function runProFirstProduction(
     thirdRefillEligible: false,
     thirdRefillUsed: false,
     synthesisCallsMade: 0,
+    thirdCallStrategy: 'not_used',
+    lowYieldFallback: emptyLowYieldFallbackDiagnostics(),
     insufficient_inventory: true, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],
     competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [], acceptedMatches: [] },
     cost: { estimatedRunCostUsd: 0, totalCalls: preparationProviderCalls, calls: [], totalPaidCalls: preparationProviderCalls, estimatedRunCostIls: 0, costPerAcceptedTopic: 0, configuredCostCeilingUsd: controller.budget.maxEstimatedCostUsd, remainingBudgetUsd: 0, callsPreventedByBudget: 0, configuredMaxCalls: controller.budget.maxModelCallsPerRun },
