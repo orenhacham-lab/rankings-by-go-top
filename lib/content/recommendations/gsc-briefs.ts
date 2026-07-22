@@ -16,6 +16,7 @@ import type { OpportunityBrief } from './opportunity-brief'
 import type { OpportunityFamily } from './opportunity-synthesis'
 import type { SearchIntent } from './opportunity'
 import { topicSignature, isHighConfidenceDuplicate, type TopicSignature } from './semantic-dup'
+import { partitionSubjectBearing, collapseGscCandidates } from './gsc-need-collapse'
 import type { SearchNeed } from './opportunity-brief'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -72,12 +73,29 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
   if (!params.enabled || candidates.length === 0) return { gscBriefs: [], diagnostics }
 
   const bump = (code: string) => { diagnostics.rejectionCounts[code] = (diagnostics.rejectionCounts[code] ?? 0) + 1 }
+
+  // (4) SUBJECT-BEARING GUARD — reject subjectless generic queries ("מה המחיר" / "what is the
+  // price": only generic framing tokens, no subject) BEFORE collapse + budget. Domain-neutral:
+  // a real subject-bearing token must survive framing removal (never a project vocabulary check).
+  const { subjectBearing, subjectless } = partitionSubjectBearing(candidates)
+  if (subjectless.length > 0) {
+    diagnostics.subjectlessGenericRejectedCount += subjectless.length
+    diagnostics.rejectionCounts['subjectless_generic_query'] = (diagnostics.rejectionCounts['subjectless_generic_query'] ?? 0) + subjectless.length
+  }
+  // (5)(6)(7) COLLAPSE strong near-duplicate needs into ONE unique need (aggregated metrics +
+  // preserved provenance, representative = highest source order). The source budget below then
+  // applies to UNIQUE needs, not raw query variants.
+  const { needs, collapsedNearDuplicateCount } = collapseGscCandidates(subjectBearing)
+  diagnostics.collapsedNearDuplicateCount += collapsedNearDuplicateCount
+  diagnostics.uniqueNeedCountBeforeBudget = needs.length
+
   const newBriefs: OpportunityBrief[] = []
   // FIX 4 — one safe diagnostic record per NEW GSC brief, aligned 1:1 with newBriefs. Source
   // metrics only (no OAuth/tokens/prompt/article bodies); synthesis fields stay null here.
   const newBriefDetails: SelectedGscBriefDetail[] = []
 
-  for (const c of candidates) {
+  for (const need of needs) {
+    const c = need.candidate
     const subject = c.primaryQuery
     // (6) existing coverage / ownership guards (the accepted route-grade helpers).
     if (params.isCoveredByContent(subject) || params.isOwnedByEntity(subject)) { diagnostics.rejectedByExistingCoverageCount++; bump('existing_coverage'); continue }
@@ -132,6 +150,10 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
       impressions: c.impressions,
       clicks: c.clicks,
       averagePosition: c.averagePosition,
+      // Collapse provenance — one selected brief per unique need; all raw sources stay traceable.
+      relatedOpportunityIds: need.relatedOpportunityIds,
+      relatedQueries: need.relatedQueries,
+      collapsedOpportunityCount: need.collapsedOpportunityCount,
       priorityTier: null,
       finalSynthesisRank: null,
       consumed: false,

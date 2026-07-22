@@ -1371,7 +1371,11 @@ export async function synthesizeFromSnapshot(
 
   // Brief-consumption reconciliation: consumed + remaining = effective pool size.
   const effectivePoolSize = workingPool.length
-  const consumedBriefs = Math.min(cursor, effectivePoolSize)
+  // Stage E3A — count UNIQUE consumed briefs. The bounded GSC append means the natural cursor may
+  // be 18 while 20 distinct briefs were actually consumed; the cursor undercounts. consumedBriefs +
+  // remainingBriefs === effectivePoolSize always holds. Flag-off: consumptionByBriefId.size equals
+  // the old cursor count (contiguous slices, each brief consumed once) → byte-identical diagnostics.
+  const consumedBriefs = consumptionByBriefId.size
   const remainingBriefs = Math.max(0, effectivePoolSize - consumedBriefs)
   const summary = controller.summary()
   const totalPaidCalls = rounds.length + (discovery?.ran ? 1 : 0)
@@ -1445,7 +1449,11 @@ export async function synthesizeFromSnapshot(
     totalGscBriefsConsumed: consumedGscBriefIds.length,
     participationMode,
   }
-  const gscInputOut = { ...snapshot.gscInput, mergedGscEvidence, consumedGscBriefIds, consumedGscBriefCount: consumedGscBriefIds.length, acceptedGscBriefIds, acceptedGscSuggestionCount: acceptedGscBriefIds.length, selectedGscBriefDetails, gscParticipation }
+  // Distinct collapsed GSC need ids consumed in the FIRST-round participation lane. Each gsc: brief
+  // is already one unique need (collapse ran before admission), so the two trial slots are two
+  // different needs whenever ≥2 unique eligible needs exist.
+  const trialDistinctNeedCount = new Set(workingPool.filter((b) => isGscOriginBrief(b) && consumptionByBriefId.get(b.opportunityId)?.consumedRound === 1).map((b) => b.opportunityId)).size
+  const gscInputOut = { ...snapshot.gscInput, mergedGscEvidence, consumedGscBriefIds, consumedGscBriefCount: consumedGscBriefIds.length, acceptedGscBriefIds, acceptedGscSuggestionCount: acceptedGscBriefIds.length, selectedGscBriefDetails, gscParticipation, trialDistinctNeedCount }
   return {
     suggestions,
     diagnostics: {

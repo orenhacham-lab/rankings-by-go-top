@@ -122,7 +122,7 @@ function main() {
     check('(49)(50) read failure → state read_failed (visible), never fabricated as zero', failRes.diagnostics.state === 'read_failed' && failRes.candidates.length === 0)
 
     // ── Map / merge / budget (28-39) ──────────────────────────────────────────
-    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [], combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [], selectedGscBriefDetails: [], gscParticipation: { enabled: true, maxTrialBriefs: 2, naturalGscBriefCountInFirstBatch: 0, appendedTrialBriefCount: 0, appendedTrialBriefIds: [], totalGscBriefsConsumed: 0, participationMode: 'no_gsc_briefs' } })
+    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [], subjectlessGenericRejectedCount: 0, collapsedNearDuplicateCount: 0, uniqueNeedCountBeforeBudget: 0, trialDistinctNeedCount: 0, combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [], selectedGscBriefDetails: [], gscParticipation: { enabled: true, maxTrialBriefs: 2, naturalGscBriefCountInFirstBatch: 0, appendedTrialBriefCount: 0, appendedTrialBriefIds: [], totalGscBriefsConsumed: 0, participationMode: 'no_gsc_briefs' } })
     const noGuards = { enabled: true, targetCount: 12, existingPool: [] as ReturnType<typeof brief>[], isCoveredByContent: () => false, isOwnedByEntity: () => false, blogDuplicateSignatures: [] as { sig: ReturnType<typeof topicSignature>; source: string }[] }
 
     check('(28) existing-content coverage suppresses a new GSC brief', applyGscBriefIntegration([cand({ opportunityId: 'o1', primaryQuery: 'folding treadmill guide home' })], diag(), { ...noGuards, isCoveredByContent: () => true }).gscBriefs.length === 0)
@@ -136,16 +136,16 @@ function main() {
     check('(34) meaningful modifiers stay distinct (different subject, one shared token)', !isHighConfidenceDuplicate(topicSignature('treadmill maintenance schedule', 'informational'), topicSignature('treadmill assembly parts list', 'informational')) && applyGscBriefIntegration([cand({ opportunityId: 'o1', primaryQuery: 'treadmill maintenance schedule tips' })], diag(), { ...noGuards, existingPool: [brief('elliptical trainer buying guide')] }).gscBriefs.length === 1)
     {
       const d = diag()
-      const many = Array.from({ length: 30 }, (_, i) => cand({ opportunityId: `o${i}`, primaryQuery: `folding treadmill quiet model number ${i}` }))
+      const many = Array.from({ length: 30 }, (_, i) => cand({ opportunityId: `o${i}`, primaryQuery: `folding treadmill quiet modelvariant${i}` }))
       const res = applyGscBriefIntegration(many, d, { ...noGuards, targetCount: 12 })
       check('(35)(36) source budget = min(60,max(20,targetCount*3)) = 36 (no cap hit at 30)', gscSourceBudget(12) === 36 && res.gscBriefs.length === 30 && d.deferredByBudgetCount === 0)
       const d2 = diag()
-      const lots = Array.from({ length: 50 }, (_, i) => cand({ opportunityId: `o${i}`, primaryQuery: `folding treadmill quiet model number ${i}` }))
+      const lots = Array.from({ length: 50 }, (_, i) => cand({ opportunityId: `o${i}`, primaryQuery: `folding treadmill quiet modelvariant${i}` }))
       const res2 = applyGscBriefIntegration(lots, d2, { ...noGuards, targetCount: 6 }) // budget = 20
       check('(38) over-budget items are DEFERRED (diagnostic), not rejected', res2.gscBriefs.length === 20 && d2.deferredByBudgetCount === 30 && d2.addedAsNewBriefCount === 20)
     }
     check('(36) budget derives from batch floor when targetCount absent', gscSourceBudget(0) === 20 && gscSourceBudget(null) === 20)
-    check('(37) no fixed per-head cap (30 same-head candidates all admitted within budget)', applyGscBriefIntegration(Array.from({ length: 30 }, (_, i) => cand({ opportunityId: `h${i}`, primaryQuery: `folding treadmill quiet variant ${i}` })), diag(), { ...noGuards, targetCount: 12 }).gscBriefs.length === 30)
+    check('(37) no fixed per-head cap (30 same-head candidates all admitted within budget)', applyGscBriefIntegration(Array.from({ length: 30 }, (_, i) => cand({ opportunityId: `h${i}`, primaryQuery: `folding treadmill quiet variantword${i}` })), diag(), { ...noGuards, targetCount: 12 }).gscBriefs.length === 30)
     check('(40) new GSC brief carries gsc provenance + gsc: source id', (() => { const b = applyGscBriefIntegration([cand({ opportunityId: 'opp_abc', primaryQuery: 'folding treadmill guide home' })], diag(), noGuards).gscBriefs[0]; return b.opportunityId === 'gsc:opp_abc' && b.sourceEvidence.some((e) => e.kind === 'gsc') && b.subject === 'folding treadmill guide home' && b.intendedPageType === 'article' })())
     check('(E)(41) subject is the search need, not a finished title (raw query passed as subject)', applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'how to choose a folding treadmill' })], diag(), noGuards).gscBriefs[0].subject === 'how to choose a folding treadmill')
 
@@ -157,7 +157,7 @@ function main() {
     check('(FIX1) confidence === briefScore for a new GSC brief (one mapped scale)', (() => { const b = applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'folding treadmill guide home', opportunityScore: 63 })], diag(), noGuards).gscBriefs[0]; return b.confidence === b.briefScore })())
     check('(FIX1 invariant) EVERY GSC-origin brief has 0<=briefScore<=1 && 0<=confidence<=1', (() => {
       const scores = [0, 1, 17, 42.5, 63, 78, 99, 100, 120, -5]
-      const briefs = applyGscBriefIntegration(scores.map((s, i) => cand({ opportunityId: `o${i}`, primaryQuery: `folding treadmill quiet model ${i}`, opportunityScore: s })), diag(), { ...noGuards, targetCount: 60 }).gscBriefs
+      const briefs = applyGscBriefIntegration(scores.map((s, i) => cand({ opportunityId: `o${i}`, primaryQuery: `folding treadmill quiet modelword${i}`, opportunityScore: s })), diag(), { ...noGuards, targetCount: 60 }).gscBriefs
       return briefs.length === scores.length && briefs.every((b) => b.briefScore >= 0 && b.briefScore <= 1 && b.confidence >= 0 && b.confidence <= 1)
     })())
 

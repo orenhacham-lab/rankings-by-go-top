@@ -36,11 +36,11 @@ const cand = (o: Partial<GscCandidate> & { opportunityId: string; primaryQuery: 
   return { ...d, ...o }
 }
 function detail(o: Partial<SelectedGscBriefDetail> & { briefId: string }): SelectedGscBriefDetail {
-  const d: SelectedGscBriefDetail = { briefId: '', gscOpportunityId: 'raw', primaryQuery: 'q', queryIntent: 'informational', opportunityScore: 70, impressions: 400, clicks: 3, averagePosition: 8, priorityTier: 1, finalSynthesisRank: 5, consumed: false, consumedRound: null, acceptedByEngine: false, finalOutcome: null }
+  const d: SelectedGscBriefDetail = { briefId: '', gscOpportunityId: 'raw', primaryQuery: 'q', queryIntent: 'informational', opportunityScore: 70, impressions: 400, clicks: 3, averagePosition: 8, relatedOpportunityIds: ['raw'], relatedQueries: ['q'], collapsedOpportunityCount: 1, priorityTier: 1, finalSynthesisRank: 5, consumed: false, consumedRound: null, acceptedByEngine: false, finalOutcome: null }
   return { ...d, ...o }
 }
 function gscInputWith(details: SelectedGscBriefDetail[]): GscInputDiagnostics {
-  return { enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [], combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [], selectedGscBriefDetails: details, gscParticipation: { enabled: true, maxTrialBriefs: 2, naturalGscBriefCountInFirstBatch: 0, appendedTrialBriefCount: 0, appendedTrialBriefIds: [], totalGscBriefsConsumed: 0, participationMode: 'no_gsc_briefs' } }
+  return { enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [], subjectlessGenericRejectedCount: 0, collapsedNearDuplicateCount: 0, uniqueNeedCountBeforeBudget: 0, trialDistinctNeedCount: 0, combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [], selectedGscBriefDetails: details, gscParticipation: { enabled: true, maxTrialBriefs: 2, naturalGscBriefCountInFirstBatch: 0, appendedTrialBriefCount: 0, appendedTrialBriefIds: [], totalGscBriefsConsumed: 0, participationMode: 'no_gsc_briefs' } }
 }
 
 function main() {
@@ -112,7 +112,7 @@ function main() {
     const res = applyGscBriefIntegration([cand({ opportunityId: 'opp_1', primaryQuery: 'folding treadmill guide home', impressions: 900, clicks: 12, averagePosition: 6.4, opportunityScore: 82 })], diag, noGuards)
     const d = res.diagnostics.selectedGscBriefDetails[0]
     check('(20) selectedGscBriefDetails carries safe source metrics', res.gscBriefs.length === 1 && d.briefId === 'gsc:opp_1' && d.gscOpportunityId === 'opp_1' && d.primaryQuery === 'folding treadmill guide home' && d.impressions === 900 && d.clicks === 12 && d.averagePosition === 6.4 && d.opportunityScore === 82)
-    check('(20b) detail exposes NO oauth/token/prompt/body fields', !('refreshToken' in d) && !('accessToken' in d) && !('prompt' in d) && !('body' in d) && Object.keys(d).length === 14)
+    check('(20b) detail exposes NO oauth/token/prompt/body fields', !('refreshToken' in d) && !('accessToken' in d) && !('prompt' in d) && !('body' in d) && Object.keys(d).length === 17)
     check('(20c) synthesis fields start unfilled (null / false) at integration', d.priorityTier === null && d.finalSynthesisRank === null && d.consumed === false && d.consumedRound === null && d.acceptedByEngine === false && d.finalOutcome === null)
   }
   {
@@ -122,6 +122,55 @@ function main() {
     const noGuards = { enabled: true, targetCount: 12, existingPool: existing, isCoveredByContent: () => false, isOwnedByEntity: () => false, blogDuplicateSignatures: [] as { sig: ReturnType<typeof topicSignature>; source: string }[] }
     const res = applyGscBriefIntegration([cand({ opportunityId: 'opp_m', primaryQuery: 'folding treadmill guide home' })], diag, noGuards)
     check('(26) merged GSC evidence stays SEPARATE from selectedGscBriefDetails', res.diagnostics.mergedGscEvidence.length === 1 && res.diagnostics.selectedGscBriefDetails.length === 0)
+  }
+
+  // ── Need-collapse × bounded participation — the live morning-food pair ───────────
+  {
+    // The two morning-food variants collapse into ONE need → ONE source-budget slot / ONE brief;
+    // a distinct need yields a second brief. (Ido regression shape, generic mechanism.)
+    const diag = gscInputWith([])
+    const noGuards = { enabled: true, targetCount: 12, existingPool: [] as OpportunityBrief[], isCoveredByContent: () => false, isOwnedByEntity: () => false, blogDuplicateSignatures: [] as { sig: ReturnType<typeof topicSignature>; source: string }[] }
+    const res = applyGscBriefIntegration([
+      cand({ opportunityId: 'food_a', primaryQuery: 'מה לאכול לפני אימון בוקר', opportunityScore: 90, impressions: 500, clicks: 5 }),
+      cand({ opportunityId: 'food_b', primaryQuery: 'מה טוב לאכול לפני אימון בוקר', opportunityScore: 80, impressions: 300, clicks: 2 }),
+      cand({ opportunityId: 'subjectless', primaryQuery: 'מה המחיר' }),
+      cand({ opportunityId: 'other', primaryQuery: 'איך להתחיל קליסטניקס', opportunityScore: 70 }),
+    ], diag, noGuards)
+    check('(pp1) morning-food pair consumes ONE source-budget slot (one brief)', res.gscBriefs.filter((b) => b.opportunityId === 'gsc:food_a').length === 1 && res.gscBriefs.filter((b) => b.opportunityId === 'gsc:food_b').length === 0)
+    check('(pp1b) two unique needs admitted (collapsed food + calisthenics); subjectless dropped', res.gscBriefs.length === 2 && res.diagnostics.uniqueNeedCountBeforeBudget === 2 && res.diagnostics.collapsedNearDuplicateCount === 1)
+    check('(pp1c) subjectless_generic_query rejected + counted', res.diagnostics.subjectlessGenericRejectedCount === 1 && res.diagnostics.rejectionCounts['subjectless_generic_query'] === 1)
+    check('(15b) "מה המחיר" is NOT in selectedGscBriefDetails', !res.diagnostics.selectedGscBriefDetails.some((x) => x.primaryQuery === 'מה המחיר'))
+    const foodDetail = res.diagnostics.selectedGscBriefDetails.find((x) => x.briefId === 'gsc:food_a')!
+    check('(pp1d) collapsed brief keeps all source provenance', foodDetail.collapsedOpportunityCount === 2 && foodDetail.relatedOpportunityIds.join(',') === 'food_a,food_b' && foodDetail.clicks === 7 && foodDetail.impressions === 800)
+    check('(pp1e) selectedBriefIds has one id per unique need', res.diagnostics.selectedBriefIds.filter((id) => id.startsWith('gsc:')).length === 2)
+  }
+
+  // ── Consumption reconciliation — unique consumed count, not the cursor ───────────
+  {
+    const consumed = new Set<string>()
+    const consumptionByBriefId = new Map<string, { consumedRound: number }>()
+    const r1 = composeSynthesisBatch({ workingPool: pool, cursor: 0, batchSize, round: 1, consumedIds: consumed, e3aTrialActive: true, maxTrialGscBriefs: 2 })
+    r1.batch.forEach((b) => { consumed.add(b.opportunityId); if (!consumptionByBriefId.has(b.opportunityId)) consumptionByBriefId.set(b.opportunityId, { consumedRound: 1 }) })
+    const effectivePoolSize = pool.length
+    const consumedBriefs = consumptionByBriefId.size
+    const remainingBriefs = Math.max(0, effectivePoolSize - consumedBriefs)
+    check('(recon1)(recon2) consumedBriefs === size (20; the 2 appended included), cursor was 18', consumedBriefs === 20 && r1.nextCursor === 18)
+    check('(recon3) consumedBriefs are unique ids only', new Set(r1.batch.map((b) => b.opportunityId)).size === r1.batch.length)
+    check('(recon4)(recon5) consumedBriefs + remainingBriefs === effectivePoolSize', consumedBriefs + remainingBriefs === effectivePoolSize)
+    const trialDistinct = new Set(pool.filter((b) => b.opportunityId.startsWith('gsc:') && consumptionByBriefId.get(b.opportunityId)?.consumedRound === 1).map((b) => b.opportunityId)).size
+    check('(trialDistinctNeedCount) = 2 distinct GSC needs in the first-round lane', trialDistinct === 2)
+  }
+  {
+    // (recon6) E3A off → size equals the old cursor count (contiguous slices, one consume each).
+    const noGsc = Array.from({ length: 40 }, (_, i) => brf(`n${i}`))
+    const consumptionByBriefId = new Map<string, true>()
+    let cursor = 0
+    for (let round = 1; round <= 2; round++) {
+      const c = composeSynthesisBatch({ workingPool: noGsc, cursor, batchSize, round, consumedIds: new Set(), e3aTrialActive: false, maxTrialGscBriefs: 2 })
+      c.batch.forEach((b) => consumptionByBriefId.set(b.opportunityId, true))
+      cursor = c.nextCursor
+    }
+    check('(recon6) flag-off: consumptionByBriefId.size === cursor count', consumptionByBriefId.size === cursor && cursor === 36)
   }
 
   // ── FIX 4 — route resolves finalOutcome truthfully (never mislabels) ─────────────
@@ -162,6 +211,10 @@ function main() {
   check('(25) gscParticipation reports the REAL mode (disabled/no_gsc/natural/appended_trial)', /participationAppendedIds\.length > 0 \? 'appended_trial'/.test(gen) && /!anyNewGscBrief \? 'no_gsc_briefs'/.test(gen))
   check('(27) integration order unchanged (GSC before CONSTRAINED DISCOVERY)', gen.indexOf('integrateGscBriefs(') < gen.indexOf('CONSTRAINED DISCOVERY'))
   check('(helper) isGscOriginBrief matches only gsc: prefix', isGscOriginBrief({ opportunityId: 'gsc:x' }) && !isGscOriginBrief({ opportunityId: 'b:x' }))
+  check('(recon-src) consumedBriefs derived from consumptionByBriefId.size (unique), not the cursor', /const consumedBriefs = consumptionByBriefId\.size/.test(gen) && !/const consumedBriefs = Math\.min\(cursor/.test(gen))
+  check('(trial-src) trialDistinctNeedCount from distinct round-1 GSC needs', /const trialDistinctNeedCount = new Set\(workingPool\.filter/.test(gen) && /consumedRound === 1/.test(gen))
+  const gscBriefsSrc = read('lib/content/recommendations/gsc-briefs.ts')
+  check('(collapse-order) subject guard + collapse run BEFORE the source budget', gscBriefsSrc.indexOf('partitionSubjectBearing(candidates)') < gscBriefsSrc.indexOf('collapseGscCandidates(subjectBearing)') && gscBriefsSrc.indexOf('collapseGscCandidates(subjectBearing)') < gscBriefsSrc.indexOf('gscSourceBudget(params.targetCount)'))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

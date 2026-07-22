@@ -49,6 +49,16 @@ export interface GscInputDiagnostics {
   mergedIntoExistingCount: number
   addedAsNewBriefCount: number
   deferredByBudgetCount: number
+  // ── Source-quality cleanup — subject-bearing guard + near-duplicate need collapse ──
+  /** Eligible opportunities rejected by the subject-bearing guard (subjectless_generic_query). */
+  subjectlessGenericRejectedCount: number
+  /** Raw eligible opportunities absorbed into an already-created unique need (Σ group size − 1). */
+  collapsedNearDuplicateCount: number
+  /** Unique collapsed GSC needs after eligibility + decision suppression + subject guard +
+   *  collapse, BEFORE the source budget. */
+  uniqueNeedCountBeforeBudget: number
+  /** Distinct collapsed GSC need ids consumed in the first-round participation lane (synthesis). */
+  trialDistinctNeedCount: number
   /** ACTUAL recommendation brief ids admitted (new gsc:<id> ids + matched normal brief ids),
    *  deduplicated in deterministic first-seen order. */
   selectedBriefIds: string[]
@@ -88,6 +98,13 @@ export interface SelectedGscBriefDetail {
   impressions: number
   clicks: number
   averagePosition: number
+  /** Every source GSC opportunity id collapsed into this need (deterministic order); a
+   *  non-collapsed need carries exactly the representative id. */
+  relatedOpportunityIds: string[]
+  /** Every source query collapsed into this need, in corresponding deterministic order. */
+  relatedQueries: string[]
+  /** Number of source opportunities collapsed into this need (1 when not collapsed). */
+  collapsedOpportunityCount: number
   priorityTier: number | null
   finalSynthesisRank: number | null
   consumed: boolean
