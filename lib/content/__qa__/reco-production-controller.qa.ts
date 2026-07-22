@@ -348,7 +348,7 @@ async function main() {
     // Blocker (round 3) #4 — the selected attempt path is NEVER downgraded:true with a null
     // reason; a runtime Pro→Flash fallback carries the typed pro_runtime_fallback reason.
     check('G27. flashAttemptModelPath uses a truthful downgradeReason (pro_runtime_fallback), never null', /downgraded: true, downgradeReason: 'pro_runtime_fallback'/.test(runSrc) && !/downgraded: true, downgradeReason: null/.test(runSrc) && /'pro_runtime_fallback'/.test(read('../recommendations/model-select.ts')))
-    check('G18. UI: flag-gated single button, selector hidden', /!PRO_FIRST && \(/.test(uiSrc) && /צור המלצות/.test(uiSrc) && /יוצר המלצות…/.test(uiSrc) && /PRO_FIRST \? \{\} : \{ qualityMode \}/.test(uiSrc))
+    check('G18. UI: single smart-combined-scan button, source selector hidden', /t\.smartScanTitle/.test(uiSrc) && !/setSource/.test(uiSrc) && /suggestions\.length > 0 \? t\.findMore : t\.generate/.test(uiSrc) && /PRO_FIRST \? \{\} : \{ qualityMode \}/.test(uiSrc))
     // Frozen surfaces untouched.
     check('G19. validated engine files unchanged by Stage D', !/production-run|production-controller|proFirst/i.test(read('../recommendations/generate-from-briefs.ts')) && !/production-run|proFirst/i.test(read('../recommendations/finalize-attempt.ts')))
     check('G20. /reco-qa compare route + blind export untouched by Stage D', !/proFirst|production-run|production-controller/i.test(read('../../../app/api/content/automation/reco-qa/compare/route.ts')) && !/production-run|proFirst/i.test(read('../recommendations/blind-review-export.ts')))

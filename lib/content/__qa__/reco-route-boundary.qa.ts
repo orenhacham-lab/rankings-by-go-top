@@ -141,7 +141,7 @@ async function main() {
     // Stage D (additive): the DEFAULT (non Pro-first) path still sends qualityMode
     // EXPLICITLY; when the global Pro-first controller is active the client omits the
     // tier field (the server always runs Pro-first and ignores any legacy tier).
-    check('G. body sends qualityMode EXPLICITLY on every request when NOT Pro-first (no requestedCount)', !/requestedCount: PLAN_MODES/.test(ui) && /projectId: requestProjectId, source, keyword: keyword\.trim\(\), clientRequestId, \.\.\.\(PRO_FIRST \? \{\} : \{ qualityMode \}\)/.test(ui))
+    check('G. body sends qualityMode EXPLICITLY when NOT Pro-first; source is always hybrid, no keyword', !/requestedCount: PLAN_MODES/.test(ui) && /projectId: requestProjectId, source: 'hybrid', clientRequestId, \.\.\.\(PRO_FIRST \? \{\} : \{ qualityMode \}\)/.test(ui))
     check('G2. Pro-first flag is the server-derived prop (single authoritative source)', /const PRO_FIRST = proFirst/.test(ui))
     check('G/D10. operator quality selector exists (flag-gated) with truthful model labels', /NEXT_PUBLIC_RECO_QUALITY_SELECTOR === '1'/.test(ui) && /reco-quality-mode/.test(ui) && /qualityPro/.test(ui) && /qualityDowngraded/.test(ui))
   }

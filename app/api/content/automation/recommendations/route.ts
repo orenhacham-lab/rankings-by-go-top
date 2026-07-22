@@ -13,6 +13,7 @@ import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
 import { buildFinalCandidateOutcomes, applyFinalOutcomesToGscDetails } from '@/lib/content/recommendations/final-outcomes'
+import { buildScanSources, buildGscRunSummary } from '@/lib/content/recommendations/customer-run-summary'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
@@ -377,6 +378,23 @@ export async function POST(request: Request) {
         .filter((f) => f.wouldPersist && f.opportunityId && (f.opportunityId.startsWith('gsc:') || gscMergedAcceptedBriefIds.has(f.opportunityId)))
         .map((f) => topicIdeaFingerprint(f.finalPrimaryKeyword, f.finalTitle)),
     )
+    // Customer-safe run summary (Parts 3/4): truthful sources-analyzed + one GSC run status. Derived
+    // from the existing evidence inventory + E3A diagnostics; survives the normal (non-diagnostics)
+    // response. supportedResultCount = the current-run GSC-backed accepted set (same as the chip).
+    const gscInputForSummary = briefDiagnostics?.gscInput ?? null
+    const evInv = briefDiagnostics?.evidence_inventory ?? null
+    const scanSources = buildScanSources({
+      projectLoaded: !!briefDiagnostics,
+      siteScanEntities: evInv?.site_scan_entities ?? 0,
+      keywordResearchQueries: evInv?.keyword_research_queries ?? 0,
+      gscState: gscInputForSummary?.state ?? 'disabled',
+    })
+    const gscRunSummary = buildGscRunSummary({
+      state: gscInputForSummary?.state ?? 'disabled',
+      consumedGscBriefCount: gscInputForSummary?.consumedGscBriefCount ?? 0,
+      addedAsNewBriefCount: gscInputForSummary?.addedAsNewBriefCount ?? 0,
+      supportedResultCount: gscBackedFingerprints.size,
+    })
     const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh, requestedTier: persistTier, modelUsed: persistModelUsed, gscBackedFingerprints })
 
     // F — persistence errors are NEVER swallowed. attempted>0 with 0 inserted AND 0
@@ -549,6 +567,9 @@ export async function POST(request: Request) {
         totalPendingCount: suggestions.length,
         filteredCount: filteredExisting,
         hiddenDuplicateCount: conflictIds.length,
+        // Customer-safe scan transparency (Parts 3/4) — truthful, non-technical; not gated on diagnostics.
+        scanSources,
+        gscRunSummary,
         // Back-compat aliases.
         newlySaved: persistOutcome ? persistOutcome.inserted : fresh.length,
         filteredExisting,

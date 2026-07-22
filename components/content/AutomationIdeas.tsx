@@ -18,6 +18,9 @@ import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkS
 
 type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
 type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: string }
+type ScanSources = { projectData: boolean; websiteScan: boolean; keywordResearch: boolean; searchConsole: boolean }
+type GscRunState = 'supported' | 'evaluated_none_accepted' | 'eligible_not_consumed' | 'no_eligible' | 'not_connected' | 'no_property' | 'never_synced' | 'read_failed' | 'disabled'
+type GscRunSummary = { state: GscRunState; evaluatedCount: number; supportedResultCount: number }
 
 /** Phase 3I.6 — per-rejected-idea evidence of WHAT blocked it (from
  *  meta.debug.primaryKeywordMatches; returned on runs that added nothing new). */
@@ -129,11 +132,10 @@ export default function AutomationIdeas({
   // Phase 3F.3.7i — the enqueue success box scrolls itself into view here.
   const successRef = useRef<HTMLDivElement | null>(null)
 
-  // Default to the most SEO-grounded source (real Google Ads keyword data).
-  // Phase 4C — default to the combined "סריקה משולבת" source (still switchable to
-  // any individual source). Selection only; nothing runs until the user clicks.
-  const [source, setSource] = useState<Source>('hybrid')
-  const [keyword, setKeyword] = useState('')
+  // Part 1 — the normal customer UI runs ONE smart combined scan. The request ALWAYS sends
+  // source: 'hybrid' (see the fetch body); there is no customer source selector and no keyword
+  // field. The server RecommendationSource enum + legacy values remain fully supported for
+  // API/diagnostic callers — only this customer UI is fixed to 'hybrid'.
   // Model tier (Phase 2 — explicit, truthful): sent on EVERY generate request.
   // The selector is OPERATOR-facing (Preview / flag-gated); customers never see
   // model names or costs. The choice is remembered locally per operator.
@@ -170,7 +172,7 @@ export default function AutomationIdeas({
   const PAGE_STEP = 5
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[] } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -233,6 +235,26 @@ export default function AutomationIdeas({
   }, [queueSuccess])
 
   const sourceBadge = (s: Source) => (s === 'keyword' ? t.badgeKeyword : s === 'project_data' ? t.badgeProject : s === 'site_scan' ? t.badgeSiteScan : s === 'hybrid' ? t.badgeHybrid : t.badgeResearch)
+  // Parts 3/4 — customer-safe scan transparency helpers (truthful; derived from server meta).
+  const sourcesAnalyzedText = (ss: ScanSources): string => [
+    ss.projectData && t.srcProjectData, ss.websiteScan && t.srcWebsiteScan, ss.keywordResearch && t.srcKeywordResearch, ss.searchConsole && t.srcSearchConsole,
+  ].filter(Boolean).join(' · ')
+  const gscStatusText = (g: GscRunSummary): string => {
+    const s = t.gscStatus
+    switch (g.state) {
+      case 'supported': return s.supported(g.supportedResultCount)
+      case 'evaluated_none_accepted': return s.evaluated_none_accepted(g.evaluatedCount)
+      case 'eligible_not_consumed': return s.eligible_not_consumed()
+      case 'no_eligible': return s.no_eligible()
+      case 'not_connected': return s.not_connected()
+      case 'no_property': return s.no_property()
+      case 'never_synced': return s.never_synced()
+      case 'read_failed': return s.read_failed()
+      default: return '' // disabled → no customer message
+    }
+  }
+  const GSC_AMBER_STATES = new Set<GscRunState>(['not_connected', 'no_property', 'never_synced', 'read_failed'])
+  const gscStatusColor = (state: GscRunState) => (GSC_AMBER_STATES.has(state) ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400')
 
   // Monotonic request id: only the latest generate() call is allowed to write
   // state, so a slow earlier response can never overwrite a newer one.
@@ -267,7 +289,7 @@ export default function AutomationIdeas({
         headers: { 'Content-Type': 'application/json' },
         // Stage D — when the Pro-first controller owns the flow the client sends NO
         // tier: the server always runs Pro-first and ignores any legacy tier field.
-        body: JSON.stringify({ projectId: requestProjectId, source, keyword: keyword.trim(), clientRequestId, ...(PRO_FIRST ? {} : { qualityMode }) }),
+        body: JSON.stringify({ projectId: requestProjectId, source: 'hybrid', clientRequestId, ...(PRO_FIRST ? {} : { qualityMode }) }),
       })
       const data = await res.json().catch(() => ({}))
       if (reqId !== reqRef.current) return // a newer request superseded this one
@@ -312,6 +334,9 @@ export default function AutomationIdeas({
         keywordMatches: Array.isArray(data.meta?.debug?.primaryKeywordMatches) ? data.meta.debug.primaryKeywordMatches : undefined,
         // Phase 4C — per-provider status for a hybrid run (partial-failure transparency).
         providers: Array.isArray(data.meta?.providers) ? data.meta.providers : undefined,
+        // Parts 3/4 — customer-safe scan transparency (this run only; not persisted).
+        scanSources: (data.meta?.scanSources && typeof data.meta.scanSources === 'object') ? data.meta.scanSources : undefined,
+        gscRunSummary: (data.meta?.gscRunSummary && typeof data.meta.gscRunSummary === 'object') ? data.meta.gscRunSummary : undefined,
       })
       // TRUTHFUL model path (operator/Preview only — present only when server
       // diagnostics are enabled; customers never receive it).
@@ -744,16 +769,6 @@ export default function AutomationIdeas({
     }
   }
 
-  // Phase 4C — hybrid first (combines all sources), then the individual sources
-  // kept for advanced/manual use.
-  const sourceTabs: { key: Source; label: string }[] = [
-    { key: 'hybrid', label: t.sourceHybrid },
-    { key: 'keyword_research_url', label: t.sourceResearch },
-    { key: 'site_scan', label: t.sourceSiteScan },
-    { key: 'keyword', label: t.sourceKeyword },
-    { key: 'project_data', label: t.sourceProject },
-  ]
-
   return (
     <Card className="hover:translate-y-0">
       <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
@@ -794,37 +809,15 @@ export default function AutomationIdeas({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        {sourceTabs.map((s) => (
-          <button
-            key={s.key}
-            type="button"
-            onClick={() => setSource(s.key)}
-            className={`text-xs font-medium rounded-full px-3 py-1.5 border ${
-              source === s.key
-                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
-                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
+      {/* Part 1 — one smart combined scan. No source selector, no keyword input. */}
+      <div className="mb-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 px-4 py-3">
+        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.smartScanTitle}</div>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{t.smartScanExplain}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        {source === 'keyword' && (
-          <input
-            type="text"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder={t.keywordPlaceholder}
-            className="flex-1 min-w-[12rem] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-sm"
-          />
-        )}
-        <Button onClick={generate} loading={loading} disabled={loading || (source === 'keyword' && !keyword.trim())}>
-          {PRO_FIRST
-            ? (loading ? 'יוצר המלצות…' : 'צור המלצות')
-            : (loading ? (source === 'site_scan' ? t.siteScanAnalyzing : t.generating) : (suggestions.length > 0 ? t.findMore : t.generate))}
+        <Button onClick={generate} loading={loading} disabled={loading}>
+          {loading ? t.generating : (suggestions.length > 0 ? t.findMore : t.generate)}
         </Button>
       </div>
 
@@ -884,6 +877,18 @@ export default function AutomationIdeas({
           {t.runSummary.replace('{new}', String(meta.newlyAdded)).replace('{total}', String(suggestions.length))}
         </p>
       )}
+      {/* Part 3 — customer-safe sources-analyzed line (only sources that actually contributed). */}
+      {meta?.scanSources && !loading && sourcesAnalyzedText(meta.scanSources) && (
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+          {t.sourcesAnalyzedLabel}: {sourcesAnalyzedText(meta.scanSources)}
+        </p>
+      )}
+      {/* Part 4 — one Search Console run status (no message when the feature is disabled). */}
+      {meta?.gscRunSummary && meta.gscRunSummary.state !== 'disabled' && !loading && (
+        <p className={`text-[11px] mb-2 ${gscStatusColor(meta.gscRunSummary.state)}`}>
+          {gscStatusText(meta.gscRunSummary)}
+        </p>
+      )}
       {/* Phase 4C — hybrid per-provider transparency: which sources ran, and a
           clear "X unavailable" for any that failed (the run never fails wholesale). */}
       {meta?.providers && meta.providers.length > 0 && !loading && (
@@ -908,7 +913,7 @@ export default function AutomationIdeas({
                 // Phase 3I.7 — after a SUCCESSFUL site-scan run saved its ideas, a
                 // repeat click hitting only known keywords is a normal state, not
                 // a failure: point at the saved ideas + the real next actions.
-                ? (source === 'site_scan' ? t.primaryKeywordExistsScan : t.primaryKeywordExists)
+                ? t.primaryKeywordExists
                 : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
                   ? t.krNoNew
                   : meta.reason === 'all_known' || meta.reason === 'no_new'
@@ -935,8 +940,6 @@ export default function AutomationIdeas({
                         ? t.krThin
                         : meta.reason === 'kr_all_known' || meta.reason === 'kr_no_new'
                           ? t.krNoNew
-                        : meta.reason === 'primary_keyword_exists' && source === 'site_scan'
-                          ? t.primaryKeywordExistsScan
                         : meta.reason === 'all_known' || meta.reason === 'no_new' || meta.reason === 'primary_keyword_exists'
                           ? t.allKnown
                           : meta.reason === 'model_error' || meta.reason === 'http_error'
@@ -1067,20 +1070,9 @@ export default function AutomationIdeas({
                                     : t.pageTypeProductImprovement}
                         </Badge>
                       )}
-                      {/* Phase 4C — hybrid provenance: show each supporting source
-                          as a badge + a count when >1 (multi-source agreement). */}
-                      {s.supportingSources && s.supportingSources.length > 0 ? (
-                        <>
-                          {s.supportingSources.map((ss) => (
-                            <Badge key={ss} variant="success">{sourceBadge(ss)}</Badge>
-                          ))}
-                          {s.supportingSources.length > 1 && (
-                            <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">{t.hybridSupportedBy.replace('{n}', String(s.supportingSources.length))}</span>
-                          )}
-                        </>
-                      ) : (
-                        <Badge variant="neutral">{sourceBadge(s.source)}</Badge>
-                      )}
+                      {/* Part 2 — the generic "combined" source badge is hidden (every normal scan
+                          is combined, so it carries no useful signal). The specific Search Console
+                          chip stays, and ONLY when this persisted idea was actually GSC-supported. */}
                       {s.basedOnGsc && (
                         <Badge variant="info">{t.basedOnGsc}</Badge>
                       )}
