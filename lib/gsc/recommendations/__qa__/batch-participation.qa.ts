@@ -36,7 +36,7 @@ const cand = (o: Partial<GscCandidate> & { opportunityId: string; primaryQuery: 
   return { ...d, ...o }
 }
 function detail(o: Partial<SelectedGscBriefDetail> & { briefId: string }): SelectedGscBriefDetail {
-  const d: SelectedGscBriefDetail = { briefId: '', gscOpportunityId: 'raw', primaryQuery: 'q', queryIntent: 'informational', opportunityScore: 70, impressions: 400, clicks: 3, averagePosition: 8, relatedOpportunityIds: ['raw'], relatedQueries: ['q'], collapsedOpportunityCount: 1, priorityTier: 1, finalSynthesisRank: 5, consumed: false, consumedRound: null, acceptedByEngine: false, finalOutcome: null }
+  const d: SelectedGscBriefDetail = { briefId: '', gscOpportunityId: 'raw', primaryQuery: 'q', queryIntent: 'informational', opportunityScore: 70, impressions: 400, clicks: 3, averagePosition: 8, relatedOpportunityIds: ['raw'], relatedQueries: ['q'], relatedPages: ['https://x.co/p'], relatedReasonCodes: [], relatedSignals: [], collapsedOpportunityCount: 1, priorityTier: 1, finalSynthesisRank: 5, consumed: false, consumedRound: null, acceptedByEngine: false, finalOutcome: null }
   return { ...d, ...o }
 }
 function gscInputWith(details: SelectedGscBriefDetail[]): GscInputDiagnostics {
@@ -112,7 +112,7 @@ function main() {
     const res = applyGscBriefIntegration([cand({ opportunityId: 'opp_1', primaryQuery: 'folding treadmill guide home', impressions: 900, clicks: 12, averagePosition: 6.4, opportunityScore: 82 })], diag, noGuards)
     const d = res.diagnostics.selectedGscBriefDetails[0]
     check('(20) selectedGscBriefDetails carries safe source metrics', res.gscBriefs.length === 1 && d.briefId === 'gsc:opp_1' && d.gscOpportunityId === 'opp_1' && d.primaryQuery === 'folding treadmill guide home' && d.impressions === 900 && d.clicks === 12 && d.averagePosition === 6.4 && d.opportunityScore === 82)
-    check('(20b) detail exposes NO oauth/token/prompt/body fields', !('refreshToken' in d) && !('accessToken' in d) && !('prompt' in d) && !('body' in d) && Object.keys(d).length === 17)
+    check('(20b) detail exposes NO oauth/token/prompt/body fields', !('refreshToken' in d) && !('accessToken' in d) && !('prompt' in d) && !('body' in d) && Object.keys(d).length === 20)
     check('(20c) synthesis fields start unfilled (null / false) at integration', d.priorityTier === null && d.finalSynthesisRank === null && d.consumed === false && d.consumedRound === null && d.acceptedByEngine === false && d.finalOutcome === null)
   }
   {

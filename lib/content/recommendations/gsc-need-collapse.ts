@@ -14,7 +14,7 @@
  * high-confidence subject-core identity. The same query + evidence shape yields the same decision
  * for every project.
  */
-import { distinctiveTokensOf, canonicalToken, canonicalVariants } from './semantic-dup'
+import { distinctiveTokensOf, canonicalToken, canonicalVariants, intentClusterOf, type IntentCluster } from './semantic-dup'
 import type { GscCandidate } from '@/lib/gsc/recommendations/types'
 
 // GENERIC framing tokens (Hebrew + English): question words, commerce/price framing, navigation /
@@ -30,8 +30,8 @@ const FRAMING_RAW = [
   'להזמין', 'מזמינים', 'הזמנה', 'הזמנת', 'למכירה', 'לרכוש', 'רכישה', 'רכישת',
   // Hebrew — navigation / "more information" / contact
   'מידע', 'פרטים', 'פרטי', 'נוסף', 'נוספים', 'נוספת', 'נוספות', 'צור', 'קשר', 'ליצור',
-  // Hebrew — generic quality / glue
-  'טוב', 'טובה', 'טובים', 'כדאי', 'שווה',
+  // Hebrew — generic quality / glue / possessive (wrapper around "near me" / "my area")
+  'טוב', 'טובה', 'טובים', 'כדאי', 'שווה', 'אליי', 'אלי', 'שלי', 'שלנו',
   // English — question / quantity
   'what', 'how', 'why', 'when', 'where', 'who', 'which', 'much', 'many',
   // English — commerce / price / purchase
@@ -51,6 +51,24 @@ function isFramingToken(token: string): boolean {
   return false
 }
 
+// GENERIC local-intent markers (Hebrew + English) — "near me" / "nearby" / "לידי" / "באזור". These
+// are NOT removable framing: a local-intent query is a DISTINCT need from its non-local sibling
+// ("office cleaning" ≠ "office cleaning near me"). They also do NOT count as a subject-bearing token
+// (a query of ONLY local markers + glue is still subjectless). NO city names / project locations —
+// explicit locations are ordinary content tokens and remain distinct naturally.
+const LOCAL_MARKER_RAW = ['near', 'nearby', 'קרוב', 'לידי', 'ליד', 'סמוך', 'באזור']
+const LOCAL = new Set(LOCAL_MARKER_RAW.map((t) => canonicalToken(t)))
+function isLocalMarker(token: string): boolean {
+  if (LOCAL.has(canonicalToken(token))) return true
+  for (const v of canonicalVariants(token)) if (LOCAL.has(v)) return true
+  return false
+}
+
+/** True when the query carries a generic local-intent marker ("near me" / "nearby" / "לידי" …). */
+export function hasLocalIntent(query: string): boolean {
+  return distinctiveTokensOf(stripApostrophes(query)).some(isLocalMarker)
+}
+
 /** Remove apostrophes/geresh/gershayim WITHOUT splitting the token, so "פוצ'יוולי" ≡ "פוציוולי"
  *  and "d'or" ≡ "dor". Everything else is handled by the accepted tokenizer. */
 function stripApostrophes(query: string): string {
@@ -59,15 +77,16 @@ function stripApostrophes(query: string): string {
 
 /**
  * The subject CORE of a query: its distinctive tokens (canonicalized, accepted stopwords already
- * removed) minus the generic framing tokens — sorted-unique for order-independent identity.
- * Empty ⇒ the query is purely generic framing (subjectless).
+ * removed) minus generic framing AND generic local-intent markers — sorted-unique for
+ * order-independent identity. Empty ⇒ the query has no real subject (purely generic framing and/or
+ * a bare local marker) and is subjectless.
  */
 export function subjectCoreTokens(query: string): string[] {
-  const toks = distinctiveTokensOf(stripApostrophes(query)).filter((t) => !isFramingToken(t))
+  const toks = distinctiveTokensOf(stripApostrophes(query)).filter((t) => !isFramingToken(t) && !isLocalMarker(t))
   return Array.from(new Set(toks)).sort()
 }
 
-/** A query is usable only when a real subject-bearing token survives framing removal. */
+/** A query is usable only when a real subject-bearing (non-framing, non-location) token survives. */
 export function isSubjectBearingQuery(query: string): boolean {
   return subjectCoreTokens(query).length > 0
 }
@@ -87,6 +106,12 @@ export interface CollapsedGscNeed {
   relatedOpportunityIds: string[]
   /** All source queries in the corresponding deterministic order. */
   relatedQueries: string[]
+  /** Union of ranking page URLs across every source (deduped, first-seen source order). */
+  relatedPages: string[]
+  /** Union of reason codes across every source (deduped, first-seen source order). */
+  relatedReasonCodes: string[]
+  /** Union of signals across every source (deduped, first-seen source order). */
+  relatedSignals: string[]
   /** Number of source opportunities in this need (1 when not collapsed). */
   collapsedOpportunityCount: number
 }
@@ -96,33 +121,49 @@ function sourceOrder(a: GscCandidate, b: GscCandidate): number {
   return b.opportunityScore - a.opportunityScore || b.impressions - a.impressions || (a.opportunityId < b.opportunityId ? -1 : a.opportunityId > b.opportunityId ? 1 : 0)
 }
 
-/** Two subject cores denote the same need when their canonical core token SETS are identical.
- *  Strict set-equality is conservative: it collapses spelling/punctuation/framing-only variants and
- *  preserves EVERY meaningful modifier (audience, location, timing, subtype, size, before/after…),
- *  because any distinguishing content token makes the cores differ. */
-function sameNeed(coreA: string[], coreB: string[]): boolean {
-  return coreA.length === coreB.length && coreA.every((t, i) => t === coreB[i])
+/**
+ * The full need identity of a candidate: subject core + intent cluster + local-intent flag. Two
+ * candidates are the same need ONLY when all three match (strict core set-equality; COMPATIBLE
+ * intent clusters via the accepted intentClusterOf — so informational and commercial variants of the
+ * same subject never collapse; and the same local-intent flag — so "office cleaning" ≠ "office
+ * cleaning near me"). Conservative: any distinguishing content token, a different intent, or a
+ * local/non-local split keeps needs separate.
+ */
+function needKey(c: GscCandidate): string {
+  const core = subjectCoreTokens(c.primaryQuery)
+  const cluster: IntentCluster = intentClusterOf(c.queryIntent)
+  const local = hasLocalIntent(c.primaryQuery) ? 'L' : ''
+  return `${core.join('')}${cluster}${local}`
 }
 
 /**
  * Collapse strong near-duplicate GSC needs. Candidates are processed in the deterministic source
  * order (so the representative is always the highest-ordered member and the result is INPUT-ORDER
- * INDEPENDENT). Each candidate joins the first existing need with an identical subject core, else
- * starts a new need. Metrics are aggregated deterministically; opportunityScore is the
- * representative's (never summed/averaged); all source provenance is preserved.
+ * INDEPENDENT). Each candidate joins the first existing need with an identical need identity
+ * (subject core + compatible intent cluster + local-intent flag), else starts a new need. Metrics
+ * are aggregated deterministically; opportunityScore is the representative's (never summed/averaged);
+ * all source provenance is preserved.
  */
 export function collapseGscCandidates(candidates: GscCandidate[]): { needs: CollapsedGscNeed[]; collapsedNearDuplicateCount: number } {
   const ordered = candidates.slice().sort(sourceOrder)
-  const groups: { members: GscCandidate[]; core: string[] }[] = []
+  const groups = new Map<string, GscCandidate[]>()
   for (const c of ordered) {
-    const core = subjectCoreTokens(c.primaryQuery)
-    const g = groups.find((grp) => sameNeed(grp.core, core))
-    if (g) g.members.push(c)
-    else groups.push({ members: [c], core })
+    const key = needKey(c)
+    const g = groups.get(key)
+    if (g) g.push(c)
+    else groups.set(key, [c]) // Map preserves insertion order → groups stay in representative order
   }
-  const needs = groups.map((g) => toNeed(g.members))
+  const needs = Array.from(groups.values()).map((members) => toNeed(members))
   const collapsedNearDuplicateCount = ordered.length - needs.length
   return { needs, collapsedNearDuplicateCount }
+}
+
+/** Deduplicate preserving first-seen order. */
+function dedupe(values: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const v of values) if (v && !seen.has(v)) { seen.add(v); out.push(v) }
+  return out
 }
 
 function toNeed(members: GscCandidate[]): CollapsedGscNeed {
@@ -146,6 +187,9 @@ function toNeed(members: GscCandidate[]): CollapsedGscNeed {
     candidate,
     relatedOpportunityIds: members.map((m) => m.opportunityId),
     relatedQueries: members.map((m) => m.primaryQuery),
+    relatedPages: dedupe(members.map((m) => m.page)),
+    relatedReasonCodes: dedupe(members.flatMap((m) => m.reasonCodes)),
+    relatedSignals: dedupe(members.flatMap((m) => m.signals)),
     collapsedOpportunityCount: members.length,
   }
 }

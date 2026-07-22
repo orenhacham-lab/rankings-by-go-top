@@ -103,6 +103,12 @@ export interface SelectedGscBriefDetail {
   relatedOpportunityIds: string[]
   /** Every source query collapsed into this need, in corresponding deterministic order. */
   relatedQueries: string[]
+  /** Union of ranking page URLs across every collapsed source (deduped, first-seen order). */
+  relatedPages: string[]
+  /** Union of reason codes across every collapsed source (deduped, first-seen order). */
+  relatedReasonCodes: string[]
+  /** Union of signals across every collapsed source (deduped, first-seen order). */
+  relatedSignals: string[]
   /** Number of source opportunities collapsed into this need (1 when not collapsed). */
   collapsedOpportunityCount: number
   priorityTier: number | null

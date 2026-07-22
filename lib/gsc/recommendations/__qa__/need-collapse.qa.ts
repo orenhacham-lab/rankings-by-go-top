@@ -7,7 +7,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { collapseGscCandidates, partitionSubjectBearing, isSubjectBearingQuery, subjectCoreTokens } from '../../../content/recommendations/gsc-need-collapse'
+import { collapseGscCandidates, partitionSubjectBearing, isSubjectBearingQuery, subjectCoreTokens, hasLocalIntent } from '../../../content/recommendations/gsc-need-collapse'
 import type { GscCandidate } from '../types'
 
 let pass = 0, fail = 0
@@ -90,6 +90,50 @@ function main() {
     // (17)(18) partition + truthful counts (no business vocabulary needed).
     const { subjectBearing, subjectless } = partitionSubjectBearing([cand({ opportunityId: '1', primaryQuery: 'מה המחיר' }), cand({ opportunityId: '2', primaryQuery: 'מה המחיר של הליכון מתקפל' })])
     check('(guard partition) subjectless separated from subject-bearing', subjectless.length === 1 && subjectBearing.length === 1 && subjectBearing[0].opportunityId === '2')
+  }
+
+  // ── FIX 1 — INTENT-COMPATIBLE COLLAPSE (reuses intentClusterOf) ──────────────────
+  const collapsesI = (a: string, ai: string, b: string, bi: string) => collapseGscCandidates([cand({ opportunityId: 'a', primaryQuery: a, queryIntent: ai }), cand({ opportunityId: 'b', primaryQuery: b, queryIntent: bi })]).needs.length === 1
+  check('(F1.1) informational + informational variants may collapse', collapsesI('מה זה ניקיון משרדים', 'informational', 'מידע על ניקיון משרדים', 'informational'))
+  check('(F1.2) commercial + commercial price variants may collapse', collapsesI('מחיר ניקיון משרדים', 'commercial', 'כמה עולה ניקיון משרדים', 'commercial'))
+  check('(F1.3) informational + commercial same subject remain SEPARATE (office cleaning, HE)', !collapsesI('מה זה ניקיון משרדים', 'informational', 'מחיר ניקיון משרדים', 'commercial'))
+  check('(F1.4) informational + commercial same subject remain SEPARATE (office cleaning, EN)', !collapsesI('what is office cleaning', 'informational', 'office cleaning price', 'commercial'))
+  check('(F1.5) legal informational + commercial remain separate', !collapsesI('מה זה עורך דין פלילי', 'informational', 'מחיר עורך דין פלילי', 'commercial'))
+  check('(F1.6) ecommerce informational + commercial remain separate', !collapsesI('what is an office chair', 'informational', 'office chair price', 'commercial'))
+  check('(F1.7) live morning-food informational pair still collapses', collapsesI('מה לאכול לפני אימון בוקר', 'informational', 'מה טוב לאכול לפני אימון בוקר', 'informational'))
+  {
+    const q = [cand({ opportunityId: '1', primaryQuery: 'מחיר ניקיון משרדים', queryIntent: 'commercial', opportunityScore: 90 }), cand({ opportunityId: '2', primaryQuery: 'מה זה ניקיון משרדים', queryIntent: 'informational', opportunityScore: 80 }), cand({ opportunityId: '3', primaryQuery: 'כמה עולה ניקיון משרדים', queryIntent: 'commercial', opportunityScore: 70 })]
+    const fwd = collapseGscCandidates(q).needs.map((n) => n.relatedOpportunityIds.slice().sort().join(',')).sort()
+    const rev = collapseGscCandidates(q.slice().reverse()).needs.map((n) => n.relatedOpportunityIds.slice().sort().join(',')).sort()
+    check('(F1.8) intent split is deterministic under shuffled input', JSON.stringify(fwd) === JSON.stringify(rev) && fwd.length === 2)
+  }
+
+  // ── FIX 2 — GENERIC LOCAL-INTENT MODIFIERS stay distinct; local-only is subjectless ──
+  check('(F2.1) office cleaning vs office cleaning near me stay separate (EN)', !collapses('office cleaning services', 'office cleaning services near me'))
+  check('(F2.2) criminal lawyer vs criminal lawyer near me stay separate (EN)', !collapses('criminal lawyer', 'criminal lawyer near me'))
+  check('(F2.3) flower delivery vs flower delivery nearby stay separate (EN)', !collapses('flower delivery', 'flower delivery nearby'))
+  check('(F2.4) ניקיון משרדים vs ניקיון משרדים לידי stay separate (HE)', !collapses('ניקיון משרדים', 'ניקיון משרדים לידי'))
+  check('(F2.5) "near me" alone is subjectless', !isSubjectBearingQuery('near me'))
+  check('(F2.6) "nearby" alone is subjectless', !isSubjectBearingQuery('nearby'))
+  check('(F2.7) "לידי" alone is subjectless', !isSubjectBearingQuery('לידי'))
+  check('(F2.8) "קרוב אליי" alone is subjectless', !isSubjectBearingQuery('קרוב אליי'))
+  check('(F2.9) a real subject + local modifier remains eligible', isSubjectBearingQuery('office cleaning near me') && isSubjectBearingQuery('ניקיון משרדים לידי') && hasLocalIntent('office cleaning near me'))
+  check('(F2.10) explicit city modifiers remain separate (not local markers)', !collapses('ניקיון משרדים בתל אביב', 'ניקיון משרדים בירושלים') && !hasLocalIntent('ניקיון משרדים בתל אביב'))
+
+  // ── FIX 3 — COLLAPSED SOURCE PROVENANCE (pages / reason codes / signals) ─────────
+  {
+    const members = [
+      cand({ opportunityId: 'hi', primaryQuery: 'מחיר ניקיון משרדים', queryIntent: 'commercial', opportunityScore: 90, impressions: 100, clicks: 7, averagePosition: 8, page: 'https://x.co/a', reasonCodes: ['low_ctr', 'position_gap'], signals: ['multi_page'] }),
+      cand({ opportunityId: 'lo', primaryQuery: 'כמה עולה ניקיון משרדים', queryIntent: 'commercial', opportunityScore: 40, impressions: 300, clicks: 3, averagePosition: 4, page: 'https://x.co/b', reasonCodes: ['position_gap', 'demand'], signals: ['multi_page', 'rising'] }),
+    ]
+    const n = collapseGscCandidates(members).needs[0]
+    check('(F3.1) pages from every collapsed source preserved (first-seen order)', n.relatedPages.join(',') === 'https://x.co/a,https://x.co/b')
+    check('(F3.2) reason codes preserved + deduped', n.relatedReasonCodes.join(',') === 'low_ctr,position_gap,demand')
+    check('(F3.3) signals preserved + deduped', n.relatedSignals.join(',') === 'multi_page,rising')
+    check('(F3.4) representative source order deterministic (hi first)', n.candidate.opportunityId === 'hi' && n.relatedOpportunityIds.join(',') === 'hi,lo')
+    check('(F3.5) aggregate metrics unchanged by provenance (clicks/impr/ctr/pos)', n.candidate.clicks === 10 && n.candidate.impressions === 400 && Math.abs(n.candidate.ctr - 10 / 400) < 1e-9 && Math.abs(n.candidate.averagePosition - (8 * 100 + 4 * 300) / 400) < 1e-9)
+    const solo = collapseGscCandidates([cand({ opportunityId: 'x', primaryQuery: 'איך להתחיל קליסטניקס', page: 'https://x.co/s', reasonCodes: ['r1'], signals: ['s1'] })]).needs[0]
+    check('(F3.6) non-collapsed need → representative provenance values', solo.relatedPages.join(',') === 'https://x.co/s' && solo.relatedReasonCodes.join(',') === 'r1' && solo.relatedSignals.join(',') === 's1')
   }
 
   // ── MULTI-PROJECT DOMAIN MATRIX (generic; label never changes the decision) ──────

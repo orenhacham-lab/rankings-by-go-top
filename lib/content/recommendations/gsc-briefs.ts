@@ -153,6 +153,9 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
       // Collapse provenance — one selected brief per unique need; all raw sources stay traceable.
       relatedOpportunityIds: need.relatedOpportunityIds,
       relatedQueries: need.relatedQueries,
+      relatedPages: need.relatedPages,
+      relatedReasonCodes: need.relatedReasonCodes,
+      relatedSignals: need.relatedSignals,
       collapsedOpportunityCount: need.collapsedOpportunityCount,
       priorityTier: null,
       finalSynthesisRank: null,
