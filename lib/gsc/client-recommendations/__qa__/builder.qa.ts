@@ -4,8 +4,12 @@
  * deterministic ordering + stable ids, overlap primary-page threshold, priority labels, exclusion of
  * new-content candidates + decided opportunities, and that NO internal field leaks to the client.
  */
-import { buildClientRecommendations, pageLabelFromUrl } from '../builder'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { buildClientRecommendations, pageLabelFromUrl, isHomepageUrl } from '../builder'
+import { getDashboardDictionary } from '../../../i18n/dashboard/getDashboardDictionary'
 import type { Opportunity, QueryIntent } from '../../opportunities/types'
+const ROOT = join(__dirname, '..', '..', '..', '..')
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -40,43 +44,27 @@ function main() {
 
   // ── Page-owned consolidation + distinct-need preservation ────────────────────────
   {
-    // FIX 1 — word-order variants with EQUAL content-token identity consolidate into one card.
+    // FIX 1 — two DIFFERENT search needs (any intent) on the same page + category → ONE page-level card.
     const res = build([
-      opp({ id: 'p1', opportunityType: 'improve_existing_page', page: 'https://x.co/chest/', primaryQuery: 'תרגילי חזה משקולות', queryIntent: 'informational', impressions: 2000, clicks: 10 }),
-      opp({ id: 'p2', opportunityType: 'improve_existing_page', page: 'https://x.co/chest/', primaryQuery: 'משקולות תרגילי חזה', queryIntent: 'informational', impressions: 1000, clicks: 5 }),
+      opp({ id: 'p1', opportunityType: 'improve_existing_page', page: 'https://x.co/tread/', primaryQuery: 'איך לבחור הליכון לדירה קטנה', queryIntent: 'informational', impressions: 2000, clicks: 10 }),
+      opp({ id: 'p2', opportunityType: 'improve_existing_page', page: 'https://x.co/tread/', primaryQuery: 'הליכון לשיקום לאחר ניתוח', queryIntent: 'commercial', impressions: 1000, clicks: 5 }),
     ])
     const card = res.recommendations[0]
-    check('(FIX1) equal-token word-order variants merge → ONE card', res.recommendations.length === 1)
-    check('(FIX1) distinct needs preserved as needGroups', card.needGroups.length === 2 && card.relatedOpportunityIds.join(',') === 'p1,p2')
-    check('(FIX1) metrics aggregated (impressions 3000, clicks 15)', card.metrics.impressions === 3000 && card.metrics.clicks === 15)
+    check('(FIX1) same page + same category → ONE card', res.recommendations.length === 1 && card.category === 'improve_page')
+    check('(FIX1) both distinct needs preserved as separate needGroups', card.needGroups.length === 2 && card.needGroups[0].representativeQuery !== card.needGroups[1].representativeQuery)
+    check('(FIX1) metrics + relatedOpportunityIds aggregated (authoritative union)', card.metrics.impressions === 3000 && card.metrics.clicks === 15 && card.relatedOpportunityIds.slice().sort().join(',') === 'p1,p2')
   }
   {
-    // FIX 1 — unrelated informational needs on the SAME page + category stay SEPARATE.
+    // FIX 1 — same page, DIFFERENT categories → may remain separate cards, capped at 2 (strongest kept).
     const res = build([
-      opp({ id: 'u1', opportunityType: 'improve_existing_page', page: 'https://x.co/tread/', primaryQuery: 'איך לבחור הליכון לדירה קטנה', queryIntent: 'informational', impressions: 900 }),
-      opp({ id: 'u2', opportunityType: 'improve_existing_page', page: 'https://x.co/tread/', primaryQuery: 'הליכון לשיקום לאחר ניתוח', queryIntent: 'informational', impressions: 800 }),
+      opp({ id: 'a', opportunityType: 'improve_title_meta_ctr', page: 'https://x.co/pg/', primaryQuery: 'q1', averagePosition: 8, impressions: 3000, scoreComponents: { demandStrength: 0.6, positionOpportunity: 1, ctrGap: 0.4, contentMatchConfidence: 0, distinctPageSignal: 0 } }),
+      opp({ id: 'b', opportunityType: 'internal_link_support_candidate', page: 'https://x.co/pg/', primaryQuery: 'q2', impressions: 2000 }),
+      opp({ id: 'c', opportunityType: 'improve_existing_page', page: 'https://x.co/pg/', primaryQuery: 'q3', impressions: 1000 }),
     ])
-    check('(FIX1) unrelated same-page informational needs stay separate (2 cards)', res.recommendations.length === 2)
-    check('(FIX1) stable ids differ for different needs', res.recommendations[0].id !== res.recommendations[1].id)
-    check('(FIX1) same page + category + intent is NOT sufficient to merge', res.recommendations.every((r) => r.category === 'improve_page' && r.affectedPage === 'https://x.co/tread/'))
-  }
-  {
-    // different intent cluster on the same page → separate cards (distinct need)
-    const res = build([
-      opp({ id: 'i1', opportunityType: 'improve_existing_page', page: 'https://x.co/shared/', primaryQuery: 'מדריך שירות', queryIntent: 'informational', impressions: 900 }),
-      opp({ id: 'i2', opportunityType: 'improve_existing_page', page: 'https://x.co/shared/', primaryQuery: 'מדריך שירות', queryIntent: 'commercial', impressions: 800 }),
-    ])
-    check('distinct intent on same page → 2 cards (capped at 2/page)', res.recommendations.length === 2 && res.recommendations.every((r) => r.category === 'improve_page'))
-  }
-  {
-    // FIX 1 — 2-per-page cap keeps the TWO STRONGEST distinct needs (by priority → impressions → id).
-    const res = build([
-      opp({ id: 'w', opportunityType: 'improve_existing_page', page: 'https://x.co/hub/', primaryQuery: 'צורך חלש', queryIntent: 'informational', impressions: 100, opportunityScore: 10 }),
-      opp({ id: 'm', opportunityType: 'improve_existing_page', page: 'https://x.co/hub/', primaryQuery: 'צורך בינוני', queryIntent: 'informational', impressions: 2000, opportunityScore: 40 }),
-      opp({ id: 's', opportunityType: 'improve_existing_page', page: 'https://x.co/hub/', primaryQuery: 'צורך חזק', queryIntent: 'informational', impressions: 5000, opportunityScore: 60 }),
-    ])
-    const kept = res.recommendations.filter((r) => r.affectedPage === 'https://x.co/hub/')
-    check('(FIX1) 2-per-page keeps the two strongest needs', kept.length === 2 && kept[0].relatedOpportunityIds.includes('s') && kept[1].relatedOpportunityIds.includes('m') && !res.recommendations.some((r) => r.relatedOpportunityIds.includes('w')))
+    const onPage = res.recommendations.filter((r) => r.affectedPage === 'https://x.co/pg/')
+    check('(FIX1) same page + different categories → separate cards, capped at 2', onPage.length === 2 && new Set(onPage.map((r) => r.category)).size === 2)
+    check('(FIX1) the two strongest kept (weakest category dropped)', !res.recommendations.some((r) => r.relatedOpportunityIds.includes('c')))
+    check('(FIX1) no two cards share the same page AND category', new Set(res.recommendations.map((r) => `${r.category}|${r.affectedPage}`)).size === res.recommendations.length)
   }
 
   // ── Overlap (D) + primary-page threshold ─────────────────────────────────────────
@@ -117,8 +105,11 @@ function main() {
     check('(bound) ≤20 total', build(many).recommendations.length === 20)
   }
   {
-    const samePage = Array.from({ length: 5 }, (_, i) => opp({ id: `s${i}`, opportunityType: 'improve_existing_page', page: 'https://x.co/one/', queryIntent: (['informational', 'commercial', 'branded_or_service', 'support', 'unknown'] as QueryIntent[])[i], impressions: 1000 - i }))
-    check('(bound) ≤2 per affected page', build(samePage).recommendations.filter((r) => r.affectedPage === 'https://x.co/one/').length === 2)
+    // Many needs, same page + same category → exactly ONE consolidated card (all needs inside it).
+    const samePage = Array.from({ length: 5 }, (_, i) => opp({ id: `s${i}`, opportunityType: 'improve_existing_page', page: 'https://x.co/one/', queryIntent: (['informational', 'commercial', 'branded_or_service', 'support', 'unknown'] as QueryIntent[])[i], primaryQuery: `need ${i}`, impressions: 1000 - i }))
+    const res = build(samePage)
+    const onPage = res.recommendations.filter((r) => r.affectedPage === 'https://x.co/one/')
+    check('(bound) 5 same-page/same-category needs → ONE card with 5 needGroups', onPage.length === 1 && onPage[0].needGroups.length === 5)
   }
   {
     const set = [
@@ -150,6 +141,31 @@ function main() {
     const ALLOWED_REASONS = new Set(['high_search_demand', 'ranks_striking_distance', 'low_ctr_for_position', 'has_relevant_page', 'impressions_split_across_pages'])
     check('(no-leak) reasonKeys are whitelisted, translated (no raw codes/score)', r.reasonKeys.every((k) => ALLOWED_REASONS.has(k)) && r.reasonKeys.includes('high_search_demand') && r.reasonKeys.includes('ranks_striking_distance'))
     check('(no-leak) no opportunityScore / opportunityType / reasons on the card', !('opportunityScore' in r) && !('opportunityType' in r) && !('reasons' in r))
+  }
+
+  // ── FIX 2 — homepage label ───────────────────────────────────────────────────────
+  check('(FIX2) isHomepageUrl: root with/without trailing slash, not a sub-page', isHomepageUrl('https://x.co/') && isHomepageUrl('https://x.co') && !isHomepageUrl('https://x.co/blog/'))
+  for (const url of ['https://www.idosport.co.il/', 'https://www.idosport.co.il']) {
+    const r = build([opp({ id: 'h', opportunityType: 'improve_existing_page', page: url })]).recommendations[0]
+    check(`(FIX2) root URL → isHomepage + pageLabel null (${url})`, r.isHomepage === true && r.pageLabel === null)
+  }
+  {
+    const he = getDashboardDictionary('he').projectDetail.contentSection.gscRecommendations
+    const homeRec = build([opp({ id: 'h2', opportunityType: 'improve_existing_page', page: 'https://x.co/' })]).recommendations[0]
+    const label = homeRec.isHomepage ? he.homepageLabel : (homeRec.pageLabel ?? he.homepageLabel)
+    const homeTitle = he.titles.improve_page(label)
+    check('(FIX2) homepage title uses "עמוד הבית"', homeTitle.includes('עמוד הבית'))
+    check('(FIX2) "העמוד המדורג מדורג" can never appear (homepage + normal page)', !homeTitle.includes('המדורג מדורג') && !he.titles.improve_page('מדריך הליכון').includes('המדורג מדורג') && !he.titles.improve_ctr(label).includes('המדורג מדורג'))
+  }
+
+  // ── FIX 3 — truthful external-link button labels (UI source contract) ─────────────
+  {
+    const ui = readFileSync(join(ROOT, 'components/content/GscRecommendations.tsx'), 'utf8')
+    const he = getDashboardDictionary('he').projectDetail.contentSection.gscRecommendations
+    check('(FIX3) i18n has openPage / openPrimary / homepageLabel', typeof he.openPage === 'string' && typeof he.openPrimary === 'string' && typeof he.homepageLabel === 'string')
+    check('(FIX3) A/B/C primary button opens the page with the openPage label', /r\.category !== 'page_overlap' && r\.affectedPage &&/.test(ui) && ui.includes('{t.openPage}'))
+    check('(FIX3) overlap opens the PRIMARY page only when hasClearPrimary (no arbitrary first page)', /r\.category === 'page_overlap' && r\.hasClearPrimary && r\.affectedPage &&/.test(ui) && ui.includes('{t.openPrimary}'))
+    check('(FIX3) no misleading per-category action labels are used', !/t\.actions\[/.test(ui) && !/openHref/.test(ui))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

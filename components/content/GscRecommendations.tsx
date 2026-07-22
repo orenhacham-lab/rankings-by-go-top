@@ -28,7 +28,7 @@ interface NeedGroup { representativeQuery: string; relatedQueries: string[]; opp
 interface InvolvedPage { url: string; impressions: number; clicks: number; isPrimary: boolean }
 interface Recommendation {
   id: string; category: Category; priority: Priority; window: number
-  affectedPage: string | null; pageLabel: string | null
+  affectedPage: string | null; pageLabel: string | null; isHomepage?: boolean
   metrics: { impressions: number; clicks: number; ctr: number; averagePosition: number }
   needGroups: NeedGroup[]; relatedOpportunityIds: string[]
   involvedPages?: InvolvedPage[]; hasClearPrimary?: boolean; reasonKeys: ReasonKey[]
@@ -99,12 +99,13 @@ export default function GscRecommendations({ projectId, onToast }: {
   const stateCta = state === 'not_connected' ? t.ctaConnect : state === 'no_property' ? t.ctaSelectProperty : state === 'never_synced' ? t.ctaSync : null
 
   const priorityVariant = (p: Priority): 'success' | 'info' | 'neutral' => (p === 'high' ? 'success' : p === 'good' ? 'info' : 'neutral')
-  const cardTitle = (r: Recommendation) => t.titles[r.category](r.pageLabel)
+  // Deterministic display label: homepage → localized "Homepage"; otherwise the decoded slug label.
+  const displayLabel = (r: Recommendation) => (r.isHomepage ? t.homepageLabel : (r.pageLabel ?? t.homepageLabel))
+  const cardTitle = (r: Recommendation) => r.category === 'page_overlap' ? t.titles.page_overlap() : t.titles[r.category](displayLabel(r))
   const cardSummary = (r: Recommendation) => r.category === 'improve_ctr' ? t.summaries.improve_ctr(fmtPos(r.metrics.averagePosition), fmtCtr(r.metrics.ctr))
     : r.category === 'improve_page' ? t.summaries.improve_page(fmtPos(r.metrics.averagePosition))
       : r.category === 'internal_links' ? t.summaries.internal_links(fmtPos(r.metrics.averagePosition))
         : t.summaries.page_overlap(r.involvedPages?.length ?? 0)
-  const openHref = (r: Recommendation) => r.affectedPage ?? r.involvedPages?.[0]?.url ?? null
 
   return (
     <div dir="rtl">
@@ -155,7 +156,6 @@ export default function GscRecommendations({ projectId, onToast }: {
 
           <ul className="space-y-3">
             {filtered.map((r) => {
-              const href = openHref(r)
               const pages = r.involvedPages ?? []
               const shown = showAllPages[r.id] ? pages : pages.slice(0, OVERLAP_INITIAL)
               return (
@@ -221,10 +221,16 @@ export default function GscRecommendations({ projectId, onToast }: {
                       </div>
                     )}
 
-                    {/* Actions */}
+                    {/* Actions — the primary button only ever opens an external page URL, so its
+                        label says exactly that. A/B/C open the affected page; page-overlap opens the
+                        primary page ONLY when one is clearly identified (else the involved page links
+                        above are the only way in — no arbitrary "first page" button). */}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {href && (
-                        <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">{t.actions[r.category]}</a>
+                      {r.category !== 'page_overlap' && r.affectedPage && (
+                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">{t.openPage}</a>
+                      )}
+                      {r.category === 'page_overlap' && r.hasClearPrimary && r.affectedPage && (
+                        <a href={r.affectedPage} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition">{t.openPrimary}</a>
                       )}
                       {ACTIONS_ENABLED && (
                         <>

@@ -46,8 +46,11 @@ export interface ClientRecommendation {
   window: 28 | 90
   /** Affected page URL. null ONLY for a page_overlap card with no clear primary page. */
   affectedPage: string | null
-  /** Human label derived deterministically from the page slug (never an internal term). */
+  /** Human label derived deterministically from the page slug (never an internal term). null for
+   *  the homepage — the UI renders the localized "Homepage" label via isHomepage. */
   pageLabel: string | null
+  /** The affected page is the site root ("/") — the UI shows the localized homepage label. */
+  isHomepage?: boolean
   metrics: { impressions: number; clicks: number; ctr: number; averagePosition: number }
   /** ≥1 need group; distinct needs on the same page are preserved (not merged away). */
   needGroups: ClientNeedGroup[]

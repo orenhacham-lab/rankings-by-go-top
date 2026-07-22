@@ -13,7 +13,7 @@
 import crypto from 'crypto'
 import { urlKey } from '../opportunities/content-match'
 import { contentTokenSet } from '../opportunities/normalize'
-import type { Opportunity, QueryIntent } from '../opportunities/types'
+import type { Opportunity } from '../opportunities/types'
 import type {
   ClientRecommendation, ClientRecCategory, ClientPriority, ClientReasonKey,
   ClientNeedGroup, ClientInvolvedPage, BuildRecommendationsResult,
@@ -23,22 +23,18 @@ const DEFAULT_MAX_TOTAL = 20
 const DEFAULT_MAX_PER_PAGE = 2
 const PRIMARY_PAGE_MIN_SHARE = 0.5 // a page is the "likely primary" only with ≥50% of impressions
 
-/** GSC-side intent cluster (no dependency on the reco-side semantic-dup). */
-type IntentCluster = 'info' | 'buy' | 'local' | 'other'
-function intentCluster(intent: QueryIntent): IntentCluster {
-  if (intent === 'informational') return 'info'
-  if (intent === 'commercial' || intent === 'product') return 'buy'
-  if (intent === 'branded_or_service') return 'local'
-  return 'other' // support / unknown
-}
-
 /** Deterministic source order: opportunityScore DESC, impressions DESC, id ASC. */
 function sourceOrder(a: Opportunity, b: Opportunity): number {
   return b.opportunityScore - a.opportunityScore || b.impressions - a.impressions || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 }
 
+/** The affected page is the site root ("/"), with or without a trailing slash. */
+export function isHomepageUrl(url: string): boolean {
+  try { const p = new URL(url).pathname; return p === '' || p === '/' } catch { return false }
+}
+
 /** Human, client-safe label from a URL slug (last non-empty path segment, decoded, hyphens→spaces).
- *  Never an internal term; null when it cannot be derived. */
+ *  Never an internal term; null for the homepage (the UI substitutes the localized homepage label). */
 export function pageLabelFromUrl(url: string): string | null {
   try {
     const u = new URL(url)
@@ -150,15 +146,13 @@ export function buildClientRecommendations(params: {
       const total = bd.reduce((s, p) => s + p.impressions, 0)
       affectedPage = bd.length > 0 && total > 0 && bd[0].impressions / total >= PRIMARY_PAGE_MIN_SHARE ? bd[0].page : null
     } else {
+      // A–C are PAGE-LEVEL actions → ONE card per (page, category). Distinct search needs on the
+      // same page are preserved as separate needGroups[] inside the card (never claimed as semantic
+      // duplicates), not as separate cards. The overlap (D) path stays need-level (below).
       category = baseCategory(o)
       if (!category) continue
       pageKey = urlKey(o.page)
-      // Distinct-need identity: intent cluster + the deterministic GSC content-token set. Same
-      // page + category + intent is NOT sufficient — only opportunities whose MEANINGFUL token set is
-      // equal (e.g. pure word-order variants) consolidate; materially different needs stay separate.
-      // Preserves location/audience/timing/subtype/problem/comparison/use-case modifiers (any
-      // distinguishing content token changes the signature). No fuzzy/edit-distance/LLM/stemming.
-      needSig = `${intentCluster(o.queryIntent)}|${contentTokenSet(o.primaryQuery).join(' ')}`
+      needSig = 'page'
       affectedPage = o.page
     }
     const key = `${category}|${pageKey}|${needSig}`
@@ -192,6 +186,7 @@ export function buildClientRecommendations(params: {
       window: params.window,
       affectedPage: g.affectedPage,
       pageLabel: g.affectedPage ? pageLabelFromUrl(g.affectedPage) : null,
+      ...(g.affectedPage && isHomepageUrl(g.affectedPage) ? { isHomepage: true } : {}),
       metrics: { impressions: totalImpr, clicks: totalClicks, ctr: totalImpr > 0 ? totalClicks / totalImpr : 0, averagePosition: totalImpr > 0 ? weightedPos / totalImpr : rep.averagePosition },
       needGroups,
       relatedOpportunityIds,
