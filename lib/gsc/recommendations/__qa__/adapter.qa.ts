@@ -122,7 +122,7 @@ function main() {
     check('(49)(50) read failure → state read_failed (visible), never fabricated as zero', failRes.diagnostics.state === 'read_failed' && failRes.candidates.length === 0)
 
     // ── Map / merge / budget (28-39) ──────────────────────────────────────────
-    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [] })
+    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [], combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [] })
     const noGuards = { enabled: true, targetCount: 12, existingPool: [] as ReturnType<typeof brief>[], isCoveredByContent: () => false, isOwnedByEntity: () => false, blogDuplicateSignatures: [] as { sig: ReturnType<typeof topicSignature>; source: string }[] }
 
     check('(28) existing-content coverage suppresses a new GSC brief', applyGscBriefIntegration([cand({ opportunityId: 'o1', primaryQuery: 'folding treadmill guide home' })], diag(), { ...noGuards, isCoveredByContent: () => true }).gscBriefs.length === 0)
@@ -148,6 +148,40 @@ function main() {
     check('(37) no fixed per-head cap (30 same-head candidates all admitted within budget)', applyGscBriefIntegration(Array.from({ length: 30 }, (_, i) => cand({ opportunityId: `h${i}`, primaryQuery: `folding treadmill quiet variant ${i}` })), diag(), { ...noGuards, targetCount: 12 }).gscBriefs.length === 30)
     check('(40) new GSC brief carries gsc provenance + gsc: source id', (() => { const b = applyGscBriefIntegration([cand({ opportunityId: 'opp_abc', primaryQuery: 'folding treadmill guide home' })], diag(), noGuards).gscBriefs[0]; return b.opportunityId === 'gsc:opp_abc' && b.sourceEvidence.some((e) => e.kind === 'gsc') && b.subject === 'folding treadmill guide home' && b.intendedPageType === 'article' })())
     check('(E)(41) subject is the search need, not a finished title (raw query passed as subject)', applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'how to choose a folding treadmill' })], diag(), noGuards).gscBriefs[0].subject === 'how to choose a folding treadmill')
+
+    // ── FIX 1 — GSC opportunityScore (0–100) mapped onto the existing 0–1 brief scale ─────
+    check('(FIX1) opportunityScore 100 → briefScore/confidence 1', (() => { const b = applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'folding treadmill guide home', opportunityScore: 100 })], diag(), noGuards).gscBriefs[0]; return b.briefScore === 1 && b.confidence === 1 })())
+    check('(FIX1) opportunityScore 0 → briefScore/confidence 0', (() => { const b = applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'folding treadmill guide home', opportunityScore: 0 })], diag(), noGuards).gscBriefs[0]; return b.briefScore === 0 && b.confidence === 0 })())
+    check('(FIX1) opportunityScore 78 → briefScore/confidence 0.78 (÷100, 4-dp deterministic)', (() => { const b = applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'folding treadmill guide home', opportunityScore: 78 })], diag(), noGuards).gscBriefs[0]; return b.briefScore === 0.78 && b.confidence === 0.78 })())
+    check('(FIX1) out-of-range opportunityScore is clamped (120 → 1, -5 → 0)', (() => { const hi = applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'folding treadmill guide home', opportunityScore: 120 })], diag(), noGuards).gscBriefs[0]; const lo = applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'folding treadmill guide home', opportunityScore: -5 })], diag(), noGuards).gscBriefs[0]; return hi.briefScore === 1 && lo.briefScore === 0 })())
+    check('(FIX1) confidence === briefScore for a new GSC brief (one mapped scale)', (() => { const b = applyGscBriefIntegration([cand({ opportunityId: 'o', primaryQuery: 'folding treadmill guide home', opportunityScore: 63 })], diag(), noGuards).gscBriefs[0]; return b.confidence === b.briefScore })())
+    check('(FIX1 invariant) EVERY GSC-origin brief has 0<=briefScore<=1 && 0<=confidence<=1', (() => {
+      const scores = [0, 1, 17, 42.5, 63, 78, 99, 100, 120, -5]
+      const briefs = applyGscBriefIntegration(scores.map((s, i) => cand({ opportunityId: `o${i}`, primaryQuery: `folding treadmill quiet model ${i}`, opportunityScore: s })), diag(), { ...noGuards, targetCount: 60 }).gscBriefs
+      return briefs.length === scores.length && briefs.every((b) => b.briefScore >= 0 && b.briefScore <= 1 && b.confidence >= 0 && b.confidence <= 1)
+    })())
+
+    // ── FIX 3 — selectedBriefIds carries ACTUAL brief ids, deduped first-seen ─────────────
+    check('(FIX3) new brief → selectedBriefIds holds gsc:<id> (not raw id)', (() => { const d = diag(); applyGscBriefIntegration([cand({ opportunityId: 'opp_x', primaryQuery: 'folding treadmill guide home' })], d, noGuards); return d.selectedBriefIds.join(',') === 'gsc:opp_x' })())
+    check('(FIX3) merge → selectedBriefIds holds the matched NORMAL brief id (not the raw GSC id)', (() => { const d = diag(); const existing = [brief('folding treadmill guide home')]; applyGscBriefIntegration([cand({ opportunityId: 'opp_x', primaryQuery: 'folding treadmill guide home' })], d, { ...noGuards, existingPool: existing }); return d.selectedBriefIds.join(',') === existing[0].opportunityId && !d.selectedBriefIds.includes('opp_x') && !d.selectedBriefIds.includes('gsc:opp_x') })())
+    check('(FIX3) multiple GSC ops → same normal brief: selectedBriefIds contains it ONCE', (() => {
+      const d = diag(); const existing = [brief('folding treadmill guide home')]
+      applyGscBriefIntegration([cand({ opportunityId: 'op1', primaryQuery: 'folding treadmill guide home' }), cand({ opportunityId: 'op2', primaryQuery: 'folding treadmill guide home tips' })], d, { ...noGuards, existingPool: existing })
+      return d.selectedBriefIds.filter((id) => id === existing[0].opportunityId).length === 1
+    })())
+
+    // ── FIX 4 — mergedGscEvidence: one record per source GSC op, raw id preserved ─────────
+    check('(FIX4) merge records {gscOpportunityId, briefId, consumed:false, accepted:false}', (() => {
+      const d = diag(); const existing = [brief('folding treadmill guide home')]
+      applyGscBriefIntegration([cand({ opportunityId: 'opp_raw', primaryQuery: 'folding treadmill guide home' })], d, { ...noGuards, existingPool: existing })
+      return d.mergedGscEvidence.length === 1 && d.mergedGscEvidence[0].gscOpportunityId === 'opp_raw' && d.mergedGscEvidence[0].briefId === existing[0].opportunityId && d.mergedGscEvidence[0].consumed === false && d.mergedGscEvidence[0].accepted === false
+    })())
+    check('(FIX4) multiple GSC ops → same brief: ONE mergedGscEvidence record per source op', (() => {
+      const d = diag(); const existing = [brief('folding treadmill guide home')]
+      applyGscBriefIntegration([cand({ opportunityId: 'op1', primaryQuery: 'folding treadmill guide home' }), cand({ opportunityId: 'op2', primaryQuery: 'folding treadmill guide home tips' })], d, { ...noGuards, existingPool: existing })
+      return d.mergedGscEvidence.length === 2 && d.mergedGscEvidence.map((r) => r.gscOpportunityId).join(',') === 'op1,op2' && d.mergedGscEvidence.every((r) => r.briefId === existing[0].opportunityId)
+    })())
+    check('(FIX4) a genuinely-new GSC brief creates NO mergedGscEvidence record', (() => { const d = diag(); applyGscBriefIntegration([cand({ opportunityId: 'opp_new', primaryQuery: 'folding treadmill guide home' })], d, noGuards); return d.mergedGscEvidence.length === 0 && d.addedAsNewBriefCount === 1 })())
   }
 
   // ── Static isolation / persistence / prompt guards (41-54) ──────────────────
@@ -159,7 +193,7 @@ function main() {
     const route = read('app/api/content/automation/recommendations/route.ts')
     check('(K) route surfaces gscInput in diagnostics', /gscInput: briefDiagnostics\?\.gscInput/.test(route))
     const gscBriefs = read('lib/content/recommendations/gsc-briefs.ts')
-    check('(45)(48) integration performs NO writes (no insert/update/upsert/delete/from(...))', !/\.(insert|update|upsert|delete)\(/.test(gscBriefs) && !/\.from\(/.test(gscBriefs))
+    check('(45)(48) integration performs NO writes (no insert/update/upsert/delete/from(...))', !/\.(insert|update|upsert|delete)\(/.test(gscBriefs) && !/(?<!Array)\.from\(/.test(gscBriefs))
     const gscBriefsCode = gscBriefs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
     check('(46)(47) integration touches no article_topics/generated_articles/queue/publish/CMS write', !/article_topics|generated_articles|content_topic_ideas|enqueue|api\/wordpress|api\/shopify|\.publish\(/i.test(gscBriefsCode))
     const adapter = read('lib/gsc/recommendations/adapter.ts')

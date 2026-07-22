@@ -49,9 +49,13 @@ export interface GscInputDiagnostics {
   mergedIntoExistingCount: number
   addedAsNewBriefCount: number
   deferredByBudgetCount: number
-  /** GSC evidence admitted by the adapter + source budget (merged ids + new gsc:<id> ids). */
+  /** ACTUAL recommendation brief ids admitted (new gsc:<id> ids + matched normal brief ids),
+   *  deduplicated in deterministic first-seen order. */
   selectedBriefIds: string[]
   rejectionCounts: Record<string, number>
+  /** Per merged GSC opportunity: which normal brief received it + whether that brief was
+   *  consumed / accepted (the separate truth source for merged evidence). */
+  mergedGscEvidence: { gscOpportunityId: string; briefId: string; consumed: boolean; accepted: boolean }[]
   // ── FIX 1 — integration order (GSC before constrained discovery) ──
   combinedPoolSizeBeforeDiscovery: number
   combinedPoolSizeAfterDiscovery: number

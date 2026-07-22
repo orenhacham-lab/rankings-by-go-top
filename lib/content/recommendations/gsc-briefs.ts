@@ -89,11 +89,17 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
     if (match) {
       match.sourceEvidence.push({ kind: 'gsc', text: gscEvidenceText(c) })
       diagnostics.mergedIntoExistingCount++
-      diagnostics.selectedBriefIds.push(c.opportunityId)
+      // selectedBriefIds carries the ACTUAL brief id (the matched normal brief).
+      diagnostics.selectedBriefIds.push(match.opportunityId)
+      // Separate truth source for merged evidence — one record per source GSC opportunity.
+      diagnostics.mergedGscEvidence.push({ gscOpportunityId: c.opportunityId, briefId: match.opportunityId, consumed: false, accepted: false })
       continue
     }
 
     // (F.5) a genuinely new content gap → a GSC-origin brief.
+    // FIX 1 — map GSC opportunityScore (0–100) into the existing brief score scale (0–1) so
+    // the shared prioritizer's briefScore-DESC ordering is on ONE scale (no hidden 100× boost).
+    const normalizedOpportunityScore = Math.round((Math.min(100, Math.max(0, c.opportunityScore)) / 100) * 10000) / 10000
     newBriefs.push({
       opportunityId: `gsc:${c.opportunityId}`,
       subject,
@@ -111,8 +117,8 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
       existingContentGap: true,
       relatedEntities: [],
       publishedCoverage: [],
-      confidence: Math.min(1, Math.max(0, c.opportunityScore / 100)),
-      briefScore: c.opportunityScore,
+      confidence: normalizedOpportunityScore,
+      briefScore: normalizedOpportunityScore,
     })
   }
 
@@ -123,6 +129,9 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
   diagnostics.addedAsNewBriefCount = selected.length
   diagnostics.deferredByBudgetCount = deferred.length // NOT rejected — merely outside the current source budget
   for (const b of selected) diagnostics.selectedBriefIds.push(b.opportunityId)
+  // Deterministic first-seen dedup (a normal brief that received several merged GSC opportunities
+  // appears once; each source opportunity stays traceable via mergedGscEvidence).
+  diagnostics.selectedBriefIds = Array.from(new Set(diagnostics.selectedBriefIds))
 
   return { gscBriefs: selected, diagnostics }
 }

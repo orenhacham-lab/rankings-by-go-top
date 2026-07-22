@@ -22,7 +22,7 @@ function brf(subject: string, o: { id?: string; kind?: string; family?: 'informa
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sourceEvidence: [{ kind: (o.kind ?? 'keyword_research') as any, text: subject }],
     alignedDemandQuery: null, demandVolumeSource: null, intendedIntent: 'informational', intendedPageType: 'article',
-    existingContentGap: true, relatedEntities: [], publishedCoverage: [], confidence: 0.5, briefScore: o.score ?? 50,
+    existingContentGap: true, relatedEntities: [], publishedCoverage: [], confidence: 0.5, briefScore: o.score ?? 0.5,
   }
 }
 
@@ -34,8 +34,8 @@ function main() {
   {
     // A pillar-aligned keyword_research brief is Tier 0; a GSC brief (kind 'gsc') is never
     // Tier 0 (fromQueryOrFocus is false for 'gsc') → it cannot jump ahead of a Tier-0 need.
-    const normalT0 = brf('folding treadmill maintenance schedule', { id: 'n0', kind: 'keyword_research', score: 40 })
-    const gscHigh = brf('folding treadmill assembly instructions', { id: 'gsc:o1', kind: 'gsc', score: 99 })
+    const normalT0 = brf('folding treadmill maintenance schedule', { id: 'n0', kind: 'keyword_research', score: 0.40 })
+    const gscHigh = brf('folding treadmill assembly instructions', { id: 'gsc:o1', kind: 'gsc', score: 0.99 })
     const ordered = prioritizeBriefsForSynthesis([normalT0, gscHigh], { pillars })
     check('(8) combined pool ordered by the existing prioritizeBriefsForSynthesis (Tier 0 first)', ordered[0].opportunityId === 'n0')
     check('(10) a GSC brief is NOT forced first merely for a high score', ordered[0].priority?.tier === 0 && (ordered.find((b) => b.opportunityId === 'gsc:o1')?.priority?.tier ?? 9) > 0)
@@ -46,17 +46,30 @@ function main() {
   }
   {
     // (9) When priority warrants (same tier, higher briefScore), a GSC brief reaches the front.
-    const normalT1 = brf('elliptical trainer cleaning routine', { id: 'n1', kind: 'keyword_research', score: 30 })
-    const gscT1 = brf('rowing machine noise reduction tips', { id: 'gsc:o2', kind: 'gsc', score: 80 })
+    const normalT1 = brf('elliptical trainer cleaning routine', { id: 'n1', kind: 'keyword_research', score: 0.30 })
+    const gscT1 = brf('rowing machine noise reduction tips', { id: 'gsc:o2', kind: 'gsc', score: 0.80 })
     const ordered = prioritizeBriefsForSynthesis([normalT1, gscT1], { pillars })
     check('(9) a GSC brief CAN reach the first batch when its earned priority warrants', ordered[0].opportunityId === 'gsc:o2' && ordered[0].priority?.tier === 1)
   }
   {
+    // ── FIX 2 — one 0–1 scale: within the same tier/family, ordering is pure briefScore DESC.
+    // A GSC brief on the OLD 0–100 scale (0.78 → 78) would have leap-frogged both normals; on the
+    // normalized scale it sits correctly between them. Proves no hidden GSC-source boost.
+    const normalHi = brf('sauna blanket weight loss facts', { id: 'nh', kind: 'keyword_research', score: 0.82 })
+    const gscMid = brf('sauna blanket temperature safety guide', { id: 'gsc:o3', kind: 'gsc', score: 0.78 })
+    const normalLo = brf('sauna blanket cleaning steps', { id: 'nl', kind: 'keyword_research', score: 0.65 })
+    const ordered = prioritizeBriefsForSynthesis([normalLo, gscMid, normalHi], { pillars })
+    check('(FIX2) same tier/family: normal 0.82 > GSC 0.78 > normal 0.65 (one scale)', ordered.map((b) => b.opportunityId).join(',') === 'nh,gsc:o3,nl')
+    check('(FIX2) GSC 0.78 does NOT win the batch over normal 0.82 (no source boost)', ordered[0].opportunityId === 'nh')
+    check('(FIX2) GSC 0.78 outranks normal 0.65 on merit (earned, not boosted)', ordered.indexOf(gscMid) < ordered.indexOf(normalLo))
+    check('(FIX2) all three share tier 1 (GSC earns no special tier)', ordered.every((b) => b.priority?.tier === 1))
+  }
+  {
     // (12) family round-robin remains active INSIDE a tier on the combined pool.
     const briefs = [
-      brf('a info topic one', { id: 'i1', family: 'informational', score: 50 }),
-      brf('b info topic two', { id: 'i2', family: 'informational', score: 49 }),
-      brf('c comparison topic', { id: 'c1', family: 'comparison', score: 48 }),
+      brf('a info topic one', { id: 'i1', family: 'informational', score: 0.50 }),
+      brf('b info topic two', { id: 'i2', family: 'informational', score: 0.49 }),
+      brf('c comparison topic', { id: 'c1', family: 'comparison', score: 0.48 }),
     ]
     const ordered = prioritizeBriefsForSynthesis(briefs, { pillars })
     // round-robin: info, comparison, info (not info, info, comparison).
@@ -90,6 +103,16 @@ function main() {
 
   const gscBriefs = read('lib/content/recommendations/gsc-briefs.ts')
   check('(19) merged evidence distinguished from a new GSC-origin brief', /mergedIntoExistingCount\+\+/.test(gscBriefs) && /addedAsNewBriefCount = selected\.length/.test(gscBriefs))
+  // FIX 1 — the 0–100 → 0–1 mapping is applied to BOTH confidence and briefScore (one scale).
+  check('(FIX1) normalizedOpportunityScore = clamp(0..100)/100 (4-dp)', /Math\.min\(100, Math\.max\(0, c\.opportunityScore\)\) \/ 100/.test(gscBriefs) && /\* 10000\) \/ 10000/.test(gscBriefs))
+  check('(FIX1) mapped score used for both confidence and briefScore', /confidence: normalizedOpportunityScore/.test(gscBriefs) && /briefScore: normalizedOpportunityScore/.test(gscBriefs))
+  check('(FIX1) raw opportunityScore is NOT assigned to briefScore', !/briefScore: c\.opportunityScore/.test(gscBriefs))
+  // FIX 3 — selectedBriefIds holds the matched normal brief id on merge + deterministic dedup.
+  check('(FIX3) merge pushes the matched normal brief id (not the raw GSC id)', /diagnostics\.selectedBriefIds\.push\(match\.opportunityId\)/.test(gscBriefs))
+  check('(FIX3) selectedBriefIds deduped first-seen', /diagnostics\.selectedBriefIds = Array\.from\(new Set\(diagnostics\.selectedBriefIds\)\)/.test(gscBriefs))
+  // FIX 4 — mergedGscEvidence populated at integration; consumed/accepted filled at synthesis.
+  check('(FIX4) integration records mergedGscEvidence with raw gscOpportunityId + briefId', /mergedGscEvidence\.push\(\{ gscOpportunityId: c\.opportunityId, briefId: match\.opportunityId, consumed: false, accepted: false \}\)/.test(gscBriefs))
+  check('(FIX4) synthesis fills mergedGscEvidence consumed/accepted from consumption map + outcomes', /mergedGscEvidence = \(snapshot\.gscInput\.mergedGscEvidence[\s\S]{0,240}consumed: consumptionByBriefId\.has\(rec\.briefId\)[\s\S]{0,240}accepted: candidateOutcomes\.some\(\(o\) => o\.opportunityId === rec\.briefId && o\.outcome === 'accepted'\)/.test(gen))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

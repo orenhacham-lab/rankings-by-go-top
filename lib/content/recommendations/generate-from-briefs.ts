@@ -1318,7 +1318,15 @@ export async function synthesizeFromSnapshot(
   // new GSC-origin brief). The snapshot is never mutated (a fresh gscInput object is returned).
   const consumedGscBriefIds = workingPool.filter((b) => b.opportunityId.startsWith('gsc:') && consumptionByBriefId.has(b.opportunityId)).map((b) => b.opportunityId)
   const acceptedGscBriefIds = candidateOutcomes.filter((o) => o.outcome === 'accepted' && (o.opportunityId ?? '').startsWith('gsc:')).map((o) => o.opportunityId as string)
-  const gscInputOut = { ...snapshot.gscInput, consumedGscBriefIds, consumedGscBriefCount: consumedGscBriefIds.length, acceptedGscBriefIds, acceptedGscSuggestionCount: acceptedGscBriefIds.length }
+  // Stage E3A FIX 4 — truthful participation for GSC evidence MERGED into a normal brief. Each
+  // record's consumed/accepted is derived from the SAME consumption map + accepted outcomes,
+  // keyed by the matched normal brief id (never the raw GSC opportunity id).
+  const mergedGscEvidence = (snapshot.gscInput.mergedGscEvidence ?? []).map((rec) => ({
+    ...rec,
+    consumed: consumptionByBriefId.has(rec.briefId),
+    accepted: candidateOutcomes.some((o) => o.opportunityId === rec.briefId && o.outcome === 'accepted'),
+  }))
+  const gscInputOut = { ...snapshot.gscInput, mergedGscEvidence, consumedGscBriefIds, consumedGscBriefCount: consumedGscBriefIds.length, acceptedGscBriefIds, acceptedGscSuggestionCount: acceptedGscBriefIds.length }
   return {
     suggestions,
     diagnostics: {
