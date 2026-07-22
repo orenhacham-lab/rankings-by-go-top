@@ -30,6 +30,7 @@ interface Candidate {
   clusterKey: string; primaryQuery: string; relatedQueries: string[]; page: string; pageType: PageType; queryIntent: QueryIntent
   clicks: number; impressions: number; ctr: number; averagePosition: number; distinctPageCount: number
   match: ContentMatch | null
+  pageBreakdown: { page: string; impressions: number; clicks: number }[]
 }
 
 /**
@@ -77,11 +78,20 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
     if (clusterRows.length === 0) continue
     let clicks = 0, impressions = 0, weightedPos = 0
     const pageImpr = new Map<string, number>()
+    const pageClicks = new Map<string, number>()
     for (const r of clusterRows) {
       clicks += r.clicks; impressions += r.impressions; weightedPos += r.position * r.impressions
       pageImpr.set(r.page, (pageImpr.get(r.page) ?? 0) + r.impressions)
+      pageClicks.set(r.page, (pageClicks.get(r.page) ?? 0) + r.clicks)
     }
     const distinctPageCount = pageImpr.size
+    // Observed per-page split (impressions DESC, urlKey ASC) — populated only for multi-page
+    // clusters, so the client "overlapping pages" review can show the actual involved pages.
+    const pageBreakdown = distinctPageCount > 1
+      ? Array.from(pageImpr.entries())
+        .map(([pg, imp]) => ({ page: pg, impressions: imp, clicks: pageClicks.get(pg) ?? 0 }))
+        .sort((a, b) => b.impressions - a.impressions || (urlKey(a.page) < urlKey(b.page) ? -1 : urlKey(a.page) > urlKey(b.page) ? 1 : 0))
+      : []
     // Representative page: most impressions (tie → smallest urlKey, then raw string).
     const page = Array.from(pageImpr.entries()).sort((a, b) =>
       b[1] - a[1] || (urlKey(a[0]) < urlKey(b[0]) ? -1 : urlKey(a[0]) > urlKey(b[0]) ? 1 : (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)))[0][0]
@@ -92,7 +102,7 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
     const match = matchExistingContent(page, cluster.primaryQuery, evidence)
     // Intent is computed BEFORE type selection so it can guide (never remove) the type.
     const queryIntent = classifyIntent(cluster.primaryQuery)
-    candidates.push({ clusterKey: cluster.key, primaryQuery: cluster.primaryQuery, relatedQueries: cluster.relatedQueries, page, pageType, queryIntent, clicks, impressions, ctr, averagePosition, distinctPageCount, match })
+    candidates.push({ clusterKey: cluster.key, primaryQuery: cluster.primaryQuery, relatedQueries: cluster.relatedQueries, page, pageType, queryIntent, clicks, impressions, ctr, averagePosition, distinctPageCount, match, pageBreakdown })
   }
 
   // Project-relative scoring context: max impressions + per-band median CTR (this dataset only).
@@ -132,6 +142,7 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
       scoreComponents: components,
       reasons: allReasons,
       existingContentMatch: c.match,
+      ...(c.pageBreakdown.length > 0 ? { pageBreakdown: c.pageBreakdown } : {}),
       windowDays: runMeta.windowDays,
       syncRunId: runMeta.syncRunId,
       dateStart: runMeta.dateStart,

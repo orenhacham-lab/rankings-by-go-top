@@ -65,6 +65,8 @@ interface Suggestion {
   recommendedPageType?: 'article' | 'commercial_landing_page' | 'category_page' | 'service_page' | 'product_page_improvement' | 'existing_page_improvement'
   /** This single idea was refined with the Pro model via "שפר עם Gemini Pro". */
   improvedWithPro?: boolean
+  /** Stage E3A — this idea's brief was also supported by Search Console evidence (provenance chip). */
+  basedOnGsc?: boolean
 }
 
 export default function AutomationIdeas({
@@ -1078,6 +1080,9 @@ export default function AutomationIdeas({
                         </>
                       ) : (
                         <Badge variant="neutral">{sourceBadge(s.source)}</Badge>
+                      )}
+                      {s.basedOnGsc && (
+                        <Badge variant="info">{t.basedOnGsc}</Badge>
                       )}
                       {typeof s.suggestionScore === 'number' && (
                         <span className="text-[10px] text-slate-400">{Math.round(s.suggestionScore * 100)}%</span>

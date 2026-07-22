@@ -44,6 +44,9 @@ interface PersistedPlan {
   improvedWithPro?: boolean
   /** The Pro model that produced the per-item improvement (diagnostic). */
   improvedModel?: string
+  /** Stage E3A provenance — this idea's brief was also supported by Search Console evidence.
+   *  Presentational only (renders the "Based also on Search Console data" chip). */
+  basedOnGsc?: boolean
 }
 
 /**
@@ -62,7 +65,7 @@ export function topicIdeaFingerprint(primaryKeyword: string | null | undefined, 
 }
 
 /** Map a persisted idea row to the UI/engine TopicSuggestion shape (id = row id). */
-export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { ideaId: string } {
+export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { ideaId: string; basedOnGsc?: boolean } {
   const primaryKeyword = row.primary_keyword || row.title
   const primNorm = normalizeText(primaryKeyword)
   // F — the user-visible secondary list must NEVER contain the primary keyword,
@@ -104,6 +107,7 @@ export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { 
     ...(plan?.requestedTier ? { requestedTier: plan.requestedTier } : {}),
     ...(plan?.modelUsed ? { modelUsed: plan.modelUsed } : {}),
     ...(plan?.improvedWithPro ? { improvedWithPro: true } : {}),
+    ...(plan?.basedOnGsc ? { basedOnGsc: true } : {}),
   }
 }
 
@@ -153,6 +157,9 @@ export interface NewIdeaInput {
    *  the run used — stored per row so the QA/admin view can show them later. */
   requestedTier?: 'standard' | 'premium'
   modelUsed?: string | null
+  /** Stage E3A — fingerprints of suggestions whose brief was also supported by Search Console
+   *  evidence (persisted into the additive link_plan bundle → no migration). Presentational. */
+  gscBackedFingerprints?: Set<string>
 }
 
 /** Persistence outcome (F) — attempted vs actually inserted (the rest were duplicate
@@ -174,9 +181,11 @@ export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Pro
     // The bundle is persisted whenever there is a link plan OR model-selection
     // provenance to preserve (a zero-link idea still records its tier/model).
     const modelMeta = { requestedTier: input.requestedTier, modelUsed: input.modelUsed ?? s.modelUsed ?? undefined, improvedWithPro: s.improvedWithPro }
+    const fp = topicIdeaFingerprint(s.primaryKeyword, s.title)
+    const basedOnGsc = input.gscBackedFingerprints?.has(fp) ?? false
     const hasModelMeta = !!(modelMeta.requestedTier || modelMeta.modelUsed || modelMeta.improvedWithPro)
-    const persistedPlan: PersistedPlan | null = (s.linkPlan || hasModelMeta)
-      ? { ...(s.linkPlan ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance } : {}), ...(s.linkPreviewSnapshot ? { linkPreviewSnapshot: s.linkPreviewSnapshot } : {}), ...modelMeta }
+    const persistedPlan: PersistedPlan | null = (s.linkPlan || hasModelMeta || basedOnGsc)
+      ? { ...(s.linkPlan ? { linkPlan: s.linkPlan, recommendedPageType: s.recommendedPageType, demandEvidence: s.demandEvidence, confidenceLevel: s.confidenceLevel, discoveryGenerated: s.discoveryGenerated, businessRelevance: s.businessRelevance } : {}), ...(s.linkPreviewSnapshot ? { linkPreviewSnapshot: s.linkPreviewSnapshot } : {}), ...modelMeta, ...(basedOnGsc ? { basedOnGsc: true } : {}) }
       : null
     return {
       user_id: input.userId,
@@ -195,7 +204,7 @@ export async function insertPendingIdeas(admin: Admin, input: NewIdeaInput): Pro
       source_context: null,
       source_url: s.suggestedInternalLinks?.[0]?.url ?? null,
       score: typeof s.suggestionScore === 'number' ? s.suggestionScore : null,
-      fingerprint: topicIdeaFingerprint(s.primaryKeyword, s.title),
+      fingerprint: fp,
       status: 'pending' as const,
       updated_at: nowIso,
     }

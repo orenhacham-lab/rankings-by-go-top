@@ -31,6 +31,10 @@ export interface ScoreComponents {
   distinctPageSignal: number
 }
 
+/** Per-page impressions/clicks split for a query cluster (observed detail rows). Populated for
+ *  multi-page clusters so the client "overlapping pages" review can show the actual pages. */
+export interface PageBreakdownEntry { page: string; impressions: number; clicks: number }
+
 export type ContentMatchSource = 'article_topic' | 'generated_article' | 'indexed_url'
 export type ContentMatchType = 'url' | 'keyword' | 'title'
 
@@ -61,6 +65,9 @@ export interface Opportunity {
   scoreComponents: ScoreComponents
   reasons: ReasonCode[]
   existingContentMatch: ContentMatch | null
+  /** Observed per-page split of the cluster's impressions/clicks (impressions DESC, urlKey ASC).
+   *  Present for multi-page clusters (distinctPageCount > 1); undefined otherwise. Diagnostic. */
+  pageBreakdown?: PageBreakdownEntry[]
   windowDays: number
   syncRunId: string
   dateStart: string | null

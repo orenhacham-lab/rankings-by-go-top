@@ -4,7 +4,7 @@
  * (not mocked away). Supports the exact chains the GSC service + state-store use.
  */
 type Row = Record<string, unknown>
-interface Filter { kind: 'eq' | 'is' | 'gt' | 'lt'; col: string; val: unknown }
+interface Filter { kind: 'eq' | 'is' | 'gt' | 'lt' | 'in'; col: string; val: unknown }
 /** Per-op DB-error injectors, keyed by mutation kind, to exercise fail-closed handling. */
 export interface ErrorHooks { insert?: () => { code: string } | null; update?: () => { code?: string; message?: string } | null; upsert?: () => { code?: string; message?: string } | null; select?: () => { code?: string; message?: string } | null; delete?: () => { code?: string; message?: string } | null }
 
@@ -24,6 +24,7 @@ class FakeQuery {
   upsert(payload: Row | Row[], opts?: { onConflict?: string }) { this.mutation = { type: 'upsert', payload, conflict: opts?.onConflict }; return this }
   delete() { this.mutation = { type: 'delete' }; return this }
   eq(col: string, val: unknown) { this.filters.push({ kind: 'eq', col, val }); return this }
+  in(col: string, vals: unknown[]) { this.filters.push({ kind: 'in', col, val: vals }); return this }
   is(col: string, val: unknown) { this.filters.push({ kind: 'is', col, val }); return this }
   gt(col: string, val: unknown) { this.filters.push({ kind: 'gt', col, val }); return this }
   lt(col: string, val: unknown) { this.filters.push({ kind: 'lt', col, val }); return this }
@@ -34,9 +35,10 @@ class FakeQuery {
   private match(r: Row): boolean {
     return this.filters.every((f) =>
       f.kind === 'eq' ? r[f.col] === f.val
-        : f.kind === 'is' ? (f.val === null ? r[f.col] == null : r[f.col] === f.val)
-          : f.kind === 'gt' ? (r[f.col] as string | number) > (f.val as string | number)
-            : (r[f.col] as string | number) < (f.val as string | number))
+        : f.kind === 'in' ? (f.val as unknown[]).includes(r[f.col])
+          : f.kind === 'is' ? (f.val === null ? r[f.col] == null : r[f.col] === f.val)
+            : f.kind === 'gt' ? (r[f.col] as string | number) > (f.val as string | number)
+              : (r[f.col] as string | number) < (f.val as string | number))
   }
 
   private run(): { data: Row[] | null; error: { code?: string; message?: string } | null; count?: number } {
@@ -68,8 +70,9 @@ class FakeQuery {
     if (this.mutation?.type === 'delete') {
       const err = this.hooks?.delete?.() ?? null
       if (err) return { data: null, error: err }
+      const deleted = matched.map((r) => ({ ...r }))
       for (const r of matched) this.rows.splice(this.rows.indexOf(r), 1)
-      return { data: null, error: null }
+      return { data: this.wantSelect ? deleted : null, error: null }
     }
     const selErr = this.hooks?.select?.() ?? null
     if (selErr) return { data: null, error: selErr }

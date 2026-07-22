@@ -27,6 +27,7 @@ import type { TopicPlanSummary } from '@/components/content/TopicPlanBadge'
 import AutomationIdeas from '@/components/content/AutomationIdeas'
 import AutomationSchedule from '@/components/content/AutomationSchedule'
 import GscOpportunities from '@/components/content/GscOpportunities'
+import GscRecommendations from '@/components/content/GscRecommendations'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -88,7 +89,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   // Already exported on the ACTIVE platform (row eligibility + status).
   const exportedIdOf = (a: ArticleRow): string | number | null => isShopify ? (a.shopify_article_id ?? null) : a.wp_post_id
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'articles' | 'gbp' | 'scheduled' | 'gscIdeas'>('articles')
+  const [activeTab, setActiveTab] = useState<'articles' | 'gbp' | 'scheduled' | 'gscIdeas' | 'gscRaw'>('articles')
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [topics, setTopics] = useState<ArticleTopic[]>([])
@@ -700,6 +701,20 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                 {t.tabs.gscIdeas}
               </button>
             )}
+            {/* Internal/dev-only raw Search Console opportunity browser (Stage E2A/E2B). Hidden
+                from the normal client experience; behind a development flag, not deleted. */}
+            {process.env.NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true' && process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && (
+              <button
+                onClick={() => setActiveTab('gscRaw')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+                  activeTab === 'gscRaw'
+                    ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {t.tabs.gscRaw}
+              </button>
+            )}
             {/* Scheduling now exists (automation section below) → drop its
                 "coming soon" placeholder tab when the automation flag is on. */}
             {(process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' ? (['gbpPosts'] as const) : (['gbpPosts', 'scheduled'] as const)).map((key) => (
@@ -720,7 +735,13 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
               {t.selectProjectMessage}
             </Card>
           ) : activeTab === 'gscIdeas' ? (
-            /* Stage E2A read-only surface + Stage E2B controlled decisions (flag-gated). */
+            /* Stage E2C — client-facing Search Console recommendations (A–D; no topic creation). */
+            <GscRecommendations
+              projectId={projectId}
+              onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+            />
+          ) : activeTab === 'gscRaw' ? (
+            /* Internal/dev-only raw browser (Stage E2A/E2B) — behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. */
             <GscOpportunities
               projectId={projectId}
               projects={projects}

@@ -368,7 +368,16 @@ export async function POST(request: Request) {
     // Flash (its resolved id), never as Pro; the requested tier is always premium.
     const persistTier = proFirstProvenance ? 'premium' : qualityMode
     const persistModelUsed = proFirstProvenance ? proFirstProvenance.modelUsedForPersistence : (briefDiagnostics?.modelPath?.model ?? null)
-    const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh, requestedTier: persistTier, modelUsed: persistModelUsed })
+    // Stage E3A provenance chip — fingerprints of persisted suggestions whose brief was also
+    // supported by Search Console evidence (a genuinely-new gsc: brief that persisted, OR a normal
+    // brief that had GSC evidence merged in and was accepted). Presentational; no engine/E3A change.
+    const gscMergedAcceptedBriefIds = new Set((briefDiagnostics?.gscInput?.mergedGscEvidence ?? []).filter((m) => m.accepted).map((m) => m.briefId))
+    const gscBackedFingerprints = new Set(
+      finalCandidateOutcomes
+        .filter((f) => f.wouldPersist && f.opportunityId && (f.opportunityId.startsWith('gsc:') || gscMergedAcceptedBriefIds.has(f.opportunityId)))
+        .map((f) => topicIdeaFingerprint(f.finalPrimaryKeyword, f.finalTitle)),
+    )
+    const persistOutcome = await insertPendingIdeas(auth.admin, { projectId: auth.project.id, userId: auth.user.id, batchId: randomUUID(), source, suggestions: fresh, requestedTier: persistTier, modelUsed: persistModelUsed, gscBackedFingerprints })
 
     // F — persistence errors are NEVER swallowed. attempted>0 with 0 inserted AND 0
     // duplicates ⇒ every write failed → a TYPED 500, never a "0 new" success response.

@@ -131,6 +131,69 @@ export async function upsertDecision(admin: Admin, params: {
   return { decision: params.decision, createdTopicId: payload.created_topic_id, createdAt: existing?.created_at ?? nowIso, updatedAt: nowIso }
 }
 
+/** Result of a grouped (multi-opportunity) hide/handled decision. */
+export interface GroupedDecisionResult { updated: number; alreadyMatching: number; failed: number; failedOpportunityIds: string[] }
+
+/**
+ * Stage E2C — apply ONE hide/handled decision ('already_covered' | 'irrelevant') to EVERY
+ * opportunity of a client recommendation, as a single authoritative server operation. Opportunities
+ * are the SERVER-recomputed set (never trusted from the browser). Idempotent (array upsert on
+ * (project_id, opportunity_id)); a created_topic-locked opportunity is reported as failed and never
+ * silently overwritten. Never writes created_topic and never touches article_topics.
+ */
+export async function upsertHideDecisionsBatch(admin: Admin, params: {
+  userId: string; projectId: string; windowDays: 28 | 90; syncRunId: string
+  decision: 'already_covered' | 'irrelevant'; opportunities: Opportunity[]
+}): Promise<GroupedDecisionResult> {
+  if (params.opportunities.length === 0) return { updated: 0, alreadyMatching: 0, failed: 0, failedOpportunityIds: [] }
+  const ids = params.opportunities.map((o) => o.id)
+  const { data: existingRows, error: readErr } = await admin.from(TABLE).select('opportunity_id, decision').eq('project_id', params.projectId).in('opportunity_id', ids)
+  if (readErr) throw new DecisionError('decisions_read_failed', 500, 'Could not read existing decisions.')
+  const existing = new Map<string, DecisionKind>()
+  for (const r of (existingRows ?? []) as { opportunity_id: string; decision: DecisionKind }[]) existing.set(r.opportunity_id, r.decision)
+
+  const failedOpportunityIds: string[] = []
+  let alreadyMatching = 0
+  const toApply: Opportunity[] = []
+  for (const o of params.opportunities) {
+    const prev = existing.get(o.id)
+    if (prev === 'created_topic') { failedOpportunityIds.push(o.id); continue } // locked — never overwrite
+    if (prev === params.decision) { alreadyMatching++; continue }
+    toApply.push(o)
+  }
+
+  let updated = 0
+  if (toApply.length > 0) {
+    const nowIso = new Date().toISOString()
+    const rows = toApply.map((o) => ({
+      user_id: params.userId, project_id: params.projectId, opportunity_id: o.id, window_days: params.windowDays,
+      decision: params.decision, created_topic_id: null, sync_run_id: params.syncRunId,
+      primary_query: o.primaryQuery, page_url: o.page, opportunity_type: o.opportunityType,
+      opportunity_snapshot: {
+        id: o.id, primaryQuery: o.primaryQuery, relatedQueries: o.relatedQueries, page: o.page, pageType: o.pageType,
+        queryIntent: o.queryIntent, opportunityType: o.opportunityType, signals: o.signals, opportunityScore: o.opportunityScore,
+        clicks: o.clicks, impressions: o.impressions, ctr: o.ctr, averagePosition: o.averagePosition, distinctPageCount: o.distinctPageCount,
+        windowDays: o.windowDays, syncRunId: o.syncRunId,
+      },
+      updated_at: nowIso,
+    }))
+    const { error: upsertErr } = await admin.from(TABLE).upsert(rows, { onConflict: 'project_id,opportunity_id' })
+    if (upsertErr) { for (const o of toApply) failedOpportunityIds.push(o.id) } // atomic statement → all failed
+    else updated = toApply.length
+  }
+  return { updated, alreadyMatching, failed: failedOpportunityIds.length, failedOpportunityIds }
+}
+
+/** Undo a grouped hide/handled decision — delete every 'already_covered'/'irrelevant' decision for
+ *  the given opportunities. Never deletes a created_topic decision. Idempotent. */
+export async function deleteHideDecisionsBatch(admin: Admin, projectId: string, opportunityIds: string[]): Promise<{ deleted: number }> {
+  if (opportunityIds.length === 0) return { deleted: 0 }
+  const { data, error } = await admin.from(TABLE).delete()
+    .eq('project_id', projectId).in('opportunity_id', opportunityIds).in('decision', ['already_covered', 'irrelevant']).select('opportunity_id')
+  if (error) throw new DecisionError('decision_delete_failed', 500, 'Could not undo the decisions.')
+  return { deleted: ((data ?? []) as unknown[]).length }
+}
+
 /** Undo (delete) a decision. Idempotent when absent. Refuses to delete a created_topic
  *  decision (that must be managed via the Content Hub topic flow). Never touches article_topics. */
 export async function deleteDecision(admin: Admin, projectId: string, opportunityId: string): Promise<{ deleted: boolean }> {
