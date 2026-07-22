@@ -92,6 +92,25 @@ function main() {
     check('(guard partition) subjectless separated from subject-bearing', subjectless.length === 1 && subjectBearing.length === 1 && subjectBearing[0].opportunityId === '2')
   }
 
+  // ── GENERIC PRICE/COST/FEE/RATE/TARIFF FAMILY — subjectless framing ─────────────
+  const priceReject = [
+    'מה העלויות?', 'מה העלות?', 'מה המחירים?', 'מה התעריפים?', 'כמה זה עולה?', 'כמה זה יעלה?',
+    'מה המחיר', 'מה העלות', 'מה העלויות', 'מה התעריף', 'כמה עולה', 'כמה יעלה',
+    'מחיר', 'מחירים', 'עלות', 'עלויות', 'תעריף', 'תעריפים', 'המחיר', 'המחירים', 'העלות', 'העלויות', 'התעריף', 'התעריפים',
+    'what is the price', 'what are the prices', 'what is the cost', 'what are the costs', 'how much', 'how much is it', 'how much does it cost',
+    'price', 'prices', 'pricing', 'cost', 'costs', 'fee', 'fees', 'rate', 'rates',
+  ]
+  const priceKeep = [
+    'מה המחיר של הליכון מתקפל', 'מה העלויות של ניקיון משרדים', 'כמה עולה ספסל משקולות', 'כמה זה עולה להתקין פרגולת אלומיניום',
+    'מחירי מיטות אורטופדיות לכלבים', 'עלות סגירת מרפסת', 'עלויות ניקיון משרד לאחר שיפוץ', 'תעריף עורך דין פלילי', 'תעריפי משלוחי פרחים בירושלים',
+    'what is the price of an aluminum pergola', 'what are the costs of office cleaning', 'how much does an office chair cost',
+    'office cleaning prices', 'cost of a dog orthopedic bed', 'criminal lawyer fees', 'flower delivery rates',
+  ]
+  for (const q of priceReject) check(`(price-reject) subjectless: "${q}"`, !isSubjectBearingQuery(q))
+  for (const q of priceKeep) check(`(price-keep) eligible: "${q}"`, isSubjectBearingQuery(q))
+  check('(price) confirmed live defect "מה העלויות?" is now rejected', !isSubjectBearingQuery('מה העלויות?'))
+  check('(price) plural/definite variants rejected where singular is (עלות/עלויות/העלות/העלויות)', !isSubjectBearingQuery('עלות') && !isSubjectBearingQuery('עלויות') && !isSubjectBearingQuery('העלות') && !isSubjectBearingQuery('העלויות'))
+
   // ── FIX 1 — INTENT-COMPATIBLE COLLAPSE (reuses intentClusterOf) ──────────────────
   const collapsesI = (a: string, ai: string, b: string, bi: string) => collapseGscCandidates([cand({ opportunityId: 'a', primaryQuery: a, queryIntent: ai }), cand({ opportunityId: 'b', primaryQuery: b, queryIntent: bi })]).needs.length === 1
   check('(F1.1) informational + informational variants may collapse', collapsesI('מה זה ניקיון משרדים', 'informational', 'מידע על ניקיון משרדים', 'informational'))

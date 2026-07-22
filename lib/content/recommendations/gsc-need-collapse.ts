@@ -75,15 +75,56 @@ function stripApostrophes(query: string): string {
   return (query || '').replace(/[׳״‘’ʼ'`´]/g, '')
 }
 
+// GENERIC price / cost / fee / rate / tariff family (Hebrew + English) — commercial framing that is
+// NEVER an article subject. Listed as EXPLICIT surface forms (singular + plural), NOT stemmed: the
+// only morphology applied is stripping a leading Hebrew definite article "ה" for the membership
+// check (so "העלויות" → "עלויות"). This is deliberately narrow and conservative — it can never
+// rewrite or drop an arbitrary noun the way a general stemmer would. Matched on the RAW surface
+// token because the accepted plural fold in canonicalToken is length-dependent and mangles some of
+// these forms inconsistently (e.g. "עלות"→"עלות" but "העלות"→"העל").
+const HE_NIQQUD = /[֑-ׇ]/g
+const COMMERCE_FAMILY = new Set([
+  // Hebrew base forms (definite "ה" handled by the check below)
+  'מחיר', 'מחירים', 'עלות', 'עלויות', 'תעריף', 'תעריפים', 'עולה', 'עולות', 'יעלה',
+  // English (singular + plural, listed explicitly)
+  'price', 'prices', 'pricing', 'cost', 'costs', 'fee', 'fees', 'rate', 'rates', 'tariff', 'tariffs',
+])
+function normForCommerce(raw: string): string {
+  const t = (raw || '').toLowerCase().replace(HE_NIQQUD, '')
+  // strip a single leading Hebrew definite article when a real word (≥3 letters) remains.
+  return /^ה[א-ת]{3,}$/.test(t) ? t.slice(1) : t
+}
+/** True when the RAW token is a generic price/cost/fee/rate/tariff term (incl. plural/definite). */
+function isGenericCommerceToken(raw: string): boolean {
+  return COMMERCE_FAMILY.has(normForCommerce(raw))
+}
+
+// The accepted distinctive tokenizer's split set (mirrored so we can classify the RAW surface token
+// while honouring the SAME stopword removal via distinctiveTokensOf).
+const SPLIT = /[?!.,:;"'“”׳״()\-–—/|]/g
+/** Raw surface tokens that survive the accepted stopword removal, paired with their canonical form.
+ *  Lets the guard classify framing/local/commerce on the RAW token yet keep canonical subject identity. */
+function classifiableTokens(query: string): { raw: string; canon: string }[] {
+  const distinct = new Set(distinctiveTokensOf(stripApostrophes(query)))
+  const out: { raw: string; canon: string }[] = []
+  for (const w of stripApostrophes(query).toLowerCase().replace(SPLIT, ' ').split(/\s+/)) {
+    if (w.length <= 1) continue
+    const canon = canonicalToken(w)
+    if (!canon || canon.length <= 1 || !distinct.has(canon)) continue
+    out.push({ raw: w, canon })
+  }
+  return out
+}
+
 /**
- * The subject CORE of a query: its distinctive tokens (canonicalized, accepted stopwords already
- * removed) minus generic framing AND generic local-intent markers — sorted-unique for
- * order-independent identity. Empty ⇒ the query has no real subject (purely generic framing and/or
- * a bare local marker) and is subjectless.
+ * The subject CORE of a query: its distinctive tokens (accepted stopwords already removed) minus
+ * generic framing, generic local-intent markers, AND the generic price/cost family — sorted-unique
+ * canonical tokens for order-independent identity. Empty ⇒ the query has no real subject (purely
+ * generic framing / commercial wrapper / a bare local marker) and is subjectless.
  */
 export function subjectCoreTokens(query: string): string[] {
-  const toks = distinctiveTokensOf(stripApostrophes(query)).filter((t) => !isFramingToken(t) && !isLocalMarker(t))
-  return Array.from(new Set(toks)).sort()
+  const kept = classifiableTokens(query).filter(({ raw, canon }) => !isFramingToken(canon) && !isLocalMarker(canon) && !isGenericCommerceToken(raw))
+  return Array.from(new Set(kept.map((k) => k.canon))).sort()
 }
 
 /** A query is usable only when a real subject-bearing (non-framing, non-location) token survives. */

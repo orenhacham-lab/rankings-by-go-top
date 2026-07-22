@@ -134,12 +134,13 @@ function main() {
       cand({ opportunityId: 'food_a', primaryQuery: 'מה לאכול לפני אימון בוקר', opportunityScore: 90, impressions: 500, clicks: 5 }),
       cand({ opportunityId: 'food_b', primaryQuery: 'מה טוב לאכול לפני אימון בוקר', opportunityScore: 80, impressions: 300, clicks: 2 }),
       cand({ opportunityId: 'subjectless', primaryQuery: 'מה המחיר' }),
+      cand({ opportunityId: 'subjectless2', primaryQuery: 'מה העלויות?' }),
       cand({ opportunityId: 'other', primaryQuery: 'איך להתחיל קליסטניקס', opportunityScore: 70 }),
     ], diag, noGuards)
     check('(pp1) morning-food pair consumes ONE source-budget slot (one brief)', res.gscBriefs.filter((b) => b.opportunityId === 'gsc:food_a').length === 1 && res.gscBriefs.filter((b) => b.opportunityId === 'gsc:food_b').length === 0)
     check('(pp1b) two unique needs admitted (collapsed food + calisthenics); subjectless dropped', res.gscBriefs.length === 2 && res.diagnostics.uniqueNeedCountBeforeBudget === 2 && res.diagnostics.collapsedNearDuplicateCount === 1)
-    check('(pp1c) subjectless_generic_query rejected + counted', res.diagnostics.subjectlessGenericRejectedCount === 1 && res.diagnostics.rejectionCounts['subjectless_generic_query'] === 1)
-    check('(15b) "מה המחיר" is NOT in selectedGscBriefDetails', !res.diagnostics.selectedGscBriefDetails.some((x) => x.primaryQuery === 'מה המחיר'))
+    check('(pp1c) subjectless_generic_query rejected + counted (מה המחיר + מה העלויות?)', res.diagnostics.subjectlessGenericRejectedCount === 2 && res.diagnostics.rejectionCounts['subjectless_generic_query'] === 2)
+    check('(15b) "מה המחיר" / "מה העלויות?" are NOT in selectedGscBriefDetails and hold no brief', !res.diagnostics.selectedGscBriefDetails.some((x) => x.primaryQuery === 'מה המחיר' || x.primaryQuery === 'מה העלויות?') && !res.diagnostics.selectedBriefIds.includes('gsc:subjectless') && !res.diagnostics.selectedBriefIds.includes('gsc:subjectless2'))
     const foodDetail = res.diagnostics.selectedGscBriefDetails.find((x) => x.briefId === 'gsc:food_a')!
     check('(pp1d) collapsed brief keeps all source provenance', foodDetail.collapsedOpportunityCount === 2 && foodDetail.relatedOpportunityIds.join(',') === 'food_a,food_b' && foodDetail.clicks === 7 && foodDetail.impressions === 800)
     check('(pp1e) selectedBriefIds has one id per unique need', res.diagnostics.selectedBriefIds.filter((id) => id.startsWith('gsc:')).length === 2)
