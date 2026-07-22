@@ -11,7 +11,7 @@
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadGscRecommendationCandidates } from '@/lib/gsc/recommendations/adapter'
-import type { GscInputDiagnostics, GscCandidate } from '@/lib/gsc/recommendations/types'
+import type { GscInputDiagnostics, GscCandidate, SelectedGscBriefDetail } from '@/lib/gsc/recommendations/types'
 import type { OpportunityBrief } from './opportunity-brief'
 import type { OpportunityFamily } from './opportunity-synthesis'
 import type { SearchIntent } from './opportunity'
@@ -73,6 +73,9 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
 
   const bump = (code: string) => { diagnostics.rejectionCounts[code] = (diagnostics.rejectionCounts[code] ?? 0) + 1 }
   const newBriefs: OpportunityBrief[] = []
+  // FIX 4 — one safe diagnostic record per NEW GSC brief, aligned 1:1 with newBriefs. Source
+  // metrics only (no OAuth/tokens/prompt/article bodies); synthesis fields stay null here.
+  const newBriefDetails: SelectedGscBriefDetail[] = []
 
   for (const c of candidates) {
     const subject = c.primaryQuery
@@ -120,12 +123,30 @@ export function applyGscBriefIntegration(candidates: GscCandidate[], diagnostics
       confidence: normalizedOpportunityScore,
       briefScore: normalizedOpportunityScore,
     })
+    newBriefDetails.push({
+      briefId: `gsc:${c.opportunityId}`,
+      gscOpportunityId: c.opportunityId,
+      primaryQuery: c.primaryQuery,
+      queryIntent: c.queryIntent,
+      opportunityScore: c.opportunityScore,
+      impressions: c.impressions,
+      clicks: c.clicks,
+      averagePosition: c.averagePosition,
+      priorityTier: null,
+      finalSynthesisRank: null,
+      consumed: false,
+      consumedRound: null,
+      acceptedByEngine: false,
+      finalOutcome: null,
+    })
   }
 
   // (G) deterministic source budget — candidates already ordered score→impressions→id.
   const budget = gscSourceBudget(params.targetCount)
   const selected = newBriefs.slice(0, budget)
   const deferred = newBriefs.slice(budget)
+  // Details mirror the admitted (within-budget) new briefs, in the same deterministic order.
+  diagnostics.selectedGscBriefDetails = newBriefDetails.slice(0, budget)
   diagnostics.addedAsNewBriefCount = selected.length
   diagnostics.deferredByBudgetCount = deferred.length // NOT rejected — merely outside the current source budget
   for (const b of selected) diagnostics.selectedBriefIds.push(b.opportunityId)

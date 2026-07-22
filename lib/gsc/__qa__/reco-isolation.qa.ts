@@ -55,6 +55,10 @@ function main() {
   check('gsc-briefs.ts imports only the GSC adapter surface', gscImportLines(gscBriefs).every((l) => ALLOWED_GSC_IN_RECO.test(l)) && /@\/lib\/gsc\/recommendations\/adapter/.test(gscBriefs))
   const genBriefs = readFileSync(join(ROOT, 'lib/content/recommendations/generate-from-briefs.ts'), 'utf8')
   check('generate-from-briefs.ts imports only the GSC config/adapter surface', gscImportLines(genBriefs).every((l) => ALLOWED_GSC_IN_RECO.test(l)))
+  // final-outcomes.ts is a SANCTIONED E3A diagnostics bridge (Stage E3A FIX 4): it resolves the
+  // per-brief GSC finalOutcome and may reference ONLY the allowed GSC type surface (type-only).
+  const finalOutcomes = readFileSync(join(ROOT, 'lib/content/recommendations/final-outcomes.ts'), 'utf8')
+  check('final-outcomes.ts imports only the GSC recommendations type surface', gscImportLines(finalOutcomes).every((l) => ALLOWED_GSC_IN_RECO.test(l)) && !GSC_TABLE.test(finalOutcomes))
 
   // (2) The frozen E2A/finalization files carry NO GSC reference at all (generate-from-briefs is
   // the SANCTIONED E3A integration point and is checked above instead).
@@ -62,7 +66,6 @@ function main() {
     'lib/content/recommendations/opportunity-brief.ts',
     'lib/content/recommendations/finalize-attempt.ts',
     'lib/content/recommendations/intra-run-dedupe.ts',
-    'lib/content/recommendations/final-outcomes.ts',
   ]
   for (const rel of frozen) {
     let src = ''

@@ -54,7 +54,7 @@ import { normalizeText } from './topic-idea-store'
 import { buildBriefPool, buildBusinessPillars, prioritizeBriefsForSynthesis, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
 import { integrateGscBriefs } from './gsc-briefs'
 import { isGscAutoRecommendationsEnabled } from '@/lib/gsc/config'
-import type { GscInputDiagnostics } from '@/lib/gsc/recommendations/types'
+import type { GscInputDiagnostics, SelectedGscBriefDetail, GscParticipation } from '@/lib/gsc/recommendations/types'
 import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, briefSynthesisResponseSchema, classifySynthesisFailure, type PolishedTopic, type SynthesisFailureType, type SynthesisResponseDiagnostics } from './brief-synthesis'
 import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
@@ -265,6 +265,69 @@ export interface BriefRunDiagnostics {
 }
 
 const MAX_ROUNDS = 2
+
+/** A genuinely-new GSC-origin brief carries the `gsc:` opportunityId prefix (merged GSC evidence
+ *  lives on a normal brief and is NOT one of these). */
+export function isGscOriginBrief(b: { opportunityId: string }): boolean {
+  return b.opportunityId.startsWith('gsc:')
+}
+
+export interface SynthesisBatchComposition {
+  batch: OpportunityBrief[]
+  /** Cursor position after this batch (natural progression only; appended briefs excluded). */
+  nextCursor: number
+  /** E3A path produced an empty batch (every remaining brief already consumed). */
+  exhausted: boolean
+  /** GSC-origin briefs naturally present in this batch (round-1 participation input). */
+  naturalGscCount: number
+  /** Bounded GSC trial briefs appended after the natural batch (round 1 only). */
+  appendedIds: string[]
+}
+
+/**
+ * Stage E3A FIX 1/2 — PURE synthesis-batch composition. Given the already-prioritized workingPool
+ * and a cursor, returns the batch for this round.
+ *
+ * - E3A off / no new GSC brief (`e3aTrialActive === false`): the EXACT contiguous slice
+ *   `workingPool.slice(cursor, cursor+batchSize)` and `nextCursor = cursor + batchSize` — the
+ *   pre-existing behavior, byte-identical batch ids.
+ * - E3A active: the natural batch takes only UNCONSUMED briefs from the cursor forward (so an
+ *   appended GSC brief pulled from a later position is skipped when the cursor reaches it), and in
+ *   round 1 appends up to `maxTrialGscBriefs − naturalGscCount` highest-ranked remaining unconsumed
+ *   GSC briefs strictly AFTER the natural batch. No normal brief is removed, displaced or reordered;
+ *   the batch grows by at most `maxTrialGscBriefs`.
+ */
+export function composeSynthesisBatch(params: {
+  workingPool: OpportunityBrief[]
+  cursor: number
+  batchSize: number
+  round: number
+  consumedIds: Set<string>
+  e3aTrialActive: boolean
+  maxTrialGscBriefs: number
+}): SynthesisBatchComposition {
+  const { workingPool, cursor, batchSize, round, consumedIds, e3aTrialActive, maxTrialGscBriefs } = params
+  if (!e3aTrialActive) {
+    const batch = workingPool.slice(cursor, cursor + batchSize)
+    return { batch, nextCursor: cursor + batchSize, exhausted: false, naturalGscCount: batch.filter(isGscOriginBrief).length, appendedIds: [] }
+  }
+  const naturalBatch: OpportunityBrief[] = []
+  let i = cursor
+  while (i < workingPool.length && naturalBatch.length < batchSize) {
+    const b = workingPool[i]
+    if (!consumedIds.has(b.opportunityId)) naturalBatch.push(b)
+    i++
+  }
+  const naturalGscCount = naturalBatch.filter(isGscOriginBrief).length
+  let appended: OpportunityBrief[] = []
+  if (round === 1) {
+    const inNatural = new Set(naturalBatch.map((b) => b.opportunityId))
+    const need = Math.max(0, maxTrialGscBriefs - naturalGscCount)
+    if (need > 0) appended = workingPool.filter((b) => isGscOriginBrief(b) && !consumedIds.has(b.opportunityId) && !inNatural.has(b.opportunityId)).slice(0, need)
+  }
+  const batch = [...naturalBatch, ...appended]
+  return { batch, nextCursor: i, exhausted: batch.length === 0, naturalGscCount, appendedIds: appended.map((b) => b.opportunityId) }
+}
 
 /** Dedupe coverage docs by normalized title+focus (link candidates and entities
  *  overlap; pending/published may repeat) so the cannibalization corpus is unique. */
@@ -1173,6 +1236,19 @@ export async function synthesizeFromSnapshot(
   const consumptionByBriefId = new Map<string, { consumedRound: number; roundPosition: number }>()
   let stop: BriefRunDiagnostics['stop_reason'] | null = null
 
+  // ── Stage E3A FIX 1/2 — bounded GSC synthesis participation ───────────────────
+  // The prepared workingPool is already globally prioritized (no GSC-specific tier). When the
+  // normal pool is larger than the target, admitted GSC briefs sit below the consumed prefix
+  // and never reach a batch. This lane gives at most TWO genuinely-new GSC briefs a controlled
+  // trial in the FIRST batch, WITHOUT displacing or reordering any normal brief. When E3A is
+  // off or no new GSC brief exists, the exact contiguous cursor/slice behavior (and
+  // byte-identical batch IDs/output) is preserved.
+  const MAX_TRIAL_GSC_BRIEFS = 2
+  const e3aTrialActive = snapshot.gscInput.enabled && workingPool.some(isGscOriginBrief)
+  const consumedIds = new Set<string>() // FIX 2 — a brief is consumed at most once across rounds
+  let participationNaturalGscInFirstBatch = 0
+  let participationAppendedIds: string[] = []
+
   // Paid-call cap: discovery + synthesis together may never exceed TWO calls.
   const maxSynthesisRounds = discovery?.ran ? 1 : MAX_ROUNDS
 
@@ -1185,9 +1261,16 @@ export async function synthesizeFromSnapshot(
     // "ask for 15 when 1 is missing".
     const batchSize = Math.min(workingPool.length - cursor, Math.max(4, Math.ceil(deficit * 1.5)))
     if (batchSize <= 0) { stop = suggestions.length > 0 ? 'true_pool_exhausted' : 'insufficient_inventory'; break }
-    const batch = workingPool.slice(cursor, cursor + batchSize)
+
+    // Compose the batch (pure): natural contiguous slice + a bounded, non-displacing GSC trial
+    // append in round 1. E3A-off / no-GSC → byte-identical contiguous slice.
+    const comp = composeSynthesisBatch({ workingPool, cursor, batchSize, round, consumedIds, e3aTrialActive, maxTrialGscBriefs: MAX_TRIAL_GSC_BRIEFS })
+    if (comp.exhausted) { stop = suggestions.length > 0 ? 'true_pool_exhausted' : 'insufficient_inventory'; break }
+    const batch = comp.batch
+    cursor = comp.nextCursor
+    if (round === 1 && e3aTrialActive) { participationNaturalGscInFirstBatch = comp.naturalGscCount; participationAppendedIds = comp.appendedIds }
     batch.forEach((bb, pos) => { if (!consumptionByBriefId.has(bb.opportunityId)) consumptionByBriefId.set(bb.opportunityId, { consumedRound: round, roundPosition: pos }) })
-    cursor += batchSize
+    batch.forEach((bb) => consumedIds.add(bb.opportunityId))
 
     const prompt = buildBriefSynthesisPrompt(batch, ctx, langLabel, year)
     const res = await generateRecommendationJSON(
@@ -1326,7 +1409,43 @@ export async function synthesizeFromSnapshot(
     consumed: consumptionByBriefId.has(rec.briefId),
     accepted: candidateOutcomes.some((o) => o.opportunityId === rec.briefId && o.outcome === 'accepted'),
   }))
-  const gscInputOut = { ...snapshot.gscInput, mergedGscEvidence, consumedGscBriefIds, consumedGscBriefCount: consumedGscBriefIds.length, acceptedGscBriefIds, acceptedGscSuggestionCount: acceptedGscBriefIds.length }
+  // Stage E3A FIX 4 — enrich per-brief detail records with synthesis-derived fields. finalOutcome
+  // is resolved to the engine-determinable value here (not_consumed / rejected_by_engine / null);
+  // the route layer fills the route/blog stages for engine-accepted (null) records via the
+  // existing stage-aware finalCandidateOutcomes. A merely-selected brief is never marked consumed.
+  const selectedGscBriefDetails = (snapshot.gscInput.selectedGscBriefDetails ?? []).map((d) => {
+    const b = briefById.get(d.briefId)
+    const c = consumptionByBriefId.get(d.briefId)
+    const consumed = !!c
+    const acceptedByEngine = candidateOutcomes.some((o) => o.opportunityId === d.briefId && o.outcome === 'accepted')
+    const finalOutcome: SelectedGscBriefDetail['finalOutcome'] = !consumed ? 'not_consumed' : acceptedByEngine ? null : 'rejected_by_engine'
+    return {
+      ...d,
+      priorityTier: b?.priority?.tier ?? null,
+      finalSynthesisRank: b?.priority?.finalSynthesisRank ?? (b ? workingPool.indexOf(b) : null),
+      consumed,
+      consumedRound: c?.consumedRound ?? null,
+      acceptedByEngine,
+      finalOutcome,
+    }
+  })
+  // Stage E3A FIX 5 — the REAL first-batch participation (reflects the actual batch, not admission).
+  const anyNewGscBrief = workingPool.some(isGscOriginBrief)
+  const participationMode: GscParticipation['participationMode'] =
+    !snapshot.gscInput.enabled ? 'disabled'
+      : !anyNewGscBrief ? 'no_gsc_briefs'
+        : participationAppendedIds.length > 0 ? 'appended_trial'
+          : 'natural'
+  const gscParticipation: GscParticipation = {
+    enabled: snapshot.gscInput.enabled,
+    maxTrialBriefs: MAX_TRIAL_GSC_BRIEFS,
+    naturalGscBriefCountInFirstBatch: participationNaturalGscInFirstBatch,
+    appendedTrialBriefCount: participationAppendedIds.length,
+    appendedTrialBriefIds: participationAppendedIds,
+    totalGscBriefsConsumed: consumedGscBriefIds.length,
+    participationMode,
+  }
+  const gscInputOut = { ...snapshot.gscInput, mergedGscEvidence, consumedGscBriefIds, consumedGscBriefCount: consumedGscBriefIds.length, acceptedGscBriefIds, acceptedGscSuggestionCount: acceptedGscBriefIds.length, selectedGscBriefDetails, gscParticipation }
   return {
     suggestions,
     diagnostics: {

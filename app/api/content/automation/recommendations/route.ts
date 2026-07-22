@@ -12,7 +12,7 @@ import { authContentProject, isContentAutomationEnabled, isProFirstControllerEna
 import { generateRecommendations } from '@/lib/content/recommendations/engine'
 import { generateOpportunities } from '@/lib/content/recommendations/generate-opportunities'
 import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-briefs'
-import { buildFinalCandidateOutcomes } from '@/lib/content/recommendations/final-outcomes'
+import { buildFinalCandidateOutcomes, applyFinalOutcomesToGscDetails } from '@/lib/content/recommendations/final-outcomes'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
@@ -327,6 +327,9 @@ export async function POST(request: Request) {
     // the engine view. Computed for both the dry-run and normal responses.
     const engineCandidateOutcomes = briefDiagnostics?.candidateOutcomes ?? []
     const { finalCandidateOutcomes, finalCandidateAccounting } = buildFinalCandidateOutcomes({ engineOutcomes: engineCandidateOutcomes, engineFresh, fresh, blogRejectedByTitle })
+    // Stage E3A FIX 4 — resolve the route/blog stages of finalOutcome for engine-accepted GSC
+    // briefs (observational; no decision/order change). Used in both dry-run + normal responses.
+    const gscInputEnriched = applyFinalOutcomesToGscDetails(briefDiagnostics?.gscInput ?? null, finalCandidateOutcomes)
 
     // Scope A — DIAGNOSTICS-ONLY (dry-run) EXIT. `fresh` here is byte-identical to what
     // the normal path would persist (identical code above; only the branch below
@@ -353,7 +356,7 @@ export async function POST(request: Request) {
           persisted: false, dryRun: true, newlyAddedCount: 0, wouldPersistCount: fresh.length,
           ...pathContract,
           funnel: { generated: rawGeneratedCount, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: 0 },
-          isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, gscInput: briefDiagnostics?.gscInput ?? null, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
+          isolationDebug: { gitSha, vercelEnv, generationRunId, clientRequestId, runtimeDiag: result.meta.runtimeDiag ?? null, diagnosticsOnly: true, wouldPersistCount: fresh.length, blogArticleGate: blogReport, canonicalLinkPreview, rejectionClassification, ...pathContract, engineCandidateOutcomes, finalCandidateOutcomes, finalCandidateAccounting, gscInput: gscInputEnriched, opportunityDiagnostics: opportunityDiagnostics ?? null, briefDiagnostics: briefDiagnostics ?? null, productionProvenance: proFirstProvenance ?? null },
         },
       })
     }
@@ -481,7 +484,7 @@ export async function POST(request: Request) {
       clientRequestId,
       runtimeClass,
       // Stage E3A — GSC input summary (also nested under briefDiagnostics). {enabled:false} when off.
-      gscInput: briefDiagnostics?.gscInput ?? null,
+      gscInput: gscInputEnriched,
       runtimeDiag: result.meta.runtimeDiag ?? null,
       freshCurrentRunCount: fresh.length,
       freshCurrentRunDomainFlags: suggestionsDomainFlags(fresh),

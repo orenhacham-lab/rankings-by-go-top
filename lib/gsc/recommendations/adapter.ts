@@ -64,6 +64,8 @@ function baseDiagnostics(enabled: boolean, state: GscInputState): GscInputDiagno
     deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [],
     combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false,
     consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [],
+    selectedGscBriefDetails: [],
+    gscParticipation: { enabled, maxTrialBriefs: 2, naturalGscBriefCountInFirstBatch: 0, appendedTrialBriefCount: 0, appendedTrialBriefIds: [], totalGscBriefsConsumed: 0, participationMode: enabled ? 'no_gsc_briefs' : 'disabled' },
   }
 }
 

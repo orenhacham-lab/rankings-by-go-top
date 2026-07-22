@@ -15,6 +15,7 @@
  */
 import { normalizeText } from './topic-idea-store'
 import type { CandidateOutcome, CandidateBlocker } from './generate-from-briefs'
+import type { GscInputDiagnostics, SelectedGscBriefDetail } from '@/lib/gsc/recommendations/types'
 
 export type FinalOutcomeLabel =
   | 'accepted_for_persistence'
@@ -115,4 +116,32 @@ export function buildFinalCandidateOutcomes(args: {
     orderMatchesFresh,
   }
   return { finalCandidateOutcomes: out, finalCandidateAccounting }
+}
+
+/**
+ * Stage E3A FIX 4 — resolve `finalOutcome` for engine-accepted GSC briefs (left null at synthesis)
+ * using the stage-aware final outcomes. Purely observational: reads the arrays the route already
+ * computed, changes NO decision and NO order, and returns a NEW gscInput (never mutates). Records
+ * already resolved at synthesis (`not_consumed` / `rejected_by_engine`) are preserved as-is, so an
+ * engine-accepted brief that a later route/blog gate rejected is never mislabeled accepted.
+ */
+export function applyFinalOutcomesToGscDetails(
+  gscInput: GscInputDiagnostics | null,
+  finalCandidateOutcomes: FinalCandidateOutcome[],
+): GscInputDiagnostics | null {
+  if (!gscInput || !gscInput.selectedGscBriefDetails?.length) return gscInput
+  const byId = new Map<string, FinalOutcomeLabel>()
+  for (const f of finalCandidateOutcomes) if (f.opportunityId) byId.set(f.opportunityId, f.finalOutcome)
+  const selectedGscBriefDetails = gscInput.selectedGscBriefDetails.map((d) => {
+    if (d.finalOutcome !== null) return d // engine-determined (not_consumed / rejected_by_engine)
+    const label = byId.get(d.briefId)
+    const finalOutcome: SelectedGscBriefDetail['finalOutcome'] =
+      label === 'accepted_for_persistence' ? 'accepted_for_persistence'
+        : label === 'rejected_by_route_finalization' ? 'rejected_by_route_finalization'
+          : label === 'rejected_by_blog_gate' ? 'rejected_by_blog_gate'
+            : label === 'rejected_by_engine' ? 'rejected_by_engine'
+              : d.finalOutcome
+    return { ...d, finalOutcome }
+  })
+  return { ...gscInput, selectedGscBriefDetails }
 }

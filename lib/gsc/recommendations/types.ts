@@ -68,6 +68,51 @@ export interface GscInputDiagnostics {
   /** GSC-origin briefs whose polished result passed validation and became a recommendation. */
   acceptedGscSuggestionCount: number
   acceptedGscBriefIds: string[]
+  // ── FIX 4 / FIX 5 — bounded live-participation diagnostics ──
+  /** Per admitted new GSC brief (within source budget): safe source metrics + participation. */
+  selectedGscBriefDetails: SelectedGscBriefDetail[]
+  /** The REAL first-batch GSC participation (natural vs bounded appended trial). */
+  gscParticipation: GscParticipation
+}
+
+/** FIX 4 — one bounded, safe diagnostic record per NEW GSC-origin brief admitted within the
+ *  source budget (never merged evidence, never OAuth/tokens/prompt/article bodies). Source
+ *  metrics are filled at integration; the synthesis fields are filled during synthesis; the
+ *  route layer resolves `finalOutcome` from the existing stage-aware final outcomes. */
+export interface SelectedGscBriefDetail {
+  briefId: string
+  gscOpportunityId: string
+  primaryQuery: string
+  queryIntent: string
+  opportunityScore: number
+  impressions: number
+  clicks: number
+  averagePosition: number
+  priorityTier: number | null
+  finalSynthesisRank: number | null
+  consumed: boolean
+  consumedRound: number | null
+  acceptedByEngine: boolean
+  finalOutcome:
+    | 'accepted_for_persistence'
+    | 'rejected_by_engine'
+    | 'rejected_by_route_finalization'
+    | 'rejected_by_blog_gate'
+    | 'not_consumed'
+    | null
+}
+
+export type GscParticipationMode = 'disabled' | 'no_gsc_briefs' | 'natural' | 'appended_trial'
+
+/** FIX 5 — the REAL first-batch GSC participation (not planned admission). */
+export interface GscParticipation {
+  enabled: boolean
+  maxTrialBriefs: number
+  naturalGscBriefCountInFirstBatch: number
+  appendedTrialBriefCount: number
+  appendedTrialBriefIds: string[]
+  totalGscBriefsConsumed: number
+  participationMode: GscParticipationMode
 }
 
 export interface GscBriefLoad {
