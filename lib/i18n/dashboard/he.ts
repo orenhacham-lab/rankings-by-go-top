@@ -111,8 +111,15 @@ export const dashboardHe = {
       srcWebsiteScan: 'סריקת האתר',
       srcKeywordResearch: 'מחקר ביטויים',
       srcSearchConsole: 'Search Console',
+      opDiag: {
+        label: 'אבחון Preview',
+        pool: 'מאגר', evaluated: 'נבדקו', generated: 'נוצרו', engine: 'עברו מנוע', final: 'עברו סינון סופי',
+        saved: 'נשמרו', stop: 'סיום', callsLeft: 'קריאות שנותרו', gscConsumed: 'GSC נבדקו', gscSupported: 'GSC נתמכו',
+      },
       gscStatus: {
-        supported: (supported: number) => `Search Console נכלל בסריקה — ${supported} מהרעיונות שהתקבלו נתמכו גם בנתוני החיפוש.`,
+        supported: (supported: number) => supported === 1
+          ? 'רעיון אחד שהתקבל נתמך גם בנתוני Search Console.'
+          : `${supported} מהרעיונות שהתקבלו נתמכו גם בנתוני Search Console.`,
         evaluated_none_accepted: (evaluated: number) => `Search Console נכלל בסריקה — ${evaluated} מועמדים נבדקו, אך אף רעיון לא עבר את כל מסנני האיכות.`,
         eligible_not_consumed: () => 'Search Console נכלל בסריקה — נמצאו הזדמנויות אפשריות, אך הן לא נדרשו בריצה הנוכחית.',
         no_eligible: () => 'Search Console נכלל בסריקה — לא נמצאו כרגע הזדמנויות מתאימות לתוכן חדש.',

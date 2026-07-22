@@ -21,6 +21,7 @@ type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: str
 type ScanSources = { projectData: boolean; websiteScan: boolean; keywordResearch: boolean; searchConsole: boolean }
 type GscRunState = 'supported' | 'evaluated_none_accepted' | 'eligible_not_consumed' | 'no_eligible' | 'not_connected' | 'no_property' | 'never_synced' | 'read_failed' | 'disabled'
 type GscRunSummary = { state: GscRunState; evaluatedCount: number; supportedResultCount: number }
+type OperatorRunDiag = { pool: number | null; evaluated: number | null; generated: number; engineAccepted: number; finalReady: number; persisted: number; stopReason: string | null; callsRemaining: number | null; gscConsumed: number; gscSupported: number }
 
 /** Phase 3I.6 — per-rejected-idea evidence of WHAT blocked it (from
  *  meta.debug.primaryKeywordMatches; returned on runs that added nothing new). */
@@ -172,7 +173,7 @@ export default function AutomationIdeas({
   const PAGE_STEP = 5
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary; operatorRunDiag?: OperatorRunDiag } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -254,6 +255,9 @@ export default function AutomationIdeas({
     }
   }
   const GSC_AMBER_STATES = new Set<GscRunState>(['not_connected', 'no_property', 'never_synced', 'read_failed'])
+  // Part 1 — only these states carry a useful customer action/positive note. Internal-processing
+  // states (evaluated_none_accepted / eligible_not_consumed / no_eligible / disabled) render NOTHING.
+  const GSC_CUSTOMER_VISIBLE = new Set<GscRunState>(['supported', 'not_connected', 'no_property', 'never_synced', 'read_failed'])
   const gscStatusColor = (state: GscRunState) => (GSC_AMBER_STATES.has(state) ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400')
 
   // Monotonic request id: only the latest generate() call is allowed to write
@@ -337,6 +341,8 @@ export default function AutomationIdeas({
         // Parts 3/4 — customer-safe scan transparency (this run only; not persisted).
         scanSources: (data.meta?.scanSources && typeof data.meta.scanSources === 'object') ? data.meta.scanSources : undefined,
         gscRunSummary: (data.meta?.gscRunSummary && typeof data.meta.gscRunSummary === 'object') ? data.meta.gscRunSummary : undefined,
+        // Preview/operator-only (present in the response ONLY when diagnostics on + non-Production).
+        operatorRunDiag: (data.meta?.operatorRunDiag && typeof data.meta.operatorRunDiag === 'object') ? data.meta.operatorRunDiag : undefined,
       })
       // TRUTHFUL model path (operator/Preview only — present only when server
       // diagnostics are enabled; customers never receive it).
@@ -883,10 +889,18 @@ export default function AutomationIdeas({
           {t.sourcesAnalyzedLabel}: {sourcesAnalyzedText(meta.scanSources)}
         </p>
       )}
-      {/* Part 4 — one Search Console run status (no message when the feature is disabled). */}
-      {meta?.gscRunSummary && meta.gscRunSummary.state !== 'disabled' && !loading && (
+      {/* Part 4 — one Search Console run status. Only supported + the actionable connection/sync/
+          read-failure states render; internal-processing states show nothing. */}
+      {meta?.gscRunSummary && GSC_CUSTOMER_VISIBLE.has(meta.gscRunSummary.state) && !loading && (
         <p className={`text-[11px] mb-2 ${gscStatusColor(meta.gscRunSummary.state)}`}>
           {gscStatusText(meta.gscRunSummary)}
+        </p>
+      )}
+      {/* Preview/operator-only low-yield diagnostic — present in the response ONLY when isolation
+          diagnostics are on and this is not Production. Small muted text; existing counts only. */}
+      {meta?.operatorRunDiag && !loading && (
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2" dir="rtl">
+          {t.opDiag.label}: {t.opDiag.pool} {meta.operatorRunDiag.pool ?? '—'} · {t.opDiag.evaluated} {meta.operatorRunDiag.evaluated ?? '—'} · {t.opDiag.generated} {meta.operatorRunDiag.generated} · {t.opDiag.engine} {meta.operatorRunDiag.engineAccepted} · {t.opDiag.final} {meta.operatorRunDiag.finalReady} · {t.opDiag.saved} {meta.operatorRunDiag.persisted} · {t.opDiag.gscConsumed} {meta.operatorRunDiag.gscConsumed} · {t.opDiag.gscSupported} {meta.operatorRunDiag.gscSupported}{meta.operatorRunDiag.callsRemaining != null ? ` · ${t.opDiag.callsLeft} ${meta.operatorRunDiag.callsRemaining}` : ''}{meta.operatorRunDiag.stopReason ? ` · ${t.opDiag.stop}: ${meta.operatorRunDiag.stopReason}` : ''}
         </p>
       )}
       {/* Phase 4C — hybrid per-provider transparency: which sources ran, and a

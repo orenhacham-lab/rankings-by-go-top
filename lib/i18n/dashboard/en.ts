@@ -113,8 +113,15 @@ export const dashboardEn = {
       srcWebsiteScan: 'Website scan',
       srcKeywordResearch: 'Keyword research',
       srcSearchConsole: 'Search Console',
+      opDiag: {
+        label: 'Preview diagnostics',
+        pool: 'pool', evaluated: 'evaluated', generated: 'generated', engine: 'engine-accepted', final: 'final-ready',
+        saved: 'saved', stop: 'stop', callsLeft: 'calls left', gscConsumed: 'GSC evaluated', gscSupported: 'GSC supported',
+      },
       gscStatus: {
-        supported: (supported: number) => `Search Console was included — ${supported} accepted ideas were also supported by search data.`,
+        supported: (supported: number) => supported === 1
+          ? 'One accepted idea was also supported by Search Console data.'
+          : `${supported} accepted ideas were also supported by Search Console data.`,
         evaluated_none_accepted: (evaluated: number) => `Search Console was included — ${evaluated} candidates were evaluated, but none passed all quality checks.`,
         eligible_not_consumed: () => 'Search Console was included — possible opportunities were found, but they were not needed in this run.',
         no_eligible: () => 'Search Console was included — no suitable new-content opportunities were found at this time.',

@@ -70,8 +70,28 @@ function main() {
   // ── Contract: supportedResultCount source + not diagnostics-gated ────────────────
   check('(13b) supportedResultCount = current-run GSC-backed accepted set (gscBackedFingerprints)', /supportedResultCount: gscBackedFingerprints\.size/.test(route))
   check('(17) scanSources + gscRunSummary are on the NORMAL meta (not diagnostics-gated)', /scanSources,\n\s*gscRunSummary,/.test(route))
-  check('(9-disabled) UI renders no GSC line when state is disabled', /state !== 'disabled'/.test(ui))
   check('(19) no migration file referenced by this feature', !/supabase\/migrations/.test(ui) && !/\.sql/.test(read('lib/content/recommendations/customer-run-summary.ts')))
+
+  // ── Part 1 — only supported + actionable states render a customer GSC message ─────
+  check('(P1.1-3) internal-processing states render NO customer message (visible set excludes them)', /GSC_CUSTOMER_VISIBLE = new Set<GscRunState>\(\['supported', 'not_connected', 'no_property', 'never_synced', 'read_failed'\]\)/.test(ui))
+  check('(P1) the GSC line renders only for the customer-visible set (not "!== disabled")', /GSC_CUSTOMER_VISIBLE\.has\(meta\.gscRunSummary\.state\)/.test(ui) && !/meta\.gscRunSummary\.state !== 'disabled'/.test(ui))
+  check('(P1.6) connection/sync/read-failure remain visible + amber', ['not_connected', 'no_property', 'never_synced', 'read_failed'].every((st) => new RegExp(`'${st}'`).test(ui)) && /GSC_AMBER_STATES = new Set<GscRunState>\(\['not_connected', 'no_property', 'never_synced', 'read_failed'\]\)/.test(ui))
+  for (const lang of ['he', 'en'] as const) {
+    const t = getDashboardDictionary(lang).contentHub.autoIdeas
+    const one = t.gscStatus.supported(1), many = t.gscStatus.supported(2)
+    check(`(P1.4) supported singular grammar for 1 (${lang})`, one !== many && !one.includes('1') && (lang === 'he' ? one.includes('אחד') : /\bOne\b/.test(one)))
+    check(`(P1.5) supported plural grammar for 2+ (${lang})`, many.includes('2'))
+  }
+  check('(P1.7) sources-analyzed line remains', /t\.sourcesAnalyzedLabel/.test(ui) && /sourcesAnalyzedText\(meta\.scanSources\)/.test(ui))
+  check('(P1.8) per-card GSC chip remains', /\{s\.basedOnGsc &&/.test(ui) && /\{t\.basedOnGsc\}/.test(ui))
+
+  // ── Part 2 — Preview/operator-only low-yield diagnostic ──────────────────────────
+  check('(P2.9) operator diagnostic is gated by the diagnostics flag AND non-Production', /\(diagnostics && rtInfo\.vercelEnv !== 'production'\) \? \{\s*operatorRunDiag/.test(route))
+  check('(P2.10) operator diagnostic renders only when the field is present (never in Production)', /\{meta\?\.operatorRunDiag && !loading &&/.test(ui))
+  {
+    const block = /operatorRunDiag: \{[\s\S]*?\n\s*\},/.exec(route)?.[0] ?? ''
+    check('(P2) operator line uses only existing counts (no prompts/model output/opportunity ids/secrets)', block.includes('gscSupported: gscBackedFingerprints.size') && !/primaryQuery|opportunityId|\bprompt\b|apiKey|modelResponse|secret/i.test(block))
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

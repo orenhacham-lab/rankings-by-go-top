@@ -570,6 +570,23 @@ export async function POST(request: Request) {
         // Customer-safe scan transparency (Parts 3/4) — truthful, non-technical; not gated on diagnostics.
         scanSources,
         gscRunSummary,
+        // Preview/operator-only low-yield diagnostic (never in Production; only existing counts, no
+        // prompts/model output/secrets/raw queries/opportunity ids). Present ONLY when the isolation
+        // diagnostics flag is on AND this is not a Production deployment.
+        ...((diagnostics && rtInfo.vercelEnv !== 'production') ? {
+          operatorRunDiag: {
+            pool: briefDiagnostics?.brief_consumption?.effectivePoolSize ?? null,
+            evaluated: briefDiagnostics?.brief_consumption?.consumedBriefs ?? null,
+            generated: rawGeneratedCount,
+            engineAccepted: engineAcceptedCount,
+            finalReady: fresh.length,
+            persisted: persistOutcome ? persistOutcome.inserted : fresh.length,
+            stopReason: briefDiagnostics?.stop_reason ?? null,
+            callsRemaining: briefDiagnostics?.brief_consumption?.callsRemaining ?? null,
+            gscConsumed: gscInputForSummary?.consumedGscBriefCount ?? 0,
+            gscSupported: gscBackedFingerprints.size,
+          },
+        } : {}),
         // Back-compat aliases.
         newlySaved: persistOutcome ? persistOutcome.inserted : fresh.length,
         filteredExisting,
