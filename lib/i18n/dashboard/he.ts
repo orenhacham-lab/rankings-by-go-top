@@ -116,6 +116,11 @@ export const dashboardHe = {
         pool: 'מאגר', evaluated: 'נבדקו', generated: 'נוצרו', engine: 'עברו מנוע', final: 'עברו סינון סופי',
         saved: 'נשמרו', stop: 'סיום', callsLeft: 'קריאות שנותרו', gscConsumed: 'GSC נבדקו', gscSupported: 'GSC נתמכו',
         remaining: 'נותרו במאגר', rounds: 'סבבים', refill: 'רענון שלישי', topRejections: 'דחיות מובילות',
+        strategyLabel: 'אסטרטגיית הקריאה',
+        strategyLowYield: 'יצירת נושאים חדשים מביטויים שלא מומשו',
+        strategyNormalRefill: 'מילוי רגיל מהמאגר',
+        strategyBlocked: 'הקריאה הנוספת נחסמה בתקציב',
+        call: 'קריאה מס׳', rawSeeds: 'חומרי גלם', eligibleSeeds: 'כשירים', sentSeeds: 'נשלחו',
       },
       gscStatus: {
         supported: (supported: number) => supported === 1

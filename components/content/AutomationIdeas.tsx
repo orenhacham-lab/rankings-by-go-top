@@ -21,7 +21,9 @@ type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: str
 type ScanSources = { projectData: boolean; websiteScan: boolean; keywordResearch: boolean; searchConsole: boolean }
 type GscRunState = 'supported' | 'evaluated_none_accepted' | 'eligible_not_consumed' | 'no_eligible' | 'not_connected' | 'no_property' | 'never_synced' | 'read_failed' | 'disabled'
 type GscRunSummary = { state: GscRunState; evaluatedCount: number; supportedResultCount: number }
-type OperatorRunDiag = { pool: number | null; evaluated: number | null; generated: number; engineAccepted: number; finalReady: number; persisted: number; stopReason: string | null; callsRemaining: number | null; gscConsumed: number; gscSupported: number; remainingPool?: number | null; synthesisRounds?: number | null; thirdRefillEligible?: boolean; thirdRefillUsed?: boolean; topRejectionReasons?: { reason: string; count: number }[] }
+type ThirdCallStrategy = 'normal_refill' | 'low_yield_discovery_synthesis' | 'not_used' | 'blocked'
+type LowYieldFallbackDiag = { callOrdinal: number | null; rawSeedCount: number; eligibleSeedCount: number; seedsSent: number; emitted: number; engineAccepted: number; finalReady: number; persisted: number }
+type OperatorRunDiag = { pool: number | null; evaluated: number | null; generated: number; engineAccepted: number; finalReady: number; persisted: number; stopReason: string | null; callsRemaining: number | null; gscConsumed: number; gscSupported: number; remainingPool?: number | null; synthesisRounds?: number | null; thirdRefillEligible?: boolean; thirdRefillUsed?: boolean; topRejectionReasons?: { reason: string; count: number }[]; thirdCallStrategy?: ThirdCallStrategy; lowYieldFallback?: LowYieldFallbackDiag | null }
 
 /** Phase 3I.6 — per-rejected-idea evidence of WHAT blocked it (from
  *  meta.debug.primaryKeywordMatches; returned on runs that added nothing new). */
@@ -907,6 +909,17 @@ export default function AutomationIdeas({
       {meta?.operatorRunDiag?.topRejectionReasons && meta.operatorRunDiag.topRejectionReasons.length > 0 && !loading && (
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2" dir="rtl">
           {t.opDiag.topRejections}: {meta.operatorRunDiag.topRejectionReasons.map((r) => `${r.reason} ${r.count}`).join(' · ')}
+        </p>
+      )}
+      {/* Preview/operator-only FINAL-CALL strategy line — rendered ONLY when the fallback slot was
+          evaluated (strategy !== 'not_used'). Count-only; no queries/ids/prompts/model output. */}
+      {meta?.operatorRunDiag && !loading && meta.operatorRunDiag.thirdCallStrategy && meta.operatorRunDiag.thirdCallStrategy !== 'not_used' && (
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2" dir="rtl">
+          {meta.operatorRunDiag.thirdCallStrategy === 'low_yield_discovery_synthesis' && meta.operatorRunDiag.lowYieldFallback
+            ? `${t.opDiag.strategyLabel}: ${t.opDiag.strategyLowYield} · ${t.opDiag.call} ${meta.operatorRunDiag.lowYieldFallback.callOrdinal ?? '—'} · ${t.opDiag.rawSeeds} ${meta.operatorRunDiag.lowYieldFallback.rawSeedCount} · ${t.opDiag.eligibleSeeds} ${meta.operatorRunDiag.lowYieldFallback.eligibleSeedCount} · ${t.opDiag.sentSeeds} ${meta.operatorRunDiag.lowYieldFallback.seedsSent} · ${t.opDiag.generated} ${meta.operatorRunDiag.lowYieldFallback.emitted} · ${t.opDiag.engine} ${meta.operatorRunDiag.lowYieldFallback.engineAccepted} · ${t.opDiag.final} ${meta.operatorRunDiag.lowYieldFallback.finalReady} · ${t.opDiag.saved} ${meta.operatorRunDiag.lowYieldFallback.persisted}`
+            : meta.operatorRunDiag.thirdCallStrategy === 'normal_refill'
+              ? `${t.opDiag.strategyLabel}: ${t.opDiag.strategyNormalRefill}`
+              : `${t.opDiag.strategyLabel}: ${t.opDiag.strategyBlocked}`}
         </p>
       )}
       {/* Phase 4C — hybrid per-provider transparency: which sources ran, and a

@@ -260,6 +260,13 @@ export interface BriefRunDiagnostics {
   thirdCallStrategy: ThirdCallStrategy
   /** Low-final-yield discovery-synthesis fallback accounting (Preview/operator only). */
   lowYieldFallback: LowYieldFallbackDiagnostics
+  /** Synthetic brief ids (lyf_…) of EVERY emitted fallback pair — the route matches these
+   *  against finalCandidateOutcomes to derive the truthful finalReady/persisted counts. */
+  lowYieldFallbackBriefIds: string[]
+  /** Subset: fallback brief ids whose seed was a Search Console evidence seed AND whose pair
+   *  validatePolished ACCEPTED — the route adds these to gscBackedFingerprints so a persisted
+   *  fallback topic grounded in GSC receives basedOnGsc + counts in supportedResultCount. */
+  lowYieldGscAcceptedBriefIds: string[]
   insufficient_inventory: boolean
   secondary_keywords_filtered: number
   /** Per-project corpus-derived domain/type/container words (the DISCRIMINATIVE
@@ -1292,6 +1299,9 @@ export async function synthesizeFromSnapshot(
   // Which strategy the FINAL (third) available paid call used (mutually exclusive).
   let thirdCallStrategy: ThirdCallStrategy = 'not_used'
   let lowYieldFallback: LowYieldFallbackDiagnostics = emptyLowYieldFallbackDiagnostics()
+  // Fallback provenance (server-side only; the route derives finalReady/persisted/basedOnGsc).
+  const lowYieldFallbackBriefIds: string[] = []
+  const lowYieldGscAcceptedBriefIds: string[] = []
   // Bounded-refill gate (conditions 1-4, 6, 7 — 5 "no failure" is guaranteed by !stop). Pure,
   // non-mutating read of current state + the authoritative controller.
   const canRunBoundedRefill = (): boolean => {
@@ -1375,6 +1385,10 @@ export async function synthesizeFromSnapshot(
       rejectionCounts: rejected_by_reason,
     })
     const prompt = buildFallbackPrompt({ language, ctx, year, seeds, ownedCommercialEntities: commercialEntities.map((e) => e.name), blocker })
+    // Truthful paid-call ordinal — the actual position of THIS call on the shared controller,
+    // captured immediately before it is authorized (never an assumed "third").
+    lowYieldFallback.callOrdinal = controller.callCount + 1
+    const seedSourceById = new Map(seeds.map((s) => [s.seedId, s.source]))
     const rd: BriefRoundDiagnostics = { round, model: effectiveModel, briefs_sent: seeds.length, provider_ok: false, provider_failed_briefs: 0, providerStatus: null, providerErrorType: null, sanitizedProviderMessage: null, finishReason: null, textPresent: false, textLength: 0, emitted: 0, polished: 0, skipped_by_model: 0, missing_from_response: 0, dropped_items: 0, not_processed: 0, accepted: 0, repaired: 0, rejected_by_reason: {}, marginal_yield: 0, synthesis_failure: null, synthesisResponse: null }
     rounds.push(rd)
     const res = await generateRecommendationJSON(
@@ -1403,6 +1417,8 @@ export async function synthesizeFromSnapshot(
       const pair = recon.pairs[idx]
       // Register the synthetic brief so blocker-resolution/outcome accounting can find it.
       briefById.set(pair.brief.opportunityId, pair.brief)
+      // Emitted provenance — every reconciled pair's synthetic brief id (route matches these).
+      lowYieldFallbackBriefIds.push(pair.brief.opportunityId)
       const dedupedTitle = dedupeMegaGuideTitle(pair.topic.title, suggestions.map((s) => s.title))
       const polishedT = dedupedTitle === pair.topic.title ? pair.topic : { ...pair.topic, title: dedupedTitle }
       // SAME validatePolished path as every other candidate — no relaxed validator, no bypass.
@@ -1410,6 +1426,9 @@ export async function synthesizeFromSnapshot(
       if (r.suggestion) {
         suggestions.push(r.suggestion); rd.accepted++; accepted++
         if (r.repaired) rd.repaired++
+        // GSC provenance: an ACCEPTED pair grounded in a Search Console seed keeps explicit
+        // provenance (its opaque lyf_ id is preserved — never impersonated as a gsc: brief).
+        if (seedSourceById.get(pair.seedId) === 'searchConsole') lowYieldGscAcceptedBriefIds.push(pair.brief.opportunityId)
         recordOutcome({ ...baseOutcome(polishedT, pair.brief), outcome: 'accepted', finalPrimaryKeyword: r.suggestion.primaryKeyword, finalIntent: r.suggestion.searchIntent ?? null, keywordRepaired: !!r.repaired })
       } else {
         const reason = r.rejectionReason || 'insufficient_independent_need'
@@ -1712,6 +1731,8 @@ export async function synthesizeFromSnapshot(
       synthesisCallsMade,
       thirdCallStrategy,
       lowYieldFallback,
+      lowYieldFallbackBriefIds,
+      lowYieldGscAcceptedBriefIds,
       insufficient_inventory: stop === 'insufficient_inventory',
       secondary_keywords_filtered: secondaryKeywordsFiltered,
       domainTypeWords: Array.from(domainTypeWords),

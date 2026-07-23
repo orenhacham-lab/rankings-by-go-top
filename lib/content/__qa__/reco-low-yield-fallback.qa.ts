@@ -34,6 +34,9 @@ import {
   type RawSeedCandidate, type FallbackSeed,
 } from '../recommendations/low-yield-fallback'
 import { buildBrandSafety } from '../recommendations/brand-safety'
+import { insertPendingIdeas, ideaToSuggestion, topicIdeaFingerprint } from '../recommendations/topic-idea-store'
+import { buildGscRunSummary } from '../recommendations/customer-run-summary'
+import type { TopicSuggestion } from '../recommendations/types'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -298,6 +301,7 @@ async function main() {
     check('B7. coverage-dominated rejections drove the trigger (ratio ≥ 0.5)', d.lowYieldFallback.coverageRejectionRatio >= 0.5, `${d.lowYieldFallback.coverageRejectionRatio}`)
     check('B8. Preview diagnostics reconcile: emitted ≥ engineAccepted, seedsSent ≤ eligible', d.lowYieldFallback.emitted >= d.lowYieldFallback.engineAccepted && d.lowYieldFallback.seedsSent <= d.lowYieldFallback.eligibleSeedCount && d.lowYieldFallback.seedsSent <= MAX_SEEDS_SENT)
     check('B9. candidate accounting still reconciles (fallback candidates counted once)', d.candidateAccounting.reconciles)
+    check('B9b. callOrdinal is the TRUTHFUL paid-call position (= model_calls here) and NOT hardcoded 3', d.lowYieldFallback.callOrdinal === d.model_calls && d.lowYieldFallback.callOrdinal !== 3, `ordinal=${d.lowYieldFallback.callOrdinal} calls=${d.model_calls}`)
   }
 
   console.log('E2E) <12 eligible seeds → the fallback does NOT fire')
@@ -336,6 +340,96 @@ async function main() {
     check('B18. the fallback was attempted exactly once (no retry loop)', calls.filter((c) => c.kind === 'fallback').length === 1)
   }
 
+  // ───────────────── DEFECT 2 — GSC provenance for fallback pairs ─────────────────
+  console.log('P) GSC provenance: a searchConsole seed pair keeps its lyf_ id + explicit provenance')
+  {
+    // Real reconcileFallback pairs from a MIXED seed set; apply the ENGINE's exact mapping.
+    const seeds: FallbackSeed[] = [
+      { seedId: 'seed_sc', phrase: 'שאילתת חיפוש לא ממומשת', source: 'searchConsole', priority: 60, alignedVolume: null, intentHint: 'informational', relatedEntities: [] },
+      { seedId: 'seed_kr', phrase: 'ביטוי מחקר מילים', source: 'keywordResearch', priority: 70, alignedVolume: 90, intentHint: 'informational', relatedEntities: [] },
+    ]
+    const text = JSON.stringify({ topics: [
+      { seedId: 'seed_sc', title: 'שאילתת חיפוש לא ממומשת למתחילים', primaryKeyword: 'שאילתת חיפוש לא ממומשת למתחילים', secondaryKeywords: [], intent: 'informational' },
+      { seedId: 'seed_kr', title: 'ביטוי מחקר מילים מדריך', primaryKeyword: 'ביטוי מחקר מילים מדריך', secondaryKeywords: [], intent: 'informational' },
+    ] })
+    const rec = reconcileFallback(text, seeds)
+    const seedSourceById = new Map(seeds.map((s) => [s.seedId, s.source]))
+    const gscAccepted = rec.pairs.filter((p) => seedSourceById.get(p.seedId) === 'searchConsole').map((p) => p.brief.opportunityId)
+    check('P1. only the searchConsole pair is recorded as GSC-accepted', gscAccepted.length === 1 && gscAccepted[0] === rec.pairs.find((p) => p.seedId === 'seed_sc')!.brief.opportunityId)
+    check('P2. the recorded id preserves the opaque lyf_ prefix (never impersonates gsc:)', gscAccepted[0].startsWith('lyf_') && !gscAccepted[0].startsWith('gsc:'))
+
+    // Real insertPendingIdeas: a fingerprint in gscBackedFingerprints → the persisted row is
+    // basedOnGsc; a non-GSC fallback fingerprint is NOT. Then ideaToSuggestion reads it back.
+    const sug = (title: string, kw: string): TopicSuggestion => ({ id: `opportunity:${kw}`, title, primaryKeyword: kw, secondaryKeywords: [], searchIntent: 'informational', recommendedWordCount: 1000, angle: '', suggestedInternalLinks: [], source: 'hybrid', suggestionReason: 'r', suggestionScore: 0.7 } as unknown as TopicSuggestion)
+    const gscSug = sug('נושא GSC נופל', 'נושא gsc נופל')
+    const nonGscSug = sug('נושא מחקר רגיל', 'נושא מחקר רגיל')
+    const captured: Record<string, unknown>[] = []
+    function capFrom() {
+      return {
+        upsert(payload: Record<string, unknown>[]) {
+          captured.push(...payload)
+          return { select: () => Promise.resolve({ data: payload.map((_p, i) => ({ id: `id${i}` })), error: null }) }
+        },
+      }
+    }
+    const capAdmin = { from: capFrom } as never
+    const gscFp = topicIdeaFingerprint(gscSug.primaryKeyword, gscSug.title)
+    await insertPendingIdeas(capAdmin, { projectId: 'p1', userId: 'u1', batchId: 'b1', source: 'hybrid', suggestions: [gscSug, nonGscSug], requestedTier: 'premium', modelUsed: 'gemini-2.5-pro', gscBackedFingerprints: new Set([gscFp]) })
+    const gscRow = captured.find((r) => r.fingerprint === gscFp)!
+    const nonGscRow = captured.find((r) => r.fingerprint === topicIdeaFingerprint(nonGscSug.primaryKeyword, nonGscSug.title))!
+    check('P3. a persisted GSC-backed fallback idea carries link_plan.basedOnGsc', ((gscRow.link_plan as { basedOnGsc?: boolean } | null)?.basedOnGsc) === true)
+    check('P4. ideaToSuggestion reads basedOnGsc back for the card chip', (ideaToSuggestion(gscRow as never) as { basedOnGsc?: boolean }).basedOnGsc === true)
+    check('P5. a non-GSC fallback idea does NOT receive basedOnGsc', !((nonGscRow.link_plan as { basedOnGsc?: boolean } | null)?.basedOnGsc))
+    check('P6. supportedResultCount reflects the GSC-backed accepted set (state → supported)', buildGscRunSummary({ state: 'loaded', consumedGscBriefCount: 0, addedAsNewBriefCount: 0, supportedResultCount: 1 }).supportedResultCount === 1 && buildGscRunSummary({ state: 'loaded', consumedGscBriefCount: 0, addedAsNewBriefCount: 0, supportedResultCount: 1 }).state === 'supported')
+  }
+
+  // ───────────── DEFECT 3 — truthful route-derived finalReady / persisted ─────────────
+  console.log('P) route derivation: finalReady from wouldPersist, persisted from reloaded fingerprints')
+  {
+    const lowYieldBriefIdSet = new Set(['lyf_a', 'lyf_b', 'lyf_c'])
+    const finalCandidateOutcomes = [
+      { opportunityId: 'lyf_a', wouldPersist: true, finalPrimaryKeyword: 'ka', finalTitle: 'ta' },
+      { opportunityId: 'lyf_b', wouldPersist: false, finalPrimaryKeyword: 'kb', finalTitle: 'tb' }, // rejected at route/blog
+      { opportunityId: 'lyf_c', wouldPersist: true, finalPrimaryKeyword: 'kc', finalTitle: 'tc' },
+      { opportunityId: 'gsc:x', wouldPersist: true, finalPrimaryKeyword: 'kx', finalTitle: 'tx' }, // normal-round GSC, not fallback
+    ]
+    // The EXACT route derivation.
+    const lowYieldFinalOutcomes = finalCandidateOutcomes.filter((f) => f.wouldPersist && f.opportunityId && lowYieldBriefIdSet.has(f.opportunityId))
+    const finalReady = lowYieldFinalOutcomes.length
+    const lowYieldFingerprints = new Set(lowYieldFinalOutcomes.map((f) => topicIdeaFingerprint(f.finalPrimaryKeyword, f.finalTitle)))
+    const reloaded = new Set([topicIdeaFingerprint('kc', 'tc')]) // only lyf_c actually visible after insert
+    const persisted = [...lowYieldFingerprints].filter((fp) => reloaded.has(fp)).length
+    check('P7. finalReady = fallback candidates with wouldPersist (NOT engineAccepted, NOT total fresh)', finalReady === 2)
+    check('P8. finalReady excludes a fallback candidate rejected at route/blog (lyf_b)', !lowYieldFinalOutcomes.some((f) => f.opportunityId === 'lyf_b'))
+    check('P9. finalReady excludes a normal-round GSC candidate (gsc:x is not a fallback id)', !lowYieldFinalOutcomes.some((f) => f.opportunityId === 'gsc:x'))
+    check('P10. persisted counts only fallback fingerprints visible in the reloaded set', persisted === 1)
+
+    // The GSC-fingerprint inclusion predicate (route) — a fallback GSC id is included; a non-GSC
+    // fallback id is NOT (it must not spuriously receive basedOnGsc).
+    const lowYieldGsc = new Set(['lyf_a'])
+    const gscMerged = new Set<string>()
+    const gscBacked = finalCandidateOutcomes.filter((f) => f.wouldPersist && f.opportunityId && (f.opportunityId.startsWith('gsc:') || gscMerged.has(f.opportunityId) || lowYieldGsc.has(f.opportunityId)))
+    check('P11. gscBackedFingerprints includes a GSC fallback id + the normal gsc: id', gscBacked.some((f) => f.opportunityId === 'lyf_a') && gscBacked.some((f) => f.opportunityId === 'gsc:x'))
+    check('P12. a non-GSC fallback id (lyf_c) is NOT GSC-backed', !gscBacked.some((f) => f.opportunityId === 'lyf_c'))
+  }
+
+  // ───────────── DEFECT 1 — client renders the strategy line (Preview-only) ─────────────
+  console.log('P) client render + i18n source contracts')
+  {
+    const ui = read('components/content/AutomationIdeas.tsx')
+    const he = read('lib/i18n/dashboard/he.ts')
+    const en = read('lib/i18n/dashboard/en.ts')
+    check('P13. OperatorRunDiag type carries thirdCallStrategy + lowYieldFallback', /thirdCallStrategy\?: ThirdCallStrategy/.test(ui) && /lowYieldFallback\?: LowYieldFallbackDiag \| null/.test(ui))
+    check('P14. the strategy line renders inside the Preview-only operatorRunDiag block', /meta\?\.operatorRunDiag && !loading && meta\.operatorRunDiag\.thirdCallStrategy && meta\.operatorRunDiag\.thirdCallStrategy !== 'not_used'/.test(ui))
+    check('P15. no additional line for not_used (guarded by !== not_used)', /thirdCallStrategy !== 'not_used'/.test(ui))
+    check('P16. low-yield line shows emitted/engine/finalReady/persisted + callOrdinal', /strategyLowYield[\s\S]{0,320}lowYieldFallback\.callOrdinal[\s\S]{0,320}lowYieldFallback\.emitted[\s\S]{0,120}lowYieldFallback\.engineAccepted[\s\S]{0,120}lowYieldFallback\.finalReady[\s\S]{0,120}lowYieldFallback\.persisted/.test(ui))
+    check('P17. normal_refill + blocked have their own labels', /strategyNormalRefill/.test(ui) && /strategyBlocked/.test(ui))
+    check('P18. Hebrew + English strategy labels exist (customer-safe, no ids/queries)', /strategyLowYield: '.+'/.test(he) && /strategyBlocked: '.+'/.test(he) && /strategyLowYield: '.+'/.test(en) && /strategyBlocked: '.+'/.test(en))
+    check('P19. route overrides finalReady + adds persisted from route-derived values', /lowYieldFallback: briefDiagnostics\?\.lowYieldFallback\s*\n\s*\? \{ \.\.\.briefDiagnostics\.lowYieldFallback, finalReady: lowYieldFinalReady, persisted: lowYieldPersisted \}/.test(read('app/api/content/automation/recommendations/route.ts')))
+    check('P20. route adds lowYieldGscAcceptedBriefIds to gscBackedFingerprints', /lowYieldGscAcceptedBriefIds\.has\(f\.opportunityId\)/.test(read('app/api/content/automation/recommendations/route.ts')))
+    check('P21. route finalReady/persisted derive from finalCandidateOutcomes + reloaded fingerprints', /const lowYieldFinalOutcomes = finalCandidateOutcomes\.filter\(\(f\) => f\.wouldPersist && f\.opportunityId && lowYieldBriefIdSet\.has\(f\.opportunityId\)\)/.test(read('app/api/content/automation/recommendations/route.ts')) && /const lowYieldPersisted = \[\.\.\.lowYieldFingerprints\]\.filter\(\(fp\) => reloadedFingerprints\.has\(fp\)\)\.length/.test(read('app/api/content/automation/recommendations/route.ts')))
+  }
+
   // ─────────────────────────── SOURCE CONTRACTS ───────────────────────────
   console.log('SRC) engine wiring — mutual exclusivity, no bypass, no fourth call, no migration')
   {
@@ -350,6 +444,9 @@ async function main() {
     check('S7. no migration / DB schema change introduced', !/supabase\/migrations|CREATE TABLE|ALTER TABLE/i.test(gen) && !/supabase\/migrations|CREATE TABLE|ALTER TABLE/i.test(read('lib/content/recommendations/low-yield-fallback.ts')))
     check('S8. the module is PURE (no Date/random/network)', !/Date\.now|Math\.random|new Date\(|fetch\(|require\(/.test(read('lib/content/recommendations/low-yield-fallback.ts')))
     check('S9. route surfaces thirdCallStrategy + lowYieldFallback Preview-only (count-only)', /thirdCallStrategy: briefDiagnostics\?\.thirdCallStrategy/.test(read('app/api/content/automation/recommendations/route.ts')) && /lowYieldFallback: briefDiagnostics\?\.lowYieldFallback/.test(read('app/api/content/automation/recommendations/route.ts')))
+    check('S11. callOrdinal is the truthful controller position, never a hardcoded 3', /lowYieldFallback\.callOrdinal = controller\.callCount \+ 1/.test(gen) && !/callOrdinal = 3\b/.test(gen))
+    check('S12. GSC provenance only for an ACCEPTED searchConsole pair; lyf_ id preserved (never gsc: impersonation)', /if \(seedSourceById\.get\(pair\.seedId\) === 'searchConsole'\) lowYieldGscAcceptedBriefIds\.push\(pair\.brief\.opportunityId\)/.test(gen) && !/opportunityId: `gsc:/.test(read('lib/content/recommendations/low-yield-fallback.ts')))
+    check('S13. every emitted pair id is recorded for route finalReady/persisted matching', /lowYieldFallbackBriefIds\.push\(pair\.brief\.opportunityId\)/.test(gen))
     check('S10. seeds/briefs never persisted directly — every candidate flows through suggestions.push(r.suggestion)', (gen.match(/suggestions\.push\(r\.suggestion\)/g) ?? []).length >= 2)
   }
 

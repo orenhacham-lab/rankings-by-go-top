@@ -462,7 +462,12 @@ export interface LowYieldFallbackDiagnostics {
   seedsSent: number
   emitted: number
   engineAccepted: number
+  /** ENGINE view = engineAccepted. The route OVERRIDES this in operatorRunDiag with the
+   *  real route/blog/persistence-ready count from finalCandidateOutcomes (wouldPersist). */
   finalReady: number
+  /** The TRUTHFUL paid-call ordinal this fallback used (controller.callCount + 1 at the
+   *  authorized call), never an assumed "third". null when the fallback did not run. */
+  callOrdinal: number | null
   excludedBySource: Record<FallbackSeedSource, number>
   excludedByReason: Record<string, number>
   ideaStatusBlocks: { pending: number; approved: number; rejected: number; generated: number; other: number }
@@ -474,7 +479,7 @@ export type ThirdCallStrategy = 'normal_refill' | 'low_yield_discovery_synthesis
 export function emptyLowYieldFallbackDiagnostics(): LowYieldFallbackDiagnostics {
   return {
     eligible: false, used: false, triggerAcceptedCount: 0, coverageRejectionRatio: 0,
-    rawSeedCount: 0, eligibleSeedCount: 0, seedsSent: 0, emitted: 0, engineAccepted: 0, finalReady: 0,
+    rawSeedCount: 0, eligibleSeedCount: 0, seedsSent: 0, emitted: 0, engineAccepted: 0, finalReady: 0, callOrdinal: null,
     excludedBySource: { keywordResearch: 0, searchConsole: 0, tracked: 0, entity: 0, projectFocus: 0 },
     excludedByReason: {}, ideaStatusBlocks: { pending: 0, approved: 0, rejected: 0, generated: 0, other: 0 },
   }

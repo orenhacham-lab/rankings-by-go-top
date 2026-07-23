@@ -177,6 +177,8 @@ export async function runProFirstProduction(
     synthesisCallsMade: 0,
     thirdCallStrategy: 'not_used',
     lowYieldFallback: emptyLowYieldFallbackDiagnostics(),
+    lowYieldFallbackBriefIds: [],
+    lowYieldGscAcceptedBriefIds: [],
     insufficient_inventory: true, secondary_keywords_filtered: 0, domainTypeWords: [], target_role_mappings: [],
     competitorLeakage: { researchRejected: [], discoveryRejected: [], briefRejected: [], acceptedTitle: [], acceptedPrimaryKeyword: [], acceptedSecondaryKeyword: [], acceptedLinkTarget: [], acceptedMatches: [] },
     cost: { estimatedRunCostUsd: 0, totalCalls: preparationProviderCalls, calls: [], totalPaidCalls: preparationProviderCalls, estimatedRunCostIls: 0, costPerAcceptedTopic: 0, configuredCostCeilingUsd: controller.budget.maxEstimatedCostUsd, remainingBudgetUsd: 0, callsPreventedByBudget: 0, configuredMaxCalls: controller.budget.maxModelCallsPerRun },

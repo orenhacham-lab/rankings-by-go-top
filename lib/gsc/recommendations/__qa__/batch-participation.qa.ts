@@ -210,7 +210,10 @@ function main() {
   check('(14) global paid-call cap = 3 (min of per-attempt allowance + refill and remaining global calls)', /const PAID_CALL_CAP = 3/.test(gen) && /const maxSynthesisRounds = Math\.min\(legacyAttemptRounds \+ \(allowRefill \? 1 : 0\), remainingGlobalCalls\)/.test(gen))
   check('(15) targetCount unchanged (deficit still from input.targetCount)', /const deficit = input\.targetCount - suggestions\.length/.test(gen))
   check('(16) prompt receives the SAME batch object (incl. the two appended briefs)', /const prompt = buildBriefSynthesisPrompt\(batch, ctx, langLabel, year\)/.test(gen))
-  check('(17)(19) appended GSC briefs enter the SAME validation batch (no forced-accept path)', /reconcileSynthesis\(res\.text, batch\)/.test(gen) && !/gsc[\s_]*accept|force.*accept|acceptGsc/i.test(genCode))
+  // No FORCED-accept / validation-bypass path for GSC briefs. (A provenance array such as
+  // lowYieldGscAcceptedBriefIds only records ids of pairs the normal validatePolished ALREADY
+  // accepted — it is not a bypass, so it must not trip this guard.)
+  check('(17)(19) appended GSC briefs enter the SAME validation batch (no forced-accept path)', /reconcileSynthesis\(res\.text, batch\)/.test(gen) && !/forc(e|ed)[\s_]*accept|accept[\s_]*gsc[\s_]*(brief|candidate)|bypass[\s_]*validat/i.test(genCode))
   check('(18) consumed GSC may still be rejected (finalOutcome maps engine-rejected)', /!consumed \? 'not_consumed' : acceptedByEngine \? null : 'rejected_by_engine'/.test(gen))
   check('(FIX2 src) round-1-only append, unconsumed-only selection', /round === 1/.test(gen) && /!consumedIds\.has\(b\.opportunityId\)/.test(gen))
   check('(25) gscParticipation reports the REAL mode (disabled/no_gsc/natural/appended_trial)', /participationAppendedIds\.length > 0 \? 'appended_trial'/.test(gen) && /!anyNewGscBrief \? 'no_gsc_briefs'/.test(gen))

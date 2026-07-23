@@ -373,9 +373,12 @@ export async function POST(request: Request) {
     // supported by Search Console evidence (a genuinely-new gsc: brief that persisted, OR a normal
     // brief that had GSC evidence merged in and was accepted). Presentational; no engine/E3A change.
     const gscMergedAcceptedBriefIds = new Set((briefDiagnostics?.gscInput?.mergedGscEvidence ?? []).filter((m) => m.accepted).map((m) => m.briefId))
+    // A low-yield FALLBACK topic grounded in a Search Console seed keeps its opaque lyf_ id (never
+    // impersonated as a gsc: brief); explicit engine provenance lets it still receive basedOnGsc.
+    const lowYieldGscAcceptedBriefIds = new Set(briefDiagnostics?.lowYieldGscAcceptedBriefIds ?? [])
     const gscBackedFingerprints = new Set(
       finalCandidateOutcomes
-        .filter((f) => f.wouldPersist && f.opportunityId && (f.opportunityId.startsWith('gsc:') || gscMergedAcceptedBriefIds.has(f.opportunityId)))
+        .filter((f) => f.wouldPersist && f.opportunityId && (f.opportunityId.startsWith('gsc:') || gscMergedAcceptedBriefIds.has(f.opportunityId) || lowYieldGscAcceptedBriefIds.has(f.opportunityId)))
         .map((f) => topicIdeaFingerprint(f.finalPrimaryKeyword, f.finalTitle)),
     )
     // Customer-safe run summary (Parts 3/4): truthful sources-analyzed + one GSC run status. Derived
@@ -547,6 +550,16 @@ export async function POST(request: Request) {
       excludePendingContext,
       siteScanTrace: (result.meta as { debug?: { siteScanCallTrace?: unknown } }).debug?.siteScanCallTrace ?? null,
     } : undefined
+    // Truthful low-yield fallback counts, derived at the ROUTE (never engineAccepted):
+    //   finalReady = fallback candidates that survived route finalization + the blog gate and
+    //     WOULD persist (finalCandidateOutcomes.wouldPersist), matched by the emitted brief-id set;
+    //   persisted  = those fallback fingerprints actually visible in the reloaded pending set.
+    const lowYieldBriefIdSet = new Set(briefDiagnostics?.lowYieldFallbackBriefIds ?? [])
+    const lowYieldFinalOutcomes = finalCandidateOutcomes.filter((f) => f.wouldPersist && f.opportunityId && lowYieldBriefIdSet.has(f.opportunityId))
+    const lowYieldFinalReady = lowYieldFinalOutcomes.length
+    const lowYieldFingerprints = new Set(lowYieldFinalOutcomes.map((f) => topicIdeaFingerprint(f.finalPrimaryKeyword, f.finalTitle)))
+    const reloadedFingerprints = new Set((pending as { fingerprint?: string }[]).map((r) => r.fingerprint).filter(Boolean))
+    const lowYieldPersisted = [...lowYieldFingerprints].filter((fp) => reloadedFingerprints.has(fp)).length
     return Response.json({
       suggestions,
       meta: {
@@ -596,8 +609,12 @@ export async function POST(request: Request) {
               .slice(0, 5),
             // Low-final-yield discovery-synthesis fallback — which strategy the final paid
             // call used + count-only fallback accounting (never prompts/ids/queries/bodies).
+            // finalReady + persisted are ROUTE-derived (finalCandidateOutcomes + reloaded
+            // fingerprints), never engineAccepted; callOrdinal is the truthful paid-call position.
             thirdCallStrategy: briefDiagnostics?.thirdCallStrategy ?? 'not_used',
-            lowYieldFallback: briefDiagnostics?.lowYieldFallback ?? null,
+            lowYieldFallback: briefDiagnostics?.lowYieldFallback
+              ? { ...briefDiagnostics.lowYieldFallback, finalReady: lowYieldFinalReady, persisted: lowYieldPersisted }
+              : null,
           },
         } : {}),
         // Back-compat aliases.

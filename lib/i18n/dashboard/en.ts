@@ -118,6 +118,11 @@ export const dashboardEn = {
         pool: 'pool', evaluated: 'evaluated', generated: 'generated', engine: 'engine-accepted', final: 'final-ready',
         saved: 'saved', stop: 'stop', callsLeft: 'calls left', gscConsumed: 'GSC evaluated', gscSupported: 'GSC supported',
         remaining: 'remaining', rounds: 'rounds', refill: 'third-refill', topRejections: 'top rejections',
+        strategyLabel: 'final-call strategy',
+        strategyLowYield: 'new topics from unrealized terms',
+        strategyNormalRefill: 'normal pool refill',
+        strategyBlocked: 'the extra call was budget-blocked',
+        call: 'call #', rawSeeds: 'raw', eligibleSeeds: 'eligible', sentSeeds: 'sent',
       },
       gscStatus: {
         supported: (supported: number) => supported === 1
