@@ -16,7 +16,7 @@ const ROOT = join(__dirname, '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 
 process.env.CONTENT_CREDENTIALS_ENCRYPTION_KEY = 'b'.repeat(64)
-const ENC_TOKEN = encryptCredential('shpat_real_token')
+const ENC_TOKEN = encryptCredential('unit-test-shopify-token')
 
 function makeRow(status: 'connected' | 'failed' | 'untested') {
   return {
@@ -38,7 +38,7 @@ async function main() {
   // connected → loads normally (creds present, token decrypted)
   {
     const r = await loadShopifyConnection(admin(makeRow('connected')), 'p1')
-    check('connected → loads with creds', !('error' in r) && r.creds.accessToken === 'shpat_real_token')
+    check('connected → loads with creds', !('error' in r) && r.creds.accessToken === 'unit-test-shopify-token')
   }
   // failed → default-denied with 409
   {
@@ -53,7 +53,7 @@ async function main() {
   // failed + allowInactive → recovery load succeeds (test-connection path)
   {
     const r = await loadShopifyConnection(admin(makeRow('failed')), 'p1', { allowInactive: true })
-    check('failed + allowInactive:true → loads for recovery', !('error' in r) && r.creds.accessToken === 'shpat_real_token')
+    check('failed + allowInactive:true → loads for recovery', !('error' in r) && r.creds.accessToken === 'unit-test-shopify-token')
   }
   // missing row → 404 (unchanged)
   {

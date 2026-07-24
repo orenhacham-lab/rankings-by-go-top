@@ -3,6 +3,8 @@
  * manual-disconnect pointer clearing). Uses a capturing fake Supabase admin — no network,
  * no DB. Run: npx tsx lib/shopify/__qa__/shop-cleanup.qa.ts
  */
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { applyAppUninstalled, applyShopRedact, clearShopifyArticlePointers, SHOPIFY_REVOCATION_SENTINEL } from '../shop-cleanup'
 import { decryptCredential } from '../../security/credentials-crypto'
 
@@ -157,6 +159,28 @@ async function main() {
     })
     const r = await applyShopRedact(admin, 'acme.myshopify.com')
     check('redact: connection-delete failure → ok:false', r.ok === false && r.error === 'connection_delete_failed')
+  }
+  {
+    // Failure DELETING oauth states → ok:false AND the connection delete is NOT attempted.
+    const { admin, calls } = fakeAdmin({
+      'shopify_connections:select': { data: [{ project_id: 'p1' }], error: null },
+      'shopify_oauth_states:delete': { error: { message: 'x' } },
+    })
+    const r = await applyShopRedact(admin, 'acme.myshopify.com')
+    check('redact: oauth-state delete failure → ok:false and connection NOT deleted', r.ok === false && r.error === 'oauth_state_delete_failed'
+      && !calls.some((c) => c.table === 'shopify_connections' && c.op === 'delete'))
+  }
+
+  // ── Manual-disconnect ordering source contract (app/api/shopify/connection/route.ts) ──
+  {
+    const src = readFileSync(join(__dirname, '..', '..', '..', 'app', 'api', 'shopify', 'connection', 'route.ts'), 'utf8')
+    const clearIdx = src.indexOf('clearShopifyArticlePointers(auth.admin')
+    const deleteIdx = src.indexOf("from('shopify_connections').delete()")
+    check('disconnect: clearShopifyArticlePointers runs BEFORE the connection delete', clearIdx !== -1 && deleteIdx !== -1 && clearIdx < deleteIdx)
+    check('disconnect: a pointer-cleanup failure returns BEFORE the connection delete', (() => {
+      const guardIdx = src.indexOf('if (!cleared.ok)')
+      return guardIdx !== -1 && guardIdx < deleteIdx && /if \(!cleared\.ok\) \{[\s\S]{0,160}return Response\.json/.test(src)
+    })())
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

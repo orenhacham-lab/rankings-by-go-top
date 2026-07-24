@@ -35,6 +35,41 @@ function shopHash(shop: string): string {
   return crypto.createHash('sha256').update(shop).digest('hex').slice(0, 12)
 }
 
+/**
+ * Resolve the target shop for a cleanup topic from the HMAC-verified inputs, per topic:
+ *   - shop/redact: `shop_domain` is part of the signed compliance PAYLOAD → required. If
+ *     the (unsigned) X-Shopify-Shop-Domain header is also present, it must normalize to the
+ *     SAME shop, else reject. An absent header is acceptable.
+ *   - app/uninstalled: the shop comes from the X-Shopify-Shop-Domain HEADER (a header on a
+ *     request whose raw body passed HMAC — the header itself is not signed) → required. If
+ *     the payload carries a non-null `myshopify_domain`, it must match the header shop.
+ * Never uses an arbitrary `payload.domain` fallback. Pure — no DB access. Returns the
+ * normalized shop or a stable non-sensitive error code.
+ */
+export function resolveCleanupShop(
+  topic: 'shop/redact' | 'app/uninstalled',
+  payload: Record<string, unknown>,
+  headerShop: string | null,
+): { shop: string } | { error: string } {
+  if (topic === 'shop/redact') {
+    const shop = normalizeShopDomain(typeof payload.shop_domain === 'string' ? payload.shop_domain : '')
+    if (!shop) return { error: 'invalid_shop' }
+    if (headerShop) {
+      const h = normalizeShopDomain(headerShop)
+      if (!h || h !== shop) return { error: 'shop_mismatch' }
+    }
+    return { shop }
+  }
+  // app/uninstalled
+  const shop = normalizeShopDomain(headerShop ?? '')
+  if (!shop) return { error: 'invalid_shop' }
+  if (payload.myshopify_domain != null) {
+    const p = normalizeShopDomain(typeof payload.myshopify_domain === 'string' ? payload.myshopify_domain : '')
+    if (!p || p !== shop) return { error: 'shop_mismatch' }
+  }
+  return { shop }
+}
+
 export async function POST(request: Request): Promise<Response> {
   // Shopify's mandatory compliance webhooks MUST stay reachable regardless of any
   // product feature flag (content module, automation, Shopify UI, etc.). This endpoint
@@ -50,15 +85,22 @@ export async function POST(request: Request): Promise<Response> {
   const hmacHeader = request.headers.get(SHOPIFY_WEBHOOK_HMAC_HEADER)
   if (!verifyShopifyWebhookHmac(raw, hmacHeader, secret)) return json(401, { error: 'unauthorized' })
 
-  // 3) Only after successful verification: decode + parse.
-  let payload: Record<string, unknown>
+  // 3) Only after successful verification: decode + parse into UNKNOWN, then require a
+  //    non-null plain JSON object. A signed null/array/string/number/boolean is a malformed
+  //    payload → 400 (never allowed to throw or reach the database).
+  let parsed: unknown
   try {
-    payload = JSON.parse(raw.toString('utf8')) as Record<string, unknown>
+    parsed = JSON.parse(raw.toString('utf8'))
   } catch {
     return json(400, { error: 'invalid_json' })
   }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return json(400, { error: 'invalid_payload' })
+  }
+  const payload = parsed as Record<string, unknown>
 
   const topic = request.headers.get(TOPIC_HEADER) ?? ''
+  const headerShop = request.headers.get(SHOP_HEADER)
 
   // customers/data_request + customers/redact — VERIFIED NO-OP.
   // Evidence (repo/schema/scopes): this app stores NO Shopify customer PII. The only
@@ -71,22 +113,18 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (topic === 'shop/redact' || topic === 'app/uninstalled') {
-    // Resolve the shop ONLY from the verified payload (fallback: the signed shop header).
-    // Never a user-controlled arbitrary host — normalizeShopDomain enforces *.myshopify.com.
-    const rawShop =
-      (typeof payload.shop_domain === 'string' && payload.shop_domain) ||
-      request.headers.get(SHOP_HEADER) ||
-      ''
-    const shop = normalizeShopDomain(String(rawShop))
-    if (!shop) return json(400, { error: 'invalid_shop' })
+    // Resolve + validate the shop identity per topic BEFORE any DB access. An invalid /
+    // missing / mismatched shop returns 400 and never opens an admin client.
+    const resolved = resolveCleanupShop(topic, payload, headerShop)
+    if ('error' in resolved) return json(400, { error: resolved.error })
 
     const admin = createAdminClient()
     const result = topic === 'shop/redact'
-      ? await applyShopRedact(admin, shop)
-      : await applyAppUninstalled(admin, shop)
+      ? await applyShopRedact(admin, resolved.shop)
+      : await applyAppUninstalled(admin, resolved.shop)
     if (!result.ok) {
       // Non-2xx so Shopify retries. Only a non-reversible shop hash + reason are logged.
-      console.error('[shopify-webhook] cleanup failed', { topic, shop: shopHash(shop), reason: result.error })
+      console.error('[shopify-webhook] cleanup failed', { topic, shop: shopHash(resolved.shop), reason: result.error })
       return json(500, { error: 'cleanup_failed' })
     }
     return json(200, { ok: true, topic })

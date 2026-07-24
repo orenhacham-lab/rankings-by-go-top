@@ -15,7 +15,7 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
-const SECRET = 'shpss_route_test_secret'
+const SECRET = 'unit-test-webhook-secret'
 process.env.SHOPIFY_CLIENT_SECRET = SECRET
 // Deliberately DISABLE the content/automation product flags for the whole suite to prove
 // the mandatory compliance endpoint stays reachable (HMAC-gated) regardless of them.
@@ -34,7 +34,7 @@ function req(url: string, raw: Buffer, headers: Record<string, string>) {
 
 async function main() {
   console.log('Shopify webhooks route — offline')
-  const { POST } = await import('../../../app/api/shopify/webhooks/route')
+  const { POST, resolveCleanupShop } = await import('../../../app/api/shopify/webhooks/route')
   const URL_NOSLASH = 'https://app.example.com/api/shopify/webhooks'
   const URL_SLASH = 'https://app.example.com/api/shopify/webhooks/'
 
@@ -102,6 +102,55 @@ async function main() {
     const a = await POST(req(URL_NOSLASH, raw, h))
     const b = await POST(req(URL_SLASH, raw, h))
     check('(7) /webhooks and /webhooks/ resolve to the same handler with identical result', a.status === 200 && b.status === 200)
+  }
+
+  // (9) A signed but non-object JSON payload (null/array/string/number/boolean) → 400
+  //     invalid_payload, before any DB access (the 400 returns before createAdminClient).
+  {
+    const bodies: [string, string][] = [['null', 'null'], ['[1,2]', 'array'], ['"hi"', 'string'], ['5', 'number'], ['true', 'boolean']]
+    for (const [body, label] of bodies) {
+      const raw = Buffer.from(body, 'utf8')
+      const r = await POST(req(URL_NOSLASH, raw, { 'x-shopify-hmac-sha256': sign(raw), 'x-shopify-topic': 'shop/redact' }))
+      const j = (await r.json()) as { error?: string }
+      check(`(9) signed ${label} payload → 400 invalid_payload (no DB)`, r.status === 400 && j.error === 'invalid_payload')
+    }
+  }
+
+  // (10) resolveCleanupShop — the pure per-topic shop resolver (no DB).
+  {
+    const rok = resolveCleanupShop('shop/redact', { shop_domain: 'acme.myshopify.com' }, null)
+    check('(10) shop/redact resolves the signed payload shop', 'shop' in rok && rok.shop === 'acme.myshopify.com')
+    const rokHdr = resolveCleanupShop('shop/redact', { shop_domain: 'acme.myshopify.com' }, 'acme.myshopify.com')
+    check('(10b) shop/redact ok when a matching header is present', 'shop' in rokHdr && rokHdr.shop === 'acme.myshopify.com')
+    const rmiss = resolveCleanupShop('shop/redact', {}, 'acme.myshopify.com')
+    check('(10c) shop/redact with no payload shop_domain → invalid_shop', 'error' in rmiss && rmiss.error === 'invalid_shop')
+    const rmis = resolveCleanupShop('shop/redact', { shop_domain: 'acme.myshopify.com' }, 'other.myshopify.com')
+    check('(10d) shop/redact payload/header mismatch → shop_mismatch', 'error' in rmis && rmis.error === 'shop_mismatch')
+    const uok = resolveCleanupShop('app/uninstalled', {}, 'acme.myshopify.com')
+    check('(10e) app/uninstalled resolves the authenticated request header', 'shop' in uok && uok.shop === 'acme.myshopify.com')
+    const umatch = resolveCleanupShop('app/uninstalled', { myshopify_domain: 'acme.myshopify.com' }, 'acme.myshopify.com')
+    check('(10f) app/uninstalled ok when payload myshopify_domain matches header', 'shop' in umatch && umatch.shop === 'acme.myshopify.com')
+    const uhdr = resolveCleanupShop('app/uninstalled', {}, null)
+    check('(10g) app/uninstalled missing header → invalid_shop', 'error' in uhdr && uhdr.error === 'invalid_shop')
+    const umis = resolveCleanupShop('app/uninstalled', { myshopify_domain: 'other.myshopify.com' }, 'acme.myshopify.com')
+    check('(10h) app/uninstalled header/myshopify_domain mismatch → shop_mismatch', 'error' in umis && umis.error === 'shop_mismatch')
+    // No arbitrary payload.domain fallback for either topic.
+    const noFallbackRedact = resolveCleanupShop('shop/redact', { domain: 'acme.myshopify.com' }, null)
+    const noFallbackUninstall = resolveCleanupShop('app/uninstalled', { domain: 'acme.myshopify.com' }, null)
+    check('(10i) neither topic uses an arbitrary payload.domain fallback', 'error' in noFallbackRedact && 'error' in noFallbackUninstall)
+  }
+
+  // (11) route POST proves the shop-identity 400s reach the client before any DB access.
+  {
+    const redactMismatch = Buffer.from(JSON.stringify({ shop_domain: 'acme.myshopify.com' }), 'utf8')
+    const r1 = await POST(req(URL_NOSLASH, redactMismatch, { 'x-shopify-hmac-sha256': sign(redactMismatch), 'x-shopify-topic': 'shop/redact', 'x-shopify-shop-domain': 'other.myshopify.com' }))
+    check('(11) shop/redact body/header mismatch → 400 (no DB)', r1.status === 400)
+    const uMissing = Buffer.from(JSON.stringify({}), 'utf8')
+    const r2 = await POST(req(URL_NOSLASH, uMissing, { 'x-shopify-hmac-sha256': sign(uMissing), 'x-shopify-topic': 'app/uninstalled' }))
+    check('(11b) app/uninstalled missing header → 400 (no DB)', r2.status === 400)
+    const uMismatch = Buffer.from(JSON.stringify({ myshopify_domain: 'other.myshopify.com' }), 'utf8')
+    const r3 = await POST(req(URL_NOSLASH, uMismatch, { 'x-shopify-hmac-sha256': sign(uMismatch), 'x-shopify-topic': 'app/uninstalled', 'x-shopify-shop-domain': 'acme.myshopify.com' }))
+    check('(11c) app/uninstalled header/myshopify_domain mismatch → 400 (no DB)', r3.status === 400)
   }
 
   // (8) Source-contract regression: NO product feature flag and NO 404 gate in the route,

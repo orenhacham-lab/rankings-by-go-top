@@ -19,6 +19,15 @@ export const SHOPIFY_WEBHOOK_HMAC_HEADER = 'x-shopify-hmac-sha256'
 const HMAC_SHA256_BYTES = 32
 
 /**
+ * Shopify's canonical base64 encoding of a 32-byte SHA-256 digest: exactly 44 chars —
+ * 43 standard-alphabet chars + a single `=` pad. Standard alphabet only (no URL-safe
+ * `-`/`_`), no whitespace, no trailing junk. Node's base64 decoder is LENIENT (it
+ * silently drops invalid characters), so a valid signature with `!!!!` appended would
+ * otherwise still decode to 32 bytes — this exact-shape check rejects that before decode.
+ */
+const CANONICAL_HMAC_RE = /^[A-Za-z0-9+/]{43}=$/
+
+/**
  * The Shopify app client secret used to sign webhook HMACs. Reads
  * `SHOPIFY_CLIENT_SECRET` ONLY — the same secret the app's OAuth uses. Returns
  * null when unset/blank so the caller fails closed (rejects the webhook).
@@ -46,11 +55,16 @@ export function verifyShopifyWebhookHmac(
   if (!hmacHeader || typeof hmacHeader !== 'string') return false
   if (!Buffer.isBuffer(rawBody)) return false
 
-  // Decode the provided base64 signature. Buffer.from(..,'base64') is lenient (it
-  // drops invalid characters), so a malformed header decodes to the wrong length
-  // and is rejected by the exact-length check below.
+  // 1) Require Shopify's EXACT canonical base64 shape before decoding (defeats the lenient
+  //    decoder: appended `!!!!`, whitespace, URL-safe alphabet, or bad length all fail here).
+  if (!CANONICAL_HMAC_RE.test(hmacHeader)) return false
+
   const provided = Buffer.from(hmacHeader, 'base64')
   if (provided.length !== HMAC_SHA256_BYTES) return false
+
+  // 2) Reject any header that does not round-trip to its OWN canonical encoding — a second
+  //    guard against non-canonical input the regex might not have distinguished.
+  if (provided.toString('base64') !== hmacHeader) return false
 
   const computed = crypto.createHmac('sha256', secret).update(rawBody).digest()
   // Both are exactly 32 bytes here, so timingSafeEqual is safe; guard anyway.
