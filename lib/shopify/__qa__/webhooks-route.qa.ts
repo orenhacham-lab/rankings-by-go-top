@@ -1,11 +1,14 @@
 /**
  * Route-level tests for POST /api/shopify/webhooks. Exercises the DB-free branches
- * (content-gate 404, HMAC 401, malformed-JSON 400, customers/* 200 no-op, unknown-topic
- * 200, invalid-shop 400) and trailing-slash parity. The actual redact/uninstalled DB
+ * (HMAC 401, malformed-JSON 400, customers/* 200 no-op, unknown-topic 200, invalid-shop
+ * 400), trailing-slash parity, and the mandatory-reachability regression (no product
+ * feature flag may 404 the compliance endpoint). The actual redact/uninstalled DB
  * mutations are covered by shop-cleanup.qa.ts. No network, no DB.
  * Run: npx tsx lib/shopify/__qa__/webhooks-route.qa.ts
  */
 import crypto from 'crypto'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -14,7 +17,10 @@ function check(name: string, cond: boolean, detail?: string) {
 
 const SECRET = 'shpss_route_test_secret'
 process.env.SHOPIFY_CLIENT_SECRET = SECRET
-process.env.ENABLE_CONTENT = 'true'
+// Deliberately DISABLE the content/automation product flags for the whole suite to prove
+// the mandatory compliance endpoint stays reachable (HMAC-gated) regardless of them.
+delete process.env.ENABLE_CONTENT
+delete process.env.ENABLE_CONTENT_AUTOMATION
 // Defensive dummies so importing the route's supabase-admin dependency never throws at load.
 process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co'
 process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role'
@@ -32,13 +38,15 @@ async function main() {
   const URL_NOSLASH = 'https://app.example.com/api/shopify/webhooks'
   const URL_SLASH = 'https://app.example.com/api/shopify/webhooks/'
 
-  // (1) content module disabled → 404 (before any parse/DB)
+  // (1) A mandatory compliance endpoint must NOT be feature-flag gated. With the content
+  // module DISABLED (unset above), an unsigned POST still reaches HMAC verification and
+  // returns 401 (never 404), and a valid signed request is still handled (200).
   {
-    process.env.ENABLE_CONTENT = 'false'
-    const raw = Buffer.from('{}', 'utf8')
-    const r = await POST(req(URL_NOSLASH, raw, { 'x-shopify-hmac-sha256': sign(raw), 'x-shopify-topic': 'shop/redact' }))
-    check('(1) content module off → 404', r.status === 404)
-    process.env.ENABLE_CONTENT = 'true'
+    const raw = Buffer.from(JSON.stringify({ id: 1 }), 'utf8')
+    const unsigned = await POST(req(URL_NOSLASH, raw, { 'x-shopify-topic': 'orders/create' }))
+    check('(1) content flag OFF + unsigned → 401 (not 404)', unsigned.status === 401)
+    const signed = await POST(req(URL_NOSLASH, raw, { 'x-shopify-hmac-sha256': sign(raw), 'x-shopify-topic': 'customers/redact' }))
+    check('(1b) content flag OFF + valid HMAC → 200 (endpoint reachable)', signed.status === 200)
   }
 
   // (2) missing/invalid HMAC → 401 (before JSON parse or DB access)
@@ -94,6 +102,16 @@ async function main() {
     const a = await POST(req(URL_NOSLASH, raw, h))
     const b = await POST(req(URL_SLASH, raw, h))
     check('(7) /webhooks and /webhooks/ resolve to the same handler with identical result', a.status === 200 && b.status === 200)
+  }
+
+  // (8) Source-contract regression: NO product feature flag and NO 404 gate in the route,
+  // so a mandatory compliance endpoint can never disappear behind a disabled UI feature.
+  {
+    const routeSrc = readFileSync(join(__dirname, '..', '..', '..', 'app', 'api', 'shopify', 'webhooks', 'route.ts'), 'utf8')
+    // Strip comments so the assertion tests CODE, not explanatory prose.
+    const code = routeSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    check('(8) route CODE has no feature-flag gate (isContent*/enabled flag)', !/isContentModuleEnabled|isContentAutomationEnabled|isGscReadOnlyEnabled/.test(code))
+    check('(8b) route CODE has no 404 response at all', !/\b404\b/.test(code) && !/Not found/.test(code))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

@@ -17,7 +17,6 @@
 
 import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { normalizeShopDomain } from '@/lib/shopify/domain'
 import { getShopifyWebhookSecret, verifyShopifyWebhookHmac, SHOPIFY_WEBHOOK_HMAC_HEADER } from '@/lib/shopify/webhook-hmac'
 import { applyShopRedact, applyAppUninstalled } from '@/lib/shopify/shop-cleanup'
@@ -37,7 +36,11 @@ function shopHash(shop: string): string {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isContentModuleEnabled()) return json(404, { error: 'Not found' })
+  // Shopify's mandatory compliance webhooks MUST stay reachable regardless of any
+  // product feature flag (content module, automation, Shopify UI, etc.). This endpoint
+  // is deliberately NOT gated by isContentModuleEnabled — disabling a UI/content feature
+  // must never turn a compliance endpoint into a 404. HMAC verification below is the
+  // first (and only) application-level gate; an unsigned/invalid request always 401s.
 
   // 1) Read the EXACT raw bytes ONCE, before any decode/parse.
   const raw = Buffer.from(await request.arrayBuffer())
