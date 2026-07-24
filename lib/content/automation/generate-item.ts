@@ -57,7 +57,13 @@ async function loadArticle(admin: Admin, articleId: string) {
 async function gateAndFinalize(admin: Admin, itemId: string, article: { id: string; title: string | null; content_html: string | null; slug: string | null }): Promise<GenerateItemResult> {
   const gate = runQualityGate(article)
   if (gate.ok) {
-    await admin.from('article_pool_items').update({ article_id: article.id, status: 'generated', last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', itemId)
+    // Area E — reset the shared attempt counter at the generated transition.
+    // Generation and publishing share article_pool_items.attempts + the same
+    // AUTOMATION_MAX_ATTEMPTS cap. Once an item is successfully generated, the
+    // publish phase must start with a FULL retry budget instead of inheriting
+    // the attempts already consumed by generation (which could otherwise leave a
+    // freshly-generated item with 0 publish retries). No new column.
+    await admin.from('article_pool_items').update({ article_id: article.id, status: 'generated', attempts: 0, last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', itemId)
     return { itemId, status: 'generated', articleId: article.id }
   }
   const reason = gate.failures.join(', ')
