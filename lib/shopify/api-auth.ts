@@ -34,13 +34,21 @@ type Admin = ReturnType<typeof createAdminClient>
 
 /**
  * Load the project's Shopify connection and decrypt its access token.
- * Returns a clear error (no secrets) when missing or undecryptable.
+ * Returns a clear error (no secrets) when missing, inactive, or undecryptable.
+ *
+ * DEFAULT-DENY inactive policy: a connection whose `connection_status` is not
+ * `'connected'` (i.e. `untested`/`failed`, including a revocation-sentinel row after
+ * app/uninstalled) is REJECTED with status 409 so blogs/sync/manual+automatic publish
+ * stop LOCALLY before any Shopify API call. Only `test-connection` may pass
+ * `{ allowInactive: true }` — it is the path responsible for testing/recovering an
+ * untested/failed connection. Ownership is unchanged (enforced by the caller).
  */
 export async function loadShopifyConnection(
   admin: Admin,
   projectId: string,
+  opts?: { allowInactive?: boolean },
 ): Promise<
-  | { error: string; status: 404 | 500 }
+  | { error: string; status: 404 | 409 | 500 }
   | { connection: ShopifyConnectionRow; creds: ShopifyCredentials }
 > {
   const { data, error } = await admin
@@ -56,6 +64,9 @@ export async function loadShopifyConnection(
   if (!data) return { error: 'No Shopify connection for this project', status: 404 }
 
   const connection = data as ShopifyConnectionRow
+  if (connection.connection_status !== 'connected' && !opts?.allowInactive) {
+    return { error: 'Shopify connection is not active', status: 409 }
+  }
   try {
     const accessToken = decryptCredential(connection.access_token_encrypted)
     return {
