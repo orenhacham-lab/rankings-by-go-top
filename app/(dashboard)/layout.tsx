@@ -1,7 +1,10 @@
 import Sidebar from '@/components/layout/Sidebar'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
-import { DashboardLanguageProvider, normalizeLocale } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
+// normalizeLocale comes from the PURE (non-'use client') module: this layout is a server
+// component, and calling a function exported by a client module throws at runtime.
+import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import { ActiveProjectProvider } from '@/lib/active-project/ActiveProjectProvider'
 import { createClient } from '@/lib/supabase/server'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'

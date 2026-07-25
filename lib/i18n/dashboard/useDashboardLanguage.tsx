@@ -2,25 +2,16 @@
 
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react'
 import type { Locale } from '../locales'
+import { normalizeLocale, resolveDashboardLocale } from './locale'
 
 /** The single, existing dashboard-language store key (localStorage). Exported so the
  *  signup flow can seed it without a second competing key. */
 export const DASHBOARD_LANGUAGE_STORAGE_KEY = 'dashboard-language'
 const STORAGE_KEY = DASHBOARD_LANGUAGE_STORAGE_KEY
 
-/** Validate an untrusted value (URL param / auth metadata) to a supported Locale. */
-export function normalizeLocale(v: unknown): Locale | null {
-  return v === 'en' || v === 'he' ? v : null
-}
-
-/**
- * The single resolution rule for the dashboard language: a previously-stored choice
- * (the switcher, or a prior signup seed) ALWAYS wins; otherwise fall back to the
- * empty-storage seed (initialLocale from auth metadata); otherwise Hebrew.
- */
-export function resolveDashboardLocale(stored: string | null, initialLocale?: Locale | null): Locale {
-  return normalizeLocale(stored) ?? normalizeLocale(initialLocale) ?? 'he'
-}
+// The pure locale helpers live in ./locale (NOT a client module) so the SERVER dashboard
+// layout can call them. Re-exported here for existing client-side importers.
+export { normalizeLocale, resolveDashboardLocale } from './locale'
 
 type DashboardLanguageContextValue = {
   language: Locale
