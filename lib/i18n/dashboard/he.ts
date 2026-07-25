@@ -363,6 +363,13 @@ export const dashboardHe = {
     },
     comingSoonBanner: 'תוכן לקידום אורגני ונראות AI — יצירת נושאים, מאמרים ופרסום יתווספו בשלבים הבאים.',
     newTopicButton: 'צור נושא למאמר',
+    // M — ideas destination sub-tabs (automatic ideas vs manual topic creation).
+    ideasSubTabs: {
+      auto: 'רעיונות אוטומטיים',
+      manual: 'נושא ידני',
+    },
+    manualTopicTitle: 'יצירת נושא ידני',
+    manualTopicHint: 'צרו נושא מאמר משלכם. הנושא עובר את אותן בדיקות (כפילות, כותרת, בעלות ומכסה) כמו כל נושא, ואינו נכנס אוטומטית לתור הפרסום — הוספה לתור היא פעולה נפרדת ומפורשת.',
     articlesHeading: 'מאמרים שנוצרו',
     articlesSubtitle: 'מאמרים שכבר נוצרו וניתנים לעריכה, פרסום או שליחה ל-WordPress.',
     articlesEmptyTitle: 'עדיין לא נוצרו מאמרים לפרויקט הזה',
