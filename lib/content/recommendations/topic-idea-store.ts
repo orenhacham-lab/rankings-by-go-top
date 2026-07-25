@@ -77,9 +77,20 @@ export function ideaToSuggestion(row: ContentTopicIdeaRow): TopicSuggestion & { 
   // exactly as before (flat links, null primary) without crashing.
   const plan = (row.link_plan && typeof row.link_plan === 'object') ? (row.link_plan as PersistedPlan) : null
   const linkPlan = plan?.linkPlan
-  const suggestedInternalLinks = linkPlan
-    ? linkPlanToOrderedFromPlan(linkPlan)
-    : (Array.isArray(row.suggested_internal_links) ? row.suggested_internal_links : [])
+  const persistedLinks = Array.isArray(row.suggested_internal_links) ? row.suggested_internal_links : []
+
+  // F — first-click invalid_anchor fix. When a row was CANONICALIZED (a
+  // linkPreviewSnapshot was persisted), canonicalizeSuggestionLinks already wrote the
+  // authoritative planner-derived links — which pass manualAnchorShapeValid and are
+  // exactly what bulk-save validates — into the suggested_internal_links column. Those
+  // are the checkable links; re-flattening the link_plan targets' TITLES here would
+  // hand back non-canonical anchors that fail manualAnchorShapeValid on the very first
+  // click. So for a canonicalized row, source the checkable links from the persisted
+  // canonical column; linkPlan is kept ONLY for role / moneyTargetUrl (below). Rows
+  // never canonicalized (no snapshot) keep the plan-derived fallback unchanged.
+  const suggestedInternalLinks = plan?.linkPreviewSnapshot
+    ? persistedLinks
+    : (linkPlan ? linkPlanToOrderedFromPlan(linkPlan) : persistedLinks)
 
   return {
     id: row.id,
