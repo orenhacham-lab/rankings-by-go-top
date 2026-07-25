@@ -7,8 +7,9 @@ import { ActiveBadge } from '@/components/ui/StatusBadge'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import ClientForm from './ClientForm'
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import { formatDate } from '@/lib/utils'
-import { toggleClientActiveAction } from '@/app/actions/clients'
+import { toggleClientActiveAction, deleteClientAction } from '@/app/actions/clients'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
@@ -23,6 +24,7 @@ export default function ClientsTable({ clients, onClientsChange }: ClientsTableP
   const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
 
   const [editingClient, setEditingClient] = useState<Client | null>(null)
+  const [deletingClient, setDeletingClient] = useState<Client | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
@@ -108,6 +110,14 @@ export default function ClientsTable({ clients, onClientsChange }: ClientsTableP
                   >
                     {client.is_active ? dict.clients.actions.deactivate : dict.clients.actions.activate}
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-red-600 dark:text-red-400"
+                    onClick={() => setDeletingClient(client)}
+                  >
+                    {dict.clients.actions.delete}
+                  </Button>
                 </div>
               </Td>
             </TableRow>
@@ -128,6 +138,17 @@ export default function ClientsTable({ clients, onClientsChange }: ClientsTableP
             onCancel={() => setEditingClient(null)}
           />
         </Modal>
+      )}
+
+      {deletingClient && (
+        <DeleteConfirmDialog
+          open={!!deletingClient}
+          name={deletingClient.name}
+          labels={dict.clients.deleteDialog}
+          onConfirm={() => deleteClientAction(deletingClient.id)}
+          onClose={() => setDeletingClient(null)}
+          onDeleted={async () => { if (onClientsChange) await onClientsChange() }}
+        />
       )}
     </>
   )

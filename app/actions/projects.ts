@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { calculateNextScanDate } from '@/lib/utils'
 import { getUserEntitlement } from '@/lib/subscription'
+import { deleteOwnedRecord, type DeleteOwnedResult } from '@/lib/data/delete-owned-record'
 
 // Note: createProjectAction is deprecated - project creation now uses API route /api/projects/create
 // Kept here for backwards compatibility if needed
@@ -91,4 +92,23 @@ export async function toggleProjectActiveAction(id: string, isActive: boolean) {
   if (error) throw new Error(error.message)
   revalidatePath('/projects')
   revalidatePath(`/projects/${id}`)
+}
+
+/**
+ * Area I — PERMANENT delete of a project. Ownership-enforced; the DB's ON DELETE
+ * CASCADE removes the project's dependents (tracking targets, scans, articles,
+ * GSC per-project data, …). The per-user gsc_connections is NOT FK'd to projects
+ * and is deliberately left intact. No remote WordPress/Shopify article is touched.
+ * Reversible deactivation stays a separate action (toggleProjectActiveAction).
+ */
+export async function deleteProjectAction(id: string): Promise<DeleteOwnedResult | { ok: false; error: 'not_authenticated' }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+  const res = await deleteOwnedRecord(supabase, 'projects', id, user.id)
+  if (res.ok) {
+    revalidatePath('/projects')
+    revalidatePath('/dashboard')
+  }
+  return res
 }
