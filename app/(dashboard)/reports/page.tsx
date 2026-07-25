@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
@@ -45,14 +45,16 @@ interface AIScanRun {
 }
 
 function ReportsContent() {
-  const searchParams = useSearchParams()
-  const defaultProjectId = searchParams.get('project_id') || ''
   const { language } = useDashboardLanguage()
   const dict = getDashboardDictionary(language)
   const t = dict.reports
 
+  // Area D — the selected project is the GLOBAL active project (shared with keywords /
+  // Content Hub, across tabs + refresh). The local `projects` list is kept only for the
+  // dropdown labels/report data (it carries client names the shared list doesn't).
+  const { activeProjectId, setActiveProject } = useActiveProject()
+  const selectedProjectId = activeProjectId ?? ''
   const [projects, setProjects] = useState<(Project & { clients?: Client })[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState(defaultProjectId)
   const [reportType, setReportType] = useState<ReportType>('google')
   
   // Google report data
@@ -103,11 +105,16 @@ function ReportsContent() {
     loadProjects()
   }, [])
 
+  // Area D — load the current report type whenever the GLOBAL active project resolves
+  // or changes (replaces the old ?project_id deep-link effect). The project switch is
+  // handled centrally by ActiveProjectProvider; this section only reacts to it.
   useEffect(() => {
-    if (defaultProjectId && projects.length > 0 && reportType === 'google') {
-      loadGoogleReport(defaultProjectId)
+    if (selectedProjectId && projects.length > 0) {
+      if (reportType === 'google') loadGoogleReport(selectedProjectId)
+      else loadAiReport(selectedProjectId)
     }
-  }, [defaultProjectId, projects.length])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId, projects.length])
 
   async function loadGoogleReport(projectId: string) {
     if (!projectId) return
@@ -380,7 +387,7 @@ function ReportsContent() {
             <Select
               label={t.selectProject}
               value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
+              onChange={(e) => setActiveProject(e.target.value)}
               options={[
                 { value: '', label: t.selectProjectPlaceholder },
                 ...projects.map((p) => ({

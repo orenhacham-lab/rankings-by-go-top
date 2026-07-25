@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { Card } from '@/components/ui/Card'
@@ -72,9 +72,10 @@ const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | '
 }
 
 export default function ContentHub({ proFirst = false }: { proFirst?: boolean }) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const projectId = searchParams.get('projectId') || ''
+  // Area D — the project comes from the GLOBAL active-project state, so Content Hub
+  // stays in sync with keywords / reports / other sections, across tabs and refresh.
+  const { activeProjectId, setActiveProject } = useActiveProject()
+  const projectId = activeProjectId ?? ''
 
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).contentHub, [language])
@@ -380,16 +381,11 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
     }
   }
 
-  // Auto-select when the user has exactly one project and none is chosen yet.
-  useEffect(() => {
-    if (!projectId && data && data.projects.length === 1) {
-      router.replace(`/content?projectId=${data.projects[0].id}`)
-    }
-  }, [projectId, data, router])
-
+  // Area D — single-project auto-selection + persistence + URL sync are all handled
+  // centrally by ActiveProjectProvider; the section only needs to change the shared
+  // active project when the user picks one from the dropdown.
   function onSelectProject(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value
-    router.push(id ? `/content?projectId=${id}` : '/content')
+    setActiveProject(e.target.value)
   }
 
   const projects = data?.projects ?? []
