@@ -336,6 +336,12 @@ export const dashboardEn = {
       gscRaw: 'Search Console (raw)',
       comingSoon: 'Coming soon',
     },
+    // L2 — sub-tabs inside the Search Console area: the client recommendations vs the
+    // underlying Search Console data (the same read-only table shown on the project page).
+    gscSubTabs: {
+      recommendations: 'Recommendations',
+      data: 'Search Console data',
+    },
     stats: {
       total: 'All articles',
       draft: 'Drafts',
@@ -1859,6 +1865,7 @@ export const dashboardEn = {
         prevPage: 'Previous',
         nextPage: 'Next',
         pageOf: (from: number, to: number, total: number) => `${from}–${to} of ${total}`,
+        pageSizeLabel: 'Rows per page',
         genericError: 'Something went wrong. Please try again.',
         errors: {
           not_connected: 'No Google connection for this project.',

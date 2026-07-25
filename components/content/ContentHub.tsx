@@ -32,6 +32,7 @@ import AutomationIdeas from '@/components/content/AutomationIdeas'
 import AutomationSchedule from '@/components/content/AutomationSchedule'
 import GscOpportunities from '@/components/content/GscOpportunities'
 import GscRecommendations from '@/components/content/GscRecommendations'
+import GscMetricsTable from '@/components/content/GscMetricsTable'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -95,6 +96,8 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   const exportedIdOf = (a: ArticleRow): string | number | null => isShopify ? (a.shopify_article_id ?? null) : a.wp_post_id
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'articles' | 'gbp' | 'scheduled' | 'gscIdeas' | 'gscRaw'>('articles')
+  // L2 — within the Search Console area: client recommendations vs the underlying SC data.
+  const [gscView, setGscView] = useState<'recommendations' | 'data'>('recommendations')
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [topics, setTopics] = useState<ArticleTopic[]>([])
@@ -747,11 +750,27 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
               {t.selectProjectMessage}
             </Card>
           ) : activeTab === 'gscIdeas' ? (
-            /* Stage E2C — client-facing Search Console recommendations (A–D; no topic creation). */
-            <GscRecommendations
-              projectId={projectId}
-              onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
-            />
+            /* L2 — two clearly-separated sub-views: the client RECOMMENDATIONS vs the
+               underlying Search Console DATA (the same read-only GscMetricsTable shown on
+               the project page — NOT the internal raw diagnostic browser). */
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700">
+                {([['recommendations', t.gscSubTabs.recommendations], ['data', t.gscSubTabs.data]] as const).map(([key, label]) => (
+                  <button key={key} type="button" onClick={() => setGscView(key)}
+                    className={`text-sm px-3 py-2 -mb-px border-b-2 transition ${gscView === key ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-medium' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {gscView === 'recommendations' ? (
+                <GscRecommendations
+                  projectId={projectId}
+                  onToast={(kind, text) => (kind === 'success' ? toast.success(text) : toast.error(text))}
+                />
+              ) : (
+                <GscMetricsTable projectId={projectId} />
+              )}
+            </div>
           ) : activeTab === 'gscRaw' ? (
             /* Internal/dev-only raw browser (Stage E2A/E2B) — behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED. */
             <GscOpportunities
