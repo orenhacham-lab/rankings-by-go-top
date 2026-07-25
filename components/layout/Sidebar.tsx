@@ -29,14 +29,15 @@ const navItemKeys = [
   { href: '/dashboard', labelKey: 'dashboard' as const, icon: BarChart3 },
   { href: '/clients', labelKey: 'clients' as const, icon: Users, onboarding: 'clients' },
   { href: '/projects', labelKey: 'projects' as const, icon: Folder, onboarding: 'projects' },
-  { href: '/keyword-research', labelKey: 'keywordResearch' as const, icon: Lightbulb, onboarding: 'keyword-research' },
-  { href: '/keywords', labelKey: 'keywords' as const, icon: KeyRound },
-  { href: '/ai-visibility', labelKey: 'aiVisibility' as const, icon: Sparkles },
-  // Content Hub — gated by the build-time content flag (same pattern as the
-  // content section in the project page). Hidden entirely when off.
+  // Content Hub ("מרכז תוכן") sits immediately after Projects. Gated by the
+  // build-time content flag (same pattern as the content section in the project
+  // page); hidden entirely when off.
   ...(process.env.NEXT_PUBLIC_ENABLE_CONTENT === 'true'
     ? [{ href: '/content', labelKey: 'content' as const, icon: Newspaper }]
     : []),
+  { href: '/keyword-research', labelKey: 'keywordResearch' as const, icon: Lightbulb, onboarding: 'keyword-research' },
+  { href: '/keywords', labelKey: 'keywords' as const, icon: KeyRound },
+  { href: '/ai-visibility', labelKey: 'aiVisibility' as const, icon: Sparkles },
   { href: '/scans', labelKey: 'scans' as const, icon: Search },
   { href: '/reports', labelKey: 'reports' as const, icon: FileText, onboarding: 'reports' },
   { href: '/billing', labelKey: 'billing' as const, icon: CreditCard },
