@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 
 const SIGNUP_UI = {
   he: {
@@ -239,8 +240,12 @@ export function SignupForm() {
             company_name: formData.companyName,
             phone: normalizedPhone,
             terms_accepted: true,
+            // Area G — persist the signup-origin language (derived from the route/param,
+            // NOT the browser) so a later fresh-device login opens the app in that language.
+            locale: lang,
           },
-          emailRedirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent('/dashboard')}`,
+          // Carry the choice through the email-confirmation callback so it survives that hop.
+          emailRedirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent('/dashboard')}&lang=${lang}`,
         },
       })
 
@@ -363,6 +368,11 @@ export function SignupForm() {
           product: 'rankings_by_go_top',
         })
       }
+
+      // Area G — immediate-session path: seed the EXISTING dashboard-language store so the
+      // dashboard opens in the signup language on this device right away (the switcher can
+      // still override afterward, and a returning device keeps whatever was last chosen).
+      try { localStorage.setItem(DASHBOARD_LANGUAGE_STORAGE_KEY, lang) } catch { /* ignore quota / privacy mode */ }
 
       // Redirect to dashboard after a short delay
       setTimeout(() => {
