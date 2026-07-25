@@ -40,8 +40,8 @@ export default async function DashboardLayout({
   // signup language. The switcher / a prior stored choice still overrides client-side.
   const initialLocale = normalizeLocale(user.user_metadata?.locale)
 
+  // Area G — the language provider is seeded from the signup-origin locale.
   return (
-    {/* Area G — the language provider is seeded from the signup-origin locale. */}
     <DashboardLanguageProvider initialLocale={initialLocale}>
       {/* Area D — ONE global active-project source of truth for the whole dashboard.
           Wrapped in Suspense because the provider reads the URL via useSearchParams. */}
