@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
@@ -36,6 +37,7 @@ import GscMetricsTable from '@/components/content/GscMetricsTable'
 import { useToasts, ToastHost } from '@/components/content/Toast'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { ideasSectionFromParam, ideasSectionToParam, type IdeasSection } from '@/lib/content/content-hub-ideas-section'
 import { formatDate } from '@/lib/utils'
 import { ExternalLink, Plus } from 'lucide-react'
 import type { ArticleTopic } from '@/lib/supabase/types'
@@ -81,6 +83,11 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   // stays in sync with keywords / reports / other sections, across tabs and refresh.
   const { activeProjectId, setActiveProject } = useActiveProject()
   const projectId = activeProjectId ?? ''
+  // Area M — router/searchParams are used ONLY for the ideas `?section` sub-tab; the
+  // active PROJECT still comes from the provider above (Areas D + M compose: M copies
+  // every existing param, so the provider's ?projectId is preserved on a section change).
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).contentHub, [language])
@@ -98,6 +105,11 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   const [activeTab, setActiveTab] = useState<'articles' | 'gbp' | 'scheduled' | 'gscIdeas' | 'gscRaw'>('articles')
   // L2 — within the Search Console area: client recommendations vs the underlying SC data.
   const [gscView, setGscView] = useState<'recommendations' | 'data'>('recommendations')
+  // M — ideas destination sub-tab (automatic ideas vs manual topic), carried in the URL
+  // `?section=` so a refresh / deep-link preserves it.
+  const [ideasSection, setIdeasSection] = useState<IdeasSection>(() => ideasSectionFromParam(searchParams.get('section')))
+  const automationEnabled = process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true'
+  const ideasSectionRef = useRef<HTMLDivElement>(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [topics, setTopics] = useState<ArticleTopic[]>([])
@@ -153,6 +165,26 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
   }, [])
   const handleDrawerPlanSaved = useCallback(() => { setLinkPlanSavedHint(true) }, [])
   const handleReturnToQueue = useCallback(() => { setLinkPlanSavedHint(true); setCtaScrollSignal((n) => n + 1) }, [])
+
+  // M — mirror the URL `?section=` into the ideas sub-tab (deep-link / refresh / Back-Forward).
+  useEffect(() => { setIdeasSection(ideasSectionFromParam(searchParams.get('section'))) }, [searchParams])
+  // Change the ideas sub-tab: write the canonical `?section=` (replace — no history spam).
+  const changeIdeasSection = useCallback((section: IdeasSection) => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()))
+    params.set('section', ideasSectionToParam(section))
+    router.replace(`/content?${params.toString()}`, { scroll: false })
+  }, [router, searchParams])
+  // The "New article topic" button leads to the automatic article-ideas section.
+  const goToIdeas = useCallback(() => {
+    changeIdeasSection('auto')
+    window.setTimeout(() => ideasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }, [changeIdeasSection])
+  // Retargeted create-topic action: to the ideas destination when automation is on;
+  // otherwise the manual brief modal directly (so manual creation always works).
+  const handleCreateTopic = useCallback(() => {
+    if (automationEnabled) goToIdeas()
+    else { setEditingTopic(null); setBriefOpen(true) }
+  }, [automationEnabled, goToIdeas])
   // Phase 3F.3.6/3F.3.7 (Part G) — ensure the project's pool exists (never flips an
   // active pool to paused) and add the given topics to its publishing queue.
   // Returns success. Used by the drawer and the batch link-review panel.
@@ -783,7 +815,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
             <>
               {/* Primary action */}
               <div className="flex justify-end mb-4">
-                <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}>
+                <Button onClick={handleCreateTopic}>
                   <Plus size={16} /> {t.newTopicButton}
                 </Button>
               </div>
@@ -807,7 +839,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
               {(data?.articles?.length ?? 0) === 0 ? (
                 <Card className="p-8 text-center mb-6">
                   <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.articlesEmptyTitle}</p>
-                  <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
+                  <Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>
                 </Card>
               ) : (
               <>
@@ -1008,31 +1040,54 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
               {/* ── Section 2: content automation — ideas + publishing schedule
                   (flag-gated). Stands as its own group so the pending/manual
                   heading below labels only the manual list. ── */}
-              {process.env.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true' && (
-                <div className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
-                  <AutomationIdeas
-                    proFirst={proFirst}
-                    projectId={projectId}
-                    language={language}
-                    onCreated={loadTopics}
-                    onScheduled={handleScheduled}
-                    onTopicsCreated={(created, unchecked, selected) => { if (created.length) { setNewTopicsUnchecked(unchecked ?? {}); setNewTopicsSelected(selected ?? {}); setNewTopics(created) } }}
-                    onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: p.exists, linkCount: p.linkCount, approvedCount: p.approvedCount, stale: p.stale }])) }))}
-                    onApproved={handleTopicsQueued}
-                    onReviewLinks={handleReviewLinks}
-                    planSavedHint={linkPlanSavedHint}
-                    scrollCtaSignal={ctaScrollSignal}
-                    queueSuccessSignal={ideasSuccessSignal}
-                    onGoToQueue={() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  />
-                  <div ref={scheduleSectionRef} className="scroll-mt-4">
-                    <AutomationSchedule
-                      projectId={projectId}
-                      language={language}
-                      refreshKey={automationRefresh}
-                      onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
-                    />
+              {automationEnabled && (
+                <div ref={ideasSectionRef} className="mb-8 mt-8 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4 scroll-mt-4">
+                  {/* M — the ideas destination: automatic ideas (default) + a manual
+                      topic sub-tab. The automatic workflow below is unchanged. */}
+                  <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700">
+                    {([['auto', t.ideasSubTabs.auto], ['manual', t.ideasSubTabs.manual]] as const).map(([key, label]) => (
+                      <button key={key} type="button" onClick={() => changeIdeasSection(key)}
+                        className={`text-sm px-3 py-2 -mb-px border-b-2 transition ${ideasSection === key ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-medium' : 'border-transparent text-slate-500 dark:text-slate-400'}`}>
+                        {label}
+                      </button>
+                    ))}
                   </div>
+
+                  {ideasSection === 'manual' ? (
+                    <Card className="hover:translate-y-0">
+                      <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.manualTopicTitle}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-3">{t.manualTopicHint}</p>
+                      {/* Reuses the SAME ArticleBriefModal → POST /api/content/topics (source='manual');
+                          all duplicate/title/ownership/quota checks apply; never auto-queued. */}
+                      <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
+                    </Card>
+                  ) : (
+                    <>
+                      <AutomationIdeas
+                        proFirst={proFirst}
+                        projectId={projectId}
+                        language={language}
+                        onCreated={loadTopics}
+                        onScheduled={handleScheduled}
+                        onTopicsCreated={(created, unchecked, selected) => { if (created.length) { setNewTopicsUnchecked(unchecked ?? {}); setNewTopicsSelected(selected ?? {}); setNewTopics(created) } }}
+                        onPlansSaved={(plans) => setPlanStatus((prev) => ({ ...prev, ...Object.fromEntries(plans.map((p) => [p.topicId, { exists: p.exists, linkCount: p.linkCount, approvedCount: p.approvedCount, stale: p.stale }])) }))}
+                        onApproved={handleTopicsQueued}
+                        onReviewLinks={handleReviewLinks}
+                        planSavedHint={linkPlanSavedHint}
+                        scrollCtaSignal={ctaScrollSignal}
+                        queueSuccessSignal={ideasSuccessSignal}
+                        onGoToQueue={() => scheduleSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      />
+                      <div ref={scheduleSectionRef} className="scroll-mt-4">
+                        <AutomationSchedule
+                          projectId={projectId}
+                          language={language}
+                          refreshKey={automationRefresh}
+                          onChanged={() => { loadTopics(); setAutomationRefresh((k) => k + 1) }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1102,7 +1157,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                 {selectableTopics.length === 0 ? (
                   <Card className="p-8 text-center">
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{t.topicsEmptyTitle}</p>
-                    <Button onClick={() => { setEditingTopic(null); setBriefOpen(true) }}><Plus size={16} /> {t.newTopicButton}</Button>
+                    <Button onClick={handleCreateTopic}><Plus size={16} /> {t.newTopicButton}</Button>
                   </Card>
                 ) : (
                   <>

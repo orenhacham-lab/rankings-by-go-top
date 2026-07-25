@@ -392,6 +392,13 @@ export const dashboardEn = {
     },
     comingSoonBanner: 'Content for organic ranking and AI visibility — topic, article and publishing tools arrive in the next phases.',
     newTopicButton: 'New article topic',
+    // M — ideas destination sub-tabs (automatic ideas vs manual topic creation).
+    ideasSubTabs: {
+      auto: 'Automatic ideas',
+      manual: 'Manual topic',
+    },
+    manualTopicTitle: 'Create a topic manually',
+    manualTopicHint: 'Create your own article topic. It goes through the same duplicate, title, ownership and quota checks as any topic, and is not auto-queued for publishing — adding it to the queue is a separate, explicit action.',
     articlesHeading: 'Generated articles',
     articlesSubtitle: 'Articles already created — edit, publish, or send them to WordPress.',
     articlesEmptyTitle: 'No articles have been created for this project yet',
