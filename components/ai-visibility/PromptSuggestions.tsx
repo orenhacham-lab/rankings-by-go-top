@@ -100,7 +100,17 @@ export default function PromptSuggestions({
   }
 
   const chipLabel = (chip: string): string => {
-    return t(chip as any) || chip
+    // Scoped safe fallback: an unknown chip key (e.g. a new tier's chip not yet added to
+    // the i18n dictionary) must render the raw key instead of throwing and crashing the
+    // whole AI Questions tab. This leniency is confined to the OPTIONAL chip label —
+    // intentionally NOT a global t() guard, so required missing translations elsewhere
+    // still fail loudly.
+    try {
+      return t(chip as any) || chip
+    } catch {
+      if (process.env.NODE_ENV !== 'production') console.warn('[ai-visibility] unknown chip label key:', chip)
+      return chip
+    }
   }
 
   // Helper to preserve quality mapping from cached items (via intent)

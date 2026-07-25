@@ -722,6 +722,10 @@ const STRINGS = {
   chip_competitor_gap: { he: 'פער מול מתחרים', en: 'Competitor Gap' },
   chip_lead_opportunity: { he: 'הזדמנות לידים', en: 'Lead Opportunity' },
   chip_regional_demand: { he: 'ביקוש גבוה באזור', en: 'High Regional Demand' },
+  // Starter-tier chip — the ONLY chip a brand-new/generic project produces (via
+  // buildFallbackSuggestions). It was missing here, so t('starter_questions') threw and
+  // crashed the AI Questions tab for new projects.
+  starter_questions: { he: 'שאלות התחלה', en: 'Starter questions' },
 } as const
 
 type StringKey = keyof typeof STRINGS
