@@ -35,7 +35,8 @@ interface MultiPageRow { query: string; distinctPageCount: number; totalClicks: 
 
 type Dict = ReturnType<typeof getDashboardDictionary>['projectDetail']['contentSection']['gsc']
 
-const PAGE_SIZE = 25
+// L1 — default 10 rows; the metrics endpoint clamps pageSize to ≤ 100 (client-only).
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 
 function fmtInt(n: number): string { return Math.round(n).toLocaleString() }
 function fmtCtr(n: number): string { return `${(n * 100).toFixed(2)}%` }
@@ -66,6 +67,7 @@ export default function GscPanel({ projectId }: { projectId: string }) {
   const [rows, setRows] = useState<(MetricRow | MultiPageRow)[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState<number>(10)
   const [loadingRows, setLoadingRows] = useState(false)
 
   const errText = useCallback((code: string | null | undefined): string => {
@@ -108,12 +110,12 @@ export default function GscPanel({ projectId }: { projectId: string }) {
     if (!property) return
     setLoadingRows(true)
     try {
-      const res = await fetch(`/api/gsc/metrics?projectId=${projectId}&window=${activeWindow}&view=${activeTab}&page=${page}&pageSize=${PAGE_SIZE}`)
+      const res = await fetch(`/api/gsc/metrics?projectId=${projectId}&window=${activeWindow}&view=${activeTab}&page=${page}&pageSize=${pageSize}`)
       const data = await res.json()
       if (data.ok) { setRows(data.rows ?? []); setTotal(data.total ?? 0) }
       else { setRows([]); setTotal(0) }
     } catch { setRows([]); setTotal(0) } finally { setLoadingRows(false) }
-  }, [projectId, property, activeWindow, activeTab, page])
+  }, [projectId, property, activeWindow, activeTab, page, pageSize])
 
   useEffect(() => { setPage(0) }, [activeWindow, activeTab])
   useEffect(() => { if (property) loadRows() }, [loadRows, property])
@@ -447,13 +449,23 @@ export default function GscPanel({ projectId }: { projectId: string }) {
                 )}
               </div>
 
-              {/* Pagination */}
-              {total > PAGE_SIZE && (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">{t.pageOf(page * PAGE_SIZE + 1, Math.min((page + 1) * PAGE_SIZE, total), total)}</span>
-                  <div className="flex gap-2">
+              {/* Pagination + page-size selector (L1) */}
+              {total > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-slate-500 dark:text-slate-400">{t.pageSizeLabel}</label>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
+                      className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {PAGE_SIZE_OPTIONS.map((n) => (<option key={n} value={n}>{n}</option>))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{t.pageOf(page * pageSize + 1, Math.min((page + 1) * pageSize, total), total)}</span>
                     <Button size="sm" variant="outline" disabled={page === 0 || loadingRows} onClick={() => setPage((p) => Math.max(0, p - 1))}>{t.prevPage}</Button>
-                    <Button size="sm" variant="outline" disabled={(page + 1) * PAGE_SIZE >= total || loadingRows} onClick={() => setPage((p) => p + 1)}>{t.nextPage}</Button>
+                    <Button size="sm" variant="outline" disabled={(page + 1) * pageSize >= total || loadingRows} onClick={() => setPage((p) => p + 1)}>{t.nextPage}</Button>
                   </div>
                 </div>
               )}

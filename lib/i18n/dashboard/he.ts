@@ -1825,6 +1825,7 @@ export const dashboardHe = {
         prevPage: 'הקודם',
         nextPage: 'הבא',
         pageOf: (from: number, to: number, total: number) => `${from}–${to} מתוך ${total}`,
+        pageSizeLabel: 'שורות בעמוד',
         genericError: 'משהו השתבש. נסו שוב.',
         errors: {
           not_connected: 'אין חיבור Google לפרויקט הזה.',

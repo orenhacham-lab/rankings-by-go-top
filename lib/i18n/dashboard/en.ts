@@ -1814,6 +1814,7 @@ export const dashboardEn = {
         prevPage: 'Previous',
         nextPage: 'Next',
         pageOf: (from: number, to: number, total: number) => `${from}–${to} of ${total}`,
+        pageSizeLabel: 'Rows per page',
         genericError: 'Something went wrong. Please try again.',
         errors: {
           not_connected: 'No Google connection for this project.',
