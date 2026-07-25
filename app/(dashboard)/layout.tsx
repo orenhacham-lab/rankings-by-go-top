@@ -3,6 +3,7 @@ import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
 import { DashboardLanguageProvider, normalizeLocale } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { createClient } from '@/lib/supabase/server'
+import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardLayout({
@@ -16,6 +17,12 @@ export default async function DashboardLayout({
   if (!user) {
     redirect('/login')
   }
+
+  // Area C — catch-all: existing users who never had a client (and users who arrive via
+  // a path that didn't run the signup/callback hooks, e.g. Google OAuth) get their default
+  // client here on first dashboard load. Idempotent + quota-aware + best-effort (a cheap
+  // head-count no-ops once any client exists; a failure never blocks the dashboard).
+  try { await ensureDefaultClient(supabase) } catch { /* non-blocking */ }
 
   // Fetch profile to determine admin status
   const { data: profile } = await supabase
