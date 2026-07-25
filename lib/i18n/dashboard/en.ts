@@ -27,6 +27,27 @@ export const dashboardEn = {
     selectProjectMessage: 'Select a project to view and manage its content.',
     noProjectsTitle: 'Create your first project to use this tool',
     noProjectsCta: 'Create project',
+    // K5 — missing-connections onboarding. Platform card = publishing setup; Search
+    // Console card = OPTIONAL evidence (never claimed required; publishing never
+    // implied without a connected platform).
+    setup: {
+      title: 'Finish setup',
+      platformNoneTitle: 'Connect your website platform',
+      platformNoneBody: 'To publish articles, connect WordPress or Shopify (one platform at a time). You can already create and review topics — publishing unlocks once a platform is connected.',
+      platformFailedTitle: 'The platform connection needs attention',
+      platformFailedBody: "The existing connection isn't working, so publishing is paused. Check the connection details and reconnect.",
+      platformScopeBody: 'The store is connected but publishing permissions are missing. Reconnect to grant write access.',
+      fixConnection: 'Fix the connection',
+      gscNoneTitle: 'Connect Google Search Console (optional)',
+      gscNoneBody: 'Connecting Search Console is optional. It adds real demand and performance data that strengthen content recommendations — topic generation works without it.',
+      gscConnect: 'Connect Search Console',
+      gscNoPropertyTitle: 'Choose a Search Console property for this project (optional)',
+      gscNoPropertyBody: "Your Google account is connected. Pick the property that covers this project's URL to use its data. This step is optional.",
+      gscChooseProperty: 'Choose a property',
+      gscReauthTitle: 'Reconnect Google Search Console',
+      gscReauthBody: 'Access to Search Console has expired. Reconnect to keep using its data (optional — not required for topic generation).',
+      gscReconnect: 'Reconnect',
+    },
     autoIdeas: {
       title: 'Automatic article ideas',
       intro: 'We found article ideas from your site data and keyword research. Approve topics now, and next you can add them to an automatic publishing schedule.',

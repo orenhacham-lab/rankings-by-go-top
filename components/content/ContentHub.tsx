@@ -22,6 +22,8 @@ import ShopifyConnectionPanel from '@/components/content/ShopifyConnectionPanel'
 import ContentHubPlatformCard from '@/components/content/ContentHubPlatformCard'
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
 import GscPanel from '@/components/content/GscPanel'
+import ContentHubSetup from '@/components/content/ContentHubSetup'
+import { PLATFORM_SETUP_ANCHOR, GSC_SETUP_ANCHOR } from '@/lib/content/content-hub-setup'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
 import NewTopicsLinkPlanPanel, { type NewTopic } from '@/components/content/NewTopicsLinkPlanPanel'
@@ -676,6 +678,18 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
             </select>
           </div>
 
+          {/* K5 — missing-connections onboarding (two independent setup cards, each
+              hidden when its dimension is ready; whole block hidden when both are).
+              Buttons scroll to the reused K3/K4 panels below. */}
+          {projectId && data && (
+            <ContentHubSetup
+              projectId={projectId}
+              platform={data.platform?.platform ?? 'none'}
+              platformFailed={data.wordpress?.status === 'failed' || data.shopify?.status === 'failed'}
+              shopifyNeedsScope={!!data.platform?.shopifyNeedsScope}
+            />
+          )}
+
           {/* Tabs — only "Articles" is active in Phase 1.5 */}
           <div className="flex items-center gap-1 mb-6 border-b border-slate-200 dark:border-slate-700">
             <button
@@ -1105,6 +1119,7 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
               {/* Phase 4F.1 — platform-aware card: a Shopify project shows a
                   compact Shopify status card; WordPress/neither/both show the
                   existing WordPress panel + index status unchanged. */}
+              <div id={PLATFORM_SETUP_ANCHOR}>
               <ContentHubPlatformCard projectId={projectId}>
                 {/* K3 — connect WordPress OR Shopify directly from the Content Hub,
                     reusing the existing self-contained panels (no duplicated
@@ -1128,13 +1143,14 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                   </div>
                 )}
               </ContentHubPlatformCard>
+              </div>
 
               {/* K4 — Search Console: connect, assign a property, reconnect on
                   reauth_required — all from the hub, reusing the self-contained panel
                   (no duplicated OAuth/token logic). connectOrigin="hub" returns the
                   OAuth flow here via the K4 callback cookie. GSC is an OPTIONAL
                   evidence source; it is never required for topic generation. */}
-              <div className="mt-4">
+              <div id={GSC_SETUP_ANCHOR} className="mt-4">
                 <GscPanel projectId={projectId} connectOrigin="hub" />
               </div>
             </>
