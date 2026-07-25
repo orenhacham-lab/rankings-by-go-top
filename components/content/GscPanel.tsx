@@ -20,12 +20,15 @@ import Badge from '@/components/ui/Badge'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import GscMetricsTable from '@/components/content/GscMetricsTable'
+import { AUTO_SYNC_MIN_INTERVAL_DAYS } from '@/lib/gsc/auto-sync'
+import { formatDateTime } from '@/lib/utils'
 
 type ConnStatus = 'connected' | 'reauth_required' | 'revoked' | 'error'
 interface SanitizedConnection { id: string; status: ConnStatus; grantedScope: string | null; lastErrorCode: string | null; updatedAt: string }
 interface AssignedProperty { siteUrl: string; permissionLevel: string | null; selectedAt: string }
 // The read-only metrics view (windows summary + table) lives in GscMetricsTable now.
-interface StatusResponse { ok: boolean; oauthConfigured: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null }
+// `windows` is still read here for Area A's last-sync / next-eligible derivation.
+interface StatusResponse { ok: boolean; oauthConfigured: boolean; connection: SanitizedConnection | null; property: AssignedProperty | null; windows?: Record<string, { finishedAt: string | null } | null> }
 
 interface PropertyView { siteUrl: string; permissionLevel: string; kind: 'domain' | 'url_prefix'; covers: boolean; assignable: boolean }
 
@@ -86,6 +89,21 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
   const connection = status?.connection ?? null
   const property = status?.property ?? null
   const connected = !!connection && connection.status !== 'revoked'
+
+  // Area A — the most recent successful sync across the stored windows, and the
+  // earliest moment the weekly auto-sync would pick this project up again.
+  // (Area L moved the metrics TABLE into GscMetricsTable; the panel still reads the
+  //  per-window finishedAt timestamps from /api/gsc/status for this derivation.)
+  const lastSyncedAt = useMemo(() => {
+    const times = Object.values(status?.windows ?? {})
+      .map((w) => (w?.finishedAt ? Date.parse(w.finishedAt) : NaN))
+      .filter((n) => Number.isFinite(n)) as number[]
+    return times.length ? new Date(Math.max(...times)).toISOString() : null
+  }, [status])
+  const nextEligibleSyncAt = useMemo(
+    () => (lastSyncedAt ? new Date(Date.parse(lastSyncedAt) + AUTO_SYNC_MIN_INTERVAL_DAYS * 24 * 60 * 60 * 1000).toISOString() : null),
+    [lastSyncedAt],
+  )
 
   async function handleConnect() {
     setConnecting(true); setMessage(null)
@@ -275,6 +293,18 @@ export default function GscPanel({ projectId, connectOrigin = 'project' }: { pro
                   </Button>
                 </div>
               </div>
+
+              {/* Area A — last successful sync + the derived next AUTOMATIC eligibility.
+                  The weekly auto-sync is a daily dispatcher, so the shown time is the
+                  EARLIEST the project becomes eligible (a lower bound), never a promise
+                  of an exact run time. The manual "Sync now" button stays available. */}
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <span>{t.lastSyncedAt}: {lastSyncedAt ? formatDateTime(lastSyncedAt) : t.neverSyncedShort}</span>
+                {nextEligibleSyncAt && (
+                  <span title={t.nextAutoSyncHint}>{t.nextAutoSyncFrom}: {formatDateTime(nextEligibleSyncAt)}</span>
+                )}
+              </div>
+              {nextEligibleSyncAt && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.nextAutoSyncHint}</p>}
             </div>
           )}
 

@@ -7,6 +7,10 @@
     {
       "path": "/api/content/automation/cron",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/gsc/sync/cron",
+      "schedule": "0 5 * * *"
     }
   ]
 }
