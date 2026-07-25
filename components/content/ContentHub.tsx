@@ -21,6 +21,7 @@ import WordPressConnectionPanel from '@/components/content/WordPressConnectionPa
 import ShopifyConnectionPanel from '@/components/content/ShopifyConnectionPanel'
 import ContentHubPlatformCard from '@/components/content/ContentHubPlatformCard'
 import InternalLinkIndexStatus from '@/components/content/InternalLinkIndexStatus'
+import GscPanel from '@/components/content/GscPanel'
 import ArticleBriefModal from '@/components/content/ArticleBriefModal'
 import TopicsList from '@/components/content/TopicsList'
 import NewTopicsLinkPlanPanel, { type NewTopic } from '@/components/content/NewTopicsLinkPlanPanel'
@@ -1127,6 +1128,15 @@ export default function ContentHub({ proFirst = false }: { proFirst?: boolean })
                   </div>
                 )}
               </ContentHubPlatformCard>
+
+              {/* K4 — Search Console: connect, assign a property, reconnect on
+                  reauth_required — all from the hub, reusing the self-contained panel
+                  (no duplicated OAuth/token logic). connectOrigin="hub" returns the
+                  OAuth flow here via the K4 callback cookie. GSC is an OPTIONAL
+                  evidence source; it is never required for topic generation. */}
+              <div className="mt-4">
+                <GscPanel projectId={projectId} connectOrigin="hub" />
+              </div>
             </>
           )}
         </>

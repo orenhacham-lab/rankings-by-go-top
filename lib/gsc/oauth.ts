@@ -11,6 +11,15 @@ const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke'
 
+/**
+ * K4 — short-lived, httpOnly cookie set at /api/gsc/connect ONLY when the flow was
+ * started from the Content Hub, read + cleared at /api/gsc/callback to decide the
+ * post-connection return path. The value is a fixed enum ('hub'), never a URL — the
+ * destination is server-built from the validated state's project id (no open redirect).
+ */
+export const GSC_RETURN_COOKIE = 'gsc_oauth_return'
+export const GSC_RETURN_COOKIE_TTL_S = 600 // matches the one-time state's 10-minute TTL
+
 export type GscOAuthErrorCode =
   | 'reauth_required'          // invalid_grant — refresh token revoked/expired
   | 'client_credentials_invalid'
