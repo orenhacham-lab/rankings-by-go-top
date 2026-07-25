@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { TrackingTarget, ScanResult, Project } from '@/lib/supabase/types'
+import { TrackingTarget, ScanResult } from '@/lib/supabase/types'
+import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import Header from '@/components/layout/Header'
 import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
 import { ActiveBadge, EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
@@ -17,37 +18,17 @@ export default function KeywordsPage() {
   const dict = getDashboardDictionary(language)
   const k = dict.keywordsPage
 
-  const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState('')
+  // Area D — the project comes from the GLOBAL active-project state (shared across
+  // sections/tabs/refresh), not a private per-page selector.
+  const { activeProjectId, projects, setActiveProject } = useActiveProject()
+  const selectedProjectId = activeProjectId ?? ''
   const [targets, setTargets] = useState<(TrackingTarget & { projects?: { name: string; id: string; clients?: { name: string } } })[]>([])
   const [latestResults, setLatestResults] = useState<Record<string, ScanResult>>({})
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [engineFilter, setEngineFilter] = useState('')
   const [positionSort, setPositionSort] = useState<'none' | 'asc' | 'desc'>('none')
   const [volumeSort, setVolumeSort] = useState<'none' | 'asc' | 'desc'>('none')
-
-  useEffect(() => {
-    async function loadProjects() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setLoading(false)
-        return
-      }
-
-      const { data: projectsData } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('name')
-
-      setProjects(projectsData || [])
-      setLoading(false)
-    }
-    loadProjects()
-  }, [])
 
   useEffect(() => {
     async function loadData() {
@@ -137,8 +118,6 @@ export default function KeywordsPage() {
     })
   }
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId)
-
   return (
     <div>
       <Header
@@ -156,7 +135,7 @@ export default function KeywordsPage() {
       <div className="flex gap-3 mb-4">
         <select
           value={selectedProjectId}
-          onChange={(e) => setSelectedProjectId(e.target.value)}
+          onChange={(e) => setActiveProject(e.target.value)}
           className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
           <option value="">{k.selectProjectPlaceholder}</option>
