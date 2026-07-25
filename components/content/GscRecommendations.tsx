@@ -103,7 +103,11 @@ export default function GscRecommendations({ projectId, onToast }: {
   const displayLabel = (r: Recommendation) => (r.isHomepage ? t.homepageLabel : (r.pageLabel ?? t.homepageLabel))
   const cardTitle = (r: Recommendation) => r.category === 'page_overlap' ? t.titles.page_overlap() : t.titles[r.category](displayLabel(r))
   const cardSummary = (r: Recommendation) => r.category === 'improve_ctr' ? t.summaries.improve_ctr(fmtPos(r.metrics.averagePosition), fmtCtr(r.metrics.ctr))
-    : r.category === 'improve_page' ? t.summaries.improve_page(fmtPos(r.metrics.averagePosition))
+    // Area N — an improve_page card only claims a CTR gap (with the real figure) when the
+    // opportunity actually emitted low_ctr_for_position; otherwise the neutral base copy.
+    : r.category === 'improve_page' ? (r.reasonKeys.includes('low_ctr_for_position')
+      ? t.summaries.improve_page_low_ctr(fmtPos(r.metrics.averagePosition), fmtCtr(r.metrics.ctr))
+      : t.summaries.improve_page(fmtPos(r.metrics.averagePosition)))
       : r.category === 'internal_links' ? t.summaries.internal_links(fmtPos(r.metrics.averagePosition))
         : t.summaries.page_overlap(r.involvedPages?.length ?? 0)
 

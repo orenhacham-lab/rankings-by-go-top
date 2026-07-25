@@ -1995,7 +1995,12 @@ export const dashboardHe = {
         },
         summaries: {
           improve_ctr: (pos: string, ctr: string) => `העמוד מדורג בממוצע במקום ${pos}, אך שיעור ההקלקה (${ctr}) נמוך מהמקובל למיקום זה.`,
-          improve_page: (pos: string) => `העמוד מקבל חשיפות ממספר ניסוחים של אותו צורך ומדורג סביב מקום ${pos}, אך כמעט אינו מקבל קליקים.`,
+          // Area N — neutral base copy: truthful whether or not a CTR gap exists (no
+          // unconditional "כמעט אינו מקבל קליקים" claim, no CTR figure).
+          improve_page: (pos: string) => `העמוד מקבל חשיפות ממספר ניסוחים של אותו צורך ומדורג סביב מקום ${pos}, ויש מקום לממש יותר מהביקוש הזה.`,
+          // Area N — gated variant shown ONLY when reasonKeys includes 'low_ctr_for_position';
+          // shows the real CTR, so the copy never contradicts the metrics.
+          improve_page_low_ctr: (pos: string, ctr: string) => `העמוד מקבל חשיפות ממספר ניסוחים של אותו צורך ומדורג סביב מקום ${pos}, אך שיעור ההקלקה (${ctr}) נמוך מהמקובל למיקום זה.`,
           internal_links: (pos: string) => `העמוד רלוונטי לצורך חיפוש שמדורג במקום ${pos} ויכול להתחזק מקישורים פנימיים.`,
           page_overlap: (n: number) => `החשיפות עבור קבוצת החיפוש מתחלקות בין ${n} עמודים. כדאי לבדוק אם אחד מהם צריך להיות העמוד המרכזי.`,
         },
