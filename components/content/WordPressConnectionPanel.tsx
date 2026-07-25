@@ -26,7 +26,7 @@ type SanitizedConnection = {
   last_tested_at: string | null
 }
 
-export default function WordPressConnectionPanel({ projectId, onChanged }: { projectId: string; onChanged?: () => void }) {
+export default function WordPressConnectionPanel({ projectId, onChanged, onConnected }: { projectId: string; onChanged?: () => void; onConnected?: () => void }) {
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
 
@@ -132,6 +132,10 @@ export default function WordPressConnectionPanel({ projectId, onChanged }: { pro
       if (data.test?.ok) {
         setMessage({ text: t.testSuccess, ok: true })
         setShowForm(false)
+        // K1 — a CLEAN connect success may drop the user into the Content Hub. The
+        // parent decides (the project page redirects; a Content-Hub mount stays put),
+        // so a disconnect (onChanged only) never triggers navigation.
+        onConnected?.()
       } else {
         setMessage({ text: data.test?.error || t.statusFailed, ok: false })
       }

@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Newspaper, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -20,8 +21,15 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function ContentSection({ projectId }: { projectId: string }) {
+  const router = useRouter()
   const { language } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection, [language])
+
+  // K1 — a clean connection success from the project page drops the user straight
+  // into the Content Hub for this project (validated internal path; no open redirect).
+  const goToContentHub = useCallback(() => {
+    router.push(`/content?projectId=${encodeURIComponent(projectId)}`)
+  }, [router, projectId])
 
   const [loading, setLoading] = useState(true)
   const [wpConnected, setWpConnected] = useState(false)
@@ -116,7 +124,7 @@ export default function ContentSection({ projectId }: { projectId: string }) {
       ) : choice === 'wordpress' ? (
         <div className="space-y-2">
           <button type="button" onClick={() => setChoice(null)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">← {t.back}</button>
-          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} onConnected={goToContentHub} />
         </div>
       ) : choice === 'shopify' ? (
         <div className="space-y-2">
