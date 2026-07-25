@@ -8,8 +8,9 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import ProjectForm from './ProjectForm'
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog'
 import { formatDate, getFrequencyLabel } from '@/lib/utils'
-import { toggleProjectActiveAction } from '@/app/actions/projects'
+import { toggleProjectActiveAction, deleteProjectAction } from '@/app/actions/projects'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import Link from 'next/link'
@@ -18,13 +19,15 @@ interface ProjectsTableProps {
   projects: (Project & { clients?: Client })[]
   clients: Client[]
   showClient?: boolean
+  onProjectsChange?: () => Promise<void>
 }
 
-export default function ProjectsTable({ projects, clients, showClient = true }: ProjectsTableProps) {
+export default function ProjectsTable({ projects, clients, showClient = true, onProjectsChange }: ProjectsTableProps) {
   const { language, isLoaded } = useDashboardLanguage()
   const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
 
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
@@ -125,6 +128,14 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
                   >
                     {project.is_active ? dict.projects.actions.deactivate : dict.projects.actions.activate}
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-red-600 dark:text-red-400"
+                    onClick={() => setDeletingProject(project)}
+                  >
+                    {dict.projects.actions.delete}
+                  </Button>
                 </div>
               </Td>
             </TableRow>
@@ -146,6 +157,17 @@ export default function ProjectsTable({ projects, clients, showClient = true }: 
             onCancel={() => setEditingProject(null)}
           />
         </Modal>
+      )}
+
+      {deletingProject && (
+        <DeleteConfirmDialog
+          open={!!deletingProject}
+          name={deletingProject.name}
+          labels={dict.projects.deleteDialog}
+          onConfirm={() => deleteProjectAction(deletingProject.id)}
+          onClose={() => setDeletingProject(null)}
+          onDeleted={async () => { if (onProjectsChange) await onProjectsChange() }}
+        />
       )}
     </>
   )

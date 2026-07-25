@@ -1397,6 +1397,15 @@ export const dashboardEn = {
       edit: 'Edit',
       activate: 'Activate',
       deactivate: 'Deactivate',
+      delete: 'Delete permanently',
+    },
+    deleteDialog: {
+      title: 'Delete project permanently',
+      body: 'This will permanently delete the project “{name}” and all of its data (keywords, scans, articles, and the project’s Search Console data). This cannot be undone.',
+      confirm: 'Delete permanently',
+      cancel: 'Cancel',
+      deleting: 'Deleting…',
+      error: 'Delete failed. Please try again.',
     },
     modal: {
       newTitle: 'New Project',
@@ -1519,6 +1528,15 @@ export const dashboardEn = {
       edit: 'Edit',
       activate: 'Activate',
       deactivate: 'Deactivate',
+      delete: 'Delete permanently',
+    },
+    deleteDialog: {
+      title: 'Delete client permanently',
+      body: 'This will permanently delete the client “{name}” and all of its projects and their data. This cannot be undone.',
+      confirm: 'Delete permanently',
+      cancel: 'Cancel',
+      deleting: 'Deleting…',
+      error: 'Delete failed. Please try again.',
     },
     modal: {
       newTitle: 'Add New Client',

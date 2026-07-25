@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { deleteOwnedRecord, type DeleteOwnedResult } from '@/lib/data/delete-owned-record'
 
 // Note: createClientAction is deprecated - client creation now uses API route /api/clients/create
 // Kept here for backwards compatibility if needed
@@ -70,4 +71,23 @@ export async function toggleClientActiveAction(id: string, isActive: boolean) {
     throw new Error('שגיאה בעדכון סטטוס הלקוח')
   }
   revalidatePath('/clients')
+}
+
+/**
+ * Area I — PERMANENT delete of a client. Ownership-enforced; the DB's ON DELETE
+ * CASCADE removes the client's projects and all their dependents. Reversible
+ * deactivation stays a separate action (toggleClientActiveAction). Returns a typed
+ * result (never throws) so the confirmation dialog can show a clear outcome.
+ */
+export async function deleteClientAction(id: string): Promise<DeleteOwnedResult | { ok: false; error: 'not_authenticated' }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+  const res = await deleteOwnedRecord(supabase, 'clients', id, user.id)
+  if (res.ok) {
+    // A client delete cascades to its projects → refresh both lists.
+    revalidatePath('/clients')
+    revalidatePath('/projects')
+  }
+  return res
 }

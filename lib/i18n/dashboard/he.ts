@@ -1404,6 +1404,15 @@ export const dashboardHe = {
       edit: 'עריכה',
       activate: 'הפעל',
       deactivate: 'השבת',
+      delete: 'מחיקה לצמיתות',
+    },
+    deleteDialog: {
+      title: 'מחיקת פרויקט לצמיתות',
+      body: 'פעולה זו תמחק לצמיתות את הפרויקט «{name}» ואת כל הנתונים המשויכים אליו (מילות מפתח, סריקות, מאמרים ונתוני Search Console של הפרויקט). לא ניתן לבטל את הפעולה.',
+      confirm: 'מחק לצמיתות',
+      cancel: 'ביטול',
+      deleting: 'מוחק…',
+      error: 'המחיקה נכשלה. נסו שוב.',
     },
     modal: {
       newTitle: 'פרויקט חדש',
@@ -1526,6 +1535,15 @@ export const dashboardHe = {
       edit: 'עריכה',
       activate: 'הפעל',
       deactivate: 'השבת',
+      delete: 'מחיקה לצמיתות',
+    },
+    deleteDialog: {
+      title: 'מחיקת לקוח לצמיתות',
+      body: 'פעולה זו תמחק לצמיתות את הלקוח «{name}» ואת כל הפרויקטים המשויכים אליו וכל הנתונים שלהם. לא ניתן לבטל את הפעולה.',
+      confirm: 'מחק לצמיתות',
+      cancel: 'ביטול',
+      deleting: 'מוחק…',
+      error: 'המחיקה נכשלה. נסו שוב.',
     },
     modal: {
       newTitle: 'הוספת לקוח חדש',

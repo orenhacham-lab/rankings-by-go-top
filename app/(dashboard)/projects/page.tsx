@@ -100,7 +100,7 @@ export default function ProjectsPage() {
           {dict.common.loading}
         </div>
       ) : (
-        <ProjectsTable projects={projects} clients={clients} />
+        <ProjectsTable projects={projects} clients={clients} onProjectsChange={loadData} />
       )}
 
       <Modal
