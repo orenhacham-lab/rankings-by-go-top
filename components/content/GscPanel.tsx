@@ -43,7 +43,7 @@ function fmtPos(n: number): string { return n.toFixed(1) }
 /** Decode a URL for display only (raw URL stays the href). Fails safe to the original. */
 function safeDecodeUrl(u: string): string { try { return decodeURI(u) } catch { return u } }
 
-export default function GscPanel({ projectId }: { projectId: string }) {
+export default function GscPanel({ projectId, connectOrigin = 'project' }: { projectId: string; connectOrigin?: 'hub' | 'project' }) {
   const { language } = useDashboardLanguage()
   const t: Dict = useMemo(() => getDashboardDictionary(language).projectDetail.contentSection.gsc, [language])
 
@@ -121,7 +121,9 @@ export default function GscPanel({ projectId }: { projectId: string }) {
   async function handleConnect() {
     setConnecting(true); setMessage(null)
     try {
-      const res = await fetch('/api/gsc/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) })
+      // K4 — `origin` tells the callback where to return: 'hub' → the Content Hub,
+      // otherwise the project page. It's a fixed enum, never a URL (no open redirect).
+      const res = await fetch('/api/gsc/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, origin: connectOrigin }) })
       const data = await res.json()
       if (res.ok && data.authUrl) { window.location.href = data.authUrl; return }
       setMessage({ text: errText(data.error), ok: false })

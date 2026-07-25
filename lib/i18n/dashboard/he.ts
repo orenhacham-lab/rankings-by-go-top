@@ -25,6 +25,27 @@ export const dashboardHe = {
     selectProjectMessage: 'בחרו פרויקט כדי לראות ולנהל את התוכן שלו.',
     noProjectsTitle: 'כדי להשתמש בכלי הזה, יש ליצור פרויקט ראשון',
     noProjectsCta: 'צור פרויקט',
+    // K5 — missing-connections onboarding. Platform card = publishing setup; Search
+    // Console card = OPTIONAL evidence (never claimed required; publishing never
+    // implied without a connected platform).
+    setup: {
+      title: 'השלמת הגדרות',
+      platformNoneTitle: 'חברו את פלטפורמת האתר',
+      platformNoneBody: 'כדי לפרסם מאמרים צריך לחבר WordPress או Shopify (פלטפורמה אחת בכל פעם). אפשר כבר עכשיו ליצור ולסקור נושאים — הפרסום ייפתח לאחר החיבור.',
+      platformFailedTitle: 'החיבור לפלטפורמה דורש טיפול',
+      platformFailedBody: 'החיבור הקיים אינו תקין ולכן הפרסום מושהה. בדקו את פרטי החיבור והתחברו מחדש.',
+      platformScopeBody: 'החנות חוברה אך חסרות הרשאות פרסום. התחברו מחדש כדי לאשר גישת כתיבה.',
+      fixConnection: 'תקנו את החיבור',
+      gscNoneTitle: 'חברו את Google Search Console (אופציונלי)',
+      gscNoneBody: 'חיבור Search Console אינו חובה. הוא מוסיף נתוני ביקוש וביצועים אמיתיים שמחזקים את המלצות התוכן — יצירת הנושאים עובדת גם בלעדיו.',
+      gscConnect: 'חבר Search Console',
+      gscNoPropertyTitle: 'בחרו נכס Search Console לפרויקט (אופציונלי)',
+      gscNoPropertyBody: 'חשבון Google מחובר. בחרו את הנכס שמכסה את כתובת הפרויקט כדי להשתמש בנתונים שלו. שלב אופציונלי.',
+      gscChooseProperty: 'בחרו נכס',
+      gscReauthTitle: 'חדשו את החיבור ל-Google Search Console',
+      gscReauthBody: 'הגישה ל-Search Console פגה. התחברו מחדש כדי להמשיך להשתמש בנתונים (אופציונלי — לא נדרש ליצירת נושאים).',
+      gscReconnect: 'התחברו מחדש',
+    },
     autoIdeas: {
       title: 'רעיונות אוטומטיים למאמרים',
       intro: 'מצאנו רעיונות למאמרים לפי נתוני האתר ומחקר ביטויים. אפשר לאשר נושאים עכשיו, ובשלב הבא להוסיף אותם לתזמון פרסום אוטומטי.',
@@ -1608,6 +1629,10 @@ export const dashboardHe = {
       conflictTitle: 'התנגשות הגדרות',
       conflictBody: 'לפרויקט זה יש גם חיבור WordPress וגם חיבור Shopify. פרויקט צריך להשתמש בפלטפורמה אחת. נתקו אחת מהן למטה כדי לפתור זאת. שום דבר לא נמחק אוטומטית.',
       platformAlreadyConnected: 'הפרויקט כבר משתמש בפלטפורמה אחרת. נתקו אותה תחילה כדי להחליף.',
+      // K2 — connected-state explainer + link to the Content Hub (no duplicate hub here).
+      connectedTitle: 'הפלטפורמה מחוברת — מרכז התוכן מוכן',
+      connectedBody: 'ממרכז התוכן ניתן ליצור נושאים, לעבור על רעיונות תוכן, לתזמן פרסום ולפרסם מאמרים.',
+      goToContentHub: 'מעבר למרכז התוכן',
       // Phase 4F.1 — Shopify connection panel.
       shopify: {
         title: 'חיבור Shopify',

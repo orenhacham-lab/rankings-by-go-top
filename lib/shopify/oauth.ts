@@ -44,6 +44,16 @@ export function projectReturnUrl(appUrl: string, projectId: string, params: Reco
 }
 
 /**
+ * K1 — server-built internal Content Hub path for a project. `projectId` comes
+ * from the server-validated, ownership-checked one-time OAuth state, so this is
+ * never an open redirect. Used on a CLEAN connection success to drop the user
+ * straight into the Content Hub for that project.
+ */
+export function contentHubReturnUrl(appUrl: string, projectId: string): string {
+  return `${appUrl.replace(/\/+$/, '')}/content?projectId=${encodeURIComponent(projectId)}`
+}
+
+/**
  * Build the Shopify authorize URL for an OFFLINE token (no grant_options[] =
  * per-user). Read-only scopes only. PURE.
  */
