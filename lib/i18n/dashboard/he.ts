@@ -1588,6 +1588,10 @@ export const dashboardHe = {
       conflictTitle: 'התנגשות הגדרות',
       conflictBody: 'לפרויקט זה יש גם חיבור WordPress וגם חיבור Shopify. פרויקט צריך להשתמש בפלטפורמה אחת. נתקו אחת מהן למטה כדי לפתור זאת. שום דבר לא נמחק אוטומטית.',
       platformAlreadyConnected: 'הפרויקט כבר משתמש בפלטפורמה אחרת. נתקו אותה תחילה כדי להחליף.',
+      // K2 — connected-state explainer + link to the Content Hub (no duplicate hub here).
+      connectedTitle: 'הפלטפורמה מחוברת — מרכז התוכן מוכן',
+      connectedBody: 'ממרכז התוכן ניתן ליצור נושאים, לעבור על רעיונות תוכן, לתזמן פרסום ולפרסם מאמרים.',
+      goToContentHub: 'מעבר למרכז התוכן',
       // Phase 4F.1 — Shopify connection panel.
       shopify: {
         title: 'חיבור Shopify',

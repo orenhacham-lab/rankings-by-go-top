@@ -1581,6 +1581,10 @@ export const dashboardEn = {
       conflictTitle: 'Configuration conflict',
       conflictBody: 'This project has both a WordPress and a Shopify connection. A project should use one platform. Disconnect one below to resolve this. Nothing is deleted automatically.',
       platformAlreadyConnected: 'This project already uses another platform. Disconnect it first to switch.',
+      // K2 — connected-state explainer + link to the Content Hub (no duplicate hub here).
+      connectedTitle: 'Platform connected — the Content Hub is ready',
+      connectedBody: 'From the Content Hub you can create topics, review content ideas, schedule publishing, and publish articles.',
+      goToContentHub: 'Go to the Content Hub',
       // Phase 4F.1 — Shopify connection panel.
       shopify: {
         title: 'Shopify connection',

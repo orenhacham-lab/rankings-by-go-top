@@ -76,6 +76,20 @@ export default function ContentSection({ projectId }: { projectId: string }) {
 
   const both = wpConnected && shopifyConnected
 
+  // K2 — when a platform is connected, explain what the Content Hub offers and link
+  // to it. This is a pointer to the hub, NOT a second Content Hub inside the project.
+  const connectedBanner = (
+    <Card className="hover:translate-y-0 border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-900/10">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <div className="font-semibold text-slate-800 dark:text-slate-100">{t.connectedTitle}</div>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{t.connectedBody}</p>
+        </div>
+        <Button size="sm" onClick={goToContentHub} className="shrink-0">{t.goToContentHub}</Button>
+      </div>
+    </Card>
+  )
+
   return (
     <section className="mb-6">
       <div className="flex items-center gap-2 mb-1">
@@ -118,9 +132,15 @@ export default function ContentSection({ projectId }: { projectId: string }) {
           <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
         </div>
       ) : wpConnected ? (
-        <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+        <div className="space-y-3">
+          {connectedBanner}
+          <WordPressConnectionPanel projectId={projectId} onChanged={refresh} />
+        </div>
       ) : shopifyConnected ? (
-        <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+        <div className="space-y-3">
+          {connectedBanner}
+          <ShopifyConnectionPanel projectId={projectId} onChanged={refresh} />
+        </div>
       ) : choice === 'wordpress' ? (
         <div className="space-y-2">
           <button type="button" onClick={() => setChoice(null)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">← {t.back}</button>
