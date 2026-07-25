@@ -16,7 +16,7 @@ import { normalizeShopDomain } from '@/lib/shopify/domain'
 import { SHOPIFY_API_VERSION, missingScopes } from '@/lib/shopify/constants'
 import { testShopifyConnection } from '@/lib/shopify/client'
 import {
-  getShopifyOAuthConfig, verifyShopifyHmac, exchangeCodeForToken, projectReturnUrl,
+  getShopifyOAuthConfig, verifyShopifyHmac, exchangeCodeForToken, projectReturnUrl, contentHubReturnUrl,
   verifyNonceCookie, OAUTH_NONCE_COOKIE, OAUTH_COOKIE_PATH,
 } from '@/lib/shopify/oauth'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
@@ -156,7 +156,10 @@ export async function GET(request: Request) {
     return toProject(st.project_id, { shopify: 'error', reason: 'save_failed' })
   }
 
-  return toProject(st.project_id, missing.length > 0
-    ? { shopify: 'warning', reason: 'missing_scopes' }
-    : { shopify: 'connected' })
+  // K1 — a WARNING (missing scopes) stays on the integration (project) screen so
+  // the owner can fix it; a CLEAN success drops straight into the Content Hub for
+  // this validated project. st.project_id is the server-validated, ownership-checked
+  // id from the one-time state (never client input) → no open redirect.
+  if (missing.length > 0) return toProject(st.project_id, { shopify: 'warning', reason: 'missing_scopes' })
+  return clearNonce(NextResponse.redirect(contentHubReturnUrl(appUrl, st.project_id)))
 }
