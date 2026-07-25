@@ -16,7 +16,9 @@ export async function POST(request: Request) {
   const auth = await authContentProject(body.projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
 
-  const loaded = await loadShopifyConnection(auth.admin, auth.project.id)
+  // test-connection is the ONLY caller allowed to load an inactive (untested/failed)
+  // connection — it exists to test/recover exactly those. Every other caller default-denies.
+  const loaded = await loadShopifyConnection(auth.admin, auth.project.id, { allowInactive: true })
   if ('error' in loaded) {
     const reason = loaded.status === 404 ? 'no_shopify_connection' : 'shopify_connection_error'
     return Response.json({ error: reason, reason }, { status: loaded.status === 404 ? 400 : loaded.status })

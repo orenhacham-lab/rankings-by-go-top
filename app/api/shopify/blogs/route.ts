@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
   const loaded = await loadShopifyConnection(auth.admin, auth.project.id)
   if ('error' in loaded) {
-    const reason = loaded.status === 404 ? 'no_shopify_connection' : 'shopify_connection_error'
+    const reason = loaded.status === 404 ? 'no_shopify_connection' : loaded.status === 409 ? 'shopify_connection_inactive' : 'shopify_connection_error'
     return Response.json({ error: reason, reason }, { status: loaded.status === 404 ? 400 : loaded.status })
   }
 

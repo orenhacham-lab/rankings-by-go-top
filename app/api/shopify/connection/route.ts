@@ -12,6 +12,7 @@
 
 import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-auth'
 import { sanitizeShopifyConnection, type ShopifyConnectionRow } from '@/lib/shopify/api-auth'
+import { clearShopifyArticlePointers } from '@/lib/shopify/shop-cleanup'
 import type { ShopifyEntityType } from '@/lib/shopify/types'
 
 const TYPES: ShopifyEntityType[] = ['product', 'collection', 'page', 'blog', 'article']
@@ -95,6 +96,16 @@ export async function DELETE(request: Request) {
   const projectId = new URL(request.url).searchParams.get('projectId')
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  // Residual-erasure fix: clear the article Shopify publish pointers (GIDs/URLs) BEFORE
+  // deleting the connection. Otherwise a disconnect removes the only shop→project mapping
+  // while leaving orphaned Shopify pointers behind. Content is preserved. If cleanup
+  // fails, do NOT delete the connection (keep the mapping so a retry can still resolve it).
+  const cleared = await clearShopifyArticlePointers(auth.admin, [auth.project.id])
+  if (!cleared.ok) {
+    console.error('[Shopify] Disconnect pointer cleanup failed:', cleared.error)
+    return Response.json({ error: 'Failed to disconnect' }, { status: 500 })
+  }
 
   const { error } = await auth.admin.from('shopify_connections').delete().eq('project_id', auth.project.id)
   if (error) {
