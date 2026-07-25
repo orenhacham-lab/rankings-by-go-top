@@ -19,6 +19,8 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { AUTO_SYNC_MIN_INTERVAL_DAYS } from '@/lib/gsc/auto-sync'
+import { formatDateTime } from '@/lib/utils'
 
 type WindowDays = 28 | 90
 const WINDOWS: WindowDays[] = [28, 90]
@@ -103,6 +105,19 @@ export default function GscPanel({ projectId }: { projectId: string }) {
   const connection = status?.connection ?? null
   const property = status?.property ?? null
   const connected = !!connection && connection.status !== 'revoked'
+
+  // Area A — the most recent successful sync across the stored windows, and the
+  // earliest moment the weekly auto-sync would pick this project up again.
+  const lastSyncedAt = useMemo(() => {
+    const times = Object.values(status?.windows ?? {})
+      .map((w) => (w?.finishedAt ? Date.parse(w.finishedAt) : NaN))
+      .filter((n) => Number.isFinite(n)) as number[]
+    return times.length ? new Date(Math.max(...times)).toISOString() : null
+  }, [status])
+  const nextEligibleSyncAt = useMemo(
+    () => (lastSyncedAt ? new Date(Date.parse(lastSyncedAt) + AUTO_SYNC_MIN_INTERVAL_DAYS * 24 * 60 * 60 * 1000).toISOString() : null),
+    [lastSyncedAt],
+  )
 
   const loadRows = useCallback(async () => {
     if (!property) return
@@ -304,6 +319,18 @@ export default function GscPanel({ projectId }: { projectId: string }) {
                   </Button>
                 </div>
               </div>
+
+              {/* Area A — last successful sync + the derived next AUTOMATIC eligibility.
+                  The weekly auto-sync is a daily dispatcher, so the shown time is the
+                  EARLIEST the project becomes eligible (a lower bound), never a promise
+                  of an exact run time. The manual "Sync now" button stays available. */}
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <span>{t.lastSyncedAt}: {lastSyncedAt ? formatDateTime(lastSyncedAt) : t.neverSyncedShort}</span>
+                {nextEligibleSyncAt && (
+                  <span title={t.nextAutoSyncHint}>{t.nextAutoSyncFrom}: {formatDateTime(nextEligibleSyncAt)}</span>
+                )}
+              </div>
+              {nextEligibleSyncAt && <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{t.nextAutoSyncHint}</p>}
             </div>
           )}
 

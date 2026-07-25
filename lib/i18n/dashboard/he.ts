@@ -1822,6 +1822,12 @@ export const dashboardHe = {
         colPosition: 'מיקום',
         colDistinctPages: 'עמודים שונים',
         emptyRows: 'אין שורות להצגה.',
+        // A — סנכרון שבועי אוטומטי: זמן הסנכרון המוצלח האחרון + המועד המוקדם ביותר
+        // שבו הפרויקט ייכלל שוב בסנכרון האוטומטי (חסם תחתון, לא הבטחה לשעה מדויקת).
+        lastSyncedAt: 'סנכרון אחרון',
+        neverSyncedShort: 'טרם סונכרן',
+        nextAutoSyncFrom: 'סנכרון אוטומטי הבא — לא לפני',
+        nextAutoSyncHint: 'הסנכרון האוטומטי רץ אחת לשבוע לכל פרויקט ונבדק מדי יום, כך שהסנכרון יתבצע בהזדמנות הראשונה מהמועד הזה ואילך. תמיד אפשר לסנכרן ידנית.',
         prevPage: 'הקודם',
         nextPage: 'הבא',
         pageOf: (from: number, to: number, total: number) => `${from}–${to} מתוך ${total}`,

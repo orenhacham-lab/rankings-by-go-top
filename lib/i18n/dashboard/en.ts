@@ -1811,6 +1811,12 @@ export const dashboardEn = {
         colPosition: 'Position',
         colDistinctPages: 'Distinct pages',
         emptyRows: 'No rows to display.',
+        // A — weekly auto-sync: last successful sync + the earliest moment the project
+        // becomes eligible again (a lower bound, never a promised exact run time).
+        lastSyncedAt: 'Last synced',
+        neverSyncedShort: 'Not synced yet',
+        nextAutoSyncFrom: 'Next automatic sync — no earlier than',
+        nextAutoSyncHint: 'The automatic sync runs once a week per project and is checked daily, so it will run at the first opportunity from that time onward. You can always sync manually.',
         prevPage: 'Previous',
         nextPage: 'Next',
         pageOf: (from: number, to: number, total: number) => `${from}–${to} of ${total}`,
