@@ -1986,7 +1986,12 @@ export const dashboardEn = {
         },
         summaries: {
           improve_ctr: (pos: string, ctr: string) => `The page ranks around position ${pos}, but its click-through (${ctr}) is lower than typical for that position.`,
-          improve_page: (pos: string) => `The page receives impressions from several phrasings of the same need and ranks around position ${pos}, but gets almost no clicks.`,
+          // Area N — neutral base copy: truthful whether or not a CTR gap exists (no
+          // unconditional "almost no clicks" claim, no CTR figure).
+          improve_page: (pos: string) => `The page receives impressions from several phrasings of the same need and ranks around position ${pos}, with room to capture more of that demand.`,
+          // Area N — gated variant shown ONLY when reasonKeys includes 'low_ctr_for_position';
+          // shows the real CTR, so the copy never contradicts the metrics.
+          improve_page_low_ctr: (pos: string, ctr: string) => `The page receives impressions from several phrasings of the same need and ranks around position ${pos}, but its click-through (${ctr}) is lower than typical for that position.`,
           internal_links: (pos: string) => `The page is relevant to a search need ranking at position ${pos} and could be strengthened with internal links.`,
           page_overlap: (n: number) => `Impressions for this search group are split across ${n} pages. It's worth checking whether one of them should be the primary page.`,
         },
