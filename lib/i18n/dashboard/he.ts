@@ -313,6 +313,12 @@ export const dashboardHe = {
       gscRaw: 'Search Console (גולמי)',
       comingSoon: 'בקרוב',
     },
+    // L2 — sub-tabs inside the Search Console area: the client recommendations vs the
+    // underlying Search Console data (the same read-only table shown on the project page).
+    gscSubTabs: {
+      recommendations: 'המלצות',
+      data: 'נתוני Search Console',
+    },
     stats: {
       total: 'כל המאמרים',
       draft: 'טיוטות',

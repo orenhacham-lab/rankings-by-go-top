@@ -18,12 +18,14 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 function main() {
   console.log('L1 — GSC pagination')
 
-  const panel = strip(read('components/content/GscPanel.tsx'))
+  // The metrics table (with the L1 pagination) lives in the shared GscMetricsTable
+  // after the L2 extraction; GscPanel delegates to it.
+  const panel = strip(read('components/content/GscMetricsTable.tsx'))
   check('page-size options are 10 / 25 / 50 / 100', /PAGE_SIZE_OPTIONS = \[10, 25, 50, 100\]/.test(panel))
   check('default page size is 10', /useState<number>\(10\)/.test(panel))
   check('fetch uses the dynamic pageSize (not a hardcoded 25)', /pageSize=\$\{pageSize\}/.test(panel) && !/pageSize=\$\{PAGE_SIZE\}/.test(panel))
   check('page resets to 0 when the size changes', /setPageSize\(Number\(e\.target\.value\)\); setPage\(0\)/.test(panel))
-  check('pageSize is a fetch dependency (re-loads on change)', /\[projectId, property, activeWindow, activeTab, page, pageSize\]/.test(panel))
+  check('pageSize is a fetch dependency (re-loads on change)', /activeTab, page, pageSize\]/.test(panel))
   check('the size selector renders all options', /PAGE_SIZE_OPTIONS\.map\(\(n\) => \(<option/.test(panel))
   // Sorting/filtering (window + view tabs) untouched — still present.
   check('window + view tabs preserved (sorting/filtering intact)', /setActiveWindow/.test(panel) && /setActiveTab/.test(panel))
