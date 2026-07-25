@@ -281,8 +281,14 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // Area G — preserve the signup-origin language through the email-confirmation
+        // hop. The durable source is auth metadata (seeds the dashboard provider); this
+        // just keeps the choice on the redirect URL so the param is never lost.
         const destination = next.startsWith('/') ? next : '/dashboard'
-        return NextResponse.redirect(`${origin}${destination}`)
+        const lang = searchParams.get('lang')
+        const dest = new URL(`${origin}${destination}`)
+        if (lang === 'en' || lang === 'he') dest.searchParams.set('lang', lang)
+        return NextResponse.redirect(dest.toString())
       }
     }
   }

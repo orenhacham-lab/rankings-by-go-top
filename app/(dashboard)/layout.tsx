@@ -1,7 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar'
 import { DashboardLocaleEffect } from '@/components/DashboardLocaleEffect'
 import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrapper'
-import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { DashboardLanguageProvider, normalizeLocale } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -26,8 +26,13 @@ export default async function DashboardLayout({
 
   const isAdmin = profile?.role === 'admin'
 
+  // Area G — seed the dashboard language from the signup-origin locale saved in auth
+  // metadata, so a fresh device's first login (empty localStorage) opens in the
+  // signup language. The switcher / a prior stored choice still overrides client-side.
+  const initialLocale = normalizeLocale(user.user_metadata?.locale)
+
   return (
-    <DashboardLanguageProvider>
+    <DashboardLanguageProvider initialLocale={initialLocale}>
       <div className="flex flex-col md:flex-row h-full min-h-screen dark:bg-slate-950">
         <DashboardLocaleEffect />
         <Sidebar isAdmin={isAdmin} />
