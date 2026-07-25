@@ -81,6 +81,13 @@ function main() {
   const content = strip(read('components/content/ContentHub.tsx'))
   check('Content Hub consumes the shared hook (not a raw searchParams read)', /useActiveProject\(/.test(content))
 
+  const reports = strip(read('app/(dashboard)/reports/page.tsx'))
+  check('reports consumes the shared hook + derives its id (no private setter)',
+    /useActiveProject\(/.test(reports) && /const selectedProjectId = activeProjectId/.test(reports) && !/setSelectedProjectId/.test(reports))
+  check('reports dropdown drives the SHARED state (setActiveProject)', /onChange=\{\(e\) => setActiveProject\(e\.target\.value\)\}/.test(reports))
+  check('reports retired the legacy project_id param (no searchParams project_id read)',
+    !/searchParams\.get\('project_id'\)/.test(reports) && !/useSearchParams/.test(reports))
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }
