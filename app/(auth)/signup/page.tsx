@@ -325,6 +325,11 @@ export function SignupForm() {
         // Even if auto-login fails, the account is created, so we can still redirect
       }
 
+      // Area C — immediate-session path: auto-create the account's default client from the
+      // signup data (server-authoritative; the endpoint ignores any body and derives every
+      // field from the session + metadata). Best-effort — never block signup on its outcome.
+      try { await fetch('/api/clients/ensure-default', { method: 'POST' }) } catch { /* non-blocking */ }
+
       setSuccess(t.success.accountCreated)
 
       // Send admin notification email

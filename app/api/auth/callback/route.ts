@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
+import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
@@ -280,6 +281,11 @@ export async function GET(request: NextRequest) {
             }
           }
         }
+
+        // Area C — email-confirmation path: auto-create the default client from signup
+        // metadata now that the session exists. Server-authoritative + best-effort; the
+        // `supabase` client above carries the just-established session (runs under RLS).
+        try { await ensureDefaultClient(supabase) } catch { /* non-blocking */ }
 
         const destination = next.startsWith('/') ? next : '/dashboard'
         return NextResponse.redirect(`${origin}${destination}`)
