@@ -47,10 +47,22 @@ function isNonPublicArea(pathname: string | null): boolean {
   )
 }
 
-export function PublicSiteWidgets() {
+/**
+ * The public contact widgets render ONLY for unauthenticated public visitors.
+ * An authenticated user never sees them — regardless of pathname — because
+ * public-ish routes (the home page `/`, the legal pages) are reachable while
+ * logged in. isAuthenticated is resolved server-side (see the root layout), so
+ * a logged-in user gets `null` from the first render — no client-side flash.
+ */
+export function shouldRenderPublicWidgets(isAuthenticated: boolean, pathname: string | null): boolean {
+  if (isAuthenticated) return false
+  return !isNonPublicArea(pathname)
+}
+
+export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const pathname = usePathname()
 
-  if (isNonPublicArea(pathname)) {
+  if (!shouldRenderPublicWidgets(isAuthenticated, pathname)) {
     return null
   }
 

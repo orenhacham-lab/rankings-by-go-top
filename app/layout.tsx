@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
+import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
   title: 'מעקב מיקומים בגוגל ונראות ב-AI - Rankings by Go Top',
@@ -33,11 +34,23 @@ export const metadata: Metadata = {
   authors: [{ name: 'Go Top' }],
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // J1 — resolve auth server-side so the public contact widgets never render for a
+  // logged-in user (no client-side flash). A transient auth failure defaults to the
+  // safe public behavior and never breaks the whole app.
+  let isAuthenticated = false
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    isAuthenticated = !!user
+  } catch {
+    isAuthenticated = false
+  }
+
   return (
     <html lang="he" dir="rtl" className="h-full" suppressHydrationWarning>
       <head>
@@ -137,7 +150,7 @@ export default function RootLayout({
         />
         <RootThemeProvider>
           {children}
-          <PublicSiteWidgets />
+          <PublicSiteWidgets isAuthenticated={isAuthenticated} />
         </RootThemeProvider>
       </body>
     </html>
