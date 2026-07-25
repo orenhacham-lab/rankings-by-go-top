@@ -287,6 +287,8 @@ export const dashboardHe = {
       alertHint: 'אפשר להריץ הרצה ידנית אחת, או לפתוח את פריט התור ולנסות שוב (יצירה/פרסום). לאחר מספר ניסיונות הפריט יסומן כנכשל וימתין לטיפול.',
       // Phase 4B.1 — persisted final-failure alerts.
       alertPublishFailedTitle: 'פרסום ל-WordPress נכשל',
+      // Area E — חסימה הדורשת טיפול (מושהה): יש לתקן את הסיבה ואז לנסות שוב.
+      alertBlockedTitle: 'הפרסום חסום — נדרש טיפול',
       alertAttempts: 'לאחר {n} ניסיונות',
       alertViewArticle: 'צפייה במאמר',
       alertRetryNow: 'נסה שוב',

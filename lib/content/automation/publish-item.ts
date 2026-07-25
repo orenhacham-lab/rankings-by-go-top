@@ -13,11 +13,52 @@ import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
-import { recordPublishFinalFailureAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
+import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-shopify'
 import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
+import type { WpCreateError } from '@/lib/content/wordpress-publish'
 
 type Admin = ReturnType<typeof createAdminClient>
+
+/** Context retained for alerting even if an unexpected error is thrown later. */
+interface PublishAlertContext { projectId: string; articleId: string | null; topicId: string | null; title: string | null; attempts: number }
+
+/**
+ * Area E — a DETERMINISTIC, action-required blocker (missing connection/scope,
+ * platform conflict, publish quality-gate failure, duplicate topic, missing
+ * source image, …). A retry cannot clear it, so the item is PAUSED (terminal,
+ * not re-picked by the runner) and an immediate deduped alert is raised so the
+ * owner can act. Best-effort alert; never throws.
+ */
+async function blockItem(admin: Admin, itemId: string, reason: string, ctx: PublishAlertContext): Promise<void> {
+  await finalizeItem(admin, itemId, 'paused', reason)
+  await recordPublishBlockedAlert(admin, {
+    projectId: ctx.projectId, poolItemId: itemId, articleId: ctx.articleId, topicId: ctx.topicId,
+    title: ctx.title, error: reason, attempts: ctx.attempts,
+  })
+}
+
+/**
+ * Classify a wpCreatePost media_upload_failed. 'deterministic' = the source image
+ * is missing/invalid or WordPress rejected the media with a client error (a retry
+ * won't help → pause + alert). 'transient' = a timeout / 429 / 5xx / unstructured
+ * network throw (retry may succeed → stays a bounded, retryable failure).
+ */
+export function classifyMediaFailure(created: WpCreateError): 'deterministic' | 'transient' {
+  const meta = created.wpErrorMeta
+  // No detail + no structured meta = the Supabase storage source object could not
+  // be downloaded (missing/invalid source image) — deterministic.
+  if (!created.detail && !meta) return 'deterministic'
+  if (meta) {
+    if (meta.timeout) return 'transient'
+    const s = meta.status
+    if (typeof s === 'number' && (s === 429 || s >= 500)) return 'transient'
+    // 4xx (auth/forbidden/unsupported-media/invalid) or a WP REST error code → deterministic.
+    return 'deterministic'
+  }
+  // detail present but no HTTP meta (non-WordPressClientError upload throw) → assume transient.
+  return 'transient'
+}
 
 export interface PublishItemResult {
   itemId: string
@@ -54,6 +95,8 @@ const ARTICLE_SELECT =
   'id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, status, featured_image_url, featured_image_storage_path, wp_post_id, wp_post_url'
 
 export async function publishPoolItem(admin: Admin, itemId: string): Promise<PublishItemResult> {
+  // Retained context so the terminal catch can still raise a proper deduped alert.
+  const ctx: PublishAlertContext = { projectId: '', articleId: null, topicId: null, title: null, attempts: 0 }
   try {
     const { data: itemData } = await admin
       .from('article_pool_items')
@@ -63,19 +106,21 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     const item = itemData as { id: string; project_id: string; topic_id: string | null; article_id: string | null; status: string; attempts: number } | null
     if (!item) return { itemId, status: 'failed', articleId: null, noop: 'item_not_found' }
     if (!item.article_id) return { itemId, status: item.status, articleId: null, noop: 'no_article' }
+    ctx.projectId = item.project_id; ctx.articleId = item.article_id; ctx.topicId = item.topic_id; ctx.attempts = item.attempts ?? 0
 
     // Phase 4F.2 — backend selection by the project's ACTIVE (connected) platform, via the
     // shared resolver. Platform is chosen by connection VALIDITY, not row existence: a
     // stale/failed/untested WordPress row never blocks a valid Shopify connection (the live
     // false-platform_conflict bug), and only TWO genuinely-connected platforms conflict.
     const active = await loadActivePlatform(admin, item.project_id)
+    // Area E — deterministic, action-required config blockers → paused + immediate alert.
     if (active.platform === 'conflict') {
-      await finalizeItem(admin, itemId, 'quality_check_failed', 'platform_conflict')
-      return { itemId, status: 'quality_check_failed', articleId: item.article_id, reason: 'platform_conflict' }
+      await blockItem(admin, itemId, 'platform_conflict', ctx)
+      return { itemId, status: 'paused', articleId: item.article_id, reason: 'platform_conflict' }
     }
     if (active.platform === 'none') {
-      await finalizeItem(admin, itemId, 'quality_check_failed', 'no_active_publishing_platform')
-      return { itemId, status: 'quality_check_failed', articleId: item.article_id, reason: 'no_active_publishing_platform' }
+      await blockItem(admin, itemId, 'no_active_publishing_platform', ctx)
+      return { itemId, status: 'paused', articleId: item.article_id, reason: 'no_active_publishing_platform' }
     }
     if (active.platform === 'shopify') {
       return await publishShopifyPoolItem(admin, item)
@@ -83,7 +128,8 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
 
     const { data: artData } = await admin.from('generated_articles').select(ARTICLE_SELECT).eq('id', item.article_id).maybeSingle()
     const article = artData as ArticleRow | null
-    if (!article) { await finalizeItem(admin, itemId, 'failed', 'article_missing'); return { itemId, status: 'failed', articleId: item.article_id, reason: 'article_missing' } }
+    if (!article) { await blockItem(admin, itemId, 'article_missing', ctx); return { itemId, status: 'paused', articleId: item.article_id, reason: 'article_missing' } }
+    ctx.title = article.title
 
     // (C/D) Recovery + already-published: the article already has a WP post →
     // reconcile status instead of creating a duplicate post.
@@ -112,12 +158,12 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       })
     }
 
-    // (E) Publish-time quality gate (structural backstop).
+    // (E) Publish-time quality gate (structural backstop). Deterministic → pause + alert.
     const gate = runQualityGate(article)
     if (!gate.ok) {
-      const reason = gate.failures.join(', ')
-      await finalizeItem(admin, itemId, 'quality_check_failed', reason)
-      return { itemId, status: 'quality_check_failed', articleId: article.id, reason }
+      const reason = `publish_quality_gate_failed: ${gate.failures.join(', ')}`
+      await blockItem(admin, itemId, reason, ctx)
+      return { itemId, status: 'paused', articleId: article.id, reason }
     }
 
     // (C) Duplicate topic: a different PUBLISHED article for this topic → block.
@@ -130,14 +176,14 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
         .neq('id', article.id)
         .limit(1)
         .maybeSingle()
-      if (dup) { await finalizeItem(admin, itemId, 'quality_check_failed', 'duplicate_topic_published'); return { itemId, status: 'quality_check_failed', articleId: article.id, reason: 'duplicate_topic_published' } }
+      if (dup) { await blockItem(admin, itemId, 'duplicate_topic_published', ctx); return { itemId, status: 'paused', articleId: article.id, reason: 'duplicate_topic_published' } }
     }
 
-    // (E) WordPress credentials must be present/valid.
+    // (E) WordPress credentials must be present/valid. Deterministic → pause + alert.
     const loaded = await loadWordPressCredentials(admin, item.project_id)
     if ('error' in loaded) {
-      await finalizeItem(admin, itemId, 'quality_check_failed', 'no_wordpress_connection')
-      return { itemId, status: 'quality_check_failed', articleId: article.id, reason: 'no_wordpress_connection' }
+      await blockItem(admin, itemId, 'no_wordpress_connection', ctx)
+      return { itemId, status: 'paused', articleId: article.id, reason: 'no_wordpress_connection' }
     }
 
     // Retry cap: a repeatedly-failing publish stops after AUTOMATION_MAX_ATTEMPTS
@@ -159,6 +205,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       .select('id')
       .maybeSingle()
     if (!claimed) return { itemId, status: item.status, articleId: article.id, noop: 'already_claimed' }
+    ctx.attempts = (item.attempts ?? 0) + 1
     await admin.from('generated_articles').update({ status: 'publishing', updated_at: nowIso() }).eq('id', article.id).in('status', ['draft', 'ready', 'generated', 'failed'])
 
     // Create the WordPress post (status=publish; never force; blocks on image
@@ -167,8 +214,17 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     if (!created.ok) {
       await admin.from('generated_articles').update({ status: 'draft', updated_at: nowIso() }).eq('id', article.id)
       if (created.kind === 'media_upload_failed') {
-        await finalizeItem(admin, itemId, 'quality_check_failed', 'wordpress_media_upload_failed')
-        return { itemId, status: 'quality_check_failed', articleId: article.id, reason: 'wordpress_media_upload_failed' }
+        // Area E — only a DETERMINISTIC media failure (missing source image /
+        // invalid media / WP 4xx) pauses + alerts; a transient timeout/429/5xx
+        // stays a bounded, retryable failure (final-failure alert at the cap).
+        if (classifyMediaFailure(created) === 'deterministic') {
+          await blockItem(admin, itemId, 'wordpress_media_upload_failed', ctx)
+          return { itemId, status: 'paused', articleId: article.id, reason: 'wordpress_media_upload_failed' }
+        }
+        const mediaReason = created.detail ? `wordpress_media_upload_failed: ${created.detail.slice(0, 120)}` : 'wordpress_media_upload_failed'
+        await finalizeItem(admin, itemId, 'failed', mediaReason)
+        await alertOnFinalFailure(mediaReason)
+        return { itemId, status: 'failed', articleId: article.id, reason: 'wordpress_media_upload_failed' }
       }
       const wpReason = created.detail ? `wordpress_post_failed: ${created.detail.slice(0, 120)}` : 'wordpress_post_failed'
       await finalizeItem(admin, itemId, 'failed', wpReason)
@@ -225,6 +281,14 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     const msg = e instanceof Error ? e.message.slice(0, 200) : 'unexpected_error'
     console.error('[automation-publish] unexpected', { itemId, message: msg })
     try { await finalizeItem(admin, itemId, 'failed', `unexpected: ${msg}`) } catch { /* ignore */ }
-    return { itemId, status: 'failed', articleId: null, reason: 'unexpected_error' }
+    // Area E — an unexpected crash must not silently set 'failed' with no signal.
+    // Raise a deduped final-failure alert from the retained context (best-effort).
+    if (ctx.projectId) {
+      await recordPublishFinalFailureAlert(admin, {
+        projectId: ctx.projectId, poolItemId: itemId, articleId: ctx.articleId, topicId: ctx.topicId,
+        title: ctx.title, error: `unexpected: ${msg}`, attempts: ctx.attempts,
+      })
+    }
+    return { itemId, status: 'failed', articleId: ctx.articleId, reason: 'unexpected_error' }
   }
 }

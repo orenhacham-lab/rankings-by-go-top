@@ -77,7 +77,7 @@ export default function AutomationSchedule({
   const [items, setItems] = useState<QueueItem[]>([])
   const [health, setHealth] = useState<{ needsAttention: boolean; overdue: boolean; failedCount: number; stuckCount: number; latestError: string | null } | null>(null)
   // Phase 4B.1 — persisted final-failure alerts (one per item, owner-scoped).
-  const [alerts, setAlerts] = useState<{ id: string; pool_item_id: string | null; article_id: string | null; title: string | null; error: string | null; attempts: number; created_at: string }[]>([])
+  const [alerts, setAlerts] = useState<{ id: string; pool_item_id: string | null; article_id: string | null; kind: string | null; title: string | null; error: string | null; attempts: number; created_at: string }[]>([])
   // Safety A — surface a clear config error when the alerts migration is missing
   // (never silently hide that failures aren't being recorded).
   const [alertsMigrationMissing, setAlertsMigrationMissing] = useState(false)
@@ -465,7 +465,7 @@ export default function AutomationSchedule({
             {alerts.map((a) => (
               <div key={a.id} className="rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/20 px-3 py-2">
                 <p className="text-xs font-semibold text-red-800 dark:text-red-300">
-                  {t.alertPublishFailedTitle}{a.title ? ` — ${a.title}` : ''}
+                  {(a.kind === 'publish_blocked' ? t.alertBlockedTitle : t.alertPublishFailedTitle)}{a.title ? ` — ${a.title}` : ''}
                 </p>
                 <p className="mt-0.5 text-[11px] text-red-700 dark:text-red-400 break-words">
                   {t.alertAttempts.replace('{n}', String(a.attempts))}{a.error ? ` · ${reasonLabel(a.error)}` : ''}

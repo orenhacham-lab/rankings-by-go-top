@@ -19,9 +19,20 @@ type Admin = ReturnType<typeof createAdminClient>
 const ALERTS = 'content_automation_alerts'
 const nowIso = () => new Date().toISOString()
 
+// Alert kinds. The `kind` column is intentionally unconstrained (no CHECK), so
+// adding kinds is migration-free. Each kind gets its OWN per-item dedupe suffix
+// so an item can carry at most one alert of each kind (they never collide on the
+// unique dedupe_key), and a later successful publish resolves all of them.
+export type ContentAlertKind = 'publish_failed_final' | 'publish_blocked'
+
 /** Deterministic dedupe key so one item's final publish failure = one alert. */
 export function publishFailureDedupeKey(poolItemId: string): string {
   return `${poolItemId}:publish_final_failure`
+}
+
+/** Deterministic dedupe key for an action-required publish BLOCK (paused item). */
+export function publishBlockedDedupeKey(poolItemId: string): string {
+  return `${poolItemId}:publish_blocked`
 }
 
 export interface RecordPublishFailureInput {
@@ -35,25 +46,23 @@ export interface RecordPublishFailureInput {
 }
 
 /**
- * Record (or reopen) the FINAL-failure alert for a queue item. Idempotent via
- * the unique dedupe_key: repeated cron runs / re-failures update the same row
- * instead of inserting a new one. Owner is resolved from the project. No-throw.
+ * Record (or reopen) a persisted, owner-scoped alert for a queue item. Idempotent
+ * via the unique dedupe_key: repeated cron runs / re-failures UPSERT (reopen) the
+ * same row instead of inserting a duplicate. Owner is resolved from the project.
+ * No-throw (best-effort; never affects the publish/generation outcome).
  */
-export async function recordPublishFinalFailureAlert(admin: Admin, input: RecordPublishFailureInput): Promise<void> {
+async function upsertAlert(admin: Admin, input: RecordPublishFailureInput, kind: ContentAlertKind, dedupeKey: string): Promise<void> {
   try {
     const { data: proj } = await admin.from('projects').select('user_id').eq('id', input.projectId).maybeSingle()
     const userId = (proj as { user_id?: string } | null)?.user_id
     if (!userId) return
-    const dedupeKey = publishFailureDedupeKey(input.poolItemId)
-    // UPSERT on dedupe_key: create when new; on conflict REOPEN (status→open) and
-    // refresh error/attempts so a re-failure after a manual retry is not a dup.
     await admin.from(ALERTS).upsert({
       user_id: userId,
       project_id: input.projectId,
       pool_item_id: input.poolItemId,
       article_id: input.articleId,
       topic_id: input.topicId,
-      kind: 'publish_failed_final',
+      kind,
       dedupe_key: dedupeKey,
       title: input.title,
       error: input.error.slice(0, 500),
@@ -63,8 +72,26 @@ export async function recordPublishFinalFailureAlert(admin: Admin, input: Record
       updated_at: nowIso(),
     }, { onConflict: 'dedupe_key' })
   } catch (e) {
-    console.warn('[content-alerts] record failed (non-fatal)', { poolItemId: input.poolItemId, message: e instanceof Error ? e.message : String(e) })
+    console.warn('[content-alerts] record failed (non-fatal)', { poolItemId: input.poolItemId, kind, message: e instanceof Error ? e.message : String(e) })
   }
+}
+
+/**
+ * Record (or reopen) the FINAL-failure alert after the last failed publish
+ * ATTEMPT (a retryable failure that exhausted the attempt cap).
+ */
+export async function recordPublishFinalFailureAlert(admin: Admin, input: RecordPublishFailureInput): Promise<void> {
+  await upsertAlert(admin, input, 'publish_failed_final', publishFailureDedupeKey(input.poolItemId))
+}
+
+/**
+ * Record (or reopen) an action-required BLOCK alert immediately — for a
+ * deterministic blocker that a retry cannot clear (missing connection/scope,
+ * platform conflict, publish quality-gate failure, duplicate topic, missing
+ * source image, …). The item is paused, not left to churn the retry budget.
+ */
+export async function recordPublishBlockedAlert(admin: Admin, input: RecordPublishFailureInput): Promise<void> {
+  await upsertAlert(admin, input, 'publish_blocked', publishBlockedDedupeKey(input.poolItemId))
 }
 
 /**

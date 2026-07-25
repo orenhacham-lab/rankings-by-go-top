@@ -287,6 +287,8 @@ export const dashboardEn = {
       alertHint: 'Run one manual pass, or open the queue item and retry (generate/publish). After a few attempts an item is marked failed and waits for a human.',
       // Phase 4B.1 — persisted final-failure alerts.
       alertPublishFailedTitle: 'WordPress publish failed',
+      // Area E — action-required block (paused): the owner must fix the cause, then retry.
+      alertBlockedTitle: 'Publishing blocked — action required',
       alertAttempts: 'after {n} attempts',
       alertViewArticle: 'View article',
       alertRetryNow: 'Retry now',

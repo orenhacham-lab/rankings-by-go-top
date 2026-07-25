@@ -132,13 +132,23 @@ async function pickForGenerate(admin: Admin, poolId: string): Promise<PickedItem
 }
 
 /** Earliest item eligible for PUBLISH: a 'generated' item, or a failed publish
- * (has an article) still under the retry cap. */
+ * (has an article) still under the retry cap.
+ *
+ * (Area E) The status filter MUST match publishPoolItem's atomic claim, which
+ * only flips 'generated' | 'failed' → 'publishing'. Selecting 'quality_check_failed'
+ * here would re-pick a publish-blocked item (e.g. no_wordpress_connection —
+ * unclaimable, article_id present) on every run: the claim/gate rejects it,
+ * the run never advances next_publish_at, and every READY item behind it (later
+ * position) is starved forever. Excluding it lets rows.find() skip past the
+ * blocked item to the next genuinely-publishable one. A quality_check_failed
+ * item stays visible via the pool health banner and is retried only through an
+ * explicit UI action (which resets it to 'queued'). */
 async function pickForPublish(admin: Admin, poolId: string): Promise<PickedItem | null> {
   const { data } = await admin
     .from('article_pool_items')
     .select('id, topic_id, status, article_id, attempts')
     .eq('pool_id', poolId)
-    .in('status', ['generated', 'failed', 'quality_check_failed'])
+    .in('status', ['generated', 'failed'])
     .order('position', { ascending: true })
     .limit(20)
   const rows = (data ?? []) as { id: string; topic_id: string | null; status: string; article_id: string | null; attempts: number }[]
@@ -175,91 +185,110 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
   let genBudget = MAX_GENERATIONS_PER_RUN
 
   for (const pool of poolRows) {
-    const intervalDays = resolveIntervalDays(pool.cadence, pool.interval_days)
-    const publishTime = pool.publish_time || DEFAULT_PUBLISH_TIME
-    const tz = pool.timezone || DEFAULT_TIMEZONE
-    const due = !!pool.next_publish_at && Date.parse(pool.next_publish_at) <= nowMs
+    // (Area E) Isolate every pool: an unexpected throw in this pool's own runner
+    // logic (countItems, pickFor*, schedule math, the pools update) must never
+    // abort the whole run and starve the pools after it. generatePoolItem /
+    // publishPoolItem already catch internally; this backstops everything else.
+    try {
+      const intervalDays = resolveIntervalDays(pool.cadence, pool.interval_days)
+      const publishTime = pool.publish_time || DEFAULT_PUBLISH_TIME
+      const tz = pool.timezone || DEFAULT_TIMEZONE
+      const due = !!pool.next_publish_at && Date.parse(pool.next_publish_at) <= nowMs
 
-    const diag: PoolDiagnostic = {
-      projectId: pool.project_id, poolId: pool.id, active: true, timezone: tz, nextPublishAt: pool.next_publish_at,
-      now: nowIso(), due, queuedCount: await countItems(admin, pool.id, 'queued'), generatedCount: await countItems(admin, pool.id, 'generated'),
-      selectedTopicId: null, selectedTopicTitle: null, generateAttempted: false, generateResult: null,
-      publishAttempted: false, publishResult: null, nextPublishAtAfter: pool.next_publish_at, note: null, error: null,
-    }
-
-    // ── DRY RUN: report what WOULD happen; mutate nothing. ──
-    if (dryRun) {
-      const pub = await pickForPublish(admin, pool.id)
-      const gen = await pickForGenerate(admin, pool.id)
-      if (due && pub) {
-        diag.selectedTopicId = pub.topicId; diag.selectedTopicTitle = pub.topicTitle
-        diag.note = 'would_publish_ready_or_retry_item'
-      } else if (gen) {
-        diag.selectedTopicId = gen.topicId; diag.selectedTopicTitle = gen.topicTitle
-        diag.note = due ? 'would_generate_then_publish' : 'would_generate_ahead'
-      } else {
-        diag.note = due ? 'due_but_no_eligible_items' : 'not_due_no_work'
+      const diag: PoolDiagnostic = {
+        projectId: pool.project_id, poolId: pool.id, active: true, timezone: tz, nextPublishAt: pool.next_publish_at,
+        now: nowIso(), due, queuedCount: await countItems(admin, pool.id, 'queued'), generatedCount: await countItems(admin, pool.id, 'generated'),
+        selectedTopicId: null, selectedTopicTitle: null, generateAttempted: false, generateResult: null,
+        publishAttempted: false, publishResult: null, nextPublishAtAfter: pool.next_publish_at, note: null, error: null,
       }
-      summary.diagnostics.push(diag)
-      continue
-    }
 
-    // (D) Generate-ahead FIRST so a DUE pool with only queued items can generate
-    // AND publish in the SAME run. Includes retrying a failed generation (no
-    // article yet) under the attempt cap.
-    if (genBudget > 0) {
-      const need = due ? Math.max(DESIRED_READY_AHEAD, 1) : DESIRED_READY_AHEAD
-      if (diag.generatedCount < need) {
-        const q = await pickForGenerate(admin, pool.id)
-        if (q) {
-          diag.selectedTopicId = q.topicId; diag.selectedTopicTitle = q.topicTitle; diag.generateAttempted = true
-          // Phase 3G.2 — scheduled generation also auto-inserts the topic's APPROVED
-          // internal links into the draft (only user-approved links are ever inserted).
-          const res = await generatePoolItem(admin, q.id, { allowRetry: true, autoApplyInternalLinks: true })
-          diag.generateResult = res.status + (res.reason ? ` (${res.reason})` : '') + (res.noop ? ` [${res.noop}]` : '')
-          if (res.noop !== 'already_claimed' && res.noop !== 'max_attempts') genBudget--
-          if (res.status === 'generated') { summary.generated++; diag.generatedCount++ }
-          else if (res.status === 'quality_check_failed' || res.status === 'failed') { summary.failures++; diag.error = res.reason ?? res.status }
-          summary.details.push(`pool ${pool.id}: generate ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
-        }
-      }
-    }
-
-    // (E) Publish the earliest READY (or retryable failed-publish) item if due — ≤1 per pool per run.
-    if (due) {
-      const gen = await pickForPublish(admin, pool.id)
-      if (gen) {
-        diag.publishAttempted = true
-        const res = await publishPoolItem(admin, gen.id)
-        diag.publishResult = res.status + (res.reason ? ` (${res.reason})` : '')
-        if (res.status === 'published') {
-          summary.published++
-          // (F) Advance next slot only on a successful publish.
-          const days = Array.isArray(pool.publish_days) ? pool.publish_days : []
-          const nextIso = days.length
-            ? nextPublishAtWeekdays(publishTime, tz, days, nowMs)
-            : advanceNextPublishAt(pool.next_publish_at!, tz, publishTime, intervalDays, nowMs)
-          await admin.from('article_pools').update({ next_publish_at: nextIso, updated_at: nowIso() }).eq('id', pool.id)
-          diag.nextPublishAtAfter = nextIso
-          summary.details.push(`pool ${pool.id}: published ${res.articleId ?? '?'} → next ${nextIso}`)
+      // ── DRY RUN: report what WOULD happen; mutate nothing. ──
+      if (dryRun) {
+        const pub = await pickForPublish(admin, pool.id)
+        const gen = await pickForGenerate(admin, pool.id)
+        if (due && pub) {
+          diag.selectedTopicId = pub.topicId; diag.selectedTopicTitle = pub.topicTitle
+          diag.note = 'would_publish_ready_or_retry_item'
+        } else if (gen) {
+          diag.selectedTopicId = gen.topicId; diag.selectedTopicTitle = gen.topicTitle
+          diag.note = due ? 'would_generate_then_publish' : 'would_generate_ahead'
         } else {
-          // (E/H) Do NOT advance; leave failed/quality_check_failed for manual retry.
-          summary.failures++; diag.error = res.reason ?? res.status
-          summary.details.push(`pool ${pool.id}: publish ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
+          diag.note = due ? 'due_but_no_eligible_items' : 'not_due_no_work'
         }
-      } else {
-        // Due but nothing generated (e.g. no queued items or generation failed).
-        summary.skipped++
-        diag.note = diag.queuedCount === 0 ? 'due_but_no_queued_items' : 'due_but_generation_did_not_produce_item'
-        summary.details.push(`pool ${pool.id}: due, no generated item ready`)
+        summary.diagnostics.push(diag)
+        continue
       }
-    }
 
-    console.log('[automation-runner] pool', {
-      projectId: diag.projectId, poolId: diag.poolId, due: diag.due, queued: diag.queuedCount, generated: diag.generatedCount,
-      generateResult: diag.generateResult, publishResult: diag.publishResult, note: diag.note, error: diag.error,
-    })
-    summary.diagnostics.push(diag)
+      // (D) Generate-ahead FIRST so a DUE pool with only queued items can generate
+      // AND publish in the SAME run. Includes retrying a failed generation (no
+      // article yet) under the attempt cap.
+      if (genBudget > 0) {
+        const need = due ? Math.max(DESIRED_READY_AHEAD, 1) : DESIRED_READY_AHEAD
+        if (diag.generatedCount < need) {
+          const q = await pickForGenerate(admin, pool.id)
+          if (q) {
+            diag.selectedTopicId = q.topicId; diag.selectedTopicTitle = q.topicTitle; diag.generateAttempted = true
+            // Phase 3G.2 — scheduled generation also auto-inserts the topic's APPROVED
+            // internal links into the draft (only user-approved links are ever inserted).
+            const res = await generatePoolItem(admin, q.id, { allowRetry: true, autoApplyInternalLinks: true })
+            diag.generateResult = res.status + (res.reason ? ` (${res.reason})` : '') + (res.noop ? ` [${res.noop}]` : '')
+            if (res.noop !== 'already_claimed' && res.noop !== 'max_attempts') genBudget--
+            if (res.status === 'generated') { summary.generated++; diag.generatedCount++ }
+            else if (res.status === 'quality_check_failed' || res.status === 'failed') { summary.failures++; diag.error = res.reason ?? res.status }
+            summary.details.push(`pool ${pool.id}: generate ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
+          }
+        }
+      }
+
+      // (E) Publish the earliest READY (or retryable failed-publish) item if due — ≤1 per pool per run.
+      if (due) {
+        const gen = await pickForPublish(admin, pool.id)
+        if (gen) {
+          diag.publishAttempted = true
+          const res = await publishPoolItem(admin, gen.id)
+          diag.publishResult = res.status + (res.reason ? ` (${res.reason})` : '')
+          if (res.status === 'published') {
+            summary.published++
+            // (F) Advance next slot only on a successful publish.
+            const days = Array.isArray(pool.publish_days) ? pool.publish_days : []
+            const nextIso = days.length
+              ? nextPublishAtWeekdays(publishTime, tz, days, nowMs)
+              : advanceNextPublishAt(pool.next_publish_at!, tz, publishTime, intervalDays, nowMs)
+            await admin.from('article_pools').update({ next_publish_at: nextIso, updated_at: nowIso() }).eq('id', pool.id)
+            diag.nextPublishAtAfter = nextIso
+            summary.details.push(`pool ${pool.id}: published ${res.articleId ?? '?'} → next ${nextIso}`)
+          } else {
+            // (E/H) Do NOT advance; leave failed/quality_check_failed for manual retry.
+            summary.failures++; diag.error = res.reason ?? res.status
+            summary.details.push(`pool ${pool.id}: publish ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
+          }
+        } else {
+          // Due but nothing generated (e.g. no queued items or generation failed).
+          summary.skipped++
+          diag.note = diag.queuedCount === 0 ? 'due_but_no_queued_items' : 'due_but_generation_did_not_produce_item'
+          summary.details.push(`pool ${pool.id}: due, no generated item ready`)
+        }
+      }
+
+      console.log('[automation-runner] pool', {
+        projectId: diag.projectId, poolId: diag.poolId, due: diag.due, queued: diag.queuedCount, generated: diag.generatedCount,
+        generateResult: diag.generateResult, publishResult: diag.publishResult, note: diag.note, error: diag.error,
+      })
+      summary.diagnostics.push(diag)
+    } catch (e) {
+      // One pool's failure is isolated: record it and move on to the next pool.
+      const msg = e instanceof Error ? e.message.slice(0, 200) : 'pool_run_error'
+      console.error('[automation-runner] pool run failed', { projectId: pool.project_id, poolId: pool.id, message: msg })
+      summary.failures++
+      summary.details.push(`pool ${pool.id}: run error (${msg})`)
+      summary.diagnostics.push({
+        projectId: pool.project_id, poolId: pool.id, active: true, timezone: pool.timezone || DEFAULT_TIMEZONE,
+        nextPublishAt: pool.next_publish_at, now: nowIso(), due: !!pool.next_publish_at && Date.parse(pool.next_publish_at) <= nowMs,
+        queuedCount: 0, generatedCount: 0, selectedTopicId: null, selectedTopicTitle: null,
+        generateAttempted: false, generateResult: null, publishAttempted: false, publishResult: null,
+        nextPublishAtAfter: pool.next_publish_at, note: 'pool_run_error', error: msg,
+      })
+    }
   }
 
   summary.durationMs = Date.now() - started
