@@ -35,7 +35,7 @@ import { GENERIC_TOKENS } from './opportunity'
 import { normalizePhrase } from './keyword-guard'
 import { normalizeText } from './topic-idea-store'
 import { distinctiveTokensOf, topicSignature, isHighConfidenceDuplicate, type TopicSignature } from './semantic-dup'
-import { containsExternalBusiness, type BrandSafety } from './brand-safety'
+import { hasNamedExternalBusiness, type BrandSafety } from './brand-safety'
 import type { OpportunityBrief } from './opportunity-brief'
 import type { PolishedTopic } from './brief-synthesis'
 import { projectContextBlock, type ProjectContext } from './prompt-guidance'
@@ -204,7 +204,21 @@ export function buildSeedInventory(params: SeedInventoryParams): SeedInventory {
     const toks = distinctiveTokensOf(phrase)
     if (toks.length < 2) { exclude(raw.source, 'malformed_generic'); continue }
     if (toks.every((t) => GENERIC_TOKENS.has(t) || params.attributeTokens.has(t))) { exclude(raw.source, 'modifier_only'); continue }
-    if (containsExternalBusiness(phrase, params.brandSafety)) { exclude(raw.source, 'competitor_branded'); continue }
+    // STRICT named-business detection (hasNamedExternalBusiness), NOT the broad
+    // classifyKeywordEntity/containsExternalBusiness shape. The broad classifier flags any
+    // "[own type token] + [any token not already in the project's vocabulary]" phrase — which
+    // is the definition of a NEW topic opportunity, so it excluded essentially every
+    // legitimate long-tail seed for a catalogue project whose entity names repeat type words
+    // (a florist: 105 of 354 raw seeds, leaving 3 eligible against a threshold of 12). It is
+    // also FALSE-NEGATIVE on real competitors: an own-brand-prefixed name ("<own brand> בע\"מ")
+    // returns 'own_brand', and a branded phrase with no project type token ("Bloom Ltd")
+    // returns 'generic_query' — both kept. brand-safety.ts documents the broad classifier as
+    // "catastrophically false-positive" and already provides this strict variant, which
+    // requires a real proper-name signal: an explicit business/legal suffix, or a
+    // phrase-level single-edit impersonation of an owned name (descriptor/own-vocab exempt).
+    // Precision AND recall both improve. The exclusion reason string is unchanged so
+    // before/after diagnostics stay directly comparable.
+    if (hasNamedExternalBusiness(phrase, params.brandSafety).hit) { exclude(raw.source, 'competitor_branded'); continue }
 
     // Exact owners — idea-status blocks counted for diagnostics (guard rule unchanged).
     if (params.isExactContentKeyword(phrase)) { bumpIdeaStatus(phrase); exclude(raw.source, 'exact_existing_content_keyword'); continue }
