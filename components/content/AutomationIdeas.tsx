@@ -15,6 +15,8 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { partitionByCheckedLinks, evaluateLinkSave, buildQueueTopics, type BulkSaveTopicResult } from '@/lib/content/automation/one-click-queue'
+import { groupRejectionReasons, shouldShowPendingAction, queueDepth, type QueueDepth, type RunReasonKey } from '@/lib/content/run-summary'
+import { resolveIntervalDays } from '@/lib/content/automation/schedule'
 
 type Source = 'keyword' | 'project_data' | 'keyword_research_url' | 'site_scan' | 'hybrid'
 type ProviderStatus = { source: Source; ok: boolean; count: number; reason?: string }
@@ -175,7 +177,7 @@ export default function AutomationIdeas({
   const PAGE_STEP = 5
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
-  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary; operatorRunDiag?: OperatorRunDiag } | null>(null)
+  const [meta, setMeta] = useState<{ skippedDuplicates: number; finalCount: number; reason?: string; keywordResearchFailed?: boolean; newlyAdded: number; funnel?: { generated: number; corpusDuplicates: number; qualityFiltered: number; engineFiltered?: number; keywordExists: number; titleExists: number; coveredByExisting: number; hiddenOnLoad: number; rejectedByReason?: Record<string, number> }; keywordMatches?: KeywordMatchEvidence[]; providers?: ProviderStatus[]; scanSources?: ScanSources; gscRunSummary?: GscRunSummary; operatorRunDiag?: OperatorRunDiag } | null>(null)
   // Phase 3F.3 — persisted-ideas state: loaded on mount so ideas survive refresh.
   const [initialLoaded, setInitialLoaded] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -194,6 +196,29 @@ export default function AutomationIdeas({
     })
   }
   const selectedLinksFor = (s: Suggestion) => s.suggestedInternalLinks.filter((l) => isLinkChecked(s, l.url))
+
+  // Queue depth is derived from the project's OWN pool cadence, never an assumed rate.
+  // The pool row is not otherwise held by this component (ensurePool() fetches it inside an
+  // action handler), so it is read once on mount. Best-effort: a failure leaves `queue` null
+  // and the queue line is simply not rendered.
+  const [queue, setQueue] = useState<QueueDepth | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    setQueue(null)
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`)
+        if (!res.ok) return
+        const d = await res.json().catch(() => ({}))
+        if (cancelled) return
+        const pool = d?.pool
+          ? { isActive: !!d.pool.isActive, intervalDays: resolveIntervalDays(d.pool.cadence, d.pool.intervalDays) }
+          : null
+        setQueue(queueDepth(Number(d?.readyCount ?? 0), pool))
+      } catch { /* ignore — queue line stays hidden */ }
+    })()
+    return () => { cancelled = true }
+  }, [projectId])
 
   // Load the project's previously-saved PENDING ideas so they appear without the
   // user clicking generate again (survives page refresh). Best-effort/read-only.
@@ -989,15 +1014,62 @@ export default function AutomationIdeas({
           נוצרו" is itself the answer: the blocker is the generator stage, not
           the filters). The old `generated > 0` gate hid the line in exactly
           that case. */}
-      {meta?.funnel && meta.newlyAdded === 0 && !loading && (
+      {meta?.funnel && meta.newlyAdded === 0 && !loading && (() => {
+        // The engine's OWN reason histogram, grouped for customers. The previous line showed
+        // engineFiltered (a subtraction) beside route-level counters that are structurally 0
+        // whenever the engine did the rejecting — so a correct run on a saturated project
+        // read exactly like a broken pipeline. Falls back to the old line when a run carries
+        // no histogram (e.g. an older cached response), so nothing regresses to blank.
+        const groups = groupRejectionReasons(meta.funnel.rejectedByReason)
+        if (groups.length === 0) {
+          return (
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
+              {t.funnelLine
+                .replace('{g}', String(meta.funnel.generated))
+                .replace('{e}', String(meta.funnel.engineFiltered ?? 0))
+                .replace('{d}', String(meta.funnel.corpusDuplicates))
+                .replace('{q}', String(meta.funnel.qualityFiltered))
+                .replace('{k}', String(meta.funnel.keywordExists + meta.funnel.titleExists))
+                .replace('{c}', String(meta.funnel.coveredByExisting))}
+            </p>
+          )
+        }
+        const label: Record<RunReasonKey, string> = {
+          covered: t.runReasonCovered, pending: t.runReasonPending, same_run: t.runReasonSameRun,
+          title_keyword: t.runReasonTitleKeyword, intent_keyword: t.runReasonIntentKeyword,
+          keyword_phrase: t.runReasonKeywordPhrase, other: t.runReasonOther,
+        }
+        return (
+          <div className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
+            <p>
+              {t.runSummaryHeading
+                .replace('{g}', String(meta.funnel.generated))
+                .replace('{e}', String(meta.funnel.engineFiltered ?? 0))}
+            </p>
+            <ul className="mt-0.5 space-y-0.5">
+              {groups.map((g) => (
+                <li key={g.key}>• {label[g.key]} — {g.count}</li>
+              ))}
+            </ul>
+            {shouldShowPendingAction(groups) && <p className="mt-1">{t.runSummaryAction}</p>}
+          </div>
+        )
+      })()}
+      {/* Queue depth in the customer's OWN cadence. Hidden until the pool read resolves. */}
+      {queue && !loading && (
         <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-2">
-          {t.funnelLine
-            .replace('{g}', String(meta.funnel.generated))
-            .replace('{e}', String(meta.funnel.engineFiltered ?? 0))
-            .replace('{d}', String(meta.funnel.corpusDuplicates))
-            .replace('{q}', String(meta.funnel.qualityFiltered))
-            .replace('{k}', String(meta.funnel.keywordExists + meta.funnel.titleExists))
-            .replace('{c}', String(meta.funnel.coveredByExisting))}
+          {(queue.kind === 'healthy' ? t.queueHealthy
+            : queue.kind === 'healthy_days' ? t.queueHealthyDays
+            : queue.kind === 'thinning' ? t.queueThinning
+            : queue.kind === 'thinning_days' ? t.queueThinningDays
+            : queue.kind === 'empty' ? t.queueEmpty
+            : queue.kind === 'no_pool' ? t.queueNoPool
+            : queue.kind === 'no_pool_empty' ? t.queueNoPoolEmpty
+            : queue.kind === 'paused' ? t.queuePaused
+            : t.queuePausedEmpty)
+            .replace('{n}', String(queue.readyCount))
+            .replace('{w}', String(queue.weeks))
+            .replace('{d}', String(queue.days))}
         </p>
       )}
       {/* Phase 3I.6 — EXACT match evidence for a zero-new run blocked on existing

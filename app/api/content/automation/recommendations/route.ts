@@ -625,7 +625,7 @@ export async function POST(request: Request) {
         reason,
         // E — customer funnel ALWAYS carries engineFiltered so "generated N / 0
         // rejections" is impossible when the engine removed candidates in-generator.
-        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: conflictIds.length },
+        funnel: { generated: result.meta.generated, corpusDuplicates: result.meta.skippedDuplicates, qualityFiltered: result.meta.qualityFilteredCount ?? 0, engineFiltered, keywordExists: filteredPrimaryKeywordExists, titleExists: filteredTitleExists, coveredByExisting: filteredCoveredByContent, hiddenOnLoad: conflictIds.length, rejectedByReason: engineRejectedByReason },
         debug: buildDebug({ revalidatedHidden: conflictIds.length }),
       },
     })

@@ -171,6 +171,29 @@ export const dashboardHe = {
       allDuplicates: 'כל הרעיונות שנמצאו כבר קיימים או דומים מדי.',
       tryOther: 'לא נמצאו רעיונות. נסו מקור אחר או מילת מפתח רחבה יותר.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
+      // Run summary — customer-facing rejection reasons. Internal engine reason strings are
+      // NEVER rendered; each maps to a group label here, and an unmapped reason degrades to
+      // runReasonOther so a new engine reason can never leak a raw identifier to a customer.
+      runReasonCovered: 'כבר מכוסה בתוכן או בעמודים הקיימים שלכם',
+      runReasonPending: 'חופף לנושאים שממתינים לאישור',
+      runReasonSameRun: 'חופף לרעיון אחר מאותה הרצה',
+      runReasonTitleKeyword: 'הכותרת ומילת המפתח לא תאמו',
+      runReasonIntentKeyword: 'כוונת החיפוש לא תאמה את מילת המפתח',
+      runReasonKeywordPhrase: 'מילת המפתח לא הייתה ביטוי חיפוש תקין',
+      runReasonOther: 'סיבות איכות אחרות',
+      runSummaryHeading: 'מתוך {g} רעיונות שנוצרו, {e} לא עברו את בדיקות האיכות:',
+      runSummaryAction: 'אשרו או הסירו נושאים שממתינים לאישור כדי לפנות מקום לרעיונות חדשים.',
+      // Queue depth — weeks are derived from the pool's OWN cadence/interval_days, never an
+      // assumed rate. Below ~2 weeks the copy switches to days.
+      queueHealthy: 'יש לכם {n} נושאים מוכנים — כ-{w} שבועות של תוכן בקצב הפרסום שלכם.',
+      queueHealthyDays: 'יש לכם {n} נושאים מוכנים — כ-{d} ימים של תוכן בקצב הפרסום שלכם.',
+      queueThinning: 'נותרו {n} נושאים — כ-{w} שבועות בקצב הנוכחי. הפקת נושאים חדשים היא חלק מהשגרה וזמינה בכל רגע.',
+      queueThinningDays: 'נותרו {n} נושאים — כ-{d} ימים בקצב הנוכחי. הפקת נושאים חדשים היא חלק מהשגרה וזמינה בכל רגע.',
+      queueEmpty: 'אין נושאים מוכנים כרגע. הפיקו נושאים חדשים, או אשרו נושאים שממתינים לאישור.',
+      queueNoPool: 'יש לכם {n} נושאים מוכנים. הוסיפו אותם לתור הפרסום כדי להתחיל לפרסם.',
+      queueNoPoolEmpty: 'עדיין אין נושאים מוכנים. הפיקו רעיונות חדשים כדי להתחיל.',
+      queuePaused: 'יש לכם {n} נושאים מוכנים. הפרסום האוטומטי מושהה.',
+      queuePausedEmpty: 'אין נושאים מוכנים כרגע, והפרסום האוטומטי מושהה. הפיקו נושאים חדשים או אשרו נושאים שממתינים לאישור.',
       funnelLine: 'פירוט הריצה: {g} רעיונות נוצרו · {e} לא עברו בדיקות איכות ורלוונטיות · {d} כפולים לנושאים קיימים · {q} סוננו באיכות · {k} עם כותרת/מילת מפתח שכבר קיימת · {c} מכוסים בתוכן קיים באתר',
       // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
       kwMatchTitle: 'אבחון: מה בדיוק חסם כל רעיון ({n} דוגמאות)',

@@ -173,6 +173,29 @@ export const dashboardEn = {
       allDuplicates: 'All the ideas we found already exist or are too similar.',
       tryOther: 'No ideas found. Try another source or a broader keyword.',
       // Phase 3I.3 — the exact funnel of the last run (counts only).
+      // Run summary — customer-facing rejection reasons. Internal engine reason strings are
+      // NEVER rendered; each maps to a group label here, and an unmapped reason degrades to
+      // runReasonOther so a new engine reason can never leak a raw identifier to a customer.
+      runReasonCovered: 'Already covered by your existing content or pages',
+      runReasonPending: 'Overlaps topics waiting for approval',
+      runReasonSameRun: 'Overlaps another idea from the same run',
+      runReasonTitleKeyword: "The title and keyword didn't match",
+      runReasonIntentKeyword: "Search intent didn't match the keyword",
+      runReasonKeywordPhrase: "The keyword wasn't a valid search phrase",
+      runReasonOther: 'Other quality checks',
+      runSummaryHeading: 'Of {g} ideas generated, {e} did not pass the quality checks:',
+      runSummaryAction: 'Approve or dismiss topics waiting for review to make room for new ideas.',
+      // Queue depth — weeks are derived from the pool's OWN cadence/interval_days, never an
+      // assumed rate. Below ~2 weeks the copy switches to days.
+      queueHealthy: 'You have {n} topics ready — about {w} weeks of content at your publishing pace.',
+      queueHealthyDays: 'You have {n} topics ready — about {d} days of content at your publishing pace.',
+      queueThinning: '{n} topics left — about {w} weeks at your current pace. Generating more is routine and available any time.',
+      queueThinningDays: '{n} topics left — about {d} days at your current pace. Generating more is routine and available any time.',
+      queueEmpty: 'No topics ready right now. Generate new ideas, or approve topics waiting for review.',
+      queueNoPool: 'You have {n} topics ready. Add them to the publishing queue to start publishing.',
+      queueNoPoolEmpty: 'No topics ready yet. Generate ideas to get started.',
+      queuePaused: 'You have {n} topics ready. Automatic publishing is paused.',
+      queuePausedEmpty: 'No topics ready right now, and automatic publishing is paused. Generate new ideas or approve topics waiting for review.',
       funnelLine: 'Run breakdown: {g} ideas generated · {e} did not pass quality/relevance checks · {d} duplicates of existing topics · {q} quality-filtered · {k} title/keyword already exists · {c} covered by existing site content',
       // Phase 3I.6 — exact primary-keyword match evidence (zero-new runs).
       kwMatchTitle: 'Diagnostics: what exactly blocked each idea ({n} examples)',
