@@ -41,8 +41,31 @@ import type { PolishedTopic } from './brief-synthesis'
 import { projectContextBlock, type ProjectContext } from './prompt-guidance'
 
 // ── Tunables (all deterministic; the engine imports the trigger thresholds) ──────
-/** Trigger condition (1): fewer than this many engine-accepted recs so far. */
+/**
+ * Trigger condition (1) — the FLOOR of the accepted-count ceiling.
+ *
+ * The effective ceiling is `max(LOW_YIELD_ACCEPTED_CEILING, ceil(targetCount / 2))`
+ * (see lowYieldAcceptedCeiling), so it scales with the request's targetCount instead of
+ * being a fixed absolute. WHY: this trigger and canRunBoundedRefill compete for the SAME
+ * single final paid call, but disagreed about what "needs help" means — the fallback used
+ * an absolute count (4) while the refill uses a RELATIVE shortfall (targetCount - accepted
+ * >= 3). At the production targetCount of 12 a run accepting 5 has a shortfall of 7 — a
+ * large miss — yet the fallback declined it and the normal refill took the slot instead.
+ *
+ * This constant remains the floor, so behavior is IDENTICAL to the previous absolute rule
+ * for every targetCount <= 8 (ceil(8/2) === 4); it only widens above that.
+ */
 export const LOW_YIELD_ACCEPTED_CEILING = 4
+
+/**
+ * The effective accepted-count ceiling for a given targetCount (pure).
+ * targetCount <= 8 → 4 (unchanged); 12 → 6; 24 → 12.
+ * Never affects HOW MANY paid calls a run makes — the fallback and the normal bounded
+ * refill are mutually exclusive strategies for the one remaining slot.
+ */
+export function lowYieldAcceptedCeiling(targetCount: number): number {
+  return Math.max(LOW_YIELD_ACCEPTED_CEILING, Math.ceil(targetCount / 2))
+}
 /** Trigger condition (3): at least this many eligible unused seeds must remain. */
 export const MIN_ELIGIBLE_SEEDS = 12
 /** Trigger condition (4): at least this share of rejections must be coverage-type. */
@@ -440,7 +463,7 @@ export function evaluateLowYieldTrigger(input: LowYieldTriggerInput): LowYieldTr
   const coverageRej = Object.entries(input.rejectionCounts).reduce((s, [r, n]) => s + (COVERAGE_REJECTION_REASONS.has(r) ? n : 0), 0)
   const coverageRejectionRatio = totalRej > 0 ? coverageRej / totalRej : 0
   const reasons = {
-    belowAcceptedCeiling: input.acceptedCount < LOW_YIELD_ACCEPTED_CEILING,
+    belowAcceptedCeiling: input.acceptedCount < lowYieldAcceptedCeiling(input.targetCount),
     targetNotReached: input.acceptedCount < input.targetCount,
     enoughSeeds: input.eligibleSeedCount >= MIN_ELIGIBLE_SEEDS,
     coverageDominated: totalRej > 0 && coverageRejectionRatio >= COVERAGE_REJECTION_MIN_RATIO,
