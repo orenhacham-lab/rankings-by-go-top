@@ -64,7 +64,27 @@ const SECOND_CLAUSE_RE = /\s*(?:[?!]|:|\s[—–|]\s|\s-\s)\s*.*$/
 // describes the subject — "ויטמין D המדריך להשוואת סוגים ומינונים" → "ויטמין D".
 const HEADLINE_TAIL_RE = /\s+(?:ו?איך\s.*|ו?כיצד\s.*|כך\s+ת.*|פירוט\s.*|וגורמי.*|וכל\s+מה.*|טיפים\s.*|ומה\s+עוד.*|ה?מדריך\s+(?:ה?מלא|ה?שלם|ה?מקיף|ל\S).*|מדריך\s+מלא.*|ש(?:כדאי|חשוב|מומלץ|צריך|רצוי|יכול)\s.*|לחיסכון.*|למשלוח\s.*|ה?מושלם(?:\s.*)?|ה?מצליח(?:ה|ות)?(?:\s.*)?)$/
 // A trailing dangling connective left after stripping.
-const DANGLING_TAIL_RE = /\s+(?:של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|with|to)\s*$/i
+//
+// The `ו?(?:איך|כיצד)` branch closes a gap between this rule and HEADLINE_TAIL_RE.
+// HEADLINE_TAIL_RE catches a coordinating question clause only MID-phrase (its
+// `ו?איך\s.*` / `ו?כיצד\s.*` branches require whitespace AND more text after the
+// question word), so a phrase whose LAST token is that word matched neither rule.
+// Live consequence: a headline was stripped to "נשים בוחרות בשמים מתוקים ואיך",
+// which passed isSearchPhraseQuality (5 tokens, opener removed) and was ACCEPTED as a
+// primary keyword — a mid-clause fragment nobody searches, so the article targeted
+// nothing. The repair produced garbage to satisfy the very gate it was repairing for.
+//
+// The list is deliberately TWO words, not the full question set. Measured against 1,068
+// real Hebrew phrases from the project corpora: `איך` occurs terminally twice (both
+// fragments) and `כיצד`/`מה`/`למה`/`מדוע`/`האם` occur terminally ZERO times, so the
+// other four would be dead weight rather than protection. `כיצד` is retained as the
+// formal register of the same construction. Terminal `מה`/`למה`/`מדוע`/`האם` are NOT
+// matched — that omission is measured, not an oversight (see the QA, which asserts it).
+//
+// Word-boundary safe: the leading `\s+` means only a standalone `מה`-class token could
+// ever match, so `כמה`/`במה`/`דמה` are unaffected, and an OPENER-led phrase
+// ("איך לשמור על זר פרחים") is untouched because the word is not at the end.
+const DANGLING_TAIL_RE = /\s+(?:של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|with|to|ו?(?:איך|כיצד)[?!]?)\s*$/i
 
 const MAX_SEARCH_TOKENS = 7
 
