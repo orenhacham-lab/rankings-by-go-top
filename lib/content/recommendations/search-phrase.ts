@@ -86,7 +86,11 @@ const HEADLINE_TAIL_RE = /\s+(?:ו?איך\s.*|ו?כיצד\s.*|כך\s+ת.*|פיר
 // ("איך לשמור על זר פרחים") is untouched because the word is not at the end.
 const DANGLING_TAIL_RE = /\s+(?:של|עם|או|ו|כי|עבור|לפי|על|אל|את|כדי|and|or|of|for|with|to|ו?(?:איך|כיצד)[?!]?)\s*$/i
 
-const MAX_SEARCH_TOKENS = 7
+/** Longest a target search phrase should be. NOTE: the acceptance gate below admits
+ *  MAX_SEARCH_TOKENS + 1 (a deliberate tolerance for the phrase a model actually
+ *  wrote). A DERIVED value — one the pipeline manufactured rather than received —
+ *  is held to this constant itself; see isAdoptableTitleRepair. */
+export const MAX_SEARCH_TOKENS = 7
 
 export interface SearchPhraseResult {
   keyword: string

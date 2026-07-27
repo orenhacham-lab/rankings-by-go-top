@@ -200,8 +200,25 @@ async function main() {
   {
     // D3 — repair NEVER slices mid-clause: an 8-word title main clause either
     // survives whole (≤10 tokens) or the repair fails; a 6-word cut is impossible.
+    //
+    // UPDATED BY R1/R2 — the ORIGINAL assertion encoded the degradation this fix
+    // removes. It required the 8-word opener-led clause
+    //   "איך לבנות דף נחיתה לעסק שמייצר לידים באינטרנט"
+    // to be ADOPTED as a primaryKeyword. That value scores isSearchPhraseQuality =
+    // FALSE (opener-led, 8 tokens), so the pipeline's own final acceptance gate would
+    // have rejected the candidate anyway: the repair only moved WHICH gate did the
+    // rejecting, and consumed the brief-anchored repair attempt on the way. The
+    // repair is now refused, the caller falls through to the brief chain, and D3's
+    // ACTUAL invariant — never a mid-clause cut — is asserted on BOTH outcomes below.
     const r = validatePrimaryKeywordQuality('של', 'איך לבנות דף נחיתה לעסק שמייצר לידים באינטרנט', new Set())
-    check('D3. repaired keyword is the FULL clause, never a 6-word cut', r.ok && r.repairedKeyword === 'איך לבנות דף נחיתה לעסק שמייצר לידים באינטרנט', JSON.stringify(r))
+    check('D3. an unusable full clause is REFUSED, never sliced (D3 invariant intact)',
+      !r.ok && r.reason === 'invalid_primary_keyword' && r.repairedKeyword === undefined, JSON.stringify(r))
+    check('D3b. a 6-word mid-clause cut is still impossible — no partial ever returned',
+      r.repairedKeyword === undefined || !'איך לבנות דף נחיתה לעסק שמייצר לידים באינטרנט'.startsWith(r.repairedKeyword ?? ' '), JSON.stringify(r))
+    // The POSITIVE half of the same invariant: a usable clause still survives WHOLE.
+    const rWhole = validatePrimaryKeywordQuality('של', 'איך לבנות דף נחיתה לעסק', new Set())
+    check('D3c. a usable full clause is still adopted WHOLE (never truncated)',
+      rWhole.ok && rWhole.repairedKeyword === 'איך לבנות דף נחיתה לעסק', JSON.stringify(rWhole))
     // D5 — subject-head rule: shoes-keyword under a suit-title is repaired/rejected.
     const c = validateIntentKeywordConsistency({ primaryKeyword: 'נעלים לחתן', title: 'איך לבחור חליפת חתן לחתונה', intent: 'informational' }, new Set())
     check('D5. groom-suit title + נעלים לחתן keyword no longer passes untouched', !c.ok || !!c.repairedKeyword, JSON.stringify(c))

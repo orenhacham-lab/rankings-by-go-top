@@ -18,6 +18,7 @@ import { GENERIC_TOKENS } from './opportunity'
 import { incompatibleActionNeed, searchNeedOf } from './coverage'
 import { normalizePhrase } from './keyword-guard'
 import { subjectTokens, type EntityPageType } from './link-role-mapper'
+import { isSearchPhraseQuality, MAX_SEARCH_TOKENS } from './search-phrase'
 import type { SearchIntent } from './opportunity'
 
 const toks = (s: string) => subjectTokens(s)
@@ -112,6 +113,52 @@ const INFORMATIONAL_INTENTS = new Set<SearchIntent>(['informational', 'compariso
  *  original surface words (Hebrew-safe), capped. keepGeneric preserves delivery/location
  *  intent words (e.g. משלוח) for local/transactional repairs. */
 const MAX_REPAIRED_KW_TOKENS = 10
+
+/**
+ * ADOPTION TEST for a TITLE-DERIVED repair (R1/R2 — proven live degradation).
+ *
+ * repairKeywordFromTitle rebuilds a keyword from the model's own TITLE. Until now the
+ * result only had to satisfy the gate that fired: >= 2 tokens and different from the
+ * original. Nothing asked whether the replacement was a usable search phrase, so a
+ * clean 3-token keyword could be discarded for an 8-token headline fragment. Proven in
+ * Production: "טיפול בזר ורדים" -> "לשמור על זר ורדים רענן ורענן לאורך זמן" (the model's
+ * own title, its opener stripped downstream, carrying its duplicated word).
+ *
+ * The repair must now clear the bar the FINAL keyword has to clear, not just the
+ * trigger. Two of these are new standards, one is an existing standard the sibling
+ * branch already applied and this one did not:
+ *   (3) TRUNCATED_KW_RE  — validatePrimaryKeywordQuality applies it to ITS repairs at
+ *       both branches below; repairOr never did. Asymmetry, now closed.
+ *   (4) isSearchPhraseQuality — the gate every accepted keyword meets before persistence.
+ *   (5) <= MAX_SEARCH_TOKENS — a DERIVED value is held to the constant, not to the
+ *       acceptance gate's MAX_SEARCH_TOKENS + 1 tolerance. Required: rule (4) alone
+ *       leaks an 8-token headline through that off-by-one (measured).
+ *
+ * DELIBERATELY NOT CHECKED HERE:
+ *   - isTitleKeywordAligned is VACUOUS for a title-derived value — the keyword IS the
+ *     title, so it passes by construction. That is precisely why this degradation was
+ *     invisible for so long; asserting it would look like rigour and test nothing.
+ *   - keywordPreservesSubject needs the brief, which this pure validator has no access
+ *     to. It is NOT skipped — it runs downstream on the FINAL keyword (subject
+ *     preservation), after every repair.
+ *
+ * MONOTONE BY CONSTRUCTION: this predicate is a conjunction that begins with the two
+ * conditions the old rule used, so it can only ever REFUSE a repair that is currently
+ * adopted. It can never adopt one that is currently refused.
+ *
+ * Refusing is not rejecting: the caller returns ok:false, and the engine then falls
+ * through to its BRIEF-anchored repair chain (aligned demand query, then brief
+ * subject) — deterministic project evidence, a strictly better source than the title.
+ */
+export function isAdoptableTitleRepair(repaired: string, original: string): boolean {
+  const rt = toks(repaired)
+  if (rt.length < 2) return false
+  if (normalizePhrase(repaired) === normalizePhrase(original)) return false
+  if (TRUNCATED_KW_RE.test((repaired || '').trim())) return false
+  if (!isSearchPhraseQuality(repaired)) return false
+  return (repaired || '').trim().split(/\s+/).filter(Boolean).length <= MAX_SEARCH_TOKENS
+}
+
 function repairKeywordFromTitle(title: string, drop: Set<string>, keepGeneric = false): string {
   const main = title.split(/[:—–]|(?:\s-\s)/)[0] || title
   const kept = main.split(/\s+/).filter(Boolean).filter((w) => { const n = normalizePhrase(w); return n && !drop.has(n) && (keepGeneric || !GENERIC_TOKENS.has(n)) })
@@ -145,7 +192,10 @@ export function validateIntentKeywordConsistency(
   const local = o.intent === 'local' || o.intent === 'transactional'
   const repairOr = (drop: Set<string>): IntentConsistencyResult => {
     const repaired = repairKeywordFromTitle(o.title, drop, local)
-    if (toks(repaired).length >= 2 && normalizePhrase(repaired) !== normalizePhrase(o.primaryKeyword)) return { ok: true, repairedKeyword: repaired }
+    // R1 — the repair must be a usable search phrase, not merely "different and >= 2
+    // tokens". A refusal here is NOT a rejection: the caller falls through to its
+    // brief-anchored repair chain (aligned demand query, then brief subject).
+    if (isAdoptableTitleRepair(repaired, o.primaryKeyword)) return { ok: true, repairedKeyword: repaired }
     return { ok: false, reason: 'intent_keyword_mismatch' }
   }
 
@@ -219,7 +269,8 @@ export function validatePrimaryKeywordQuality(
   // J.1 — a truncated/malformed keyword is repaired from the title or rejected.
   if (TRUNCATED_KW_RE.test((primaryKeyword || '').trim())) {
     const repaired = repairKeywordFromTitle(title, new Set(), false)
-    if (toks(repaired).length >= 2 && !TRUNCATED_KW_RE.test(repaired)) return { ok: true, repairedKeyword: repaired }
+    // R2 (truncated branch) — same adoption test as every other title-derived repair.
+    if (isAdoptableTitleRepair(repaired, primaryKeyword)) return { ok: true, repairedKeyword: repaired }
     return { ok: false, reason: 'invalid_primary_keyword' }
   }
   const kw = toks(primaryKeyword)
@@ -231,9 +282,12 @@ export function validatePrimaryKeywordQuality(
   if (distinctive.length === 0 || (titleDistinctive.length > 0 && !sharesTitleSubject)) {
     const repaired = repairKeywordFromTitle(title, new Set(), false)
     const rt = toks(repaired)
-    // A repaired keyword must ALSO pass the truncation test — the no-distinctive
-    // branch previously skipped it (asymmetric with the truncated branch above).
-    if (rt.some((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t)) && !TRUNCATED_KW_RE.test(repaired) && normalizePhrase(repaired) !== normalizePhrase(primaryKeyword)) return { ok: true, repairedKeyword: repaired }
+    // R2 — the branch's OWN condition is unchanged: the repair must still carry a
+    // distinctive (non-generic, non-corpus-type) token, which is specific to this
+    // branch and not part of the shared test. The truncation + "differs from the
+    // original" conditions now live inside isAdoptableTitleRepair, which additionally
+    // requires the repair to be a usable search phrase.
+    if (rt.some((t) => !GENERIC_TOKENS.has(t) && !corpusTypeWords.has(t)) && isAdoptableTitleRepair(repaired, primaryKeyword)) return { ok: true, repairedKeyword: repaired }
     return { ok: false, reason: 'invalid_primary_keyword' }
   }
   return { ok: true }
