@@ -25,7 +25,7 @@ function opp(id: string): Opportunity {
     id, primaryQuery: 'q ' + id, relatedQueries: [], page: 'https://x.co/' + id, pageType: 'article', queryIntent: 'informational',
     clicks: 1, impressions: 100, ctr: 0.01, averagePosition: 8, distinctPageCount: 1, opportunityType: 'improve_existing_page',
     signals: [], opportunityScore: 50, scoreComponents: { demandStrength: 0.5, positionOpportunity: 1, ctrGap: 0, contentMatchConfidence: 0, distinctPageSignal: 0 },
-    reasons: [], existingContentMatch: null, windowDays: 90, syncRunId: 'run-90', dateStart: null, dateEnd: null,
+    reasons: [], existingContentMatch: null, pageInSiteIndex: true, servesQuery: false, windowDays: 90, syncRunId: 'run-90', dateStart: null, dateEnd: null,
   }
 }
 const TABLE = 'gsc_opportunity_decisions'

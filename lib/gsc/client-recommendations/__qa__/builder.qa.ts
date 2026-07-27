@@ -22,7 +22,7 @@ function opp(o: Partial<Opportunity> & { id: string }): Opportunity {
     clicks: 5, impressions: 500, ctr: 0.01, averagePosition: 8, distinctPageCount: 1,
     opportunityType: 'improve_existing_page', signals: [], opportunityScore: 50,
     scoreComponents: { demandStrength: 0.6, positionOpportunity: 1, ctrGap: 0, contentMatchConfidence: 0, distinctPageSignal: 0 },
-    reasons: [], existingContentMatch: null, windowDays: 90, syncRunId: 'r', dateStart: null, dateEnd: null,
+    reasons: [], existingContentMatch: null, pageInSiteIndex: true, servesQuery: false, windowDays: 90, syncRunId: 'r', dateStart: null, dateEnd: null,
   }
   return { ...d, ...o }
 }

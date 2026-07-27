@@ -45,6 +45,17 @@ export interface GscInputDiagnostics {
   eligibleAfterIntentCount: number
   eligibleAfterBareHeadGuardCount: number
   suppressedByDecisionCount: number
+  /** Supporting candidates dropped because their ranking page is not in our site index. */
+  unresolvablePageCount: number
+  /** The serving-adequacy position threshold this run used (echoed for tuning). */
+  servingPositionMax: number
+  /** Where every opportunity went — ends the "N in, 0 out, no attribution" blind spot. */
+  typeDistribution: Record<string, number>
+  /** Position bands split by whether the page earns clicks — the field to tune the threshold from. */
+  positionBuckets: Record<string, { withClicks: number; withoutClicks: number }>
+  multiPageCount: number
+  reclassifiedByServingGate: number
+  pageNotInSiteIndexCount: number
   rejectedByExistingCoverageCount: number
   mergedIntoExistingCount: number
   addedAsNewBriefCount: number

@@ -28,7 +28,7 @@ function opp(o: Partial<Opportunity> & { id: string }): Opportunity {
     queryIntent: 'informational', clicks: 1, impressions: 100, ctr: 0.01, averagePosition: 8, distinctPageCount: 1,
     opportunityType: 'supporting_content_candidate', signals: [], opportunityScore: 50,
     scoreComponents: { demandStrength: 0.5, positionOpportunity: 1, ctrGap: 0, contentMatchConfidence: 0, distinctPageSignal: 0 },
-    reasons: [], existingContentMatch: null, windowDays: 90, syncRunId: 'run-90', dateStart: null, dateEnd: null,
+    reasons: [], existingContentMatch: null, pageInSiteIndex: true, servesQuery: false, windowDays: 90, syncRunId: 'run-90', dateStart: null, dateEnd: null,
   }
   return { ...d, ...o }
 }
@@ -60,7 +60,7 @@ function main() {
   check('(23) multi-token informational passes', filterEligibleGscOpportunities([opp({ id: 'a', primaryQuery: 'איך לבחור הליכון מתקפל לבית' })], NO_DECISIONS).eligible.length === 1)
   check('(24) multi-token commercial-research passes', filterEligibleGscOpportunities([opp({ id: 'a', queryIntent: 'commercial', primaryQuery: 'הליכון מתקפל מומלץ למתחילים' })], NO_DECISIONS).eligible.length === 1)
   check('(25-27) any persisted decision suppresses', filterEligibleGscOpportunities([opp({ id: 'a' })], new Set(['a'])).eligible.length === 0)
-  check('(28) strong E2A content match suppresses at adapter level', filterEligibleGscOpportunities([opp({ id: 'a', existingContentMatch: { source: 'article_topic', matchType: 'keyword', confidence: 0.9, reference: 'x', matchedUrl: null } })], NO_DECISIONS).eligible.length === 0)
+  check('(28) strong E2A content match suppresses at adapter level', filterEligibleGscOpportunities([opp({ id: 'a', pageInSiteIndex: true, servesQuery: false, existingContentMatch: { source: 'article_topic', matchType: 'keyword', confidence: 0.9, reference: 'x', matchedUrl: null } })], NO_DECISIONS).eligible.length === 0)
   check('(9) a high score never overrides the conditions', filterEligibleGscOpportunities([opp({ id: 'a', opportunityType: 'improve_existing_page', opportunityScore: 100 })], NO_DECISIONS).eligible.length === 0)
   {
     // deterministic order + input-order independence.
@@ -83,10 +83,14 @@ function main() {
       { id: 'run-28', project_id: 'p', window_days: 28, status: 'succeeded', started_at: '2026-07-10T00:00:00Z', start_date: '2026-06-13', end_date: '2026-07-10' },
     ],
     gsc_query_page_metrics: [
-      { sync_run_id: 'run-90', project_id: 'p', query: 'how to choose a folding treadmill for home', page: 'https://x.co/blog/g', clicks: 1, impressions: 400, ctr: 0.0025, position: 8 },
+      // position 40: the page IS ours (see wordpress_content_index below) but is NOT serving
+      // the query, which is the ONLY shape that may become a supporting-content candidate.
+      { sync_run_id: 'run-90', project_id: 'p', query: 'how to choose a folding treadmill for home', page: 'https://x.co/blog/g', clicks: 1, impressions: 400, ctr: 0.0025, position: 40 },
       { sync_run_id: 'run-28', project_id: 'p', query: 'twenty eight day only query here', page: 'https://x.co/blog/h', clicks: 1, impressions: 400, ctr: 0.0025, position: 8 },
     ],
     article_topics: [], gsc_opportunity_decisions: [],
+    // The ranking page must resolve in OUR index, else the verifiability gate excludes it.
+    wordpress_content_index: [{ project_id: 'p', targets: [{ targetUrl: 'https://x.co/blog/g' }] }],
   })
 
   async function stateTests() {
@@ -122,7 +126,7 @@ function main() {
     check('(49)(50) read failure → state read_failed (visible), never fabricated as zero', failRes.diagnostics.state === 'read_failed' && failRes.candidates.length === 0)
 
     // ── Map / merge / budget (28-39) ──────────────────────────────────────────
-    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [], subjectlessGenericRejectedCount: 0, collapsedNearDuplicateCount: 0, uniqueNeedCountBeforeBudget: 0, trialDistinctNeedCount: 0, combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [], selectedGscBriefDetails: [], gscParticipation: { enabled: true, maxTrialBriefs: 2, naturalGscBriefCountInFirstBatch: 0, appendedTrialBriefCount: 0, appendedTrialBriefIds: [], totalGscBriefsConsumed: 0, participationMode: 'no_gsc_briefs' } })
+    const diag = (): GscInputDiagnostics => ({ enabled: true, state: 'loaded', windowDays: 90, syncRunId: 'run-90', rawOpportunityCount: 0, supportingCandidateCount: 0, eligibleAfterIntentCount: 0, eligibleAfterBareHeadGuardCount: 0, suppressedByDecisionCount: 0, unresolvablePageCount: 0, servingPositionMax: 20, typeDistribution: {}, positionBuckets: {}, multiPageCount: 0, reclassifiedByServingGate: 0, pageNotInSiteIndexCount: 0, rejectedByExistingCoverageCount: 0, mergedIntoExistingCount: 0, addedAsNewBriefCount: 0, deferredByBudgetCount: 0, selectedBriefIds: [], rejectionCounts: {}, mergedGscEvidence: [], subjectlessGenericRejectedCount: 0, collapsedNearDuplicateCount: 0, uniqueNeedCountBeforeBudget: 0, trialDistinctNeedCount: 0, combinedPoolSizeBeforeDiscovery: 0, combinedPoolSizeAfterDiscovery: 0, discoveryDeficitAfterGsc: 0, discoverySkippedBecauseGscFilledDeficit: false, consumedGscBriefCount: 0, consumedGscBriefIds: [], acceptedGscSuggestionCount: 0, acceptedGscBriefIds: [], selectedGscBriefDetails: [], gscParticipation: { enabled: true, maxTrialBriefs: 2, naturalGscBriefCountInFirstBatch: 0, appendedTrialBriefCount: 0, appendedTrialBriefIds: [], totalGscBriefsConsumed: 0, participationMode: 'no_gsc_briefs' } })
     const noGuards = { enabled: true, targetCount: 12, existingPool: [] as ReturnType<typeof brief>[], isCoveredByContent: () => false, isOwnedByEntity: () => false, blogDuplicateSignatures: [] as { sig: ReturnType<typeof topicSignature>; source: string }[] }
 
     check('(28) existing-content coverage suppresses a new GSC brief', applyGscBriefIntegration([cand({ opportunityId: 'o1', primaryQuery: 'folding treadmill guide home' })], diag(), { ...noGuards, isCoveredByContent: () => true }).gscBriefs.length === 0)

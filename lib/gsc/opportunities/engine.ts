@@ -30,8 +30,24 @@ interface Candidate {
   clusterKey: string; primaryQuery: string; relatedQueries: string[]; page: string; pageType: PageType; queryIntent: QueryIntent
   clicks: number; impressions: number; ctr: number; averagePosition: number; distinctPageCount: number
   match: ContentMatch | null
+  pageInSiteIndex: boolean; servesQuery: boolean
   pageBreakdown: { page: string; impressions: number; clicks: number }[]
 }
+
+/**
+ * SERVING-ADEQUACY threshold. A page ranking beyond this position is not meaningfully
+ * serving the query, even though GSC reports it as the ranking page.
+ *
+ * WHY THIS EXISTS: matchExistingContent's rule 1 compares the GSC ranking page against the
+ * project's own indexed URLs. But GSC data IS (query, page) pairs where the page is on this
+ * site — so for any well-indexed site that comparison is a TAUTOLOGY: it matched at
+ * confidence 1 for essentially every query, determineType rule 2 then classified every one
+ * as improve_existing_page, and supporting_content_candidate became unreachable. Measured:
+ * 721 -> 0 and 471 -> 0 on two unrelated sites, while a third produced a 2.8% trickle ONLY
+ * because its crawl was incomplete. The better a site was indexed, the more completely GSC
+ * was disabled as a topic source.
+ */
+export const SERVING_POSITION_MAX = 20
 
 /**
  * Assign exactly one PRIMARY, actionable opportunity type by deterministic precedence.
@@ -99,10 +115,24 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
     if (!isActionablePageType(pageType)) continue // utility/admin/account/search/archive → observed, not actionable
     const ctr = impressions > 0 ? clicks / impressions : 0
     const averagePosition = impressions > 0 ? weightedPos / impressions : 0
-    const match = matchExistingContent(page, cluster.primaryQuery, evidence)
+    // SERVING ADEQUACY — the single insertion point. matchExistingContent is UNCHANGED; we
+    // only decide what its result means given how the page actually performs.
+    //
+    //   pageInSiteIndex : rule 1 fired, i.e. the ranking page is one of OUR indexed URLs.
+    //                     A non-url match (keyword/title overlap) does NOT resolve the page.
+    //   servesQuery     : in the index AND ranking within SERVING_POSITION_MAX.
+    //
+    // Only a resolved-but-not-serving page yields a null match (=> supporting candidate).
+    // An UNRESOLVED page keeps whatever match it had and is additionally barred from
+    // eligibility by the adapter: we cannot see that page, so we cannot verify it does not
+    // already target this query, and admitting it could put two pages on one query.
+    const rawMatch = matchExistingContent(page, cluster.primaryQuery, evidence)
+    const pageInSiteIndex = !!rawMatch && rawMatch.matchType === 'url'
+    const servesQuery = pageInSiteIndex && averagePosition <= SERVING_POSITION_MAX
+    const match = pageInSiteIndex && !servesQuery ? null : rawMatch
     // Intent is computed BEFORE type selection so it can guide (never remove) the type.
     const queryIntent = classifyIntent(cluster.primaryQuery)
-    candidates.push({ clusterKey: cluster.key, primaryQuery: cluster.primaryQuery, relatedQueries: cluster.relatedQueries, page, pageType, queryIntent, clicks, impressions, ctr, averagePosition, distinctPageCount, match, pageBreakdown })
+    candidates.push({ clusterKey: cluster.key, primaryQuery: cluster.primaryQuery, relatedQueries: cluster.relatedQueries, page, pageType, queryIntent, clicks, impressions, ctr, averagePosition, distinctPageCount, match, pageBreakdown, pageInSiteIndex, servesQuery })
   }
 
   // Project-relative scoring context: max impressions + per-band median CTR (this dataset only).
@@ -142,6 +172,8 @@ export function buildOpportunities(rows: GscMetricRow[], evidence: ContentEviden
       scoreComponents: components,
       reasons: allReasons,
       existingContentMatch: c.match,
+      pageInSiteIndex: c.pageInSiteIndex,
+      servesQuery: c.servesQuery,
       ...(c.pageBreakdown.length > 0 ? { pageBreakdown: c.pageBreakdown } : {}),
       windowDays: runMeta.windowDays,
       syncRunId: runMeta.syncRunId,
