@@ -152,6 +152,51 @@ export function hasNamedExternalBusiness(text: string, bs: BrandSafety): { hit: 
   return { hit: false, token: null, evidence: '' }
 }
 
+/** A latin-script token: the shape a foreign brand takes on a Hebrew-language site. */
+const LATIN_TOKEN_RE = /^[a-z][a-z0-9'.-]*$/
+
+/**
+ * UNKNOWN-LATIN-TOKEN detection for model-authored output — the STRUCTURAL form of
+ * the per-brief prompt rule "NEVER mention a business, brand or product name that is
+ * not in that brief's entities". Prose can be ignored; this cannot.
+ *
+ * A latin token that appears in NEITHER the project's own vocabulary NOR the caller's
+ * allow-set (the brief's own subject + related entity names) was introduced by the
+ * model itself — the "Tom Ford in a florist title" shape. Precision comes from
+ * `unknownTokens`, which already excludes GENERIC_TOKENS, everything in ownVocab, and
+ * tokens shorter than 3 chars; a project whose legitimate vocabulary IS latin
+ * (WordPress / SEO / Core Web Vitals) carries those tokens in ownVocab and is
+ * unaffected, and a retailer that genuinely sells Dior has "dior" as an entity name.
+ *
+ * The allow-set must NOT include a brief's aligned demand query. ownVocab is built
+ * deliberately WITHOUT keyword research (see BrandSafety.ownVocab) because research
+ * may itself surface a competitor's name; letting a research-derived query authorise
+ * a latin token would re-open exactly that hole.
+ *
+ * LIMITATION — DELIBERATE AND UNCLOSED. This detects the LATIN-SCRIPT case only. A
+ * foreign brand written in HEBREW letters, with no legal suffix (BUSINESS_SUFFIX_RE)
+ * and no single-edit relationship to an owned name, is NOT detected here and is
+ * REJECTED BY NOTHING in this pipeline. "בשמים מתוקים לנשים בהשראת שאנל" is accepted.
+ *
+ * It may still be OBSERVED, inconsistently: the broad classifier
+ * (classifyKeywordEntity / scanSuggestionBrandSafety) flags such a title WHEN the
+ * title happens to retain one of the project's own type tokens — measured true for
+ * a perfume title keeping "בשמים", and false for a florist title that dropped
+ * "פרחים". That path is SHADOW-ONLY by an earlier deliberate decision (its false
+ * positives — "ורדים ורודים" reads as a business to it — are why it was demoted),
+ * and this change does not revisit it. So the Hebrew-script case is at best counted
+ * in shadow_rejected_by_reason, never blocked.
+ *
+ * Closing it properly would need a name gazetteer or a model call, both of which
+ * cost more than the defect. Containment is therefore PARTIAL: do not read a passing
+ * title as proof that no external brand is present.
+ */
+export function unknownLatinTokens(text: string, bs: BrandSafety, allowed?: Iterable<string>): string[] {
+  if (!text) return []
+  const allow = new Set(allowed ?? [])
+  return unknownTokens(toks(text), bs).filter((t) => LATIN_TOKEN_RE.test(t) && !allow.has(t))
+}
+
 // ── unsafe named-entity mutation ──────────────────────────────────────────────
 function editDistance(a: string, b: string): number {
   const m = a.length, n = b.length

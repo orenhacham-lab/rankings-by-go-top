@@ -45,7 +45,7 @@ import { mapLinkRoles, buildLinkPlan, linkPlanToOrdered, isBoilerplatePage, type
 import { filterLinkPlan, sharesSubjectHead } from './link-relevance'
 import { assessNeedCannibalization, isSameNeedDuplicate, isTitleKeywordAligned, hasIncompatibleSubtype, type ExistingCoverageDoc, type TopicNeed, type CoverageMatch } from './coverage'
 import { validateIntentKeywordConsistency, validatePrimaryKeywordQuality, classifyRecommendedPageType, computeDemandEvidence, isMalformedReason, filterSecondaryKeywords, assessBusinessRelevance, assessExistingLocalOwnership, deriveCorpusTypeWords, deriveAttributeTokens, deriveIntent, desiredOpportunityRole, basisRoleOf, isImprovementBasisCompatible, type RecommendedPageType, type DemandEvidence } from './opportunity-validation'
-import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
+import { buildBrandSafety, classifyKeywordEntity, hasNamedExternalBusiness, unknownLatinTokens, detectUnsafeNamedEntityMutation, scanSuggestionBrandSafety, type BrandSafety } from './brand-safety'
 import { generateRecommendationJSON } from './model'
 import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
@@ -1008,6 +1008,34 @@ export async function synthesizeFromSnapshot(
     // (3) SAFE brand gate — exact named-entity mutation only (hard, proven safe).
     if (detectUnsafeNamedEntityMutation(t.title, primaryKeyword, brandSafety)) return rej('unsafe_named_entity_mutation', 'brand_safety', { blocker: { blockingSource: null, blockingRecordStatus: null, blockingTitle: t.title, blockingPrimaryKeyword: primaryKeyword, blockingUrl: null, matchType: 'named_entity_mutation' } })
     if (classifyKeywordEntity(primaryKeyword, brandSafety) === 'suspected_external_business') shadow('competitor_brand_leakage')
+
+    // (3b/3c) TITLE containment — the model-authored TITLE is the one field the rest of
+    // this validator never checks for foreign brand vocabulary. (0)/(2.8) anchor the
+    // KEYWORD to the brief subject, so subject SUBSTITUTION is already impossible; what
+    // remains is subject CONTAMINATION — a title that keeps its subject and adds someone
+    // else's brand beside it. Both gates below are ADDITIVE and run AFTER the existing
+    // (3) mutation gate; no existing gate moved, changed or was promoted. In particular
+    // scanSuggestionBrandSafety at (11) stays SHADOW-only — the broad classifier's false
+    // positives are why it was demoted, and that decision is not revisited here.
+    //
+    // (3b) STRICT named external business in the title — legal suffix (בע"מ / Ltd / …)
+    // or a single-edit mutation of an owned name. Already a hard exclusion on the
+    // fallback seed path (21464c9); this applies the SAME detector to accepted output.
+    const titleNamedBusiness = hasNamedExternalBusiness(t.title, brandSafety)
+    if (titleNamedBusiness.hit) {
+      return rej('title_named_external_business', 'brand_safety_title_named_business', { blocker: { blockingSource: null, blockingRecordStatus: null, blockingTitle: t.title, blockingPrimaryKeyword: titleNamedBusiness.token, blockingUrl: null, matchType: titleNamedBusiness.evidence } })
+    }
+    // (3c) UNKNOWN LATIN TOKEN in the title — the structural form of the prompt's
+    // per-brief rule. Allowed: the project's own vocabulary (ownVocab) plus THIS brief's
+    // own subject and related entity names. NOT the aligned demand query: ownVocab
+    // excludes keyword research by design, and research can surface a competitor name.
+    // See unknownLatinTokens for the documented Hebrew-script blind spot.
+    const briefOwnTokens = new Set<string>(contentTokens(brief.subject))
+    for (const e of brief.relatedEntities) for (const tok of contentTokens(e.name)) briefOwnTokens.add(tok)
+    const foreignLatin = unknownLatinTokens(t.title, brandSafety, briefOwnTokens)
+    if (foreignLatin.length > 0) {
+      return rej('title_unknown_latin_token', 'brand_safety_title_unknown_token', { blocker: { blockingSource: null, blockingRecordStatus: null, blockingTitle: t.title, blockingPrimaryKeyword: foreignLatin.slice(0, 4).join(' '), blockingUrl: null, matchType: 'unknown_latin_token' } })
+    }
 
     // (4) ownership / coverage / cannibalization — ALWAYS on the FINAL keyword
     // (the old engine validated the pre-repair keyword only — proven gap).
