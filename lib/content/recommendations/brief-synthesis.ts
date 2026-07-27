@@ -210,3 +210,36 @@ export function classifySynthesisFailure(rec: SynthesisReconciliation & { respon
   if (rec.missing.length === sentCount) return 'synthesis_all_briefs_missing'
   return null
 }
+
+/** One model-authored skip, with its brief's SUBJECT resolved (Preview-only). */
+export interface SkippedBriefDetail { briefId: string; subject: string | null; why: string }
+
+/** Bound on the per-round skip sample carried in diagnostics. */
+export const MAX_SKIP_REASON_DETAILS = 30
+
+/**
+ * OBSERVABILITY ONLY — resolve each skipped brief's id to its SUBJECT so the
+ * model's own `why` is interpretable without a second lookup. The synthesis
+ * skip is the single largest loss in the pipeline and, until now, only its
+ * COUNT survived (`skipped_by_model`); the reasons were discarded at the call
+ * site. This is a bounded SAMPLE of that same set — it never replaces the
+ * count, never changes it, and no caller may derive one from the other.
+ *
+ * PURE: no I/O, no throw. An unknown briefId (impossible via the responseSchema
+ * enum, but never assumed) keeps a null subject rather than being dropped, so
+ * the sample can never silently lose a skip. Model-authored text is whitespace-
+ * collapsed and length-bounded exactly like every other diagnostics excerpt.
+ */
+export function summarizeSkipReasons(skipped: SkippedBrief[], briefs: OpportunityBrief[], cap = MAX_SKIP_REASON_DETAILS): SkippedBriefDetail[] {
+  const subjectById = new Map(briefs.map((b) => [b.opportunityId, b.subject]))
+  const out: SkippedBriefDetail[] = []
+  for (const s of skipped) {
+    if (out.length >= cap) break
+    out.push({
+      briefId: s.briefId,
+      subject: subjectById.get(s.briefId) ?? null,
+      why: (s.why || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+    })
+  }
+  return out
+}

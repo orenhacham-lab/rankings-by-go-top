@@ -55,7 +55,7 @@ import { buildBriefPool, buildBusinessPillars, prioritizeBriefsForSynthesis, typ
 import { integrateGscBriefs } from './gsc-briefs'
 import { isGscAutoRecommendationsEnabled } from '@/lib/gsc/config'
 import type { GscInputDiagnostics, SelectedGscBriefDetail, GscParticipation } from '@/lib/gsc/recommendations/types'
-import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, briefSynthesisResponseSchema, classifySynthesisFailure, type PolishedTopic, type SynthesisFailureType, type SynthesisResponseDiagnostics } from './brief-synthesis'
+import { buildBriefSynthesisPrompt, reconcileSynthesis, synthesisOutputBudget, briefSynthesisResponseSchema, classifySynthesisFailure, summarizeSkipReasons, type PolishedTopic, type SynthesisFailureType, type SynthesisResponseDiagnostics, type SkippedBriefDetail } from './brief-synthesis'
 import { buildDiscoveryPrompt, discoveryResponseSchema, reconcileDiscovery, validateDiscoveredCandidates } from './constrained-discovery'
 import {
   buildSeedInventory, fallbackResponseSchema, buildFallbackPrompt, reconcileFallback,
@@ -93,6 +93,13 @@ export interface BriefRoundDiagnostics {
   emitted: number
   polished: number
   skipped_by_model: number
+  /** Preview/operator-only: the model's OWN reasons for the briefs it skipped, each
+   *  with its brief SUBJECT resolved. A bounded SAMPLE (<= MAX_SKIP_REASON_DETAILS)
+   *  of the set `skipped_by_model` counts — ADDITIVE and OPTIONAL, never a
+   *  replacement for the count and never used to derive it (a capped sample and a
+   *  true count must never be conflated). Absent on rounds with no model skips and
+   *  on the low-yield fallback round, whose contract has no skip field at all. */
+  skipped_reasons?: SkippedBriefDetail[]
   missing_from_response: number
   dropped_items: number
   /** Polished topics NOT validated because targetCount was reached mid-response —
@@ -1541,6 +1548,10 @@ export async function synthesizeFromSnapshot(
     rd.emitted = rec.emitted
     rd.polished = rec.polished.length
     rd.skipped_by_model = rec.skipped.length
+    // Observability only — the count above is authoritative and UNCHANGED; this is a
+    // bounded, subject-resolved SAMPLE of the same skips so the largest loss in the
+    // pipeline stops being an unattributed number. Never read by any gate.
+    if (rec.skipped.length > 0) rd.skipped_reasons = summarizeSkipReasons(rec.skipped, batch)
     rd.missing_from_response = rec.missing.length
     rd.dropped_items = rec.droppedItems
     rd.synthesisResponse = rec.response
