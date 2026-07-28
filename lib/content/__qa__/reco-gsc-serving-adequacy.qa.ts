@@ -158,7 +158,13 @@ function main() {
       && /isOwnedByEntity/.test(gb) && /isHighConfidenceDuplicate/.test(gb))
     check('E4. GSC briefs run the SAME validatePolished', /const r = validatePolished\(polishedT, brief\)/.test(gfb))
     check('E5. need-level cannibalisation still runs on every candidate', /assessNeedCannibalization\(/.test(gfb))
-    check('E6. MAX_TRIAL_GSC_BRIEFS still caps batch participation', /const MAX_TRIAL_GSC_BRIEFS = 2\b/.test(gfb))
+    // SHAPE C replaced the literal cap with a supply-scaled quota. Batch participation
+    // is STILL capped — by trialGscBriefQuota, floored at the historical 2
+    // (TRIAL_GSC_BASE) and bounded above by TRIAL_GSC_MAX — and it is still appended
+    // past batchSize rather than re-ranked, so this branch's guarantee is unchanged.
+    check('E6. batch participation is still capped (supply-scaled quota, historical 2 as floor)',
+      /const MAX_TRIAL_GSC_BRIEFS = trialGscBriefQuota\(/.test(gfb)
+      && /const TRIAL_GSC_BASE = 2\b/.test(gfb) && /const TRIAL_GSC_MAX = 8\b/.test(gfb))
     check('E7. gscSourceBudget unchanged', /return Math\.min\(60, Math\.max\(20, base \* 3\)\)/.test(stripComments(read('lib/content/recommendations/gsc-briefs.ts'))))
   }
 

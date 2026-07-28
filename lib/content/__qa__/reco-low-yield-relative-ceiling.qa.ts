@@ -162,7 +162,11 @@ function main() {
     check('H6. the seed-exclusion chain is untouched (entity-owner + duplicate guards present)',
       /exact_entity_owner/.test(lyf) && /consumed_brief_duplicate/.test(lyf)
       && /published_duplicate/.test(lyf) && /pending_duplicate/.test(lyf))
-    check('H7. GSC caps untouched', /const MAX_TRIAL_GSC_BRIEFS = 2\b/.test(gfb))
+    // SHAPE C replaced the constant with a supply-scaled quota. The historical value 2
+    // survives as the FLOOR (TRIAL_GSC_BASE), so no project can receive fewer trial
+    // slots than before; the cap is additive-only and never re-ranks.
+    check('H7. GSC trial quota is supply-scaled with the historical 2 as its floor',
+      /const TRIAL_GSC_BASE = 2\b/.test(gfb) && /const MAX_TRIAL_GSC_BRIEFS = trialGscBriefQuota\(/.test(gfb))
     check('H8. the ceiling is the ONLY trigger predicate that reads targetCount for a bound',
       /belowAcceptedCeiling: input\.acceptedCount < lowYieldAcceptedCeiling\(input\.targetCount\)/.test(lyf))
   }

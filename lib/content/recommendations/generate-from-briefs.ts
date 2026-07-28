@@ -331,6 +331,41 @@ export interface SynthesisBatchComposition {
  *   GSC briefs strictly AFTER the natural batch. No normal brief is removed, displaced or reordered;
  *   the batch grows by at most `maxTrialGscBriefs`.
  */
+/**
+ * SHAPE C — the round-1 GSC trial quota, scaled by how much Search Console material the
+ * project actually has.
+ *
+ * A fixed quota of 2 made GSC participation independent of supply. Measured on nagler:
+ * 312 supporting candidates, 29 GSC briefs admitted to the pool, `consumedGscBriefCount`
+ * exactly 2 — the constant, every time. Every GSC brief ranked below the examined window
+ * (28 of 58), so the round-1 append was the ONLY way in and it was capped at two.
+ *
+ * ADDITIVE BY CONSTRUCTION: the quota only ever feeds the append at the end of
+ * composeSynthesisBatch, which extends the batch PAST `batchSize` rather than competing
+ * for slots inside it. Raising it cannot displace a keyword-research brief, because
+ * nothing is removed — `naturalBatch` is built first and kept whole.
+ *
+ * SELF-SCALING: one slot per SUPPORTING_PER_SLOT supporting candidates, never below the
+ * historical floor of 2, never above TRIAL_MAX, and never more than the project actually
+ * has (`addedAsNewBriefCount`). A project with 6 supporting candidates keeps 2; nagler's
+ * 312 earns 6.
+ *
+ * NO-GSC PROJECTS ARE UNAFFECTED — and not merely by this returning a small number:
+ * `e3aTrialActive` is false when the pool holds no GSC brief, and composeSynthesisBatch
+ * then takes its early return, which never reads the quota at all. The QA asserts real
+ * array equality (same length, same element references, same order) for that path.
+ */
+export const TRIAL_GSC_BASE = 2
+export const TRIAL_GSC_MAX = 8
+export const SUPPORTING_PER_SLOT = 50
+
+export function trialGscBriefQuota(supportingCandidateCount: number, addedAsNewBriefCount: number): number {
+  if (!(addedAsNewBriefCount > 0)) return 0
+  const supporting = Number.isFinite(supportingCandidateCount) ? Math.max(0, supportingCandidateCount) : 0
+  const scaled = Math.floor(supporting / SUPPORTING_PER_SLOT)
+  return Math.min(TRIAL_GSC_MAX, addedAsNewBriefCount, Math.max(TRIAL_GSC_BASE, scaled))
+}
+
 export function composeSynthesisBatch(params: {
   workingPool: OpportunityBrief[]
   cursor: number
@@ -1311,7 +1346,12 @@ export async function synthesizeFromSnapshot(
   // trial in the FIRST batch, WITHOUT displacing or reordering any normal brief. When E3A is
   // off or no new GSC brief exists, the exact contiguous cursor/slice behavior (and
   // byte-identical batch IDs/output) is preserved.
-  const MAX_TRIAL_GSC_BRIEFS = 2
+  // SHAPE C — scaled by the project's own GSC supply (see trialGscBriefQuota). The
+  // historical value 2 remains the floor, so no project can receive less than before.
+  const MAX_TRIAL_GSC_BRIEFS = trialGscBriefQuota(
+    snapshot.gscInput.supportingCandidateCount ?? 0,
+    snapshot.gscInput.addedAsNewBriefCount ?? 0,
+  )
   const e3aTrialActive = snapshot.gscInput.enabled && workingPool.some(isGscOriginBrief)
   const consumedIds = new Set<string>() // FIX 2 — a brief is consumed at most once across rounds
   let participationNaturalGscInFirstBatch = 0

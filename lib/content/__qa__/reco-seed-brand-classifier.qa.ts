@@ -184,7 +184,11 @@ function main() {
       /return fail\('source_only_entity_expansion', 0, cannib\)/.test(opp))
     check('G9. cannibalisation / pending / intra-run dedupe intact',
       /assessNeedCannibalization\(/.test(gfb) && /pending_semantic_duplicate/.test(gfb) && /intra_run_need_duplicate/.test(gfb))
-    check('G10. GSC caps untouched', /const MAX_TRIAL_GSC_BRIEFS = 2\b/.test(gfb))
+    // SHAPE C replaced the constant with a supply-scaled quota. The historical value 2
+    // survives as the FLOOR (TRIAL_GSC_BASE), so no project can receive fewer trial
+    // slots than before; the cap is additive-only and never re-ranks.
+    check('G10. GSC trial quota is supply-scaled with the historical 2 as its floor',
+      /const TRIAL_GSC_BASE = 2\b/.test(gfb) && /const MAX_TRIAL_GSC_BRIEFS = trialGscBriefQuota\(/.test(gfb))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
