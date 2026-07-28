@@ -50,8 +50,8 @@ function main() {
   {
     const briefs = [brief('b1', 'נורות לד לסלון'), brief('b2', 'אילוף גור חתולים')]
     const skipped: SkippedBrief[] = [
-      { briefId: 'b2', why: 'הנושא אינו תואם את תחומי ההתמחות של הפרויקט' },
-      { briefId: 'b1', why: 'off domain' },
+      { briefId: 'b2', skipReason: 'cannot_form_title' as const, why: 'הנושא אינו תואם את תחומי ההתמחות של הפרויקט' },
+      { briefId: 'b1', skipReason: 'cannot_form_title' as const, why: 'off domain' },
     ]
     const out = summarizeSkipReasons(skipped, briefs)
     check('A1. one detail per skip, order preserved', out.length === 2 && out[0].briefId === 'b2' && out[1].briefId === 'b1')
@@ -64,7 +64,7 @@ function main() {
   console.log('\nB) the bounded sample never becomes the count')
   {
     const briefs = Array.from({ length: 41 }, (_, i) => brief(`b${i}`, `נושא ${i}`))
-    const skipped: SkippedBrief[] = briefs.map((b) => ({ briefId: b.opportunityId, why: 'x' }))
+    const skipped: SkippedBrief[] = briefs.map((b) => ({ briefId: b.opportunityId, skipReason: 'cannot_form_title' as const, why: 'x' }))
     const out = summarizeSkipReasons(skipped, briefs)
     check(`B1. sample is capped at MAX_SKIP_REASON_DETAILS (${MAX_SKIP_REASON_DETAILS})`, out.length === MAX_SKIP_REASON_DETAILS, String(out.length))
     check('B2. the underlying skip count is UNCHANGED by summarizing', skipped.length === 41)
@@ -78,24 +78,24 @@ function main() {
   console.log('\nC) robustness: no drop, no throw')
   {
     const briefs = [brief('b1', 'נושא')]
-    const out = summarizeSkipReasons([{ briefId: 'ghost', why: 'r' }, { briefId: 'b1', why: 'r2' }], briefs)
+    const out = summarizeSkipReasons([{ briefId: 'ghost', skipReason: 'cannot_form_title' as const, why: 'r' }, { briefId: 'b1', skipReason: 'cannot_form_title' as const, why: 'r2' }], briefs)
     check('C1. an UNKNOWN briefId is kept with subject=null (never dropped)',
       out.length === 2 && out[0].briefId === 'ghost' && out[0].subject === null, JSON.stringify(out))
     check('C2. an empty why becomes an empty string, not undefined',
-      summarizeSkipReasons([{ briefId: 'b1', why: '' }], briefs)[0].why === '')
-    const messy = summarizeSkipReasons([{ briefId: 'b1', why: '  a\n\n  b\t c  ' }], briefs)[0].why
+      summarizeSkipReasons([{ briefId: 'b1', skipReason: 'cannot_form_title' as const, why: '' }], briefs)[0].why === '')
+    const messy = summarizeSkipReasons([{ briefId: 'b1', skipReason: 'cannot_form_title' as const, why: '  a\n\n  b\t c  ' }], briefs)[0].why
     check('C3. model text is whitespace-collapsed and trimmed', messy === 'a b c', JSON.stringify(messy))
-    const long = summarizeSkipReasons([{ briefId: 'b1', why: 'x'.repeat(500) }], briefs)[0].why
+    const long = summarizeSkipReasons([{ briefId: 'b1', skipReason: 'cannot_form_title' as const, why: 'x'.repeat(500) }], briefs)[0].why
     check('C4. model text is length-bounded (<=120)', long.length === 120)
     check('C5. no briefs at all → every subject null, nothing thrown',
-      summarizeSkipReasons([{ briefId: 'b1', why: 'r' }], []).every((d) => d.subject === null))
+      summarizeSkipReasons([{ briefId: 'b1', skipReason: 'cannot_form_title' as const, why: 'r' }], []).every((d) => d.subject === null))
   }
 
   // ── D) PURITY — observability may not mutate the pipeline's data ─────────────
   console.log('\nD) pure: inputs are not mutated')
   {
     const briefs = [brief('b1', 'נושא')]
-    const skipped: SkippedBrief[] = [{ briefId: 'b1', why: '  spaced  ' }]
+    const skipped: SkippedBrief[] = [{ briefId: 'b1', skipReason: 'cannot_form_title' as const, why: '  spaced  ' }]
     const beforeSkipped = JSON.stringify(skipped)
     const beforeBriefs = JSON.stringify(briefs)
     summarizeSkipReasons(skipped, briefs)

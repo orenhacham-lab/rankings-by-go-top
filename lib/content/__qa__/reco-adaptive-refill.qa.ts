@@ -64,7 +64,7 @@ function main() {
   check('(9) refill uses composeSynthesisBatch (unconsumed-only) + consumedIds guard', /const comp = composeSynthesisBatch\(\{ workingPool, cursor, batchSize, round, consumedIds/.test(gen) && /batch\.forEach\(\(bb\) => consumedIds\.add\(bb\.opportunityId\)\)/.test(gen))
   check('(10) GSC trial append is round-1 only (composeSynthesisBatch), never in a refill', /if \(round === 1\) \{[\s\S]{0,400}appended = workingPool\.filter/.test(gen))
   check('(11) validation/reconciliation gates unchanged (same reconcile + failure classify)', /const rec = reconcileSynthesis\(res\.text, batch\)/.test(gen) && /rd\.synthesis_failure = classifySynthesisFailure\(rec, batch\.length\)/.test(gen) && /if \(rd\.synthesis_failure\) \{ stop = 'synthesis_failed'; break \}/.test(gen))
-  check('(11b) same prompt builder + response schema + selected model', /buildBriefSynthesisPrompt\(batch, ctx, langLabel, year\)/.test(gen) && /briefSynthesisResponseSchema\(batch\.map/.test(gen) && /\.\.\.\(effectiveModel \? \{ model: effectiveModel \} : \{\}\)/.test(gen))
+  check('(11b) same prompt builder + response schema + selected model', /buildBriefSynthesisPrompt\(batch, langLabel, year\)/.test(gen) && /briefSynthesisResponseSchema\(batch\.map/.test(gen) && /\.\.\.\(effectiveModel \? \{ model: effectiveModel \} : \{\}\)/.test(gen))
   check('(target) targetCount is untouched (deficit from input.targetCount)', /const deficit = input\.targetCount - suggestions\.length/.test(gen))
 
   // (12) top rejection reasons — deterministic (count desc, reason asc), count-only, ≤5.

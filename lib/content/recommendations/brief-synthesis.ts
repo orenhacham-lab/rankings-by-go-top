@@ -11,8 +11,6 @@
  */
 
 import type { OpportunityBrief } from './opportunity-brief'
-import type { ProjectContext } from './prompt-guidance'
-import { projectContextBlock } from './prompt-guidance'
 
 export interface PolishedTopic {
   briefId: string
@@ -21,7 +19,11 @@ export interface PolishedTopic {
   secondaryKeywords: string[]
   intent: string
 }
-export interface SkippedBrief { briefId: string; why: string }
+/** A model-declared skip. `skipReason` is the ENUM the responseSchema constrains;
+ *  'unspecified' is recorded when the model omitted it (the schema subset cannot make
+ *  a field conditionally required — see SKIP_REASONS). `why` stays free text. */
+export type SkipReason = (typeof SKIP_REASONS)[number] | 'unspecified'
+export interface SkippedBrief { briefId: string; skipReason: SkipReason; why: string }
 export interface SynthesisReconciliation {
   polished: PolishedTopic[]
   skipped: SkippedBrief[]
@@ -47,11 +49,38 @@ function briefPayload(briefs: OpportunityBrief[]) {
   }))
 }
 
+/**
+ * BRIEF PROVENANCE — replaces the project-owned context block in THIS prompt.
+ *
+ * The old block asserted `primaryProjectFocus`, which deriveProjectFocus computes as
+ * `cats[0]` — array index zero of the site-scan entities, in crawl order, with no
+ * scoring. For a multi-topic site that names one arbitrary area as "the central
+ * editorial and commercial focus" and then forbids generating outside it, so the model
+ * correctly refuses briefs the pipeline had already verified as on-domain (nagler:
+ * 0 topics from a 29-brief pool).
+ *
+ * Synthesis cannot invent a subject: briefId is a responseSchema enum, reconcileSynthesis
+ * drops unknown ids, and validatePolished re-anchors any keyword that shares no
+ * distinctive token with its brief. So the domain claim protects nothing here and only
+ * suppresses. Project NAME and DOMAIN are dropped too — for a wording task they add
+ * nothing, and keeping the name while removing the description would invite exactly the
+ * inference the old block explicitly forbade.
+ */
+export function briefProvenanceBlock(): string {
+  return [
+    `BRIEF PROVENANCE — read this before the rules:`,
+    `- Every brief below was derived deterministically from THIS project's own website, its published content, and its own search data. Each one has ALREADY been verified as belonging to this business, and already checked against what the site has published and what is pending.`,
+    `- Your job is WORDING ONLY. Do NOT re-judge whether a subject belongs to this business, whether it fits the project's focus, or whether the business "really" covers this area. That judgement was made before you saw it, from data you do not have.`,
+    `- A project may legitimately span several unrelated subject areas. Two briefs having nothing to do with each other is normal and is NOT a reason to reject either one.`,
+    `- The ONLY names you may use are the ones inside each brief's own "entities". Do not introduce any other business, brand or product name, in any script.`,
+  ].join('\n')
+}
+
 /** Build the single batched polishing prompt. */
-export function buildBriefSynthesisPrompt(briefs: OpportunityBrief[], ctx: ProjectContext, langLabel: string, year: number): string {
+export function buildBriefSynthesisPrompt(briefs: OpportunityBrief[], langLabel: string, year: number): string {
   return [
     `You are an SEO content editor. Today's year is ${year}. Return ALL text in ${langLabel}.`,
-    projectContextBlock(ctx),
+    briefProvenanceBlock(),
     ``,
     `TASK: Below are ${briefs.length} EVIDENCE-BACKED content briefs. For EACH brief, polish it into ONE article topic. The brief IS the opportunity — do NOT invent a different subject, do NOT merge briefs, do NOT add extra topics.`,
     `RULES:`,
@@ -62,13 +91,17 @@ export function buildBriefSynthesisPrompt(briefs: OpportunityBrief[], ctx: Proje
     `- "intent": keep the brief's intent unless it is clearly wrong for the title you wrote.`,
     `- NEVER mention search volume, demand, popularity, statistics or "many searches" anywhere.`,
     `- NEVER mention a business, brand or product name that is not in that brief's "entities".`,
-    `- Do not duplicate a "covered_titles" topic — angle the title differently or skip.`,
-    `- If a brief cannot become a distinct, well-formed topic, SKIP it with a short reason.`,
+    `- Do not duplicate a "covered_titles" topic — angle the title differently, and only skip if no distinct angle exists.`,
+    `- SKIPPING: skip ONLY when the wording task itself is impossible, and say which case it is in "skipReason":`,
+    `    "cannot_form_title" — no fluent ${langLabel} title can answer this need for this exact subject;`,
+    `    "subject_unintelligible" — the subject is not a comprehensible topic;`,
+    `    "duplicate_of_covered_title" — this brief's own "covered_titles" already answer it and no distinct angle exists.`,
+    `  These are the ONLY valid reasons. "Off-topic", "not the project's field", "outside the business's specialisation" and anything similar are NOT valid — domain fit is not yours to judge (see BRIEF PROVENANCE). A brief you could write a title for must be polished, not skipped.`,
     ``,
     `BRIEFS:`,
     JSON.stringify(briefPayload(briefs)),
     ``,
-    `OUTPUT — ONLY valid JSON, no markdown/commentary: {"topics":[{"briefId":string,"skip":boolean,"why":string(only when skip, <=8 words),"title":string,"primaryKeyword":string,"secondaryKeywords":string[],"intent":"informational"|"commercial"|"comparison"|"transactional"|"local"}]}. Include EVERY briefId from BRIEFS exactly once.`,
+    `OUTPUT — ONLY valid JSON, no markdown/commentary: {"topics":[{"briefId":string,"skip":boolean,"skipReason":"cannot_form_title"|"subject_unintelligible"|"duplicate_of_covered_title"(only when skip),"why":string(only when skip, <=8 words),"title":string,"primaryKeyword":string,"secondaryKeywords":string[],"intent":"informational"|"commercial"|"comparison"|"transactional"|"local"}]}. Include EVERY briefId from BRIEFS exactly once.`,
   ].join('\n')
 }
 
@@ -78,6 +111,21 @@ export function synthesisOutputBudget(briefCount: number): number {
 }
 
 const SYNTH_INTENTS = ['informational', 'commercial', 'comparison', 'transactional', 'local'] as const
+
+/**
+ * The ONLY valid skip reasons — CRAFT failures. A domain-motivated skip ("off-topic",
+ * "not the project's field") is deliberately UNREPRESENTABLE: the responseSchema
+ * constrains the VALUE, the same mechanism that fixed briefId when prompt wording alone
+ * proved insufficient live.
+ *
+ * LIMITATION, stated rather than papered over: this OpenAPI subset expresses `required`
+ * only at object level, and briefId/skip already occupy it, so skipReason cannot be made
+ * mandatory-when-skipping. A skip that omits it is recorded as 'unspecified' and counted
+ * — NOT rejected, because dropping it would change the exact
+ * sent = polished + skipped + missing accounting for an unmeasured benefit. If
+ * 'unspecified' turns out to be near zero the enum is holding and it can be hardened.
+ */
+export const SKIP_REASONS = ['cannot_form_title', 'subject_unintelligible', 'duplicate_of_covered_title'] as const
 
 /**
  * ENFORCED structured-output schema (OpenAPI style, uppercase types — the shape
@@ -98,6 +146,7 @@ export function briefSynthesisResponseSchema(briefIds: string[]): Record<string,
           properties: {
             briefId: { type: 'STRING', enum: briefIds },
             skip: { type: 'BOOLEAN' },
+            skipReason: { type: 'STRING', enum: [...SKIP_REASONS] },
             why: { type: 'STRING' },
             title: { type: 'STRING' },
             primaryKeyword: { type: 'STRING' },
@@ -181,7 +230,13 @@ export function reconcileSynthesis(text: string, briefs: OpportunityBrief[]): Sy
     if (!briefId || !ids.has(briefId)) { out.droppedItems++; response.invalidItems++; if (briefId) response.unknownBriefIds.push(briefId.slice(0, 40)); continue }
     if (seen.has(briefId)) { out.droppedItems++; response.duplicateBriefIds.push(briefId); continue }
     response.recognizedBriefIds++
-    if (o.skip === true) { seen.add(briefId); out.skipped.push({ briefId, why: String(o.why ?? '').slice(0, 120) }); continue }
+    if (o.skip === true) {
+      seen.add(briefId)
+      const raw = String(o.skipReason ?? '').trim()
+      const skipReason: SkipReason = (SKIP_REASONS as readonly string[]).includes(raw) ? (raw as SkipReason) : 'unspecified'
+      out.skipped.push({ briefId, skipReason, why: String(o.why ?? '').slice(0, 120) })
+      continue
+    }
     const title = String(o.title ?? '').trim()
     const primaryKeyword = String(o.primaryKeyword ?? '').trim()
     if (!title || !primaryKeyword) { out.droppedItems++; response.invalidItems++; continue }
@@ -212,7 +267,7 @@ export function classifySynthesisFailure(rec: SynthesisReconciliation & { respon
 }
 
 /** One model-authored skip, with its brief's SUBJECT resolved (Preview-only). */
-export interface SkippedBriefDetail { briefId: string; subject: string | null; why: string }
+export interface SkippedBriefDetail { briefId: string; subject: string | null; skipReason: SkipReason; why: string }
 
 /** Bound on the per-round skip sample carried in diagnostics. */
 export const MAX_SKIP_REASON_DETAILS = 30
@@ -238,6 +293,7 @@ export function summarizeSkipReasons(skipped: SkippedBrief[], briefs: Opportunit
     out.push({
       briefId: s.briefId,
       subject: subjectById.get(s.briefId) ?? null,
+      skipReason: s.skipReason,
       why: (s.why || '').replace(/\s+/g, ' ').trim().slice(0, 120),
     })
   }

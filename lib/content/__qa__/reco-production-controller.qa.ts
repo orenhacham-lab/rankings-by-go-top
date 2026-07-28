@@ -204,7 +204,7 @@ async function main() {
     const snap = await prepareBriefRun(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, rr15.newRunCostController('premium', 'prep15', 8))
     const batchSize = Math.min(snap.workingPool.length, Math.max(4, Math.ceil(8 * 1.5)))
     const batch = snap.workingPool.slice(0, batchSize)
-    const exactPrompt = buildBriefSynthesisPrompt(batch, snap.ctx, snap.langLabel, snap.year)
+    const exactPrompt = buildBriefSynthesisPrompt(batch, snap.langLabel, snap.year)
     const outputBudget = synthesisOutputBudget(batch.length)
     const measCtrl = rr15.newRunCostController('premium', 'meas15', 8)
     const exactEst = measCtrl.estimateNextCallUsd('gemini-2.5-flash', exactPrompt.length, outputBudget)
@@ -325,7 +325,7 @@ async function main() {
     check('G15. the flag flows server→UI (page → ContentHub → AutomationIdeas), single source', /isProFirstControllerEnabled\(\)/.test(pageSrc) && /<ContentHub proFirst=\{proFirst\}/.test(pageSrc) && /proFirst=\{proFirst\}/.test(hubSrc))
     check('G16. no residual NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER anywhere', !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(uiSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(pageSrc) && !/NEXT_PUBLIC_RECO_PRO_FIRST_CONTROLLER/.test(hubSrc))
     // Blocker 7/2b — EXACT-prompt budget: the same batch/prompt/output-budget the gate uses.
-    check('G17. fallback budget uses the EXACT synthesis prompt (buildBriefSynthesisPrompt + prompt.length + synthesisOutputBudget)', /buildBriefSynthesisPrompt\(batch, snapshot\.ctx, snapshot\.langLabel, snapshot\.year\)/.test(runSrc) && /estimateNextCallUsd\(flashModel, prompt\.length, outputBudget\)/.test(runSrc) && /synthesisOutputBudget\(batch\.length\)/.test(runSrc) && !/2500 \+ estBatch \* 350/.test(runSrc) && /budgetStopped/.test(runSrc))
+    check('G17. fallback budget uses the EXACT synthesis prompt (buildBriefSynthesisPrompt + prompt.length + synthesisOutputBudget)', /buildBriefSynthesisPrompt\(batch, snapshot\.langLabel, snapshot\.year\)/.test(runSrc) && /estimateNextCallUsd\(flashModel, prompt\.length, outputBudget\)/.test(runSrc) && /synthesisOutputBudget\(batch\.length\)/.test(runSrc) && !/2500 \+ estBatch \* 350/.test(runSrc) && /budgetStopped/.test(runSrc))
     // Blocker 1 — Flash is a REAL Flash-class model; resolver runs only after rescue; a
     // Pro id is never used as a Flash override; flash_unavailable is a typed reason.
     check('G21. Flash resolution requires a Flash-class model; resolveFlashClassModel returns null otherwise', /isFlashClassModel\(fr\.model\) \? fr\.model : null/.test(runSrc) && /'flash_unavailable'/.test(runSrc) && /flash_unavailable/.test(ctrlSrc) && !/flashResolution\.ok\s*\?\s*flashResolution\.model\s*:\s*proRequestedModel/.test(runSrc))

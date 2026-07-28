@@ -222,8 +222,13 @@ function main() {
   {
     const gfb = stripComments(read('lib/content/recommendations/generate-from-briefs.ts'))
     check('G1. no new model call', (gfb.match(/await generateRecommendationJSON\(/g) ?? []).length === 3)
-    check('G2. the synthesis PROMPT is untouched (Step 2 not started)',
-      /- If a brief cannot become a distinct, well-formed topic, SKIP it with a short reason\./.test(read('lib/content/recommendations/brief-synthesis.ts'))
+    // Step 2 HAS now landed — this assertion was a deliberate tripwire and it fired.
+    // Inverted to pin the post-Step-2 state: the synthesis prompt no longer carries the
+    // domain claim, while projectContextBlock itself survives for the GENERATIVE callers
+    // (constrained discovery + low-yield fallback), which legitimately need it.
+    check('G2. Step 2 landed: the synthesis prompt dropped the domain claim, the block survives for generative callers',
+      !/projectContextBlock/.test(read('lib/content/recommendations/brief-synthesis.ts'))
+      && /BRIEF PROVENANCE/.test(read('lib/content/recommendations/brief-synthesis.ts'))
       && /Do NOT generate brands, products, services, entities or subject areas that are absent from it\./.test(read('lib/content/recommendations/prompt-guidance.ts')))
     check('G3. deriveProjectFocus is unchanged (Step 3 not started)',
       /return \{ primaryProjectFocus: cats\[0\], secondaryProjectAreas: Array\.from\(new Set\(cats\.slice\(1\)\)\)\.slice\(0, 8\) \}/.test(read('lib/content/recommendations/prompt-guidance.ts')))

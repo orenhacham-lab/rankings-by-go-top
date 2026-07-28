@@ -104,7 +104,7 @@ export function exactFlashBudgetOk(controller: RunCostController, snapshot: Brie
   const deficit = target // suggestions.length is 0 at the start of a Flash attempt
   const batchSize = Math.min(snapshot.workingPool.length, Math.max(4, Math.ceil(deficit * 1.5)))
   const batch = snapshot.workingPool.slice(0, batchSize)
-  const prompt = buildBriefSynthesisPrompt(batch, snapshot.ctx, snapshot.langLabel, snapshot.year)
+  const prompt = buildBriefSynthesisPrompt(batch, snapshot.langLabel, snapshot.year)
   const outputBudget = synthesisOutputBudget(batch.length)
   const est = controller.estimateNextCallUsd(flashModel, prompt.length, outputBudget)
   return controller.spentUsd + Math.max(0, est) <= controller.budget.maxEstimatedCostUsd

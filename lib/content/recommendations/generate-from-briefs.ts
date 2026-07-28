@@ -1521,7 +1521,7 @@ export async function synthesizeFromSnapshot(
     batch.forEach((bb, pos) => { if (!consumptionByBriefId.has(bb.opportunityId)) consumptionByBriefId.set(bb.opportunityId, { consumedRound: round, roundPosition: pos }) })
     batch.forEach((bb) => consumedIds.add(bb.opportunityId))
 
-    const prompt = buildBriefSynthesisPrompt(batch, ctx, langLabel, year)
+    const prompt = buildBriefSynthesisPrompt(batch, langLabel, year)
     const res = await generateRecommendationJSON(
       prompt,
       { temperature: 0.4, maxOutputTokens: synthesisOutputBudget(batch.length), ...(effectiveModel ? { model: effectiveModel } : {}), responseSchema: briefSynthesisResponseSchema(batch.map((b) => b.opportunityId)) },
