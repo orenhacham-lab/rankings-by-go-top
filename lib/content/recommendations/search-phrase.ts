@@ -185,8 +185,15 @@ export function isSearchPhraseQuality(keyword: string): boolean {
   const toks = k.split(/\s+/).filter(Boolean)
   if (toks.length > MAX_SEARCH_TOKENS + 1) return false
   if (OPENERS_RE.test(k)) {
-    // e.g. "איך לשמור על ורדים" is fine (short); a long opener phrase is not.
-    if (toks.length > 5) return false
+    // A2 — an opener-led query gets the SAME budget as any other. The cap was 5 while
+    // everything else got MAX_SEARCH_TOKENS + 1, so an identical query failed or passed
+    // purely on whether it began with a question word. Executed:
+    //   "איך לשמור על זר פרחים טרי"  (6t, opener) REJECT
+    //   "שמירה על זר פרחים טרי"      (5t, none)   PASS
+    // Same meaning, same length. Opener-led phrasing is one of the most common Hebrew
+    // search forms; the two-clause / colon / dangling-tail rules above still reject a
+    // genuine headline regardless of how it opens.
+    if (toks.length > MAX_SEARCH_TOKENS) return false
   }
   if (HOW_MUCH_RE.test(k)) return false // "כמה עולה …" is a headline form → "מחיר …"
   return true

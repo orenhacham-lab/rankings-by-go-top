@@ -150,8 +150,11 @@ function main() {
       /method: 'aligned_query'/.test(sp) && /method: 'brief_subject'/.test(sp) && /method: 'stripped_headline'/.test(sp))
     check('E6. HEADLINE_TAIL_RE unchanged (mid-phrase clauses still handled there)',
       /ו\?איך\\s\.\*\|ו\?כיצד\\s\.\*/.test(sp))
-    check('E7. MAX_SEARCH_TOKENS and the opener cap unchanged',
-      /const MAX_SEARCH_TOKENS = 7\b/.test(sp) && /if \(toks\.length > 5\) return false/.test(sp))
+    // A2 raised the opener cap from a literal 5 to MAX_SEARCH_TOKENS — an opener-led
+    // query now gets the same budget as any other. The constant itself is unchanged and
+    // the cap still EXISTS; only the asymmetry is gone.
+    check('E7. MAX_SEARCH_TOKENS unchanged; the opener cap now equals it (A2)',
+      /const MAX_SEARCH_TOKENS = 7\b/.test(sp) && /if \(toks\.length > MAX_SEARCH_TOKENS\) return false/.test(sp))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

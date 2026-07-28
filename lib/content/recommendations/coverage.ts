@@ -16,7 +16,7 @@
  * against existing page titles / focus keywords / slugs.
  */
 
-import { distinctiveTokensOf, canonicalToken, canonicalVariants, topicSignature, isHighConfidenceDuplicate } from './semantic-dup'
+import { constructStateVariants, distinctiveTokensOf, canonicalToken, canonicalVariants, topicSignature, isHighConfidenceDuplicate } from './semantic-dup'
 import { normalizePhrase } from './keyword-guard'
 import { sharesSubjectHead, coversAllSubjectHeads, subjectTokensOf, isModifierToken } from './link-relevance'
 
@@ -137,12 +137,26 @@ export function isSameNeedDuplicate(a: TopicNeed, b: TopicNeed, typeWords?: Set<
  * suit title). NOT literal wording.
  */
 export function isTitleKeywordAligned(primaryKeyword: string, title: string): boolean {
-  const kw = synonymTokens(primaryKeyword)
-  if (kw.size === 0) return true // no distinctive subject to contradict
-  const ti = synonymTokens(title)
-  let shared = 0
-  for (const t of kw) if (ti.has(t)) shared++
-  if (shared / kw.size < 0.6) return false
+  // A1 — the ratio counts SOURCE tokens, each matched through morphology folding.
+  //
+  // It used to expand the keyword into synonym/proclitic variants and divide by the
+  // EXPANDED set. That inflates the denominator faster than the numerator, so genuine
+  // matches score below the threshold. Measured on nagler's two GSC candidates, both
+  // rejected at stage final_title_keyword_alignment while sharesSubjectHead returned
+  // TRUE:
+  //   kw "איך להוציא אלכוהול מהגוף" / title "איך הגוף מפרק אלכוהול…"
+  //     expanded kwSet=5, shared=2 -> 0.40 REJECT   |  source tokens 2/3 -> 0.67 ALIGN
+  // Two of three keyword tokens appear in the title; that is 0.67, not 0.40.
+  //
+  // Matching folds through constructStateVariants (proclitic + plural + smichut), so
+  // "זרי"≡"זר", "נעלי"≡"נעל", "מהגוף"≡"הגוף". sharesSubjectHead below is UNCHANGED and
+  // remains the second, independent guard — this ratio never accepts on its own.
+  const kwSource = subjectTokensOf(primaryKeyword).length > 0 ? distinctiveTokensOf(primaryKeyword) : []
+  if (kwSource.length === 0) return true // no distinctive subject to contradict
+  const titleVariants = new Set<string>()
+  for (const t of distinctiveTokensOf(title)) for (const v of constructStateVariants(t)) titleVariants.add(v)
+  const matched = kwSource.filter((t) => constructStateVariants(t).some((v) => titleVariants.has(v))).length
+  if (matched / kwSource.length < 0.6) return false
   // DISCRIMINATIVE-CORE gate (P0): a generic CONTAINER word ("חברה"→"משרד"
   // synonym fold) shared with the title must NOT, by itself, establish alignment
   // — otherwise a generic "מזכירות חברה" keyword aligns with any office/company
