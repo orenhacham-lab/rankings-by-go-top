@@ -18,6 +18,7 @@ import { GENERIC_TOKENS } from './opportunity'
 import { incompatibleActionNeed, searchNeedOf } from './coverage'
 import { normalizePhrase } from './keyword-guard'
 import { subjectTokens, type EntityPageType } from './link-role-mapper'
+import { constructStateVariants } from './semantic-dup'
 import type { SearchIntent } from './opportunity'
 
 const toks = (s: string) => subjectTokens(s)
@@ -151,7 +152,30 @@ export function validateIntentKeywordConsistency(
 
   // Commercial drift: informational topic whose keyword injects a commercial-entity
   // token the title never uses (a keyword that would compete with a product page).
-  const drift = kw.filter((t) => !titleSet.has(t) && commercialEntityTokens.has(t) && !GENERIC_TOKENS.has(t))
+  //
+  // "the title never uses" is a MORPHOLOGICAL claim, and comparing raw tokens got it
+  // wrong. Proven live on four projects' worth of rejections: keyword "זרי ורדים" under
+  // title "כיצד לבחור זר ורדים…" flagged "זרי" as drift because the title spells the
+  // same word in its absolute state ("זר"); "משלוחי מתנות…" under "…למשלוחי מתנות…"
+  // flagged "משלוחי"/"שלוחי" likewise. In every case the model's keyword was already a
+  // clean 2-4 token search phrase and needed no repair at all — the gate fired on
+  // grammar, the title repair then replaced a good keyword with a headline, and when
+  // that repair was refused the candidate was lost outright.
+  //
+  // Membership is therefore folded through constructStateVariants (canonicalVariants +
+  // smichut). SAFE DIRECTION BY CONSTRUCTION: folding can only ADD title variants, so
+  // `drift` can only SHRINK — this branch can fire less often, never more. A token that
+  // stops being drift does not become accepted; control simply falls through to the
+  // comparison / local / overlap / subject-head checks below, all unchanged.
+  //
+  // The over-folding constructStateVariants documents ("כלי"→"כל") is harmless here for
+  // two compounding reasons: the only effect of a spurious match is to SILENCE a drift
+  // warning, and the token must ALSO be in commercialEntityTokens — the project's own
+  // entity vocabulary — to reach this filter at all.
+  const titleVariants = new Set<string>()
+  for (const t of titleToks) for (const v of constructStateVariants(t)) titleVariants.add(v)
+  const usedInTitle = (t: string) => titleSet.has(t) || constructStateVariants(t).some((v) => titleVariants.has(v))
+  const drift = kw.filter((t) => !usedInTitle(t) && commercialEntityTokens.has(t) && !GENERIC_TOKENS.has(t))
   if (informational && drift.length > 0) return repairOr(new Set(drift))
 
   // Comparison intent → the keyword must carry a comparison connector OR both compared

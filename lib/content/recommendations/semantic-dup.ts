@@ -60,6 +60,28 @@ export function canonicalVariants(raw: string): string[] {
   return out
 }
 
+/**
+ * canonicalVariants PLUS the Hebrew CONSTRUCT STATE (smichut): "זרי"→"זר",
+ * "משלוחי"→"משלוח", "סידורי"→"סידור". Same word, different grammatical state.
+ *
+ * Deliberately NOT folded into canonicalVariants itself: that helper feeds semantic
+ * duplicate detection and the evidence-first invariant, where widening equality would
+ * change which topics count as duplicates. This is additive and opt-in — a caller that
+ * wants construct-state equality asks for it.
+ *
+ * OVER-FOLDING IS REAL AND ACCEPTED: a trailing י is not always construct state, so
+ * this also merges "כלי"→"כל", "בתי"→"בת", "פרי"→"פר". That is tolerable ONLY where
+ * the merge direction is safe — i.e. where a match SILENCES a warning rather than
+ * admits a candidate. Do not use it anywhere a match can accept something.
+ */
+export function constructStateVariants(raw: string): string[] {
+  const out = new Set(canonicalVariants(raw))
+  for (const v of Array.from(out)) {
+    if (/^[א-ת]+$/.test(v) && v.endsWith('י') && v.length >= 3) out.add(v.slice(0, -1))
+  }
+  return Array.from(out)
+}
+
 /** Distinctive content tokens of a phrase (stopwords removed, canonicalized).
  *  Order-preserving (the FIRST token is the construct-state head candidate). */
 export function distinctiveTokensOf(s: string): string[] {
