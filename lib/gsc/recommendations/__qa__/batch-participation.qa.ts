@@ -209,7 +209,7 @@ function main() {
   check('(13b) synthesis loop unchanged + bounded provider call sites (discovery + per-round synth + low-yield fallback)', /for \(let round = 1; round <= maxSynthesisRounds/.test(gen) && (genCode.match(/generateRecommendationJSON\(/g) ?? []).length === 3)
   check('(14) global paid-call cap = 3 (min of per-attempt allowance + refill and remaining global calls)', /const PAID_CALL_CAP = 3/.test(gen) && /const maxSynthesisRounds = Math\.min\(legacyAttemptRounds \+ \(allowRefill \? 1 : 0\), remainingGlobalCalls\)/.test(gen))
   check('(15) targetCount unchanged (deficit still from input.targetCount)', /const deficit = input\.targetCount - suggestions\.length/.test(gen))
-  check('(16) prompt receives the SAME batch object (incl. the two appended briefs)', /const prompt = buildBriefSynthesisPrompt\(batch, ctx, langLabel, year\)/.test(gen))
+  check('(16) prompt receives the SAME batch object (incl. the two appended briefs)', /const prompt = buildBriefSynthesisPrompt\(batch, langLabel, year\)/.test(gen))
   // No FORCED-accept / validation-bypass path for GSC briefs. (A provenance array such as
   // lowYieldGscAcceptedBriefIds only records ids of pairs the normal validatePolished ALREADY
   // accepted — it is not a bypass, so it must not trip this guard.)
