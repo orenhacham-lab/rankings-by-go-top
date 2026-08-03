@@ -11,6 +11,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 import { publishArticleToShopify, type ShopifyPublishArticleRow } from '@/lib/shopify/publish-article'
+import { authorNameFromShopDomain } from '@/lib/shopify/article-payload'
 import { hasWriteContent } from '@/lib/shopify/constants'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
@@ -67,6 +68,11 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
     // a never-opened queue article publishes to the project default automatically.
 
     // Retry cap (same bound as WordPress).
+    // KNOWN UX GAP (logged, not fixed here): this noop carries status:'failed'
+    // with no `reason`, so AutomationSchedule's publishItem() falls back to
+    // displaying the bare word "failed" — indistinguishable from a genuine
+    // second failed attempt. A user clicking "פרסם עכשיו" on a maxed-out item
+    // can't tell it didn't actually retry. Same shape in publish-item.ts.
     if (item.status === 'failed' && (item.attempts ?? 0) >= AUTOMATION_MAX_ATTEMPTS) {
       return { itemId: item.id, status: item.status, articleId, noop: 'max_attempts' }
     }
@@ -87,9 +93,19 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
     if (!claimed) return { itemId: item.id, status: item.status, articleId, noop: 'already_claimed' }
     await admin.from('generated_articles').update({ status: 'publishing', updated_at: nowIso() }).eq('id', articleId).in('status', ['draft', 'ready', 'generated', 'failed'])
 
+    // Resolve the author the SAME way the manual publish route does (the
+    // project's business_name) — this scheduled path previously hardcoded
+    // `null`, which Shopify's ArticleCreateInput rejects (author is required,
+    // non-null). Falls back to a cleaned shop domain so a project with no
+    // business_name set still never sends null — never a raw "*.myshopify.com"
+    // byline either.
+    const { data: projRow } = await admin.from('projects').select('business_name').eq('id', item.project_id).maybeSingle()
+    const businessName = (projRow as { business_name?: string | null } | null)?.business_name?.trim()
+    const authorName = businessName || authorNameFromShopDomain(loaded.connection.shop_domain)
+
     // Idempotent create/update (scheduled publish → published). The orchestrator
     // persists shopify_article_id BEFORE the final state and never duplicates.
-    const result = await publishArticleToShopify(admin, loaded.connection, loaded.creds, article, { published: true, authorName: null })
+    const result = await publishArticleToShopify(admin, loaded.connection, loaded.creds, article, { published: true, authorName })
     if (!result.ok) {
       await admin.from('generated_articles').update({ status: 'draft', updated_at: nowIso() }).eq('id', articleId)
       const reason = `shopify_${result.reason}${result.detail ? `: ${result.detail.slice(0, 120)}` : ''}`

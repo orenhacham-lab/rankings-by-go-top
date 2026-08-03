@@ -189,6 +189,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // Retry cap: a repeatedly-failing publish stops after AUTOMATION_MAX_ATTEMPTS
     // and stays 'failed' for a human (never an infinite loop). First publish of a
     // freshly 'generated' item is unaffected (its attempts came from generation).
+    // KNOWN UX GAP (logged, not fixed here): this noop carries status:'failed'
+    // with no `reason`, so AutomationSchedule's publishItem() falls back to
+    // displaying the bare word "failed" — indistinguishable from a genuine
+    // second failed attempt. Same shape in publish-item-shopify.ts.
     if (item.status === 'failed' && (item.attempts ?? 0) >= AUTOMATION_MAX_ATTEMPTS) {
       return { itemId, status: item.status, articleId: article.id, noop: 'max_attempts' }
     }

@@ -11,6 +11,7 @@ import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-au
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 import { publishArticleToShopify, type ShopifyPublishArticleRow } from '@/lib/shopify/publish-article'
+import { authorNameFromShopDomain } from '@/lib/shopify/article-payload'
 
 const ARTICLE_SELECT =
   'id, project_id, title, slug, excerpt, meta_description, content_html, featured_image_url, shopify_blog_id, shopify_article_id, shopify_tags'
@@ -39,13 +40,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return Response.json({ error: reason, reason }, { status: loaded.status === 404 ? 400 : loaded.status })
   }
 
-  // Author name (optional) — the project's business name where available.
-  let authorName: string | null = null
+  // Author name — the project's business_name where available, else a cleaned
+  // shop domain. Never null: Shopify's ArticleCreateInput requires a non-null
+  // author, so a project with no business_name set must still send one.
+  let authorName: string = authorNameFromShopDomain(loaded.connection.shop_domain)
   try {
     const { data: proj } = await auth.admin.from('projects').select('business_name').eq('id', auth.project.id).maybeSingle()
-    const bn = (proj as { business_name?: string } | null)?.business_name
-    authorName = bn ? String(bn) : null
-  } catch { /* optional */ }
+    const bn = (proj as { business_name?: string } | null)?.business_name?.trim()
+    if (bn) authorName = bn
+  } catch { /* keep the domain-derived fallback already set */ }
 
   const result = await publishArticleToShopify(
     auth.admin, loaded.connection, loaded.creds, a as unknown as ShopifyPublishArticleRow,

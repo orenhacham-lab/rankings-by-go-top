@@ -100,6 +100,20 @@ export function decideArticleAction(storedArticleId: string | null | undefined):
 }
 
 /**
+ * Fallback author display name when a project has no business_name set —
+ * e.g. "https://my-shop.myshopify.com/" → "my-shop". Shopify's ArticleCreateInput
+ * requires a non-null author, so callers need SOME name; this is only ever used
+ * when business_name is blank, so the raw *.myshopify.com host never appears as
+ * the byline on a published article.
+ */
+export function authorNameFromShopDomain(shopDomain: string): string {
+  return String(shopDomain || '').trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/$/, '')
+    .replace(/\.myshopify\.com$/i, '')
+}
+
+/**
  * Resolve the target Blog GID: the article-level selection ALWAYS overrides the
  * project/connection default. Returns null when neither is set (→ no_shopify_blog).
  * PURE — the caller persists the resolved id on the article so retries are
