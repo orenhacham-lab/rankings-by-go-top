@@ -6,6 +6,18 @@
  * tested against every meta shape. Source-contract: the paused-routing + alert
  * wiring across generate-item / publish-item / publish-item-shopify / alerts,
  * which are DB-coupled and can only be guaranteed on source.
+ *
+ * DEFECT (found 2026-08-16, live evidence): the Supabase storage-download
+ * branch in wpCreatePost returned a WpCreateError with NO `detail` — the exact
+ * shape classifyMediaFailure treats as 'deterministic' (assumed: source image
+ * missing/invalid). But two unrelated projects (BUY BUY, Louiz Flowers) hit
+ * this SAME branch the same day while five OTHER downloads succeeded within
+ * the same few-minute window, and BUY BUY's retry succeeded on the IDENTICAL
+ * storagePath with no regeneration — proving ordinary transient Storage noise,
+ * not a missing object. Every occurrence was pausing on the FIRST attempt
+ * instead of getting the bounded retry a transient failure deserves. Fixed by
+ * setting `detail` on that branch, which routes it through classifyMediaFailure's
+ * existing transient fallback — no change to the classifier itself.
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -73,6 +85,24 @@ function main() {
   check('WordPress terminal catch raises a final-failure alert', /catch \(e\)[\s\S]*recordPublishFinalFailureAlert\(admin, \{[\s\S]*ctx\.projectId/.test(wp))
   check('WordPress catch guards on retained ctx.projectId', /if \(ctx\.projectId\)/.test(wp))
   check('Shopify has a terminal try/catch (previously none) with an alert', /catch \(e\)[\s\S]*recordPublishFinalFailureAlert/.test(shop))
+
+  console.log('SOURCE) storage-download failure now carries `detail` — no longer misclassified')
+  const wpub = strip(read('../wordpress-publish.ts'))
+  // The download-failure branch: `if (dl.error || !dl.data) { ... detail ... }`.
+  // Isolate that block specifically (not the later uploadMedia-throw branch,
+  // which already had detail) so this can't pass by matching the wrong site.
+  const dlBlockMatch = wpub.match(/if \(dl\.error \|\| !dl\.data\) \{[\s\S]*?\n {6}\} else \{/)
+  const dlBlock = dlBlockMatch ? dlBlockMatch[0] : ''
+  check('the storage-download failure branch exists (regex still matches current source)', dlBlock.length > 0)
+  check('…and now computes a non-empty `detail` from dl.error (or a clear fallback)',
+    /const detail = dl\.error\?\.message \|\| '[^']+'/.test(dlBlock))
+  check('…and passes it into the returned WpCreateError (not just `stage`)',
+    /return \{ ok: false, kind: 'media_upload_failed', detail, stage: 'media_upload' \}/.test(dlBlock))
+  // Behavioral tie-back: the exact shape this branch now produces (detail set,
+  // no wpErrorMeta — Supabase errors carry no WordPress HTTP meta) is the shape
+  // already proven transient at line ~38 above. No classifier change needed.
+  check('…and that exact shape (detail, no wpErrorMeta) classifies transient',
+    classifyMediaFailure(media({ detail: 'objects/xyz.jpg not found' })) === 'transient')
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

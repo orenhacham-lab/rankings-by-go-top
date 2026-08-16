@@ -111,7 +111,16 @@ export async function wpCreatePost(
     if (article.featured_image_url && storagePath) {
       const dl = await admin.storage.from(BUCKET).download(storagePath)
       if (dl.error || !dl.data) {
-        if (block) return { ok: false, kind: 'media_upload_failed', stage: 'media_upload' }
+        // Evidence (2026-08-16, BUY BUY + Louiz Flowers): a download failure here
+        // is ordinary transient Storage noise, not a missing/invalid source image —
+        // the SAME storagePath succeeded on a later retry with no regeneration.
+        // Without `detail`, classifyMediaFailure (publish-item.ts) had no way to
+        // tell the two apart and treated every occurrence as deterministic (pause +
+        // alert on the FIRST attempt, no retry). Setting `detail` here routes it
+        // through the existing transient fallback instead — bounded retry via
+        // AUTOMATION_MAX_ATTEMPTS, alert only if it doesn't resolve.
+        const detail = dl.error?.message || 'source image object not found in storage'
+        if (block) return { ok: false, kind: 'media_upload_failed', detail, stage: 'media_upload' }
         imageWarning = true
       } else {
         try {
