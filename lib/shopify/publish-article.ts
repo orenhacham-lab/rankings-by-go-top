@@ -20,6 +20,7 @@ import { hasWriteContent } from './constants'
 import { buildCanonicalUrl } from './domain'
 import { ShopifyClientError, shopifyArticleCreate, shopifyArticleUpdate, shopifyGetArticle } from './client'
 import { buildArticleInput, isStableImageUrl, summarizeUserErrors, decideArticleAction, resolveTargetBlogId, type ShopifyUserError } from './article-payload'
+import { checkShopifyPublishEntitlement } from './billing-guard'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
 
@@ -29,6 +30,8 @@ export type ShopifyPublishReason =
   | 'missing_write_content_scope' | 'no_shopify_blog' | 'invalid_blog' | 'permission_error'
   | 'article_create_failed' | 'article_update_failed' | 'graphql_user_error' | 'remote_article_missing'
   | 'token_invalid' | 'rate_limited' | 'exact_failure'
+  // Phase 2 — the central billing entitlement guard denied this publish.
+  | 'billing_not_entitled'
 
 export interface ShopifyPublishArticleRow {
   id: string
@@ -106,6 +109,18 @@ export async function publishArticleToShopify(
   opts: { published: boolean; publishDate?: string | null; authorName?: string | null },
 ): Promise<ShopifyPublishResult> {
   const base = { imageWarnings: [] as string[] }
+
+  // 0) Phase 2 — the CENTRAL Shopify billing entitlement guard. Runs FIRST,
+  //    before even the write_content scope check, because this function is
+  //    the single choke point every Shopify publish path (manual, queue,
+  //    cron, retry) goes through — see lib/shopify/billing-guard.ts for why
+  //    that's true and what this call actually verifies. Fails closed: any
+  //    unverifiable state blocks the publish rather than allowing it.
+  const entitlement = await checkShopifyPublishEntitlement(admin, connection)
+  if (!entitlement.ok) {
+    await persistError(admin, article.id, `shopify_billing_${entitlement.reason}`, entitlement.detail)
+    return { ok: false, reason: 'billing_not_entitled', detail: entitlement.detail, imageWarnings: [] }
+  }
 
   // 1) write_content is mandatory before any mutation.
   if (!hasWriteContent(connection.granted_scopes)) {

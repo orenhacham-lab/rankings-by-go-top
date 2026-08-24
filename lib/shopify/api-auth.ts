@@ -26,6 +26,18 @@ export type ShopifyConnectionRow = {
   // Phase 4F.1 OAuth — scopes the merchant approved + how the token was obtained.
   granted_scopes: string[] | null
   auth_method: 'manual' | 'oauth'
+  // Phase 2 — canonical Shopify Shop GID (gid://shopify/Shop/…), captured
+  // server-side via Admin GraphQL at OAuth completion. NULL on pre-Phase-2
+  // connections until they re-verify (the billing guard fails closed on null).
+  shop_gid: string | null
+  // Phase 2 — cache/audit of the last Partner API activeSubscription check.
+  // NEVER the source of truth for a publish decision — see billing-guard.ts.
+  shopify_plan_handle: string | null
+  shopify_subscription_status: 'active' | 'none' | 'unknown' | null
+  shopify_trial_ends_at: string | null
+  shopify_current_period_end: string | null
+  shopify_billing_verified_at: string | null
+  shopify_billing_last_error: string | null
   created_at: string
   updated_at: string
 }
@@ -95,6 +107,14 @@ export function sanitizeShopifyConnection(c: ShopifyConnectionRow) {
     last_error: c.last_error,
     granted_scopes: Array.isArray(c.granted_scopes) ? c.granted_scopes : [],
     auth_method: c.auth_method ?? 'oauth',
+    // Phase 2 — safe to expose: plan handle/status/dates, never the shop_gid
+    // itself (no reason the browser needs it) and never anything token-shaped.
+    shopify_plan_handle: c.shopify_plan_handle ?? null,
+    shopify_subscription_status: c.shopify_subscription_status ?? null,
+    shopify_trial_ends_at: c.shopify_trial_ends_at ?? null,
+    shopify_current_period_end: c.shopify_current_period_end ?? null,
+    shopify_billing_verified_at: c.shopify_billing_verified_at ?? null,
+    shopify_billing_last_error: c.shopify_billing_last_error ?? null,
     // Phase 4F.2 — true when write_content was granted (publishing is enabled).
     can_publish: hasWriteContent(c.granted_scopes),
     default_blog_id: c.default_blog_id ?? null,

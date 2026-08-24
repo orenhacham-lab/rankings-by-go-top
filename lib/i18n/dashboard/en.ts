@@ -2507,5 +2507,12 @@ export const dashboardEn = {
       invalidClientId: 'Invalid PayPal client ID. Check NEXT_PUBLIC_PAYPAL_CLIENT_ID',
       unknownError: 'Unknown error',
     },
+    shopify: {
+      title: 'Billing is managed through Shopify',
+      description: 'Your store is connected to the Shopify app, so your plan is billed through Shopify App Pricing — not PayPal.',
+      manageButton: 'Manage plan in Shopify',
+      migrationPending: 'We’re finishing linking your billing to Shopify. This can take a moment — refresh this page shortly.',
+      migrationNeedsAttention: 'Your Shopify plan is active, but we’re still finalizing your previous billing. If this doesn’t resolve on its own, contact us.',
+    },
   },
 } as const

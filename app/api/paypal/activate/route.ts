@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isKnownPlanCode, verifyPayPalActivation } from '@/lib/paypal/client'
 import { transitionSubscriptionToActivePlan } from '@/lib/paypal/activation-processing'
+import { hasActiveShopifyConnection } from '@/lib/shopify/paypal-block'
 
 /**
  * Phase 1 hardening (goal E): activation is NEVER granted on client-submitted
@@ -41,6 +42,17 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
+    // Phase 2 — defense-in-depth: a merchant with an actively connected
+    // Shopify store must use Shopify App Pricing exclusively. Checked here
+    // independent of whether the PayPal UI was actually hidden client-side
+    // (app/(dashboard)/billing/BillingView.tsx) — never decided by referrer,
+    // UTM, or any other client-supplied signal.
+    const admin = createAdminClient()
+    if (await hasActiveShopifyConnection(admin, user.id)) {
+      console.warn('[paypal-activate] blocked: user has an active Shopify connection', { userId: user.id })
+      return Response.json({ error: 'Shopify billing required', reason: 'shopify_store_connected' }, { status: 403 })
+    }
+
     // Mandatory server-side verification — no env-gated skip, no "continue
     // anyway" on failure. Every branch here fails closed: nothing is written
     // to the database unless PayPal itself confirms the exact subscription id,
@@ -59,7 +71,6 @@ export async function POST(request: Request) {
     const periodEnd = new Date(now)
     periodEnd.setMonth(periodEnd.getMonth() + 1)
 
-    const admin = createAdminClient()
     const result = await transitionSubscriptionToActivePlan(admin, user.id, {
       plan_code: verified.planCode,
       status: 'active',

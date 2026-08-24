@@ -14,12 +14,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-auth'
 import { normalizeShopDomain } from '@/lib/shopify/domain'
 import { SHOPIFY_API_VERSION, missingScopes } from '@/lib/shopify/constants'
-import { testShopifyConnection } from '@/lib/shopify/client'
+import { testShopifyConnection, getShopIdentity } from '@/lib/shopify/client'
 import {
   getShopifyOAuthConfig, verifyShopifyHmac, exchangeCodeForToken, projectReturnUrl, contentHubReturnUrl,
   verifyNonceCookie, OAUTH_NONCE_COOKIE, OAUTH_COOKIE_PATH,
 } from '@/lib/shopify/oauth'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
+import { initiateMigrationIfPayPalSubscriber } from '@/lib/shopify/paypal-migration'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -130,6 +131,48 @@ export async function GET(request: Request) {
   const status = missing.length > 0 ? 'failed' : 'connected'
   const lastError = missing.length > 0 ? `missing_scopes: ${missing.join(', ')}` : null
 
+  // 12b) Phase 2 — resolve the canonical Shopify Shop GID server-side via Admin
+  // GraphQL (never accepted from the browser). Required for Partner API billing
+  // verification; a connection with no shop_gid fails closed on Shopify
+  // publishing (see lib/shopify/billing-guard.ts) until it re-verifies.
+  const shopIdentity = await getShopIdentity(creds)
+  if (shopIdentity && shopIdentity.myshopifyDomain !== shop) {
+    // Defense-in-depth only — should never happen (the token is scoped to
+    // `shop`). Don't trust either value if they disagree; leave shop_gid null.
+    console.warn('[Shopify OAuth] shop identity mismatch', { route: 'shopify_oauth_callback', expected: shop, actual: shopIdentity.myshopifyDomain })
+  }
+  const shopGid = shopIdentity && shopIdentity.myshopifyDomain === shop ? shopIdentity.shopGid : null
+
+  // 12c) Phase 2 — enforce one canonical owner per Shopify store: reject if this
+  // shop_domain (or shop_gid) is already claimed by a DIFFERENT project. Mirrors
+  // the DB-level unique constraint added in
+  // supabase/migrations/20260828_add_shopify_app_pricing.sql (not yet applied),
+  // so the invariant holds at the application layer regardless. Never silently
+  // reassigns or overwrites another project's connection — a genuine conflict
+  // requires a human decision.
+  const { data: existingByDomain } = await auth.admin
+    .from('shopify_connections')
+    .select('id, project_id')
+    .eq('shop_domain', shop)
+    .neq('project_id', auth.project.id)
+    .maybeSingle()
+  if (existingByDomain) {
+    console.warn('[Shopify OAuth] shop already connected to a different project', { route: 'shopify_oauth_callback', shop, conflictingProjectId: existingByDomain.project_id })
+    return toProject(st.project_id, { shopify: 'error', reason: 'shop_already_connected' })
+  }
+  if (shopGid) {
+    const { data: existingByGid } = await auth.admin
+      .from('shopify_connections')
+      .select('id, project_id')
+      .eq('shop_gid', shopGid)
+      .neq('project_id', auth.project.id)
+      .maybeSingle()
+    if (existingByGid) {
+      console.warn('[Shopify OAuth] shop_gid already connected to a different project', { route: 'shopify_oauth_callback', shopGid, conflictingProjectId: existingByGid.project_id })
+      return toProject(st.project_id, { shopify: 'error', reason: 'shop_already_connected' })
+    }
+  }
+
   // 13) Encrypt + persist (token never leaves the server).
   let tokenEncrypted: string
   try { tokenEncrypted = encryptCredential(token.accessToken) } catch {
@@ -137,10 +180,11 @@ export async function GET(request: Request) {
   }
 
   const nowIso = new Date().toISOString()
-  const { error: saveErr } = await auth.admin.from('shopify_connections').upsert({
+  const { data: savedConnection, error: saveErr } = await auth.admin.from('shopify_connections').upsert({
     user_id: auth.project.user_id,
     project_id: auth.project.id,
     shop_domain: shop,
+    shop_gid: shopGid,
     storefront_domain: storefront,
     access_token_encrypted: tokenEncrypted,
     api_version: SHOPIFY_API_VERSION,
@@ -150,10 +194,26 @@ export async function GET(request: Request) {
     last_tested_at: nowIso,
     last_error: lastError,
     updated_at: nowIso,
-  }, { onConflict: 'project_id' })
+  }, { onConflict: 'project_id' }).select('id').maybeSingle()
   if (saveErr) {
     console.error('[Shopify OAuth] save failed:', saveErr.message)
-    return toProject(st.project_id, { shopify: 'error', reason: 'save_failed' })
+    // Defense-in-depth against a race between the pre-check above and this
+    // write: a unique-constraint violation (once the Phase 2 migration is
+    // applied) surfaces as the same clear reason, never a raw DB error.
+    const reason = (saveErr as { code?: string }).code === '23505' ? 'shop_already_connected' : 'save_failed'
+    return toProject(st.project_id, { shopify: 'error', reason })
+  }
+
+  // 13b) Phase 2 — if this user already has a real, paid PayPal subscription,
+  // start (or reuse) the PayPal→Shopify migration. This does NOT block the
+  // connection itself; it locks Shopify publishing until the migration
+  // completes (see lib/shopify/billing-guard.ts).
+  if (savedConnection?.id) {
+    await initiateMigrationIfPayPalSubscriber(auth.admin, {
+      userId: auth.project.user_id,
+      projectId: auth.project.id,
+      shopifyConnectionId: savedConnection.id,
+    })
   }
 
   // K1 — a WARNING (missing scopes) stays on the integration (project) screen so

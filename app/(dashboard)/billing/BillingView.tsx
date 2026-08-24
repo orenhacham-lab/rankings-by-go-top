@@ -15,6 +15,12 @@ interface BillingViewProps {
   subscriptionEndsAt: string | null
   hasPaypalSubscriptionId: boolean
   renewalCancelled: boolean
+  /** Phase 2 — true when this user has an actively CONNECTED Shopify store.
+   *  When true, PayPal checkout/upgrade/cancel UI is hidden entirely — this
+   *  merchant must use Shopify App Pricing exclusively. */
+  shopifyConnected: boolean
+  shopifyPricingUrl: string | null
+  shopifyMigrationStatus: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | null
   planPrices: Record<PlanKey, number>
 }
 
@@ -26,6 +32,9 @@ export default function BillingView({
   subscriptionEndsAt,
   hasPaypalSubscriptionId,
   renewalCancelled,
+  shopifyConnected,
+  shopifyPricingUrl,
+  shopifyMigrationStatus,
   planPrices,
 }: BillingViewProps) {
   const { language, isLoaded } = useDashboardLanguage()
@@ -89,103 +98,126 @@ export default function BillingView({
         </div>
       )}
 
-      {hasActiveSubscription && (
+      {shopifyConnected ? (
         <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">{t.manage.title}</h2>
-          {renewalCancelled ? (
-            <p className="text-slate-700 dark:text-slate-300 text-sm">
-              {t.manage.renewalAlreadyCancelled}
-              {subscriptionEndsAt && (
-                <span className="font-semibold">
-                  {' '}{new Date(subscriptionEndsAt).toLocaleDateString(dateLocale)}
-                </span>
-              )}
-            </p>
-          ) : hasPaypalSubscriptionId ? (
-            <>
-              <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.manage.description}</p>
-              <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {cancelling ? t.manage.cancelling : t.manage.cancelButton}
-              </button>
-            </>
-          ) : (
-            <p className="text-slate-700 dark:text-slate-300 text-sm">{t.manage.contactToCancel}</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.shopify.title}</h2>
+          <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.shopify.description}</p>
+          {shopifyMigrationStatus === 'pending' && (
+            <p className="mb-4 text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-3">{t.shopify.migrationPending}</p>
           )}
-          {cancelMessage && (
-            <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{cancelMessage}</p>
+          {shopifyMigrationStatus === 'paypal_cancel_failed' && (
+            <p className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">{t.shopify.migrationNeedsAttention}</p>
+          )}
+          {shopifyPricingUrl && (
+            <a
+              href={shopifyPricingUrl}
+              className="inline-block px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+            >
+              {t.shopify.manageButton}
+            </a>
           )}
         </div>
+      ) : (
+        <>
+          {hasActiveSubscription && (
+            <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">{t.manage.title}</h2>
+              {renewalCancelled ? (
+                <p className="text-slate-700 dark:text-slate-300 text-sm">
+                  {t.manage.renewalAlreadyCancelled}
+                  {subscriptionEndsAt && (
+                    <span className="font-semibold">
+                      {' '}{new Date(subscriptionEndsAt).toLocaleDateString(dateLocale)}
+                    </span>
+                  )}
+                </p>
+              ) : hasPaypalSubscriptionId ? (
+                <>
+                  <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.manage.description}</p>
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelling}
+                    className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {cancelling ? t.manage.cancelling : t.manage.cancelButton}
+                  </button>
+                </>
+              ) : (
+                <p className="text-slate-700 dark:text-slate-300 text-sm">{t.manage.contactToCancel}</p>
+              )}
+              {cancelMessage && (
+                <p className="mt-3 text-sm text-slate-700 dark:text-slate-300">{cancelMessage}</p>
+              )}
+            </div>
+          )}
+
+          <p className="mb-6 text-xs text-slate-500 dark:text-slate-400">
+            {t.keywordCheckNote}
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <PlanCard
+              name={t.trialName}
+              price={0}
+              period=""
+              features={t.features.trial}
+              isPopular={false}
+              isCurrent={plan === 'trial'}
+              plan="trial"
+              recommendedLabel={t.recommended}
+              currentLabel={t.currentPlan}
+            />
+            <PlanCard
+              name={t.planLabels.regular}
+              price={planPrices.regular}
+              period={t.perMonth}
+              features={t.features.regular}
+              isPopular={false}
+              isCurrent={plan === 'regular' && hasActiveSubscription}
+              plan="regular"
+              recommendedLabel={t.recommended}
+              currentLabel={t.currentPlan}
+            />
+            <PlanCard
+              name={t.planLabels.advanced}
+              price={planPrices.advanced}
+              period={t.perMonth}
+              features={t.features.advanced}
+              isPopular={true}
+              isCurrent={plan === 'advanced' && hasActiveSubscription}
+              plan="advanced"
+              recommendedLabel={t.recommended}
+              currentLabel={t.currentPlan}
+            />
+            <PlanCard
+              name={t.planLabels.premium}
+              price={planPrices.premium}
+              period={t.perMonth}
+              features={t.features.premium}
+              isPopular={false}
+              isCurrent={plan === 'premium' && hasActiveSubscription}
+              plan="premium"
+              recommendedLabel={t.recommended}
+              currentLabel={t.currentPlan}
+            />
+            {planPrices.large_agency !== undefined && (
+              <PlanCard
+                name={t.planLabels.large_agency}
+                price={planPrices.large_agency}
+                period={t.perMonth}
+                features={t.features.large_agency}
+                isPopular={false}
+                isCurrent={plan === 'large_agency' && hasActiveSubscription}
+                plan="large_agency"
+                recommendedLabel={t.recommended}
+                currentLabel={t.currentPlan}
+              />
+            )}
+          </div>
+
+          <BillingClient />
+        </>
       )}
-
-      <p className="mb-6 text-xs text-slate-500 dark:text-slate-400">
-        {t.keywordCheckNote}
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <PlanCard
-          name={t.trialName}
-          price={0}
-          period=""
-          features={t.features.trial}
-          isPopular={false}
-          isCurrent={plan === 'trial'}
-          plan="trial"
-          recommendedLabel={t.recommended}
-          currentLabel={t.currentPlan}
-        />
-        <PlanCard
-          name={t.planLabels.regular}
-          price={planPrices.regular}
-          period={t.perMonth}
-          features={t.features.regular}
-          isPopular={false}
-          isCurrent={plan === 'regular' && hasActiveSubscription}
-          plan="regular"
-          recommendedLabel={t.recommended}
-          currentLabel={t.currentPlan}
-        />
-        <PlanCard
-          name={t.planLabels.advanced}
-          price={planPrices.advanced}
-          period={t.perMonth}
-          features={t.features.advanced}
-          isPopular={true}
-          isCurrent={plan === 'advanced' && hasActiveSubscription}
-          plan="advanced"
-          recommendedLabel={t.recommended}
-          currentLabel={t.currentPlan}
-        />
-        <PlanCard
-          name={t.planLabels.premium}
-          price={planPrices.premium}
-          period={t.perMonth}
-          features={t.features.premium}
-          isPopular={false}
-          isCurrent={plan === 'premium' && hasActiveSubscription}
-          plan="premium"
-          recommendedLabel={t.recommended}
-          currentLabel={t.currentPlan}
-        />
-        {planPrices.large_agency !== undefined && (
-          <PlanCard
-            name={t.planLabels.large_agency}
-            price={planPrices.large_agency}
-            period={t.perMonth}
-            features={t.features.large_agency}
-            isPopular={false}
-            isCurrent={plan === 'large_agency' && hasActiveSubscription}
-            plan="large_agency"
-            recommendedLabel={t.recommended}
-            currentLabel={t.currentPlan}
-          />
-        )}
-      </div>
-
-      <BillingClient />
     </div>
   )
 }

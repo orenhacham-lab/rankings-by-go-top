@@ -153,6 +153,44 @@ export async function verifyPayPalActivation(
   return { ok: true, planCode: resolvedPlanCode }
 }
 
+export type CancelSubscriptionResult =
+  | { ok: true }
+  | { ok: false; reason: 'paypal_not_configured' | 'cancel_request_failed' }
+
+/**
+ * Phase 2 — cancel a PayPal subscription's renewal via PayPal's official
+ * POST /v1/billing/subscriptions/{id}/cancel. Used by the Shopify migration
+ * state machine (lib/shopify/paypal-migration.ts) ONLY after the Partner API
+ * has already confirmed an active Shopify plan for the same account — never
+ * called speculatively. A 404/422 (already cancelled/not found) is treated
+ * as success — the goal (no further PayPal billing) is already satisfied.
+ */
+export async function cancelPayPalSubscription(
+  subscriptionId: string,
+  reason: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CancelSubscriptionResult> {
+  let token: string
+  try {
+    token = await getPayPalToken(fetchImpl)
+  } catch {
+    return { ok: false, reason: 'paypal_not_configured' }
+  }
+  try {
+    const response = await fetchImpl(`${paypalApiUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    if (response.ok || response.status === 204 || response.status === 404 || response.status === 422) {
+      return { ok: true }
+    }
+    return { ok: false, reason: 'cancel_request_failed' }
+  } catch {
+    return { ok: false, reason: 'cancel_request_failed' }
+  }
+}
+
 // ── Webhook signature verification (Phase 1 goal F) ─────────────────────────
 
 export interface PayPalWebhookHeaders {

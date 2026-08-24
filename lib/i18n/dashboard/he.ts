@@ -2518,6 +2518,13 @@ export const dashboardHe = {
       invalidClientId: 'שגיאה ב-client ID של PayPal. בדוק את NEXT_PUBLIC_PAYPAL_CLIENT_ID',
       unknownError: 'שגיאה לא ידועה',
     },
+    shopify: {
+      title: 'החיוב מנוהל דרך Shopify',
+      description: 'החנות שלך מחוברת לאפליקציית Shopify, ולכן התוכנית שלך מחויבת דרך Shopify App Pricing — לא דרך PayPal.',
+      manageButton: 'ניהול תוכנית ב-Shopify',
+      migrationPending: 'אנחנו מסיימים לקשר את החיוב שלך ל-Shopify. זה עשוי לקחת רגע — רענן/י את הדף בקרוב.',
+      migrationNeedsAttention: 'התוכנית שלך ב-Shopify פעילה, אך אנחנו עדיין משלימים את סגירת החיוב הקודם. אם זה לא נפתר מעצמו, צרו איתנו קשר.',
+    },
   },
 } as const
 

@@ -46,6 +46,21 @@ export function missingScopes(granted: string[], required: readonly string[] = S
 }
 
 /**
+ * Phase 2 — the ONLY Shopify App Pricing plan handles this app treats as a
+ * valid paid entitlement for Shopify publishing. The obsolete public
+ * `free-plan` and private `shopify-test` plans are deliberately NOT included:
+ * a merchant on either of those has no verifiable Partner-API-confirmed paid
+ * plan, so the publishing guard must treat them as unentitled.
+ */
+export const SHOPIFY_SUPPORTED_PLAN_HANDLES = ['regular', 'advanced', 'premium', 'large-agency'] as const
+export type ShopifyPlanHandle = (typeof SHOPIFY_SUPPORTED_PLAN_HANDLES)[number]
+
+/** True narrowing guard: is this a Shopify App Pricing plan handle we grant entitlement for. */
+export function isSupportedShopifyPlanHandle(value: unknown): value is ShopifyPlanHandle {
+  return typeof value === 'string' && (SHOPIFY_SUPPORTED_PLAN_HANDLES as readonly string[]).includes(value)
+}
+
+/**
  * Classify a connection test into one precise status. PURE + unit-tested.
  * Priority: invalid token → can't read scopes → missing scopes → version
  * fall-forward → healthy.

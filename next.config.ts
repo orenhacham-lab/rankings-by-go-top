@@ -39,6 +39,19 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Phase 2 — the embedded Shopify App Home is the ONLY page in this
+        // app meant to render inside an iframe. Explicitly scope
+        // frame-ancestors to Shopify only, rather than leaving framing
+        // unrestricted (the site otherwise sets no X-Frame-Options/CSP).
+        source: '/shopify/app/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;',
+          },
+        ],
+      },
     ];
   },
 };
