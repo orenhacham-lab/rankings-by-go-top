@@ -375,17 +375,22 @@ export interface Profile {
 export type SubscriptionPlan = 'regular' | 'advanced' | 'premium' | 'large_agency'
 export type SubscriptionStatus = 'trial' | 'active' | 'inactive' | 'cancelled' | 'expired'
 
+/**
+ * Matches the verified production schema exactly (information_schema.columns,
+ * 2026-08-16) — NOT the pre-Phase-1 shape this interface previously declared
+ * (`plan`, `current_period_start`, `scans_this_period`, `scans_period_key` do
+ * not exist as columns). `plan_code` and `trial_ends_at` are nullable: a
+ * trial row has no plan_code yet, and a manually-granted/paid active row has
+ * no trial_ends_at.
+ */
 export interface Subscription {
   id: string
   user_id: string
-  plan: SubscriptionPlan
   status: SubscriptionStatus
-  paypal_subscription_id: string | null
   trial_ends_at: string | null
-  current_period_start: string | null
   current_period_end: string | null
-  scans_this_period: number
-  scans_period_key: string | null
+  plan_code: SubscriptionPlan | null
+  paypal_subscription_id: string | null
   created_at: string
   updated_at: string
 }

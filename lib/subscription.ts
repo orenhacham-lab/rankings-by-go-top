@@ -1,4 +1,5 @@
 import type { SubscriptionPlan } from '@/lib/supabase/types'
+import { isKnownPlanCode } from '@/lib/paypal/client'
 
 export type PlanType = 'trial' | SubscriptionPlan
 
@@ -77,16 +78,7 @@ export interface UserEntitlement {
   trialEndsAt: string | null
   hasActiveSubscription: boolean
   subscriptionEndsAt: string | null
-  scansThisPeriod: number
   subscriptionId: string | null
-}
-
-/**
- * Get current month key in 'YYYY-MM' format
- */
-export function currentPeriodKey(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 /**
@@ -118,22 +110,32 @@ export async function getUserEntitlement(
       trialEndsAt: null,
       hasActiveSubscription: true,
       subscriptionEndsAt: null,
-      scansThisPeriod: 0,
       subscriptionId: null,
     }
   }
 
-  // Fetch most recent trial, active, or cancelled subscription.
+  // Fetch most recent trial, active, or cancelled subscription. `plan_code`
+  // is the real column (the `plan` column referenced pre-fix did not exist,
+  // so this select always errored and every non-admin user silently fell
+  // back to trial-tier limits regardless of actual status).
   // 'cancelled' status means the renewal was cancelled in PayPal but access
   // remains valid until current_period_end.
-  const { data: sub } = await supabase
+  const { data: sub, error } = await supabase
     .from('subscriptions')
-    .select('id, plan, status, trial_ends_at, current_period_end, scans_this_period, scans_period_key')
+    .select('id, plan_code, status, trial_ends_at, current_period_end')
     .eq('user_id', userId)
     .in('status', ['trial', 'active', 'cancelled'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  if (error) {
+    // Fail closed: a read error means we genuinely don't know this user's
+    // status, so we do NOT grant paid entitlement — fall through to the
+    // trial defaults below, same as "no subscription row found", but LOGGED
+    // rather than silently discarded.
+    console.error('[subscription] getUserEntitlement query failed', { userId, message: error.message })
+  }
 
   let plan: PlanType = 'trial'
   let trialActive = false
@@ -145,19 +147,16 @@ export async function getUserEntitlement(
     trialActive = trialEndsAt ? new Date(trialEndsAt) > now : false
     plan = 'trial'
   } else if (sub?.status === 'active') {
-    hasActiveSubscription = !sub.current_period_end || new Date(sub.current_period_end) > now
-    plan = hasActiveSubscription ? (sub.plan as SubscriptionPlan) : 'trial'
+    const periodOk = !sub.current_period_end || new Date(sub.current_period_end) > now
+    const resolvedPlan = periodOk && isKnownPlanCode(sub.plan_code) ? sub.plan_code : null
+    hasActiveSubscription = resolvedPlan !== null
+    plan = resolvedPlan ?? 'trial'
   } else if (sub?.status === 'cancelled') {
     // Renewal cancelled: keep access until paid period ends.
-    hasActiveSubscription = !!sub.current_period_end && new Date(sub.current_period_end) > now
-    plan = hasActiveSubscription ? (sub.plan as SubscriptionPlan) : 'trial'
-  }
-
-  // Resolve scans used this period for paid plans
-  let scansThisPeriod = 0
-  if (hasActiveSubscription && sub) {
-    const periodKey = currentPeriodKey()
-    scansThisPeriod = sub.scans_period_key === periodKey ? sub.scans_this_period : 0
+    const periodOk = !!sub.current_period_end && new Date(sub.current_period_end) > now
+    const resolvedPlan = periodOk && isKnownPlanCode(sub.plan_code) ? sub.plan_code : null
+    hasActiveSubscription = resolvedPlan !== null
+    plan = resolvedPlan ?? 'trial'
   }
 
   return {
@@ -168,7 +167,6 @@ export async function getUserEntitlement(
     trialEndsAt,
     hasActiveSubscription,
     subscriptionEndsAt: sub?.current_period_end ?? null,
-    scansThisPeriod,
     subscriptionId: sub?.id ?? null,
   }
 }

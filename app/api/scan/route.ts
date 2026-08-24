@@ -504,18 +504,9 @@ export async function POST(request: Request) {
       .eq('id', scan.id)
 
     // Source of truth for keyword-check usage is the scan_results table,
-    // which we count from at quota-check time. We also maintain the legacy
-    // subscriptions.scans_this_period field as a coarse running counter
-    // (incremented by the number of checks consumed, not by 1) so old
-    // consumers don't break — it is no longer used for enforcement.
-    if (!entitlement.isAdmin && entitlement.plan !== 'trial' && entitlement.subscriptionId) {
-      await admin
-        .from('subscriptions')
-        .update({
-          scans_this_period: entitlement.scansThisPeriod + completedTargets + failedTargets,
-        })
-        .eq('id', entitlement.subscriptionId)
-    }
+    // which we count from at quota-check time (lib/quota.ts) — subscriptions
+    // carries no usage counter (scans_this_period/scans_period_key are not
+    // real columns; see lib/subscription.ts). Nothing to write back here.
 
     // Update project last_scan_at only — manual scans never change the scheduled next_scan_at
     await admin

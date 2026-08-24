@@ -1,10 +1,30 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { SubscriptionPlan } from '@/lib/supabase/types'
+import { isKnownPlanCode, verifyPayPalActivation } from '@/lib/paypal/client'
+import { transitionSubscriptionToActivePlan } from '@/lib/paypal/activation-processing'
 
+/**
+ * Phase 1 hardening (goal E): activation is NEVER granted on client-submitted
+ * data alone. PayPal verification is now mandatory (previously optional/
+ * best-effort, and a failure fell through to "continue anyway — webhook will
+ * verify later"). The stored plan_code is always the server-resolved value
+ * from PayPal's own plan_id, never the raw client string, and a resolution
+ * mismatch fails closed rather than trusting either side.
+ *
+ * Corrective pass (write-ordering defect): the original Phase 1 version
+ * cancelled the user's existing trial/active row FIRST, then inserted the
+ * new paid row — so a failed insert (any transient DB error) left the user
+ * with NO valid entitlement at all, despite PayPal having already approved
+ * the charge. lib/paypal/activation-processing.ts now UPDATEs the existing
+ * trial/active row IN PLACE (a single atomic write to one row — nothing to
+ * insert, so no uniqueness constraint on that table can be violated by this
+ * operation) instead of cancel-then-insert. If no trial/active row exists,
+ * it inserts fresh (safe on its own: there is no prior valid entitlement to
+ * lose in that case). Either way, if the write fails, the prior state is
+ * verifiably unchanged.
+ */
 export async function POST(request: Request) {
   try {
-    // Auth check
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -15,71 +35,51 @@ export async function POST(request: Request) {
     const { subscriptionId, plan } = body
 
     if (!subscriptionId || !plan) {
-      return Response.json(
-        { error: 'subscriptionId and plan are required' },
-        { status: 400 }
-      )
+      return Response.json({ error: 'subscriptionId and plan are required' }, { status: 400 })
     }
-
-    // Validate plan
-    const validPlans = ['regular', 'advanced', 'premium', 'large_agency']
-    if (!validPlans.includes(plan)) {
+    if (!isKnownPlanCode(plan)) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-
-    // Optional: Verify subscription with PayPal API
-    // (requires PayPal credentials, can be skipped for now)
-    if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_SECRET) {
-      try {
-        const token = await getPayPalToken()
-        const subscriptionDetails = await verifyPayPalSubscription(
-          subscriptionId,
-          token
-        )
-        if (subscriptionDetails.status !== 'APPROVAL_PENDING' && subscriptionDetails.status !== 'ACTIVE') {
-          return Response.json(
-            { error: 'Invalid subscription status' },
-            { status: 400 }
-          )
-        }
-      } catch (error) {
-        console.warn('Failed to verify PayPal subscription:', error)
-        // Continue anyway - webhook will verify later
-      }
+    // Mandatory server-side verification — no env-gated skip, no "continue
+    // anyway" on failure. Every branch here fails closed: nothing is written
+    // to the database unless PayPal itself confirms the exact subscription id,
+    // an acceptable status, AND a plan_id that resolves to the submitted plan.
+    const verified = await verifyPayPalActivation({ submittedSubscriptionId: subscriptionId, submittedPlanCode: plan })
+    if (!verified.ok) {
+      console.warn('[paypal-activate] verification failed', { userId: user.id, reason: verified.reason })
+      return Response.json({ error: 'PayPal verification failed', reason: verified.reason }, { status: 400 })
     }
 
-    // Mark all previous trial and active subscriptions as cancelled
-    await admin
-      .from('subscriptions')
-      .update({ status: 'cancelled' })
-      .eq('user_id', user.id)
-      .in('status', ['trial', 'active'])
-
-    // Create new subscription record
+    // Matches the REAL schema (plan_code, no current_period_start/
+    // scans_this_period/scans_period_key columns). trial_ends_at is
+    // intentionally omitted (NULL): a paid active row has no trial end, and
+    // the column is nullable as of the Phase-1 migration.
     const now = new Date()
     const periodEnd = new Date(now)
     periodEnd.setMonth(periodEnd.getMonth() + 1)
 
-    const { error } = await admin.from('subscriptions').insert({
-      user_id: user.id,
-      plan: plan as SubscriptionPlan,
+    const admin = createAdminClient()
+    const result = await transitionSubscriptionToActivePlan(admin, user.id, {
+      plan_code: verified.planCode,
       status: 'active',
       paypal_subscription_id: subscriptionId,
-      current_period_start: now.toISOString(),
       current_period_end: periodEnd.toISOString(),
-      scans_this_period: 0,
-      scans_period_key: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
     })
 
-    if (error) {
-      console.error('Failed to create subscription record:', error)
-      console.error('Database error details:', error.message)
-      return Response.json(
-        { error: `Failed to save subscription: ${error.message}` },
-        { status: 500 }
-      )
+    if (result.kind === 'lookup_failed') {
+      console.error('[paypal-activate] failed to look up existing subscription', { userId: user.id, message: result.message })
+      return Response.json({ error: `Failed to check existing subscription: ${result.message}` }, { status: 500 })
+    }
+    if (result.kind === 'write_failed') {
+      console.error('[paypal-activate] failed to save subscription', { userId: user.id, message: result.message })
+      return Response.json({ error: `Failed to save subscription: ${result.message}` }, { status: 500 })
+    }
+    if (result.kind === 'multiple_current_entitlement_rows') {
+      // Data-integrity violation that predates this request — never guess
+      // which row is "the" entitlement. Surfaced loudly, not silently fixed.
+      console.error('[paypal-activate] invariant violated: multiple current trial/active rows', { userId: user.id, count: result.count })
+      return Response.json({ error: 'Account has more than one active entitlement record — contact support.' }, { status: 500 })
     }
 
     return Response.json({ success: true })
@@ -92,54 +92,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-}
-
-interface PayPalTokenResponse {
-  access_token: string
-}
-
-interface PayPalSubscription {
-  status: string
-}
-
-async function getPayPalToken(): Promise<string> {
-  const auth = Buffer.from(
-    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
-  ).toString('base64')
-
-  const response = await fetch(
-    `${process.env.PAYPAL_API_URL || 'https://api.paypal.com'}/v1/oauth2/token`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: 'grant_type=client_credentials',
-    }
-  )
-
-  const data = await response.json() as PayPalTokenResponse
-  return data.access_token
-}
-
-async function verifyPayPalSubscription(
-  subscriptionId: string,
-  token: string
-): Promise<PayPalSubscription> {
-  const response = await fetch(
-    `${process.env.PAYPAL_API_URL || 'https://api.paypal.com'}/v1/billing/subscriptions/${subscriptionId}`,
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  )
-
-  if (!response.ok) {
-    throw new Error(`PayPal API error: ${response.statusText}`)
-  }
-
-  return response.json() as Promise<PayPalSubscription>
 }
