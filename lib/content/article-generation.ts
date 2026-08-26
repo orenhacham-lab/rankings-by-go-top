@@ -22,6 +22,7 @@ import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-d
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
 import { autoApplyApprovedLinksToDraft, type AutoApplyResult } from '@/lib/content/internal-link-apply'
 import { isInternalLinkAutoInsertAfterManualGenerationEnabled } from '@/lib/content/api-auth'
+import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -46,6 +47,9 @@ export type GenerateForTopicFailure =
   | { ok: false; kind: 'cta_details_missing' }
   | { ok: false; kind: 'generation'; reason: string; audit: unknown; attempts: number | undefined }
   | { ok: false; kind: 'insert_failed' }
+  // Blocker D fix — the project owner is Shopify-billing-required (no
+  // verified Shopify App Pricing plan). Checked BEFORE any Gemini call.
+  | { ok: false; kind: 'billing_required' }
 
 export type GenerateForTopicResult = GenerateForTopicSuccess | GenerateForTopicFailure
 
@@ -58,6 +62,16 @@ export async function generateArticleForTopic(
   opts: { topicId: string; userId: string; autoApplyInternalLinks?: boolean },
 ): Promise<GenerateForTopicResult> {
   const { topicId, userId } = opts
+
+  // Blocker D fix — the CENTRAL gate for article + auto-image generation.
+  // This is the ONE function every entry point (manual per-topic generate,
+  // the manual per-item route, the cron job, the "run automation now"
+  // route, and every retry) funnels through — see generatePoolItem() below,
+  // which is itself the sole caller reachable from cron/queue/retry. Checked
+  // FIRST, before any DB read beyond what's needed, and before any Gemini
+  // call (generateValidatedArticle / createFeaturedImageForArticle).
+  const gate = await assertContentGenerationAllowedForUser(admin, userId)
+  if (!gate.allowed) return { ok: false, kind: 'billing_required' }
 
   const { data: topic } = await admin.from('article_topics').select('*').eq('id', topicId).maybeSingle()
   if (!topic) return { ok: false, kind: 'topic_not_found' }

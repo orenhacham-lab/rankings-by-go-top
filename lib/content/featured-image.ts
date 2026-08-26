@@ -11,6 +11,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
+import { assertContentGenerationAllowedForProject } from '@/lib/content/entitlement-guard'
 
 export const CONTENT_IMAGE_BUCKET = 'content-article-images'
 
@@ -32,6 +33,12 @@ export async function createFeaturedImageForArticle(
     .maybeSingle()
   if (!article) return { error: 'article_not_found' }
   const a = article as Record<string, unknown>
+
+  // Blocker D fix — central gate for the STANDALONE image-regenerate route
+  // (the auto-image call from generateArticleForTopic is already gated
+  // there; this covers the path that does NOT go through it).
+  const gate = await assertContentGenerationAllowedForProject(admin, String(a.project_id))
+  if (!gate.allowed) return { error: 'billing_required' }
 
   // Language + topical context from the linked topic (best-effort).
   let language: 'he' | 'en' = 'he'

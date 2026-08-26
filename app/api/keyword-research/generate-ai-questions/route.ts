@@ -14,10 +14,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { analyzeSelectedKeywordSignals } from '@/lib/ai-visibility/keyword-analysis'
 import { generateKeywordResearchQuestions, toGeneratedQuestions, type GeneratedKRQuestion } from '@/lib/ai-visibility/keyword-research-question-generator'
 import { detectCategory } from '@/lib/ai-visibility/prompt-templates'
 import { classifyKeywordsWithGemini, isQuestionSemanticallyValid, reviewAndRepairQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { authorizeAiQuestionGeneration } from '@/lib/ai-visibility/keyword-research-auth'
 
 interface RequestBody {
   keyword: string
@@ -50,6 +53,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid request: projectId required' },
         { status: 400 }
+      )
+    }
+
+    // Security fix — this route previously ran with NO authentication or
+    // ownership check at all: any caller could spend Gemini cost against
+    // any projectId. Runs BEFORE any billable provider call
+    // (classifyKeywordsWithGemini / reviewAndRepairQuestions) and before any
+    // generation-state mutation. See lib/ai-visibility/keyword-research-auth.ts.
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const admin = createAdminClient()
+    const auth = await authorizeAiQuestionGeneration(admin, user?.id ?? null, body.projectId)
+    if (!auth.ok) {
+      return NextResponse.json(
+        'reason' in auth ? { error: auth.error, reason: auth.reason } : { error: auth.error },
+        { status: auth.status },
       )
     }
 

@@ -177,6 +177,7 @@ export type QuotaErrorPayload = {
 
 const EN_PLAN_LABEL: Record<PlanType, string> = {
   trial: 'Trial',
+  shopify_billing_required: 'Shopify billing required',
   regular: 'Regular',
   advanced: 'Advanced',
   premium: 'Premium',

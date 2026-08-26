@@ -36,6 +36,7 @@ export type ShopifyConnectionRow = {
   shopify_subscription_status: 'active' | 'none' | 'unknown' | null
   shopify_trial_ends_at: string | null
   shopify_current_period_end: string | null
+  shopify_cancel_at_end_of_cycle: boolean | null
   shopify_billing_verified_at: string | null
   shopify_billing_last_error: string | null
   created_at: string
@@ -113,6 +114,7 @@ export function sanitizeShopifyConnection(c: ShopifyConnectionRow) {
     shopify_subscription_status: c.shopify_subscription_status ?? null,
     shopify_trial_ends_at: c.shopify_trial_ends_at ?? null,
     shopify_current_period_end: c.shopify_current_period_end ?? null,
+    shopify_cancel_at_end_of_cycle: c.shopify_cancel_at_end_of_cycle ?? false,
     shopify_billing_verified_at: c.shopify_billing_verified_at ?? null,
     shopify_billing_last_error: c.shopify_billing_last_error ?? null,
     // Phase 4F.2 — true when write_content was granted (publishing is enabled).

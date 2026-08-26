@@ -56,6 +56,11 @@ ALTER TABLE public.shopify_connections
     CHECK (shopify_subscription_status IN ('active', 'none', 'unknown') OR shopify_subscription_status IS NULL),
   ADD COLUMN IF NOT EXISTS shopify_trial_ends_at timestamptz,
   ADD COLUMN IF NOT EXISTS shopify_current_period_end timestamptz,
+  -- Blocker-fix pass: whether Shopify itself will cancel this subscription at
+  -- the end of the current cycle (merchant-initiated cancellation already in
+  -- flight on Shopify's side). Display/audit only, same as the other cache
+  -- columns above.
+  ADD COLUMN IF NOT EXISTS shopify_cancel_at_end_of_cycle boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS shopify_billing_verified_at timestamptz,
   ADD COLUMN IF NOT EXISTS shopify_billing_last_error text;
 
@@ -172,5 +177,121 @@ CREATE POLICY shopify_billing_migrations_insert ON public.shopify_billing_migrat
 CREATE POLICY shopify_billing_migrations_update ON public.shopify_billing_migrations
   FOR UPDATE USING (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()))
   WITH CHECK (project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid()));
+
+-- ── 3) shopify_preauth_states — CSRF/nonce state for an App-Store-initiated
+-- OAuth flow that begins BEFORE any Rankings user/project is known (blocker
+-- fix). Mirrors shopify_oauth_states (20260726_add_shopify_oauth.sql)
+-- exactly, minus user_id/project_id, which genuinely don't exist yet at this
+-- point in the flow. Consumed exactly once at callback time, same as the
+-- existing table.
+
+CREATE TABLE IF NOT EXISTS public.shopify_preauth_states (
+  state        text PRIMARY KEY,
+  shop_domain  text NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  expires_at   timestamptz NOT NULL,
+  used_at      timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_shopify_preauth_states_expires
+  ON public.shopify_preauth_states (expires_at);
+
+ALTER TABLE public.shopify_preauth_states ENABLE ROW LEVEL SECURITY;
+-- Deliberately NO policies: there is no authenticated user to scope by at
+-- this point in the flow (pre-auth). RLS with zero policies denies every
+-- role except the service role (which bypasses RLS) — every application
+-- read/write to this table goes through the admin client after its own
+-- HMAC + one-time-consume checks (app/api/shopify/install,
+-- app/api/shopify/oauth/callback), matching the security model already used
+-- for shopify_billing_migrations' server-route-only writes.
+
+-- ── 4) shopify_pending_installs — the short-lived, single-use pending
+-- install/link record itself (blocker fix). Holds the OAuth result (token,
+-- shop identity, granted scopes) for an App-Store-initiated install BEFORE
+-- the merchant has authenticated on Rankings and chosen/created a project.
+-- Referenced ONLY by its own high-entropy `token` (never by a guessable
+-- sequential id), carried browser-side in a signed, httpOnly cookie (see
+-- lib/shopify/pending-link.ts) — never in an unsigned query parameter.
+-- Consumed exactly once, at which point the encrypted token is copied into
+-- a real shopify_connections row and this row is marked consumed (but not
+-- deleted, for audit).
+
+CREATE TABLE IF NOT EXISTS public.shopify_pending_installs (
+  token                   text PRIMARY KEY,
+  shop_domain             text NOT NULL,
+  -- Captured via Admin GraphQL at token-exchange time, same as
+  -- shopify_connections.shop_gid. NULL only if that lookup failed — such a
+  -- row can still be consumed, but the resulting connection will fail the
+  -- publish guard's shop_gid check until it re-verifies (same fail-closed
+  -- policy as the existing OAuth callback path).
+  shop_gid                text,
+  access_token_encrypted  text NOT NULL,
+  api_version             text NOT NULL,
+  granted_scopes          text[] NOT NULL DEFAULT '{}',
+  storefront_domain       text,
+  created_at              timestamptz NOT NULL DEFAULT now(),
+  expires_at              timestamptz NOT NULL,
+  consumed_at             timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_shopify_pending_installs_expires
+  ON public.shopify_pending_installs (expires_at);
+CREATE INDEX IF NOT EXISTS idx_shopify_pending_installs_shop
+  ON public.shopify_pending_installs (shop_domain);
+
+ALTER TABLE public.shopify_pending_installs ENABLE ROW LEVEL SECURITY;
+-- Deliberately NO policies — same rationale as shopify_preauth_states above.
+-- This table holds an ENCRYPTED access token pre-linking; only server routes
+-- using the admin client, after validating the signed cookie + expiry +
+-- consumed_at, ever read or write it.
+
+-- ── 5) shopify_billing_intents — the short-lived, single-use server-side
+-- authorization record for a pricing redirect / return round-trip (blocker
+-- fix). The `shop` query parameter Shopify appends to
+-- /api/shopify/billing/return is NEVER sufficient authorization on its own
+-- (an unauthenticated request could name any shop_domain in the database);
+-- this table is what actually authorizes that route's side effects
+-- (billing-cache write, migration advance, PayPal cancellation).
+--
+-- Only a HASH of the intent nonce is stored (sha256, hex) — the raw nonce
+-- lives ONLY in a signed-scope, HttpOnly, Secure cookie set immediately
+-- before the top-level redirect to Shopify's hosted pricing page (see
+-- lib/shopify/billing-intent.ts). Possession of a value whose hash matches a
+-- stored row IS the authorization; a guessed/forged nonce cannot match any
+-- row (256-bit entropy). Single-use: consumed_at is set atomically as part
+-- of the one legitimate processing pass; a replay of an already-consumed
+-- intent is detected and produces a safe idempotent no-op (same redirect,
+-- zero further side effects), never a repeated cache write / migration
+-- advance / PayPal cancellation.
+
+CREATE TABLE IF NOT EXISTS public.shopify_billing_intents (
+  nonce_hash    text PRIMARY KEY,
+  user_id       uuid NOT NULL,
+  project_id    uuid NOT NULL,
+  connection_id uuid NOT NULL REFERENCES public.shopify_connections(id) ON DELETE CASCADE,
+  shop_domain   text NOT NULL,
+  shop_gid      text NOT NULL,
+  -- Free-text label of what this intent authorizes (currently always
+  -- 'select_plan' — the only action that redirects to Shopify's pricing
+  -- page). Not constrained to an enum: this is audit metadata, never branched
+  -- on for a security decision.
+  intended_action text NOT NULL DEFAULT 'select_plan',
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  expires_at    timestamptz NOT NULL,
+  consumed_at   timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_shopify_billing_intents_expires
+  ON public.shopify_billing_intents (expires_at);
+CREATE INDEX IF NOT EXISTS idx_shopify_billing_intents_connection
+  ON public.shopify_billing_intents (connection_id);
+
+ALTER TABLE public.shopify_billing_intents ENABLE ROW LEVEL SECURITY;
+-- Deliberately NO policies — same rationale as shopify_preauth_states above.
+-- /api/shopify/billing/return is reached by an unauthenticated top-level
+-- redirect FROM Shopify (no Rankings session can be assumed to exist in
+-- that request); only server routes using the admin client, after
+-- validating the intent cookie's hash against this table, ever read or
+-- write it.
 
 COMMIT;

@@ -108,6 +108,16 @@ export async function initiateMigrationIfPayPalSubscriber(
 export interface AdvanceMigrationResult {
   status: MigrationStatus
   cancelFailed: boolean
+  // Blocker fix — true when PayPal cancellation succeeded but the DB write
+  // recording 'completed' could not be confirmed after retries. The DB row
+  // is left non-terminal ('pending'/'shopify_confirmed') in that case —
+  // NEVER reported as 'completed' without confirming the write — so the
+  // publish guard (which reads the row directly, not this return value)
+  // keeps Shopify publishing locked, and a later retry (new intent + return,
+  // or any other call to this function) safely re-attempts the same write;
+  // re-cancelling an already-cancelled PayPal subscription is itself
+  // idempotent (lib/paypal/client.ts treats 404/422 as success).
+  dbWriteUnconfirmed?: boolean
 }
 
 /**
@@ -150,12 +160,37 @@ export async function confirmShopifyActiveAndAdvance(
 
   const cancel = await cancelPayPalSubscription(migration.paypal_subscription_id, 'Migrated to Shopify App Pricing', fetchImpl)
   if (cancel.ok) {
-    await admin
-      .from('shopify_billing_migrations')
-      .update({ status: 'completed', last_error: null, updated_at: nowIso() })
-      .eq('id', migration.id)
+    // Blocker fix — PayPal cancellation is a completed, irreversible
+    // real-world side effect at this point. The DB write recording
+    // 'completed' must be CONFIRMED (not merely "no exception thrown") — a
+    // silently-discarded write error here would leave the row non-terminal
+    // while callers believed the migration was done. Retry a bounded number
+    // of times (same pattern as lib/shopify/publish-article.ts's critical
+    // shopify_article_id write); if it still can't be confirmed, report
+    // the LAST CONFIRMED status (never 'completed') plus
+    // dbWriteUnconfirmed:true, and log loudly for manual attention. The
+    // publish guard reads this row directly — never this function's return
+    // value — so publishing correctly stays locked either way, and a later
+    // retry (new intent, or any other call) safely re-attempts the same
+    // write (re-cancelling an already-cancelled PayPal subscription is
+    // itself idempotent — see lib/paypal/client.ts).
+    let confirmed = false
+    for (let i = 0; i < 3 && !confirmed; i++) {
+      const { data: updated, error } = await admin
+        .from('shopify_billing_migrations')
+        .update({ status: 'completed', last_error: null, updated_at: nowIso() })
+        .eq('id', migration.id)
+        .select('id')
+        .maybeSingle()
+      if (!error && updated) confirmed = true
+    }
+    if (!confirmed) {
+      console.error('[shopify-migration] PayPal cancelled but the "completed" DB write could not be confirmed after retries', { migrationId: migration.id, userId })
+      return { status: migration.status, cancelFailed: false, dbWriteUnconfirmed: true }
+    }
     // Best-effort local mirror — PayPal's own BILLING.SUBSCRIPTION.CANCELLED
-    // webhook will also arrive and apply the same update idempotently.
+    // webhook will also arrive and apply the same update idempotently. Not
+    // retried: a miss here just means the mirror catches up via that webhook.
     await admin
       .from('subscriptions')
       .update({ status: 'cancelled', updated_at: nowIso() })

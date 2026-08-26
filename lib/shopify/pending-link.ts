@@ -1,0 +1,120 @@
+/**
+ * Phase 2 (blocker fix) — the pending Shopify install/link record and its
+ * browser-side cookie. Bridges an App-Store-initiated OAuth completion
+ * (before any Rankings user/project exists) to the moment the merchant
+ * authenticates on Rankings and picks/creates a project to link the store
+ * to. Never preserved in an unsigned query parameter — the token lives in a
+ * signed, httpOnly cookie (same signing pattern as the existing OAuth nonce
+ * cookie in lib/shopify/oauth.ts), and the DB row it references is the
+ * actual source of truth (single-use: consumed_at, short-lived: expires_at).
+ */
+
+import crypto from 'crypto'
+import type { createAdminClient } from '@/lib/supabase/admin'
+import { getShopifyOAuthConfig } from './oauth'
+
+type Admin = ReturnType<typeof createAdminClient>
+
+export const PENDING_LINK_COOKIE = 'shopify_pending_link'
+export const PENDING_LINK_TTL_MS = 30 * 60_000
+
+export function generatePendingLinkToken(): string {
+  return crypto.randomBytes(32).toString('hex')
+}
+
+/** Sign the token for the browser cookie: `${token}.${hmac}`. PURE. */
+export function signPendingLinkCookieValue(token: string, secret: string): string {
+  const mac = crypto.createHmac('sha256', secret).update(token).digest('hex')
+  return `${token}.${mac}`
+}
+
+/** Verify a signed cookie value; returns the token or null (missing/tampered). PURE, constant-time. */
+export function verifyPendingLinkCookieValue(value: string | undefined | null, secret: string): string | null {
+  if (!value || typeof value !== 'string') return null
+  const dot = value.lastIndexOf('.')
+  if (dot <= 0) return null
+  const token = value.slice(0, dot)
+  const provided = value.slice(dot + 1)
+  const expected = crypto.createHmac('sha256', secret).update(token).digest('hex')
+  const a = Buffer.from(provided, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  if (a.length !== b.length) return null
+  return crypto.timingSafeEqual(a, b) ? token : null
+}
+
+/** Reads + HMAC-verifies the pending-link cookie straight from a Request header. Never hits the DB. */
+export function readPendingLinkTokenFromRequest(request: Request): string | null {
+  const config = getShopifyOAuthConfig()
+  if (!config) return null
+  const cookieHeader = request.headers.get('cookie') || ''
+  const entry = cookieHeader.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${PENDING_LINK_COOKIE}=`))
+  if (!entry) return null
+  let raw: string
+  try { raw = decodeURIComponent(entry.slice(PENDING_LINK_COOKIE.length + 1)) } catch { return null }
+  return verifyPendingLinkCookieValue(raw, config.clientSecret)
+}
+
+/**
+ * True when THIS request's browser carries a still-signature-valid pending
+ * Shopify link — used as a fast, DB-free defense-in-depth gate to block
+ * PayPal checkout during the pre-project-link window (Blocker 3). The
+ * cookie's maxAge is set equal to PENDING_LINK_TTL_MS, so an expired pending
+ * install and its cookie always expire together — no separate DB check is
+ * needed for this gate. The completion route re-validates against the DB
+ * regardless before ever using the record.
+ */
+export function hasPendingShopifyLinkCookie(request: Request): boolean {
+  return readPendingLinkTokenFromRequest(request) !== null
+}
+
+export interface PendingInstallRow {
+  token: string
+  shop_domain: string
+  shop_gid: string | null
+  access_token_encrypted: string
+  api_version: string
+  granted_scopes: string[]
+  storefront_domain: string | null
+  expires_at: string
+  consumed_at: string | null
+}
+
+export async function createPendingInstall(
+  admin: Admin,
+  fields: Omit<PendingInstallRow, 'token' | 'expires_at' | 'consumed_at'>,
+): Promise<string> {
+  const token = generatePendingLinkToken()
+  await admin.from('shopify_pending_installs').insert({
+    token,
+    ...fields,
+    expires_at: new Date(Date.now() + PENDING_LINK_TTL_MS).toISOString(),
+  })
+  return token
+}
+
+/** Loads a pending install by token IFF it is unexpired and unconsumed. The row IS the identity — never trust a caller-asserted shop/user alongside it. */
+export async function loadValidPendingInstall(admin: Admin, token: string): Promise<PendingInstallRow | null> {
+  if (!token) return null
+  const { data } = await admin
+    .from('shopify_pending_installs')
+    .select('*')
+    .eq('token', token)
+    .is('consumed_at', null)
+    .maybeSingle()
+  if (!data) return null
+  const row = data as PendingInstallRow
+  if (new Date(row.expires_at).getTime() < Date.now()) return null
+  return row
+}
+
+/** Marks a pending install consumed. Atomic (only succeeds while consumed_at is null) — a second consume attempt is a no-op. */
+export async function consumePendingInstall(admin: Admin, token: string): Promise<boolean> {
+  const { data } = await admin
+    .from('shopify_pending_installs')
+    .update({ consumed_at: new Date().toISOString() })
+    .eq('token', token)
+    .is('consumed_at', null)
+    .select('token')
+    .maybeSingle()
+  return !!data
+}

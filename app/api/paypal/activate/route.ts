@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isKnownPlanCode, verifyPayPalActivation } from '@/lib/paypal/client'
 import { transitionSubscriptionToActivePlan } from '@/lib/paypal/activation-processing'
-import { hasActiveShopifyConnection } from '@/lib/shopify/paypal-block'
+import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
+import { hasPendingShopifyLinkCookie } from '@/lib/shopify/pending-link'
 
 /**
  * Phase 1 hardening (goal E): activation is NEVER granted on client-submitted
@@ -42,15 +43,21 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
-    // Phase 2 — defense-in-depth: a merchant with an actively connected
-    // Shopify store must use Shopify App Pricing exclusively. Checked here
-    // independent of whether the PayPal UI was actually hidden client-side
-    // (app/(dashboard)/billing/BillingView.tsx) — never decided by referrer,
-    // UTM, or any other client-supplied signal.
+    // Phase 2 (blocker fix) — defense-in-depth against the FULL
+    // billing-provider state machine, not just a "connected" store: blocked
+    // by a connected Shopify store, an unresolved PayPal→Shopify migration,
+    // OR a pending Shopify install/link in THIS browser (a merchant mid
+    // Shopify install who opens /billing in another tab, before any
+    // project/user link exists yet, must not be able to slip through here).
+    // Never decided by referrer, UTM, or any other client-supplied signal.
     const admin = createAdminClient()
-    if (await hasActiveShopifyConnection(admin, user.id)) {
-      console.warn('[paypal-activate] blocked: user has an active Shopify connection', { userId: user.id })
+    if (await isShopifyBillingRequiredForUser(admin, user.id)) {
+      console.warn('[paypal-activate] blocked: user is Shopify-governed', { userId: user.id })
       return Response.json({ error: 'Shopify billing required', reason: 'shopify_store_connected' }, { status: 403 })
+    }
+    if (hasPendingShopifyLinkCookie(request)) {
+      console.warn('[paypal-activate] blocked: pending Shopify install/link in this browser', { userId: user.id })
+      return Response.json({ error: 'Shopify billing required', reason: 'shopify_link_pending' }, { status: 403 })
     }
 
     // Mandatory server-side verification — no env-gated skip, no "continue

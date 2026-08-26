@@ -18,6 +18,7 @@ export interface BillingCacheFields {
   shopify_subscription_status: 'active' | 'none' | 'unknown'
   shopify_trial_ends_at: string | null
   shopify_current_period_end: string | null
+  shopify_cancel_at_end_of_cycle: boolean
   shopify_billing_last_error: string | null
 }
 

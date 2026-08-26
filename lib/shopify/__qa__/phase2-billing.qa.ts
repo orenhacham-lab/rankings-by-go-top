@@ -32,7 +32,7 @@ process.env.SHOPIFY_APP_URL = 'https://www.example-test.com'
 process.env.SHOPIFY_APP_HANDLE = 'go-top-seo-test'
 process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN = 'test-partner-token'
 process.env.SHOPIFY_PARTNER_ORGANIZATION_ID = '4243054'
-process.env.SHOPIFY_PARTNER_APP_GID = 'gid://partners/App/397648429057'
+process.env.SHOPIFY_PARTNER_APP_GID = 'gid://shopify/App/397648429057'
 process.env.SHOPIFY_PARTNER_API_VERSION = '2026-07'
 process.env.PAYPAL_CLIENT_ID = 'test-paypal-client-id'
 process.env.PAYPAL_SECRET = 'test-paypal-secret'
@@ -54,8 +54,18 @@ function fakePayPalFetch(impl: () => { ok: boolean; status?: number; body: unkno
     return { ok: r.ok, status: r.status ?? (r.ok ? 200 : 400), json: async () => r.body } as Response
   }) as unknown as typeof fetch
 }
-const activeSubBody = (handle: string) => ({
-  data: { activeSubscription: { trialEndsAt: null, currentBillingCycle: { endTime: '2026-12-01T00:00:00Z' }, items: [{ handle }] } },
+const DEFAULT_SHOP_GID = 'gid://shopify/Shop/1'
+const DEFAULT_SHOP_DOMAIN = 'test-shop.myshopify.com'
+const activeSubBody = (handle: string, shopId = DEFAULT_SHOP_GID, myshopifyDomain = DEFAULT_SHOP_DOMAIN) => ({
+  data: {
+    activeSubscription: {
+      shop: { id: shopId, myshopifyDomain },
+      trialEndsAt: null,
+      cancelAtEndOfCycle: false,
+      currentBillingCycle: { endTime: '2026-12-01T00:00:00Z' },
+      items: [{ handle, price: { __typename: 'FlatRatePrice', active: true } }],
+    },
+  },
 })
 const noSubBody = { data: { activeSubscription: null } }
 
@@ -65,8 +75,9 @@ function baseConnection(overrides: Partial<ShopifyConnectionRow> = {}): ShopifyC
     storefront_domain: null, access_token_encrypted: 'enc', api_version: '2026-07',
     connection_status: 'connected', last_tested_at: null, last_synced_at: null, last_error: null,
     default_blog_id: null, granted_scopes: ['read_products', 'read_content', 'write_content'], auth_method: 'oauth',
-    shop_gid: 'gid://shopify/Shop/1', shopify_plan_handle: null, shopify_subscription_status: null,
-    shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_billing_verified_at: null,
+    shop_gid: DEFAULT_SHOP_GID, shopify_plan_handle: null, shopify_subscription_status: null,
+    shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
+    shopify_billing_verified_at: null,
     shopify_billing_last_error: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }
@@ -91,6 +102,19 @@ async function main() {
     const r = await getActiveShopifySubscription('gid://shopify/Shop/1')
     check('ok:false, reason missing_config (no network attempted)', r.ok === false && r.reason === 'missing_config')
     process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN = saved
+  }
+
+  console.log('\n1b) Blocker C (resolved) — SHOPIFY_PARTNER_APP_GID in the gid://partners/App/... namespace is now REJECTED (fails closed as missing_config); only gid://shopify/App/... is accepted')
+  {
+    const saved = process.env.SHOPIFY_PARTNER_APP_GID
+    process.env.SHOPIFY_PARTNER_APP_GID = 'gid://partners/App/397648429057'
+    const r = await getActiveShopifySubscription('gid://shopify/Shop/1')
+    check('gid://partners/App/... -> ok:false, reason missing_config (no network attempted)', r.ok === false && r.reason === 'missing_config')
+    process.env.SHOPIFY_PARTNER_APP_GID = 'gid://shopify/App/397648429057'
+    const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody }))
+    const r2 = await getActiveShopifySubscription('gid://shopify/Shop/1', f)
+    check('gid://shopify/App/... -> config accepted, live call proceeds', r2.ok === true)
+    process.env.SHOPIFY_PARTNER_APP_GID = saved
   }
 
   console.log('\n2) getActiveShopifySubscription — malformed shopGid fails closed')

@@ -1,7 +1,16 @@
 import type { SubscriptionPlan } from '@/lib/supabase/types'
 import { isKnownPlanCode } from '@/lib/paypal/client'
+import { resolveShopifyGovernedEntitlement, isShopifyGovernedAndActive } from '@/lib/shopify/entitlement-resolver'
 
-export type PlanType = 'trial' | SubscriptionPlan
+/**
+ * Phase 2 (blocker fix) — 'shopify_billing_required' is a DISTINCT state
+ * from 'trial': a Shopify-connected merchant with no verified Shopify App
+ * Pricing plan (activeSubscription null, Partner API unavailable,
+ * unsupported handle, shop mismatch, or an unresolved PayPal→Shopify
+ * migration) gets ZERO product entitlement — never the local website
+ * trial's limits. See lib/shopify/entitlement-resolver.ts.
+ */
+export type PlanType = 'trial' | 'shopify_billing_required' | SubscriptionPlan
 
 export interface PlanLimits {
   maxProjects: number
@@ -36,6 +45,17 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     maxAIScansPerPeriodPerProject: 0,        maxAIScansTotal: 3,
     maxScansPerPeriod: 1,  price: 0,   label: 'ניסיון',
   },
+  // Phase 2 (blocker fix) — a Shopify-connected merchant with no verified
+  // Shopify App Pricing plan. Genuinely ZERO — not the website trial's
+  // limits. Every quota check in the app reads PLAN_LIMITS[entitlement.plan]
+  // (directly or via entitlement.limits), so this single entry is what
+  // enforces zero project/keyword/AI-scan/publish entitlement everywhere.
+  shopify_billing_required: {
+    maxProjects: 0, maxClients: 0, maxKeywordsPerProject: 0,
+    maxKeywordChecksPerPeriodPerProject: 0,  maxKeywordChecksTotal: 0,
+    maxAIScansPerPeriodPerProject: 0,        maxAIScansTotal: 0,
+    maxScansPerPeriod: 0,  price: 0,   label: 'נדרש חיוב דרך Shopify',
+  },
   regular:  {
     maxProjects: 3, maxClients: 5, maxKeywordsPerProject: 50,
     maxKeywordChecksPerPeriodPerProject: 50, maxKeywordChecksTotal: 0,
@@ -64,6 +84,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
 
 export const PLAN_FEATURES: Record<PlanType, string[]> = {
   trial:    ['פרויקט 1 בלבד', 'עד 30 מילות מפתח', 'עד 30 בדיקות מילות מפתח בתקופת הניסיון', 'עד 3 סריקות AI בתקופת הניסיון', '7 ימי ניסיון'],
+  shopify_billing_required: ['יש לבחור תוכנית ב-Shopify App Pricing כדי להשתמש במערכת'],
   regular:  ['עד 3 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 50 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
   advanced: ['עד 10 פרויקטים', 'עד 50 מילות מפתח לפרויקט', 'עד 100 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 10 סריקות AI בחודש לכל פרויקט'],
   premium:  ['עד 25 פרויקטים', 'עד 100 מילות מפתח לפרויקט', 'עד 200 בדיקות מילות מפתח בחודש לכל פרויקט', 'עד 20 סריקות AI בחודש לכל פרויקט'],
@@ -88,9 +109,15 @@ export interface UserEntitlement {
 export async function getUserEntitlement(
   userId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any
+  supabase: any,
+  // Injectable clock (repo convention — see
+  // lib/content/recommendations/smart-run-harness.ts's `now: () => number`)
+  // so trial/period-expiry tests are deterministic regardless of wall-clock
+  // time. Every real caller uses the default; production behavior is
+  // unchanged.
+  nowFn: () => Date = () => new Date(),
 ): Promise<UserEntitlement> {
-  const now = new Date()
+  const now = nowFn()
 
   // Fetch profile — role only
   const { data: profile } = await supabase
@@ -110,6 +137,32 @@ export async function getUserEntitlement(
       trialEndsAt: null,
       hasActiveSubscription: true,
       subscriptionEndsAt: null,
+      subscriptionId: null,
+    }
+  }
+
+  // Phase 2 (blocker fix) — Shopify governance is AUTHORITATIVE and checked
+  // BEFORE the subscriptions table. A Shopify-connected user's local trial,
+  // manually-granted row, or PayPal history is never read for entitlement —
+  // see lib/shopify/entitlement-resolver.ts's header for why (this is
+  // exactly what closes the shopify@gotop.co.il reviewer-bypass gap).
+  const shopifyGoverned = await resolveShopifyGovernedEntitlement(supabase, userId)
+  if (shopifyGoverned) {
+    // Blocker fix — a Shopify-connected merchant with no VERIFIED Shopify
+    // App Pricing plan gets ZERO product entitlement, never the local
+    // website trial's limits (PLAN_LIMITS.shopify_billing_required is all
+    // zero). A verified Shopify trial is not this case — Shopify's own
+    // activeSubscription for an in-trial plan is non-null with a recognized
+    // handle, so shopifyGoverned.planCode is already the mapped real plan.
+    const plan: PlanType = shopifyGoverned.planCode ?? 'shopify_billing_required'
+    return {
+      plan,
+      limits: PLAN_LIMITS[plan],
+      isAdmin: false,
+      trialActive: false,
+      trialEndsAt: null,
+      hasActiveSubscription: shopifyGoverned.hasActiveSubscription,
+      subscriptionEndsAt: shopifyGoverned.currentPeriodEnd,
       subscriptionId: null,
     }
   }
@@ -178,7 +231,10 @@ export async function getUserEntitlement(
 export async function hasAccess(
   userId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any
+  supabase: any,
+  // Injectable clock — same convention as getUserEntitlement above. Every
+  // real caller uses the default; production behavior is unchanged.
+  nowFn: () => Date = () => new Date(),
 ): Promise<boolean> {
   // Check role
   const { data: profile } = await supabase
@@ -188,6 +244,13 @@ export async function hasAccess(
     .maybeSingle()
 
   if (profile?.role === 'admin') return true
+
+  // Phase 2 (blocker fix) — Shopify governance is authoritative and checked
+  // before the subscriptions table (cache-only — see
+  // lib/shopify/entitlement-resolver.ts's isShopifyGovernedAndActive for why
+  // this never makes a live network call on the middleware hot path).
+  const shopify = await isShopifyGovernedAndActive(supabase, userId)
+  if (shopify.governed) return shopify.active
 
   // Check subscription. 'cancelled' status grants access until current_period_end.
   const { data: sub } = await supabase
@@ -200,17 +263,18 @@ export async function hasAccess(
     .maybeSingle()
 
   if (!sub) return false
+  const now = nowFn()
 
   if (sub.status === 'trial') {
-    return sub.trial_ends_at ? new Date(sub.trial_ends_at) > new Date() : false
+    return sub.trial_ends_at ? new Date(sub.trial_ends_at) > now : false
   }
 
   if (sub.status === 'active') {
-    return !sub.current_period_end || new Date(sub.current_period_end) > new Date()
+    return !sub.current_period_end || new Date(sub.current_period_end) > now
   }
 
   if (sub.status === 'cancelled') {
-    return !!sub.current_period_end && new Date(sub.current_period_end) > new Date()
+    return !!sub.current_period_end && new Date(sub.current_period_end) > now
   }
 
   return false

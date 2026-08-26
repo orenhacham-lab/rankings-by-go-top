@@ -25,7 +25,6 @@ interface AppHomeData {
     currentPeriodEnd: string | null
     verificationError: string | null
   }
-  pricingUrl?: string | null
   migrationStatus?: 'pending' | 'shopify_confirmed' | 'completed' | 'paypal_cancel_failed' | null
   lastPublish?: { status: string | null; lastError: string | null; lastSyncedAt: string | null } | null
 }
@@ -57,6 +56,28 @@ function navigateTopLevel(url: string) {
 export default function ConnectorHomeClient() {
   const [state, setState] = useState<'loading' | 'no_app_bridge' | 'auth_failed' | 'error' | 'ready'>('loading')
   const [data, setData] = useState<AppHomeData | null>(null)
+  const [managePlanBusy, setManagePlanBusy] = useState(false)
+
+  // Phase 2 (blocker fix) — never a pre-built Shopify URL: fetches a FRESH
+  // App Bridge session token (recommended to re-fetch per request rather
+  // than cache) and exchanges it at /api/shopify/billing/start-intent,
+  // which authenticates the request, mints a single-use billing intent, and
+  // returns a just-in-time redirect URL.
+  const startBillingIntent = async () => {
+    setManagePlanBusy(true)
+    try {
+      const bridge = await waitForAppBridge()
+      if (!bridge) { setManagePlanBusy(false); return }
+      const token = await bridge.idToken()
+      const res = await fetch('/api/shopify/billing/start-intent', { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) { setManagePlanBusy(false); return }
+      const json = (await res.json()) as { redirectUrl?: string }
+      if (json.redirectUrl) navigateTopLevel(json.redirectUrl)
+      else setManagePlanBusy(false)
+    } catch {
+      setManagePlanBusy(false)
+    }
+  }
 
   const load = useCallback(async () => {
     const bridge = await waitForAppBridge()
@@ -123,7 +144,6 @@ export default function ConnectorHomeClient() {
   }
 
   const billing = data.billing
-  const showManagePlan = data.pricingUrl != null
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '32px 20px' }}>
@@ -147,11 +167,9 @@ export default function ConnectorHomeClient() {
         {data.migrationStatus === 'paypal_cancel_failed' && (
           <p style={{ color: '#b71c1c', fontSize: 13, marginTop: 8 }}>Your plan is active, but we&apos;re still finalizing your previous billing. Contact us if this persists.</p>
         )}
-        {showManagePlan && (
-          <button onClick={() => navigateTopLevel(data.pricingUrl!)} style={{ ...buttonStyle, marginTop: 12 }}>
-            {billing?.status === 'active' ? 'Manage plan' : 'Choose a plan'}
-          </button>
-        )}
+        <button onClick={startBillingIntent} disabled={managePlanBusy} style={{ ...buttonStyle, marginTop: 12 }}>
+          {managePlanBusy ? 'Redirecting…' : billing?.status === 'active' ? 'Manage plan' : 'Choose a plan'}
+        </button>
       </Card>
 
       <Card title="Last publish">

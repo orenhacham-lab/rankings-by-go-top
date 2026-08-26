@@ -21,6 +21,94 @@ import {
 } from '@/lib/shopify/oauth'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
 import { initiateMigrationIfPayPalSubscriber } from '@/lib/shopify/paypal-migration'
+import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
+
+type Admin = ReturnType<typeof createAdminClient>
+
+/**
+ * Phase 2 (blocker fix) — completes an App-Store-initiated (pre-auth) OAuth
+ * flow: no Rankings user/project exists yet. Exchanges the code, captures
+ * shop identity, stores the result in a short-lived pending_installs row
+ * (never shopify_connections — there is no project to attach it to), sets
+ * the signed pending-link cookie, and sends the merchant to /shopify/link to
+ * authenticate and pick/create a project. Mirrors the logged-in-initiated
+ * branch below step-for-step; kept as a fully separate function so the
+ * already-verified logged-in path (unchanged, below) carries zero risk from
+ * this addition.
+ */
+async function completePreAuthInstall(
+  admin: Admin,
+  pst: { state: string; shop_domain: string; expires_at: string; used_at: string | null },
+  params: Record<string, string>,
+  config: { clientId: string; clientSecret: string; appUrl: string },
+  nonceCookieRaw: string | undefined,
+): Promise<NextResponse> {
+  const appUrl = config.appUrl
+  const clearNonce = (res: NextResponse): NextResponse => {
+    res.cookies.set(OAUTH_NONCE_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: OAUTH_COOKIE_PATH, maxAge: 0 })
+    return res
+  }
+  const fail = (reason: string) => clearNonce(NextResponse.redirect(`${appUrl}/shopify/link?shopify=error&reason=${encodeURIComponent(reason)}`))
+
+  const shop = normalizeShopDomain(params.shop || '')
+  if (!shop || shop !== pst.shop_domain) return fail('invalid_shop')
+  if (new Date(pst.expires_at).getTime() < Date.now()) return fail('expired_state')
+  if (params.error) return fail('cancelled')
+
+  const cookieNonce = verifyNonceCookie(nonceCookieRaw, config.clientSecret)
+  if (!cookieNonce || cookieNonce !== params.state) return fail('invalid_nonce')
+
+  const { data: consumed } = await admin
+    .from('shopify_preauth_states')
+    .update({ used_at: new Date().toISOString() })
+    .eq('state', pst.state)
+    .is('used_at', null)
+    .select('state')
+    .maybeSingle()
+  if (!consumed) return fail('state_replay')
+
+  if (!params.code) return fail('missing_code')
+  if (!isCredentialsCryptoConfigured()) return fail('not_configured')
+
+  let token: { accessToken: string; scope: string }
+  try {
+    token = await exchangeCodeForToken({ shop, code: params.code, clientId: config.clientId, clientSecret: config.clientSecret })
+  } catch {
+    return fail('token_exchange_failed')
+  }
+
+  const creds = { shopDomain: shop, accessToken: token.accessToken, apiVersion: SHOPIFY_API_VERSION }
+  const test = await testShopifyConnection(creds)
+  const grantedScopes = test.grantedScopes ?? token.scope.split(/[,\s]+/).filter(Boolean)
+  const storefront = test.ok && test.storefrontDomain ? test.storefrontDomain : null
+
+  const shopIdentity = await getShopIdentity(creds)
+  const shopGid = shopIdentity && shopIdentity.myshopifyDomain === shop ? shopIdentity.shopGid : null
+
+  let tokenEncrypted: string
+  try { tokenEncrypted = encryptCredential(token.accessToken) } catch {
+    return fail('encryption_failed')
+  }
+
+  const pendingToken = await createPendingInstall(admin, {
+    shop_domain: shop,
+    shop_gid: shopGid,
+    access_token_encrypted: tokenEncrypted,
+    api_version: SHOPIFY_API_VERSION,
+    granted_scopes: grantedScopes,
+    storefront_domain: storefront,
+  })
+
+  const res = clearNonce(NextResponse.redirect(`${appUrl}/shopify/link`))
+  res.cookies.set(PENDING_LINK_COOKIE, signPendingLinkCookieValue(pendingToken, config.clientSecret), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: PENDING_LINK_TTL_MS / 1000,
+  })
+  return res
+}
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -52,6 +140,14 @@ export async function GET(request: Request) {
   const { data: stateData } = await admin
     .from('shopify_oauth_states').select('*').eq('state', params.state || '').maybeSingle()
   const st = stateData as { state: string; user_id: string; project_id: string; shop_domain: string; expires_at: string; used_at: string | null } | null
+  // Phase 2 (blocker fix) — an App-Store-initiated (pre-auth) flow has no
+  // matching row in shopify_oauth_states (no project/user existed yet when
+  // it started); check the separate pre-auth table too, read-only, same as
+  // `st` above. Branched on at step 3 below — every check ABOVE and the
+  // entire logged-in-initiated branch below are otherwise unchanged.
+  const { data: preAuthData } = await admin
+    .from('shopify_preauth_states').select('*').eq('state', params.state || '').maybeSingle()
+  const pst = preAuthData as { state: string; shop_domain: string; expires_at: string; used_at: string | null } | null
   // Error redirect: to the project page when the project is known, else the list.
   const fail = (reason: string) => (st?.project_id ? toProject(st.project_id, { shopify: 'error', reason }) : generic(reason))
 
@@ -68,7 +164,10 @@ export async function GET(request: Request) {
     return fail('invalid_shop')
   }
 
-  // 3) State must exist (server-persisted, one-time).
+  // 3) State must exist (server-persisted, one-time) — in EITHER table.
+  if (!st && pst) {
+    return await completePreAuthInstall(admin, pst, params, config, nonceCookieRaw)
+  }
   if (!st) {
     console.warn('[Shopify OAuth] state not found', { route: 'shopify_oauth_callback', receivedShop: params.shop ?? null, normalizedShop: shop, reason: 'invalid_state' })
     return generic('invalid_state')

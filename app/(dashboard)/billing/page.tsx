@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
-import { buildShopifyPricingUrl } from '@/lib/shopify/billing-urls'
+import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
+import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
+import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import BillingView from './BillingView'
 
 export default async function BillingPage() {
@@ -40,9 +44,19 @@ export default async function BillingPage() {
     .limit(1)
     .maybeSingle()
 
-  const shopifyConnected = !!shopifyConn
-  const shopifyPricing = shopifyConn ? buildShopifyPricingUrl(shopifyConn.shop_domain) : null
-  const shopifyPricingUrl = shopifyPricing?.ok ? shopifyPricing.url : null
+  // Phase 2 (blocker fix) — "must hide the PayPal UI" covers the FULL
+  // billing-provider state machine, not only a fully 'connected' store: a
+  // connection stuck at 'failed' with an unresolved migration, AND a
+  // pending Shopify install/link (this exact browser mid-linking, before
+  // any shopify_connections row even exists — see
+  // lib/shopify/pending-link.ts) both hide it too. Never decided by
+  // referrer/UTM/client state.
+  const admin = createAdminClient()
+  const shopifyConfig = getShopifyOAuthConfig()
+  const cookieStore = await cookies()
+  const pendingLinkCookie = cookieStore.get(PENDING_LINK_COOKIE)?.value
+  const hasPendingLink = shopifyConfig ? verifyPendingLinkCookieValue(pendingLinkCookie, shopifyConfig.clientSecret) !== null : false
+  const shopifyConnected = !!shopifyConn || await isShopifyBillingRequiredForUser(admin, user.id) || hasPendingLink
 
   let shopifyMigrationStatus: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | null = null
   if (shopifyConnected) {
@@ -65,7 +79,6 @@ export default async function BillingPage() {
       hasPaypalSubscriptionId={!!activeSub?.paypal_subscription_id}
       renewalCancelled={renewalCancelled}
       shopifyConnected={shopifyConnected}
-      shopifyPricingUrl={shopifyPricingUrl}
       shopifyMigrationStatus={shopifyMigrationStatus}
       planPrices={{
         trial: PLAN_LIMITS.trial.price,

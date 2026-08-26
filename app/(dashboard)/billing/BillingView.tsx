@@ -3,23 +3,32 @@
 import { useState } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import type { PlanType } from '@/lib/subscription'
 import BillingClient from './client'
 
+/** The 5 plans this view actually has cards/labels for. */
 type PlanKey = 'trial' | 'regular' | 'advanced' | 'premium' | 'large_agency'
 
 interface BillingViewProps {
-  plan: PlanKey
+  /** The full PlanType (blocker fix): includes 'shopify_billing_required',
+   *  which this view never renders a card/label for — it's only ever
+   *  used behind `hasActiveSubscription` (always false for that state) or
+   *  the `shopifyConnected` panel, which takes over entirely instead of
+   *  the plan-cards grid below. */
+  plan: PlanType
   hasActiveSubscription: boolean
   trialActive: boolean
   trialEndsAt: string | null
   subscriptionEndsAt: string | null
   hasPaypalSubscriptionId: boolean
   renewalCancelled: boolean
-  /** Phase 2 — true when this user has an actively CONNECTED Shopify store.
-   *  When true, PayPal checkout/upgrade/cancel UI is hidden entirely — this
-   *  merchant must use Shopify App Pricing exclusively. */
+  /** Phase 2 (blocker fix) — true when this user is anywhere in the
+   *  Shopify billing-provider state machine: a connected store, an
+   *  unresolved PayPal→Shopify migration, or a pending Shopify install/link
+   *  in this browser (before any store is even connected yet). When true,
+   *  PayPal checkout/upgrade/cancel UI is hidden entirely — this merchant
+   *  must use Shopify App Pricing exclusively. */
   shopifyConnected: boolean
-  shopifyPricingUrl: string | null
   shopifyMigrationStatus: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | null
   planPrices: Record<PlanKey, number>
 }
@@ -33,7 +42,6 @@ export default function BillingView({
   hasPaypalSubscriptionId,
   renewalCancelled,
   shopifyConnected,
-  shopifyPricingUrl,
   shopifyMigrationStatus,
   planPrices,
 }: BillingViewProps) {
@@ -88,7 +96,7 @@ export default function BillingView({
       {hasActiveSubscription && (
         <div className="mb-8 p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-green-900">
-            {t.onPlanPrefix} <span className="font-semibold">{t.planLabels[plan]}</span>.
+            {t.onPlanPrefix} <span className="font-semibold">{plan in t.planLabels ? t.planLabels[plan as PlanKey] : plan}</span>.
             {subscriptionEndsAt && (
               <span>
                 {' '}{t.renewalPrefix}{new Date(subscriptionEndsAt).toLocaleDateString(dateLocale)}
@@ -108,14 +116,16 @@ export default function BillingView({
           {shopifyMigrationStatus === 'paypal_cancel_failed' && (
             <p className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">{t.shopify.migrationNeedsAttention}</p>
           )}
-          {shopifyPricingUrl && (
-            <a
-              href={shopifyPricingUrl}
-              className="inline-block px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
-            >
-              {t.shopify.manageButton}
-            </a>
-          )}
+          {/* Phase 2 (blocker fix) — never a pre-built Shopify URL: this
+              always goes through /api/shopify/billing/start-intent, which
+              authenticates the request, mints a single-use billing intent,
+              and only THEN redirects to Shopify's hosted pricing page. */}
+          <a
+            href="/api/shopify/billing/start-intent"
+            className="inline-block px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+          >
+            {t.shopify.manageButton}
+          </a>
         </div>
       ) : (
         <>

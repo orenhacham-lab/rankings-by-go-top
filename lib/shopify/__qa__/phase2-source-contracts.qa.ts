@@ -100,19 +100,17 @@ async function main() {
     check('an arbitrary/unknown handle is NOT supported', !isSupportedShopifyPlanHandle('enterprise-custom'))
   }
 
-  console.log('\n7) no reviewer-account exception was hardcoded anywhere in the new Phase 2 source')
+  console.log('\n7) no reviewer-account exception was hardcoded anywhere in the source tree')
   {
-    const phase2Files = [
-      'lib/shopify/partner-client.ts', 'lib/shopify/billing-guard.ts', 'lib/shopify/billing-cache.ts',
-      'lib/shopify/billing-urls.ts', 'lib/shopify/paypal-migration.ts', 'lib/shopify/paypal-block.ts',
-      'lib/shopify/session-token.ts', 'lib/shopify/publish-article.ts', 'lib/shopify/api-auth.ts',
-      'lib/shopify/constants.ts', 'lib/paypal/client.ts', 'app/api/shopify/oauth/callback/route.ts',
-      'app/api/shopify/billing/return/route.ts', 'app/api/shopify/app-home/route.ts', 'app/api/paypal/activate/route.ts',
-      'app/(dashboard)/billing/page.tsx', 'app/(dashboard)/billing/BillingView.tsx',
-      'app/shopify/app/layout.tsx', 'app/shopify/app/page.tsx', 'app/shopify/app/ConnectorHomeClient.tsx',
-    ]
-    const hits = phase2Files.filter((rel) => /shopify@gotop\.co\.il/i.test(read(rel)))
-    check('zero hardcoded references to the reviewer email across all Phase 2 files', hits.length === 0, hits.join(', '))
+    // Swept dynamically (not a manually maintained list) so it can never
+    // silently miss a new Phase 2 file.
+    // Comments legitimately explain THIS check's own rationale by naming the
+    // reviewer account (e.g. "closes the shopify@gotop.co.il bypass gap") —
+    // strip comments first so that prose doesn't false-positive as a
+    // hardcoded exception in executable code.
+    const files = [...listSourceFiles('app'), ...listSourceFiles('lib')]
+    const hits = files.filter((f) => /shopify@gotop\.co\.il/i.test(strip(read(f.slice(ROOT.length + 1)))))
+    check('zero hardcoded references to the reviewer email in executable code anywhere in app/ or lib/', hits.length === 0, hits.join(', '))
   }
 
   console.log('\n8) the shop_domain unique index has NO status-scoped WHERE clause — one canonical owner regardless of connection_status')
@@ -147,11 +145,41 @@ async function main() {
   console.log('\n11) PayPal checkout (activate) is blocked server-side for an actively connected Shopify merchant, independent of the client')
   {
     const src = strip(read('app/api/paypal/activate/route.ts'))
-    const blockIdx = src.indexOf('hasActiveShopifyConnection(admin, user.id)')
+    const blockIdx = src.indexOf('isShopifyBillingRequiredForUser(admin, user.id)')
     const verifyIdx = src.indexOf('verifyPayPalActivation(')
     check('the Shopify-connection block check exists', blockIdx !== -1)
     check('it runs before PayPal verification/any entitlement write', blockIdx !== -1 && verifyIdx !== -1 && blockIdx < verifyIdx)
     check('the decision never references UTM/referrer/signup-source', !/utm_|referrer|signup.?source/i.test(src))
+  }
+
+  console.log('\n12) the billing-return processing loads the connection ONLY via the intent\'s own connection_id — never by the shop query param')
+  {
+    const src = strip(read('lib/shopify/billing-return-processing.ts'))
+    check('the connection lookup is keyed by intent.connection_id', /\.eq\('id', intent\.connection_id\)/.test(src))
+    check('`shop` is read only as args.suppliedShopRaw and never used in a .eq()/.from() lookup', !/\.eq\([^)]*suppliedShop/.test(src))
+    const consumeIdx = src.indexOf('consumeBillingIntent(')
+    const cacheIdx = src.indexOf('recordShopifyBillingCache(')
+    const migrateIdx = src.indexOf('confirmShopifyActiveAndAdvance(')
+    check('the intent is consumed BEFORE any cache write', consumeIdx !== -1 && cacheIdx !== -1 && consumeIdx < cacheIdx)
+    check('the intent is consumed BEFORE the migration is ever advanced', consumeIdx !== -1 && migrateIdx !== -1 && consumeIdx < migrateIdx)
+  }
+
+  console.log('\n13) Blocker C (resolved) — only the gid://shopify/App/... Partner app-ID GID namespace is accepted; gid://partners/App/... is no longer accepted anywhere in production source')
+  {
+    const src = strip(read('lib/shopify/partner-client.ts'))
+    check('PARTNER_APP_GID_PATTERN matches ONLY the gid://shopify/App/... namespace', /PARTNER_APP_GID_PATTERN = \/\^gid:\\\/\\\/shopify\\\/App\\\/\\d\+\$\//.test(src))
+    check('the pattern no longer accepts gid://partners/App/...', !/\(partners\|shopify\)/.test(src))
+
+    const files = [...listSourceFiles('app'), ...listSourceFiles('lib')]
+    const stillAccepting = files
+      .map((f) => f.slice(ROOT.length + 1))
+      .filter((rel) => {
+        // Excludes the confirmation comment in partner-client.ts itself, which
+        // documents the REJECTED namespace, not accepts it.
+        if (rel === 'lib/shopify/partner-client.ts') return false
+        return /gid:\/\/partners\/App\//.test(strip(read(rel)))
+      })
+    check('no other production file references the rejected gid://partners/App/... namespace', stillAccepting.length === 0, stillAccepting.join(', '))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

@@ -22,7 +22,6 @@ import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { getActiveShopifySubscription } from '@/lib/shopify/partner-client'
 import { recordShopifyBillingCache } from '@/lib/shopify/billing-cache'
 import { getActiveMigration } from '@/lib/shopify/paypal-migration'
-import { buildShopifyPricingUrl } from '@/lib/shopify/billing-urls'
 import { hasWriteContent } from '@/lib/shopify/constants'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 
@@ -84,19 +83,22 @@ export async function GET(request: Request) {
   if (!connection.shop_gid) {
     billing = { status: 'unknown', planHandle: null, trialEndsAt: null, currentPeriodEnd: null, verificationError: 'shop_identity_unverified' }
   } else {
-    const result = await getActiveShopifySubscription(connection.shop_gid)
+    // shopDomain is from the VERIFIED session token (never a query param) —
+    // passed as the expected canonical domain for the cross-check inside
+    // getActiveShopifySubscription.
+    const result = await getActiveShopifySubscription(connection.shop_gid, fetch, shopDomain)
     if (!result.ok) {
       billing = { status: 'unknown', planHandle: null, trialEndsAt: null, currentPeriodEnd: null, verificationError: result.reason }
       await recordShopifyBillingCache(admin, connection.id, {
         shopify_plan_handle: null, shopify_subscription_status: 'unknown',
-        shopify_trial_ends_at: null, shopify_current_period_end: null,
+        shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
         shopify_billing_last_error: `verification_failed: ${result.reason}`,
       })
     } else if (!result.active) {
       billing = { status: 'none', planHandle: null, trialEndsAt: null, currentPeriodEnd: null, verificationError: null }
       await recordShopifyBillingCache(admin, connection.id, {
         shopify_plan_handle: null, shopify_subscription_status: 'none',
-        shopify_trial_ends_at: null, shopify_current_period_end: null,
+        shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
         shopify_billing_last_error: null,
       })
     } else {
@@ -104,13 +106,13 @@ export async function GET(request: Request) {
       await recordShopifyBillingCache(admin, connection.id, {
         shopify_plan_handle: result.planHandle, shopify_subscription_status: 'active',
         shopify_trial_ends_at: result.trialEndsAt, shopify_current_period_end: result.currentPeriodEnd,
+        shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle,
         shopify_billing_last_error: null,
       })
     }
   }
 
   const migration = await getActiveMigration(admin, connection.user_id)
-  const pricing = buildShopifyPricingUrl(shopDomain)
 
   return Response.json({
     connected: true,
@@ -122,7 +124,10 @@ export async function GET(request: Request) {
     project: project ? { businessName: project.business_name, targetDomain: project.target_domain } : null,
     dashboardUrl: `${config.appUrl}/projects/${encodeURIComponent(connection.project_id)}`,
     billing,
-    pricingUrl: pricing.ok ? pricing.url : null,
+    // Phase 2 (blocker fix) — no pre-built Shopify URL is ever handed to the
+    // client. The "Manage plan" button in ConnectorHomeClient fetches
+    // /api/shopify/billing/start-intent (with this same session token) to
+    // mint a billing intent and get a fresh redirect URL just-in-time.
     migrationStatus: migration?.status ?? null,
     lastPublish: lastArticle
       ? { status: lastArticle.shopify_status, lastError: lastArticle.shopify_last_error, lastSyncedAt: lastArticle.shopify_last_synced_at }

@@ -51,3 +51,21 @@ export function buildShopifyPricingUrl(shopDomain: string): PricingUrlResult {
   if (!appHandle) return { ok: false, reason: 'missing_app_handle' }
   return { ok: true, url: `https://admin.shopify.com/store/${storeHandle}/charges/${encodeURIComponent(appHandle)}/pricing_plans` }
 }
+
+/**
+ * Phase 2 (blocker fix) — the embedded app's own home inside Shopify Admin:
+ * `https://admin.shopify.com/store/{storeHandle}/apps/{appHandle}`. Used to
+ * send a merchant back INTO the embedded connector home (app/shopify/app,
+ * which shows the "choose a plan" prompt via its live billing check) right
+ * after completing the fresh-install linking flow
+ * (app/shopify/link/ShopifyLinkClient.tsx) — same URL-building policy as
+ * buildShopifyPricingUrl (store handle derived only from the shop's own
+ * canonical domain, app handle only from SHOPIFY_APP_HANDLE).
+ */
+export function buildShopifyAdminAppUrl(shopDomain: string): PricingUrlResult {
+  const storeHandle = shopHandleFromMyshopifyDomain(shopDomain)
+  if (!storeHandle) return { ok: false, reason: 'invalid_shop_domain' }
+  const appHandle = process.env.SHOPIFY_APP_HANDLE?.trim()
+  if (!appHandle) return { ok: false, reason: 'missing_app_handle' }
+  return { ok: true, url: `https://admin.shopify.com/store/${storeHandle}/apps/${encodeURIComponent(appHandle)}` }
+}

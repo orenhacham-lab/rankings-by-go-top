@@ -16,6 +16,7 @@ import { uploadMedia, WordPressClientError } from '@/lib/wordpress/client'
 import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
 import { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages, type InlineImage, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
+import { assertContentGenerationAllowedForProject } from '@/lib/content/entitlement-guard'
 
 // Re-export the pure engine (back-compat for existing server-side imports).
 export { INLINE_IMAGE_MAX, eligibleSections, figureHtml, injectInlineImages }
@@ -35,6 +36,15 @@ export async function generateInlineImage(admin: Admin, imageId: string): Promis
   const row = data as { id: string; project_id: string; article_id: string; prompt: string | null; alt_text: string | null; storage_path: string | null } | null
   if (!row) return { ok: false, error: 'image_not_found' }
   const nowIso = () => new Date().toISOString()
+
+  // Blocker D fix — central gate, checked BEFORE marking the row
+  // 'generating' and before any Gemini call.
+  const gate = await assertContentGenerationAllowedForProject(admin, row.project_id)
+  if (!gate.allowed) {
+    await admin.from('article_inline_images').update({ status: 'failed', last_error: 'billing_required', updated_at: nowIso() }).eq('id', imageId)
+    return { ok: false, error: 'billing_required' }
+  }
+
   await admin.from('article_inline_images').update({ status: 'generating', last_error: null, updated_at: nowIso() }).eq('id', imageId)
   try {
     const { data: art } = await admin.from('generated_articles').select('title, topic_id').eq('id', row.article_id).maybeSingle()

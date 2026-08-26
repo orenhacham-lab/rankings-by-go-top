@@ -28,6 +28,13 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 const NOW = new Date('2026-08-22T12:00:00Z')
 const future = (days: number) => new Date(NOW.getTime() + days * 86400000).toISOString()
 const past = (days: number) => new Date(NOW.getTime() - days * 86400000).toISOString()
+// Blocker E fix — getUserEntitlement/hasAccess read wall-clock time by
+// default; this suite's fixtures are relative to the FIXED `NOW` above, so
+// every call injects it via the repo's existing `now: () => ...` convention
+// (see lib/content/recommendations/smart-run-harness.ts). Without this, the
+// suite silently drifts from pass to fail as real time crosses `future()`/
+// `past()` boundaries computed from a date that never changes.
+const nowFn = () => NOW
 
 function adminWith(subRows: Record<string, unknown>[], profileRole: string | null = null, userId = 'u1') {
   const tables: Record<string, Record<string, unknown>[]> = { subscriptions: subRows }
@@ -47,12 +54,12 @@ async function main() {
       id: 'sub1', user_id: 'u1', status: 'active', plan_code: 'large_agency',
       trial_ends_at: null, current_period_end: null, paypal_subscription_id: null, created_at: '2026-07-01',
     }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('plan resolves to large_agency', ent.plan === 'large_agency', ent.plan)
     check('hasActiveSubscription is true', ent.hasActiveSubscription === true)
     check('limits match large_agency (not trial)', ent.limits.maxProjects === PLAN_LIMITS.large_agency.maxProjects)
     check('a null current_period_end does NOT expire an active row', ent.hasActiveSubscription === true)
-    const access = await hasAccess('u1', admin)
+    const access = await hasAccess('u1', admin, nowFn)
     check('hasAccess (middleware gate) also grants access', access === true)
   }
 
@@ -63,7 +70,7 @@ async function main() {
       id: 'sub2', user_id: 'u1', status: 'trial', plan_code: null,
       trial_ends_at: future(3), current_period_end: null, paypal_subscription_id: null, created_at: '2026-08-20',
     }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('plan is trial', ent.plan === 'trial')
     check('trialActive is true', ent.trialActive === true)
     check('hasActiveSubscription is false (trial is a separate flag)', ent.hasActiveSubscription === false)
@@ -76,9 +83,9 @@ async function main() {
       id: 'sub3', user_id: 'u1', status: 'trial', plan_code: null,
       trial_ends_at: past(1), current_period_end: null, paypal_subscription_id: null, created_at: '2026-08-01',
     }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('trialActive is false', ent.trialActive === false)
-    const access = await hasAccess('u1', admin)
+    const access = await hasAccess('u1', admin, nowFn)
     check('hasAccess denies (middleware gate)', access === false)
   }
 
@@ -89,10 +96,10 @@ async function main() {
       id: 'sub4', user_id: 'u1', status: 'trial', plan_code: null,
       trial_ends_at: null, current_period_end: null, paypal_subscription_id: null, created_at: '2026-08-20',
     }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('trialActive is false (no end date → cannot be active)', ent.trialActive === false)
     check('trialEndsAt surfaces as null, not thrown/crashed', ent.trialEndsAt === null)
-    const access = await hasAccess('u1', admin)
+    const access = await hasAccess('u1', admin, nowFn)
     check('hasAccess denies — a trial with no end is never granted', access === false)
   }
 
@@ -103,7 +110,7 @@ async function main() {
       id: 'sub5', user_id: 'u1', status: 'active', plan_code: 'enterprise_legacy_typo',
       trial_ends_at: null, current_period_end: null, paypal_subscription_id: 'PP-1', created_at: '2026-08-01',
     }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('does NOT grant the unrecognized plan', (ent.plan as string) !== 'enterprise_legacy_typo')
     check('falls back to trial-tier, not full access', ent.plan === 'trial' && ent.hasActiveSubscription === false)
   }
@@ -115,7 +122,7 @@ async function main() {
       id: 'sub6', user_id: 'u1', status: 'cancelled', plan_code: 'premium',
       trial_ends_at: null, current_period_end: future(10), paypal_subscription_id: 'PP-2', created_at: '2026-07-01',
     }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('still entitled until current_period_end', ent.hasActiveSubscription === true && ent.plan === 'premium')
   }
   console.log('\n7) cancelled subscription with NO current_period_end is NOT active (asymmetric vs. active-status null handling)')
@@ -124,7 +131,7 @@ async function main() {
       id: 'sub7', user_id: 'u1', status: 'cancelled', plan_code: 'premium',
       trial_ends_at: null, current_period_end: null, paypal_subscription_id: 'PP-3', created_at: '2026-07-01',
     }])
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('a cancelled row with no period end is NOT treated as unlimited', ent.hasActiveSubscription === false)
   }
   console.log('\n8) a genuine query error (e.g. RLS/connectivity) fails closed, is logged not swallowed')
@@ -134,7 +141,7 @@ async function main() {
     const origError = console.error
     let logged = false
     console.error = (...args: unknown[]) => { if (String(args[0]).includes('getUserEntitlement query failed')) logged = true }
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     console.error = origError
     check('falls back to trial (fail closed), not a throw or full access', ent.plan === 'trial' && ent.hasActiveSubscription === false)
     check('the error is LOGGED, not silently discarded', logged)
@@ -142,7 +149,7 @@ async function main() {
   console.log('\n9) admin role bypasses subscription entirely')
   {
     const admin = adminWith([], 'admin', 'u1')
-    const ent = await getUserEntitlement('u1', admin)
+    const ent = await getUserEntitlement('u1', admin, nowFn)
     check('admin gets premium limits regardless of subscription state', ent.isAdmin === true && ent.plan === 'premium')
   }
 

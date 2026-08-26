@@ -156,9 +156,12 @@ export async function generatePoolItem(
         status = QUALITY_REASONS.has(gen.reason) ? 'quality_check_failed' : 'failed'
         reason = gen.reason
       }
-      // Transient provider failure (Gemini quota/overload/timeout) → keep the retry
-      // budget by rolling the attempt counter back to its pre-claim value.
-      const transient = gen.kind === 'generation' && TRANSIENT_GEN_REASONS.has(gen.reason)
+      // Blocker D fix — billing_required is not the item's fault and not
+      // fixable by retrying sooner (only the merchant choosing a Shopify
+      // plan fixes it); roll back the attempt counter like a transient
+      // failure so it doesn't burn the finite retry budget while blocked on
+      // billing. No Gemini call was ever made for this attempt.
+      const transient = (gen.kind === 'generation' && TRANSIENT_GEN_REASONS.has(gen.reason)) || gen.kind === 'billing_required'
       await finalize(admin, itemId, status, reason, transient ? (item.attempts ?? 0) : undefined)
       return { itemId, status, articleId: null, reason }
     }

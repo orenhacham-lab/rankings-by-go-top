@@ -72,7 +72,7 @@ export async function checkShopifyPublishEntitlement(
   // 3) The live, authoritative check. Every failure mode of this call is
   //    ALREADY fail-closed (see partner-client.ts) — never treat an
   //    unverifiable result as entitled.
-  const result = await getActiveShopifySubscription(connection.shop_gid, fetchImpl)
+  const result = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain)
 
   if (!result.ok) {
     await recordBillingCache(admin, connection.id, {
@@ -80,6 +80,7 @@ export async function checkShopifyPublishEntitlement(
       shopify_subscription_status: 'unknown',
       shopify_trial_ends_at: connection.shopify_trial_ends_at,
       shopify_current_period_end: connection.shopify_current_period_end,
+      shopify_cancel_at_end_of_cycle: connection.shopify_cancel_at_end_of_cycle ?? false,
       shopify_billing_last_error: `verification_failed: ${result.reason}`,
     })
     return { ok: false, reason: 'billing_verification_unavailable', detail: result.reason }
@@ -91,6 +92,7 @@ export async function checkShopifyPublishEntitlement(
       shopify_subscription_status: 'none',
       shopify_trial_ends_at: null,
       shopify_current_period_end: null,
+      shopify_cancel_at_end_of_cycle: false,
       shopify_billing_last_error: result.reason === 'unrecognized_plan_handle' ? `unrecognized_plan_handle: ${(result.rawHandles ?? []).join(',')}` : null,
     })
     return { ok: false, reason: 'no_active_shopify_plan', detail: result.reason }
@@ -101,6 +103,7 @@ export async function checkShopifyPublishEntitlement(
     shopify_subscription_status: 'active',
     shopify_trial_ends_at: result.trialEndsAt,
     shopify_current_period_end: result.currentPeriodEnd,
+    shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle,
     shopify_billing_last_error: null,
   })
   return { ok: true, planHandle: result.planHandle }

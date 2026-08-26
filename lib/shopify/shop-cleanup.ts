@@ -64,6 +64,18 @@ export async function clearShopifyArticlePointers(admin: Admin, projectIds: stri
  * closed if crypto is unavailable/throws so no usable token can ever survive),
  * `connection_status='failed'`, empty scopes, cleared default blog. Idempotent (a
  * re-delivery re-writes the same terminal fields). Scoped by normalized `shop_domain`.
+ *
+ * Cache-invalidation fix — also clears the Shopify billing cache columns
+ * (shopify_subscription_status/shopify_plan_handle/shopify_billing_verified_at).
+ * `connection_status='failed'` ALREADY excludes this row from every entitlement
+ * query (resolveShopifyGovernedEntitlement/isShopifyGovernedAndActive both filter
+ * on connection_status='connected'), so this isn't needed for THIS install's
+ * entitlement to end — it closes a narrower edge case: if the SAME shop
+ * reinstalls shortly after, connection_status flips back to 'connected' and
+ * would otherwise still carry a stale (but not yet expired) 'active' cache
+ * entry from before the uninstall, momentarily granting entitlement before any
+ * fresh Partner API check. Clearing it here forces the very next check after
+ * any reinstall to be live.
  */
 export async function applyAppUninstalled(admin: Admin, shopDomain: string): Promise<CleanupResult> {
   if (!isCredentialsCryptoConfigured()) return { ok: false, error: 'crypto_unavailable' }
@@ -82,6 +94,13 @@ export async function applyAppUninstalled(admin: Admin, shopDomain: string): Pro
       granted_scopes: [],
       default_blog_id: null,
       last_error: 'app_uninstalled',
+      shopify_subscription_status: null,
+      shopify_plan_handle: null,
+      shopify_billing_verified_at: null,
+      shopify_current_period_end: null,
+      shopify_trial_ends_at: null,
+      shopify_cancel_at_end_of_cycle: false,
+      shopify_billing_last_error: null,
       updated_at: new Date().toISOString(),
     })
     .eq('shop_domain', shopDomain)

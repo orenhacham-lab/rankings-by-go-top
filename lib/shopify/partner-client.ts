@@ -15,12 +15,12 @@
  * SHOPIFY_CLIENT_ID and never a shop_domain string.
  *
  * Query shape verified against shopify.dev (Partner API `ActiveSubscription`
- * object + the "Active subscription" guide) via web search — WebFetch to
- * shopify.dev is blocked in this environment, so this should be spot-checked
- * against a real response during manual testing (see the Phase 2 report).
- * `activeSubscription` returns null when the shop has no active managed-
- * pricing contract for this app — that is the "not subscribed" signal; there
- * is no separate top-level status field to check.
+ * object + the "Active subscription" guide) via web search, and the `appId`
+ * GID namespace additionally confirmed live against the real Partner API
+ * (see docs/shopify-partner-app-gid-verification.md). `activeSubscription`
+ * returns null when the shop has no active managed-pricing contract for this
+ * app — that is the "not subscribed" signal; there is no separate top-level
+ * status field to check.
  *
  * Every failure mode (missing config, network, timeout, auth, rate limit,
  * malformed response) returns `{ ok: false }` — callers MUST treat that as
@@ -44,6 +44,7 @@ export type PartnerApiErrorKind =
   | 'rate_limited'
   | 'api_error'
   | 'malformed_response'
+  | 'shop_identity_mismatch'
 
 export class PartnerApiError extends Error {
   kind: PartnerApiErrorKind
@@ -62,9 +63,22 @@ interface PartnerApiConfig {
 }
 
 /**
+ * Blocker C (resolved) — the Partner API app GID namespace is CONFIRMED via a
+ * live GraphiQL call against `activeSubscription`: `gid://partners/App/…`
+ * is rejected outright by the API ("Invalid GID app name 'partners'. Use
+ * 'shopify' instead."); `gid://shopify/App/…` is accepted (returned a clean
+ * `{ "data": { "activeSubscription": null } }` with no errors). See
+ * docs/shopify-partner-app-gid-verification.md for the full verification
+ * record. Only `gid://shopify/App/…` is accepted here — never `gid://partners/
+ * App/…`, and never silently rewritten from one namespace to the other.
+ */
+const PARTNER_APP_GID_PATTERN = /^gid:\/\/shopify\/App\/\d+$/
+
+/**
  * Reads + validates the required Partner API env vars. Returns null (never
- * throws) if any is missing/empty — callers must fail closed on null. Never
- * logs the token or any config value.
+ * throws) if any is missing/empty, or if SHOPIFY_PARTNER_APP_GID doesn't match
+ * either known GID namespace — callers must fail closed on null. Never logs
+ * the token or any config value.
  */
 function loadPartnerApiConfig(): PartnerApiConfig | null {
   const accessToken = process.env.SHOPIFY_PARTNER_API_ACCESS_TOKEN?.trim()
@@ -72,6 +86,7 @@ function loadPartnerApiConfig(): PartnerApiConfig | null {
   const appGid = process.env.SHOPIFY_PARTNER_APP_GID?.trim()
   const apiVersion = process.env.SHOPIFY_PARTNER_API_VERSION?.trim()
   if (!accessToken || !organizationId || !appGid || !apiVersion) return null
+  if (!PARTNER_APP_GID_PATTERN.test(appGid)) return null
   return { accessToken, organizationId, appGid, apiVersion }
 }
 
@@ -163,41 +178,59 @@ async function partnerGraphql<T>(
 const ACTIVE_SUBSCRIPTION_QUERY = `
   query ActiveSubscription($appId: ID!, $shopId: ID!) {
     activeSubscription(appId: $appId, shopId: $shopId) {
+      shop { id myshopifyDomain }
       trialEndsAt
+      cancelAtEndOfCycle
       currentBillingCycle { endTime }
-      items { handle }
+      items { handle price { __typename active } }
     }
   }
 `
+// pendingUpdate is DELIBERATELY not queried: current entitlement is derived
+// only from `items` (the CURRENT contract). A pending update describes a
+// future, not-yet-effective change and must never be read as if it were
+// already active.
 
 interface ActiveSubscriptionData {
   activeSubscription: {
+    shop: { id: string | null; myshopifyDomain: string | null } | null
     trialEndsAt: string | null
+    cancelAtEndOfCycle: boolean | null
     currentBillingCycle: { endTime: string | null } | null
-    items: { handle: string | null }[] | null
+    items: { handle: string | null; price: { active: boolean | null } | null }[] | null
   } | null
 }
 
 export type ActiveSubscriptionResult =
-  | { ok: true; active: true; planHandle: ShopifyPlanHandle; trialEndsAt: string | null; currentPeriodEnd: string | null }
+  | { ok: true; active: true; planHandle: ShopifyPlanHandle; trialEndsAt: string | null; currentPeriodEnd: string | null; cancelAtEndOfCycle: boolean }
   | { ok: true; active: false; reason: 'no_subscription' | 'unrecognized_plan_handle'; rawHandles?: string[] }
   | { ok: false; reason: PartnerApiErrorKind }
 
 /**
  * The ONLY Partner API query this app ever calls. FAILS CLOSED: every error
  * path (missing config, network, timeout, auth, rate limit, malformed
- * response) returns `{ ok: false }` — the caller must treat that as
- * "verification could not complete" and deny Shopify publishing, never
- * silently treat it as "no active subscription."
+ * response, shop-identity mismatch) returns `{ ok: false }` — the caller must
+ * treat that as "verification could not complete" and deny Shopify
+ * publishing, never silently treat it as "no active subscription."
  *
- * `active: true` requires BOTH a non-null activeSubscription AND at least one
- * subscription item whose handle is in SHOPIFY_SUPPORTED_PLAN_HANDLES — an
- * active contract for an unrecognized/obsolete plan handle (e.g. a leftover
- * `free-plan`) is treated as `active: false`, never as a valid entitlement.
+ * `active: true` requires ALL of:
+ *   - a non-null activeSubscription;
+ *   - Shopify's OWN `shop.id` on the returned subscription matches the
+ *     `shopGid` we asked for (defends against ever trusting a response for
+ *     the wrong shop);
+ *   - at least one subscription item whose handle is in
+ *     SHOPIFY_SUPPORTED_PLAN_HANDLES AND whose `price.active` is not
+ *     explicitly `false` (an active contract for an unrecognized/obsolete
+ *     handle, e.g. a leftover `free-plan`, or a superseded/inactive line
+ *     item, is `active: false`, never a valid entitlement).
+ * Only CURRENT `items` are read — `pendingUpdate` is never consulted (see
+ * above), so a plan change that hasn't taken effect yet cannot grant early
+ * entitlement.
  */
 export async function getActiveShopifySubscription(
   shopGid: string,
   fetchImpl: typeof fetch = fetch,
+  expectedMyshopifyDomain?: string,
 ): Promise<ActiveSubscriptionResult> {
   const config = loadPartnerApiConfig()
   if (!config) return { ok: false, reason: 'missing_config' }
@@ -217,11 +250,27 @@ export async function getActiveShopifySubscription(
   const sub = data.activeSubscription
   if (!sub) return { ok: true, active: false, reason: 'no_subscription' }
 
-  const handles = Array.isArray(sub.items)
-    ? sub.items.map((i) => i?.handle).filter((h): h is string => typeof h === 'string' && h.length > 0)
-    : []
+  // Integrity check: the subscription Shopify returned must be for the exact
+  // shop we asked about — both by GID and (when the caller supplies it, e.g.
+  // from the shopify_connections row) by canonical .myshopify.com domain.
+  if (sub.shop?.id !== shopGid) return { ok: false, reason: 'shop_identity_mismatch' }
+  if (expectedMyshopifyDomain && sub.shop?.myshopifyDomain !== expectedMyshopifyDomain) {
+    return { ok: false, reason: 'shop_identity_mismatch' }
+  }
+
+  // Only items whose price is not explicitly inactive count — `price.active`
+  // missing/undefined is treated as active (fail-open on an absent field the
+  // schema doesn't guarantee everywhere), but an explicit `false` excludes it.
+  const items = Array.isArray(sub.items) ? sub.items : []
+  const handles = items
+    .filter((i) => i?.price?.active !== false)
+    .map((i) => i?.handle)
+    .filter((h): h is string => typeof h === 'string' && h.length > 0)
   const recognized = handles.find(isSupportedShopifyPlanHandle)
-  if (!recognized) return { ok: true, active: false, reason: 'unrecognized_plan_handle', rawHandles: handles }
+  if (!recognized) {
+    const allHandles = items.map((i) => i?.handle).filter((h): h is string => typeof h === 'string' && h.length > 0)
+    return { ok: true, active: false, reason: 'unrecognized_plan_handle', rawHandles: allHandles }
+  }
 
   return {
     ok: true,
@@ -229,5 +278,6 @@ export async function getActiveShopifySubscription(
     planHandle: recognized,
     trialEndsAt: sub.trialEndsAt ?? null,
     currentPeriodEnd: sub.currentBillingCycle?.endTime ?? null,
+    cancelAtEndOfCycle: sub.cancelAtEndOfCycle === true,
   }
 }

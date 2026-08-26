@@ -20,6 +20,7 @@ import {
   type ProjectKeywordFit,
 } from '@/lib/content/gemini-topics'
 import { suggestTopics, type SuggestionLanguage, type SuggestionIntent } from '@/lib/content/topic-suggestions'
+import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 
 const VALID_INTENTS: SuggestionIntent[] = ['informational', 'commercial', 'local', 'comparison', 'transactional', 'other']
 const MIN_GOOD = 6
@@ -53,6 +54,12 @@ export async function POST(request: Request) {
 
   const auth = await authContentProject(typeof body.projectId === 'string' ? body.projectId : null)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  // Blocker D fix — central gate, before any Gemini call. Single caller of
+  // generateRawTopics (no queue/cron for this subsystem), so the route is
+  // the narrowest shared point.
+  const gate = await assertContentGenerationAllowedForUser(auth.admin, auth.user.id)
+  if (!gate.allowed) return Response.json({ error: 'Shopify billing required', reason: gate.reason }, { status: 403 })
 
   const primaryKeyword = typeof body.primaryKeyword === 'string' ? body.primaryKeyword.trim() : ''
   if (!primaryKeyword) return Response.json({ error: 'primaryKeyword is required' }, { status: 400 })
