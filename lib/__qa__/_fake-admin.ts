@@ -200,6 +200,28 @@ export class FakeAdmin {
    *       supabase/migrations/__qa__/phase3-reserve-usage-ambiguity-fix.qa.ts
    *       for that source-contract proof — do not treat any FakeAdmin-based
    *       "concurrent same-key" test as proof this class of bug is fixed.
+   *
+   * Corrective migration (20260829020000_fix_finalize_lost_update_race.sql)
+   * fixed a SECOND, DIFFERENT real-Postgres bug this mock is likewise
+   * incapable of reproducing OR disproving: finalize_article_generation's
+   * (and finalize_usage_reservation's) guard was a plain unlocked SELECT
+   * followed by an UPDATE guarded only by `id` — two concurrent real
+   * transactions holding the SAME valid token could both pass the check and
+   * both successfully write, the second silently clobbering the first
+   * (lost update). The fix is `SELECT ... FOR UPDATE` before the guard,
+   * re-validated against the WHERE clause after any blocking wait, plus a
+   * defense-in-depth fully-guarded final UPDATE with a ROW_COUNT check. This
+   * mock's finalize_article_generation / finalize_usage_reservation
+   * branches, like reserve_usage's, run entirely synchronously — two calls
+   * issued via Promise.all() here can never truly interleave, so this mock
+   * ALREADY cannot lose an update regardless of whether the real SQL fix
+   * exists. See
+   * supabase/migrations/__qa__/phase3-finalize-lost-update-fix.qa.ts for the
+   * actual source-contract proof (FOR UPDATE presence, guarded final
+   * UPDATE predicates, ROW_COUNT verification) — the ONE genuinely new
+   * LOGICAL behavior this mock DOES faithfully model is the new
+   * project-integrity guard in finalize_article_generation below (a real
+   * guard, not a locking artifact — JS can and does reproduce it exactly).
    */
   async rpc(name: string, params: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }> {
     const reservations = (this.tables.usage_reservations ??= [])
@@ -294,6 +316,15 @@ export class FakeAdmin {
       const row = reservations.find((r) => r.id === params.p_reservation_id && r.user_id === params.p_user_id && r.usage_type === 'article' && r.status === 'reserved' && r.reservation_token === params.p_reservation_token)
       if (!row) return { data: [{ outcome: 'not_reserved', article_id: null }], error: null }
       const article = params.p_article as Record<string, unknown>
+      // Corrective migration (20260829020000_fix_finalize_lost_update_race.sql)
+      // — project-integrity guard: a reservation that DOES carry a project
+      // scope must never be consumed by an article for a DIFFERENT project.
+      // No-op for today's real article reservations (always project_id=null
+      // at the ledger level) — pure defense-in-depth, mirrored here for
+      // parity with the real SQL's new guard.
+      if (row.project_id != null && row.project_id !== article.project_id) {
+        return { data: [{ outcome: 'not_reserved', article_id: null }], error: null }
+      }
       const articles = (this.tables.generated_articles ??= [])
       const slugConflict = articles.some((a) => a.slug === article.slug)
       if (slugConflict) return { data: [{ outcome: 'slug_conflict', article_id: null }], error: null }
