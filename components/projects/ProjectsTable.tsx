@@ -31,10 +31,11 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
+  // Phase 3 — weekly/monthly_first_day removed. A legacy value that somehow
+  // still reaches this component (pre-migration data) falls back to the
+  // generic label helper rather than a dedicated (now-removed) translation.
   function localizedFrequency(freq: string): string {
-    if (freq === 'weekly') return dict.projects.frequency.weekly
     if (freq === 'monthly') return dict.projects.frequency.monthly
-    if (freq === 'monthly_first_day') return dict.projects.frequency.monthlyFirstDay
     if (freq === 'manual') return dict.projects.frequency.manual
     return getFrequencyLabel(freq)
   }

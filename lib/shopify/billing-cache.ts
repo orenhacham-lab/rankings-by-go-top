@@ -18,6 +18,12 @@ export interface BillingCacheFields {
   shopify_subscription_status: 'active' | 'none' | 'unknown'
   shopify_trial_ends_at: string | null
   shopify_current_period_end: string | null
+  /** Phase 3 — authoritative billing-cycle start (Partner API
+   *  currentBillingCycle.startTime). Optional so existing callers that
+   *  haven't been updated to pass it don't break; omitted entirely from the
+   *  write when undefined (never overwrites a good value with null by
+   *  accident from a caller that simply doesn't know it yet). */
+  shopify_current_period_start?: string | null
   shopify_cancel_at_end_of_cycle: boolean
   shopify_billing_last_error: string | null
 }

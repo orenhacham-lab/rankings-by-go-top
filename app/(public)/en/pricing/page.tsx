@@ -2,125 +2,56 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
+import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 
-interface Plan {
-  slug: string
-  name: string
-  description: string
-  price: string
-  originalPrice?: string
-  priceSuffix?: string
-  features: string[]
-  cta: string
-  highlighted?: boolean
-  badge?: string
+const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
+
+const PLAN_UI: Record<PlanCode, { name: string; description: string }> = {
+  regular: { name: 'Basic', description: 'One project, a perfect starting point' },
+  advanced: { name: 'Advanced', description: 'For growing businesses with multiple sites' },
+  premium: { name: 'Premium', description: 'For businesses and agencies with advanced needs' },
+  large_agency: { name: 'Agency', description: 'For agencies with many clients' },
 }
 
-const plans: Plan[] = [
-  {
-    slug: 'single_site',
-    name: 'Single Site',
-    description: 'One site / single project',
-    price: '₪79',
-    priceSuffix: '/ month',
-    features: [
-      'One site / project',
-      'Up to 50 keywords',
-      'Up to 50 keyword checks per month',
-      'Up to 10 AI scans',
-      'PDF & Excel reports',
-      'Google Organic + Google Maps',
-      'Email support',
-    ],
-    cta: 'Start free trial',
-  },
-  {
-    slug: 'boutique',
-    name: 'Boutique',
-    description: 'For growing businesses with multiple sites',
-    price: '₪199',
-    originalPrice: '₪299',
-    priceSuffix: '/ month',
-    features: [
-      'Up to 10 sites / projects',
-      'Up to 50 keywords per site',
-      'Up to 100 keyword checks per month per site',
-      'Up to 10 AI scans per site',
-      'PDF & Excel reports',
-      'Google Organic + Google Maps + AI visibility',
-      'Advanced trend tracking',
-      'Priority support',
-    ],
-    cta: 'Start free trial',
-    highlighted: true,
-    badge: 'Most Popular',
-  },
-  {
-    slug: 'agency',
-    name: 'Agency',
-    description: 'For agencies and large businesses',
-    price: '₪349',
-    originalPrice: '₪449',
-    priceSuffix: '/ month',
-    features: [
-      'Up to 25 sites / projects',
-      'Up to 100 keywords per site',
-      'Up to 200 keyword checks per month per site',
-      'Up to 20 AI scans per site',
-      'PDF & Excel reports',
-      'Google Organic + Google Maps + AI visibility',
-      'Advanced trend tracking',
-      'VIP priority support',
-      'Personal onboarding',
-    ],
-    cta: 'Start free trial',
-  },
-  {
-    slug: 'large_agency',
-    name: 'Large Agency',
-    description: 'For agencies with many clients',
-    price: '₪799',
-    originalPrice: '₪999',
-    priceSuffix: '/ month',
-    features: [
-      'Up to 100 sites / projects',
-      'Up to 200 keywords per site',
-      'Up to 400 keyword checks per month per site',
-      'Up to 100 AI scans per site',
-      'PDF & Excel reports',
-      'Google Organic + Google Maps + AI visibility',
-      'Suited for agencies with many clients',
-      'VIP priority support',
-      'Personal onboarding and coaching',
-    ],
-    cta: 'Start free trial',
-  },
-]
+/** Highlighted / "most popular" plan — a UI choice, currently pinned to Advanced. */
+const HIGHLIGHTED_PLAN: PlanCode = 'advanced'
+
+function formatUSD(amount: number): string {
+  return `$${amount.toLocaleString('en-US')}`
+}
 
 const faqs = [
   {
-    q: 'How does the free trial work?',
-    a: 'You get 7 days of free trial with the Trial plan, no credit card required. You can test all the system\'s capabilities before making a decision. The Trial plan includes up to 3 AI scans.',
+    q: 'How does the article allowance work?',
+    a: 'Your article allowance is shared across all projects in your account and resets every billing period. Unused articles don\'t roll over to the next period.',
   },
   {
-    q: 'What is AI visibility tracking?',
-    a: 'AI visibility tracking checks if your business appears in AI engine responses (ChatGPT, Gemini, Perplexity, Copilot, Grok, Google AI), which searches mention it, if your domain is cited, and which sources appear in results. It\'s essential to understand your visibility in the AI world.',
+    q: 'How is an "AI check" counted?',
+    a: 'One AI check means running one query in one AI engine. If you check the same query across multiple AI engines (for example ChatGPT and Gemini), each engine counts as a separate check.',
+  },
+  {
+    q: 'How is a "Google check" counted?',
+    a: 'One Google check means checking one keyword in one destination — either Google Organic or Google Maps. Checking the same keyword in both counts as two checks.',
+  },
+  {
+    q: 'What\'s the difference between manual and automatic scans?',
+    a: 'You can run a manual scan whenever you like, and you can also turn on an automatic monthly scan that runs on its own each billing period. There\'s currently no daily or weekly automatic option — only manual and automatic monthly.',
+  },
+  {
+    q: 'What happens when I create a new article?',
+    a: 'Creating a new article uses one credit from your article allowance. Editing, scheduling, or publishing an existing article doesn\'t use an additional credit.',
+  },
+  {
+    q: 'Can I schedule and publish articles automatically?',
+    a: 'Yes. You can schedule an article for future publishing or publish it directly to a connected WordPress or Shopify site.',
   },
   {
     q: 'Can I upgrade or downgrade my plan?',
-    a: 'Yes! You can switch between plans anytime. Upgrades take effect immediately, and downgrades apply at the start of your next billing cycle.',
+    a: 'Yes, you can switch between plans at any time. The change takes effect and the new limits apply from that point forward.',
   },
   {
-    q: 'How many AI scans do I get with each plan?',
-    a: 'Trial plan: up to 3 AI scans. Regular plan: up to 10 AI scans per project. Advanced plan: up to 10 AI scans per project. Premium plan: up to 20 AI scans per project.',
-  },
-  {
-    q: 'What is a "keyword check"?',
-    a: 'A keyword check means checking one keyword in either Google Organic or Google Maps. For example, 10 keywords in Google Organic only = 10 checks; the same 10 keywords in both Organic and Maps = 20 checks. Every plan includes a monthly keyword-check allowance per project.',
-  },
-  {
-    q: 'What does a "scan" of keywords include?',
-    a: 'One scan checks the position of all your keywords in Google Organic and Google Maps, and generates a complete report with rankings, trends and changes. Each individual position lookup counts as one keyword check. An AI scan checks visibility in different AI engine responses.',
+    q: 'How does the free trial work?',
+    a: `You get ${TRIAL_CATALOG.days} days of free trial, no credit card required, with 1 project, up to ${TRIAL_CATALOG.maxKeywordsPerProject} keywords, up to ${TRIAL_CATALOG.maxGoogleChecksLifetime} Google checks and up to ${TRIAL_CATALOG.maxAIChecksLifetime} AI checks for the whole trial period, plus one AI-generated article so you can try the full workflow.`,
   },
   {
     q: 'How do I cancel my subscription?',
@@ -129,10 +60,6 @@ const faqs = [
   {
     q: 'Is my data secure?',
     a: 'Absolutely. All data is encrypted, stored on secure servers and never shared with third parties. Your privacy is important to us.',
-  },
-  {
-    q: 'What\'s the difference between Google Organic and Google Maps?',
-    a: 'Google Organic checks your position in regular Google search results. Google Maps checks your position in location-based results — especially important for local businesses.',
   },
 ]
 
@@ -174,7 +101,7 @@ export default async function EnglishPricingPage() {
                   Want to try the platform before choosing a plan?
                 </h3>
                 <p className="text-sm text-slate-600">
-                  Start a free 7-day trial — no credit card required.
+                  Start a free {TRIAL_CATALOG.days}-day trial — no credit card required.
                 </p>
               </div>
               <Link
@@ -189,93 +116,110 @@ export default async function EnglishPricingPage() {
       )}
 
       {/* Pricing Cards */}
-      <section className="pb-20 lg:pb-28">
+      <section className="pb-12 lg:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {plans.map((plan) => (
-              <div
-                key={plan.slug}
-                className={`relative rounded-2xl ${
-                  plan.highlighted
-                    ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
-                    : 'bg-white border border-slate-200 text-slate-900 shadow-sm'
-                } p-6 lg:p-7 flex flex-col`}
-              >
-                {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold shadow-md">
-                    {plan.badge}
-                  </div>
-                )}
+            {PLAN_ORDER.map((code) => {
+              const plan = PLAN_CATALOG[code]
+              const ui = PLAN_UI[code]
+              const highlighted = code === HIGHLIGHTED_PLAN
 
-                <div className="mb-5">
-                  <h3 className={`text-xl font-bold mb-1 ${plan.highlighted ? 'text-white' : 'text-slate-900'}`}>
-                    {plan.name}
-                  </h3>
-                  <p className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                    {plan.description}
-                  </p>
-                </div>
+              const features = [
+                `Up to ${plan.maxProjects} project${plan.maxProjects === 1 ? '' : 's'}`,
+                `Up to ${plan.maxKeywordsPerProject} keywords per project`,
+                `Up to ${plan.maxGoogleChecksPerPeriodPerProject} Google checks per billing period per project`,
+                `Up to ${plan.maxAIChecksPerPeriodPerProject} AI checks per billing period per project`,
+                `${plan.maxArticlesPerPeriodAccountWide} articles per billing period, shared across all projects in your account`,
+                'Google Organic and Google Maps tracking',
+                'AI visibility tracking',
+                'Article creation, scheduling and publishing to WordPress and Shopify',
+                'PDF and Excel reports',
+                'Personal support',
+              ]
 
-                <div className="mb-6">
-                  {plan.originalPrice && (
-                    <div className={`text-sm line-through mb-1 ${plan.highlighted ? 'text-blue-200' : 'text-slate-400'}`}>
-                      {plan.originalPrice}
+              return (
+                <div
+                  key={code}
+                  className={`relative rounded-2xl ${
+                    highlighted
+                      ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
+                      : 'bg-white border border-slate-200 text-slate-900 shadow-sm'
+                  } p-6 lg:p-7 flex flex-col`}
+                >
+                  {highlighted && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold shadow-md">
+                      Most Popular
                     </div>
                   )}
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-4xl lg:text-5xl font-extrabold ${plan.highlighted ? 'text-white' : 'text-slate-900'}`}>
-                      {plan.price}
-                    </span>
-                    {plan.priceSuffix && (
-                      <span className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                        {plan.priceSuffix}
-                      </span>
-                    )}
+
+                  <div className="mb-5">
+                    <h3 className={`text-xl font-bold mb-1 ${highlighted ? 'text-white' : 'text-slate-900'}`}>
+                      {ui.name}
+                    </h3>
+                    <p className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
+                      {ui.description}
+                    </p>
                   </div>
-                </div>
 
-                <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm">
-                      <span
-                        className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
-                          plan.highlighted ? 'bg-white/20' : 'bg-blue-50'
-                        }`}
-                      >
-                        <svg
-                          className={`w-3 h-3 ${plan.highlighted ? 'text-white' : 'text-blue-600'}`}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                          viewBox="0 0 24 24"
+                  <div className="mb-6">
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-4xl lg:text-5xl font-extrabold ${highlighted ? 'text-white' : 'text-slate-900'}`}>
+                        {formatUSD(plan.priceUSD)}
+                      </span>
+                      <span className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
+                        /month
+                      </span>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-3 mb-8 flex-1">
+                    {features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-sm">
+                        <span
+                          className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
+                            highlighted ? 'bg-white/20' : 'bg-blue-50'
+                          }`}
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </span>
-                      <span className={plan.highlighted ? 'text-blue-50' : 'text-slate-700'}>
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                          <svg
+                            className={`w-3 h-3 ${highlighted ? 'text-white' : 'text-blue-600'}`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={3}
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                        <span className={highlighted ? 'text-blue-50' : 'text-slate-700'}>
+                          {feature}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
 
-                <Link
-                  href={user ? '/dashboard' : `/en/signup?plan=${plan.slug}`}
-                  className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
-                    plan.highlighted
-                      ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
-                      : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm hover:shadow-md'
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
-              </div>
-            ))}
+                  <Link
+                    href={user ? '/dashboard' : `/en/signup?plan=${code}`}
+                    className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
+                      highlighted
+                        ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
+                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    Start free trial
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Usage clarification */}
+          <div className="mt-10 max-w-4xl mx-auto rounded-2xl border border-blue-100 bg-blue-50/60 px-6 py-5 text-center text-sm text-slate-600 leading-relaxed">
+            One AI check means running one query in one AI engine. Running the same query across multiple engines consumes one check per engine. Article allowances are shared across all projects in the account and reset each billing cycle.
           </div>
 
           {/* Comparison note */}
-          <p className="text-center text-sm text-slate-500 mt-12">
-            All plans include full access to Google Organic, Google Maps and AI visibility tracking. AI scans vary by plan. Cancel anytime with no penalties.
+          <p className="text-center text-sm text-slate-500 mt-8">
+            All plans include Google Organic, Google Maps and AI visibility tracking, plus article creation and publishing. Allowances vary by plan. Cancel anytime with no penalties.
           </p>
         </div>
       </section>
@@ -328,7 +272,7 @@ export default async function EnglishPricingPage() {
                 Ready to get started?
               </h2>
               <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
-                Start your free 7-day trial and test the platform yourself
+                Start your free {TRIAL_CATALOG.days}-day trial and test the platform yourself
               </p>
               <Link
                 href={user ? '/dashboard' : '/en/signup'}

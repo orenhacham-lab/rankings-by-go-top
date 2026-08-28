@@ -181,7 +181,7 @@ const ACTIVE_SUBSCRIPTION_QUERY = `
       shop { id myshopifyDomain }
       trialEndsAt
       cancelAtEndOfCycle
-      currentBillingCycle { endTime }
+      currentBillingCycle { startTime endTime }
       items { handle price { __typename active } }
     }
   }
@@ -196,13 +196,23 @@ interface ActiveSubscriptionData {
     shop: { id: string | null; myshopifyDomain: string | null } | null
     trialEndsAt: string | null
     cancelAtEndOfCycle: boolean | null
-    currentBillingCycle: { endTime: string | null } | null
+    currentBillingCycle: { startTime: string | null; endTime: string | null } | null
     items: { handle: string | null; price: { active: boolean | null } | null }[] | null
   } | null
 }
 
 export type ActiveSubscriptionResult =
-  | { ok: true; active: true; planHandle: ShopifyPlanHandle; trialEndsAt: string | null; currentPeriodEnd: string | null; cancelAtEndOfCycle: boolean }
+  | {
+      ok: true; active: true; planHandle: ShopifyPlanHandle; trialEndsAt: string | null
+      currentPeriodEnd: string | null
+      /** Phase 3 — authoritative billing-cycle start, straight from the
+       *  Partner API's own currentBillingCycle.startTime. Whatever Shopify
+       *  reports here is always what gets cached — including after an
+       *  upgrade/downgrade/replacement subscription changes the cycle
+       *  boundaries; there is no special-cased "never reset" logic. */
+      currentPeriodStart: string | null
+      cancelAtEndOfCycle: boolean
+    }
   | { ok: true; active: false; reason: 'no_subscription' | 'unrecognized_plan_handle'; rawHandles?: string[] }
   | { ok: false; reason: PartnerApiErrorKind }
 
@@ -278,6 +288,7 @@ export async function getActiveShopifySubscription(
     planHandle: recognized,
     trialEndsAt: sub.trialEndsAt ?? null,
     currentPeriodEnd: sub.currentBillingCycle?.endTime ?? null,
+    currentPeriodStart: sub.currentBillingCycle?.startTime ?? null,
     cancelAtEndOfCycle: sub.cancelAtEndOfCycle === true,
   }
 }

@@ -80,6 +80,7 @@ export async function checkShopifyPublishEntitlement(
       shopify_subscription_status: 'unknown',
       shopify_trial_ends_at: connection.shopify_trial_ends_at,
       shopify_current_period_end: connection.shopify_current_period_end,
+      shopify_current_period_start: connection.shopify_current_period_start,
       shopify_cancel_at_end_of_cycle: connection.shopify_cancel_at_end_of_cycle ?? false,
       shopify_billing_last_error: `verification_failed: ${result.reason}`,
     })
@@ -92,6 +93,7 @@ export async function checkShopifyPublishEntitlement(
       shopify_subscription_status: 'none',
       shopify_trial_ends_at: null,
       shopify_current_period_end: null,
+      shopify_current_period_start: null,
       shopify_cancel_at_end_of_cycle: false,
       shopify_billing_last_error: result.reason === 'unrecognized_plan_handle' ? `unrecognized_plan_handle: ${(result.rawHandles ?? []).join(',')}` : null,
     })
@@ -103,6 +105,7 @@ export async function checkShopifyPublishEntitlement(
     shopify_subscription_status: 'active',
     shopify_trial_ends_at: result.trialEndsAt,
     shopify_current_period_end: result.currentPeriodEnd,
+    shopify_current_period_start: result.currentPeriodStart,
     shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle,
     shopify_billing_last_error: null,
   })

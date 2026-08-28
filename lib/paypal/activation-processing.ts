@@ -39,6 +39,11 @@ export interface PaidSubscriptionFields {
   status: 'active'
   paypal_subscription_id: string
   current_period_end: string
+  /** Phase 3 — authoritative period start from PayPal's own verified
+   *  response (lib/paypal/client.ts::verifyPayPalActivation); null when
+   *  PayPal doesn't report start_time for this subscription (the usage-period
+   *  resolver falls back to current_period_end - 1 month in that case). */
+  current_period_start: string | null
 }
 
 export type ActivationTransitionOutcome =

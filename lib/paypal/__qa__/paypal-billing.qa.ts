@@ -20,14 +20,14 @@ import { transitionSubscriptionToActivePlan, type PaidSubscriptionFields } from 
 /** Fake authoritative-billing-date dependency — always returns the same
  *  fixed date unless overridden, so idempotency is genuinely exercised
  *  (two calls, same PayPal-reported date, same result) rather than assumed. */
-function fakeDeps(nextBillingTime: string | null = '2026-10-01T00:00:00Z'): ProcessDeps {
+function fakeDeps(nextBillingTime: string | null = '2026-10-01T00:00:00Z', periodStart: string | null = null): ProcessDeps {
   return {
-    fetchAuthoritativeNextBillingTime: async () =>
-      nextBillingTime ? { ok: true, nextBillingTime } : { ok: false, reason: 'no_authoritative_date' },
+    fetchAuthoritativeBillingPeriod: async () =>
+      nextBillingTime ? { ok: true, periodEnd: nextBillingTime, periodStart } : { ok: false, reason: 'no_authoritative_date' },
   }
 }
 function failingDeps(reason: string): ProcessDeps {
-  return { fetchAuthoritativeNextBillingTime: async () => ({ ok: false, reason }) }
+  return { fetchAuthoritativeBillingPeriod: async () => ({ ok: false, reason }) }
 }
 
 let pass = 0, fail = 0
@@ -68,10 +68,19 @@ async function main() {
   // ── Test 6: valid activation ──
   console.log('6) valid PayPal subscription activation')
   {
-    const f = fakeFetch(() => ({ ok: true, body: { id: 'SUB-1', status: 'ACTIVE', plan_id: 'P-PREMIUM' } }))
+    const f = fakeFetch(() => ({ ok: true, body: { id: 'SUB-1', status: 'ACTIVE', plan_id: 'P-PREMIUM', start_time: '2026-08-01T00:00:00Z', billing_info: { next_billing_time: '2026-09-01T00:00:00Z' } } }))
     const r = await verifyPayPalActivation({ submittedSubscriptionId: 'SUB-1', submittedPlanCode: 'premium', fetchImpl: f })
     check('verification succeeds', r.ok === true)
     check('resolved planCode is server-derived (premium)', r.ok && r.planCode === 'premium')
+    check('periodEnd is PayPal\'s authoritative next_billing_time, never now()+1month', r.ok && r.periodEnd === '2026-09-01T00:00:00Z')
+    check('periodStart is PayPal\'s authoritative start_time, never now()', r.ok && r.periodStart === '2026-08-01T00:00:00Z')
+  }
+  console.log('\n6b) valid activation but PayPal reports no next_billing_time at all → fails closed (never invents now()+1month)')
+  {
+    const f = fakeFetch(() => ({ ok: true, body: { id: 'SUB-1b', status: 'ACTIVE', plan_id: 'P-PREMIUM' } }))
+    const r = await verifyPayPalActivation({ submittedSubscriptionId: 'SUB-1b', submittedPlanCode: 'premium', fetchImpl: f })
+    check('rejected', r.ok === false)
+    check('reason is no_authoritative_period', !r.ok && r.reason === 'no_authoritative_period')
   }
 
   // ── Test 7: PayPal verification failure ──
@@ -278,7 +287,7 @@ async function main() {
       { subscriptions: [{ id: 'trial-row', user_id: 'u1', status: 'trial', trial_ends_at: '2026-09-01T00:00:00Z', created_at: '2026-08-01T00:00:00Z' }] },
       { subscriptions: { update: () => ({ message: 'connection reset' }) } },
     )
-    const paid: PaidSubscriptionFields = { plan_code: 'premium', status: 'active', paypal_subscription_id: 'SUB-20', current_period_end: '2026-09-22T00:00:00Z' }
+    const paid: PaidSubscriptionFields = { plan_code: 'premium', status: 'active', paypal_subscription_id: 'SUB-20', current_period_end: '2026-09-22T00:00:00Z', current_period_start: null }
     const result = await transitionSubscriptionToActivePlan(admin, 'u1', paid)
     check('outcome is write_failed', result.kind === 'write_failed')
     const row = admin.tables.subscriptions[0]
@@ -290,7 +299,7 @@ async function main() {
   console.log('\n[required] successful activation: the trial row transitions exactly once, in place — no separate cancel+insert')
   {
     const admin = new FakeAdmin({ subscriptions: [{ id: 'trial-row-2', user_id: 'u1', status: 'trial', trial_ends_at: '2026-09-01T00:00:00Z', created_at: '2026-08-01T00:00:00Z' }] })
-    const paid: PaidSubscriptionFields = { plan_code: 'large_agency', status: 'active', paypal_subscription_id: 'SUB-21', current_period_end: '2026-09-22T00:00:00Z' }
+    const paid: PaidSubscriptionFields = { plan_code: 'large_agency', status: 'active', paypal_subscription_id: 'SUB-21', current_period_end: '2026-09-22T00:00:00Z', current_period_start: null }
     const result = await transitionSubscriptionToActivePlan(admin, 'u1', paid)
     check('outcome is transitioned_existing (in-place update, not insert)', result.kind === 'transitioned_existing')
     check('exactly one row for this user — no second row was inserted', admin.tables.subscriptions.filter((r) => r.user_id === 'u1').length === 1)
@@ -301,7 +310,7 @@ async function main() {
   console.log('\n[required, variant] no prior trial/active row → inserts fresh, exactly once')
   {
     const admin = new FakeAdmin({ subscriptions: [] })
-    const paid: PaidSubscriptionFields = { plan_code: 'regular', status: 'active', paypal_subscription_id: 'SUB-22', current_period_end: '2026-09-22T00:00:00Z' }
+    const paid: PaidSubscriptionFields = { plan_code: 'regular', status: 'active', paypal_subscription_id: 'SUB-22', current_period_end: '2026-09-22T00:00:00Z', current_period_start: null }
     const result = await transitionSubscriptionToActivePlan(admin, 'u2', paid)
     check('outcome is inserted_new', result.kind === 'inserted_new')
     check('exactly one row now exists', admin.tables.subscriptions.length === 1)
@@ -319,7 +328,7 @@ async function main() {
       { subscriptions: [{ id: 'row-u2', user_id: 'u2', status: 'trial', trial_ends_at: '2026-09-01T00:00:00Z' }] },
       { subscriptions: { update: () => ({ code: '23505', message: 'duplicate key value violates unique constraint "subscriptions_paypal_subscription_id_unique"' }) } },
     )
-    const paid: PaidSubscriptionFields = { plan_code: 'premium', status: 'active', paypal_subscription_id: 'SUB-ALREADY-USED', current_period_end: '2026-09-22T00:00:00Z' }
+    const paid: PaidSubscriptionFields = { plan_code: 'premium', status: 'active', paypal_subscription_id: 'SUB-ALREADY-USED', current_period_end: '2026-09-22T00:00:00Z', current_period_start: null }
     const result = await transitionSubscriptionToActivePlan(admin, 'u2', paid)
     check('outcome is write_failed, not silently accepted', result.kind === 'write_failed')
     check('the constraint-violation message is carried through', result.kind === 'write_failed' && /unique constraint/.test(result.message))
@@ -334,7 +343,7 @@ async function main() {
         { id: 'dup-2', user_id: 'u3', status: 'active', plan_code: 'regular', created_at: '2026-08-10T00:00:00Z' },
       ],
     })
-    const paid: PaidSubscriptionFields = { plan_code: 'premium', status: 'active', paypal_subscription_id: 'SUB-23', current_period_end: '2026-09-22T00:00:00Z' }
+    const paid: PaidSubscriptionFields = { plan_code: 'premium', status: 'active', paypal_subscription_id: 'SUB-23', current_period_end: '2026-09-22T00:00:00Z', current_period_start: null }
     const result = await transitionSubscriptionToActivePlan(admin, 'u3', paid)
     check('outcome is multiple_current_entitlement_rows', result.kind === 'multiple_current_entitlement_rows')
     check('reports the actual count (2), not just a boolean', result.kind === 'multiple_current_entitlement_rows' && result.count === 2)
@@ -344,7 +353,7 @@ async function main() {
   console.log('\n[required] normal one-row trial-to-active transition still succeeds after the hardening pass')
   {
     const admin = new FakeAdmin({ subscriptions: [{ id: 'trial-row-3', user_id: 'u4', status: 'trial', trial_ends_at: '2026-09-01T00:00:00Z', created_at: '2026-08-01T00:00:00Z' }] })
-    const paid: PaidSubscriptionFields = { plan_code: 'advanced', status: 'active', paypal_subscription_id: 'SUB-24', current_period_end: '2026-09-22T00:00:00Z' }
+    const paid: PaidSubscriptionFields = { plan_code: 'advanced', status: 'active', paypal_subscription_id: 'SUB-24', current_period_end: '2026-09-22T00:00:00Z', current_period_start: null }
     const result = await transitionSubscriptionToActivePlan(admin, 'u4', paid)
     check('outcome is transitioned_existing', result.kind === 'transitioned_existing')
     check('the single row is now active with the correct plan', admin.tables.subscriptions[0].status === 'active' && admin.tables.subscriptions[0].plan_code === 'advanced')
@@ -371,8 +380,8 @@ async function main() {
 
     console.log('\nSOURCE) activation write-ordering (lib/paypal/activation-processing.ts)')
     const activationProcessing = strip(read('lib/paypal/activation-processing.ts'))
-    check('no longer references the nonexistent plan/current_period_start/scans_* columns',
-      !/\bplan:\s*plan\b|current_period_start|scans_this_period|scans_period_key/.test(activationProcessing))
+    check('no longer references the nonexistent plan/scans_* columns (current_period_start is now a REAL column — Phase 3)',
+      !/\bplan:\s*plan\b|scans_this_period|scans_period_key/.test(activationProcessing))
     check('the best-effort cleanup step is GONE — no application-layer cancellation of other rows at all',
       !/status: 'cancelled'/.test(activationProcessing))
     check('no order()/limit(1)/maybeSingle() narrowing — reads ALL current-entitlement rows, not just the newest',

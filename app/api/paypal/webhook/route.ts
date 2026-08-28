@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { extractPayPalWebhookHeaders, verifyPayPalWebhookSignature, fetchAuthoritativeNextBillingTime } from '@/lib/paypal/client'
+import { extractPayPalWebhookHeaders, verifyPayPalWebhookSignature, fetchAuthoritativeBillingPeriod } from '@/lib/paypal/client'
 import { processVerifiedPayPalWebhookEvent, httpStatusForOutcome, type PayPalWebhookEvent } from '@/lib/paypal/webhook-processing'
 
 /**
@@ -71,17 +71,26 @@ async function handle(request: Request): Promise<Response> {
   // From here on, the event is CONFIRMED genuine per PayPal's own API.
   const admin = createAdminClient()
   const outcome = await processVerifiedPayPalWebhookEvent(admin, parsed as PayPalWebhookEvent, {
-    fetchAuthoritativeNextBillingTime: (subscriptionId) => fetchAuthoritativeNextBillingTime(subscriptionId),
+    fetchAuthoritativeBillingPeriod: (subscriptionId) => fetchAuthoritativeBillingPeriod(subscriptionId),
   })
 
   if (outcome.kind === 'lookup_failed' || outcome.kind === 'update_failed' || outcome.kind === 'unmappable_subscription_reference' || outcome.kind === 'renewal_date_unavailable') {
     console.error('[paypal-webhook] processing failed', outcome)
   } else if (outcome.kind === 'ignored_unknown_subscription') {
     console.warn('[paypal-webhook] unknown subscription', outcome)
+  } else if (outcome.kind === 'renewal_duplicate' || outcome.kind === 'renewal_stale') {
+    // Not an error — a duplicate/out-of-order renewal webhook was safely
+    // no-op'd. Logged for observability only.
+    console.warn('[paypal-webhook] renewal not applied (duplicate/stale, safely ignored)', outcome)
+  } else if (outcome.kind === 'renewal_conflict') {
+    // A concurrent renewal handler won the race — THIS delivery must be
+    // retried (unlike duplicate/stale, which are permanent no-ops).
+    console.warn('[paypal-webhook] renewal conflict — concurrent handler already advanced this row, retry needed', outcome)
   }
 
   const isError = outcome.kind === 'update_failed' || outcome.kind === 'lookup_failed'
     || outcome.kind === 'unmappable_subscription_reference' || outcome.kind === 'renewal_date_unavailable'
+    || outcome.kind === 'renewal_conflict'
   return Response.json(
     isError ? { error: outcome.kind } : { status: 'received' },
     { status: httpStatusForOutcome(outcome) },

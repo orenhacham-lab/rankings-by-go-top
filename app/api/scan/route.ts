@@ -6,11 +6,12 @@ import {
   buildQuotaError,
   buildTrialTargetAlreadyScannedError,
   countActiveTargets,
-  countKeywordChecksThisPeriodForProject,
   countKeywordChecksTrialLifetime,
   hasTrialTargetAlreadyBeenScanned,
   areAnyTrialTargetsAlreadyScanned,
 } from '@/lib/quota'
+import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
+import { reserveUsage, finalizeUsageReservation, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
 
 export async function POST(request: Request) {
@@ -36,14 +37,25 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
   let scan: any = null
+  // Phase 3 — set once a reservation is granted; the outer catch and every
+  // early-return path below MUST finalize/release it so a request that
+  // never dispatches a single provider call never leaves checks consumed.
+  // Hoisted to function scope (not just the try block) so the catch handler
+  // can see how many checks were actually dispatched before a fatal error.
+  let reservationId: string | null = null
+  let reservationToken: string | null = null
+  let dispatchedCount = 0
 
   try {
     // Check entitlement and keyword-check limits.
     //
-    // One keyword check = one tracking_target scan (one keyword × one engine).
-    // For "Scan All" we pre-count active targets in the project; for a single
-    // target scan it's always 1. The pre-check blocks BEFORE any scan_run /
-    // Serper call is made when the projected usage would exceed the quota.
+    // One Google check = one tracking_target scan (one keyword × one Google
+    // destination — Organic or Maps). For "Scan All" we pre-count active
+    // targets in the project; for a single target scan it's always 1. The
+    // check is an ATOMIC RESERVATION (lib/billing/usage-reservations.ts) —
+    // never a plain count-then-proceed — so no external provider call is
+    // ever made unless the reservation actually succeeded, and concurrent
+    // scan requests can never together exceed the plan's allowance.
     const entitlement = await getUserEntitlement(user.id, supabase)
     const checksThisScan = targetId
       ? 1
@@ -58,18 +70,36 @@ export async function POST(request: Request) {
       const limit = isTrial
         ? entitlement.limits.maxKeywordChecksTotal
         : entitlement.limits.maxKeywordChecksPerPeriodPerProject
-      const used = isTrial
-        ? await countKeywordChecksTrialLifetime(user.id, admin)
-        : await countKeywordChecksThisPeriodForProject(projectId, admin)
 
-      if (used + checksThisScan > limit) {
-        const payload = buildQuotaError(
-          'QUOTA_KEYWORD_CHECKS',
-          entitlement.plan,
-          entitlement.limits,
-          limit
-        )
-        return Response.json(payload, { status: 403 })
+      if (isTrial) {
+        // Trial: lifetime cap, no real "billing period" resolver needed — a
+        // plain count is sufficient here (no concurrent-job race risk for a
+        // single trial user clicking "scan" from one browser session), same
+        // as before this change.
+        const used = await countKeywordChecksTrialLifetime(user.id, admin)
+        if (used + checksThisScan > limit) {
+          const payload = buildQuotaError('QUOTA_KEYWORD_CHECKS', entitlement.plan, entitlement.limits, limit)
+          return Response.json(payload, { status: 403 })
+        }
+      } else {
+        const period = await resolveCurrentUsagePeriod(admin, user.id)
+        if (!period) {
+          return Response.json({ error: 'Unable to resolve billing period' }, { status: 500 })
+        }
+        const reservation = await reserveUsage(admin, {
+          userId: user.id, projectId, usageType: 'google_check', amount: checksThisScan,
+          periodStart: period.start, periodEnd: period.end, limit,
+          idempotencyKey: `manual:${projectId}:${targetId ?? 'all'}:${Date.now()}`,
+        })
+        if (reservation.outcome === 'quota_exceeded') {
+          const payload = buildQuotaError('QUOTA_KEYWORD_CHECKS', entitlement.plan, entitlement.limits, limit)
+          return Response.json(payload, { status: 403 })
+        }
+        if (reservation.outcome !== 'reserved' && reservation.outcome !== 'already_reserved') {
+          return Response.json({ error: 'Failed to reserve keyword-check allowance' }, { status: 500 })
+        }
+        reservationId = reservation.reservationId
+        reservationToken = reservation.reservationToken
       }
 
       // Trial plan: prevent rescanning the same tracking_target.
@@ -101,6 +131,13 @@ export async function POST(request: Request) {
       }
     }
 
+    // Phase 3 — no external provider call has happened yet on any path below
+    // that returns before the scan loop; a reservation held at that point
+    // must be released (nothing was dispatched).
+    const releaseIfReserved = async (reason: string) => {
+      if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason })
+    }
+
     // Load project
     const { data: project, error: projectError } = await admin
       .from('projects')
@@ -109,6 +146,7 @@ export async function POST(request: Request) {
       .single()
 
     if (projectError || !project) {
+      await releaseIfReserved('project_not_found')
       return Response.json({ error: 'Project not found' }, { status: 404 })
     }
 
@@ -126,38 +164,107 @@ export async function POST(request: Request) {
     const { data: targets, error: targetsError } = await targetsQuery
 
     if (targetsError) {
+      await releaseIfReserved('targets_load_failed')
       return Response.json({ error: `Failed to load targets: ${targetsError.message}` }, { status: 500 })
     }
     if (!targets || targets.length === 0) {
+      await releaseIfReserved('no_active_targets')
       return Response.json({ error: 'No active targets found' }, { status: 404 })
     }
 
-    // Create scan record
-    const { data: scanData, error: scanError } = await admin
-      .from('scans')
-      .insert({
-        user_id: user.id,
-        project_id: projectId,
-        status: 'running',
-        triggered_by: triggeredBy,
-        total_targets: targets.length,
-        completed_targets: 0,
-        failed_targets: 0,
-        started_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    // Correction (review blocker 1, applied consistently to manual scans) —
+    // a "Scan All" that crashed mid-batch must be RESUMABLE without
+    // re-dispatching (and so re-charging) targets already checked. A
+    // single-target scan has no batch to partially fail, so it always gets
+    // a fresh scan row (unchanged behavior).
+    let scanForResume: { id: string } | null = null
+    if (!targetId) {
+      const { data: existingScan } = await admin
+        .from('scans')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('status', 'running')
+        .eq('triggered_by', triggeredBy)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      scanForResume = existingScan as { id: string } | null
+    }
 
-    if (scanError || !scanData) {
-      return Response.json({ error: `Failed to create scan record: ${scanError?.message}` }, { status: 500 })
+    let scanData: { id: string } | null = scanForResume
+    if (!scanData) {
+      const { data: newScan, error: scanError } = await admin
+        .from('scans')
+        .insert({
+          user_id: user.id,
+          project_id: projectId,
+          status: 'running',
+          triggered_by: triggeredBy,
+          total_targets: targets.length,
+          completed_targets: 0,
+          failed_targets: 0,
+          started_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (scanError || !newScan) {
+        await releaseIfReserved('scan_record_create_failed')
+        return Response.json({ error: `Failed to create scan record: ${scanError?.message}` }, { status: 500 })
+      }
+      scanData = newScan
     }
 
     scan = scanData
-    let completedTargets = 0
-    let failedTargets = 0
+
+    // Only targets with NO scan_results row under this scan yet are
+    // "remaining" — a target that already has one (from an earlier, crashed
+    // attempt resuming the SAME scan row) already consumed its check and is
+    // NEVER re-dispatched or re-charged.
+    const { data: doneRows } = await admin.from('scan_results').select('tracking_target_id').eq('scan_id', scan.id)
+    const doneIds = new Set((doneRows ?? []).map((r: { tracking_target_id: string }) => r.tracking_target_id))
+    const targetsToRun = scanForResume ? targets.filter((t: { id: string }) => !doneIds.has(t.id)) : targets
+
+    // Correction — the reservation must cover only the REMAINING targets on
+    // a resumed scan, never the original full batch size again. The
+    // reservation above (before targets/scan were loaded) already used
+    // `checksThisScan` (the pre-resume full count) for the FIRST attempt;
+    // when resuming, release that over-broad reservation and take a fresh
+    // one sized to what's actually left.
+    if (scanForResume && reservationId && reservationToken && targetsToRun.length !== checksThisScan) {
+      await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'resized_for_resume' })
+      reservationId = null
+      reservationToken = null
+      const entitlementForResume = await getUserEntitlement(user.id, supabase)
+      if (!entitlementForResume.isAdmin && entitlementForResume.plan !== 'trial' && targetsToRun.length > 0) {
+        const period = await resolveCurrentUsagePeriod(admin, user.id)
+        if (period) {
+          const resumeReservation = await reserveUsage(admin, {
+            userId: user.id, projectId, usageType: 'google_check', amount: targetsToRun.length,
+            periodStart: period.start, periodEnd: period.end,
+            limit: entitlementForResume.limits.maxKeywordChecksPerPeriodPerProject,
+            idempotencyKey: `manual:${projectId}:resume:${scan.id}:${Date.now()}`,
+          })
+          if (resumeReservation.outcome === 'quota_exceeded') {
+            const payload = buildQuotaError('QUOTA_KEYWORD_CHECKS', entitlementForResume.plan, entitlementForResume.limits, entitlementForResume.limits.maxKeywordChecksPerPeriodPerProject)
+            return Response.json(payload, { status: 403 })
+          }
+          if (resumeReservation.outcome === 'reserved' || resumeReservation.outcome === 'already_reserved') {
+            reservationId = resumeReservation.reservationId
+            reservationToken = resumeReservation.reservationToken
+          }
+        }
+      }
+    }
+
+    // Phase 3 — only incremented right before an actual provider call is
+    // made (runScan). A target that throws during pre-flight validation
+    // (e.g. missing exact_point coordinates) BEFORE runScan is reached never
+    // increments this — that check was never dispatched, so it must not be
+    // consumed from the reservation (released back at finalize time below).
     const results = []
 
-    for (const target of targets) {
+    for (const target of targetsToRun) {
       try {
         // Use .maybeSingle() — returns null (not an error) when no previous results exist
         const { data: prevResult } = await admin
@@ -367,6 +474,7 @@ export async function POST(request: Request) {
         })
         console.log('[Scan:route] === END PAYLOAD SUMMARY ===')
 
+        dispatchedCount++ // the provider call is about to actually happen — this check is now "consumed" regardless of outcome (including a valid not-found result)
         const scanOutput = await runScan(target.engine_type, scanPayload)
 
         // change_value: positive = improved (moved up), negative = dropped
@@ -441,12 +549,21 @@ export async function POST(request: Request) {
             audit_location_mode: resultData.audit_location_mode,
             audit_resolved_location: resultData.audit_resolved_location,
           })
-          failedTargets++
+          // 2nd review correction — a scan_results insert failure is now
+          // THROWN (caught by this SAME target's catch block below) rather
+          // than silently continuing to `results.push` as if the row had
+          // been persisted. This target has NO durable dispatch record when
+          // this happens (the row that would prove "this target was already
+          // checked" never landed), so it is correctly left eligible for a
+          // future resume/retry to re-attempt — the SAME documented
+          // trade-off as the automatic scheduler
+          // (lib/scan-scheduler/process-scheduled-scan.ts): the provider
+          // call CAN be intentionally repeated in this narrow window, since
+          // there is no cheaper way to guarantee this target is never
+          // silently skipped for the rest of the billing period.
+          throw new Error(`scan_results_insert_failed:${target.id}:${resultError.message}`)
         } else if (scanOutput.error) {
           // Scan attempted but API returned an error — result saved with error_message
-          failedTargets++
-        } else {
-          completedTargets++
         }
 
         results.push({
@@ -461,7 +578,6 @@ export async function POST(request: Request) {
         const errorMsg = targetError instanceof Error ? targetError.message : String(targetError)
         console.error(`[Scan] Exception while scanning target ${target.id}:`, errorMsg)
         console.error((targetError as Error)?.stack)
-        failedTargets++
         results.push({
           targetId: target.id,
           keyword: target.keyword,
@@ -473,7 +589,13 @@ export async function POST(request: Request) {
       }
     }
 
-    const finalStatus = failedTargets === targets.length ? 'failed' : 'completed'
+    // Cumulative tally across ALL attempts of this scan row (not just this
+    // attempt's targetsToRun) — correct even when this request resumed a
+    // previously-crashed "Scan All".
+    const { data: allScanResultRows } = await admin.from('scan_results').select('error_message').eq('scan_id', scan.id)
+    const cumulativeCompleted = (allScanResultRows ?? []).filter((r: { error_message: string | null }) => !r.error_message).length
+    const cumulativeFailed = (allScanResultRows ?? []).filter((r: { error_message: string | null }) => !!r.error_message).length
+    const finalStatus = cumulativeFailed === targets.length ? 'failed' : 'completed'
 
     // Build error summary if scan failed
     let scanErrorMessage: string | null = null
@@ -484,14 +606,14 @@ export async function POST(request: Request) {
         .slice(0, 5)
       scanErrorMessage = failedKeywords.length > 0
         ? `Failed targets: ${failedKeywords.join('; ')}`
-        : `All ${failedTargets} targets failed`
+        : `All ${cumulativeFailed} targets failed`
     }
 
     // Update scan record with final status
     const updatePayload: Record<string, unknown> = {
       status: finalStatus,
-      completed_targets: completedTargets,
-      failed_targets: failedTargets,
+      completed_targets: cumulativeCompleted,
+      failed_targets: cumulativeFailed,
       completed_at: new Date().toISOString(),
     }
     if (scanErrorMessage) {
@@ -503,10 +625,15 @@ export async function POST(request: Request) {
       .update(updatePayload)
       .eq('id', scan.id)
 
-    // Source of truth for keyword-check usage is the scan_results table,
-    // which we count from at quota-check time (lib/quota.ts) — subscriptions
-    // carries no usage counter (scans_this_period/scans_period_key are not
-    // real columns; see lib/subscription.ts). Nothing to write back here.
+    // Phase 3 — consume exactly what was actually dispatched to the
+    // provider; any reserved-but-undispatched checks (pre-flight validation
+    // throws before runScan) are released automatically by the RPC.
+    if (reservationId && reservationToken) {
+      await finalizeUsageReservation(admin, {
+        reservationId, userId: user.id, reservationToken, consumed: dispatchedCount, relatedRef: scan.id,
+        reason: dispatchedCount < checksThisScan ? 'partial_dispatch' : null,
+      })
+    }
 
     // Update project last_scan_at only — manual scans never change the scheduled next_scan_at
     await admin
@@ -517,8 +644,8 @@ export async function POST(request: Request) {
     return Response.json({
       scanId: scan.id,
       status: finalStatus,
-      completed: completedTargets,
-      failed: failedTargets,
+      completed: cumulativeCompleted,
+      failed: cumulativeFailed,
       total: targets.length,
       results,
     })
@@ -529,17 +656,43 @@ export async function POST(request: Request) {
     console.error('[Scan] FATAL ERROR:', errorMsg)
     console.error('[Scan] Stack:', errorStack)
 
-    // If scan record was created, update it with error
+    // Correction (review blocker 1) — a fatal error must never leave a
+    // reservation permanently held, AND must never blanket-release checks
+    // that were genuinely already dispatched. `consumed: dispatchedCount`
+    // resolves correctly either way inside finalizeUsageReservation: 0 →
+    // full release, >0 → exactly that many consumed, the rest released.
+    // Already-consumed usage from any earlier attempt on this same scan row
+    // is untouched by this call.
+    if (reservationId && reservationToken) {
+      await finalizeUsageReservation(admin, {
+        reservationId, userId: user.id, reservationToken, consumed: dispatchedCount, relatedRef: scan?.id ?? null,
+        reason: dispatchedCount > 0 ? `partial_before_fatal_error:${errorMsg}` : 'fatal_error',
+      })
+    }
+
+    // If scan record was created, update it with error. A "Scan All" batch
+    // is left 'running' (NOT 'failed') so the user's next "Scan All" click
+    // can RESUME it (only dispatching remaining targets, never re-charging
+    // ones already consumed above) — matches the automatic scheduler's
+    // retry-resume design. A single-target scan has no batch to resume, so
+    // it's still marked 'failed' outright, unchanged from before.
     if (scan) {
       try {
-        await admin
-          .from('scans')
-          .update({
-            status: 'failed',
-            error_message: errorMsg,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', scan.id)
+        if (targetId) {
+          await admin
+            .from('scans')
+            .update({
+              status: 'failed',
+              error_message: errorMsg,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', scan.id)
+        } else {
+          await admin
+            .from('scans')
+            .update({ error_message: `resumable_after_error: ${errorMsg}` })
+            .eq('id', scan.id)
+        }
       } catch (updateErr) {
         console.error('[Scan] Failed to update scan with error:', updateErr)
       }

@@ -70,19 +70,17 @@ export async function POST(request: Request) {
       return Response.json({ error: 'PayPal verification failed', reason: verified.reason }, { status: 400 })
     }
 
-    // Matches the REAL schema (plan_code, no current_period_start/
-    // scans_this_period/scans_period_key columns). trial_ends_at is
-    // intentionally omitted (NULL): a paid active row has no trial end, and
-    // the column is nullable as of the Phase-1 migration.
-    const now = new Date()
-    const periodEnd = new Date(now)
-    periodEnd.setMonth(periodEnd.getMonth() + 1)
-
+    // Phase 3 — current_period_end/current_period_start are the AUTHORITATIVE
+    // values PayPal itself reported in the SAME verified fetch above — never
+    // now()/now()+1 month. trial_ends_at is intentionally omitted (NULL): a
+    // paid active row has no trial end, and the column is nullable as of the
+    // Phase-1 migration.
     const result = await transitionSubscriptionToActivePlan(admin, user.id, {
       plan_code: verified.planCode,
       status: 'active',
       paypal_subscription_id: subscriptionId,
-      current_period_end: periodEnd.toISOString(),
+      current_period_end: verified.periodEnd,
+      current_period_start: verified.periodStart,
     })
 
     if (result.kind === 'lookup_failed') {

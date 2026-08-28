@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { MapPin, Users, Phone, Star, Award, Navigation } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'Google Maps Rank Tracking | Rankings by Go Top',
   description: 'Monitor your local visibility in Google Maps. Track positions by city and region. Essential for local SEO success.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/features/google-maps-rank-tracking',
+    languages: buildHreflangAlternates(
+      '/features/google-maps-rank-tracking',
+      '/en/features/google-maps-rank-tracking'
+    ),
+  },
 }
 
 export default function GoogleMapsFeaturePage() {
@@ -163,9 +171,9 @@ export default function GoogleMapsFeaturePage() {
               <div className="relative">
                 <div className="absolute -top-6 -left-6 w-12 h-12 rounded-full bg-amber-600 text-white flex items-center justify-center text-lg font-bold">3</div>
                 <div className="bg-white rounded-lg p-8 border border-slate-200">
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">Daily Tracking Begins</h3>
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">Tracking Begins</h3>
                   <p className="text-slate-700">
-                    Daily automatic checks on Google Maps. See how your ranking changes and impacts visits.
+                    Run a scan on demand whenever you want, or turn on automatic monthly checks on Google Maps. See how your ranking changes and impacts visits.
                   </p>
                 </div>
               </div>
@@ -198,8 +206,8 @@ export default function GoogleMapsFeaturePage() {
               <div className="flex gap-4">
                 <Award className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-2">Review & Response Tracking</h3>
-                  <p className="text-slate-700">Monitor your review count, average rating, and response time.</p>
+                  <h3 className="font-bold text-slate-900 mb-2">Ranking History Over Time</h3>
+                  <p className="text-slate-700">See how your Google Maps position has changed from scan to scan, and spot upward or downward trends.</p>
                 </div>
               </div>
 
@@ -222,8 +230,8 @@ export default function GoogleMapsFeaturePage() {
               <div className="flex gap-4">
                 <Phone className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-2">Phone & Website Analytics</h3>
-                  <p className="text-slate-700">See how many people clicked your phone number or website.</p>
+                  <h3 className="font-bold text-slate-900 mb-2">Accurate Business Matching</h3>
+                  <p className="text-slate-700">The system identifies your business among the results by name and domain, so the ranking you see is always accurate.</p>
                 </div>
               </div>
             </div>
@@ -242,7 +250,7 @@ export default function GoogleMapsFeaturePage() {
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>✓ Google Maps rank = direct customers</li>
                   <li>✓ Monitor local competitors</li>
-                  <li>✓ Improve reviews & response time</li>
+                  <li>✓ Spot ranking changes over time</li>
                 </ul>
               </div>
 

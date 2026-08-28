@@ -30,9 +30,10 @@ import {
 import { getUserEntitlement } from '@/lib/subscription'
 import {
   buildQuotaError,
-  countAIScansThisPeriodForProject,
   countAIScansTrialLifetime,
 } from '@/lib/quota'
+import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
+import { reserveUsage, finalizeUsageReservation, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 
 const SCRAPELLM_TIMEOUT_MS = 60_000 // 60s — within Vercel/Next.js limits, avoids user-perceived stuck state
 
@@ -82,27 +83,40 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Enforce AI-scan quota BEFORE creating ai_scan_runs or calling AI providers.
-  // Trial: lifetime cap across all of the user's projects (3 AI scans total).
-  // Paid:  per-project per-calendar-month cap.
+  // Enforce AI-check quota BEFORE creating ai_scan_runs or calling AI
+  // providers. Trial: lifetime cap across all of the user's projects (3 AI
+  // checks total, plain count — no concurrent-job race risk for a single
+  // trial user). Paid: an ATOMIC reservation against the user's actual
+  // billing-period boundary (never a plain count-then-proceed).
   const entitlement = await getUserEntitlement(user.id, supabase)
+  let reservationId: string | null = null
+  let reservationToken: string | null = null
   if (!entitlement.isAdmin) {
     const isTrial = entitlement.plan === 'trial'
-    const limit = isTrial
-      ? entitlement.limits.maxAIScansTotal
-      : entitlement.limits.maxAIScansPerPeriodPerProject
-    const used = isTrial
-      ? await countAIScansTrialLifetime(user.id, admin)
-      : await countAIScansThisPeriodForProject(projectId, admin)
-
-    if (used + 1 > limit) {
-      const payload = buildQuotaError(
-        'QUOTA_AI_SCANS',
-        entitlement.plan,
-        entitlement.limits,
-        limit
-      )
-      return Response.json(payload, { status: 403 })
+    if (isTrial) {
+      const used = await countAIScansTrialLifetime(user.id, admin)
+      if (used + 1 > entitlement.limits.maxAIScansTotal) {
+        const payload = buildQuotaError('QUOTA_AI_SCANS', entitlement.plan, entitlement.limits, entitlement.limits.maxAIScansTotal)
+        return Response.json(payload, { status: 403 })
+      }
+    } else {
+      const period = await resolveCurrentUsagePeriod(admin, user.id)
+      if (!period) return Response.json({ error: 'Unable to resolve billing period' }, { status: 500 })
+      const limit = entitlement.limits.maxAIScansPerPeriodPerProject
+      const reservation = await reserveUsage(admin, {
+        userId: user.id, projectId, usageType: 'ai_check', amount: 1,
+        periodStart: period.start, periodEnd: period.end, limit,
+        idempotencyKey: `manual:${projectId}:${promptId}:${engine}:${Date.now()}`,
+      })
+      if (reservation.outcome === 'quota_exceeded') {
+        const payload = buildQuotaError('QUOTA_AI_SCANS', entitlement.plan, entitlement.limits, limit)
+        return Response.json(payload, { status: 403 })
+      }
+      if (reservation.outcome !== 'reserved' && reservation.outcome !== 'already_reserved') {
+        return Response.json({ error: 'Failed to reserve AI-check allowance' }, { status: 500 })
+      }
+      reservationId = reservation.reservationId
+      reservationToken = reservation.reservationToken
     }
   }
 
@@ -115,6 +129,7 @@ export async function POST(request: Request) {
     .single()
 
   if (promptError || !prompt) {
+    if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'prompt_not_found' })
     return Response.json({ error: 'Prompt not found' }, { status: 404 })
   }
 
@@ -140,6 +155,7 @@ export async function POST(request: Request) {
     .single()
 
   if (runError || !run) {
+    if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId: user.id, reservationToken, reason: 'run_create_failed' })
     return Response.json(
       { error: `Failed to create scan run: ${runError?.message}` },
       { status: 500 }
@@ -159,6 +175,13 @@ export async function POST(request: Request) {
     targetBrandName: targetBrand,
     timeout: SCRAPELLM_TIMEOUT_MS,
   })
+
+  // Phase 3 — the provider call has now actually been dispatched: this
+  // check is consumed regardless of outcome (including a provider-side
+  // error result — the check still ran).
+  if (reservationId && reservationToken) {
+    await finalizeUsageReservation(admin, { reservationId, userId: user.id, reservationToken, consumed: 1, relatedRef: run.id, reason: null })
+  }
 
   const scannedAt = new Date().toISOString()
 

@@ -10,7 +10,7 @@
  * topic-suggestions model. No Anthropic.
  */
 
-import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import {
   validateAnchorPlacement, scanAnchorHits, isAnchorTooEarly,
@@ -795,7 +795,9 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string)
     const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.75 } })
     const prompt = buildPrompt(brief, opts)
     promptChars = prompt.length
-    const result = await model.generateContent(prompt)
+    // 3rd review correction — bounded well under the 30-min reservation TTL;
+    // see the constant's definition for the full rationale.
+    const result = await model.generateContent(prompt, { timeout: GEMINI_REQUEST_TIMEOUT_MS })
     const text = result.response.text()
     let parsed: Record<string, unknown>
     try { parsed = JSON.parse(text) } catch { const m = text.match(/\{[\s\S]*\}/); if (!m) return { error: 'gemini_no_json' }; parsed = JSON.parse(m[0]) }

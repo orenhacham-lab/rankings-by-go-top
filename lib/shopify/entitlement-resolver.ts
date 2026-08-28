@@ -81,6 +81,7 @@ interface ConnectionRow {
   shopify_plan_handle: string | null
   shopify_subscription_status: 'active' | 'none' | 'unknown' | null
   shopify_current_period_end: string | null
+  shopify_current_period_start: string | null
   shopify_billing_verified_at: string | null
 }
 
@@ -108,7 +109,7 @@ function fromCache(c: ConnectionRow): ShopifyGovernedEntitlement {
 export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: string): Promise<ShopifyGovernedEntitlement | null> {
   const { data } = await admin
     .from('shopify_connections')
-    .select('id, shop_domain, shop_gid, shopify_plan_handle, shopify_subscription_status, shopify_current_period_end, shopify_billing_verified_at')
+    .select('id, shop_domain, shop_gid, shopify_plan_handle, shopify_subscription_status, shopify_current_period_end, shopify_current_period_start, shopify_billing_verified_at')
     .eq('user_id', userId)
     .eq('connection_status', 'connected')
     .order('updated_at', { ascending: false })
@@ -142,6 +143,7 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
       shopify_subscription_status: 'unknown',
       shopify_trial_ends_at: null,
       shopify_current_period_end: connection.shopify_current_period_end,
+      shopify_current_period_start: connection.shopify_current_period_start,
       shopify_cancel_at_end_of_cycle: false,
       shopify_billing_last_error: `verification_failed: ${result.reason}`,
     })
@@ -158,6 +160,7 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
       shopify_subscription_status: 'none',
       shopify_trial_ends_at: null,
       shopify_current_period_end: null,
+      shopify_current_period_start: null,
       shopify_cancel_at_end_of_cycle: false,
       shopify_billing_last_error: null,
     })
@@ -169,6 +172,10 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
     shopify_subscription_status: 'active',
     shopify_trial_ends_at: result.trialEndsAt,
     shopify_current_period_end: result.currentPeriodEnd,
+    // Phase 3 — always whatever the Partner API reports RIGHT NOW; no
+    // special-casing for a plan change having reset the cycle boundaries —
+    // this write simply reflects Shopify's own current authoritative state.
+    shopify_current_period_start: result.currentPeriodStart,
     shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle,
     shopify_billing_last_error: null,
   })

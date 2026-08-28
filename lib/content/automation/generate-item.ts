@@ -161,7 +161,14 @@ export async function generatePoolItem(
       // plan fixes it); roll back the attempt counter like a transient
       // failure so it doesn't burn the finite retry budget while blocked on
       // billing. No Gemini call was ever made for this attempt.
-      const transient = (gen.kind === 'generation' && TRANSIENT_GEN_REASONS.has(gen.reason)) || gen.kind === 'billing_required'
+      // Phase 3 — quota_exceeded (account article allowance exhausted this
+      // billing period) and generation_in_progress/reservation_error (a
+      // concurrent attempt or a ledger DB error, never the item's fault)
+      // get the same treatment: never burn a retry attempt on something
+      // that isn't the item's own problem.
+      const transient = (gen.kind === 'generation' && TRANSIENT_GEN_REASONS.has(gen.reason))
+        || gen.kind === 'billing_required' || gen.kind === 'quota_exceeded'
+        || gen.kind === 'generation_in_progress' || gen.kind === 'reservation_error'
       await finalize(admin, itemId, status, reason, transient ? (item.attempts ?? 0) : undefined)
       return { itemId, status, articleId: null, reason }
     }

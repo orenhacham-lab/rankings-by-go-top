@@ -75,6 +75,15 @@ export async function POST(request: Request) {
         { status: qualityGate ? 422 : 502 },
       )
     }
+    case 'billing_required':
+      return Response.json({ error: 'Shopify billing required', reason: 'shopify_billing_required' }, { status: 403 })
+    case 'quota_exceeded':
+      return Response.json({ error: 'Article quota exceeded', reason: 'quota_exceeded' }, { status: 429 })
+    case 'generation_in_progress':
+      return Response.json({ error: 'A generation for this topic is already in progress', reason: 'generation_in_progress' }, { status: 409 })
+    case 'reservation_error':
+      console.error('[content-article-generation] reservation_error', { message: result.message })
+      return Response.json({ error: 'Failed to reserve article credit' }, { status: 500 })
     case 'insert_failed':
     default:
       return Response.json({ error: 'Failed to save article' }, { status: 500 })

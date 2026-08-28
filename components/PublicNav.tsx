@@ -47,6 +47,12 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
   const featureItems = [
     {
+      id: 'contentPublishing',
+      href: `${prefix}/features/seo-geo-content-publishing`,
+      label: dict.nav.featuresMenu.contentPublishing.label,
+      description: dict.nav.featuresMenu.contentPublishing.description,
+    },
+    {
       id: 'googleOrganic',
       href: `${prefix}/features/google-organic-rank-tracking`,
       label: dict.nav.featuresMenu.googleOrganic.label,

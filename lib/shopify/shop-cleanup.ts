@@ -98,6 +98,7 @@ export async function applyAppUninstalled(admin: Admin, shopDomain: string): Pro
       shopify_plan_handle: null,
       shopify_billing_verified_at: null,
       shopify_current_period_end: null,
+      shopify_current_period_start: null,
       shopify_trial_ends_at: null,
       shopify_cancel_at_end_of_cycle: false,
       shopify_billing_last_error: null,

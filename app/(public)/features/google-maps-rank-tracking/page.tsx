@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { MapPin, Users, Phone, Star, Award, Navigation } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'מעקב דירוג בגוגל מפות | Rankings by Go Top',
   description: 'עקבו אחרי המיקום שלכם בגוגל מפות. בדקו נראות מקומית לפי עיר, אזור וביטוי חיפוש. Local SEO מתקדם.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/features/google-maps-rank-tracking',
+    languages: buildHreflangAlternates(
+      '/features/google-maps-rank-tracking',
+      '/en/features/google-maps-rank-tracking'
+    ),
+  },
 }
 
 export default function GoogleMapsFeaturePage() {
@@ -33,7 +41,7 @@ export default function GoogleMapsFeaturePage() {
 
             {/* Subheading */}
             <p className="text-xl text-slate-600 text-center mb-12 max-w-2xl mx-auto">
-              לקוחות מקומיים מחפשים בגוגל מפות. אם אתם לא בשלוש הראשונות, הם ימצאו את התחרות. דע היכן אתה עומד.
+              לקוחות מקומיים מחפשים בגוגל מפות. אם אתם לא בשלושת המקומות הראשונים, הם ימצאו את המתחרים שלכם. דעו היכן אתם עומדים.
             </p>
 
             {/* CTAs */}
@@ -111,7 +119,7 @@ export default function GoogleMapsFeaturePage() {
                 <Users className="w-10 h-10 text-amber-600 mb-4" />
                 <h3 className="text-lg font-bold text-slate-900 mb-3">הכניסה הראשונה של לקוחות</h3>
                 <p className="text-slate-700">
-                  לקוחות מקומיים לא משחקים משחקים. אם אתה לא בשלוש הראשונות בגוגל מפות, הם מוצאים מישהו אחר.
+                  לקוחות מקומיים לא מתפשרים. אם אתם לא בשלושת המקומות הראשונים בגוגל מפות, הם מוצאים מישהו אחר.
                 </p>
               </div>
 
@@ -145,7 +153,7 @@ export default function GoogleMapsFeaturePage() {
                 <div className="bg-white rounded-lg p-8 border border-slate-200">
                   <h3 className="text-lg font-bold text-slate-900 mb-3">הגדירו את הסניפים שלכם</h3>
                   <p className="text-slate-700">
-                    הוסיפו את כתובת העסק שלכם בגוגל מפות. אם יש כמה סניפים, הוסיפו את כלם.
+                    הוסיפו את כתובת העסק שלכם בגוגל מפות. אם יש לכם כמה סניפים, הוסיפו את כולם.
                   </p>
                 </div>
               </div>
@@ -163,9 +171,9 @@ export default function GoogleMapsFeaturePage() {
               <div className="relative">
                 <div className="absolute -top-6 -left-6 w-12 h-12 rounded-full bg-amber-600 text-white flex items-center justify-center text-lg font-bold">3</div>
                 <div className="bg-white rounded-lg p-8 border border-slate-200">
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">קבלו מעקב יומי</h3>
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">קבלו מעקב שוטף</h3>
                   <p className="text-slate-700">
-                    כל יום המערכת תבדוק את הדירוגים שלכם בגוגל מפות. ראו כיצד השינויים משפיעים.
+                    הריצו סריקה ידנית בכל רגע שתרצו, או הפעילו סריקה אוטומטית חודשית של הדירוגים שלכם בגוגל מפות. ראו כיצד השינויים משפיעים.
                   </p>
                 </div>
               </div>
@@ -198,8 +206,8 @@ export default function GoogleMapsFeaturePage() {
               <div className="flex gap-4">
                 <Award className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-2">מעקב ביקורות וזמן התגובה</h3>
-                  <p className="text-slate-700">ראו כמה ביקורות יש לכם, מה הדירוג הממוצע, וזמן התגובה שלכם.</p>
+                  <h3 className="font-bold text-slate-900 mb-2">היסטוריית דירוגים לאורך זמן</h3>
+                  <p className="text-slate-700">ראו כיצד המיקום שלכם בגוגל מפות השתנה משינוי לשינוי, וזהו מגמות עלייה או ירידה.</p>
                 </div>
               </div>
 
@@ -222,8 +230,8 @@ export default function GoogleMapsFeaturePage() {
               <div className="flex gap-4">
                 <Phone className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-2">מעקב טלפונים וקישורים</h3>
-                  <p className="text-slate-700">ראו כמה אנשים חיפשו את הטלפון או הקישור של העסק שלכם.</p>
+                  <h3 className="font-bold text-slate-900 mb-2">התאמה מדויקת לפי שם העסק</h3>
+                  <p className="text-slate-700">המערכת מזהה את העסק שלכם בין כל התוצאות לפי שם ולפי דומיין, כדי שהדירוג שתראו יהיה תמיד מדויק.</p>
                 </div>
               </div>
             </div>
@@ -241,14 +249,14 @@ export default function GoogleMapsFeaturePage() {
                 <p className="text-slate-700 mb-4">מסעדה, ספריה, חנות, קליניקה - כל עסק שלקוחות מחפשים ממקום מסוים.</p>
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>✓ דירוג בגוגל מפות = לקוחות ישירים</li>
-                  <li>✓ עקבו אחרי תחרויות מקומיות</li>
-                  <li>✓ שיפרו את ביקורות וזמן התגובה</li>
+                  <li>✓ עקבו אחרי מתחרים מקומיים</li>
+                  <li>✓ זהו שינויים בדירוג בזמן</li>
                 </ul>
               </div>
 
               <div className="bg-white rounded-lg p-8 border-l-4 border-orange-600">
                 <h3 className="text-xl font-bold text-slate-900 mb-3">עסקים עם מספר סניפים</h3>
-                <p className="text-slate-700 mb-4">אתרים, חנויות שרשרת, מטופלים של צי כלים - כל עסק מקומי רחוק.</p>
+                <p className="text-slate-700 mb-4">רשתות חנויות, מרפאות ומשרדים עם כמה סניפים - כל עסק שרוצה לראות את כל הסניפים במקום אחד.</p>
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>✓ מעקב ממרכזי לכל סניף</li>
                   <li>✓ השוואה בין ביצועי סניפים</li>
@@ -262,7 +270,7 @@ export default function GoogleMapsFeaturePage() {
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>✓ דוחות ברורים ללקוחות</li>
                   <li>✓ הוכחה לערך העבודה שלך</li>
-                  <li>✓ תחרות בערך הנראות בגוגל מפות</li>
+                  <li>✓ יתרון תחרותי בנראות בגוגל מפות</li>
                 </ul>
               </div>
 
@@ -271,8 +279,8 @@ export default function GoogleMapsFeaturePage() {
                 <p className="text-slate-700 mb-4">מלונות, בארים, שטח בחו"ל - עסקים שהביקוש משתנה לפי עונה או זמן.</p>
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>✓ דעו כיצד הביקוש משתנה</li>
-                  <li>✓ התאם את ההשקעה בשיווק</li>
-                  <li>✓ היזהר מירידה בדירוג</li>
+                  <li>✓ התאימו את ההשקעה בשיווק</li>
+                  <li>✓ שימו לב לירידות בדירוג</li>
                 </ul>
               </div>
             </div>

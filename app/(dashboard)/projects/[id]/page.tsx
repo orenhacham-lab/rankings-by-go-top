@@ -30,12 +30,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const dict = getDashboardDictionary(language)
   const k = dict.projectDetail
 
+  // Phase 3 — weekly/monthly_first_day removed; the dead 'daily' branch
+  // (never a valid value anywhere — not the DB constraint, not the form)
+  // is also removed.
   const localizedFrequencyLabel = (freq: string | null | undefined): string => {
     const f = (freq || 'manual').toLowerCase()
     const map = dict.projects.frequency as Record<string, string>
-    if (f === 'weekly') return map.weekly
     if (f === 'monthly') return map.monthly
-    if (f === 'daily') return language === 'he' ? 'יומי' : 'Daily'
     return map.manual
   }
 

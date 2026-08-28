@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import type { PlanType } from '@/lib/subscription'
+import type { BillingMarket } from '@/lib/paypal/checkout-plans'
 import BillingClient from './client'
 
 /** The 5 plans this view actually has cards/labels for. */
@@ -30,7 +31,13 @@ interface BillingViewProps {
    *  must use Shopify App Pricing exclusively. */
   shopifyConnected: boolean
   shopifyMigrationStatus: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | null
-  planPrices: Record<PlanKey, number>
+  /** Phase 3 — resolved server-side from the durable user_metadata.locale,
+   *  NEVER from the dashboard display-language toggle. `null` means a
+   *  legacy account with no stored locale — an explicit market prompt is
+   *  shown instead of any plan card or PayPal button. */
+  market: BillingMarket | null
+  planPricesILS: Record<PlanKey, number>
+  planPricesUSD: Record<PlanKey, number>
 }
 
 export default function BillingView({
@@ -43,15 +50,33 @@ export default function BillingView({
   renewalCancelled,
   shopifyConnected,
   shopifyMigrationStatus,
-  planPrices,
+  market,
+  planPricesILS,
+  planPricesUSD,
 }: BillingViewProps) {
   const { language, isLoaded } = useDashboardLanguage()
   const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
   const t = dict.billing
   const dateLocale = language === 'en' ? 'en-US' : 'he-IL'
+  const planPrices = market === 'USD' ? planPricesUSD : planPricesILS
+  const currencySymbol = market === 'USD' ? '$' : '₪'
 
   const [cancelling, setCancelling] = useState(false)
   const [cancelMessage, setCancelMessage] = useState('')
+  const [savingMarket, setSavingMarket] = useState<BillingMarket | null>(null)
+
+  const selectMarket = async (chosen: BillingMarket) => {
+    setSavingMarket(chosen)
+    try {
+      const res = await fetch('/api/billing-market/select', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ market: chosen }),
+      })
+      if (res.ok) window.location.reload()
+      else setSavingMarket(null)
+    } catch {
+      setSavingMarket(null)
+    }
+  }
 
   const handleCancel = async () => {
     if (!confirm(t.manage.confirmCancel)) return
@@ -161,71 +186,108 @@ export default function BillingView({
             </div>
           )}
 
-          <p className="mb-6 text-xs text-slate-500 dark:text-slate-400">
-            {t.keywordCheckNote}
-          </p>
+          {market === null ? (
+            // Phase 3 — a legacy account with no stored billing market.
+            // Never silently defaulted (browser locale, dashboard toggle) —
+            // an explicit, one-time, persisted choice is required before any
+            // plan/price/checkout is shown.
+            <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-center">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.marketPrompt.title}</h2>
+              <p className="text-slate-600 dark:text-slate-300 mb-6 text-sm">{t.marketPrompt.description}</p>
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => selectMarket('ILS')}
+                  disabled={savingMarket !== null}
+                  className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingMarket === 'ILS' ? t.marketPrompt.saving : t.marketPrompt.ilsOption}
+                </button>
+                <button
+                  onClick={() => selectMarket('USD')}
+                  disabled={savingMarket !== null}
+                  className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingMarket === 'USD' ? t.marketPrompt.saving : t.marketPrompt.usdOption}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {t.marketPrompt.currentMarketPrefix} {market === 'USD' ? t.marketPrompt.usdLabel : t.marketPrompt.ilsLabel}
+              </p>
+              <p className="mb-6 text-xs text-slate-500 dark:text-slate-400">
+                {t.keywordCheckNote}
+              </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <PlanCard
-              name={t.trialName}
-              price={0}
-              period=""
-              features={t.features.trial}
-              isPopular={false}
-              isCurrent={plan === 'trial'}
-              plan="trial"
-              recommendedLabel={t.recommended}
-              currentLabel={t.currentPlan}
-            />
-            <PlanCard
-              name={t.planLabels.regular}
-              price={planPrices.regular}
-              period={t.perMonth}
-              features={t.features.regular}
-              isPopular={false}
-              isCurrent={plan === 'regular' && hasActiveSubscription}
-              plan="regular"
-              recommendedLabel={t.recommended}
-              currentLabel={t.currentPlan}
-            />
-            <PlanCard
-              name={t.planLabels.advanced}
-              price={planPrices.advanced}
-              period={t.perMonth}
-              features={t.features.advanced}
-              isPopular={true}
-              isCurrent={plan === 'advanced' && hasActiveSubscription}
-              plan="advanced"
-              recommendedLabel={t.recommended}
-              currentLabel={t.currentPlan}
-            />
-            <PlanCard
-              name={t.planLabels.premium}
-              price={planPrices.premium}
-              period={t.perMonth}
-              features={t.features.premium}
-              isPopular={false}
-              isCurrent={plan === 'premium' && hasActiveSubscription}
-              plan="premium"
-              recommendedLabel={t.recommended}
-              currentLabel={t.currentPlan}
-            />
-            {planPrices.large_agency !== undefined && (
-              <PlanCard
-                name={t.planLabels.large_agency}
-                price={planPrices.large_agency}
-                period={t.perMonth}
-                features={t.features.large_agency}
-                isPopular={false}
-                isCurrent={plan === 'large_agency' && hasActiveSubscription}
-                plan="large_agency"
-                recommendedLabel={t.recommended}
-                currentLabel={t.currentPlan}
-              />
-            )}
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <PlanCard
+                  name={t.trialName}
+                  price={0}
+                  currencySymbol={currencySymbol}
+                  period=""
+                  features={t.features.trial}
+                  isPopular={false}
+                  isCurrent={plan === 'trial'}
+                  plan="trial"
+                  recommendedLabel={t.recommended}
+                  currentLabel={t.currentPlan}
+                />
+                <PlanCard
+                  name={t.planLabels.regular}
+                  price={planPrices.regular}
+                  currencySymbol={currencySymbol}
+                  period={t.perMonth}
+                  features={t.features.regular}
+                  isPopular={false}
+                  isCurrent={plan === 'regular' && hasActiveSubscription}
+                  plan="regular"
+                  recommendedLabel={t.recommended}
+                  currentLabel={t.currentPlan}
+                />
+                <PlanCard
+                  name={t.planLabels.advanced}
+                  price={planPrices.advanced}
+                  currencySymbol={currencySymbol}
+                  period={t.perMonth}
+                  features={t.features.advanced}
+                  isPopular={true}
+                  isCurrent={plan === 'advanced' && hasActiveSubscription}
+                  plan="advanced"
+                  recommendedLabel={t.recommended}
+                  currentLabel={t.currentPlan}
+                />
+                <PlanCard
+                  name={t.planLabels.premium}
+                  price={planPrices.premium}
+                  currencySymbol={currencySymbol}
+                  period={t.perMonth}
+                  features={t.features.premium}
+                  isPopular={false}
+                  isCurrent={plan === 'premium' && hasActiveSubscription}
+                  plan="premium"
+                  recommendedLabel={t.recommended}
+                  currentLabel={t.currentPlan}
+                />
+                {planPrices.large_agency !== undefined && (
+                  <PlanCard
+                    name={t.planLabels.large_agency}
+                    price={planPrices.large_agency}
+                    currencySymbol={currencySymbol}
+                    period={t.perMonth}
+                    features={t.features.large_agency}
+                    isPopular={false}
+                    isCurrent={plan === 'large_agency' && hasActiveSubscription}
+                    plan="large_agency"
+                    recommendedLabel={t.recommended}
+                    currentLabel={t.currentPlan}
+                  />
+                )}
+              </div>
 
-          <BillingClient />
+              <BillingClient market={market} />
+            </>
+          )}
         </>
       )}
     </div>
@@ -235,6 +297,7 @@ export default function BillingView({
 interface PlanCardProps {
   name: string
   price: number
+  currencySymbol: string
   period: string
   features: readonly string[]
   isPopular: boolean
@@ -247,6 +310,7 @@ interface PlanCardProps {
 function PlanCard({
   name,
   price,
+  currencySymbol,
   period,
   features,
   isPopular,
@@ -279,7 +343,7 @@ function PlanCard({
       <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{name}</h3>
 
       <div className="mb-6">
-        <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">₪{price}</span>
+        <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">{currencySymbol}{price}</span>
         {period && <span className="text-slate-600 dark:text-slate-300 ml-2">{period}</span>}
       </div>
 

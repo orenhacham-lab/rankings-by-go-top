@@ -1,3 +1,5 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+
 export const metadata = {
   title: 'About Rankings by Go Top',
   description: 'Discover the story of Rankings by Go Top - a Google rank tracking and AI visibility platform built on 11+ years of digital experience. Professional, transparent, results-focused.',
@@ -6,6 +8,10 @@ export const metadata = {
     description: 'Google rank tracking and AI visibility platform built with 11+ years of digital expertise',
     url: 'https://www.gotopseo.com/en/about',
     type: 'website',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/about',
+    languages: buildHreflangAlternates('/about', '/en/about'),
   },
 }
 

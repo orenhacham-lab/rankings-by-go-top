@@ -76,7 +76,7 @@ function baseConnection(overrides: Partial<ShopifyConnectionRow> = {}): ShopifyC
     connection_status: 'connected', last_tested_at: null, last_synced_at: null, last_error: null,
     default_blog_id: null, granted_scopes: ['read_products', 'read_content', 'write_content'], auth_method: 'oauth',
     shop_gid: DEFAULT_SHOP_GID, shopify_plan_handle: null, shopify_subscription_status: null,
-    shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_cancel_at_end_of_cycle: false,
+    shopify_trial_ends_at: null, shopify_current_period_end: null, shopify_current_period_start: null, shopify_cancel_at_end_of_cycle: false,
     shopify_billing_verified_at: null,
     shopify_billing_last_error: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     ...overrides,

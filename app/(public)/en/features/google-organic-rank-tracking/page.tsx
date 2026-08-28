@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Search, TrendingUp, Globe, Smartphone, BarChart3, Clock } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'Google Organic Rank Tracking | Rankings by Go Top',
-  description: 'Monitor your Google search rankings by keyword, location, language, and device. Track trends, competitor analysis, and detailed reports in real-time.',
+  description: 'Monitor your Google search rankings by keyword, location, language, and device. Scan on demand whenever you need, or automatically once a month, and get detailed trend and competitor reports.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/features/google-organic-rank-tracking',
+    languages: buildHreflangAlternates(
+      '/features/google-organic-rank-tracking',
+      '/en/features/google-organic-rank-tracking'
+    ),
+  },
 }
 
 export default function GoogleOrganicFeaturePage() {
@@ -28,7 +36,7 @@ export default function GoogleOrganicFeaturePage() {
 
             {/* Main Heading */}
             <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 text-center mb-6 leading-tight">
-              Monitor Your Google Rankings in Real-Time
+              Monitor Your Google Rankings, Whenever You Need
             </h1>
 
             {/* Subheading */}
@@ -96,15 +104,15 @@ export default function GoogleOrganicFeaturePage() {
           <div className="max-w-5xl mx-auto">
             <h2 className="text-4xl font-bold text-slate-900 text-center mb-4">Why Rank Tracking Matters</h2>
             <p className="text-xl text-slate-600 text-center mb-16 max-w-2xl mx-auto">
-              High Google rankings drive organic traffic. Track daily to understand what works and optimize your SEO strategy.
+              High Google rankings drive organic traffic. Track your positions over time to understand what works and optimize your SEO strategy.
             </p>
 
             <div className="grid md:grid-cols-3 gap-8">
               <div className="p-8 rounded-lg border border-blue-200 bg-blue-50 hover:shadow-lg transition-shadow">
                 <TrendingUp className="w-10 h-10 text-blue-600 mb-4" />
-                <h3 className="text-lg font-bold text-slate-900 mb-3">Track Trends in Real-Time</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-3">Track Trends Over Time</h3>
                 <p className="text-slate-700">
-                  See how your rankings change daily. Identify what SEO strategies are working and what needs adjustment.
+                  See how your rankings change from scan to scan. Identify what SEO strategies are working and what needs adjustment.
                 </p>
               </div>
 
@@ -158,7 +166,7 @@ export default function GoogleOrganicFeaturePage() {
                 <div className="bg-white rounded-lg p-8 border border-slate-200">
                   <h3 className="text-lg font-bold text-slate-900 mb-3">Get Results</h3>
                   <p className="text-slate-700">
-                    Daily automatic tracking. View rankings, trends, and insights on a professional dashboard.
+                    Run a scan on demand, or turn on automatic monthly scanning to keep your history up to date. View rankings, trends, and insights on a professional dashboard.
                   </p>
                 </div>
               </div>
@@ -176,7 +184,7 @@ export default function GoogleOrganicFeaturePage() {
                 <Smartphone className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">Device-Specific Tracking</h3>
-                  <p className="text-slate-700">Track rankings on desktop, mobile, and tablet. Rankings often vary by device.</p>
+                  <p className="text-slate-700">Track rankings separately for desktop and mobile. Rankings often vary by device.</p>
                 </div>
               </div>
 
@@ -207,8 +215,8 @@ export default function GoogleOrganicFeaturePage() {
               <div className="flex gap-4">
                 <Clock className="w-6 h-6 text-indigo-600 flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-2">Daily Automatic Checks</h3>
-                  <p className="text-slate-700">System checks rankings every day automatically. You just review the results.</p>
+                  <h3 className="font-bold text-slate-900 mb-2">Automatic Monthly Checks</h3>
+                  <p className="text-slate-700">The system checks your rankings automatically once a month, and you can also run a manual check any time you need.</p>
                 </div>
               </div>
 
@@ -261,9 +269,9 @@ export default function GoogleOrganicFeaturePage() {
 
               <div className="bg-white rounded-lg p-8 border-l-4 border-purple-600">
                 <h3 className="text-xl font-bold text-slate-900 mb-3">SEO Professionals</h3>
-                <p className="text-slate-700 mb-4">You need real-time rankings to prove your work is having impact.</p>
+                <p className="text-slate-700 mb-4">You need reliable ranking data to prove your work is having impact.</p>
                 <ul className="space-y-2 text-sm text-slate-600">
-                  <li>✓ Real-time results</li>
+                  <li>✓ Scans on demand, whenever you need them</li>
                   <li>✓ Evidence of SEO effectiveness</li>
                   <li>✓ Clear KPIs and goals</li>
                 </ul>

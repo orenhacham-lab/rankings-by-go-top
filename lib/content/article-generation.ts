@@ -23,6 +23,9 @@ import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-
 import { autoApplyApprovedLinksToDraft, type AutoApplyResult } from '@/lib/content/internal-link-apply'
 import { isInternalLinkAutoInsertAfterManualGenerationEnabled } from '@/lib/content/api-auth'
 import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
+import { getUserEntitlement } from '@/lib/subscription'
+import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
+import { reserveUsage, finalizeArticleGeneration, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -50,6 +53,16 @@ export type GenerateForTopicFailure =
   // Blocker D fix — the project owner is Shopify-billing-required (no
   // verified Shopify App Pricing plan). Checked BEFORE any Gemini call.
   | { ok: false; kind: 'billing_required' }
+  // Phase 3 — the account's article allowance for the current billing
+  // period is exhausted. Checked BEFORE any Gemini call, via an atomic
+  // reservation (lib/billing/usage-reservations.ts) — never a plain
+  // count-then-insert (race-prone under concurrent generation jobs).
+  | { ok: false; kind: 'quota_exceeded' }
+  // A DIFFERENT in-flight attempt already holds this topic's reservation
+  // (concurrent retry of the same logical request) — transient, safe to
+  // retry shortly; never a permanent failure.
+  | { ok: false; kind: 'generation_in_progress' }
+  | { ok: false; kind: 'reservation_error'; message: string }
 
 export type GenerateForTopicResult = GenerateForTopicSuccess | GenerateForTopicFailure
 
@@ -176,10 +189,44 @@ export async function generateArticleForTopic(
     category,
   }
 
+  // Phase 3 — atomic article-credit reservation, taken immediately before
+  // the Gemini call (never before it — validation failures above never
+  // touch the ledger). Admins bypass the ledger entirely (same convention as
+  // every other quota check in this app) and fall through to a plain insert.
+  const entitlement = await getUserEntitlement(userId, admin)
+  let reservationId: string | null = null
+  let reservationToken: string | null = null
+  if (!entitlement.isAdmin) {
+    const period = await resolveCurrentUsagePeriod(admin, userId)
+    if (!period) return { ok: false, kind: 'quota_exceeded' }
+    const reservation = await reserveUsage(admin, {
+      userId, projectId: null, usageType: 'article', amount: 1,
+      periodStart: period.start, periodEnd: period.end,
+      limit: entitlement.limits.maxArticlesPerPeriodAccountWide,
+      idempotencyKey: `topic:${topicId}`,
+    })
+    if (reservation.outcome === 'quota_exceeded') return { ok: false, kind: 'quota_exceeded' }
+    if (reservation.outcome === 'already_reserved') return { ok: false, kind: 'generation_in_progress' }
+    if (reservation.outcome === 'already_consumed') {
+      // A retry of a request that already produced an article — return the
+      // existing outcome, never regenerate or consume a second credit.
+      if (reservation.articleId) {
+        return { ok: true, articleId: reservation.articleId, warnings: [], audit: null, imageGenerated: false }
+      }
+      return { ok: false, kind: 'reservation_error', message: 'already_consumed with no article reference' }
+    }
+    if (reservation.outcome === 'error' || reservation.outcome === 'project_not_owned') {
+      return { ok: false, kind: 'reservation_error', message: reservation.outcome === 'error' ? reservation.message : reservation.outcome }
+    }
+    reservationId = reservation.reservationId
+    reservationToken = reservation.reservationToken
+  }
+
   const gen = await generateValidatedArticle(brief)
   if ('error' in gen) {
     const reason = gen.reason || 'unknown'
     console.log(`[content-article-generation] failed reason=${reason} attempts=${gen.attempts}`)
+    if (reservationId && reservationToken) await releaseUsageReservation(admin, { reservationId, userId, reservationToken, reason: `generation_failed:${reason}` })
     return { ok: false, kind: 'generation', reason, audit: gen.audit ?? null, attempts: gen.attempts }
   }
 
@@ -187,7 +234,6 @@ export async function generateArticleForTopic(
   const safeHtml = gen.safeHtml
 
   const baseRow = {
-    user_id: userId,
     project_id: projectId,
     topic_id: topicId,
     title: article.title,
@@ -198,24 +244,47 @@ export async function generateArticleForTopic(
     content_markdown: article.contentMarkdown || null,
     faq_json: article.faq.length ? article.faq : null,
     image_prompt: article.imagePrompt || null,
-    status: 'draft' as const,
     wp_connection_id: (wpConn as { id?: string } | null)?.id ?? null,
-    updated_at: new Date().toISOString(),
   }
 
   const baseSlug = gen.slug || `article-${Date.now().toString(36)}`
   let inserted: { id: string } | null = null
   let lastError: { code?: string; message?: string } | null = null
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`.slice(0, 90)
-    const { data, error } = await admin.from('generated_articles').insert({ ...baseRow, slug }).select('id').single()
-    if (!error && data) { inserted = data as { id: string }; break }
-    lastError = error as { code?: string; message?: string }
-    if ((error as { code?: string })?.code !== '23505') break
-  }
-  if (!inserted) {
-    console.error('[content-article-generation] insert failed', { code: lastError?.code, message: lastError?.message })
-    return { ok: false, kind: 'insert_failed' }
+
+  if (reservationId && reservationToken) {
+    // Phase 3 — ATOMIC: the RPC persists generated_articles AND consumes the
+    // reservation in ONE transaction (either both happen or neither does),
+    // closing the "article exists without a consumed credit" gap. A
+    // 'slug_conflict' rolls back the whole attempt (reservation stays
+    // 'reserved') — safe to retry with the next slug candidate.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`.slice(0, 90)
+      const result = await finalizeArticleGeneration(admin, { reservationId, userId, reservationToken, article: { ...baseRow, slug } })
+      if (result.outcome === 'consumed') { inserted = { id: result.articleId }; break }
+      if (result.outcome === 'slug_conflict') { lastError = { code: '23505', message: 'slug_conflict' }; continue }
+      lastError = { message: result.outcome === 'error' ? result.message : result.outcome }
+      break
+    }
+    if (!inserted) {
+      await releaseUsageReservation(admin, { reservationId, userId, reservationToken, reason: 'insert_failed' })
+      console.error('[content-article-generation] atomic insert failed', { message: lastError?.message })
+      return { ok: false, kind: 'insert_failed' }
+    }
+  } else {
+    // Admin bypass — no ledger involvement.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`.slice(0, 90)
+      const { data, error } = await admin.from('generated_articles')
+        .insert({ ...baseRow, slug, user_id: userId, status: 'draft', updated_at: new Date().toISOString() })
+        .select('id').single()
+      if (!error && data) { inserted = data as { id: string }; break }
+      lastError = error as { code?: string; message?: string }
+      if ((error as { code?: string })?.code !== '23505') break
+    }
+    if (!inserted) {
+      console.error('[content-article-generation] insert failed', { code: lastError?.code, message: lastError?.message })
+      return { ok: false, kind: 'insert_failed' }
+    }
   }
 
   // Best-effort AI usage logging (never blocks).

@@ -163,10 +163,10 @@ export default function ArticlesPage() {
                     Rankings by Go Top
                   </div>
                   <h3 className="text-3xl lg:text-4xl font-extrabold mb-4 leading-tight">
-                    עקבו אחר הדירוגים שלכם<br />בגוגל בזמן אמת
+                    עקבו אחר הדירוגים שלכם<br />בגוגל, מתי שתרצו
                   </h3>
                   <p className="text-blue-100 text-lg mb-6 leading-relaxed">
-                    מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. דוחות מפורטים, מעקב מגמות ותמיכה אישית בעברית.
+                    מערכת מקצועית למעקב מיקומים בגוגל אורגני וגוגל מפות. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ותמיכה אישית בעברית.
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <Link
@@ -187,7 +187,7 @@ export default function ArticlesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     { num: '1000+', label: 'מילות מפתח' },
-                    { num: '24/7', label: 'מעקב רציף' },
+                    { num: '2', label: 'מנועי דירוג (Google + Maps)' },
                     { num: '100%', label: 'בעברית' },
                     { num: '7 ימים', label: 'ניסיון חינם' },
                   ].map((stat) => (

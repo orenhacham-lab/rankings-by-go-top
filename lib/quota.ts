@@ -164,6 +164,7 @@ export type QuotaCode =
   | 'QUOTA_KEYWORD_CHECKS'
   | 'QUOTA_AI_SCANS'
   | 'QUOTA_TRIAL_TARGET_ALREADY_SCANNED'
+  | 'QUOTA_ARTICLES'
 
 export type QuotaErrorPayload = {
   error: string
@@ -175,13 +176,14 @@ export type QuotaErrorPayload = {
   planLabelEn: string
 }
 
+// Phase 3 — approved display names (Basic / Advanced / Premium / Agency).
 const EN_PLAN_LABEL: Record<PlanType, string> = {
   trial: 'Trial',
   shopify_billing_required: 'Shopify billing required',
-  regular: 'Regular',
+  regular: 'Basic',
   advanced: 'Advanced',
   premium: 'Premium',
-  large_agency: 'Large Agency',
+  large_agency: 'Agency',
 }
 
 export function buildQuotaError(
@@ -212,6 +214,10 @@ export function buildQuotaError(
     case 'QUOTA_AI_SCANS':
       error = `הגעת למגבלת ${limit} סריקות AI בתוכנית ${planLabel}. שדרג את המנוי כדי להמשיך לבצע סריקות AI.`
       errorEn = `You have reached the limit of ${limit} AI scans on the ${planLabelEn} plan. Upgrade your plan to continue running AI scans.`
+      break
+    case 'QUOTA_ARTICLES':
+      error = `הגעת למכסת ${limit} המאמרים בתוכנית ${planLabel} למחזור החיוב הנוכחי. שדרג את המנוי כדי ליצור מאמרים נוספים.`
+      errorEn = `You have reached the ${limit}-article limit on the ${planLabelEn} plan for this billing period. Upgrade your plan to create more articles.`
       break
   }
 

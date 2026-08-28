@@ -1,11 +1,17 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+
 export const metadata = {
   title: 'Pricing - Rankings by Go Top',
-  description: 'Flexible pricing plans for Google rank tracking and AI visibility. Free 7-day trial, no commitment. Plans starting from just $29/month.',
+  description: 'Flexible pricing plans for Google rank tracking and AI visibility. Free 7-day trial, no commitment. Plans starting from $79/month.',
   openGraph: {
     title: 'Pricing - Rankings by Go Top',
     description: 'Flexible pricing plans for Google rank tracking and AI visibility monitoring',
     url: 'https://www.gotopseo.com/en/pricing',
     type: 'website',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/pricing',
+    languages: buildHreflangAlternates('/pricing', '/en/pricing'),
   },
 }
 

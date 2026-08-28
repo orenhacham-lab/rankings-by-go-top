@@ -36,6 +36,10 @@ export type ShopifyConnectionRow = {
   shopify_subscription_status: 'active' | 'none' | 'unknown' | null
   shopify_trial_ends_at: string | null
   shopify_current_period_end: string | null
+  // Phase 3 — authoritative billing-cycle start (Partner API
+  // currentBillingCycle.startTime). Same cache/audit-only rule as
+  // shopify_current_period_end.
+  shopify_current_period_start: string | null
   shopify_cancel_at_end_of_cycle: boolean | null
   shopify_billing_verified_at: string | null
   shopify_billing_last_error: string | null

@@ -3,11 +3,12 @@ import './globals.css'
 import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
 import { createClient } from '@/lib/supabase/server'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
-  title: 'מעקב מיקומים בגוגל ונראות ב-AI - Rankings by Go Top',
-  description: 'Rankings by Go Top - מערכת מעקב מיקומים בגוגל ונראות ב-AI מתקדמת. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI (ChatGPT, Gemini, Perplexity). להרשמה בחינם כנסו עכשיו',
-  keywords: 'מעקב מיקומים, קידום אתרים, SEO, גוגל, דירוג, מפות גוגל, AI visibility, ChatGPT, Gemini',
+  title: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO | Go Top',
+  description: 'Rankings by Go Top - יצירה, תזמון ופרסום תוכן SEO ו-GEO ממקום אחד, לצד מעקב מיקומים בגוגל ונראות ב-AI (ChatGPT, Gemini, Perplexity). להרשמה בחינם כנסו עכשיו',
+  keywords: 'יצירת תוכן SEO, תזמון תוכן, פרסום תוכן, GEO, מעקב מיקומים, קידום אתרים, SEO, גוגל, דירוג, מפות גוגל, AI visibility, ChatGPT, Gemini',
   icons: {
     icon: [
       { url: '/favicon.ico' },
@@ -18,8 +19,8 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'מעקב מיקומים בגוגל ונראות ב-AI - Rankings by Go Top',
-    description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI (ChatGPT, Gemini, Perplexity)',
+    title: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO - Rankings by Go Top',
+    description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO ממקום אחד, לצד מעקב מיקומים בגוגל ונראות ב-AI (ChatGPT, Gemini, Perplexity)',
     images: ['/gotop-primary.png'],
     url: 'https://www.gotopseo.com',
     siteName: 'Rankings by Go Top',
@@ -28,6 +29,7 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: 'https://www.gotopseo.com',
+    languages: buildHreflangAlternates('/', '/en'),
   },
   viewport: 'width=device-width, initial-scale=1',
   robots: 'index, follow',
@@ -98,7 +100,7 @@ export default async function RootLayout({
                 name: 'Rankings by Go Top',
                 url: 'https://www.gotopseo.com',
                 logo: 'https://www.gotopseo.com/gotop-primary.png',
-                description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
+                description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
                 sameAs: ['https://www.gotop.co.il'],
                 contactPoint: {
                   '@type': 'ContactPoint',
@@ -116,7 +118,7 @@ export default async function RootLayout({
                 '@context': 'https://schema.org',
                 '@type': 'SoftwareApplication',
                 name: 'Rankings by Go Top',
-                description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
+                description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
                 url: 'https://www.gotopseo.com',
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',

@@ -6,6 +6,7 @@ import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
 import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
+import { billingMarketFromLocale } from '@/lib/paypal/checkout-plans'
 import BillingView from './BillingView'
 
 export default async function BillingPage() {
@@ -69,6 +70,14 @@ export default async function BillingPage() {
     if (migration) shopifyMigrationStatus = (migration as { status: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' }).status
   }
 
+  // Phase 3 — the billing CURRENCY is resolved from the durable, persisted
+  // signup locale (user_metadata.locale), NEVER from the mutable dashboard
+  // display-language toggle (useDashboardLanguage) and NEVER from browser
+  // locale. A legacy account with no stored locale resolves to `null` here —
+  // BillingView shows an explicit market-selection prompt instead of
+  // guessing or defaulting silently (see app/api/billing-market/select).
+  const market = billingMarketFromLocale((user.user_metadata as { locale?: string } | null)?.locale ?? null)
+
   return (
     <BillingView
       plan={entitlement.plan}
@@ -80,12 +89,20 @@ export default async function BillingPage() {
       renewalCancelled={renewalCancelled}
       shopifyConnected={shopifyConnected}
       shopifyMigrationStatus={shopifyMigrationStatus}
-      planPrices={{
+      market={market}
+      planPricesILS={{
         trial: PLAN_LIMITS.trial.price,
         regular: PLAN_LIMITS.regular.price,
         advanced: PLAN_LIMITS.advanced.price,
         premium: PLAN_LIMITS.premium.price,
         large_agency: PLAN_LIMITS.large_agency.price,
+      }}
+      planPricesUSD={{
+        trial: PLAN_LIMITS.trial.priceUSD,
+        regular: PLAN_LIMITS.regular.priceUSD,
+        advanced: PLAN_LIMITS.advanced.priceUSD,
+        premium: PLAN_LIMITS.premium.priceUSD,
+        large_agency: PLAN_LIMITS.large_agency.priceUSD,
       }}
     />
   )
