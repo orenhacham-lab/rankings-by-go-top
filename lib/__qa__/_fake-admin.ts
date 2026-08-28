@@ -172,6 +172,34 @@ export class FakeAdmin {
    * against what is now a different logical reservation. See
    * lib/scan-scheduler/__qa__/process-scheduled-scan.qa.ts scenario 9b for
    * the exact race this closes.
+   *
+   * Corrective migration
+   * (20260829010000_fix_reserve_usage_ambiguous_column_and_idempotency_lock.sql)
+   * fixed two bugs in the REAL SQL that this JS mock was never capable of
+   * exercising in the first place, and this mock is DELIBERATELY NOT changed
+   * for either of them:
+   *   (a) an unqualified `reservation_token` column reference in
+   *       reserve_usage's idempotency-lookup SELECT was ambiguous against the
+   *       RETURNS TABLE OUT variable of the same name — a pure PL/pgSQL
+   *       variable-scoping rule with no JS equivalent; every column
+   *       reference in all four real RPCs is now qualified with a `ur` table
+   *       alias.
+   *   (b) the idempotency-key lookup SELECT ran with NO lock held, before
+   *       even the pre-existing per-(user,usage_type,period) capacity
+   *       advisory lock — two genuinely concurrent Postgres connections
+   *       calling reserve_usage for the SAME idempotency key could both
+   *       observe no row and both attempt an INSERT, the loser raising a raw
+   *       unique_violation instead of a clean already_reserved outcome. A
+   *       NEW idempotency-scoped pg_advisory_xact_lock is now acquired FIRST
+   *       in the real SQL. This mock's rpc() method runs its ENTIRE
+   *       reserve_usage branch synchronously (no `await` inside it), so two
+   *       calls issued via Promise.all() here already can never interleave —
+   *       proving this specific fix requires either a live Postgres
+   *       connection (out of reach in this environment) or static analysis
+   *       of the migration SQL text itself. See
+   *       supabase/migrations/__qa__/phase3-reserve-usage-ambiguity-fix.qa.ts
+   *       for that source-contract proof — do not treat any FakeAdmin-based
+   *       "concurrent same-key" test as proof this class of bug is fixed.
    */
   async rpc(name: string, params: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }> {
     const reservations = (this.tables.usage_reservations ??= [])
