@@ -9,6 +9,7 @@
 
 import crypto from 'crypto'
 import { SHOPIFY_REQUIRED_SCOPES } from './constants'
+import { normalizeShopDomain } from './domain'
 
 export interface ShopifyOAuthConfig {
   clientId: string
@@ -94,6 +95,58 @@ export function verifyShopifyHmac(params: Record<string, string>, clientSecret: 
   const b = Buffer.from(provided, 'utf8')
   if (a.length !== b.length) return false
   return crypto.timingSafeEqual(a, b)
+}
+
+export interface ShopifyLaunchDetectionResult {
+  ok: boolean
+  /** The normalized *.myshopify.com host, only when ok === true. */
+  shop: string | null
+  /** A stable, non-sensitive reason code — never included the raw hmac/shop
+   *  values, safe to log. */
+  reason: 'missing_params' | 'invalid_hmac' | 'invalid_shop' | 'invalid_timestamp' | 'expired_launch' | null
+}
+
+/** Default tolerance for a signed launch's `timestamp` param — Shopify's own
+ *  request/redirect chain is near-instant; 5 minutes comfortably covers
+ *  normal clock skew and network latency while still rejecting a captured
+ *  URL replayed long after the fact. */
+export const SHOPIFY_LAUNCH_TIMESTAMP_TOLERANCE_MS = 5 * 60_000
+
+/**
+ * Hotfix — detects and validates a genuine, fresh, Shopify-SIGNED app-launch
+ * request: the `?shop=...&hmac=...&host=...&timestamp=...` shape Shopify
+ * sends to the app's configured Application URL on every install AND every
+ * reopen (see app/shopify/app/page.tsx's header comment — this is the SAME
+ * request shape, just detected at whatever URL Shopify is ACTUALLY
+ * configured to send it to, which this codebase cannot itself change — see
+ * app/page.tsx for where this is used).
+ *
+ * PURE — no I/O, no persistence, no privileged decision made here at all;
+ * this ONLY decides whether the caller should redirect into the real
+ * embedded entry point (/shopify/app), mirroring that page's own documented
+ * stance that an unverified `shop` decides nothing privileged on its own.
+ * Missing shop/hmac, an invalid signature, an unparseable/expired
+ * timestamp, or a shop that fails to normalize all fail closed (`ok: false`)
+ * with a distinct, non-sensitive reason — NEVER guessed, never silently
+ * treated as valid.
+ */
+export function detectSignedShopifyLaunch(
+  params: Record<string, string>,
+  clientSecret: string,
+  nowMs: number = Date.now(),
+  toleranceMs: number = SHOPIFY_LAUNCH_TIMESTAMP_TOLERANCE_MS,
+): ShopifyLaunchDetectionResult {
+  if (!params.shop || !params.hmac) return { ok: false, shop: null, reason: 'missing_params' }
+  if (!verifyShopifyHmac(params, clientSecret)) return { ok: false, shop: null, reason: 'invalid_hmac' }
+  const shop = normalizeShopDomain(params.shop)
+  if (!shop) return { ok: false, shop: null, reason: 'invalid_shop' }
+  if (params.timestamp) {
+    const ts = Number(params.timestamp)
+    if (!Number.isFinite(ts)) return { ok: false, shop: null, reason: 'invalid_timestamp' }
+    const ageMs = nowMs - ts * 1000
+    if (ageMs > toleranceMs || ageMs < -toleranceMs) return { ok: false, shop: null, reason: 'expired_launch' }
+  }
+  return { ok: true, shop, reason: null }
 }
 
 /** A cryptographically-random opaque state token (also used as the nonce). */
