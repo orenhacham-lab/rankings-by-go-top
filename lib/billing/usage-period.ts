@@ -8,12 +8,35 @@
  *
  * Resolution order (first match wins), mirroring lib/subscription.ts's own
  * precedence: Shopify-governed (cache-only, no live Partner API call — same
- * hot-path design as isShopifyGovernedAndActive) → PayPal/trial subscriptions
- * row → null (no resolvable period; callers MUST fail closed, never grant an
- * allowance with no period to bound it).
+ * hot-path design as isShopifyGovernedAndActive) → PayPal subscription row
+ * (paypal_subscription_id present) → legacy/manual active subscription
+ * (status='active', paypal_subscription_id NULL — see the "Legacy/manual"
+ * section below) → trial → null (no resolvable period; callers MUST fail
+ * closed, never grant an allowance with no period to bound it).
  *
  * Admins are NOT resolved here — every existing quota call site already
  * short-circuits on entitlement.isAdmin before consulting a period at all.
+ *
+ * Final Phase 3 compatibility fix — legacy/manual active subscriptions.
+ * Production evidence: an active, large_agency-plan subscription exists with
+ * paypal_subscription_id NULL, no connected Shopify connection, a NULL
+ * current_period_end, and an expired trial_ends_at. This is a genuine,
+ * legitimate paid subscriber whose row simply predates (or was never routed
+ * through) the PayPal activation/renewal flow that populates
+ * current_period_end — NOT a PayPal subscription with missing data, and NOT
+ * a trial. Before this fix, such a row fell into the PayPal branch (the only
+ * remaining branch after trial), which correctly requires an authoritative
+ * current_period_end and therefore correctly-but-wrongly failed closed for
+ * this account. The fix distinguishes this case EXPLICITLY, by
+ * paypal_subscription_id being NULL while status='active' — never by
+ * "current_period_end happens to be missing" (a genuine PayPal subscription
+ * with a missing/malformed current_period_end must still fail closed; see
+ * the tests). A legacy/manual row's own current_period_start/
+ * current_period_end are NEVER read or trusted (there is no PayPal
+ * authoritative source backing them) — instead this resolves the exact
+ * fixed UTC-calendar-month period this app used before Phase 3 introduced
+ * per-subscription periods, so these accounts keep the SAME quota-period
+ * behavior they always had.
  */
 
 import { parseInstantMs } from '@/lib/paypal/timestamp'
@@ -30,10 +53,22 @@ function parseStoredInstant(raw: string | null | undefined): Date | null {
   return ms === null ? null : new Date(ms)
 }
 
+/** The first instant of `reference`'s UTC calendar month, and the first
+ *  instant of the FOLLOWING UTC calendar month — used ONLY for the
+ *  legacy/manual fallback below. `Date.UTC` itself correctly rolls
+ *  month=12 into January of the next year (December → January) and handles
+ *  leap years natively (day is always 1, never 28/29/30/31, so no special
+ *  leap-year handling is needed here at all). */
+function utcCalendarMonthPeriod(reference: Date): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1, 0, 0, 0, 0))
+  const end = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 1, 0, 0, 0, 0))
+  return { start, end }
+}
+
 export interface UsagePeriod {
   start: Date
   end: Date
-  source: 'shopify' | 'paypal' | 'trial'
+  source: 'shopify' | 'paypal' | 'trial' | 'legacy_manual'
 }
 
 interface ShopifyPeriodRow {
@@ -48,9 +83,17 @@ interface SubscriptionPeriodRow {
   current_period_start: string | null
   current_period_end: string | null
   created_at: string
+  paypal_subscription_id: string | null
 }
 
-export async function resolveCurrentUsagePeriod(admin: Admin, userId: string): Promise<UsagePeriod | null> {
+/** `nowFn` — same injectable-clock convention as lib/subscription.ts, so the
+ *  UTC-calendar-month fallback's start/end are genuinely deterministic in
+ *  tests (never depending on the wall clock at test-run time). */
+export async function resolveCurrentUsagePeriod(
+  admin: Admin,
+  userId: string,
+  nowFn: () => Date = () => new Date(),
+): Promise<UsagePeriod | null> {
   const { data: shopifyConn } = await admin
     .from('shopify_connections')
     .select('shopify_current_period_start, shopify_current_period_end')
@@ -80,7 +123,7 @@ export async function resolveCurrentUsagePeriod(admin: Admin, userId: string): P
 
   const { data: sub } = await admin
     .from('subscriptions')
-    .select('status, plan_code, trial_ends_at, current_period_start, current_period_end, created_at')
+    .select('status, plan_code, trial_ends_at, current_period_start, current_period_end, created_at, paypal_subscription_id')
     .eq('user_id', userId)
     .in('status', ['trial', 'active', 'cancelled'])
     .order('created_at', { ascending: false })
@@ -105,8 +148,28 @@ export async function resolveCurrentUsagePeriod(admin: Admin, userId: string): P
     return { start, end, source: 'trial' }
   }
 
-  // Corrective pass — current_period_end is the AUTHORITATIVE boundary;
-  // missing OR unparseable both fail closed identically.
+  // Final Phase 3 compatibility fix — legacy/manual active subscription.
+  // Explicitly gated on BOTH status === 'active' AND paypal_subscription_id
+  // being NULL — never inferred from current_period_end happening to be
+  // missing (that would also, wrongly, catch a genuine PayPal subscription
+  // whose authoritative date is simply absent/corrupt, which must still
+  // fail closed below). A CANCELLED row with no paypal_subscription_id
+  // falls through to the PayPal branch below instead (and correctly
+  // resolves to null there — there is no authoritative period, PayPal or
+  // otherwise, to grace a cancelled legacy/manual row against).
+  if (row.status === 'active' && row.paypal_subscription_id === null) {
+    const { start, end } = utcCalendarMonthPeriod(nowFn())
+    return { start, end, source: 'legacy_manual' }
+  }
+
+  // PayPal branch — reached when paypal_subscription_id IS present (a
+  // genuine PayPal subscription), or when status is 'cancelled' with
+  // paypal_subscription_id null (a legacy/manual row that is no longer
+  // active — no authoritative period, PayPal or otherwise, to grace it
+  // against). current_period_end is the AUTHORITATIVE boundary here;
+  // missing OR unparseable both fail closed identically — a genuine PayPal
+  // subscription with a missing/corrupt date is NEVER routed to the
+  // legacy/manual fallback above.
   const end = parseStoredInstant(row.current_period_end)
   if (!end) return null
   // Documented compatibility fallback for a pre-existing subscriber whose

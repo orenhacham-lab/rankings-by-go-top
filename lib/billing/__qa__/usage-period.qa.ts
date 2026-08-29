@@ -21,7 +21,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_connections: [],
-      subscriptions: [{ id: 's1', user_id: 'u1', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_start: '2026-08-15T00:00:00Z', current_period_end: '2026-09-15T00:00:00Z', created_at: '2026-08-15T00:00:00Z' }],
+      subscriptions: [{ id: 's1', user_id: 'u1', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_start: '2026-08-15T00:00:00Z', current_period_end: '2026-09-15T00:00:00Z', created_at: '2026-08-15T00:00:00Z', paypal_subscription_id: 'I-REAL-SUB-1' }],
     })
     const period = await resolveCurrentUsagePeriod(admin as unknown as Admin, 'u1')
     check('period resolved', period !== null)
@@ -36,7 +36,7 @@ async function main() {
     // month rolled over), the period is STILL Aug 28 - Sep 28, not reset.
     const admin = new FakeAdmin({
       shopify_connections: [],
-      subscriptions: [{ id: 's2', user_id: 'u2', status: 'active', plan_code: 'regular', trial_ends_at: null, current_period_start: '2026-08-28T00:00:00Z', current_period_end: '2026-09-28T00:00:00Z', created_at: '2026-08-28T00:00:00Z' }],
+      subscriptions: [{ id: 's2', user_id: 'u2', status: 'active', plan_code: 'regular', trial_ends_at: null, current_period_start: '2026-08-28T00:00:00Z', current_period_end: '2026-09-28T00:00:00Z', created_at: '2026-08-28T00:00:00Z', paypal_subscription_id: 'I-REAL-SUB-2' }],
     })
     const period = await resolveCurrentUsagePeriod(admin as unknown as Admin, 'u2')
     check('period start is still Aug 28 (the real subscription anchor)', period?.start.toISOString() === '2026-08-28T00:00:00.000Z')
@@ -47,7 +47,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_connections: [],
-      subscriptions: [{ id: 's3', user_id: 'u3', status: 'active', plan_code: 'regular', trial_ends_at: null, current_period_start: null, current_period_end: '2026-09-22T00:00:00Z', created_at: '2026-01-01T00:00:00Z' }],
+      subscriptions: [{ id: 's3', user_id: 'u3', status: 'active', plan_code: 'regular', trial_ends_at: null, current_period_start: null, current_period_end: '2026-09-22T00:00:00Z', created_at: '2026-01-01T00:00:00Z', paypal_subscription_id: 'I-REAL-SUB-3' }],
     })
     const period = await resolveCurrentUsagePeriod(admin as unknown as Admin, 'u3')
     check('falls back to current_period_end - 1 month', period?.start.toISOString() === '2026-08-22T00:00:00.000Z')
@@ -80,7 +80,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_connections: [{ id: 'c1', user_id: 'u6', connection_status: 'connected', shopify_current_period_start: '2026-08-10T00:00:00Z', shopify_current_period_end: '2026-09-10T00:00:00Z', updated_at: '2026-08-10T00:00:00Z' }],
-      subscriptions: [{ id: 's6', user_id: 'u6', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_start: '2020-01-01T00:00:00Z', current_period_end: '2020-02-01T00:00:00Z', created_at: '2020-01-01T00:00:00Z' }],
+      subscriptions: [{ id: 's6', user_id: 'u6', status: 'active', plan_code: 'premium', trial_ends_at: null, current_period_start: '2020-01-01T00:00:00Z', current_period_end: '2020-02-01T00:00:00Z', created_at: '2020-01-01T00:00:00Z', paypal_subscription_id: 'I-STALE-SUB' }],
     })
     const period = await resolveCurrentUsagePeriod(admin as unknown as Admin, 'u6')
     check('source is shopify', period?.source === 'shopify')
