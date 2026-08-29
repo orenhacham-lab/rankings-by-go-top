@@ -40,6 +40,23 @@ interface ResolvedConnection {
   shop_gid: string | null
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Admin = any
+
+/**
+ * Hotfix (defense in depth) — an admin must never reach a Shopify
+ * billing-management destination, even if their account happens to have a
+ * connected (possibly test/unverified) Shopify store. Exported as a plain,
+ * FakeAdmin-testable gate function (same convention as isAllowedOrigin /
+ * isValidJsonContentType in app/api/billing-market/select/route.ts) — GET
+ * below calls it, but the actual role-resolution logic is unit-tested
+ * directly, independent of Request/NextResponse.
+ */
+export async function isAdminUser(admin: Admin, userId: string): Promise<boolean> {
+  const { data: profile } = await admin.from('profiles').select('role').eq('id', userId).maybeSingle()
+  return (profile as { role?: string } | null)?.role === 'admin'
+}
+
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
@@ -50,6 +67,12 @@ export async function GET(request: Request) {
 
   let connection: ResolvedConnection | null = null
 
+  // For the external dashboard caller, user identity is already known here
+  // — checked BEFORE touching shopify_connections at all. For the embedded
+  // App Bridge caller, identity is only resolvable AFTER the connection
+  // lookup (the session token only proves a shop domain, not a user id) —
+  // checked immediately after resolving the connection, still strictly
+  // BEFORE the shop_gid check or any pricing-URL construction below.
   if (isApiCall) {
     const verified = verifyShopifySessionToken(bearerToken)
     if (!verified.ok) return Response.json({ error: 'invalid_session_token', reason: verified.reason }, { status: 401 })
@@ -60,10 +83,16 @@ export async function GET(request: Request) {
       .eq('connection_status', 'connected')
       .maybeSingle()
     connection = data as ResolvedConnection | null
+    if (connection && await isAdminUser(admin, connection.user_id)) {
+      return Response.json({ error: 'admin_not_applicable' }, { status: 403 })
+    }
   } else {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.redirect(new URL('/login', request.url))
+    if (await isAdminUser(admin, user.id)) {
+      return NextResponse.redirect(new URL('/billing?shopify=error&reason=admin_not_applicable', request.url))
+    }
     const { data } = await admin
       .from('shopify_connections')
       .select('id, user_id, project_id, shop_domain, shop_gid')
