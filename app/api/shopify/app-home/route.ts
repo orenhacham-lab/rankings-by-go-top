@@ -24,6 +24,7 @@ import { recordShopifyBillingCache } from '@/lib/shopify/billing-cache'
 import { getActiveMigration } from '@/lib/shopify/paypal-migration'
 import { hasWriteContent } from '@/lib/shopify/constants'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
+import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -73,14 +74,26 @@ export async function GET(request: Request) {
     .limit(1)
     .maybeSingle()
 
+  // Hotfix — admin billing bypass. Checked BEFORE the live Shopify Partner
+  // API billing call below, so an admin's connector home NEVER makes that
+  // network call or writes a billing cache row at all (there is nothing to
+  // govern) — the client renders no Billing card / plan-selection control
+  // for isAdmin: true (see ConnectorHomeClient.tsx). Reuses the SAME
+  // exported gate function as /api/shopify/billing/start-intent, rather
+  // than a 5th independent inline copy of the role check.
+  const isAdmin = await isAdminUser(admin, connection.user_id)
+
   let billing: {
     status: 'active' | 'none' | 'unknown'
     planHandle: string | null
     trialEndsAt: string | null
     currentPeriodEnd: string | null
     verificationError: string | null
-  }
-  if (!connection.shop_gid) {
+  } | null = null
+  if (isAdmin) {
+    // No live billing check, no cache write — admins are never Shopify
+    // billing-governed.
+  } else if (!connection.shop_gid) {
     billing = { status: 'unknown', planHandle: null, trialEndsAt: null, currentPeriodEnd: null, verificationError: 'shop_identity_unverified' }
   } else {
     // shopDomain is from the VERIFIED session token (never a query param) —
@@ -123,6 +136,10 @@ export async function GET(request: Request) {
     connectionLastError: connection.last_error,
     project: project ? { businessName: project.business_name, targetDomain: project.target_domain } : null,
     dashboardUrl: `${config.appUrl}/projects/${encodeURIComponent(connection.project_id)}`,
+    // Hotfix — admin billing bypass: isAdmin: true means the client must
+    // render NO Billing card / plan-selection control at all (billing is
+    // always null in that case too, above).
+    isAdmin,
     billing,
     // Phase 2 (blocker fix) — no pre-built Shopify URL is ever handed to the
     // client. The "Manage plan" button in ConnectorHomeClient fetches

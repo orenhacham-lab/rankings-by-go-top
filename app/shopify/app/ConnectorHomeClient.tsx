@@ -18,6 +18,11 @@ interface AppHomeData {
   connectionLastError?: string | null
   project?: { businessName: string | null; targetDomain: string | null } | null
   dashboardUrl?: string
+  /** Hotfix — admin billing bypass. true means: no Billing card, no plan-
+   *  selection control — the admin may connect/use this store for testing
+   *  and publishing, but is never Shopify billing-governed. `billing` is
+   *  always null alongside isAdmin: true (see /api/shopify/app-home). */
+  isAdmin?: boolean
   billing?: {
     status: 'active' | 'none' | 'unknown'
     planHandle: string | null
@@ -158,19 +163,27 @@ export default function ConnectorHomeClient() {
         )}
       </Card>
 
-      <Card title="Billing">
-        <Row label="Plan" value={billing?.status === 'active' ? (billing.planHandle ?? '—') : billing?.status === 'none' ? 'No active plan' : 'Could not verify'} />
-        {billing?.currentPeriodEnd && <Row label="Renews" value={new Date(billing.currentPeriodEnd).toLocaleDateString()} />}
-        {data.migrationStatus === 'pending' && (
-          <p style={{ color: '#8a6d3b', fontSize: 13, marginTop: 8 }}>Finishing linking your previous billing — this can take a moment.</p>
-        )}
-        {data.migrationStatus === 'paypal_cancel_failed' && (
-          <p style={{ color: '#b71c1c', fontSize: 13, marginTop: 8 }}>Your plan is active, but we&apos;re still finalizing your previous billing. Contact us if this persists.</p>
-        )}
-        <button onClick={startBillingIntent} disabled={managePlanBusy} style={{ ...buttonStyle, marginTop: 12 }}>
-          {managePlanBusy ? 'Redirecting…' : billing?.status === 'active' ? 'Manage plan' : 'Choose a plan'}
-        </button>
-      </Card>
+      {data.isAdmin ? (
+        <Card title="Access">
+          <p style={{ color: '#202223', fontSize: 14 }}>
+            Admin account — full access. This account has full access to the system and does not require a billing plan.
+          </p>
+        </Card>
+      ) : (
+        <Card title="Billing">
+          <Row label="Plan" value={billing?.status === 'active' ? (billing.planHandle ?? '—') : billing?.status === 'none' ? 'No active plan' : 'Could not verify'} />
+          {billing?.currentPeriodEnd && <Row label="Renews" value={new Date(billing.currentPeriodEnd).toLocaleDateString()} />}
+          {data.migrationStatus === 'pending' && (
+            <p style={{ color: '#8a6d3b', fontSize: 13, marginTop: 8 }}>Finishing linking your previous billing — this can take a moment.</p>
+          )}
+          {data.migrationStatus === 'paypal_cancel_failed' && (
+            <p style={{ color: '#b71c1c', fontSize: 13, marginTop: 8 }}>Your plan is active, but we&apos;re still finalizing your previous billing. Contact us if this persists.</p>
+          )}
+          <button onClick={startBillingIntent} disabled={managePlanBusy} style={{ ...buttonStyle, marginTop: 12 }}>
+            {managePlanBusy ? 'Redirecting…' : billing?.status === 'active' ? 'Manage plan' : 'Choose a plan'}
+          </button>
+        </Card>
+      )}
 
       <Card title="Last publish">
         {data.lastPublish ? (
