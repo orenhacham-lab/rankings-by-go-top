@@ -72,8 +72,13 @@ async function main() {
     const r = await verifyPayPalActivation({ submittedSubscriptionId: 'SUB-1', submittedPlanCode: 'premium', fetchImpl: f })
     check('verification succeeds', r.ok === true)
     check('resolved planCode is server-derived (premium)', r.ok && r.planCode === 'premium')
-    check('periodEnd is PayPal\'s authoritative next_billing_time, never now()+1month', r.ok && r.periodEnd === '2026-09-01T00:00:00Z')
-    check('periodStart is PayPal\'s authoritative start_time, never now()', r.ok && r.periodStart === '2026-08-01T00:00:00Z')
+    // Corrective pass — verifyPayPalActivation now normalizes via
+    // lib/paypal/timestamp.ts's normalizeInstant at extraction, so a clean
+    // "...Z" input round-trips through Date.parse -> toISOString() as
+    // "...000Z" (toISOString always emits 3 fractional-second digits) — the
+    // SAME instant, canonical form, never a lexicographic mismatch.
+    check('periodEnd is PayPal\'s authoritative next_billing_time (normalized), never now()+1month', r.ok && r.periodEnd === '2026-09-01T00:00:00.000Z')
+    check('periodStart is PayPal\'s authoritative start_time (normalized), never now()', r.ok && r.periodStart === '2026-08-01T00:00:00.000Z')
   }
   console.log('\n6b) valid activation but PayPal reports no next_billing_time at all → fails closed (never invents now()+1month)')
   {
@@ -231,7 +236,10 @@ async function main() {
       fakeDeps('2026-10-01T00:00:00Z'),
     )
     check('processed successfully by resolving via billing_agreement_id', outcome.kind === 'processed')
-    check('the row matched by paypal_subscription_id was updated', admin.tables.subscriptions[0].current_period_end === '2026-10-01T00:00:00Z')
+    // Corrective pass — the persisted value is normalized (parseInstantMs +
+    // toISOString in webhook-processing.ts), so a clean "...Z" input is
+    // stored as "...000Z" — the SAME instant, canonical form.
+    check('the row matched by paypal_subscription_id was updated (normalized)', admin.tables.subscriptions[0].current_period_end === '2026-10-01T00:00:00.000Z')
   }
   console.log('\n[corrective] PAYMENT.SALE.COMPLETED with NO billing_agreement_id is an ordinary non-subscription sale — ignored, not an error')
   {
@@ -260,7 +268,7 @@ async function main() {
     const after1 = admin.tables.subscriptions[0].current_period_end
     await processVerifiedPayPalWebhookEvent(admin, { event_type: 'BILLING.SUBSCRIPTION.RENEWED', resource: { id: 'SUB-13' } }, deps)
     const after2 = admin.tables.subscriptions[0].current_period_end
-    check('FIXED: replaying RENEWED twice produces the IDENTICAL current_period_end (was: extended again each time)', after1 === after2 && after1 === '2026-10-01T00:00:00Z')
+    check('FIXED: replaying RENEWED twice produces the IDENTICAL (normalized) current_period_end (was: extended again each time)', after1 === after2 && after1 === '2026-10-01T00:00:00.000Z')
   }
 
   // ── Required test: PayPal subscription-detail lookup failure does not extend the period ──

@@ -99,6 +99,8 @@
  *    described or treated as authoritative anywhere it's used.
  */
 
+import { parseInstantMs } from '@/lib/paypal/timestamp'
+
 // `any` deliberately, matching lib/subscription.ts / lib/quota.ts's own
 // established convention — this is called with BOTH the real Supabase admin
 // client (route.ts) and a lightweight fake (QA), and Supabase's generated
@@ -122,13 +124,23 @@ export type WebhookProcessingOutcome =
   | { kind: 'ignored_unrecognized_event_type'; eventType: string }
   | { kind: 'processed'; eventType: string }
   | { kind: 'update_failed'; eventType: string; message: string }
-  /** Renewal-specific fail-safe outcomes — current_period_end is NEVER invented locally. */
+  /** Renewal-specific fail-safe outcomes — current_period_end is NEVER
+   *  invented locally. `reason` distinguishes the exact cause via a stable
+   *  string tag: `'no_authoritative_date'` / `'fetch_failed'` /
+   *  `'paypal_not_configured'` (deps.fetchAuthoritativeBillingPeriod itself
+   *  failed) — or, since the corrective pass, `'unparseable_authoritative_period_end'`
+   *  (PayPal reported a period end this app could not parse to a valid
+   *  instant) / `'unparseable_stored_period_end'` (the ROW's own stored
+   *  current_period_end is corrupt — never guessed against, row untouched). */
   | { kind: 'renewal_date_unavailable'; eventType: string; reason: string }
-  /** The authoritative next_billing_time EQUALS what's already stored — a
-   *  genuine duplicate delivery of the same renewal. Safe no-op. */
+  /** The authoritative next_billing_time represents the SAME INSTANT as
+   *  what's already stored (compared as epoch milliseconds, never as
+   *  strings — see the corrective-pass note below) — a genuine duplicate
+   *  delivery of the same renewal. Safe no-op. */
   | { kind: 'renewal_duplicate'; eventType: string; periodEnd: string }
-  /** The authoritative next_billing_time is OLDER than what's already
-   *  stored — an out-of-order-delivered event. Safe no-op, row untouched. */
+  /** The authoritative next_billing_time is an OLDER instant than what's
+   *  already stored — an out-of-order-delivered event. Safe no-op, row
+   *  untouched. */
   | { kind: 'renewal_stale'; eventType: string; storedPeriodEnd: string; reportedPeriodEnd: string }
   /** A concurrent renewal handler already advanced current_period_end
    *  between this handler's read and its conditional write — zero rows
@@ -226,41 +238,87 @@ export async function processVerifiedPayPalWebhookEvent(
     if (!authoritative.ok) {
       return { kind: 'renewal_date_unavailable', eventType: event_type, reason: authoritative.reason }
     }
-    const previousPeriodEnd = (subscription as { current_period_end?: string | null }).current_period_end ?? null
 
-    // ISO 8601 UTC timestamps ("...Z") compare correctly as plain strings —
-    // no Date parsing needed. A previousPeriodEnd of null means this row has
-    // never recorded an authoritative period yet (missing-period recovery —
-    // see file header); duplicate/stale detection only applies once a real
-    // stored value exists to compare against.
-    if (previousPeriodEnd !== null) {
-      if (authoritative.periodEnd === previousPeriodEnd) {
-        return { kind: 'renewal_duplicate', eventType: event_type, periodEnd: previousPeriodEnd }
-      }
-      if (authoritative.periodEnd < previousPeriodEnd) {
-        return {
-          kind: 'renewal_stale',
-          eventType: event_type,
-          storedPeriodEnd: previousPeriodEnd,
-          reportedPeriodEnd: authoritative.periodEnd,
-        }
+    // Corrective pass — NEVER compare PayPal/Postgres timestamps as plain
+    // strings. The SAME instant can be represented differently — PayPal
+    // commonly returns "2036-01-01T00:00:00Z", Postgres/PostgREST commonly
+    // returns the identical instant as "2036-01-01T00:00:00+00:00" for a
+    // value this app itself wrote back — and fractional-second precision can
+    // differ too. A lexicographic `===`/`<` compare can therefore
+    // misclassify a genuine duplicate renewal as a newer one, corrupting the
+    // stored period. Every comparison below is on epoch MILLISECONDS,
+    // parsed via lib/paypal/timestamp.ts's parseInstantMs (which itself
+    // validates with Number.isFinite and never throws).
+    //
+    // fetchAuthoritativeBillingPeriod already normalizes periodEnd at
+    // extraction (lib/paypal/client.ts) — parseInstantMs here is a second,
+    // deliberate defense-in-depth check specifically for the comparison
+    // logic below, not a redundant no-op: it is what actually protects this
+    // function against ANY future caller of ProcessDeps.fetchAuthoritativeBillingPeriod
+    // that doesn't go through the real client.ts (e.g. a test double, or a
+    // future alternate implementation).
+    const authoritativeMs = parseInstantMs(authoritative.periodEnd)
+    if (authoritativeMs === null) {
+      return { kind: 'renewal_date_unavailable', eventType: event_type, reason: 'unparseable_authoritative_period_end' }
+    }
+    const normalizedPeriodEnd = new Date(authoritativeMs).toISOString()
+
+    const previousPeriodEndRaw = (subscription as { current_period_end?: string | null }).current_period_end ?? null
+    // A previousPeriodEndRaw of null means this row has never recorded an
+    // authoritative period yet (missing-period recovery — see file header);
+    // duplicate/stale detection only applies once a real stored value exists
+    // to compare against. A NON-null but UNPARSEABLE stored value means the
+    // row itself holds corrupt data — never guess whether that represents a
+    // duplicate, a stale event, or a genuinely new renewal; fail closed
+    // WITHOUT mutating the row, with a reason distinct from the
+    // authoritative-side failure above so the two causes are never confused
+    // in logs/alerts.
+    let previousPeriodEndMs: number | null = null
+    if (previousPeriodEndRaw !== null) {
+      previousPeriodEndMs = parseInstantMs(previousPeriodEndRaw)
+      if (previousPeriodEndMs === null) {
+        return { kind: 'renewal_date_unavailable', eventType: event_type, reason: 'unparseable_stored_period_end' }
       }
     }
 
+    if (previousPeriodEndMs !== null) {
+      if (authoritativeMs === previousPeriodEndMs) {
+        return { kind: 'renewal_duplicate', eventType: event_type, periodEnd: new Date(previousPeriodEndMs).toISOString() }
+      }
+      if (authoritativeMs < previousPeriodEndMs) {
+        return {
+          kind: 'renewal_stale',
+          eventType: event_type,
+          storedPeriodEnd: new Date(previousPeriodEndMs).toISOString(),
+          reportedPeriodEnd: normalizedPeriodEnd,
+        }
+      }
+    }
+    // Persist the NORMALIZED (never raw) UTC form for both boundaries —
+    // current_period_start is the row's own previously-stored period end,
+    // re-normalized the same way, so every value this app writes to these
+    // columns is always in the same canonical shape.
+    const normalizedPreviousPeriodEnd = previousPeriodEndMs === null ? null : new Date(previousPeriodEndMs).toISOString()
+
     // Concurrency guard — CONDITIONAL update. The WHERE clause re-checks
-    // current_period_end against the exact value we just read; if a
-    // concurrent renewal handler already advanced this row in between, the
-    // condition matches zero rows and this handler must NOT overwrite that
-    // newer state (which would otherwise silently skip the concurrent
-    // winner's period boundary). `.select('id')` lets us tell "zero rows
-    // matched" apart from "matched and updated."
+    // current_period_end against the EXACT RAW value we just read (never the
+    // normalized form) — if a concurrent renewal handler already advanced
+    // this row in between, the condition matches zero rows and this handler
+    // must NOT overwrite that newer state (which would otherwise silently
+    // skip the concurrent winner's period boundary). `.select('id')` lets us
+    // tell "zero rows matched" apart from "matched and updated." (Postgres
+    // compares a timestamptz column by actual instant regardless of the
+    // literal's string form, so guarding on the raw value here is exactly as
+    // correct as the normalized value would be for the DATABASE comparison —
+    // this is deliberately the RAW value purely to guard against the EXACT
+    // row state this handler actually read, not a re-derived one.)
     let updateQuery = admin
       .from('subscriptions')
-      .update({ current_period_end: authoritative.periodEnd, current_period_start: previousPeriodEnd })
+      .update({ current_period_end: normalizedPeriodEnd, current_period_start: normalizedPreviousPeriodEnd })
       .eq('id', subscription.id)
-    updateQuery = previousPeriodEnd === null
+    updateQuery = previousPeriodEndRaw === null
       ? updateQuery.is('current_period_end', null)
-      : updateQuery.eq('current_period_end', previousPeriodEnd)
+      : updateQuery.eq('current_period_end', previousPeriodEndRaw)
     const { data: updatedRows, error: updateError } = await updateQuery.select('id')
     if (updateError) return { kind: 'update_failed', eventType: event_type, message: updateError.message }
     if (!updatedRows || updatedRows.length === 0) {

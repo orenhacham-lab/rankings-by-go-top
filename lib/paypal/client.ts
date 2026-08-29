@@ -11,6 +11,7 @@
  */
 
 import type { SubscriptionPlan } from '@/lib/supabase/types'
+import { normalizeInstant } from '@/lib/paypal/timestamp'
 
 const KNOWN_PLAN_CODES: readonly SubscriptionPlan[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -115,6 +116,16 @@ export type AuthoritativeNextBillingResult =
  * source of truth for a subscription's next `current_period_end` — never
  * computed locally. If PayPal has no authoritative date (e.g. a subscription
  * with no future billing cycle), this fails rather than inventing one.
+ *
+ * Corrective pass — normalized via `normalizeInstant` (parse + re-serialize
+ * to canonical UTC ISO-8601) right here, at the point this value is first
+ * extracted from PayPal's raw response — a malformed `next_billing_time`
+ * fails closed as `no_authoritative_date` (the SAME reason as a genuinely
+ * missing one — from a caller's perspective, both mean "no usable
+ * authoritative date," and this codebase never guesses which). Every caller
+ * downstream of this function therefore always receives an already-
+ * normalized, canonical timestamp — never PayPal's raw, format-inconsistent
+ * string.
  */
 export async function fetchAuthoritativeNextBillingTime(
   subscriptionId: string,
@@ -132,7 +143,7 @@ export async function fetchAuthoritativeNextBillingTime(
   } catch {
     return { ok: false, reason: 'fetch_failed' }
   }
-  const nextBillingTime = details.billing_info?.next_billing_time
+  const nextBillingTime = normalizeInstant(details.billing_info?.next_billing_time)
   if (!nextBillingTime) return { ok: false, reason: 'no_authoritative_date' }
   return { ok: true, nextBillingTime }
 }
@@ -150,6 +161,14 @@ export type AuthoritativeBillingPeriodResult =
  * which case the caller (the renewal webhook) falls back to the row's
  * PREVIOUS current_period_end, which is itself authoritative (it was set
  * from a prior next_billing_time) and keeps periods contiguous.
+ *
+ * Corrective pass — both fields are normalized via `normalizeInstant` right
+ * here, at extraction. `periodEnd` fails the WHOLE call closed
+ * (`no_authoritative_date`) if unparseable — this is the only field this
+ * result is actually authoritative FOR. `periodStart` is informational only
+ * (see above — the renewal webhook never uses it as the period anchor), so
+ * an unparseable `last_payment.time` degrades to `null` (treated identically
+ * to PayPal simply not reporting it) rather than failing the whole fetch.
  */
 export async function fetchAuthoritativeBillingPeriod(
   subscriptionId: string,
@@ -167,9 +186,9 @@ export async function fetchAuthoritativeBillingPeriod(
   } catch {
     return { ok: false, reason: 'fetch_failed' }
   }
-  const periodEnd = details.billing_info?.next_billing_time
+  const periodEnd = normalizeInstant(details.billing_info?.next_billing_time)
   if (!periodEnd) return { ok: false, reason: 'no_authoritative_date' }
-  return { ok: true, periodEnd, periodStart: details.billing_info?.last_payment?.time ?? null }
+  return { ok: true, periodEnd, periodStart: normalizeInstant(details.billing_info?.last_payment?.time) }
 }
 
 /** Subscription statuses this app treats as a legitimate, activatable charge. */
@@ -223,9 +242,15 @@ export async function verifyPayPalActivation(
   const resolvedPlanCode = resolvePlanCodeFromPayPalPlanId(details.plan_id)
   if (!resolvedPlanCode) return { ok: false, reason: 'unrecognized_paypal_plan' }
   if (resolvedPlanCode !== args.submittedPlanCode) return { ok: false, reason: 'plan_mismatch' }
-  const periodEnd = details.billing_info?.next_billing_time
+  // Corrective pass — normalized at extraction, same as
+  // fetchAuthoritativeBillingPeriod above: a malformed next_billing_time
+  // fails closed (no_authoritative_period); a malformed start_time degrades
+  // to null (treated the same as PayPal simply not reporting it — the
+  // caller already has a documented, tested fallback for a null
+  // periodStart).
+  const periodEnd = normalizeInstant(details.billing_info?.next_billing_time)
   if (!periodEnd) return { ok: false, reason: 'no_authoritative_period' }
-  return { ok: true, planCode: resolvedPlanCode, periodEnd, periodStart: details.start_time ?? null }
+  return { ok: true, planCode: resolvedPlanCode, periodEnd, periodStart: normalizeInstant(details.start_time) }
 }
 
 export type CancelSubscriptionResult =

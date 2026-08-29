@@ -84,8 +84,11 @@ async function main() {
     const paid: PaidSubscriptionFields = { plan_code: verified.planCode, status: 'active', paypal_subscription_id: 'SUB-A1', current_period_end: verified.periodEnd, current_period_start: verified.periodStart }
     await transitionSubscriptionToActivePlan(admin, 'u1', paid)
     const row = admin.tables.subscriptions[0]
-    check('current_period_start is PayPal\'s start_time', row.current_period_start === '2026-08-15T10:00:00Z')
-    check('current_period_end is PayPal\'s next_billing_time', row.current_period_end === '2026-09-15T10:00:00Z')
+    // Corrective pass — verifyPayPalActivation now normalizes at extraction
+    // (lib/paypal/timestamp.ts), so a clean "...Z" input persists as
+    // "...000Z" — the SAME instant, canonical form.
+    check('current_period_start is PayPal\'s start_time (normalized)', row.current_period_start === '2026-08-15T10:00:00.000Z')
+    check('current_period_end is PayPal\'s next_billing_time (normalized)', row.current_period_end === '2026-09-15T10:00:00.000Z')
   }
 
   console.log('\n1) Billing boundary at 00:00, payment CAPTURED at 00:07 — period_start must be the PRIOR stored period_end, NEVER the 00:07 payment timestamp')
@@ -100,9 +103,11 @@ async function main() {
     const after = admin.tables.subscriptions[0]
     showBeforeAfter(before, after)
     check('processed', outcome.kind === 'processed')
-    check('current_period_start is the PRIOR stored period_end (Aug 1 00:00:00), NOT the 00:00:07 payment-capture time', after.current_period_start === '2026-08-01T00:00:00Z')
-    check('current_period_start is NOT the last_payment.time value at all', after.current_period_start !== '2026-08-01T00:00:07Z')
-    check('current_period_end is the new authoritative next_billing_time', after.current_period_end === '2026-09-01T00:00:00Z')
+    // Corrective pass — persisted values are normalized (parseInstantMs +
+    // toISOString in webhook-processing.ts).
+    check('current_period_start is the PRIOR stored period_end (Aug 1 00:00:00, normalized), NOT the 00:00:07 payment-capture time', after.current_period_start === '2026-08-01T00:00:00.000Z')
+    check('current_period_start is NOT the last_payment.time value at all', after.current_period_start !== '2026-08-01T00:00:07.000Z')
+    check('current_period_end is the new authoritative next_billing_time (normalized)', after.current_period_end === '2026-09-01T00:00:00.000Z')
   }
 
   console.log('\n2) Webhook delivered several hours later — delayed DELIVERY must not shift the period start either')
@@ -118,8 +123,8 @@ async function main() {
     const after = admin.tables.subscriptions[0]
     showBeforeAfter(before, after)
     check('processed', outcome.kind === 'processed')
-    check('current_period_start is STILL the prior stored period_end, unaffected by a 9-hour-delayed last_payment.time or delivery delay', after.current_period_start === '2026-08-01T00:00:00Z')
-    check('current_period_end correctly advanced', after.current_period_end === '2026-09-01T00:00:00Z')
+    check('current_period_start is STILL the prior stored period_end (normalized), unaffected by a 9-hour-delayed last_payment.time or delivery delay', after.current_period_start === '2026-08-01T00:00:00.000Z')
+    check('current_period_end correctly advanced (normalized)', after.current_period_end === '2026-09-01T00:00:00.000Z')
   }
 
   console.log('\n3) Duplicate webhook — next_billing_time EQUALS the stored period_end')
@@ -131,7 +136,8 @@ async function main() {
     const after = admin.tables.subscriptions[0]
     showBeforeAfter(before, after)
     check('outcome is renewal_duplicate (distinct from stale)', outcome.kind === 'renewal_duplicate')
-    check('reports the duplicate period end', outcome.kind === 'renewal_duplicate' && outcome.periodEnd === '2026-08-01T00:00:00Z')
+    // Corrective pass — reported outcome values are normalized too.
+    check('reports the duplicate period end (normalized)', outcome.kind === 'renewal_duplicate' && outcome.periodEnd === '2026-08-01T00:00:00.000Z')
     check('row is completely untouched — start AND end unchanged', after.current_period_start === before.current_period_start && after.current_period_end === before.current_period_end)
     check('maps to 200 (expected, not an error)', httpStatusForOutcome(outcome) === 200)
   }
@@ -145,7 +151,8 @@ async function main() {
     const after = admin.tables.subscriptions[0]
     showBeforeAfter(before, after)
     check('outcome is renewal_stale (distinct from duplicate)', outcome.kind === 'renewal_stale')
-    check('reports both the stored and the (older) reported value', outcome.kind === 'renewal_stale' && outcome.storedPeriodEnd === '2026-09-01T00:00:00Z' && outcome.reportedPeriodEnd === '2026-08-01T00:00:00Z')
+    // Corrective pass — reported outcome values are normalized too.
+    check('reports both the stored and the (older) reported value (normalized)', outcome.kind === 'renewal_stale' && outcome.storedPeriodEnd === '2026-09-01T00:00:00.000Z' && outcome.reportedPeriodEnd === '2026-08-01T00:00:00.000Z')
     check('row is completely untouched', after.current_period_start === before.current_period_start && after.current_period_end === before.current_period_end)
     check('maps to 200 (expected, not an error)', httpStatusForOutcome(outcome) === 200)
   }
@@ -175,7 +182,7 @@ async function main() {
     const outcomes = [rA.kind, rB.kind].sort()
     check('exactly one handler processed, the other got renewal_conflict (never both "processed", never both silently no-op)', outcomes[0] === 'processed' && outcomes[1] === 'renewal_conflict', `outcomes=${outcomes.join(',')}`)
     check('the conflict outcome maps to 409 (retryable), never a silent 200', httpStatusForOutcome(rA.kind === 'renewal_conflict' ? rA : rB) === 409)
-    check('the row ends up at the correct advanced boundary exactly once — never double-applied, never lost', after.current_period_end === '2026-09-01T00:00:00Z' && after.current_period_start === '2026-08-01T00:00:00Z')
+    check('the row ends up at the correct (normalized) advanced boundary exactly once — never double-applied, never lost', after.current_period_end === '2026-09-01T00:00:00.000Z' && after.current_period_start === '2026-08-01T00:00:00.000Z')
   }
   console.log('\n5b) After a conflict, reprocessing the LOSING event resolves correctly (as a duplicate) against the now-current state')
   {
@@ -205,8 +212,10 @@ async function main() {
       const outcome = await processVerifiedPayPalWebhookEvent(admin, { event_type: 'BILLING.SUBSCRIPTION.RENEWED', resource: { id: `SUB-6-${c.label}` } }, deps)
       const after = admin.tables.subscriptions[0]
       console.log(`  ${c.label}:`); showBeforeAfter(before, after)
-      check(`${c.label} — processed, period_start = prior end exactly, period_end = new authoritative date exactly`,
-        outcome.kind === 'processed' && after.current_period_start === c.priorEnd && after.current_period_end === c.newEnd)
+      // Corrective pass — persisted values are normalized; compare against
+      // the SAME normalization the production code applies.
+      check(`${c.label} — processed, period_start = prior end exactly (normalized), period_end = new authoritative date exactly (normalized)`,
+        outcome.kind === 'processed' && after.current_period_start === new Date(c.priorEnd).toISOString() && after.current_period_end === new Date(c.newEnd).toISOString())
     }
   }
 
@@ -219,7 +228,7 @@ async function main() {
     const after = admin.tables.subscriptions[0]
     showBeforeAfter(before, after)
     check('processed', outcome.kind === 'processed')
-    check('current_period_end is set from the authoritative next_billing_time', after.current_period_end === '2026-09-01T00:00:00Z')
+    check('current_period_end is set from the authoritative next_billing_time (normalized)', after.current_period_end === '2026-09-01T00:00:00.000Z')
     check('current_period_start is left NULL — NOT last_payment.time (Aug 15), not invented', after.current_period_start === null)
     console.log('  (from the row\'s SECOND tracked renewal onward, current_period_start chains normally from this current_period_end — see test 2 above for the steady-state behavior; the interim gap is covered by the documented, tested, explicitly non-authoritative -1-month fallback in lib/billing/usage-period.ts::resolveCurrentUsagePeriod)')
   }

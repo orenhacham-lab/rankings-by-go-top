@@ -16,8 +16,19 @@
  * short-circuits on entitlement.isAdmin before consulting a period at all.
  */
 
+import { parseInstantMs } from '@/lib/paypal/timestamp'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
+
+/** Parses a stored billing-period timestamp, failing to `null` (never an
+ *  Invalid Date silently embedded in a UsagePeriod) if the DB value is
+ *  missing or unparseable — see lib/paypal/timestamp.ts for why raw
+ *  timestamp strings must never be trusted without validation. */
+function parseStoredInstant(raw: string | null | undefined): Date | null {
+  const ms = parseInstantMs(raw)
+  return ms === null ? null : new Date(ms)
+}
 
 export interface UsagePeriod {
   start: Date
@@ -51,13 +62,19 @@ export async function resolveCurrentUsagePeriod(admin: Admin, userId: string): P
 
   if (shopifyConn) {
     const row = shopifyConn as ShopifyPeriodRow
-    if (row.shopify_current_period_start && row.shopify_current_period_end) {
-      return { start: new Date(row.shopify_current_period_start), end: new Date(row.shopify_current_period_end), source: 'shopify' }
+    const shopifyStart = parseStoredInstant(row.shopify_current_period_start)
+    const shopifyEnd = parseStoredInstant(row.shopify_current_period_end)
+    // Corrective pass — a stored value that fails to parse is treated
+    // exactly like a missing one (fail closed below), never silently
+    // embedded as an Invalid Date that downstream quota comparisons would
+    // then evaluate as always-false.
+    if (shopifyStart && shopifyEnd) {
+      return { start: shopifyStart, end: shopifyEnd, source: 'shopify' }
     }
-    // Shopify-governed but no verified period yet (never checked, or
-    // verification failed) — no PayPal/trial fallback is ever consulted for
-    // a Shopify-governed user (same rule as the general entitlement
-    // resolver). Fail closed: no resolvable period.
+    // Shopify-governed but no verified (or a corrupt) period yet (never
+    // checked, verification failed, or malformed data) — no PayPal/trial
+    // fallback is ever consulted for a Shopify-governed user (same rule as
+    // the general entitlement resolver). Fail closed: no resolvable period.
     return null
   }
 
@@ -74,26 +91,37 @@ export async function resolveCurrentUsagePeriod(admin: Admin, userId: string): P
   const row = sub as SubscriptionPeriodRow
 
   if (row.status === 'trial' || !row.plan_code) {
-    if (!row.trial_ends_at) return null
-    const end = new Date(row.trial_ends_at)
+    // Corrective pass — trial_ends_at is the AUTHORITATIVE boundary here;
+    // missing OR unparseable both fail closed identically (never an Invalid
+    // Date silently returned as a "resolvable" period).
+    const end = parseStoredInstant(row.trial_ends_at)
+    if (!end) return null
     // Prefer the actual stored trial/subscription creation timestamp as the
-    // trial start when available (reliable — set once, at row-insert time,
-    // never mutated). `trial_ends_at - 7 days` is only a documented
-    // fallback for the case created_at is somehow unavailable.
-    const start = row.created_at ? new Date(row.created_at) : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000)
+    // trial start when available and parseable (reliable — set once, at
+    // row-insert time, never mutated). `trial_ends_at - 7 days` is the
+    // documented fallback for the case created_at is unavailable OR
+    // somehow malformed — a non-authoritative convenience field either way.
+    const start = parseStoredInstant(row.created_at) ?? new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000)
     return { start, end, source: 'trial' }
   }
 
-  if (!row.current_period_end) return null
-  const end = new Date(row.current_period_end)
+  // Corrective pass — current_period_end is the AUTHORITATIVE boundary;
+  // missing OR unparseable both fail closed identically.
+  const end = parseStoredInstant(row.current_period_end)
+  if (!end) return null
   // Documented compatibility fallback for a pre-existing subscriber whose
   // current_period_start hasn't been backfilled yet (added in this same
   // migration) — resolves to a synthetic ~1-calendar-month-earlier period
   // until their next authoritative PayPal renewal event fills in the real
-  // value. True calendar-month subtraction (not a flat 30 days).
+  // value. True calendar-month subtraction (not a flat 30 days). A stored
+  // current_period_start that fails to parse falls back the SAME way as one
+  // that's simply absent — this field is a documented, non-authoritative
+  // compatibility value already, so a corrupt one degrades exactly like a
+  // missing one rather than failing the whole period closed.
   let start: Date
-  if (row.current_period_start) {
-    start = new Date(row.current_period_start)
+  const storedStart = parseStoredInstant(row.current_period_start)
+  if (storedStart) {
+    start = storedStart
   } else {
     start = new Date(end)
     start.setUTCMonth(start.getUTCMonth() - 1)
