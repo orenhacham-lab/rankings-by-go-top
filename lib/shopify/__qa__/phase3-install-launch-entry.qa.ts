@@ -76,7 +76,11 @@ function signedLaunchParams(overrides: Record<string, string | undefined> = {}, 
     if (v === undefined) delete base[k]
     else base[k] = v
   }
-  const message = Object.keys(base).sort().map((k) => `${k}=${base[k]}`).join('&')
+  // Matches Shopify's own canonicalization (see the HMAC-canonicalization
+  // hotfix in lib/shopify/oauth.ts): each value is re-percent-encoded before
+  // joining, not used raw. This is what makes `host` (base64, contains `=`)
+  // a genuine regression vector for that fix.
+  const message = Object.keys(base).sort().map((k) => `${k}=${encodeURIComponent(base[k])}`).join('&')
   const hmac = crypto.createHmac('sha256', SECRET).update(message).digest('hex')
   return { ...base, hmac }
 }

@@ -76,10 +76,30 @@ export function buildAuthorizeUrl(opts: {
 }
 
 /**
- * Verify the HMAC Shopify appends to OAuth callbacks. Builds the message from
- * every query param except `hmac` (and the legacy `signature`), sorted, joined
- * as k=v&… , and compares an HMAC-SHA256 with the client secret in constant
- * time. PURE. `params` is the raw query as key→value.
+ * Verify the HMAC Shopify appends to OAuth callbacks AND app-launch requests.
+ * Builds the message from every query param except `hmac` (and the legacy
+ * `signature`), sorted, joined as k=v&…, and compares an HMAC-SHA256 with the
+ * client secret in constant time. PURE. `params` is the raw query as
+ * key→value, using whatever DECODED string values the caller's own request
+ * parsing already produced (e.g. Next.js's `searchParams`).
+ *
+ * Corrective pass (production bug: a genuine, freshly-generated Shopify
+ * app-launch request — `?shop=...&hmac=...&host=...&timestamp=...` — was
+ * rejected with `invalid_hmac` even though nothing was tampered). Root
+ * cause: this function previously joined each param's DECODED value
+ * verbatim (`${k}=${v}`). Shopify computes its own `hmac` over the message
+ * with each value RE-PERCENT-ENCODED (the documented canonicalization,
+ * matching e.g. PHP's `http_build_query` / Ruby's `CGI.escape` convention
+ * Shopify's backend uses) — a no-op difference for OAuth-callback params
+ * (`code`/`shop`/`state`/`timestamp`, always plain alphanumerics), which is
+ * why that path never surfaced this bug, but a GUARANTEED mismatch for the
+ * app-launch `host` param: it is base64, and base64 padding (`=`) — along
+ * with `+`/`/` when they occur for other shop names — is exactly what
+ * percent-encoding escapes and a raw join does not. Every value is now
+ * re-encoded via `encodeURIComponent` before joining, matching Shopify's own
+ * canonicalization; this exactly reproduces the digest Shopify computed for
+ * the SAME request it signed, while remaining a no-op for every value that
+ * was already plain ASCII (so previously-working callers are unaffected).
  */
 export function verifyShopifyHmac(params: Record<string, string>, clientSecret: string): boolean {
   const provided = params.hmac
@@ -87,7 +107,7 @@ export function verifyShopifyHmac(params: Record<string, string>, clientSecret: 
   const message = Object.keys(params)
     .filter((k) => k !== 'hmac' && k !== 'signature')
     .sort()
-    .map((k) => `${k}=${params[k]}`)
+    .map((k) => `${k}=${encodeURIComponent(params[k])}`)
     .join('&')
   const digest = crypto.createHmac('sha256', clientSecret).update(message).digest('hex')
   // Constant-time compare (equal length required by timingSafeEqual).
