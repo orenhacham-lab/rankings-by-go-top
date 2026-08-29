@@ -7,7 +7,7 @@
  * raw + filtered topics so the caller can retry before ever falling back.
  */
 
-import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
 
 export interface GeminiTopicSuggestion {
@@ -177,7 +177,9 @@ export async function generateRawTopics(ctx: TopicSuggestionContext, strengthen 
       model: modelName,
       generationConfig: { responseMimeType: 'application/json', temperature: strengthen ? 1.0 : 0.9 },
     })
-    const result = await model.generateContent(buildPrompt(ctx, strengthen))
+    // 3rd review correction — bounded provider timeout; see
+    // GEMINI_REQUEST_TIMEOUT_MS's definition for the full rationale.
+    const result = await model.generateContent(buildPrompt(ctx, strengthen), { timeout: GEMINI_REQUEST_TIMEOUT_MS })
     const text = result.response.text()
     let parsed: { topics?: unknown }
     try {

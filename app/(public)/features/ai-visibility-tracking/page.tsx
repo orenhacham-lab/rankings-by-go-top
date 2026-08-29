@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Brain, MessageSquare, Zap, TrendingUp, Link2, BarChart3 } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'מעקב נראות AI | Rankings by Go Top',
   description: 'גלו האם העסק, האתר או המותג שלכם מופיעים בתשובות של ChatGPT, Gemini, Perplexity, Google AI וכלים נוספים. מעקב GEO - Generative Engine Optimization.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/features/ai-visibility-tracking',
+    languages: buildHreflangAlternates(
+      '/features/ai-visibility-tracking',
+      '/en/features/ai-visibility-tracking'
+    ),
+  },
 }
 
 export default function AIVisibilityFeaturePage() {

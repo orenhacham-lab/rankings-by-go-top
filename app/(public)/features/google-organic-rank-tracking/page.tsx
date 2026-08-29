@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Search, TrendingUp, Globe, Smartphone, BarChart3, Clock } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'מעקב דירוג בגוגל חיפוש | Rankings by Go Top',
-  description: 'עקבו אחרי דירוגים אורגניים בגוגל לפי ביטוי חיפוש, מדינה, שפה ומכשיר. דוחות מפורטים, מעקב מתחרים וניתוח מגמות בזמן אמת.',
+  description: 'עקבו אחרי דירוגים אורגניים בגוגל לפי ביטוי חיפוש, מדינה, שפה ומכשיר. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ומעקב מתחרים.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/features/google-organic-rank-tracking',
+    languages: buildHreflangAlternates(
+      '/features/google-organic-rank-tracking',
+      '/en/features/google-organic-rank-tracking'
+    ),
+  },
 }
 
 export default function GoogleOrganicFeaturePage() {
@@ -28,12 +36,12 @@ export default function GoogleOrganicFeaturePage() {
 
             {/* Main Heading */}
             <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 text-center mb-6 leading-tight">
-              עקבו אחרי הדירוגים שלכם בגוגל בזמן אמת
+              עקבו אחרי הדירוגים שלכם בגוגל, בכל רגע שתרצו
             </h1>
 
             {/* Subheading */}
             <p className="text-xl text-slate-600 text-center mb-12 max-w-2xl mx-auto">
-              קבלו מידע מדויק על מיקום האתר שלכם בתוצאות הפרסום של גוגל. עקבו אחרי מגמות, השוו לתחרות, וקבלו דוחות מפורטים.
+              קבלו מידע מדויק על מיקום האתר שלכם בתוצאות החיפוש של גוגל. הריצו סריקה ידנית מתי שנוח לכם, או תנו למערכת לסרוק אוטומטית פעם בחודש. עקבו אחרי מגמות, השוו לתחרות, וקבלו דוחות מפורטים.
             </p>
 
             {/* CTAs */}
@@ -96,15 +104,15 @@ export default function GoogleOrganicFeaturePage() {
           <div className="max-w-5xl mx-auto">
             <h2 className="text-4xl font-bold text-slate-900 text-center mb-4">למה מעקב דירוגים חשוב?</h2>
             <p className="text-xl text-slate-600 text-center mb-16 max-w-2xl mx-auto">
-              בעולם דיגיטלי, דירוג בגוגל הוא מה שמביא לאתכם לקוחות. לא בדיוק כמו בעבר בעיתון, אבל ממש כמו זה בעברית.
+              בעולם דיגיטלי, דירוג גבוה בגוגל הוא מה שמביא לכם לקוחות. ככל שתדעו יותר על המיקום שלכם, כך תוכלו לקבל החלטות שיווק טובות יותר.
             </p>
 
             <div className="grid md:grid-cols-3 gap-8">
               <div className="p-8 rounded-lg border border-blue-200 bg-blue-50 hover:shadow-lg transition-shadow">
                 <TrendingUp className="w-10 h-10 text-blue-600 mb-4" />
-                <h3 className="text-lg font-bold text-slate-900 mb-3">מעקב מגמות בזמן אמת</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-3">מעקב מגמות לאורך זמן</h3>
                 <p className="text-slate-700">
-                  ראו כמה דירוג שלכם משתנה כל יום. בחודש הבא תוכלו לראות אם הקמפיין שלכם בSEO עובד או לא.
+                  ראו כיצד הדירוג שלכם משתנה מסריקה לסריקה. תוך כמה חודשים תוכלו לראות אם הקמפיין שלכם ב-SEO עובד או לא.
                 </p>
               </div>
 
@@ -158,7 +166,7 @@ export default function GoogleOrganicFeaturePage() {
                 <div className="bg-white rounded-lg p-8 border border-slate-200">
                   <h3 className="text-lg font-bold text-slate-900 mb-3">קבלו תוצאות</h3>
                   <p className="text-slate-700">
-                    המערכת תבדוק את הדירוגים שלכם מידי יום. תראו גרפים, דוחות, ועידכונים בזמן אמת.
+                    הריצו סריקה ידנית מתי שנוח לכם, או הפעילו סריקה אוטומטית חודשית לשמירה על היסטוריה מעודכנת. תראו גרפים ודוחות ברגע שהתוצאות מוכנות.
                   </p>
                 </div>
               </div>
@@ -176,7 +184,7 @@ export default function GoogleOrganicFeaturePage() {
                 <Smartphone className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">מעקב לפי מכשיר</h3>
-                  <p className="text-slate-700">בדקו דירוגים במכשירים שונים: דסקטופ, טלפון, וטאבלט. הדירוגים עלולים להיות שונים בכל מכשיר.</p>
+                  <p className="text-slate-700">בדקו דירוגים בנפרד עבור דסקטופ וניידים. הדירוגים עלולים להיות שונים בכל מכשיר.</p>
                 </div>
               </div>
 
@@ -192,7 +200,7 @@ export default function GoogleOrganicFeaturePage() {
                 <TrendingUp className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">ניתוח מגמות</h3>
-                  <p className="text-slate-700">ראו כיצד הדירוגים משתנים לאורך זמן. גרפים תוך דקות יעזרו לכם להבין את הטרנדים.</p>
+                  <p className="text-slate-700">ראו כיצד הדירוגים משתנים לאורך זמן. גרפים ברורים יעזרו לכם להבין את הטרנדים.</p>
                 </div>
               </div>
 
@@ -200,15 +208,15 @@ export default function GoogleOrganicFeaturePage() {
                 <BarChart3 className="w-6 h-6 text-orange-600 flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">השוואת מתחרים</h3>
-                  <p className="text-slate-700">אם אתם יודעים את דירוגי המתחרים, תוכלו לראות איפה אתם מדויק.</p>
+                  <p className="text-slate-700">אם הזנתם את דירוגי המתחרים, תוכלו לראות בדיוק איפה אתם עומדים מולם.</p>
                 </div>
               </div>
 
               <div className="flex gap-4">
                 <Clock className="w-6 h-6 text-indigo-600 flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-2">בדיקות יומיות אוטומטיות</h3>
-                  <p className="text-slate-700">כל יום המערכת תבדוק את הדירוגים שלכם בעצמה. אתם רק צופים בתוצאות.</p>
+                  <h3 className="font-bold text-slate-900 mb-2">בדיקות אוטומטיות חודשיות</h3>
+                  <p className="text-slate-700">פעם בחודש המערכת תבדוק את הדירוגים שלכם באופן אוטומטי. תוכלו גם להריץ בדיקה ידנית בכל רגע שתרצו.</p>
                 </div>
               </div>
 
@@ -251,7 +259,7 @@ export default function GoogleOrganicFeaturePage() {
 
               <div className="bg-white rounded-lg p-8 border-l-4 border-green-600">
                 <h3 className="text-xl font-bold text-slate-900 mb-3">מנהלי שיווק ודיגיטל</h3>
-                <p className="text-slate-700 mb-4">אם אתם אחראיים על ביצועי האתר, תצטרכו לדוח ברור על דירוגים.</p>
+                <p className="text-slate-700 mb-4">אם אתם אחראים על ביצועי האתר, תזדקקו לדוח ברור על הדירוגים.</p>
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>✓ ניתוח מפורט של ביצועים</li>
                   <li>✓ זיהוי בעיות ומקורות בעיות</li>
@@ -260,12 +268,12 @@ export default function GoogleOrganicFeaturePage() {
               </div>
 
               <div className="bg-white rounded-lg p-8 border-l-4 border-purple-600">
-                <h3 className="text-xl font-bold text-slate-900 mb-3">מקדמי SEO וקוראים</h3>
-                <p className="text-slate-700 mb-4">אם אתם עובדים על SEO, תצטרכו ללדעת בדיוק איפה הדירוגים משתנים.</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">מקדמי SEO ובעלי מקצוע</h3>
+                <p className="text-slate-700 mb-4">אם אתם עובדים על SEO, תצטרכו לדעת בדיוק איפה ומתי הדירוגים משתנים.</p>
                 <ul className="space-y-2 text-sm text-slate-600">
-                  <li>✓ תוצאות בזמן אמת</li>
+                  <li>✓ סריקות לפי דרישה בכל רגע</li>
                   <li>✓ הוכחה של השפעת העבודה</li>
-                  <li>✓ יעדים וKPI ברורים</li>
+                  <li>✓ יעדים ומדדי KPI ברורים</li>
                 </ul>
               </div>
             </div>

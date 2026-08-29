@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { FileText, BarChart2, TrendingUp, Share2, Clock, Zap, Award } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'SEO/GEO Reports | Rankings by Go Top',
   description: 'Professional PDF and Excel reports with rankings, trends, and competitive analysis. Client-ready reports in seconds.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/features/seo-geo-reports',
+    languages: buildHreflangAlternates(
+      '/features/seo-geo-reports',
+      '/en/features/seo-geo-reports'
+    ),
+  },
 }
 
 export default function SEOGeoReportsFeaturePage() {

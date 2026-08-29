@@ -18,7 +18,88 @@
  *     period again each time. It is now always set from PayPal's OWN
  *     authoritative `next_billing_time` — an absolute value, so replays
  *     converge on the same result by construction.
+ *
+ * Phase 3 (2nd review correction) — exactly which PayPal fields back each
+ * lifecycle state, and why each is safe against replay/delay/reordering:
+ *
+ *  - INITIAL ACTIVATION (lib/paypal/activation-processing.ts, called from
+ *    app/api/paypal/activate/route.ts, NOT this file): `start_time` (period
+ *    start) and `billing_info.next_billing_time` (period end), both read from
+ *    the SAME server-side `GET /v1/billing/subscriptions/{id}` call that
+ *    verifies the subscription id/status/plan
+ *    (lib/paypal/client.ts::verifyPayPalActivation). This is the ONE place
+ *    `start_time` is ever used as a period boundary — a fresh subscription
+ *    has no prior stored period to chain from, so PayPal's own reported
+ *    start is the only available anchor. A plan change (upgrade/downgrade)
+ *    creates a brand-new PayPal subscription with its own id, and goes
+ *    through this exact same activation path — so a plan change always gets
+ *    a fresh, independently-verified period; it never inherits or extends
+ *    the prior plan's period. This is the plan-change period-reset policy,
+ *    enforced by construction (there is no code path that carries a period
+ *    across a plan change), not by a special case.
+ *
+ *  - RENEWAL (this file, RENEWAL_EVENTS below) — corrected policy:
+ *    `billing_info.next_billing_time` is the ONLY field used as the new
+ *    `current_period_end`. The new `current_period_start` is ALWAYS the
+ *    row's PREVIOUSLY STORED `current_period_end` — NEVER
+ *    `billing_info.last_payment.time`. A payment timestamp answers "when did
+ *    money move," not "when does the customer's contractual billing period
+ *    begin" — those two can legitimately differ (a delayed capture, a
+ *    retried charge, a payment processed hours after the actual billing
+ *    boundary), and using it as the period anchor would let a late payment
+ *    silently shift the customer's quota window. `last_payment.time` is
+ *    therefore NOT persisted as the period anchor by this pass at all (no
+ *    dedicated "last payment" column exists yet — adding one is out of
+ *    scope here; see the final report for this as a documented, low-priority
+ *    follow-up rather than something silently dropped).
+ *
+ *    Both `next_billing_time` and (for reference only) `last_payment.time`
+ *    are read via `deps.fetchAuthoritativeBillingPeriod`, which LIVE-QUERIES
+ *    PayPal's subscription-detail endpoint at the moment the webhook is
+ *    processed — never trusting any date embedded in the webhook payload
+ *    itself. This is what makes delayed delivery safe: a webhook delivered
+ *    hours late still re-reads PayPal's CURRENT `next_billing_time`, which
+ *    hasn't moved just because delivery was slow.
+ *
+ *    On top of that, three EXPLICIT, tested guards (never inferred from
+ *    "PayPal's live state can't regress" alone):
+ *      1. `next_billing_time === storedPeriodEnd` → 'renewal_duplicate', a
+ *         no-op. (Replaying the identical event, or two webhooks for the
+ *         same renewal, e.g. BILLING.SUBSCRIPTION.RENEWED and
+ *         PAYMENT.SALE.COMPLETED for the same cycle.)
+ *      2. `next_billing_time < storedPeriodEnd` → 'renewal_stale', a no-op.
+ *         (An out-of-order-delivered older event.)
+ *      3. A CONDITIONAL update (`.eq('current_period_end', storedPeriodEnd)`
+ *         at write time, re-checked against whatever is in the DB at that
+ *         exact moment) guards the actual write — if a concurrent renewal
+ *         handler already advanced the row between this handler's read and
+ *         its write, zero rows match and 'renewal_conflict' is returned
+ *         (transient — safe to reprocess, at which point the now-current
+ *         stored value makes this event resolve as duplicate/stale/processed
+ *         correctly). This is what prevents two interleaved renewal webhooks
+ *         from silently skipping an intermediate period boundary (handler A
+ *         advances X→Y, handler B — still holding the stale X read —  must
+ *         NOT then advance X→Z, which would lose Y entirely from the chain).
+ *
+ *  - MISSING-PERIOD RECOVERY (a legacy row with no stored
+ *    `current_period_start`/`current_period_end` at all, or a row whose
+ *    `current_period_end` was never set): its FIRST renewal under this code
+ *    sets `current_period_end` from PayPal's authoritative
+ *    `next_billing_time`, but deliberately leaves `current_period_start`
+ *    unset (null) — there is no previously-stored period_end to chain from,
+ *    and inventing one (e.g. from `last_payment.time`, or a nominal "end
+ *    minus 1 month") would NOT be authoritative, so it is not done here.
+ *    lib/billing/usage-period.ts::resolveCurrentUsagePeriod is the ONE place
+ *    that fills this gap, with an EXPLICITLY documented, tested, non-
+ *    authoritative fallback (`current_period_end - 1 calendar month`) used
+ *    only until a real chain exists — every SUBSEQUENT renewal after this
+ *    first one has a real stored `current_period_end` to anchor from, so the
+ *    row self-heals into the fully authoritative chain from its second
+ *    tracked renewal onward. This fallback is a recovery convenience, never
+ *    described or treated as authoritative anywhere it's used.
  */
+
+import { parseInstantMs } from '@/lib/paypal/timestamp'
 
 // `any` deliberately, matching lib/subscription.ts / lib/quota.ts's own
 // established convention — this is called with BOTH the real Supabase admin
@@ -43,8 +124,30 @@ export type WebhookProcessingOutcome =
   | { kind: 'ignored_unrecognized_event_type'; eventType: string }
   | { kind: 'processed'; eventType: string }
   | { kind: 'update_failed'; eventType: string; message: string }
-  /** Renewal-specific fail-safe outcomes — current_period_end is NEVER invented locally. */
+  /** Renewal-specific fail-safe outcomes — current_period_end is NEVER
+   *  invented locally. `reason` distinguishes the exact cause via a stable
+   *  string tag: `'no_authoritative_date'` / `'fetch_failed'` /
+   *  `'paypal_not_configured'` (deps.fetchAuthoritativeBillingPeriod itself
+   *  failed) — or, since the corrective pass, `'unparseable_authoritative_period_end'`
+   *  (PayPal reported a period end this app could not parse to a valid
+   *  instant) / `'unparseable_stored_period_end'` (the ROW's own stored
+   *  current_period_end is corrupt — never guessed against, row untouched). */
   | { kind: 'renewal_date_unavailable'; eventType: string; reason: string }
+  /** The authoritative next_billing_time represents the SAME INSTANT as
+   *  what's already stored (compared as epoch milliseconds, never as
+   *  strings — see the corrective-pass note below) — a genuine duplicate
+   *  delivery of the same renewal. Safe no-op. */
+  | { kind: 'renewal_duplicate'; eventType: string; periodEnd: string }
+  /** The authoritative next_billing_time is an OLDER instant than what's
+   *  already stored — an out-of-order-delivered event. Safe no-op, row
+   *  untouched. */
+  | { kind: 'renewal_stale'; eventType: string; storedPeriodEnd: string; reportedPeriodEnd: string }
+  /** A concurrent renewal handler already advanced current_period_end
+   *  between this handler's read and its conditional write — zero rows
+   *  matched the write's guard. Transient; safe to reprocess (the event
+   *  will then correctly resolve as processed/duplicate/stale against the
+   *  now-current stored value). Never overwrites the concurrent winner. */
+  | { kind: 'renewal_conflict'; eventType: string }
 
 const SUBSCRIPTION_STATUS_EVENTS = new Set([
   'BILLING.SUBSCRIPTION.ACTIVATED',
@@ -72,9 +175,9 @@ function resolveSubscriptionId(eventType: string, resource: PayPalWebhookEvent['
 
 export interface ProcessDeps {
   /** Injectable so QA never hits live PayPal. Real callers pass
-   *  lib/paypal/client.ts's fetchAuthoritativeNextBillingTime. */
-  fetchAuthoritativeNextBillingTime: (subscriptionId: string) => Promise<
-    { ok: true; nextBillingTime: string } | { ok: false; reason: string }
+   *  lib/paypal/client.ts's fetchAuthoritativeBillingPeriod. */
+  fetchAuthoritativeBillingPeriod: (subscriptionId: string) => Promise<
+    { ok: true; periodEnd: string; periodStart: string | null } | { ok: false; reason: string }
   >
 }
 
@@ -124,16 +227,104 @@ export async function processVerifiedPayPalWebhookEvent(
   }
 
   if (RENEWAL_EVENTS.has(event_type)) {
-    // Idempotency fix: current_period_end is ALWAYS the absolute value
-    // PayPal itself reports as the next billing time — never `stored + 1
-    // month`. Replaying the same delivery re-fetches the SAME authoritative
-    // date from PayPal (PayPal's own state hasn't changed between replays),
-    // so this converges rather than extending further each time.
-    const authoritative = await deps.fetchAuthoritativeNextBillingTime(paypalSubscriptionId)
+    // 2nd review correction — current_period_end is ALWAYS the absolute
+    // value PayPal itself reports as the next billing time (never `stored +
+    // 1 month`, never invented). current_period_start is ALWAYS the row's
+    // OWN previously-stored current_period_end — NEVER
+    // authoritative.periodStart (last_payment.time). See the file header for
+    // the full rationale (a payment timestamp is not a billing-boundary
+    // field).
+    const authoritative = await deps.fetchAuthoritativeBillingPeriod(paypalSubscriptionId)
     if (!authoritative.ok) {
       return { kind: 'renewal_date_unavailable', eventType: event_type, reason: authoritative.reason }
     }
-    return applyUpdate({ current_period_end: authoritative.nextBillingTime })
+
+    // Corrective pass — NEVER compare PayPal/Postgres timestamps as plain
+    // strings. The SAME instant can be represented differently — PayPal
+    // commonly returns "2036-01-01T00:00:00Z", Postgres/PostgREST commonly
+    // returns the identical instant as "2036-01-01T00:00:00+00:00" for a
+    // value this app itself wrote back — and fractional-second precision can
+    // differ too. A lexicographic `===`/`<` compare can therefore
+    // misclassify a genuine duplicate renewal as a newer one, corrupting the
+    // stored period. Every comparison below is on epoch MILLISECONDS,
+    // parsed via lib/paypal/timestamp.ts's parseInstantMs (which itself
+    // validates with Number.isFinite and never throws).
+    //
+    // fetchAuthoritativeBillingPeriod already normalizes periodEnd at
+    // extraction (lib/paypal/client.ts) — parseInstantMs here is a second,
+    // deliberate defense-in-depth check specifically for the comparison
+    // logic below, not a redundant no-op: it is what actually protects this
+    // function against ANY future caller of ProcessDeps.fetchAuthoritativeBillingPeriod
+    // that doesn't go through the real client.ts (e.g. a test double, or a
+    // future alternate implementation).
+    const authoritativeMs = parseInstantMs(authoritative.periodEnd)
+    if (authoritativeMs === null) {
+      return { kind: 'renewal_date_unavailable', eventType: event_type, reason: 'unparseable_authoritative_period_end' }
+    }
+    const normalizedPeriodEnd = new Date(authoritativeMs).toISOString()
+
+    const previousPeriodEndRaw = (subscription as { current_period_end?: string | null }).current_period_end ?? null
+    // A previousPeriodEndRaw of null means this row has never recorded an
+    // authoritative period yet (missing-period recovery — see file header);
+    // duplicate/stale detection only applies once a real stored value exists
+    // to compare against. A NON-null but UNPARSEABLE stored value means the
+    // row itself holds corrupt data — never guess whether that represents a
+    // duplicate, a stale event, or a genuinely new renewal; fail closed
+    // WITHOUT mutating the row, with a reason distinct from the
+    // authoritative-side failure above so the two causes are never confused
+    // in logs/alerts.
+    let previousPeriodEndMs: number | null = null
+    if (previousPeriodEndRaw !== null) {
+      previousPeriodEndMs = parseInstantMs(previousPeriodEndRaw)
+      if (previousPeriodEndMs === null) {
+        return { kind: 'renewal_date_unavailable', eventType: event_type, reason: 'unparseable_stored_period_end' }
+      }
+    }
+
+    if (previousPeriodEndMs !== null) {
+      if (authoritativeMs === previousPeriodEndMs) {
+        return { kind: 'renewal_duplicate', eventType: event_type, periodEnd: new Date(previousPeriodEndMs).toISOString() }
+      }
+      if (authoritativeMs < previousPeriodEndMs) {
+        return {
+          kind: 'renewal_stale',
+          eventType: event_type,
+          storedPeriodEnd: new Date(previousPeriodEndMs).toISOString(),
+          reportedPeriodEnd: normalizedPeriodEnd,
+        }
+      }
+    }
+    // Persist the NORMALIZED (never raw) UTC form for both boundaries —
+    // current_period_start is the row's own previously-stored period end,
+    // re-normalized the same way, so every value this app writes to these
+    // columns is always in the same canonical shape.
+    const normalizedPreviousPeriodEnd = previousPeriodEndMs === null ? null : new Date(previousPeriodEndMs).toISOString()
+
+    // Concurrency guard — CONDITIONAL update. The WHERE clause re-checks
+    // current_period_end against the EXACT RAW value we just read (never the
+    // normalized form) — if a concurrent renewal handler already advanced
+    // this row in between, the condition matches zero rows and this handler
+    // must NOT overwrite that newer state (which would otherwise silently
+    // skip the concurrent winner's period boundary). `.select('id')` lets us
+    // tell "zero rows matched" apart from "matched and updated." (Postgres
+    // compares a timestamptz column by actual instant regardless of the
+    // literal's string form, so guarding on the raw value here is exactly as
+    // correct as the normalized value would be for the DATABASE comparison —
+    // this is deliberately the RAW value purely to guard against the EXACT
+    // row state this handler actually read, not a re-derived one.)
+    let updateQuery = admin
+      .from('subscriptions')
+      .update({ current_period_end: normalizedPeriodEnd, current_period_start: normalizedPreviousPeriodEnd })
+      .eq('id', subscription.id)
+    updateQuery = previousPeriodEndRaw === null
+      ? updateQuery.is('current_period_end', null)
+      : updateQuery.eq('current_period_end', previousPeriodEndRaw)
+    const { data: updatedRows, error: updateError } = await updateQuery.select('id')
+    if (updateError) return { kind: 'update_failed', eventType: event_type, message: updateError.message }
+    if (!updatedRows || updatedRows.length === 0) {
+      return { kind: 'renewal_conflict', eventType: event_type }
+    }
+    return { kind: 'processed', eventType: event_type }
   }
 
   switch (event_type) {
@@ -154,7 +345,14 @@ export async function processVerifiedPayPalWebhookEvent(
 /** Maps a processing outcome to the route's HTTP response — 2xx only for a
  *  successfully processed or intentionally-ignored VERIFIED event. Every
  *  fail-safe / error outcome is non-2xx so PayPal's retry can help where it
- *  can, and a human is alerted (via logs) where it can't. */
+ *  can, and a human is alerted (via logs) where it can't.
+ *  `renewal_duplicate` / `renewal_stale` are 200 (not errors): each is the
+ *  EXPECTED outcome for a duplicate/out-of-order renewal webhook,
+ *  deliberately a safe no-op rather than a failure PayPal should retry.
+ *  `renewal_conflict` is 409 — NOT the same as those two: it means a
+ *  concurrent handler raced this one and won; this exact delivery must be
+ *  RETRIED (unlike duplicate/stale, which are permanently correct no-ops),
+ *  so it must not read as success. */
 export function httpStatusForOutcome(outcome: WebhookProcessingOutcome): number {
   switch (outcome.kind) {
     case 'lookup_failed':
@@ -166,6 +364,8 @@ export function httpStatusForOutcome(outcome: WebhookProcessingOutcome): number 
       // strictly "retry will definitely fix it," but a non-2xx is what
       // keeps PayPal retrying AND keeps this from reading as success.
       return 422
+    case 'renewal_conflict':
+      return 409
     default:
       return 200
   }

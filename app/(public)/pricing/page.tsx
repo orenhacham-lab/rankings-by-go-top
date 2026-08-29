@@ -2,127 +2,56 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
+import { PLAN_CATALOG, TRIAL_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 
+const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
-
-interface Plan {
-  slug: string
-  name: string
-  description: string
-  price: string
-  originalPrice?: string
-  priceSuffix?: string
-  features: string[]
-  cta: string
-  highlighted?: boolean
-  badge?: string
+const PLAN_UI: Record<PlanCode, { name: string; description: string }> = {
+  regular: { name: 'בייסיק', description: 'פרויקט אחד, בסיס מושלם להתחלה' },
+  advanced: { name: 'מתקדם', description: 'לעסקים בצמיחה עם כמה אתרים' },
+  premium: { name: 'פרימיום', description: 'לעסקים ולסוכנויות עם צרכים מתקדמים' },
+  large_agency: { name: 'סוכנות', description: 'לסוכנויות עם הרבה לקוחות' },
 }
 
-const plans: Plan[] = [
-  {
-    slug: 'single_site',
-    name: 'Single Site',
-    description: 'אתר אחד / פרויקט יחיד',
-    price: '₪79',
-    priceSuffix: '/ חודש',
-    features: [
-      'אתר / פרויקט אחד',
-      'עד 50 מילות מפתח',
-      'עד 50 בדיקות מילות מפתח בחודש',
-      'עד 10 סריקות AI',
-      'דוחות PDF ו-Excel',
-      'Google Organic + Google Maps',
-      'תמיכה בעברית',
-    ],
-    cta: 'להתנסות חינם',
-  },
-  {
-    slug: 'boutique',
-    name: 'Boutique',
-    description: 'לעסקים בצמיחה ולמספר אתרים',
-    price: '₪199',
-    originalPrice: '₪299',
-    priceSuffix: '/ חודש',
-    features: [
-      'עד 10 אתרים / פרויקטים',
-      'עד 50 מילות מפתח לכל אתר',
-      'עד 100 בדיקות מילות מפתח בחודש לכל אתר',
-      'עד 10 סריקות AI לכל אתר',
-      'דוחות PDF ו-Excel',
-      'Google Organic + Google Maps + נראות ב-AI',
-      'מעקב מגמות מתקדם',
-      'תמיכה אישית',
-    ],
-    cta: 'להתנסות חינם',
-    highlighted: true,
-    badge: 'הכי פופולרי',
-  },
-  {
-    slug: 'agency',
-    name: 'Agency',
-    description: 'לסוכנויות ועסקים גדולים',
-    price: '₪349',
-    originalPrice: '₪449',
-    priceSuffix: '/ חודש',
-    features: [
-      'עד 25 אתרים / פרויקטים',
-      'עד 100 מילות מפתח לכל אתר',
-      'עד 200 בדיקות מילות מפתח בחודש לכל אתר',
-      'עד 20 סריקות AI לכל אתר',
-      'דוחות PDF ו-Excel',
-      'Google Organic + Google Maps + נראות ב-AI',
-      'מעקב מגמות מתקדם',
-      'תמיכה VIP',
-      'הדרכה אישית',
-    ],
-    cta: 'להתנסות חינם',
-  },
-  {
-    slug: 'large_agency',
-    name: 'Large Agency',
-    description: 'לסוכנויות עם הרבה לקוחות',
-    price: '₪799',
-    originalPrice: '₪999',
-    priceSuffix: '/ חודש',
-    features: [
-      'עד 100 אתרים / פרויקטים',
-      'עד 200 מילות מפתח לכל אתר',
-      'עד 400 בדיקות מילות מפתח בחודש לכל אתר',
-      'עד 100 סריקות AI לכל אתר',
-      'דוחות PDF ו-Excel',
-      'Google Organic + Google Maps + נראות ב-AI',
-      'מתאים לסוכנויות עם הרבה לקוחות',
-      'תמיכה VIP',
-      'הדרכה וליווי אישי',
-    ],
-    cta: 'להתנסות חינם',
-  },
-]
+/** Highlighted / "most popular" plan — a UI choice, currently pinned to Advanced. */
+const HIGHLIGHTED_PLAN: PlanCode = 'advanced'
+
+function formatILS(amount: number): string {
+  return `₪${amount.toLocaleString('he-IL')}`
+}
 
 const faqs = [
   {
-    q: 'איך עובד הניסיון החינם?',
-    a: 'אתה מקבל 7 ימי ניסיון חינם בתוכנית הניסיון, ללא צורך בכרטיס אשראי. תוכל לבדוק את כל היכולות של המערכת לפני שאתה מחליט. בתוכנית הניסיון יש לך עד 3 סריקות AI.',
+    q: 'איך עובדת מכסת המאמרים?',
+    a: 'מכסת המאמרים משותפת לכל הפרויקטים בחשבון שלך ומתחדשת בכל מחזור חיוב. מאמרים שלא נוצלו לא עוברים למחזור הבא.',
   },
   {
-    q: 'מה זה מעקב נראות ב-AI?',
-    a: 'מעקב נראות ב-AI בודק האם העסק שלך מופיע בתשובות של מנועי AI (ChatGPT, Gemini, Perplexity, Copilot, Grok, Google AI), באילו שאילתות הוא מוזכר, האם הדומיין שלך מצוטט, ואילו מקורות מופיעים בתוצאות. זה חיוני כדי להבין את נראותך בעולם ה-AI.',
+    q: 'איך נספרת "בדיקת AI"?',
+    a: 'בדיקת AI אחת היא בדיקה של שאילתה אחת במנוע AI אחד. אם אתה בודק את אותה שאילתה במספר מנועי AI (לדוגמה ChatGPT ו-Gemini), כל מנוע נספר כבדיקה נפרדת.',
+  },
+  {
+    q: 'איך נספרת "בדיקת גוגל"?',
+    a: 'בדיקת גוגל אחת היא בדיקה של מילת מפתח אחת ביעד אחד — גוגל אורגני או גוגל מפות. אם אתה בודק את אותה מילת מפתח גם באורגני וגם במפות, זה נספר כשתי בדיקות.',
+  },
+  {
+    q: 'מה ההבדל בין סריקה ידנית לסריקה אוטומטית?',
+    a: 'אפשר להריץ סריקה ידנית בכל רגע שתרצה, ואפשר גם להפעיל סריקה אוטומטית חודשית שרצה בעצמה בכל מחזור חיוב. אין כרגע אפשרות לסריקה אוטומטית יומית או שבועית — רק ידנית ואוטומטית חודשית.',
+  },
+  {
+    q: 'מה קורה כשאני יוצר מאמר חדש?',
+    a: 'יצירת מאמר חדש צורכת קרדיט אחד ממכסת המאמרים שלך. עריכה, תזמון או פרסום של מאמר קיים לא צורכים קרדיט נוסף.',
+  },
+  {
+    q: 'האם אפשר לתזמן ולפרסם מאמרים אוטומטית?',
+    a: 'כן. אפשר לתזמן מאמר לפרסום עתידי או לפרסם אותו ישירות לאתר וורדפרס או שופיפיי מחובר.',
   },
   {
     q: 'האם אפשר לשדרג או להוריד תוכנית?',
-    a: 'כן! אפשר לעבור בין תוכניות בכל זמן. השדרוג נכנס לתוקף מיידית, וירידת תוכנית מתבצעת בתחילת מחזור החיוב הבא.',
+    a: 'כן, אפשר לעבור בין תוכניות בכל זמן. השינוי נכנס לתוקף והמגבלות החדשות חלות מרגע השינוי ואילך.',
   },
   {
-    q: 'כמה סריקות AI אני מקבל בכל תוכנית?',
-    a: 'בתוכנית הניסיון: עד 3 סריקות AI. בתוכנית Regular: עד 10 סריקות AI לכל פרויקט. בתוכנית Advanced: עד 10 סריקות AI לכל פרויקט. בתוכנית Premium: עד 20 סריקות AI לכל פרויקט.',
-  },
-  {
-    q: 'מה זאת "בדיקת מילת מפתח"?',
-    a: 'בדיקת מילת מפתח = בדיקה של מילת מפתח אחת בגוגל אורגני או בגוגל מפות. לדוגמה, 10 מילות מפתח בגוגל אורגני בלבד = 10 בדיקות; אותן 10 מילים גם באורגני וגם במפות = 20 בדיקות. כל תוכנית כוללת מכסה חודשית של בדיקות מילות מפתח לכל פרויקט.',
-  },
-  {
-    q: 'מה כוללת "סריקה" של מילות מפתח?',
-    a: 'סריקה אחת בודקת את המיקום של כל מילות המפתח שהגדרת בפרויקט בגוגל אורגני ובגוגל מפות, ומפיקה דוח מלא עם המיקומים, המגמות והשינויים. כל בדיקה בפועל נספרת כ"בדיקת מילת מפתח" אחת. סריקת AI בודקת נראות בתשובות של מנועי AI השונים.',
+    q: 'איך עובד הניסיון החינם?',
+    a: `מקבלים ${TRIAL_CATALOG.days} ימי ניסיון חינם, ללא צורך בכרטיס אשראי, עם פרויקט אחד, עד ${TRIAL_CATALOG.maxKeywordsPerProject} מילות מפתח, עד ${TRIAL_CATALOG.maxGoogleChecksLifetime} בדיקות גוגל ועד ${TRIAL_CATALOG.maxAIChecksLifetime} בדיקות AI לכל אורך תקופת הניסיון, וכן מאמר אחד שנוצר על ידי AI כדי להתנסות בתהליך המלא.`,
   },
   {
     q: 'איך אני מבטל את המנוי?',
@@ -131,10 +60,6 @@ const faqs = [
   {
     q: 'האם הנתונים שלי מאובטחים?',
     a: 'בהחלט. כל הנתונים מוצפנים, מאוחסנים בשרתים מאובטחים ולא משותפים עם צדדים שלישיים. הפרטיות שלך חשובה לנו.',
-  },
-  {
-    q: 'מה ההבדל בין גוגל אורגני לגוגל מפות?',
-    a: 'גוגל אורגני בודק את המיקום שלך בתוצאות החיפוש הרגילות של גוגל. גוגל מפות בודק את המיקום בתוצאות הממוקמות גיאוגרפית — חשוב במיוחד לעסקים מקומיים.',
   },
 ]
 
@@ -176,7 +101,7 @@ export default async function PricingPage() {
                   רוצים לבדוק את המערכת לפני שמתחייבים?
                 </h3>
                 <p className="text-sm text-slate-600">
-                  התחילו 7 ימי ניסיון בחינם — ללא כרטיס אשראי.
+                  התחילו {TRIAL_CATALOG.days} ימי ניסיון בחינם — ללא כרטיס אשראי.
                 </p>
               </div>
               <Link
@@ -191,93 +116,110 @@ export default async function PricingPage() {
       )}
 
       {/* Pricing Cards */}
-      <section className="pb-20 lg:pb-28">
+      <section className="pb-12 lg:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {plans.map((plan) => (
-              <div
-                key={plan.slug}
-                className={`relative rounded-2xl ${
-                  plan.highlighted
-                    ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
-                    : 'bg-white border border-slate-200 text-slate-900 shadow-sm'
-                } p-6 lg:p-7 flex flex-col`}
-              >
-                {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold shadow-md">
-                    {plan.badge}
-                  </div>
-                )}
+            {PLAN_ORDER.map((code) => {
+              const plan = PLAN_CATALOG[code]
+              const ui = PLAN_UI[code]
+              const highlighted = code === HIGHLIGHTED_PLAN
 
-                <div className="mb-5">
-                  <h3 className={`text-xl font-bold mb-1 ${plan.highlighted ? 'text-white' : 'text-slate-900'}`}>
-                    {plan.name}
-                  </h3>
-                  <p className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                    {plan.description}
-                  </p>
-                </div>
+              const features = [
+                plan.maxProjects === 1 ? 'פרויקט אחד' : `עד ${plan.maxProjects} פרויקטים`,
+                `עד ${plan.maxKeywordsPerProject} מילות מפתח לכל פרויקט`,
+                `עד ${plan.maxGoogleChecksPerPeriodPerProject} בדיקות גוגל בכל מחזור חיוב לפרויקט`,
+                `עד ${plan.maxAIChecksPerPeriodPerProject} בדיקות AI בכל מחזור חיוב לפרויקט`,
+                `${plan.maxArticlesPerPeriodAccountWide} מאמרים בכל מחזור חיוב, משותפים לכל הפרויקטים בחשבון`,
+                'מעקב Google Organic ו-Google Maps',
+                'מעקב נראות במנועי AI',
+                'יצירה, תזמון ופרסום מאמרים לוורדפרס ולשופיפיי',
+                'דוחות PDF ו-Excel',
+                'תמיכה אישית',
+              ]
 
-                <div className="mb-6">
-                  {plan.originalPrice && (
-                    <div className={`text-sm line-through mb-1 ${plan.highlighted ? 'text-blue-200' : 'text-slate-400'}`}>
-                      {plan.originalPrice}
+              return (
+                <div
+                  key={code}
+                  className={`relative rounded-2xl ${
+                    highlighted
+                      ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 scale-100 lg:scale-105 z-10'
+                      : 'bg-white border border-slate-200 text-slate-900 shadow-sm'
+                  } p-6 lg:p-7 flex flex-col`}
+                >
+                  {highlighted && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold shadow-md">
+                      הכי פופולרי
                     </div>
                   )}
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-4xl lg:text-5xl font-extrabold ${plan.highlighted ? 'text-white' : 'text-slate-900'}`}>
-                      {plan.price}
-                    </span>
-                    {plan.priceSuffix && (
-                      <span className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
-                        {plan.priceSuffix}
-                      </span>
-                    )}
+
+                  <div className="mb-5">
+                    <h3 className={`text-xl font-bold mb-1 ${highlighted ? 'text-white' : 'text-slate-900'}`}>
+                      {ui.name}
+                    </h3>
+                    <p className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
+                      {ui.description}
+                    </p>
                   </div>
-                </div>
 
-                <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm">
-                      <span
-                        className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
-                          plan.highlighted ? 'bg-white/20' : 'bg-blue-50'
-                        }`}
-                      >
-                        <svg
-                          className={`w-3 h-3 ${plan.highlighted ? 'text-white' : 'text-blue-600'}`}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                          viewBox="0 0 24 24"
+                  <div className="mb-6">
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-4xl lg:text-5xl font-extrabold ${highlighted ? 'text-white' : 'text-slate-900'}`}>
+                        {formatILS(plan.priceILS)}
+                      </span>
+                      <span className={`text-sm ${highlighted ? 'text-blue-100' : 'text-slate-500'}`}>
+                        לחודש
+                      </span>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-3 mb-8 flex-1">
+                    {features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-sm">
+                        <span
+                          className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
+                            highlighted ? 'bg-white/20' : 'bg-blue-50'
+                          }`}
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </span>
-                      <span className={plan.highlighted ? 'text-blue-50' : 'text-slate-700'}>
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                          <svg
+                            className={`w-3 h-3 ${highlighted ? 'text-white' : 'text-blue-600'}`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={3}
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                        <span className={highlighted ? 'text-blue-50' : 'text-slate-700'}>
+                          {feature}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
 
-                <Link
-                  href={user ? '/dashboard' : `/signup?plan=${plan.slug}`}
-                  className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
-                    plan.highlighted
-                      ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
-                      : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm hover:shadow-md'
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
-              </div>
-            ))}
+                  <Link
+                    href={user ? '/dashboard' : `/signup?plan=${code}`}
+                    className={`block w-full px-5 py-3 rounded-xl text-center font-semibold text-sm transition-all ${
+                      highlighted
+                        ? 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg'
+                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    להתנסות חינם
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Usage clarification */}
+          <div className="mt-10 max-w-4xl mx-auto rounded-2xl border border-blue-100 bg-blue-50/60 px-6 py-5 text-center text-sm text-slate-600 leading-relaxed">
+            בדיקת AI אחת היא בדיקה של שאילתה אחת במנוע AI אחד. בדיקת אותה שאילתה במספר מנועים תחושב בנפרד עבור כל מנוע. מכסת המאמרים משותפת לכל הפרויקטים בחשבון ומתחדשת בכל מחזור חיוב.
           </div>
 
           {/* Comparison note */}
-          <p className="text-center text-sm text-slate-500 mt-12">
-            כל התוכניות כוללות גישה מלאה למעקב Google Organic, Google Maps ונראות ב-AI. סריקות AI מוגבלות לפי התוכנית. ביטול בכל זמן ללא קנסות.
+          <p className="text-center text-sm text-slate-500 mt-8">
+            כל התוכניות כוללות מעקב Google Organic, Google Maps ונראות ב-AI, וכן יצירה ופרסום מאמרים. המכסות משתנות לפי התוכנית. ביטול בכל זמן ללא קנסות.
           </p>
         </div>
       </section>
@@ -330,7 +272,7 @@ export default async function PricingPage() {
                 מוכן להתחיל?
               </h2>
               <p className="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
-                התחל ניסיון חינם של 7 ימים ובדוק את היכולות בעצמך
+                התחל ניסיון חינם של {TRIAL_CATALOG.days} ימים ובדוק את היכולות בעצמך
               </p>
               <Link
                 href={user ? '/dashboard' : '/signup'}

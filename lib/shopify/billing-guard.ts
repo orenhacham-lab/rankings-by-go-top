@@ -1,0 +1,113 @@
+/**
+ * Phase 2 — the CENTRAL Shopify publishing entitlement guard.
+ *
+ * This is the single choke point for "may this Shopify connection publish
+ * right now." It is called from exactly one place —
+ * `publishArticleToShopify()` in lib/shopify/publish-article.ts, the ONLY
+ * function in the codebase that performs a Shopify article create/update
+ * mutation (confirmed by inspecting every caller: the manual publish route
+ * and the automation/queue publish path both call that one function, and
+ * nothing else in the tree calls shopifyArticleCreate/shopifyArticleUpdate
+ * directly). Installing the guard there — before even the write_content
+ * scope check — means there is no direct publication path (manual,
+ * queue-triggered, cron, or retry) that can bypass it.
+ *
+ * ALWAYS revalidates live against the Shopify Partner API. The
+ * shopify_connections billing columns (shopify_plan_handle,
+ * shopify_subscription_status, etc.) are a cache/audit record this guard
+ * writes back to AFTER deciding — never a source of truth it reads from to
+ * make the decision. This module never applies to non-Shopify publish paths
+ * (WordPress has its own, unrelated flow).
+ */
+
+import type { createAdminClient } from '@/lib/supabase/admin'
+import type { ShopifyConnectionRow } from './api-auth'
+import { getActiveShopifySubscription } from './partner-client'
+import { getActiveMigration } from './paypal-migration'
+import { recordShopifyBillingCache } from './billing-cache'
+import type { ShopifyPlanHandle } from './constants'
+
+type Admin = ReturnType<typeof createAdminClient>
+
+export type ShopifyPublishDenyReason =
+  | 'shop_identity_unverified'
+  | 'paypal_migration_incomplete'
+  | 'billing_verification_unavailable'
+  | 'no_active_shopify_plan'
+
+export type ShopifyPublishEntitlementResult =
+  | { ok: true; planHandle: ShopifyPlanHandle }
+  | { ok: false; reason: ShopifyPublishDenyReason; detail?: string }
+
+const recordBillingCache = recordShopifyBillingCache
+
+/**
+ * Fail closed on every branch. `connection` must be the freshly-loaded row
+ * for the project attempting to publish (loadShopifyConnection's ownership
+ * check already happened upstream in every caller).
+ */
+export async function checkShopifyPublishEntitlement(
+  admin: Admin,
+  connection: ShopifyConnectionRow,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ShopifyPublishEntitlementResult> {
+  // 1) A connection with no verified Shop GID cannot be checked against the
+  //    Partner API at all (activeSubscription requires a real shopId). This
+  //    also covers pre-Phase-2 connections that haven't re-verified yet.
+  if (!connection.shop_gid) {
+    return { ok: false, reason: 'shop_identity_unverified', detail: 'no shop_gid on this connection; reconnect required' }
+  }
+
+  // 2) An in-progress or failed PayPal→Shopify migration means the account
+  //    must not be treated as safely entitled yet, even if Shopify itself
+  //    reports an active plan — the migration might have confirmed Shopify
+  //    but not yet safely stopped PayPal (shopify_confirmed), or the PayPal
+  //    cancellation itself failed (paypal_cancel_failed) and needs manual
+  //    attention before this account is safe to treat as fully migrated.
+  const activeMigration = await getActiveMigration(admin, connection.user_id)
+  if (activeMigration) {
+    return { ok: false, reason: 'paypal_migration_incomplete', detail: activeMigration.status }
+  }
+
+  // 3) The live, authoritative check. Every failure mode of this call is
+  //    ALREADY fail-closed (see partner-client.ts) — never treat an
+  //    unverifiable result as entitled.
+  const result = await getActiveShopifySubscription(connection.shop_gid, fetchImpl, connection.shop_domain)
+
+  if (!result.ok) {
+    await recordBillingCache(admin, connection.id, {
+      shopify_plan_handle: connection.shopify_plan_handle,
+      shopify_subscription_status: 'unknown',
+      shopify_trial_ends_at: connection.shopify_trial_ends_at,
+      shopify_current_period_end: connection.shopify_current_period_end,
+      shopify_current_period_start: connection.shopify_current_period_start,
+      shopify_cancel_at_end_of_cycle: connection.shopify_cancel_at_end_of_cycle ?? false,
+      shopify_billing_last_error: `verification_failed: ${result.reason}`,
+    })
+    return { ok: false, reason: 'billing_verification_unavailable', detail: result.reason }
+  }
+
+  if (!result.active) {
+    await recordBillingCache(admin, connection.id, {
+      shopify_plan_handle: null,
+      shopify_subscription_status: 'none',
+      shopify_trial_ends_at: null,
+      shopify_current_period_end: null,
+      shopify_current_period_start: null,
+      shopify_cancel_at_end_of_cycle: false,
+      shopify_billing_last_error: result.reason === 'unrecognized_plan_handle' ? `unrecognized_plan_handle: ${(result.rawHandles ?? []).join(',')}` : null,
+    })
+    return { ok: false, reason: 'no_active_shopify_plan', detail: result.reason }
+  }
+
+  await recordBillingCache(admin, connection.id, {
+    shopify_plan_handle: result.planHandle,
+    shopify_subscription_status: 'active',
+    shopify_trial_ends_at: result.trialEndsAt,
+    shopify_current_period_end: result.currentPeriodEnd,
+    shopify_current_period_start: result.currentPeriodStart,
+    shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle,
+    shopify_billing_last_error: null,
+  })
+  return { ok: true, planHandle: result.planHandle }
+}

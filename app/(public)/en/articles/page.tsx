@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
   title: 'SEO, Rank Tracking and AI Visibility Articles | Rankings by Go Top',
@@ -12,6 +13,10 @@ export const metadata = {
     url: 'https://www.gotopseo.com/en/articles',
     type: 'website',
     locale: 'en_US',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/articles',
+    languages: buildHreflangAlternates('/articles', '/en/articles'),
   },
 }
 
@@ -71,11 +76,11 @@ export default function EnglishArticlesPage() {
                     Rankings by Go Top
                   </div>
                   <h3 className="text-3xl lg:text-4xl font-extrabold mb-4 leading-tight">
-                    Track Your Rankings<br />in Google in Real-Time
+                    Track Your Rankings<br />in Google, Whenever You Need
                   </h3>
                   <p className="text-blue-100 text-lg mb-6 leading-relaxed">
                     Professional platform for tracking your Google organic and Google Maps rankings.
-                    Detailed reports, trend tracking and personal support.
+                    Scan on demand whenever you need, or automatically once a month. Detailed reports, trend tracking and personal support.
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <Link
@@ -96,7 +101,7 @@ export default function EnglishArticlesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     { num: '1000+', label: 'Keywords' },
-                    { num: '24/7', label: 'Continuous Monitoring' },
+                    { num: '2', label: 'Ranking Engines (Google + Maps)' },
                     { num: 'AI', label: 'Visibility Tracking' },
                     { num: '7 days', label: 'Free Trial' },
                   ].map((stat) => (

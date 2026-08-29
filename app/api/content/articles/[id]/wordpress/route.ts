@@ -25,6 +25,7 @@ import { wpCreatePost } from '@/lib/content/wordpress-publish'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { classifyWordPressError, hebrewMessageFor, httpStatusFor, safeRemoteDiagnostics, type WpFailureStage, type WpPublishErrorCode } from '@/lib/content/wordpress-error'
 import { currentGitSha, isPreviewEnv } from '@/lib/runtime-info'
+import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 
 // This route uses Node-only APIs (node:https / node:dns / node:crypto via the
 // WordPress client + credential decryption). Pin the Node runtime EXPLICITLY so a
@@ -240,6 +241,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     projectId = auth.project.id
     logStage('auth_completed')
     logStage('ownership_validated')
+
+    // Blocker D fix — publishing existing content is a "paid/product action"
+    // too, not only generation. A project with an ACTIVE Shopify connection
+    // can never reach here at all (platform exclusivity — Shopify/WordPress
+    // are mutually exclusive per project), so this specifically covers a
+    // Shopify-billing-required user's OTHER, unrelated WordPress project.
+    const billingGate = await assertContentGenerationAllowedForUser(auth.admin, auth.user.id)
+    if (!billingGate.allowed) return Response.json({ error: 'Shopify billing required', reason: billingGate.reason }, { status: 403 })
 
     // Duplicate protection. Once exported (wp_post_id present) a plain re-export is
     // ambiguous, so require an explicit intent:

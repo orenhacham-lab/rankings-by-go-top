@@ -1,3 +1,5 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+
 export const metadata = {
   title: 'עמוד אודות - Rankings by Go Top',
   description: 'גלו הכל על Rankings by Go Top - מערכת מעקב מיקומים בגוגל ונראות ב-AI המהפכנית. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI כמו ChatGPT ו-Gemini.',
@@ -6,6 +8,10 @@ export const metadata = {
     description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
     url: 'https://www.gotopseo.com/about',
     type: 'website',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/about',
+    languages: buildHreflangAlternates('/about', '/en/about'),
   },
 }
 

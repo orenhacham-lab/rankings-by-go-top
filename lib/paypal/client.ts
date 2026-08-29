@@ -11,6 +11,7 @@
  */
 
 import type { SubscriptionPlan } from '@/lib/supabase/types'
+import { normalizeInstant } from '@/lib/paypal/timestamp'
 
 const KNOWN_PLAN_CODES: readonly SubscriptionPlan[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -24,10 +25,20 @@ export function paypalApiUrl(): string {
 }
 
 /**
- * PayPal Plan ID → internal plan_code, built from the SAME env vars the
- * client-side PayPal Buttons SDK already uses to create a subscription
- * (`NEXT_PUBLIC_PAYPAL_PLAN_ID_*`). These are Plan IDs, not secrets — safe to
- * read server-side too. No new env var needed for this mapping.
+ * Phase 3 — PayPal Plan ID → internal plan_code, built from THREE families
+ * of env vars, all recognized so ANY subscription (old or new) still
+ * verifies/renews correctly:
+ *   - LEGACY (`NEXT_PUBLIC_PAYPAL_PLAN_ID_*`) — the original 4 vars, kept
+ *     unchanged. Recognized here so an already-started subscription on one
+ *     of these plan IDs keeps working, but see lib/paypal/checkout-plans.ts:
+ *     these are NEVER selected for a NEW checkout button once the new
+ *     currency-specific vars are configured — that separation lives at the
+ *     CHECKOUT SELECTION layer, not here (this function's job is only "what
+ *     plan_code does this plan_id map to," for verifying/renewing whatever
+ *     subscription PayPal reports, old or new).
+ *   - `NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_*` — new Hebrew-market checkout plans.
+ *   - `NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_*` — new English-market checkout plans.
+ * These are Plan IDs, not secrets — safe to read server-side too.
  */
 export function resolvePlanCodeFromPayPalPlanId(planId: string | null | undefined): SubscriptionPlan | null {
   if (!planId) return null
@@ -36,6 +47,14 @@ export function resolvePlanCodeFromPayPalPlanId(planId: string | null | undefine
     [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ADVANCED ?? '']: 'advanced',
     [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PREMIUM ?? '']: 'premium',
     [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_LARGE_AGENCY ?? '']: 'large_agency',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_REGULAR ?? '']: 'regular',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_ADVANCED ?? '']: 'advanced',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_PREMIUM ?? '']: 'premium',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_LARGE_AGENCY ?? '']: 'large_agency',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_REGULAR ?? '']: 'regular',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_ADVANCED ?? '']: 'advanced',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_PREMIUM ?? '']: 'premium',
+    [process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_LARGE_AGENCY ?? '']: 'large_agency',
   }
   delete map['']
   return map[planId] ?? null
@@ -63,11 +82,16 @@ export interface PayPalSubscriptionDetails {
   id: string
   status: string
   plan_id?: string
+  /** Authoritative subscription start — used as current_period_start on
+   *  first activation (Phase 3: never now()). */
+  start_time?: string
   /** Authoritative billing-cycle info — `next_billing_time` is the source of
    *  truth for `current_period_end` (Phase 1 corrective pass: previously
    *  computed locally as `current_period_end + 1 month`, which extended
-   *  again on every replay of the same webhook event). */
-  billing_info?: { next_billing_time?: string }
+   *  again on every replay of the same webhook event). `last_payment.time`
+   *  is the authoritative signal for the START of the CURRENT cycle on
+   *  renewal (Phase 3). */
+  billing_info?: { next_billing_time?: string; last_payment?: { time?: string } }
 }
 
 export async function fetchPayPalSubscription(
@@ -92,6 +116,16 @@ export type AuthoritativeNextBillingResult =
  * source of truth for a subscription's next `current_period_end` — never
  * computed locally. If PayPal has no authoritative date (e.g. a subscription
  * with no future billing cycle), this fails rather than inventing one.
+ *
+ * Corrective pass — normalized via `normalizeInstant` (parse + re-serialize
+ * to canonical UTC ISO-8601) right here, at the point this value is first
+ * extracted from PayPal's raw response — a malformed `next_billing_time`
+ * fails closed as `no_authoritative_date` (the SAME reason as a genuinely
+ * missing one — from a caller's perspective, both mean "no usable
+ * authoritative date," and this codebase never guesses which). Every caller
+ * downstream of this function therefore always receives an already-
+ * normalized, canonical timestamp — never PayPal's raw, format-inconsistent
+ * string.
  */
 export async function fetchAuthoritativeNextBillingTime(
   subscriptionId: string,
@@ -109,17 +143,72 @@ export async function fetchAuthoritativeNextBillingTime(
   } catch {
     return { ok: false, reason: 'fetch_failed' }
   }
-  const nextBillingTime = details.billing_info?.next_billing_time
+  const nextBillingTime = normalizeInstant(details.billing_info?.next_billing_time)
   if (!nextBillingTime) return { ok: false, reason: 'no_authoritative_date' }
   return { ok: true, nextBillingTime }
+}
+
+export type AuthoritativeBillingPeriodResult =
+  | { ok: true; periodEnd: string; periodStart: string | null }
+  | { ok: false; reason: 'paypal_not_configured' | 'fetch_failed' | 'no_authoritative_date' }
+
+/**
+ * Phase 3 — renewal period boundaries, NEVER a nominal +1-month calculation.
+ * `periodEnd` = PayPal's own `next_billing_time` (same authoritative source
+ * as fetchAuthoritativeNextBillingTime above). `periodStart` = PayPal's own
+ * `billing_info.last_payment.time` when present (the payment that just
+ * started the CURRENT cycle) — `null` when PayPal doesn't report it, in
+ * which case the caller (the renewal webhook) falls back to the row's
+ * PREVIOUS current_period_end, which is itself authoritative (it was set
+ * from a prior next_billing_time) and keeps periods contiguous.
+ *
+ * Corrective pass — both fields are normalized via `normalizeInstant` right
+ * here, at extraction. `periodEnd` fails the WHOLE call closed
+ * (`no_authoritative_date`) if unparseable — this is the only field this
+ * result is actually authoritative FOR. `periodStart` is informational only
+ * (see above — the renewal webhook never uses it as the period anchor), so
+ * an unparseable `last_payment.time` degrades to `null` (treated identically
+ * to PayPal simply not reporting it) rather than failing the whole fetch.
+ */
+export async function fetchAuthoritativeBillingPeriod(
+  subscriptionId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AuthoritativeBillingPeriodResult> {
+  let token: string
+  try {
+    token = await getPayPalToken(fetchImpl)
+  } catch {
+    return { ok: false, reason: 'paypal_not_configured' }
+  }
+  let details: PayPalSubscriptionDetails
+  try {
+    details = await fetchPayPalSubscription(subscriptionId, token, fetchImpl)
+  } catch {
+    return { ok: false, reason: 'fetch_failed' }
+  }
+  const periodEnd = normalizeInstant(details.billing_info?.next_billing_time)
+  if (!periodEnd) return { ok: false, reason: 'no_authoritative_date' }
+  return { ok: true, periodEnd, periodStart: normalizeInstant(details.billing_info?.last_payment?.time) }
 }
 
 /** Subscription statuses this app treats as a legitimate, activatable charge. */
 const ACCEPTABLE_ACTIVATION_STATUSES = new Set(['APPROVAL_PENDING', 'ACTIVE'])
 
 type VerifiedActivationResult =
-  | { ok: true; planCode: SubscriptionPlan }
-  | { ok: false; reason: 'paypal_not_configured' | 'paypal_verification_failed' | 'subscription_id_mismatch' | 'subscription_status_unacceptable' | 'unrecognized_paypal_plan' | 'plan_mismatch' }
+  | {
+      ok: true
+      planCode: SubscriptionPlan
+      /** Phase 3 — authoritative period boundaries from the SAME verified
+       *  fetch (no extra API call). `periodEnd` is always present when
+       *  `ok: true` (an activation with no future billing cycle at all is
+       *  treated as unresolvable — see below); `periodStart` may be null
+       *  when PayPal doesn't report `start_time` for this subscription, in
+       *  which case the caller falls back per the documented compatibility
+       *  rule (current_period_end - 1 month). */
+      periodEnd: string
+      periodStart: string | null
+    }
+  | { ok: false; reason: 'paypal_not_configured' | 'paypal_verification_failed' | 'subscription_id_mismatch' | 'subscription_status_unacceptable' | 'unrecognized_paypal_plan' | 'plan_mismatch' | 'no_authoritative_period' }
 
 /**
  * The full activation-verification gate (Phase 1 goal E). Fails closed on
@@ -128,6 +217,9 @@ type VerifiedActivationResult =
  * PayPal-verified plan_id resolving to the SAME plan_code the client submitted.
  * The returned planCode is always the server-resolved one — the caller must
  * never fall back to the raw client-submitted plan string.
+ *
+ * Phase 3 — also returns AUTHORITATIVE period boundaries (never now()/now()+1
+ * month) read from this SAME verified PayPal response.
  */
 export async function verifyPayPalActivation(
   args: { submittedSubscriptionId: string; submittedPlanCode: string; fetchImpl?: typeof fetch },
@@ -150,7 +242,53 @@ export async function verifyPayPalActivation(
   const resolvedPlanCode = resolvePlanCodeFromPayPalPlanId(details.plan_id)
   if (!resolvedPlanCode) return { ok: false, reason: 'unrecognized_paypal_plan' }
   if (resolvedPlanCode !== args.submittedPlanCode) return { ok: false, reason: 'plan_mismatch' }
-  return { ok: true, planCode: resolvedPlanCode }
+  // Corrective pass — normalized at extraction, same as
+  // fetchAuthoritativeBillingPeriod above: a malformed next_billing_time
+  // fails closed (no_authoritative_period); a malformed start_time degrades
+  // to null (treated the same as PayPal simply not reporting it — the
+  // caller already has a documented, tested fallback for a null
+  // periodStart).
+  const periodEnd = normalizeInstant(details.billing_info?.next_billing_time)
+  if (!periodEnd) return { ok: false, reason: 'no_authoritative_period' }
+  return { ok: true, planCode: resolvedPlanCode, periodEnd, periodStart: normalizeInstant(details.start_time) }
+}
+
+export type CancelSubscriptionResult =
+  | { ok: true }
+  | { ok: false; reason: 'paypal_not_configured' | 'cancel_request_failed' }
+
+/**
+ * Phase 2 — cancel a PayPal subscription's renewal via PayPal's official
+ * POST /v1/billing/subscriptions/{id}/cancel. Used by the Shopify migration
+ * state machine (lib/shopify/paypal-migration.ts) ONLY after the Partner API
+ * has already confirmed an active Shopify plan for the same account — never
+ * called speculatively. A 404/422 (already cancelled/not found) is treated
+ * as success — the goal (no further PayPal billing) is already satisfied.
+ */
+export async function cancelPayPalSubscription(
+  subscriptionId: string,
+  reason: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CancelSubscriptionResult> {
+  let token: string
+  try {
+    token = await getPayPalToken(fetchImpl)
+  } catch {
+    return { ok: false, reason: 'paypal_not_configured' }
+  }
+  try {
+    const response = await fetchImpl(`${paypalApiUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    if (response.ok || response.status === 204 || response.status === 404 || response.status === 422) {
+      return { ok: true }
+    }
+    return { ok: false, reason: 'cancel_request_failed' }
+  } catch {
+    return { ok: false, reason: 'cancel_request_failed' }
+  }
 }
 
 // ── Webhook signature verification (Phase 1 goal F) ─────────────────────────

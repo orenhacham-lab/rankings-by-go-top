@@ -1,3 +1,5 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+
 export const metadata = {
   title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי | Rankings by Go Top',
   description: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי של מומחי השיווק מהגדולים בישראל. להמשך קריאה כנסו עכשיו >>',
@@ -6,6 +8,10 @@ export const metadata = {
     description: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי של מומחי השיווק מהגדולים בישראל',
     url: 'https://www.gotopseo.com/articles',
     type: 'website',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/articles',
+    languages: buildHreflangAlternates('/articles', '/en/articles'),
   },
 }
 

@@ -15,6 +15,7 @@ import { loadPendingIdeaById, ideaToSuggestion, applyProImprovement } from '@/li
 import { improveRecommendationWithPro } from '@/lib/content/recommendations/improve-one'
 import { newRunCostController } from '@/lib/content/recommendations/run-cost-controller'
 import { BillingExhaustedError } from '@/lib/content/recommendations/model'
+import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 import { randomUUID } from 'crypto'
 
 export const runtime = 'nodejs'
@@ -29,6 +30,11 @@ export async function POST(request: Request) {
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  // Blocker D fix — central gate, before any Pro model call.
+  const gate = await assertContentGenerationAllowedForUser(auth.admin, auth.user.id)
+  if (!gate.allowed) return Response.json({ error: 'Shopify billing required', reason: gate.reason }, { status: 403 })
+
   if (!ideaId) return Response.json({ error: 'idea_required' }, { status: 400 })
 
   const row = await loadPendingIdeaById(auth.admin, auth.project.id, ideaId)

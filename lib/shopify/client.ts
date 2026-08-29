@@ -205,6 +205,25 @@ export async function testShopifyConnection(creds: ShopifyCredentials): Promise<
   }
 }
 
+/**
+ * Phase 2 — resolve the canonical Shopify Shop GID + myshopifyDomain via
+ * Admin GraphQL. Called ONCE server-side at OAuth completion; the browser
+ * never supplies a shop GID. Returns null on any failure — callers must fail
+ * closed (no shop_gid persisted) rather than guess.
+ */
+export async function getShopIdentity(creds: ShopifyCredentials): Promise<{ shopGid: string; myshopifyDomain: string } | null> {
+  const query = `{ shop { id myshopifyDomain } }`
+  try {
+    const { data } = await graphql<{ shop?: { id?: string; myshopifyDomain?: string } }>(creds, query)
+    const shopGid = data.shop?.id
+    const myshopifyDomain = data.shop?.myshopifyDomain
+    if (!shopGid || !myshopifyDomain) return null
+    return { shopGid, myshopifyDomain }
+  } catch {
+    return null
+  }
+}
+
 /** Resolve the host used to build canonical storefront URLs. */
 function resolveHost(creds: ShopifyCredentials, storefrontDomain: string | null): string {
   return storefrontDomain || creds.shopDomain

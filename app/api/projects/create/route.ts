@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
 import { buildQuotaError } from '@/lib/quota'
-import { calculateNextScanDate } from '@/lib/utils'
+import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
 
 // API Route for creating new projects
 // Replaces Server Action approach to avoid production crashes
@@ -93,7 +93,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const scanFrequency = formData.get('scan_frequency') as string
+    const rawScanFrequency = (formData.get('scan_frequency') as string) || 'manual'
+    // Phase 3 — reject weekly (and any other unsupported value) server-side,
+    // never relying solely on the DB CHECK constraint.
+    if (!isValidScanFrequency(rawScanFrequency)) {
+      return NextResponse.json({ error: 'תדירות סריקה לא נתמכת. רק "ידני" או "פעם בחודש" מותרים.' }, { status: 400 })
+    }
+    const scanFrequency = rawScanFrequency
     const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
     const nextScanAt = autoScanEnabled && scanFrequency !== 'manual'
       ? calculateNextScanDate(scanFrequency)

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { resolveCheckoutPlans, type BillingMarket } from '@/lib/paypal/checkout-plans'
 
 interface PayPalButtonsOptions {
   style: {
@@ -22,7 +23,7 @@ interface PayPalWindow extends Window {
   }
 }
 
-export default function BillingClient() {
+export default function BillingClient({ market }: { market: BillingMarket }) {
   const { language, isLoaded } = useDashboardLanguage()
   const dict = isLoaded ? getDashboardDictionary(language) : getDashboardDictionary('he')
   const t = dict.billing.paypal
@@ -35,13 +36,12 @@ export default function BillingClient() {
     const paypalWindow = window as PayPalWindow
     if (!paypalWindow.paypal) return
 
-    // Read plan IDs from env — must be real PayPal plan IDs from your account
-    const planIds: Record<string, string | undefined> = {
-      regular:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_REGULAR,
-      advanced: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ADVANCED,
-      premium:  process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PREMIUM,
-      large_agency: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_LARGE_AGENCY,
-    }
+    // Phase 3 — ONLY the market-specific checkout plan IDs are ever used for
+    // a NEW checkout button. The legacy bare NEXT_PUBLIC_PAYPAL_PLAN_ID_*
+    // vars (old prices) are NEVER read here — a missing market-specific ID
+    // fails closed (shows "unavailable"), it never falls back to the legacy
+    // ID or the other currency's ID. See lib/paypal/checkout-plans.ts.
+    const planIds: Record<string, string | undefined> = resolveCheckoutPlans(market).plans as unknown as Record<string, string | undefined>
 
     const plans = [
       { id: 'paypal-button-regular',  plan: 'regular'  },
@@ -134,7 +134,7 @@ export default function BillingClient() {
         console.error(`[PayPal] Failed to render button for plan "${plan}":`, error)
       }
     }
-  }, [t])
+  }, [t, market])
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID

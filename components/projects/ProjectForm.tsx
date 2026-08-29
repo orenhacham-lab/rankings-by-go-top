@@ -31,7 +31,8 @@ export default function ProjectForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [autoScan, setAutoScan] = useState(project?.auto_scan_enabled ?? false)
-  const [scanFreq, setScanFreq] = useState<'manual' | 'weekly' | 'monthly' | 'monthly_first_day'>(
+  // Phase 3 — weekly and monthly_first_day removed; only manual/monthly remain.
+  const [scanFreq, setScanFreq] = useState<'manual' | 'monthly'>(
     project?.scan_frequency || 'manual'
   )
   const [country, setCountry] = useState(project?.country || 'IL')
@@ -193,14 +194,12 @@ export default function ProjectForm({
           name="scan_frequency"
           value={scanFreq}
           onChange={(e) => {
-            setScanFreq(e.target.value as 'manual' | 'weekly' | 'monthly' | 'monthly_first_day')
+            setScanFreq(e.target.value as 'manual' | 'monthly')
             if (e.target.value === 'manual') setAutoScan(false)
           }}
           options={[
             { value: 'manual', label: f.scanFreqManual },
-            { value: 'weekly', label: f.scanFreqWeekly },
             { value: 'monthly', label: f.scanFreqMonthly },
-            { value: 'monthly_first_day', label: f.scanFreqMonthlyFirstDay },
           ]}
         />
 

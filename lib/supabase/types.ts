@@ -270,10 +270,14 @@ export interface Project {
   city: string | null
   device_type: 'desktop' | 'mobile' | null
   is_active: boolean
-  scan_frequency: 'manual' | 'weekly' | 'monthly' | 'monthly_first_day'
+  // Phase 3 — 'weekly' and 'monthly_first_day' removed; existing rows are
+  // migrated to 'monthly' (supabase/migrations/20260829000000_add_usage_reservations_and_billing_periods.sql).
+  scan_frequency: 'manual' | 'monthly'
   auto_scan_enabled: boolean
   next_scan_at: string | null
   last_scan_at: string | null
+  scan_claimed_at: string | null
+  scan_retry_count: number
   created_at: string
   updated_at: string
   // joins

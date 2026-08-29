@@ -10,6 +10,23 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
+// 3rd review correction — every generateContent() call anywhere in the app
+// that uses this shared client (here, gemini-article.ts, gemini-image.ts,
+// gemini-topics.ts) MUST pass this as its requestOptions.timeout. The
+// @google/generative-ai SDK has no default request timeout of its own — an
+// un-bounded call could in principle hang far longer than the 30-minute
+// usage_reservations TTL or the 60-minute scan-claim lease, letting a worker
+// stay "alive" past its reservation's expiry and later act as a stale caller
+// against a row a recovering worker has since reused. 60s matches the other
+// provider timeouts in this codebase (SCRAPELLM_TIMEOUT_MS, GENAI_TIMEOUT_MS
+// in lib/content/recommendations/model.ts) and is materially shorter than
+// both windows even across the up-to-2 retry attempts in
+// generateValidatedArticle. A timed-out request may still have reached
+// Gemini server-side (AbortSignal only cancels the CLIENT side) — this is a
+// narrow, already-accepted duplicate-provider-cost risk, never a duplicate
+// CHARGE (the reservation ledger only ever consumes once per token).
+export const GEMINI_REQUEST_TIMEOUT_MS = 60_000
+
 export type EntityType =
   | 'product'
   | 'service'
@@ -94,7 +111,7 @@ export async function classifyKeywordsWithGemini(
     const genAI = client
     const modelInstance = genAI.getGenerativeModel({ model })
 
-    const result = await modelInstance.generateContent(prompt)
+    const result = await modelInstance.generateContent(prompt, { timeout: GEMINI_REQUEST_TIMEOUT_MS })
     const responseText = result.response.text()
 
     // Parse JSON response
@@ -601,7 +618,7 @@ Return ONLY JSON (no other text):
     const genAI = client
     const modelInstance = genAI.getGenerativeModel({ model })
 
-    const result = await modelInstance.generateContent(`${systemPrompt}\n\n${userPrompt}`)
+    const result = await modelInstance.generateContent(`${systemPrompt}\n\n${userPrompt}`, { timeout: GEMINI_REQUEST_TIMEOUT_MS })
     const responseText = result.response.text()
 
     // Parse JSON response
@@ -775,7 +792,7 @@ export async function reviewAndRepairQuestions(
     const genAI = client
     const modelInstance = genAI.getGenerativeModel({ model })
 
-    const result = await modelInstance.generateContent(prompt)
+    const result = await modelInstance.generateContent(prompt, { timeout: GEMINI_REQUEST_TIMEOUT_MS })
     const responseText = result.response.text()
 
     // Parse JSON response

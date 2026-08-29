@@ -13,7 +13,7 @@
 
 import { GoogleGenAI } from '@google/genai'
 import sharp from 'sharp'
-import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 
 export interface GeneratedImage {
   data: Buffer
@@ -151,7 +151,9 @@ export async function writeCommercialSafeConcept(input: {
 
   try {
     const model = client.getGenerativeModel({ model: modelName })
-    const res = await model.generateContent(prompt)
+    // 3rd review correction — bounded provider timeout; see
+    // GEMINI_REQUEST_TIMEOUT_MS's definition for the full rationale.
+    const res = await model.generateContent(prompt, { timeout: GEMINI_REQUEST_TIMEOUT_MS })
     const text = (res.response.text() || '').trim().replace(/^["'\s]+|["'\s]+$/g, '')
     if (!text || text.length < 8) return fallback()
     return text
@@ -180,7 +182,11 @@ export async function generateArticleImage(input: {
 
   let ai: GoogleGenAI
   try {
-    ai = new GoogleGenAI({ apiKey })
+    // 3rd review correction — httpOptions.timeout bounds EVERY HTTP request
+    // this client instance makes (each candidate model's interactions.create
+    // call below included) to GEMINI_REQUEST_TIMEOUT_MS. See that constant's
+    // definition for the full rationale.
+    ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: GEMINI_REQUEST_TIMEOUT_MS } })
   } catch {
     return { error: 'gemini_init_failed' }
   }

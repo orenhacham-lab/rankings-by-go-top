@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isKnownPlanCode, verifyPayPalActivation } from '@/lib/paypal/client'
 import { transitionSubscriptionToActivePlan } from '@/lib/paypal/activation-processing'
+import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
+import { hasPendingShopifyLinkCookie } from '@/lib/shopify/pending-link'
 
 /**
  * Phase 1 hardening (goal E): activation is NEVER granted on client-submitted
@@ -41,6 +43,23 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
+    // Phase 2 (blocker fix) — defense-in-depth against the FULL
+    // billing-provider state machine, not just a "connected" store: blocked
+    // by a connected Shopify store, an unresolved PayPal→Shopify migration,
+    // OR a pending Shopify install/link in THIS browser (a merchant mid
+    // Shopify install who opens /billing in another tab, before any
+    // project/user link exists yet, must not be able to slip through here).
+    // Never decided by referrer, UTM, or any other client-supplied signal.
+    const admin = createAdminClient()
+    if (await isShopifyBillingRequiredForUser(admin, user.id)) {
+      console.warn('[paypal-activate] blocked: user is Shopify-governed', { userId: user.id })
+      return Response.json({ error: 'Shopify billing required', reason: 'shopify_store_connected' }, { status: 403 })
+    }
+    if (hasPendingShopifyLinkCookie(request)) {
+      console.warn('[paypal-activate] blocked: pending Shopify install/link in this browser', { userId: user.id })
+      return Response.json({ error: 'Shopify billing required', reason: 'shopify_link_pending' }, { status: 403 })
+    }
+
     // Mandatory server-side verification — no env-gated skip, no "continue
     // anyway" on failure. Every branch here fails closed: nothing is written
     // to the database unless PayPal itself confirms the exact subscription id,
@@ -51,20 +70,17 @@ export async function POST(request: Request) {
       return Response.json({ error: 'PayPal verification failed', reason: verified.reason }, { status: 400 })
     }
 
-    // Matches the REAL schema (plan_code, no current_period_start/
-    // scans_this_period/scans_period_key columns). trial_ends_at is
-    // intentionally omitted (NULL): a paid active row has no trial end, and
-    // the column is nullable as of the Phase-1 migration.
-    const now = new Date()
-    const periodEnd = new Date(now)
-    periodEnd.setMonth(periodEnd.getMonth() + 1)
-
-    const admin = createAdminClient()
+    // Phase 3 — current_period_end/current_period_start are the AUTHORITATIVE
+    // values PayPal itself reported in the SAME verified fetch above — never
+    // now()/now()+1 month. trial_ends_at is intentionally omitted (NULL): a
+    // paid active row has no trial end, and the column is nullable as of the
+    // Phase-1 migration.
     const result = await transitionSubscriptionToActivePlan(admin, user.id, {
       plan_code: verified.planCode,
       status: 'active',
       paypal_subscription_id: subscriptionId,
-      current_period_end: periodEnd.toISOString(),
+      current_period_end: verified.periodEnd,
+      current_period_start: verified.periodStart,
     })
 
     if (result.kind === 'lookup_failed') {

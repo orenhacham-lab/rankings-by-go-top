@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Search, TrendingUp, Target, PieChart, Zap, Check } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'Keyword Research | Rankings by Go Top',
   description: 'Discover keyword ideas with Google Ads data. Check search volume, competition, and CPC estimates. Add keywords directly to rank tracking and AI questions.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/features/keyword-research',
+    languages: buildHreflangAlternates(
+      '/features/keyword-research',
+      '/en/features/keyword-research'
+    ),
+  },
 }
 
 export default function KeywordResearchFeaturePage() {

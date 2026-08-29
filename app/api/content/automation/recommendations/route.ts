@@ -31,6 +31,7 @@ import { domainFlags } from '@/lib/content/recommendations/domain-flags'
 import { BillingExhaustedError, RecommendationModelUnavailableError } from '@/lib/content/recommendations/model'
 import { classifyRecoRun } from '@/lib/content/recommendations/run-classify'
 import { runtimeInfo } from '@/lib/runtime-info'
+import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 import { randomUUID } from 'crypto'
 
 // Node runtime (uses node:crypto for run ids + SHA-256 domain fingerprints).
@@ -94,6 +95,13 @@ export async function POST(request: Request) {
 
   const auth = await authContentProject(projectId)
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
+
+  // Blocker D fix — central gate for the ENTIRE recommendation/topic-idea
+  // engine (every variant below funnels through generateRecommendationJSON,
+  // a pure DB-free function shared by 7 callers — this route is the
+  // narrowest shared point with project/DB context). Before any model call.
+  const gate = await assertContentGenerationAllowedForUser(auth.admin, auth.user.id)
+  if (!gate.allowed) return Response.json({ error: 'Shopify billing required', reason: gate.reason }, { status: 403 })
 
   // FAIL-CLOSED (Scope 1): a REQUESTED dry run that could not be honored (isolation
   // diagnostics disabled OR Production) must NEVER silently continue as a normal,

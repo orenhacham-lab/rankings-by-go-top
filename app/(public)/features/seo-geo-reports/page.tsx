@@ -3,10 +3,18 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { FileText, BarChart2, TrendingUp, Share2, Clock, Zap, Award } from 'lucide-react'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata: Metadata = {
   title: 'דוחות SEO/GEO מקצועיים | Rankings by Go Top',
   description: 'הפיקו דוחות PDF ו-Excel פרופסיונליים עם דירוגים, מגמות, תחרות ונראות AI. דוחות ללקוחות ודירוגים בלחיצת כפתור.',
+  alternates: {
+    canonical: 'https://www.gotopseo.com/features/seo-geo-reports',
+    languages: buildHreflangAlternates(
+      '/features/seo-geo-reports',
+      '/en/features/seo-geo-reports'
+    ),
+  },
 }
 
 export default function SEOGeoReportsFeaturePage() {

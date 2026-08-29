@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { calculateNextScanDate } from '@/lib/utils'
+import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
 import { getUserEntitlement } from '@/lib/subscription'
 import { deleteOwnedRecord, type DeleteOwnedResult } from '@/lib/data/delete-owned-record'
 
@@ -30,7 +30,13 @@ export async function createProjectAction(formData: FormData) {
     }
   }
 
-  const scanFrequency = formData.get('scan_frequency') as string
+  const rawScanFrequency = (formData.get('scan_frequency') as string) || 'manual'
+  // Phase 3 — reject weekly (and any other unsupported value) server-side,
+  // never relying solely on the DB CHECK constraint.
+  if (!isValidScanFrequency(rawScanFrequency)) {
+    throw new Error('תדירות סריקה לא נתמכת. רק "ידני" או "פעם בחודש" מותרים.')
+  }
+  const scanFrequency = rawScanFrequency
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
   const nextScanAt = autoScanEnabled && scanFrequency !== 'manual'
     ? calculateNextScanDate(scanFrequency)
@@ -61,7 +67,11 @@ export async function createProjectAction(formData: FormData) {
 export async function updateProjectAction(id: string, formData: FormData) {
   const supabase = await createClient()
 
-  const scanFrequency = formData.get('scan_frequency') as string
+  const rawScanFrequency = (formData.get('scan_frequency') as string) || 'manual'
+  if (!isValidScanFrequency(rawScanFrequency)) {
+    throw new Error('תדירות סריקה לא נתמכת. רק "ידני" או "פעם בחודש" מותרים.')
+  }
+  const scanFrequency = rawScanFrequency
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
 
   const data = {
