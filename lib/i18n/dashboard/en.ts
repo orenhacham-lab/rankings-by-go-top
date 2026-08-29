@@ -2520,5 +2520,9 @@ export const dashboardEn = {
       migrationPending: 'We’re finishing linking your billing to Shopify. This can take a moment — refresh this page shortly.',
       migrationNeedsAttention: 'Your Shopify plan is active, but we’re still finalizing your previous billing. If this doesn’t resolve on its own, contact us.',
     },
+    admin: {
+      title: 'Admin account — full access',
+      description: 'This account has full access to the system and does not require a billing plan.',
+    },
   },
 } as const

@@ -8,6 +8,7 @@ import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { billingMarketFromLocale } from '@/lib/paypal/checkout-plans'
 import BillingView from './BillingView'
+import AdminBillingView from './AdminBillingView'
 
 export default async function BillingPage() {
   const supabase = await createClient()
@@ -18,6 +19,18 @@ export default async function BillingPage() {
   }
 
   const entitlement = await getUserEntitlement(user.id, supabase)
+
+  // Hotfix — admin users bypass ALL billing-provider governance and
+  // presentation. Checked FIRST, before any Shopify connection / migration /
+  // PayPal / billing-market query — an admin's own Shopify store (kept
+  // connected for testing/publishing) must never surface Shopify-managed
+  // billing wording or a "Manage plan in Shopify" action, and
+  // entitlement.plan being the internal 'premium' stand-in (used only to
+  // grant full product limits — see lib/subscription.ts) must never be
+  // displayed as if it were a real subscribed plan.
+  if (entitlement.isAdmin) {
+    return <AdminBillingView />
+  }
 
   const { data: activeSub } = await supabase
     .from('subscriptions')
