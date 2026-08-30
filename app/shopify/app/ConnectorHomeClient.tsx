@@ -62,6 +62,39 @@ export default function ConnectorHomeClient() {
   const [state, setState] = useState<'loading' | 'no_app_bridge' | 'auth_failed' | 'error' | 'ready'>('loading')
   const [data, setData] = useState<AppHomeData | null>(null)
   const [managePlanBusy, setManagePlanBusy] = useState(false)
+  const [installBusy, setInstallBusy] = useState(false)
+  const [installError, setInstallError] = useState<string | null>(null)
+
+  /**
+   * First-time setup under Shopify-managed installation. Sends a FRESH App
+   * Bridge session token to /api/shopify/embedded-install, which verifies it
+   * and exchanges it server-side for an offline access token — there is no
+   * authorization redirect, so nothing is ever navigated to Shopify and
+   * nothing can be blocked by iframe framing rules.
+   *
+   * `next` is an internal path chosen by the server (never a URL from this
+   * client), so this cannot become an open redirect. It is opened top-level
+   * because /shopify/link signs the merchant in to Rankings, which needs a
+   * first-party context.
+   */
+  const startEmbeddedInstall = async () => {
+    setInstallError(null)
+    setInstallBusy(true)
+    try {
+      const bridge = await waitForAppBridge()
+      if (!bridge) { setInstallError('Please open this app from Shopify Admin.'); setInstallBusy(false); return }
+      const token = await bridge.idToken()
+      const res = await fetch('/api/shopify/embedded-install', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) { setInstallError('We couldn’t finish setting up this store. Please try again.'); setInstallBusy(false); return }
+      const json = (await res.json()) as { alreadyConnected?: boolean; next?: string | null }
+      if (json.alreadyConnected) { setInstallBusy(false); retry(); return }
+      if (json.next) navigateTopLevel(`${data?.appUrl ?? ''}${json.next}`)
+      else setInstallBusy(false)
+    } catch {
+      setInstallError('We couldn’t finish setting up this store. Please try again.')
+      setInstallBusy(false)
+    }
+  }
 
   // Phase 2 (blocker fix) — never a pre-built Shopify URL: fetches a FRESH
   // App Bridge session token (recommended to re-fetch per request rather
@@ -138,11 +171,12 @@ export default function ConnectorHomeClient() {
       <Centered>
         <h2 style={{ marginBottom: 8 }}>Connect this store to Rankings</h2>
         <p style={{ color: '#616161', marginBottom: 16 }}>
-          This store ({data.shopDomain}) isn&apos;t linked to a Rankings account yet. Log in (or sign up) on the
-          Rankings dashboard, then connect this Shopify store from your project&apos;s integration settings.
+          This store ({data.shopDomain}) isn&apos;t linked to a Rankings project yet. Continue to finish setting it
+          up — you&apos;ll sign in (or sign up) and choose which project to publish to.
         </p>
-        <button onClick={() => navigateTopLevel(`${data.appUrl}/login`)} style={buttonStyle}>
-          Go to Rankings login
+        {installError && <p style={{ color: '#b71c1c', fontSize: 13, marginBottom: 12 }}>{installError}</p>}
+        <button onClick={startEmbeddedInstall} disabled={installBusy} style={buttonStyle}>
+          {installBusy ? 'Setting up…' : 'Continue setup'}
         </button>
       </Centered>
     )

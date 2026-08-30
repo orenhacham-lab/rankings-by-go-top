@@ -190,9 +190,15 @@ async function main() {
   console.log('\n10) EMBEDDED ENTRY FLOW — /shopify/app accepts Shopify\'s embedded launch params')
   {
     const page = read('app/shopify/app/page.tsx')
-    check('10a: it reads searchParams (so a launch query reaches it at all)', /searchParams/.test(page))
-    check('10b: it uses ONLY `shop` from the query — the other embedded params (embedded, host, id_token, session, hmac, timestamp) are simply carried, never required',
-      /params\.shop/.test(page) && !/params\.(embedded|id_token|host|session)\b/.test(page))
+    // Updated by the managed-install fix: the page now makes NO decision from
+    // the query string at all. Shopify's embedded launch params (embedded,
+    // host, id_token, session, shop, timestamp, hmac) are simply ignored here
+    // and the connected/not-connected state is driven entirely by the VERIFIED
+    // App Bridge session token, which is strictly stronger than reading `shop`.
+    check('10a: it consumes NO query parameter (nothing unverified can steer this page)',
+      !/searchParams/.test(page) && !/params\.shop/.test(page))
+    check('10b: consequently no embedded launch param is required for it to render',
+      !/params\.(embedded|id_token|host|session|hmac|timestamp)\b/.test(page))
     check('10c: real identity still comes from the verified App Bridge session token, not the query',
       /<ConnectorHomeClient \/>/.test(page))
     const client = read('app/shopify/app/ConnectorHomeClient.tsx')

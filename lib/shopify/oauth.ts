@@ -236,10 +236,76 @@ export function verifyNonceCookie(value: string | undefined | null, secret: stri
   return crypto.timingSafeEqual(a, b) ? nonce : null
 }
 
+/* ------------------------------------------------------------------------- *
+ * Token exchange (Shopify-managed installation).
+ *
+ * With `use_legacy_install_flow` absent/false in shopify.app.toml, Shopify
+ * MANAGES installation: it grants scopes itself and never calls this app's
+ * OAuth callback during install. The documented way for an embedded app to
+ * obtain an access token in that model is to exchange the App Bridge session
+ * token (id_token) — there is no authorization redirect at all, which is
+ * precisely why it cannot put Shopify's authorize screen inside the Admin
+ * iframe.
+ *
+ * Constants and request shape mirror Shopify's own implementation
+ * (@shopify/shopify-api, lib/auth/oauth/token-exchange.ts) exactly.
+ * ------------------------------------------------------------------------- */
+
+export const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange'
+export const TOKEN_EXCHANGE_SUBJECT_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id_token'
+/** OFFLINE, not online: this app stores a long-lived token for background
+ *  publishing, so it must request the offline token type. */
+export const TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE = 'urn:shopify:params:oauth:token-type:offline-access-token'
+
+/**
+ * Exchange a VERIFIED App Bridge session token for an OFFLINE access token.
+ *
+ * The caller MUST have already verified the session token
+ * (lib/shopify/session-token.ts) and MUST pass the shop domain that
+ * verification returned — never a shop taken from a query parameter. Shopify
+ * independently rejects a session token that doesn't match the shop, but this
+ * function is not the place that decides identity.
+ *
+ * Returns the offline token + granted scope string. Throws on any failure so
+ * the caller fails closed; never logs the token, the session token, or the
+ * secret.
+ */
+export async function exchangeSessionTokenForOfflineToken(opts: {
+  shop: string
+  sessionToken: string
+  clientId: string
+  clientSecret: string
+  fetchImpl?: typeof fetch
+}): Promise<{ accessToken: string; scope: string }> {
+  const doFetch = opts.fetchImpl ?? fetch
+  const res = await doFetch(`https://${opts.shop}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      client_id: opts.clientId,
+      client_secret: opts.clientSecret,
+      grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
+      subject_token: opts.sessionToken,
+      subject_token_type: TOKEN_EXCHANGE_SUBJECT_TOKEN_TYPE,
+      requested_token_type: TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE,
+    }),
+    redirect: 'error',
+  })
+  if (!res.ok) throw new Error(`token_exchange_http_${res.status}`)
+  const json = (await res.json().catch(() => null)) as { access_token?: string; scope?: string } | null
+  if (!json || typeof json.access_token !== 'string' || !json.access_token) throw new Error('token_exchange_no_token')
+  return { accessToken: json.access_token, scope: typeof json.scope === 'string' ? json.scope : '' }
+}
+
 /**
  * Exchange the authorization code for an OFFLINE access token. Returns the token
  * + the space/comma-separated granted scope string. Throws on failure (caller
  * maps to a token_exchange_failed redirect). Never logs the token/secret.
+ *
+ * Still used by the NON-embedded, dashboard-initiated connect flow
+ * (/api/shopify/oauth/start → Shopify authorize → callback), which runs
+ * top-level in an ordinary browser tab and is unaffected by iframe framing
+ * rules. The embedded install path uses token exchange above instead.
  */
 export async function exchangeCodeForToken(opts: {
   shop: string

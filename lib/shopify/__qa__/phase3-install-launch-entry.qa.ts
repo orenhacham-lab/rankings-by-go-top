@@ -219,7 +219,14 @@ async function main() {
   console.log('\n12) app/shopify/app/page.tsx — UNCHANGED: still the correct, safe existence-check entry point (defense in depth, still reachable directly too)')
   {
     const embeddedSrc = read('app/shopify/app/page.tsx')
-    check('12: still redirects to /api/shopify/install when the shop is not yet connected', /redirect\(`\/api\/shopify\/install\?shop=/.test(embeddedSrc))
+    // Updated by the managed-install fix: this server redirect was the exact
+    // iframe-hostile step (it led to Shopify's authorize screen, which cannot
+    // be framed). Under Shopify-managed installation the unconnected case is
+    // handled client-side by /api/shopify/embedded-install (token exchange),
+    // so the redirect must be GONE — see
+    // lib/shopify/__qa__/phase3-managed-install-token-exchange.qa.ts.
+    check('12: no longer server-redirects to /api/shopify/install (that redirect could not be framed)',
+      !/redirect\(`\/api\/shopify\/install\?shop=/.test(embeddedSrc))
     check('12: still renders ConnectorHomeClient for the normal (connected or unknown-shop) case', /<ConnectorHomeClient \/>/.test(embeddedSrc))
   }
 
