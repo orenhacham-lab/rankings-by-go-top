@@ -1,0 +1,82 @@
+# Shopify public app configuration — "Go Top SEO".
+#
+# client_id is the "Go Top SEO" PUBLIC app's Client ID — the same value as
+# SHOPIFY_PUBLIC_CLIENT_ID in Vercel, and the app's PUBLIC API key (it is
+# rendered in the `shopify-api-key` meta tag for every merchant to see). It is
+# NEVER a secret; the matching SHOPIFY_PUBLIC_CLIENT_SECRET is server-only and
+# appears nowhere in this file. Do NOT use the legacy custom app's
+# SHOPIFY_CLIENT_ID here.
+#
+# It is set MANUALLY and must stay that way. Do NOT run `shopify app config
+# link`: that command rewrites this file from the LIVE remote app version, and
+# the live version still carries `embedded = false` and the bare-root
+# application_url — so linking would silently undo the embedded-app fix below.
+# Do NOT link/deploy over the old custom app.
+#
+# Scopes are minimal: only what publishing needs (read products/content + write
+# content). NO customer / order / staff / contributor scopes are requested — the
+# mandatory GDPR compliance webhooks require no scopes.
+#
+# EMBEDDED-APP FIX (production evidence: the active app version had
+# embedded = false and application_url = https://www.gotopseo.com). With
+# embedded = false Shopify opens the app in a TOP-LEVEL browser tab instead of
+# the Admin iframe, so App Bridge never injects `window.shopify`, the connector
+# home can never obtain a session token, and it renders
+# "This page must be opened from within Shopify Admin." — which is exactly what
+# production showed after a successful, correctly-signed launch.
+#
+# Two changes fix that, and nothing else in this file is altered:
+#   * embedded = true          → Shopify loads the app inside the Admin iframe
+#                                and sends the embedded launch params
+#                                (embedded=1, host, id_token, session, shop,
+#                                timestamp, hmac). App Bridge then initializes
+#                                against the `shopify-api-key` meta tag rendered
+#                                by app/shopify/app/layout.tsx, which resolves to
+#                                SHOPIFY_PUBLIC_CLIENT_ID via
+#                                getShopifyAppClientId() (lib/shopify/oauth.ts).
+#   * application_url          → points straight at the embedded entry point
+#                                /shopify/app, rather than the marketing root.
+#
+# The signed-launch detection at `/` (app/page.tsx) is deliberately KEPT as a
+# safe fallback for any launch Shopify still sends to the bare root — it is not
+# removed by this change.
+#
+# Framing is already permitted for exactly this path: next.config.ts sets
+# `Content-Security-Policy: frame-ancestors https://admin.shopify.com
+# https://*.myshopify.com` on /shopify/app/:path* and nowhere else.
+
+name = "Go Top SEO"
+client_id = "64ea5778fd1e44656b5ac7f0605799e8" # = SHOPIFY_PUBLIC_CLIENT_ID (public API key, not a secret)
+application_url = "https://www.gotopseo.com/shopify/app"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,read_content,write_content"
+
+[auth]
+redirect_urls = [
+  "https://www.gotopseo.com/api/shopify/oauth/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+# Mandatory GDPR / compliance webhooks (HMAC-verified with the public app secret).
+[[webhooks.subscriptions]]
+compliance_topics = [
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact"
+]
+uri = "https://www.gotopseo.com/api/shopify/webhooks/compliance"
+
+# Normal webhook (NOT a compliance topic): clean up the token when a merchant
+# uninstalls. Kept as a separate subscription from the compliance topics above.
+[[webhooks.subscriptions]]
+topics = [ "app/uninstalled" ]
+uri = "https://www.gotopseo.com/api/shopify/webhooks/app-uninstalled"
+
+# POS embedding is a separate surface from Admin embedding above and stays off —
+# this is not a POS app.
+[pos]
+embedded = false

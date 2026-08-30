@@ -1,6 +1,3 @@
-import { redirect } from 'next/navigation'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { normalizeShopDomain } from '@/lib/shopify/domain'
 import ConnectorHomeClient from './ConnectorHomeClient'
 
 /**
@@ -9,41 +6,24 @@ import ConnectorHomeClient from './ConnectorHomeClient'
  * Shopify opens on every install AND every reopen, with no distinction
  * between the two beyond the `shop` query param.
  *
- * The ONLY thing this server component does with `shop` is a non-privileged
- * "have we ever completed OAuth for this shop" existence check, to decide
- * whether to kick off installation (blocker fix — see
- * app/api/shopify/install/route.ts) before rendering anything. This is safe
- * to base on an unverified query param because it decides nothing
- * privileged: worst case a spoofed `shop` either shows the connect flow for
- * a shop that isn't real, or redirects to Shopify's OWN authorize screen for
- * that domain (which Shopify itself will reject if it doesn't exist) — no
- * entitlement or data is read or granted here. Real identity for everything
- * that follows comes from ConnectorHomeClient's verified App Bridge session
- * token (see lib/shopify/session-token.ts), never from this param.
+ * This server component makes NO decision from the query string at all — it
+ * renders the client shell and nothing else. Real identity, the connected/
+ * not-connected state, and first-time installation are all driven by
+ * ConnectorHomeClient from a VERIFIED App Bridge session token (see
+ * lib/shopify/session-token.ts), never from an unverified `shop` param.
+ *
+ * Embedded-app fix: this page previously read `shop` and, when no connected
+ * row existed, server-redirected to /api/shopify/install — which redirects to
+ * https://{shop}/admin/oauth/authorize, a page Shopify refuses to let anyone
+ * frame. Under `embedded = true` that ran INSIDE the Admin iframe and rendered
+ * a blocked frame, so a brand-new merchant could never install. Shopify-managed
+ * installation removes the authorization redirect entirely: the client calls
+ * /api/shopify/embedded-install, which exchanges the session token for an
+ * offline access token server-side. Nothing navigates to Shopify, so nothing
+ * can be framed. The authorization-code flow remains for the non-embedded,
+ * dashboard-initiated connect path, which runs top-level in a normal tab.
  */
-export default async function ShopifyAppHomePage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>
-}) {
-  const params = await searchParams
-  const shopRaw = typeof params.shop === 'string' ? params.shop : ''
-  const shop = normalizeShopDomain(shopRaw)
-
-  if (shop) {
-    const admin = createAdminClient()
-    const { data } = await admin
-      .from('shopify_connections')
-      .select('id')
-      .eq('shop_domain', shop)
-      .eq('connection_status', 'connected')
-      .limit(1)
-      .maybeSingle()
-    if (!data) {
-      redirect(`/api/shopify/install?shop=${encodeURIComponent(shop)}`)
-    }
-  }
-
+export default async function ShopifyAppHomePage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f6f6f7', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <ConnectorHomeClient />
