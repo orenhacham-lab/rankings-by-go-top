@@ -6,8 +6,13 @@
  * secret. This is DIFFERENT from the OAuth callback HMAC (query-string, hex,
  * sorted params) in lib/shopify/oauth.ts — do not use that verifier for webhooks.
  *
- * Security: reads ONLY `SHOPIFY_CLIENT_SECRET` (the same app secret the OAuth flow
- * uses). Never logs the secret, the header, the raw body, or any digest.
+ * Security: reads ONLY `SHOPIFY_CLIENT_SECRET` — the LEGACY custom app's secret.
+ * This is deliberate and unchanged: this base route serves the legacy custom app's
+ * webhooks. The PUBLIC "Go Top SEO" app's compliance webhooks verify with
+ * SHOPIFY_PUBLIC_CLIENT_SECRET via lib/shopify/webhook-public.ts, and the public
+ * app's OAuth/app-launch/session-token flows resolve their credentials through
+ * getShopifyOAuthConfig() (which prefers the public pair). Never logs the secret,
+ * the header, the raw body, or any digest.
  */
 
 import crypto from 'crypto'

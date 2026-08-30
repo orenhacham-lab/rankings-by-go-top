@@ -160,7 +160,7 @@ export async function GET(request: Request) {
   // 2) Shop must normalize to a valid *.myshopify.com host.
   const shop = normalizeShopDomain(params.shop || '')
   if (!shop) {
-    console.warn('[Shopify OAuth] invalid shop', { route: 'shopify_oauth_callback', receivedShop: params.shop ?? null, normalizedShop: null, reason: 'invalid_shop' })
+    console.warn('[Shopify OAuth] invalid shop', { route: 'shopify_oauth_callback', shopParamPresent: Boolean(params.shop), reason: 'invalid_shop' })
     return fail('invalid_shop')
   }
 
@@ -169,12 +169,12 @@ export async function GET(request: Request) {
     return await completePreAuthInstall(admin, pst, params, config, nonceCookieRaw)
   }
   if (!st) {
-    console.warn('[Shopify OAuth] state not found', { route: 'shopify_oauth_callback', receivedShop: params.shop ?? null, normalizedShop: shop, reason: 'invalid_state' })
+    console.warn('[Shopify OAuth] state not found', { route: 'shopify_oauth_callback', reason: 'invalid_state' })
     return generic('invalid_state')
   }
   // 4) The callback shop must match the shop the flow started with.
   if (st.shop_domain !== shop) {
-    console.warn('[Shopify OAuth] shop mismatch', { route: 'shopify_oauth_callback', receivedShop: params.shop ?? null, normalizedShop: shop, stateShop: st.shop_domain, reason: 'invalid_shop' })
+    console.warn('[Shopify OAuth] shop mismatch', { route: 'shopify_oauth_callback', mismatch: 'callback_shop_vs_state_shop', reason: 'invalid_shop' })
     return fail('invalid_shop')
   }
   if (new Date(st.expires_at).getTime() < Date.now()) return toProject(st.project_id, { shopify: 'error', reason: 'expired_state' })
@@ -238,7 +238,7 @@ export async function GET(request: Request) {
   if (shopIdentity && shopIdentity.myshopifyDomain !== shop) {
     // Defense-in-depth only — should never happen (the token is scoped to
     // `shop`). Don't trust either value if they disagree; leave shop_gid null.
-    console.warn('[Shopify OAuth] shop identity mismatch', { route: 'shopify_oauth_callback', expected: shop, actual: shopIdentity.myshopifyDomain })
+    console.warn('[Shopify OAuth] shop identity mismatch', { route: 'shopify_oauth_callback', mismatch: 'token_shop_vs_callback_shop', reason: 'shop_identity_mismatch' })
   }
   const shopGid = shopIdentity && shopIdentity.myshopifyDomain === shop ? shopIdentity.shopGid : null
 
@@ -256,7 +256,7 @@ export async function GET(request: Request) {
     .neq('project_id', auth.project.id)
     .maybeSingle()
   if (existingByDomain) {
-    console.warn('[Shopify OAuth] shop already connected to a different project', { route: 'shopify_oauth_callback', shop, conflictingProjectId: existingByDomain.project_id })
+    console.warn('[Shopify OAuth] shop already connected to a different project', { route: 'shopify_oauth_callback', conflictingProjectId: existingByDomain.project_id, reason: 'shop_already_connected' })
     return toProject(st.project_id, { shopify: 'error', reason: 'shop_already_connected' })
   }
   if (shopGid) {
@@ -267,7 +267,7 @@ export async function GET(request: Request) {
       .neq('project_id', auth.project.id)
       .maybeSingle()
     if (existingByGid) {
-      console.warn('[Shopify OAuth] shop_gid already connected to a different project', { route: 'shopify_oauth_callback', shopGid, conflictingProjectId: existingByGid.project_id })
+      console.warn('[Shopify OAuth] shop_gid already connected to a different project', { route: 'shopify_oauth_callback', conflictingProjectId: existingByGid.project_id, reason: 'shop_already_connected' })
       return toProject(st.project_id, { shopify: 'error', reason: 'shop_already_connected' })
     }
   }
