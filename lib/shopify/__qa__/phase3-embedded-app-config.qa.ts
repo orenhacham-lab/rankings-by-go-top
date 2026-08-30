@@ -34,6 +34,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { createHash } from 'crypto'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -77,6 +78,40 @@ async function main() {
       /SHOPIFY_PUBLIC_CLIENT_ID/.test(RAW_TOML))
     check('1c: explicitly warns against linking over the old custom app', /Do NOT link\/deploy over the old custom app/.test(RAW_TOML))
     check('1d: it is the ONLY Shopify app config file in the repo', true) // enforced by test 9 below
+  }
+
+  console.log('\n1B) Client ID — populated, correct app, and never a secret')
+  {
+    const m = rootTable.match(/client_id\s*=\s*"([^"]*)"/)
+    const clientId = m ? m[1] : ''
+    check('1B-a: client_id is present and NON-EMPTY (an empty id makes this config unusable)', clientId.length > 0)
+    check('1B-b: it has the Shopify client-id shape (32 lowercase hex chars)', /^[0-9a-f]{32}$/.test(clientId))
+    // The confirmed "Go Top SEO" PUBLIC app id, pinned by its SHA-256 rather
+    // than a second plaintext copy: this fails if the value is ever swapped
+    // for the legacy custom app's id (or any other), without restating the id
+    // itself anywhere in the test.
+    const PUBLIC_APP_CLIENT_ID_SHA256 = '9d882096bf3d1f45b0e6869ed844cde0bcd79551fc248b2e1a2e2e29ae9bbc62'
+    check('1B-c: it is exactly the confirmed public "Go Top SEO" Client ID (SHA-256 pinned), not the legacy custom app\'s',
+      createHash('sha256').update(clientId, 'utf8').digest('hex') === PUBLIC_APP_CLIENT_ID_SHA256)
+    // The comment lives in the RAW file — rootTable has comments stripped.
+    check('1B-c2: it is annotated in the file as SHOPIFY_PUBLIC_CLIENT_ID',
+      /client_id\s*=\s*"[0-9a-f]{32}"\s*#\s*=\s*SHOPIFY_PUBLIC_CLIENT_ID/.test(RAW_TOML))
+    check('1B-d: the file states the id is a public API key, not a secret', /not a secret/i.test(RAW_TOML))
+
+    // Nothing secret may ever live in this file. A Shopify app secret is
+    // shpss_-prefixed; an access token shpat_/shpca_. Also reject the env var
+    // name being given a value here.
+    check('1B-e: no client SECRET value appears anywhere in the file',
+      !/shpss_|shpat_|shpca_/.test(RAW_TOML) && !/SHOPIFY_PUBLIC_CLIENT_SECRET\s*=\s*["'][^"']+["']/.test(RAW_TOML))
+    check('1B-f: no second 32-hex value that could be a stray credential', (RAW_TOML.match(/\b[0-9a-f]{32}\b/g) || []).length === 1)
+
+    // `shopify app config link` rewrites this file from the LIVE remote app
+    // version, which still has embedded = false and the bare-root URL — so it
+    // would silently revert the fix. The file must warn against it.
+    check('1B-g: the file warns that `shopify app config link` would overwrite these values',
+      /Do NOT run `shopify app config\s*\n?#?\s*link`/.test(RAW_TOML) && /would silently undo|overwrite|rewrites this file/i.test(RAW_TOML))
+    check('1B-h: it no longer claims client_id is populated by `shopify app config link`',
+      !/set by: shopify app config link/.test(RAW_TOML))
   }
 
   console.log('\n2) THE FIX — the two values that were wrong in the active app version')

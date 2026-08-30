@@ -1,9 +1,17 @@
 # Shopify public app configuration — "Go Top SEO".
 #
-# client_id is populated by `shopify app config link` (links this file to the
-# "Go Top SEO" app whose credentials are SHOPIFY_PUBLIC_CLIENT_ID /
-# SHOPIFY_PUBLIC_CLIENT_SECRET in Vercel). It is the app's PUBLIC API key — never a
-# secret. Do NOT link/deploy over the old custom app.
+# client_id is the "Go Top SEO" PUBLIC app's Client ID — the same value as
+# SHOPIFY_PUBLIC_CLIENT_ID in Vercel, and the app's PUBLIC API key (it is
+# rendered in the `shopify-api-key` meta tag for every merchant to see). It is
+# NEVER a secret; the matching SHOPIFY_PUBLIC_CLIENT_SECRET is server-only and
+# appears nowhere in this file. Do NOT use the legacy custom app's
+# SHOPIFY_CLIENT_ID here.
+#
+# It is set MANUALLY and must stay that way. Do NOT run `shopify app config
+# link`: that command rewrites this file from the LIVE remote app version, and
+# the live version still carries `embedded = false` and the bare-root
+# application_url — so linking would silently undo the embedded-app fix below.
+# Do NOT link/deploy over the old custom app.
 #
 # Scopes are minimal: only what publishing needs (read products/content + write
 # content). NO customer / order / staff / contributor scopes are requested — the
@@ -38,7 +46,7 @@
 # https://*.myshopify.com` on /shopify/app/:path* and nowhere else.
 
 name = "Go Top SEO"
-client_id = "" # set by: shopify app config link  (→ SHOPIFY_PUBLIC_CLIENT_ID)
+client_id = "64ea5778fd1e44656b5ac7f0605799e8" # = SHOPIFY_PUBLIC_CLIENT_ID (public API key, not a secret)
 application_url = "https://www.gotopseo.com/shopify/app"
 embedded = true
 
