@@ -1735,6 +1735,8 @@ export const dashboardEn = {
           token_exchange_failed: 'Could not complete the Shopify authorization. Please try again.',
           missing_scopes: 'Connected, but required read permissions were not approved (read_products, read_content).',
           forbidden: 'This connection could not be verified for your account.',
+          shop_already_connected: 'This Shopify store is already connected to another project. Disconnect it there, or uninstall the app from the store, before connecting it here.',
+          shop_not_reclaimable: 'This Shopify store cannot be connected right now because an earlier connection is in an unexpected state. Uninstall the app from the store and try again, or contact support.',
           save_failed: 'The Shopify connection could not be saved. Please try again.',
           encryption_failed: 'Server encryption is not configured. Contact the administrator.',
           state_error: 'Could not start the Shopify connection. Please try again.',
