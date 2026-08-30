@@ -6,14 +6,17 @@
  * iframe is NEVER accepted as proof of Shopify identity on its own (per the
  * explicit Phase 2 requirement); this is the actual verification.
  *
- * Session tokens are JWTs signed HS256 with the app's client secret
- * (SHOPIFY_CLIENT_SECRET — the same secret used for OAuth HMAC verification,
- * never sent to the browser). Verified here with Node's built-in `crypto`
+ * Session tokens are JWTs signed HS256 with the app's client secret — resolved
+ * through getShopifyOAuthConfig(), so it is the PUBLIC "Go Top SEO" app's
+ * secret when that app is configured and the legacy custom app's otherwise,
+ * always paired with the matching client id (never sent to the browser).
+ * Verified here with Node's built-in `crypto`
  * only — no JWT library dependency, consistent with how this codebase
  * hand-rolls the other Shopify/PayPal HMAC verifications.
  *
  * Rejects: any algorithm other than exactly "HS256" (no alg-confusion), a bad
- * signature, a missing/mismatched `aud` (must equal SHOPIFY_CLIENT_ID), an
+ * signature, a missing/mismatched `aud` (must equal the resolved config's
+ * clientId — the SAME app whose secret is checked above), an
  * `iss`/`dest` whose hostnames don't match each other or don't end with
  * `.myshopify.com`, and a token outside its `nbf`/`exp` window. On success,
  * returns the verified shop's `.myshopify.com` domain — the ONLY shop

@@ -41,10 +41,10 @@ export async function GET(request: Request) {
 
   const shop = normalizeShopDomain(shopRaw)
   if (!shop) {
-    console.warn('[Shopify OAuth] invalid shop', { route: 'shopify_oauth_start', receivedShop: shopRaw || null, normalizedShop: null, reason: 'invalid_domain' })
+    console.warn('[Shopify OAuth] invalid shop', { route: 'shopify_oauth_start', shopParamPresent: Boolean(shopRaw), reason: 'invalid_domain' })
     return fail('invalid_domain')
   }
-  console.log('[Shopify OAuth] start', { route: 'shopify_oauth_start', receivedShop: shopRaw, normalizedShop: shop, projectId: auth.project.id })
+  console.log('[Shopify OAuth] start', { route: 'shopify_oauth_start', projectId: auth.project.id })
 
   // Platform exclusivity: refuse if the project already uses WordPress.
   const { data: wordpress } = await auth.admin

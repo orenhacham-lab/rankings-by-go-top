@@ -11,20 +11,70 @@ import crypto from 'crypto'
 import { SHOPIFY_REQUIRED_SCOPES } from './constants'
 import { normalizeShopDomain } from './domain'
 
+/** Which Shopify app a resolved credential pair belongs to. */
+export type ShopifyAppEdition = 'public' | 'legacy'
+
 export interface ShopifyOAuthConfig {
   clientId: string
   clientSecret: string
   /** Canonical app base URL, e.g. https://www.gotopseo.com (no trailing slash). */
   appUrl: string
+  /** Which app the clientId/clientSecret above belong to. Never a mixed pair. */
+  edition: ShopifyAppEdition
 }
 
-/** Resolve the OAuth app credentials from server env. Never exposed to client. */
+/**
+ * Resolve the OAuth app credentials from server env. Never exposed to client.
+ *
+ * Production bug this fixes: this app exists TWICE in Shopify — the PUBLIC
+ * "Go Top SEO" app (which merchants install, and which signs every app-launch
+ * request, OAuth callback and session token) and an older LEGACY custom app.
+ * They have entirely different client IDs and secrets. Every embedded/public
+ * flow resolves its credentials here, and this function read only the LEGACY
+ * pair — so a genuine, correctly-signed public-app launch was verified against
+ * the wrong secret and rejected as `invalid_hmac`. Only the compliance
+ * webhooks (lib/shopify/webhook-public.ts) were ever wired to the public app.
+ *
+ * The pair is resolved ATOMICALLY and is never mixed: a public client id is
+ * only ever used with the public secret, and a legacy id only with the legacy
+ * secret. Mixing them would produce a config that cannot verify anything and
+ * would silently fail every flow. The public app wins when BOTH of its values
+ * are configured; otherwise this falls back to the legacy pair, so a
+ * deployment that has not yet been given public credentials keeps behaving
+ * exactly as it does today rather than breaking.
+ */
 export function getShopifyOAuthConfig(): ShopifyOAuthConfig | null {
+  const appUrl = (process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
+  if (!appUrl || !/^https:\/\//.test(appUrl)) return null
+
+  const publicClientId = (process.env.SHOPIFY_PUBLIC_CLIENT_ID || '').trim()
+  const publicClientSecret = (process.env.SHOPIFY_PUBLIC_CLIENT_SECRET || '').trim()
+  if (publicClientId && publicClientSecret) {
+    return { clientId: publicClientId, clientSecret: publicClientSecret, appUrl, edition: 'public' }
+  }
+
   const clientId = (process.env.SHOPIFY_CLIENT_ID || '').trim()
   const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || '').trim()
-  const appUrl = (process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
-  if (!clientId || !clientSecret || !appUrl || !/^https:\/\//.test(appUrl)) return null
-  return { clientId, clientSecret, appUrl }
+  if (clientId && clientSecret) {
+    return { clientId, clientSecret, appUrl, edition: 'legacy' }
+  }
+  return null
+}
+
+/**
+ * The client id of whichever app getShopifyOAuthConfig() would resolve —
+ * without requiring the app URL to be configured. Used ONLY for the App
+ * Bridge `shopify-api-key` meta tag, which is a public API key (never a
+ * secret) and must name the SAME app whose secret verifies the resulting
+ * session tokens. Applies the identical atomic-pair rule so the meta tag can
+ * never name the public app while session-token verification uses the legacy
+ * secret. Returns '' when nothing is configured.
+ */
+export function getShopifyAppClientId(): string {
+  const publicClientId = (process.env.SHOPIFY_PUBLIC_CLIENT_ID || '').trim()
+  const publicClientSecret = (process.env.SHOPIFY_PUBLIC_CLIENT_SECRET || '').trim()
+  if (publicClientId && publicClientSecret) return publicClientId
+  return (process.env.SHOPIFY_CLIENT_ID || '').trim()
 }
 
 /** True when OAuth is configured (used to gate the flow / show a clear error). */

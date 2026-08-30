@@ -1,18 +1,22 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
+import { getShopifyAppClientId } from '@/lib/shopify/oauth'
 
 /**
  * Phase 2 — layout scoped to the embedded Shopify App Home only. Adds the
  * `shopify-api-key` meta tag + the App Bridge CDN script App Bridge requires
  * (client_id is a public API key, never a secret — safe to render here).
- * SHOPIFY_CLIENT_ID is read directly (not via lib/shopify/oauth.ts's
- * getShopifyOAuthConfig, which also requires the secret + app URL to be
- * configured) so this still renders a usable page even if only the client id
- * is set; the actual session-token verification still hard-requires full
- * config server-side (lib/shopify/session-token.ts).
+ * Uses getShopifyAppClientId(), which does NOT require the app URL to be
+ * configured — so this still renders a usable page when only the credentials
+ * are set — but DOES apply the same atomic public/legacy pair rule as
+ * getShopifyOAuthConfig. That matters: the key rendered here names the app
+ * whose secret must verify the resulting App Bridge session tokens
+ * (lib/shopify/session-token.ts checks `aud === config.clientId`), so naming
+ * the public app here while verifying with the legacy secret would reject
+ * every session token.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const clientId = (process.env.SHOPIFY_CLIENT_ID || '').trim()
+  const clientId = getShopifyAppClientId()
   return {
     other: clientId ? { 'shopify-api-key': clientId } : {},
   }
