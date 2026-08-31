@@ -243,8 +243,14 @@ async function main() {
       /claim_shopify_shop_ownership/.test(read('lib/shopify/connection-ownership.ts')))
     check('9b: archived rows still excluded from live lookups',
       /\.is\('archived_at', null\)/.test(read('app/api/shopify/app-home/route.ts')))
+    // PR #38 detected the reinstall case with one exact string; that string was
+    // overwritable and dead-ended production, so it is now the shared classifier
+    // in lib/shopify/connection-health.ts. The GUARANTEE under test is unchanged:
+    // app-home still returns needsInstall + a stable reason for a store whose
+    // credential can no longer be used.
     check('9c: the reinstall (needsInstall) entry from PR #38 is intact',
-      /needsInstallReason: 'app_uninstalled'/.test(read('app/api/shopify/app-home/route.ts')))
+      /needsInstall: true,\s*\n\s*needsInstallReason: reinstall\.reason/.test(read('app/api/shopify/app-home/route.ts'))
+      && /classifyReinstallNeed/.test(read('app/api/shopify/app-home/route.ts')))
     check('9d: App Bridge is still a real synchronous script tag',
       /<script src="https:\/\/cdn\.shopify\.com\/shopifycloud\/app-bridge\.js"/.test(read('app/shopify/app/layout.tsx')))
     check('9e: frame-ancestors CSP still scoped to /shopify/app',

@@ -7,6 +7,7 @@
 import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-auth'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 import { testShopifyConnection } from '@/lib/shopify/client'
+import { nextConnectionLastError } from '@/lib/shopify/connection-health'
 
 export async function POST(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -33,7 +34,21 @@ export async function POST(request: Request) {
       connection_status: test.ok ? 'connected' : 'failed',
       last_tested_at: new Date().toISOString(),
       storefront_domain: storefront,
-      last_error: test.status === 'connection_ok' ? null : test.error ?? test.status,
+      // `last_error` is persisted as a STABLE MACHINE CODE (optionally followed
+      // by the human detail), never as the client's English sentence alone.
+      // Writing that sentence here is what broke production: it overwrote the
+      // 'app_uninstalled' tombstone, so /api/shopify/app-home stopped offering a
+      // reconnect and the store could never re-authorise. nextConnectionLastError
+      // also refuses to overwrite that marker with a failing test's own code —
+      // an uninstalled store's stored credential is the revocation sentinel, so
+      // it ALWAYS fails with invalid_token, and the marker is what
+      // claim_shopify_shop_ownership needs to supersede the shop.
+      last_error: nextConnectionLastError({
+        priorLastError: loaded.connection.last_error,
+        ok: test.ok,
+        status: test.status,
+        message: test.error,
+      }),
       updated_at: new Date().toISOString(),
     })
     .eq('id', loaded.connection.id)
