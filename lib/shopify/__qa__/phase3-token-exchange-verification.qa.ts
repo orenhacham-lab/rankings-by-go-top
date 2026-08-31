@@ -256,6 +256,134 @@ async function main() {
       /shop_identity_unverified/.test(read('app/api/shopify/app-home/route.ts')))
   }
 
+  console.log('\n10) Token-exchange response diagnostics — shape only, never material')
+  {
+    const { exchangeSessionTokenForOfflineToken, TokenExchangeError } = await import('../oauth')
+    const OFFLINE = 'shpat_' + 'f'.repeat(32)
+    const realFetch = globalThis.fetch
+
+    const stub = (status: number, body: unknown, reqId = 'req-x-1') => (async () => ({
+      ok: status >= 200 && status < 300, status,
+      headers: { get: (k: string) => (k.toLowerCase() === 'x-request-id' ? reqId : null) },
+      json: async () => body,
+    })) as unknown as typeof fetch
+
+    // Happy path: the diagnostics describe the response without quoting it.
+    const okRes = await exchangeSessionTokenForOfflineToken({
+      shop: SHOP, sessionToken: 'sess.tok', clientId: 'id', clientSecret: 'sec',
+      fetchImpl: stub(200, { access_token: OFFLINE, scope: 'read_products,read_content,write_content', expires_in: 0 }),
+    })
+    const d = okRes.diagnostics
+    check('10a: HTTP status recorded', d.httpStatus === 200)
+    check('10b: Shopify request id recorded', d.shopifyRequestId === 'req-x-1')
+    check('10c: presence of an access_token recorded as a boolean', d.hasAccessToken === true)
+    check('10d: token LENGTH recorded, not the token', d.tokenLength === OFFLINE.length)
+    check('10e: token classified as OFFLINE from its documented prefix', d.tokenType === 'offline')
+    check('10f: scope NAMES recorded', d.scopes.join(',') === 'read_products,read_content,write_content')
+    check('10g: scope count recorded', d.scopeCount === 3)
+    check('10h: requested token type echoed for comparison',
+      d.requestedTokenType === 'urn:shopify:params:oauth:token-type:offline-access-token')
+
+    // An ONLINE token returned despite requesting offline — the mismatch case.
+    const onlineRes = await exchangeSessionTokenForOfflineToken({
+      shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x',
+      fetchImpl: stub(200, { access_token: 'shpca_' + 'a'.repeat(32), scope: 'read_products', associated_user_scope: 'read_products', expires_in: 86399 }),
+    })
+    check('10i: an online token is classified as such (offline/online mismatch is visible)',
+      onlineRes.diagnostics.tokenType === 'online')
+    check('10j: associated_user_scope is surfaced when present', onlineRes.diagnostics.associatedUserScope === 'read_products')
+    check('10k: expires_in is surfaced when present', onlineRes.diagnostics.expiresIn === 86399)
+
+    // ZERO granted scopes — the state that makes the Admin API 403 every query.
+    const noScope = await exchangeSessionTokenForOfflineToken({
+      shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x',
+      fetchImpl: stub(200, { access_token: OFFLINE, scope: '' }),
+    })
+    check('10l: an empty scope grant is visible as scopeCount 0', noScope.diagnostics.scopeCount === 0)
+
+    // Failure paths still carry diagnostics.
+    let thrown: unknown = null
+    try {
+      await exchangeSessionTokenForOfflineToken({ shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x', fetchImpl: stub(400, { error: 'invalid_subject_token' }, 'req-fail-2') })
+    } catch (e) { thrown = e }
+    check('10m: a non-2xx exchange still throws (fail-closed unchanged)', thrown instanceof TokenExchangeError)
+    check('10n: with the HTTP status and request id attached',
+      (thrown as InstanceType<typeof TokenExchangeError>).diagnostics.httpStatus === 400
+      && (thrown as InstanceType<typeof TokenExchangeError>).diagnostics.shopifyRequestId === 'req-fail-2')
+
+    let thrown2: unknown = null
+    try {
+      await exchangeSessionTokenForOfflineToken({ shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x', fetchImpl: stub(200, { scope: 'read_products' }) })
+    } catch (e) { thrown2 = e }
+    check('10o: a 200 with no access_token still throws', thrown2 instanceof TokenExchangeError)
+    check('10p: reporting hasAccessToken:false and tokenType absent',
+      (thrown2 as InstanceType<typeof TokenExchangeError>).diagnostics.hasAccessToken === false
+      && (thrown2 as InstanceType<typeof TokenExchangeError>).diagnostics.tokenType === 'absent')
+
+    globalThis.fetch = realFetch
+  }
+
+  console.log('\n11) NO credential material can appear in any diagnostic value')
+  {
+    const { exchangeSessionTokenForOfflineToken } = await import('../oauth')
+    const SECRET = 'super-secret-client-secret-value'
+    const SESSION = 'eyJhbGciOiJIUzI1NiJ9.sessionpayload.signature'
+    const TOKEN = 'shpat_' + 'd'.repeat(40)
+    const stub = (async () => ({
+      ok: true, status: 200,
+      headers: { get: () => 'req-z' },
+      json: async () => ({ access_token: TOKEN, scope: 'read_products' }),
+    })) as unknown as typeof fetch
+
+    const res = await exchangeSessionTokenForOfflineToken({
+      shop: SHOP, sessionToken: SESSION, clientId: 'client-id-abc', clientSecret: SECRET, fetchImpl: stub,
+    })
+    const serialized = JSON.stringify(res.diagnostics)
+    for (const [label, secret] of [
+      ['the access token', TOKEN],
+      ['the session token', SESSION],
+      ['the client secret', SECRET],
+    ] as [string, string][]) {
+      check(`11: ${label} never appears in the diagnostics object`, !serialized.includes(secret))
+    }
+    // Not even a fragment: a prefix long enough to be identifying must be absent.
+    check('11: no 12-character fragment of the access token leaks', !serialized.includes(TOKEN.slice(0, 12)))
+    check('11: the classification is a fixed label, not bytes taken from the token',
+      /"tokenType":"(offline|online|app_secret_shaped|unrecognised|absent)"/.test(serialized))
+    check('11: only shape fields are present',
+      Object.keys(res.diagnostics).every((k) => [
+        'httpStatus', 'shopifyRequestId', 'hasAccessToken', 'tokenLength', 'tokenType',
+        'scopes', 'scopeCount', 'associatedUserScope', 'expiresIn', 'requestedTokenType',
+      ].includes(k)))
+
+    // The route must never hand a raw credential to fail().
+    const route = strip(read('app/api/shopify/embedded-install/route.ts'))
+    // Assert the real property: inside every fail(...) diagnostic OBJECT, no
+    // field's VALUE references a token/secret. (The route legitimately uses
+    // exchanged.accessToken once, to build `creds` for the Admin API call —
+    // that is the whole point of the token and is not a log.)
+    // Brace-balanced extraction — a lazy regex would run past the block and
+    // swallow unrelated code (including the legitimate `creds` construction).
+    const diagObjects: string[] = []
+    for (const m of route.matchAll(/fail\(\d+, '[a-z_]+', \{/g)) {
+      let depth = 1
+      let i = m.index! + m[0].length
+      const start = i
+      while (i < route.length && depth > 0) {
+        if (route[i] === '{') depth++
+        else if (route[i] === '}') depth--
+        i++
+      }
+      diagObjects.push(route.slice(start, i - 1))
+    }
+    check('11: at least one diagnostic object was found to inspect', diagObjects.length > 0)
+    const leaky = diagObjects.filter((o) => /accessToken|sessionToken|clientSecret|tokenEncrypted|authHeader|\btoken\b\s*[,}]/.test(o))
+    check('11: no fail() diagnostic field carries a token or secret value', leaky.length === 0,
+      leaky.join(' | ').slice(0, 120))
+    check('11: the route logs exchanged.diagnostics fields only, never the exchange result itself',
+      !/\.\.\.exchanged\b/.test(route) && !/exchanged,/.test(route))
+  }
+
   console.log('\n12) Shopify\'s structured 403 reason is captured, not discarded')
   {
     const realFetch = globalThis.fetch

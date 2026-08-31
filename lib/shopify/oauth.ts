@@ -270,13 +270,60 @@ export const TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE = 'urn:shopify:params:oauth:token
  * the caller fails closed; never logs the token, the session token, or the
  * secret.
  */
+/**
+ * Non-sensitive shape report for a token-exchange response.
+ *
+ * Every field here is either a status/identifier Shopify itself publishes, a
+ * boolean, a length, or a SCOPE NAME. It deliberately contains no token bytes:
+ * `tokenType` is a CLASSIFICATION mapped from the documented Shopify token
+ * prefixes to a fixed label, never the token's own characters —
+ *   shpat_ -> 'offline'  (Admin API offline access token)
+ *   shpca_ -> 'online'   (Admin API online / per-user access token)
+ *   shpss_ -> 'app_secret_shaped'  (would mean a secret was returned/echoed)
+ *   anything else -> 'unrecognised'
+ * so an online/offline mismatch is visible without exposing the credential.
+ */
+export interface TokenExchangeDiagnostics {
+  httpStatus: number
+  shopifyRequestId: string | null
+  hasAccessToken: boolean
+  tokenLength: number
+  tokenType: 'offline' | 'online' | 'app_secret_shaped' | 'unrecognised' | 'absent'
+  /** Scope NAMES granted by Shopify. Names are public API identifiers. */
+  scopes: string[]
+  scopeCount: number
+  associatedUserScope: string | null
+  expiresIn: number | null
+  requestedTokenType: string
+}
+
+/** Classify a token by its documented Shopify prefix. Returns a fixed label —
+ *  never any part of the token itself. */
+function classifyShopifyToken(token: string | undefined | null): TokenExchangeDiagnostics['tokenType'] {
+  if (!token) return 'absent'
+  if (token.startsWith('shpat_')) return 'offline'
+  if (token.startsWith('shpca_')) return 'online'
+  if (token.startsWith('shpss_')) return 'app_secret_shaped'
+  return 'unrecognised'
+}
+
+/** Thrown on a failed exchange, carrying only non-sensitive shape data. */
+export class TokenExchangeError extends Error {
+  diagnostics: Partial<TokenExchangeDiagnostics>
+  constructor(message: string, diagnostics: Partial<TokenExchangeDiagnostics>) {
+    super(message)
+    this.name = 'TokenExchangeError'
+    this.diagnostics = diagnostics
+  }
+}
+
 export async function exchangeSessionTokenForOfflineToken(opts: {
   shop: string
   sessionToken: string
   clientId: string
   clientSecret: string
   fetchImpl?: typeof fetch
-}): Promise<{ accessToken: string; scope: string }> {
+}): Promise<{ accessToken: string; scope: string; diagnostics: TokenExchangeDiagnostics }> {
   const doFetch = opts.fetchImpl ?? fetch
   const res = await doFetch(`https://${opts.shop}/admin/oauth/access_token`, {
     method: 'POST',
@@ -291,10 +338,30 @@ export async function exchangeSessionTokenForOfflineToken(opts: {
     }),
     redirect: 'error',
   })
-  if (!res.ok) throw new Error(`token_exchange_http_${res.status}`)
-  const json = (await res.json().catch(() => null)) as { access_token?: string; scope?: string } | null
-  if (!json || typeof json.access_token !== 'string' || !json.access_token) throw new Error('token_exchange_no_token')
-  return { accessToken: json.access_token, scope: typeof json.scope === 'string' ? json.scope : '' }
+  const shopifyRequestId = res.headers?.get?.('x-request-id') ?? null
+  const base = { httpStatus: res.status, shopifyRequestId, requestedTokenType: TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE }
+
+  if (!res.ok) throw new TokenExchangeError(`token_exchange_http_${res.status}`, { ...base, hasAccessToken: false, tokenType: 'absent' })
+
+  const json = (await res.json().catch(() => null)) as
+    | { access_token?: string; scope?: string; associated_user_scope?: string; expires_in?: number }
+    | null
+  const scopes = typeof json?.scope === 'string' && json.scope ? json.scope.split(/[,\s]+/).filter(Boolean) : []
+  const diagnostics: TokenExchangeDiagnostics = {
+    ...base,
+    hasAccessToken: typeof json?.access_token === 'string' && !!json.access_token,
+    tokenLength: typeof json?.access_token === 'string' ? json.access_token.length : 0,
+    tokenType: classifyShopifyToken(json?.access_token),
+    scopes,
+    scopeCount: scopes.length,
+    associatedUserScope: typeof json?.associated_user_scope === 'string' ? json.associated_user_scope : null,
+    expiresIn: typeof json?.expires_in === 'number' ? json.expires_in : null,
+  }
+
+  if (!json || typeof json.access_token !== 'string' || !json.access_token) {
+    throw new TokenExchangeError('token_exchange_no_token', diagnostics)
+  }
+  return { accessToken: json.access_token, scope: typeof json.scope === 'string' ? json.scope : '', diagnostics }
 }
 
 /**
