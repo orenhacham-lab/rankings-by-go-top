@@ -262,7 +262,9 @@ async function main() {
     // A 403 whose body names the missing access — the case production hit.
     const { impl } = captureFetch((): StubResponse => ({
       status: 403,
-      body: { errors: [{ message: 'Access denied for shop field. Required access: `read_content` access scope.', extensions: { code: 'ACCESS_DENIED' } }] },
+      // A representative Shopify 403 body. The wording is a FIXTURE only — it
+      // asserts nothing about which scope the live store is actually missing.
+      body: { errors: [{ message: 'Access denied for shop field.', extensions: { code: 'ACCESS_DENIED' } }] },
       headers: { 'x-request-id': 'req-403-abc' },
     }))
     globalThis.fetch = impl
@@ -271,7 +273,7 @@ async function main() {
 
     check('12a: still fails closed', res.ok === false)
     check('12b: HTTP 403 recorded', res.diagnostics?.httpStatus === 403)
-    check('12c: Shopify\'s message is captured', (res.diagnostics?.shopifyMessages ?? [])[0]?.includes('Required access'))
+    check('12c: Shopify\'s message is captured', (res.diagnostics?.shopifyMessages ?? [])[0] === 'Access denied for shop field.')
     check('12d: the GraphQL extensions.code is captured', (res.diagnostics?.shopifyCodes ?? [])[0] === 'ACCESS_DENIED')
     check('12e: the request id is still captured', res.diagnostics?.requestId === 'req-403-abc')
   }
@@ -319,7 +321,7 @@ async function main() {
       check(`14: ${label} — a 12-char fragment does not survive either`, !out.includes(secret.slice(0, 12)))
     }
     check('14: ordinary Shopify text is preserved so the reason stays readable',
-      sanitizeShopifyMessage('Required access: `read_content` access scope.').includes('read_content'))
+      sanitizeShopifyMessage('Access denied for shop field.') === 'Access denied for shop field.')
 
     // End-to-end: a 403 body echoing a token must not reach the diagnostics.
     const realFetch = globalThis.fetch
