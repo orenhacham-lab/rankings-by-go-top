@@ -31,7 +31,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { SHOPIFY_API_VERSION } from '@/lib/shopify/constants'
 import { testShopifyConnection, getShopIdentity } from '@/lib/shopify/client'
-import { getShopifyOAuthConfig, exchangeSessionTokenForOfflineToken, TokenExchangeError } from '@/lib/shopify/oauth'
+import { getShopifyOAuthConfig, exchangeSessionTokenForOfflineToken, TokenExchangeError, expiryFromNow } from '@/lib/shopify/oauth'
 import type { TokenExchangeDiagnostics } from '@/lib/shopify/oauth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
@@ -85,7 +85,11 @@ export async function POST(request: Request) {
 
   // 3) Token exchange — the managed-installation replacement for the
   //    authorization-code redirect. Uses the VERIFIED shop domain.
-  let exchanged: { accessToken: string; scope: string; diagnostics: TokenExchangeDiagnostics }
+  let exchanged: {
+    accessToken: string; refreshToken: string
+    expiresIn: number; refreshTokenExpiresIn: number
+    scope: string; diagnostics: TokenExchangeDiagnostics
+  }
   try {
     exchanged = await exchangeSessionTokenForOfflineToken({
       shop: shopDomain,
@@ -95,7 +99,16 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     const d = err instanceof TokenExchangeError ? err.diagnostics : {}
-    return fail(502, 'token_exchange_failed', {
+    // `token_exchange_not_expiring` is its own stable reason: Shopify answered
+    // 200 but without the refresh material an expiring offline grant must
+    // carry. Storing that would recreate the production failure — an access
+    // token the Admin API refuses ("[API] Non-expiring access tokens are no
+    // longer accepted…") with nothing to refresh it with — so it fails closed
+    // here, BEFORE any pending install exists.
+    const reason = err instanceof TokenExchangeError && err.message === 'token_exchange_not_expiring'
+      ? 'non_expiring_token_rejected'
+      : 'token_exchange_failed'
+    return fail(502, reason, {
       stage: 'token_exchange',
       kind: err instanceof Error ? err.message : 'unknown',
       apiVersion: SHOPIFY_API_VERSION,
@@ -106,6 +119,14 @@ export async function POST(request: Request) {
       tokenType: d.tokenType,
       scopes: d.scopes,
       scopeCount: d.scopeCount,
+      // Expiring-grant shape. Booleans, lengths and Shopify's OWN public field
+      // names — never a token, never a value from the response.
+      requestedExpiring: d.requestedExpiring,
+      hasRefreshToken: d.hasRefreshToken,
+      refreshTokenLength: d.refreshTokenLength,
+      expiresIn: d.expiresIn,
+      refreshTokenExpiresIn: d.refreshTokenExpiresIn,
+      missingFields: d.missingFields,
     })
   }
 
@@ -170,6 +191,11 @@ export async function POST(request: Request) {
       associatedUserScope: exchanged.diagnostics.associatedUserScope,
       expiresIn: exchanged.diagnostics.expiresIn,
       requestedTokenType: exchanged.diagnostics.requestedTokenType,
+      // The expiring-grant facts, so a verification failure can be told apart
+      // from a non-expiring grant at a glance.
+      requestedExpiring: exchanged.diagnostics.requestedExpiring,
+      hasRefreshToken: exchanged.diagnostics.hasRefreshToken,
+      refreshTokenExpiresIn: exchanged.diagnostics.refreshTokenExpiresIn,
     })
   }
 
@@ -187,17 +213,27 @@ export async function POST(request: Request) {
   const grantedScopes = test.grantedScopes ?? exchanged.scope.split(/[,\s]+/).filter(Boolean)
   const storefront = test.storefrontDomain ?? null
 
+  // BOTH halves of the expiring grant are encrypted with the same mechanism.
+  // The refresh token is never written, logged or returned in plaintext.
   let tokenEncrypted: string
+  let refreshTokenEncrypted: string
   try {
     tokenEncrypted = encryptCredential(exchanged.accessToken)
+    refreshTokenEncrypted = encryptCredential(exchanged.refreshToken)
   } catch {
     return fail(500, 'encryption_failed')
   }
 
+  const grantIssuedAt = Date.now()
   const pendingToken = await createPendingInstall(admin, {
     shop_domain: shopDomain,
     shop_gid: shopGid,
     access_token_encrypted: tokenEncrypted,
+    refresh_token_encrypted: refreshTokenEncrypted,
+    // Absolute expiries, computed once here from Shopify's relative lifetimes,
+    // so every later reader compares against the same instant.
+    access_token_expires_at: expiryFromNow(exchanged.expiresIn, grantIssuedAt),
+    refresh_token_expires_at: expiryFromNow(exchanged.refreshTokenExpiresIn, grantIssuedAt),
     api_version: SHOPIFY_API_VERSION,
     granted_scopes: grantedScopes,
     storefront_domain: storefront,

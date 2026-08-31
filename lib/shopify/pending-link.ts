@@ -72,6 +72,19 @@ export interface PendingInstallRow {
   shop_domain: string
   shop_gid: string | null
   access_token_encrypted: string
+  /**
+   * Expiring offline grants (Shopify no longer accepts non-expiring Admin API
+   * tokens) come as a PAIR with two expiries. All four values must survive this
+   * handoff table: if only the access token crossed the bridge, the connection
+   * created at /shopify/link would have nothing to refresh with and would die
+   * at the access token's first expiry with no way back.
+   *
+   * Nullable only so a row written before this column existed can still be
+   * read; every writer in the codebase supplies them.
+   */
+  refresh_token_encrypted: string | null
+  access_token_expires_at: string | null
+  refresh_token_expires_at: string | null
   api_version: string
   granted_scopes: string[]
   storefront_domain: string | null

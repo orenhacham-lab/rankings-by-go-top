@@ -376,6 +376,12 @@ export class FakeAdmin {
           live.shop_gid = shopGid ?? live.shop_gid
           live.storefront_domain = p.p_storefront_domain
           live.access_token_encrypted = p.p_access_token_encrypted
+          live.refresh_token_encrypted = p.p_refresh_token_encrypted ?? null
+          live.access_token_expires_at = p.p_access_token_expires_at ?? null
+          live.refresh_token_expires_at = p.p_refresh_token_expires_at ?? null
+          // A brand-new grant invalidates any in-flight rotation's lease.
+          live.token_refresh_lease_token = null
+          live.token_refresh_lease_until = null
           live.api_version = p.p_api_version
           live.granted_scopes = p.p_granted_scopes
           live.connection_status = p.p_connection_status
@@ -416,7 +422,12 @@ export class FakeAdmin {
       if (existingForProject) {
         Object.assign(existingForProject, {
           shop_domain: shopDomain, shop_gid: shopGid, storefront_domain: p.p_storefront_domain,
-          access_token_encrypted: p.p_access_token_encrypted, api_version: p.p_api_version,
+          access_token_encrypted: p.p_access_token_encrypted,
+          refresh_token_encrypted: p.p_refresh_token_encrypted ?? null,
+          access_token_expires_at: p.p_access_token_expires_at ?? null,
+          refresh_token_expires_at: p.p_refresh_token_expires_at ?? null,
+          token_refresh_lease_token: null, token_refresh_lease_until: null,
+          api_version: p.p_api_version,
           granted_scopes: p.p_granted_scopes, connection_status: p.p_connection_status,
           last_error: p.p_last_error, last_tested_at: now, updated_at: now,
         })
@@ -429,11 +440,89 @@ export class FakeAdmin {
       rows.push({
         id, user_id: p.p_user_id, project_id: projectId, shop_domain: shopDomain, shop_gid: shopGid,
         storefront_domain: p.p_storefront_domain, access_token_encrypted: p.p_access_token_encrypted,
+        refresh_token_encrypted: p.p_refresh_token_encrypted ?? null,
+        access_token_expires_at: p.p_access_token_expires_at ?? null,
+        refresh_token_expires_at: p.p_refresh_token_expires_at ?? null,
+        token_refresh_lease_token: null, token_refresh_lease_until: null,
         api_version: p.p_api_version, granted_scopes: p.p_granted_scopes,
         connection_status: p.p_connection_status, last_error: p.p_last_error,
         last_tested_at: now, created_at: now, updated_at: now, archived_at: null, archived_reason: null,
       })
       return finish('claimed', id)
+    }
+
+    // ── Expiring-offline-token refresh lease (20260831000000) ─────────────
+    // Models the SQL closely enough to exercise the anti-clobber rule: only the
+    // lease holder may store a rotated pair, an expired lease is reclaimable,
+    // and a terminal failure never overwrites the app_uninstalled tombstone.
+    if (name === 'begin_shopify_token_refresh') {
+      const rows = (this.tables.shopify_connections ??= [])
+      const p = params as Record<string, string | number>
+      const row = rows.find((r) => r.id === p.p_connection_id && !r.archived_at)
+      const nowMs = Date.now()
+      const one = (o: Record<string, unknown>) => ({ data: [o], error: null })
+      if (!row) return one({ outcome: 'not_found', lease_token: null, access_token_encrypted: null, refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null })
+      const minValid = Number(p.p_min_valid_seconds ?? 120)
+      const exp = row.access_token_expires_at ? new Date(String(row.access_token_expires_at)).getTime() : null
+      const base = {
+        access_token_encrypted: row.access_token_encrypted ?? null,
+        access_token_expires_at: row.access_token_expires_at ?? null,
+        refresh_token_expires_at: row.refresh_token_expires_at ?? null,
+      }
+      if (exp !== null && exp > nowMs + minValid * 1000) {
+        return one({ outcome: 'fresh', lease_token: null, refresh_token_encrypted: row.refresh_token_encrypted ?? null, ...base })
+      }
+      if (!row.refresh_token_encrypted) return one({ outcome: 'no_refresh_material', lease_token: null, refresh_token_encrypted: null, ...base })
+      const leaseUntil = row.token_refresh_lease_until ? new Date(String(row.token_refresh_lease_until)).getTime() : null
+      if (row.token_refresh_lease_token && leaseUntil !== null && leaseUntil > nowMs) {
+        return one({ outcome: 'locked', lease_token: null, refresh_token_encrypted: null, ...base })
+      }
+      const lease = `fake-lease-${++fakeRpcIdCounter}`
+      row.token_refresh_lease_token = lease
+      row.token_refresh_lease_until = new Date(nowMs + Number(p.p_lease_seconds ?? 60) * 1000).toISOString()
+      row.updated_at = nowIso()
+      return one({ outcome: 'granted', lease_token: lease, refresh_token_encrypted: row.refresh_token_encrypted, ...base })
+    }
+
+    if (name === 'complete_shopify_token_refresh') {
+      const rows = (this.tables.shopify_connections ??= [])
+      const p = params as Record<string, string | null>
+      const row = rows.find((r) => r.id === p.p_connection_id && !r.archived_at)
+      const one = (outcome: string) => ({ data: [{ outcome }], error: null })
+      if (!p.p_lease_token || !p.p_access_token_encrypted || !p.p_refresh_token_encrypted
+        || !p.p_access_token_expires_at || !p.p_refresh_token_expires_at) return one('invalid_rotation')
+      if (!row) return one('lease_lost')
+      // THE anti-clobber rule.
+      if (row.token_refresh_lease_token !== p.p_lease_token) return one('lease_lost')
+      row.access_token_encrypted = p.p_access_token_encrypted
+      row.refresh_token_encrypted = p.p_refresh_token_encrypted
+      row.access_token_expires_at = p.p_access_token_expires_at
+      row.refresh_token_expires_at = p.p_refresh_token_expires_at
+      row.token_refresh_lease_token = null
+      row.token_refresh_lease_until = null
+      if (row.last_error !== 'app_uninstalled') {
+        row.connection_status = 'connected'
+        if (row.last_error === 'invalid_token' || row.last_error === 'refresh_token_invalid') row.last_error = null
+      }
+      row.updated_at = nowIso()
+      return one('rotated')
+    }
+
+    if (name === 'fail_shopify_token_refresh') {
+      const rows = (this.tables.shopify_connections ??= [])
+      const p = params as Record<string, string | boolean | null>
+      const row = rows.find((r) => r.id === p.p_connection_id && !r.archived_at)
+      const one = (outcome: string) => ({ data: [{ outcome }], error: null })
+      if (!row) return one('lease_lost')
+      if (p.p_lease_token != null && row.token_refresh_lease_token !== p.p_lease_token) return one('lease_lost')
+      row.token_refresh_lease_token = null
+      row.token_refresh_lease_until = null
+      if (p.p_terminal === true && row.last_error !== 'app_uninstalled') {
+        row.connection_status = 'failed'
+        row.last_error = (p.p_last_error as string) ?? 'refresh_token_invalid'
+      }
+      row.updated_at = nowIso()
+      return one(p.p_terminal === true ? 'terminal' : 'released')
     }
 
     return { data: null, error: { message: `unknown rpc: ${name}` } }

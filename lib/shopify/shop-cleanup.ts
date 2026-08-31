@@ -90,6 +90,19 @@ export async function applyAppUninstalled(admin: Admin, shopDomain: string): Pro
     .from('shopify_connections')
     .update({
       access_token_encrypted: sentinel,
+      // Expiring offline grants: the refresh token is the half that could mint
+      // NEW access tokens indefinitely, so it is the half that must not survive
+      // an uninstall. It is cleared outright (the column is nullable — unlike
+      // access_token_encrypted, which is NOT NULL and therefore takes the
+      // non-usable sentinel instead), together with both expiries and any
+      // refresh lease, so no rotation started before the uninstall can land
+      // afterwards. The tombstone/archive semantics are untouched: same
+      // connection_status, same last_error marker, same scopes, same row.
+      refresh_token_encrypted: null,
+      access_token_expires_at: null,
+      refresh_token_expires_at: null,
+      token_refresh_lease_token: null,
+      token_refresh_lease_until: null,
       connection_status: 'failed',
       granted_scopes: [],
       default_blog_id: null,

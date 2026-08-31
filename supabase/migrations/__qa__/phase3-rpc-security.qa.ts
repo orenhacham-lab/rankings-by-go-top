@@ -126,7 +126,8 @@ async function main() {
     // Every migration filename's version prefix (the part before the first
     // underscore) is now checked to be PURELY numeric across the WHOLE
     // directory — not just the two files this pass touched. (VERIFY_*.sql /
-    // add_article_fields.sql / insert_google_position_article.sql are
+    // VERIFY_* scripts are manual, read-only inspection helpers; the rest,
+    // add_article_fields.sql / insert_google_position_article.sql, are
     // pre-existing, non-timestamped utility scripts that predate the
     // migrations-must-be-numeric convention entirely; they are excluded here
     // exactly as they are excluded from being "applied" migrations by
@@ -137,7 +138,15 @@ async function main() {
       return !/^\d+$/.test(versionPart)
     })
     check('every REAL migration filename (excluding the 3 known pre-existing non-timestamped utility scripts) has a purely numeric version prefix',
-      nonNumericPrefixed.every((n) => ['VERIFY_cache_state.sql', 'add_article_fields.sql', 'insert_google_position_article.sql'].includes(n)),
+      nonNumericPrefixed.every((n) => [
+        'VERIFY_cache_state.sql',
+        // Read-only verification script for 20260831000000 (expiring offline
+        // tokens). Like VERIFY_cache_state.sql it is run BY HAND in the SQL
+        // editor, is never applied by the migration runner, and deliberately
+        // carries no version prefix so it cannot be mistaken for one.
+        'VERIFY_shopify_expiring_offline_tokens.sql',
+        'add_article_fields.sql', 'insert_google_position_article.sql',
+      ].includes(n)),
       `non-numeric-prefixed files found: ${nonNumericPrefixed.join(', ')}`)
 
     // Uniqueness: the TWO version numbers this pass introduced must not

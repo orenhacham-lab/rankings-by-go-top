@@ -17,8 +17,9 @@ import { SHOPIFY_API_VERSION, missingScopes } from '@/lib/shopify/constants'
 import { testShopifyConnection, getShopIdentity } from '@/lib/shopify/client'
 import {
   getShopifyOAuthConfig, verifyShopifyHmac, exchangeCodeForToken, projectReturnUrl, contentHubReturnUrl,
-  verifyNonceCookie, OAUTH_NONCE_COOKIE, OAUTH_COOKIE_PATH,
+  verifyNonceCookie, OAUTH_NONCE_COOKIE, OAUTH_COOKIE_PATH, expiryFromNow,
 } from '@/lib/shopify/oauth'
+import type { ExpiringOfflineToken } from '@/lib/shopify/oauth'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
 import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
 import { claimShopForProject } from '@/lib/shopify/connection-ownership'
@@ -70,11 +71,17 @@ async function completePreAuthInstall(
   if (!params.code) return fail('missing_code')
   if (!isCredentialsCryptoConfigured()) return fail('not_configured')
 
-  let token: { accessToken: string; scope: string }
+  // Expiring offline grant (expiring=1). exchangeCodeForToken FAILS CLOSED if
+  // Shopify returns anything but the full access_token + refresh_token +
+  // expires_in + refresh_token_expires_in shape, so a non-expiring token — the
+  // kind the Admin API now refuses outright — can never reach a pending
+  // install, let alone a connection.
+  let token: ExpiringOfflineToken
   try {
     token = await exchangeCodeForToken({ shop, code: params.code, clientId: config.clientId, clientSecret: config.clientSecret })
-  } catch {
-    return fail('token_exchange_failed')
+  } catch (err) {
+    const kind = err instanceof Error ? err.message : ''
+    return fail(kind.startsWith('token_exchange_not_expiring') ? 'non_expiring_token_rejected' : 'token_exchange_failed')
   }
 
   const creds = { shopDomain: shop, accessToken: token.accessToken, apiVersion: SHOPIFY_API_VERSION }
@@ -86,14 +93,22 @@ async function completePreAuthInstall(
   const shopGid = shopIdentity && shopIdentity.myshopifyDomain === shop ? shopIdentity.shopGid : null
 
   let tokenEncrypted: string
-  try { tokenEncrypted = encryptCredential(token.accessToken) } catch {
+  let refreshTokenEncrypted: string
+  try {
+    tokenEncrypted = encryptCredential(token.accessToken)
+    refreshTokenEncrypted = encryptCredential(token.refreshToken)
+  } catch {
     return fail('encryption_failed')
   }
 
+  const grantIssuedAt = Date.now()
   const pendingToken = await createPendingInstall(admin, {
     shop_domain: shop,
     shop_gid: shopGid,
     access_token_encrypted: tokenEncrypted,
+    refresh_token_encrypted: refreshTokenEncrypted,
+    access_token_expires_at: expiryFromNow(token.expiresIn, grantIssuedAt),
+    refresh_token_expires_at: expiryFromNow(token.refreshTokenExpiresIn, grantIssuedAt),
     api_version: SHOPIFY_API_VERSION,
     granted_scopes: grantedScopes,
     storefront_domain: storefront,
@@ -213,12 +228,18 @@ export async function GET(request: Request) {
 
   if (!isCredentialsCryptoConfigured()) return toProject(st.project_id, { shopify: 'error', reason: 'not_configured' })
 
-  // 11) Exchange the code for an OFFLINE access token (server-side).
-  let token: { accessToken: string; scope: string }
+  // 11) Exchange the code for an EXPIRING OFFLINE grant (server-side). Fails
+  //     closed unless Shopify returns the full expiring shape — a non-expiring
+  //     token is refused by the Admin API and has nothing to refresh with.
+  let token: ExpiringOfflineToken
   try {
     token = await exchangeCodeForToken({ shop, code: params.code, clientId: config.clientId, clientSecret: config.clientSecret })
-  } catch {
-    return toProject(st.project_id, { shopify: 'error', reason: 'token_exchange_failed' })
+  } catch (err) {
+    const kind = err instanceof Error ? err.message : ''
+    return toProject(st.project_id, {
+      shopify: 'error',
+      reason: kind.startsWith('token_exchange_not_expiring') ? 'non_expiring_token_rejected' : 'token_exchange_failed',
+    })
   }
 
   // 12) Verify granted scopes + resolve storefront host (reuses scope verification).
@@ -256,16 +277,25 @@ export async function GET(request: Request) {
   // state, state atomically consumed, code exchanged for a token, and the
   // Shopify-returned shop identity cross-checked against the requested shop.
   let tokenEncrypted: string
-  try { tokenEncrypted = encryptCredential(token.accessToken) } catch {
+  let refreshTokenEncrypted: string
+  try {
+    tokenEncrypted = encryptCredential(token.accessToken)
+    refreshTokenEncrypted = encryptCredential(token.refreshToken)
+  } catch {
     return toProject(st.project_id, { shopify: 'error', reason: 'encryption_failed' })
   }
 
+  const grantIssuedAt = Date.now()
   const claim = await claimShopForProject(auth.admin, {
     userId: auth.project.user_id,
     projectId: auth.project.id,
     shopDomain: shop,
     shopGid,
     accessTokenEncrypted: tokenEncrypted,
+    // The whole expiring grant moves in ONE claim call — see the RPC.
+    refreshTokenEncrypted,
+    accessTokenExpiresAt: expiryFromNow(token.expiresIn, grantIssuedAt),
+    refreshTokenExpiresAt: expiryFromNow(token.refreshTokenExpiresIn, grantIssuedAt),
     apiVersion: SHOPIFY_API_VERSION,
     grantedScopes,
     storefrontDomain: storefront,

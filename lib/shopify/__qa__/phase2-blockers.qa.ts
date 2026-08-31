@@ -151,7 +151,11 @@ async function main() {
   {
     const admin = new FakeAdmin({ shopify_pending_installs: [] })
     const token = await createPendingInstall(admin as unknown as Admin, {
-      shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, access_token_encrypted: 'enc', api_version: '2026-07',
+      shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, access_token_encrypted: 'enc',
+      refresh_token_encrypted: 'enc(refresh)',
+      access_token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 30 * 24 * 3600_000).toISOString(),
+      api_version: '2026-07',
       granted_scopes: ['read_products'], storefront_domain: null,
     })
     const loaded = await loadValidPendingInstall(admin as unknown as Admin, token)
