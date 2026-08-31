@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   const { data: existing } = await admin
     .from('shopify_connections')
     .select('id')
-        .eq('shop_domain', shopDomain)
+    .eq('shop_domain', shopDomain)
     .is('archived_at', null)
     .eq('connection_status', 'connected')
     .limit(1)
@@ -85,14 +85,26 @@ export async function POST(request: Request) {
     return fail(502, 'token_exchange_failed')
   }
 
-  // 4) Same post-token work the OAuth pre-auth callback does, in the same order.
+  // 4) VERIFY the freshly-exchanged token against Shopify before it is allowed
+  //    to become a connection. Previously the results of both calls below were
+  //    computed and then ignored, so a token that failed verification still
+  //    produced a pending install — that is how a connection with a NULL
+  //    shop_gid was created, which then failed test-connection with
+  //    invalid_token and was correctly blocked at billing with
+  //    shop_identity_unverified. Fail closed here instead, so a bad token
+  //    never reaches the linking flow at all.
   const creds = { shopDomain, accessToken: exchanged.accessToken, apiVersion: SHOPIFY_API_VERSION }
   const test = await testShopifyConnection(creds)
-  const grantedScopes = test.grantedScopes ?? exchanged.scope.split(/[,\s]+/).filter(Boolean)
-  const storefront = test.ok && test.storefrontDomain ? test.storefrontDomain : null
+  if (!test.ok) return fail(502, 'token_verification_failed')
 
   const shopIdentity = await getShopIdentity(creds)
   const shopGid = shopIdentity && shopIdentity.myshopifyDomain === shopDomain ? shopIdentity.shopGid : null
+  // shop_gid is the identity Shopify billing is verified against; a connection
+  // without it can never be billing-verified, so refuse to create one.
+  if (!shopGid) return fail(502, 'shop_identity_unverified')
+
+  const grantedScopes = test.grantedScopes ?? exchanged.scope.split(/[,\s]+/).filter(Boolean)
+  const storefront = test.storefrontDomain ?? null
 
   let tokenEncrypted: string
   try {

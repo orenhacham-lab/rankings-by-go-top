@@ -23,6 +23,11 @@ interface AppHomeData {
    *  and publishing, but is never Shopify billing-governed. `billing` is
    *  always null alongside isAdmin: true (see /api/shopify/app-home). */
   isAdmin?: boolean
+  /** Reinstall entry: the stored connection is an app_uninstalled tombstone,
+   *  so its Admin API token is dead and a fresh managed install (token
+   *  exchange) is required before anything works again. */
+  needsInstall?: boolean
+  needsInstallReason?: string
   billing?: {
     status: 'active' | 'none' | 'unknown'
     planHandle: string | null
@@ -169,14 +174,17 @@ export default function ConnectorHomeClient() {
   if (!data.connected) {
     return (
       <Centered>
-        <h2 style={{ marginBottom: 8 }}>Connect this store to Rankings</h2>
+        <h2 style={{ marginBottom: 8 }}>
+          {data.needsInstall ? 'Reconnect this store to Rankings' : 'Connect this store to Rankings'}
+        </h2>
         <p style={{ color: '#616161', marginBottom: 16 }}>
-          This store ({data.shopDomain}) isn&apos;t linked to a Rankings project yet. Continue to finish setting it
-          up — you&apos;ll sign in (or sign up) and choose which project to publish to.
+          {data.needsInstall
+            ? `The app was reinstalled on this store (${data.shopDomain}), so it needs to be authorised again. Continue to finish setting it up.`
+            : `This store (${data.shopDomain}) isn't linked to a Rankings project yet. Continue to finish setting it up — you'll sign in (or sign up) and choose which project to publish to.`}
         </p>
         {installError && <p style={{ color: '#b71c1c', fontSize: 13, marginBottom: 12 }}>{installError}</p>}
         <button onClick={startEmbeddedInstall} disabled={installBusy} style={buttonStyle}>
-          {installBusy ? 'Setting up…' : 'Continue setup'}
+          {installBusy ? 'Setting up…' : data.needsInstall ? 'Reconnect store' : 'Continue setup'}
         </button>
       </Centered>
     )

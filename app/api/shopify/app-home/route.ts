@@ -44,13 +44,39 @@ export async function GET(request: Request) {
   const { data } = await admin
     .from('shopify_connections')
     .select('id, user_id, project_id, shop_gid, connection_status, granted_scopes, last_error')
-        .eq('shop_domain', shopDomain)
+    .eq('shop_domain', shopDomain)
     .is('archived_at', null)
     .maybeSingle()
 
   if (!data) {
     return Response.json({
       connected: false,
+      shopDomain,
+      appUrl: config.appUrl,
+    })
+  }
+
+  // Reinstall entry (production bug): after `app/uninstalled`, the row survives
+  // as a TOMBSTONE — connection_status 'failed', last_error 'app_uninstalled',
+  // scopes cleared, token replaced by the revocation sentinel. It is live
+  // (archived_at IS NULL) but its Admin API token is dead, so it is NOT a
+  // usable connection. This route previously reported `connected: true` for it
+  // purely because a row existed, so the embedded client rendered
+  // "Needs attention / app_uninstalled" and never reached the branch that
+  // calls /api/shopify/embedded-install. No token exchange could ever happen
+  // after a reinstall.
+  //
+  // Deliberately NARROW — the same predicate the ownership RPC uses. A generic
+  // 'failed' (bad token, missing scopes) still reports as connected-with-a-
+  // problem so the merchant can retry or re-test; only the exact uninstall
+  // tombstone demands a fresh managed install.
+  const uninstalled = (data as { connection_status?: string; last_error?: string | null }).connection_status === 'failed'
+    && (data as { last_error?: string | null }).last_error === 'app_uninstalled'
+  if (uninstalled) {
+    return Response.json({
+      connected: false,
+      needsInstall: true,
+      needsInstallReason: 'app_uninstalled',
       shopDomain,
       appUrl: config.appUrl,
     })
