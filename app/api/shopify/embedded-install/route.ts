@@ -36,9 +36,20 @@ import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
 import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
 
-/** A stable, non-sensitive failure code — never the shop, token, or secret. */
-function fail(status: number, reason: string) {
-  console.warn('[Shopify embedded install] rejected', { route: 'embedded_install', reason })
+/**
+ * A stable, non-sensitive failure code, optionally with structured diagnostics.
+ *
+ * `diag` may carry ONLY: the pipeline stage, an error kind, Shopify's HTTP
+ * status, the pinned API version, the shop domain, and Shopify's opaque
+ * `x-request-id`. It must NEVER carry a session token, access token, client
+ * secret, ciphertext, auth header, cookie, or any response body — those are the
+ * things that would make this log dangerous, and none of them are ever passed
+ * in. The shop domain is included deliberately: it is the merchant's public
+ * store address, already visible in the URL, and without it a failure cannot be
+ * attributed to a store.
+ */
+function fail(status: number, reason: string, diag?: Record<string, unknown>) {
+  console.warn('[Shopify embedded install] rejected', { route: 'embedded_install', reason, ...(diag ?? {}) })
   return NextResponse.json({ error: reason }, { status })
 }
 
@@ -81,8 +92,13 @@ export async function POST(request: Request) {
       clientId: config.clientId,
       clientSecret: config.clientSecret,
     })
-  } catch {
-    return fail(502, 'token_exchange_failed')
+  } catch (err) {
+    return fail(502, 'token_exchange_failed', {
+      stage: 'token_exchange',
+      kind: err instanceof Error ? err.message : 'unknown',
+      apiVersion: SHOPIFY_API_VERSION,
+      shopDomain,
+    })
   }
 
   // 4) VERIFY the freshly-exchanged token against Shopify before it is allowed
@@ -95,13 +111,48 @@ export async function POST(request: Request) {
   //    never reaches the linking flow at all.
   const creds = { shopDomain, accessToken: exchanged.accessToken, apiVersion: SHOPIFY_API_VERSION }
   const test = await testShopifyConnection(creds)
-  if (!test.ok) return fail(502, 'token_verification_failed')
 
+  // Diagnostics gap this closes: previously a failed verification returned
+  // immediately, so the logs could never say WHICH stage failed — the shop
+  // query (bad token / HTTP 401 / GraphQL error) or the separate
+  // currentAppInstallation.accessScopes read, which turns an otherwise-usable
+  // token into ok:false via classifyConnection's permission_error. Both are
+  // reported as `token_verification_failed`, which is why production showed
+  // nothing actionable. The shop-identity probe is now run even on the failure
+  // path so the log states whether the token can authenticate as this shop at
+  // all — that single fact separates "dead token" from "token fine, scope read
+  // refused".
+  //
+  // The GATE ITSELF IS UNCHANGED: verification and shop_gid must both succeed
+  // before anything is persisted.
   const shopIdentity = await getShopIdentity(creds)
-  const shopGid = shopIdentity && shopIdentity.myshopifyDomain === shopDomain ? shopIdentity.shopGid : null
+  const identityMatches = !!shopIdentity && shopIdentity.myshopifyDomain === shopDomain
+  const shopGid = identityMatches ? shopIdentity!.shopGid : null
+
+  if (!test.ok) {
+    return fail(502, 'token_verification_failed', {
+      stage: test.diagnostics?.stage ?? 'shop_query',
+      kind: test.diagnostics?.kind ?? test.status,
+      httpStatus: test.diagnostics?.httpStatus,
+      shopifyRequestId: test.diagnostics?.requestId ?? null,
+      apiVersionRequested: test.apiVersionRequested,
+      apiVersionActual: test.apiVersionActual ?? null,
+      shopDomain,
+      // Did the freshly exchanged token authenticate as this shop at all?
+      tokenAuthenticates: identityMatches,
+    })
+  }
+
   // shop_gid is the identity Shopify billing is verified against; a connection
   // without it can never be billing-verified, so refuse to create one.
-  if (!shopGid) return fail(502, 'shop_identity_unverified')
+  if (!shopGid) {
+    return fail(502, 'shop_identity_unverified', {
+      stage: 'shop_identity',
+      kind: shopIdentity ? 'shop_domain_mismatch' : 'no_identity_returned',
+      apiVersionRequested: SHOPIFY_API_VERSION,
+      shopDomain,
+    })
+  }
 
   const grantedScopes = test.grantedScopes ?? exchanged.scope.split(/[,\s]+/).filter(Boolean)
   const storefront = test.storefrontDomain ?? null

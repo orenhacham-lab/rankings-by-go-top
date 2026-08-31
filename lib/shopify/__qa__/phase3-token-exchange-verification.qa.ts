@@ -1,0 +1,254 @@
+/**
+ * Production failure — reinstall reaches embedded-install and is rejected with
+ * {"error":"token_verification_failed"}, with no further detail in Vercel.
+ *
+ * WHAT THIS PASS ESTABLISHES.
+ *
+ * (a) The raw-vs-encrypted hypothesis is DISPROVEN, from the real signatures:
+ *     ShopifyCredentials.accessToken is documented "plaintext, decrypted
+ *     server-side at call time"; graphql() puts creds.accessToken directly into
+ *     the X-Shopify-Access-Token header; and embedded-install passes
+ *     exchanged.accessToken — the RAW token straight from the exchange, before
+ *     encryptCredential is ever called. The contract matches at every hop. The
+ *     encrypted form is only ever handed to createPendingInstall. Tests 1-2
+ *     pin this both ways, so a future edit that passes ciphertext to the
+ *     verifier fails loudly instead of silently producing a 401.
+ *
+ * (b) The failure surface is enumerated exactly. testShopifyConnection returns
+ *     ok:false in only four ways:
+ *       1. the `{ shop { … } }` query throws  -> invalid_token | permission_error
+ *       2. it returns no shop.name            -> permission_error
+ *       3. getGrantedScopes cannot read
+ *          currentAppInstallation.accessScopes -> scopesReadable:false
+ *          -> classifyConnection -> permission_error -> ok:false
+ *       4. (missing_scopes and api_version_fallback are ok:TRUE, so neither
+ *          can be the cause)
+ *     Case 3 is a SEPARATE query surface from case 1: a token that reads `shop`
+ *     perfectly can still fail here, and the old code swallowed the reason
+ *     entirely (`catch { readable:false }`), which is why production could not
+ *     distinguish it from a dead token.
+ *
+ * (c) WHAT IT DOES NOT ESTABLISH: which of 1/2/3 is actually happening on the
+ *     live store. That needs either live Shopify credentials (egress to
+ *     Shopify is blocked from this environment) or the diagnostics below in
+ *     production. No root cause is asserted here beyond (a).
+ *
+ * The fail-closed gate is UNCHANGED — verification and shop_gid must both
+ * succeed before any pending install or connection exists.
+ *
+ * Run: npx tsx lib/shopify/__qa__/phase3-token-exchange-verification.qa.ts
+ */
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { ShopifyClientError, testShopifyConnection, getGrantedScopes, getShopIdentity } from '../client'
+import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
+import { SHOPIFY_API_VERSION } from '../constants'
+
+let pass = 0, fail = 0
+function check(name: string, cond: boolean, detail?: string) {
+  if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
+}
+const ROOT = join(__dirname, '..', '..', '..')
+const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
+const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+const SHOP = 'go-top-seo-test.myshopify.com'
+const RAW_TOKEN = 'shpat_raw_offline_token_value'
+
+/** Captures exactly what reaches Shopify, so the header can be asserted. */
+type StubResponse = { status: number; body: unknown; headers?: Record<string, string> }
+function captureFetch(handler: (url: string, init: RequestInit) => StubResponse) {
+  const calls: { url: string; init: RequestInit }[] = []
+  const impl = (async (url: unknown, init: unknown) => {
+    calls.push({ url: String(url), init: init as RequestInit })
+    const r = handler(String(url), init as RequestInit)
+    return {
+      ok: r.status >= 200 && r.status < 300,
+      status: r.status,
+      headers: { get: (k: string) => (r.headers ?? {})[k.toLowerCase()] ?? null },
+      json: async () => r.body,
+    }
+  }) as unknown as typeof fetch
+  return { impl, calls }
+}
+const okShop = { data: { shop: { name: 'Go Top SEO Test', myshopifyDomain: SHOP, primaryDomain: { host: SHOP } } } }
+const okScopes = { data: { currentAppInstallation: { accessScopes: [{ handle: 'read_products' }, { handle: 'read_content' }, { handle: 'write_content' }] } } }
+
+async function main() {
+  console.log('Token-exchange verification QA\n')
+  const realFetch = globalThis.fetch
+
+  console.log('1) CONTRACT — the verifier receives the RAW token and sends it as-is')
+  {
+    const { impl, calls } = captureFetch((url): StubResponse =>
+      url.includes('currentAppInstallation') ? { status: 200, body: okScopes } : { status: 200, body: okShop })
+    // graphql() bodies differ, not the URL — dispatch on the query instead.
+    const { impl: impl2, calls: calls2 } = captureFetch((_u, init): StubResponse => {
+      const q = String((init as { body?: string }).body || '')
+      return { status: 200, body: q.includes('currentAppInstallation') ? okScopes : okShop, headers: { 'x-shopify-api-version': SHOPIFY_API_VERSION } }
+    })
+    void impl; void calls
+    globalThis.fetch = impl2
+    const res = await testShopifyConnection({ shopDomain: SHOP, accessToken: RAW_TOKEN, apiVersion: SHOPIFY_API_VERSION })
+    globalThis.fetch = realFetch
+
+    check('1a: a valid RAW token verifies successfully', res.ok === true)
+    const hdr = (calls2[0].init.headers as Record<string, string>)['X-Shopify-Access-Token']
+    check('1b: the token is sent verbatim in X-Shopify-Access-Token', hdr === RAW_TOKEN)
+    check('1c: it is NOT encrypted, wrapped or prefixed on the way out', !hdr.includes(':'))
+    check('1d: the request targets the shop\'s Admin GraphQL endpoint',
+      calls2[0].url === `https://${SHOP}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`)
+    check('1e: the pinned API version is in the path', calls2[0].url.includes(`/api/${SHOPIFY_API_VERSION}/`))
+  }
+
+  console.log('\n2) CONTRACT — passing ENCRYPTED ciphertext instead of the raw token MUST fail')
+  {
+    if (!isCredentialsCryptoConfigured()) {
+      process.env.CREDENTIALS_ENC_KEY ||= 'a'.repeat(64)
+    }
+    let ciphertext: string
+    try { ciphertext = encryptCredential(RAW_TOKEN) } catch { ciphertext = 'aa:bb:cc' }
+    check('2a: ciphertext is structurally different from the raw token (iv:tag:ciphertext)',
+      ciphertext !== RAW_TOKEN && ciphertext.split(':').length === 3)
+
+    // Shopify answers 401 for a token it does not recognise — which is exactly
+    // what it would do if ciphertext were ever sent by mistake.
+    const { impl } = captureFetch((_u, init): StubResponse => {
+      const sent = (init.headers as Record<string, string>)['X-Shopify-Access-Token']
+      return sent === RAW_TOKEN
+        ? { status: 200, body: okShop, headers: { 'x-shopify-api-version': SHOPIFY_API_VERSION } }
+        : { status: 401, body: { errors: 'Unauthorized' }, headers: { 'x-request-id': 'req-abc-123' } }
+    })
+    globalThis.fetch = impl
+    const res = await testShopifyConnection({ shopDomain: SHOP, accessToken: ciphertext, apiVersion: SHOPIFY_API_VERSION })
+    globalThis.fetch = realFetch
+
+    check('2b: sending ciphertext fails verification (a raw/encrypted swap can never pass silently)', res.ok === false)
+    check('2c: it is classified as invalid_token', res.status === 'invalid_token')
+    check('2d: the diagnostic names the shop_query stage', res.diagnostics?.stage === 'shop_query')
+    check('2e: it carries Shopify\'s HTTP status', res.diagnostics?.httpStatus === 401)
+    check('2f: and Shopify\'s opaque request id for correlation', res.diagnostics?.requestId === 'req-abc-123')
+  }
+
+  console.log('\n3) The access-scopes stage is a SEPARATE failure surface from the shop query')
+  {
+    // The shop query succeeds; only currentAppInstallation is refused. Before
+    // this pass that produced a bare ok:false with no way to tell it apart.
+    const { impl } = captureFetch((_u, init): StubResponse => {
+      const q = String((init as { body?: string }).body || '')
+      return q.includes('currentAppInstallation')
+        ? { status: 403, body: { errors: 'Access denied' }, headers: { 'x-request-id': 'req-scopes-9' } }
+        : { status: 200, body: okShop, headers: { 'x-shopify-api-version': SHOPIFY_API_VERSION } }
+    })
+    globalThis.fetch = impl
+    const res = await testShopifyConnection({ shopDomain: SHOP, accessToken: RAW_TOKEN, apiVersion: SHOPIFY_API_VERSION })
+    globalThis.fetch = realFetch
+
+    check('3a: a readable shop + unreadable scopes still yields ok:false', res.ok === false)
+    check('3b: classified permission_error, NOT invalid_token', res.status === 'permission_error')
+    check('3c: the diagnostic names the access_scopes stage — the distinction production lacked',
+      res.diagnostics?.stage === 'access_scopes')
+    check('3d: with the HTTP status from that specific call', res.diagnostics?.httpStatus === 403)
+    check('3e: and its own Shopify request id', res.diagnostics?.requestId === 'req-scopes-9')
+  }
+
+  console.log('\n4) getGrantedScopes no longer swallows the reason')
+  {
+    const { impl } = captureFetch((): StubResponse => ({ status: 401, body: { errors: 'Unauthorized' }, headers: { 'x-request-id': 'req-gs-1' } }))
+    globalThis.fetch = impl
+    const g = await getGrantedScopes({ shopDomain: SHOP, accessToken: RAW_TOKEN, apiVersion: SHOPIFY_API_VERSION })
+    globalThis.fetch = realFetch
+    check('4a: readable is false', g.readable === false)
+    check('4b: the failure kind is reported', g.failure?.kind === 'invalid_token')
+    check('4c: with the HTTP status', g.failure?.status === 401)
+    check('4d: and the request id', g.failure?.requestId === 'req-gs-1')
+  }
+
+  console.log('\n5) ShopifyClientError carries safe correlation metadata')
+  {
+    const e = new ShopifyClientError('invalid_token', 'nope', { status: 403, requestId: 'r-1' })
+    check('5a: status is retained', e.status === 403)
+    check('5b: requestId is retained', e.requestId === 'r-1')
+    check('5c: it is still a plain Error with a kind', e instanceof Error && e.kind === 'invalid_token')
+  }
+
+  console.log('\n6) Shop identity is resolved from the same raw token, against the same shop')
+  {
+    const { impl, calls } = captureFetch((): StubResponse => ({
+      status: 200,
+      body: { data: { shop: { id: 'gid://shopify/Shop/778', myshopifyDomain: SHOP } } },
+      headers: { 'x-shopify-api-version': SHOPIFY_API_VERSION },
+    }))
+    globalThis.fetch = impl
+    const id = await getShopIdentity({ shopDomain: SHOP, accessToken: RAW_TOKEN, apiVersion: SHOPIFY_API_VERSION })
+    globalThis.fetch = realFetch
+    check('6a: identity resolves with the RAW token', id?.shopGid === 'gid://shopify/Shop/778')
+    check('6b: the returned domain matches the requested shop', id?.myshopifyDomain === SHOP)
+    check('6c: it used the same header and endpoint',
+      (calls[0].init.headers as Record<string, string>)['X-Shopify-Access-Token'] === RAW_TOKEN
+      && calls[0].url.startsWith(`https://${SHOP}/admin/api/`))
+  }
+
+  console.log('\n7) embedded-install: the FAIL-CLOSED gate is unchanged')
+  {
+    const src = strip(read('app/api/shopify/embedded-install/route.ts'))
+    const testGuard = src.indexOf("return fail(502, 'token_verification_failed'")
+    const gidGuard = src.indexOf("return fail(502, 'shop_identity_unverified'")
+    const pending = src.indexOf('createPendingInstall(admin, {')
+    check('7a: verification failure still aborts', testGuard !== -1)
+    check('7b: a missing shop_gid still aborts', gidGuard !== -1)
+    check('7c: BOTH still run before any pending install exists',
+      testGuard < pending && gidGuard < pending)
+    check('7d: the raw exchanged token is what gets verified',
+      /accessToken: exchanged\.accessToken/.test(src))
+    check('7e: only the ENCRYPTED form is ever persisted',
+      /access_token_encrypted: tokenEncrypted/.test(src) && /encryptCredential\(exchanged\.accessToken\)/.test(src))
+    check('7f: the connected-shop short-circuit is untouched', /alreadyConnected: true/.test(src))
+  }
+
+  console.log('\n8) Diagnostics are SAFE — no secret can reach a log')
+  {
+    const src = read('app/api/shopify/embedded-install/route.ts')
+    const logCalls = (strip(src).match(/console\.\w+\([^\n]*/g) || [])
+    const forbidden = /sessionToken|accessToken|clientSecret|access_token_encrypted|tokenEncrypted|authorization|cookie|Bearer|exchanged\.|creds\b|\.body\b/i
+    for (const c of logCalls) {
+      check(`8a: log call carries no secret-bearing value — ${c.slice(0, 46)}…`, !forbidden.test(c))
+    }
+    const failFn = src.slice(src.indexOf('function fail('), src.indexOf('export async function POST'))
+    check('8b: fail() logs only reason + the caller-supplied diagnostic object',
+      /route: 'embedded_install', reason, \.\.\.\(diag \?\? \{\}\)/.test(failFn))
+    // Every field actually passed as a diagnostic must be on the allowed list.
+    const diagKeys = [...src.matchAll(/fail\(\d+, '[a-z_]+', \{([\s\S]*?)\}\)/g)]
+      .flatMap((m) => [...m[1].matchAll(/^\s*(\w+):/gm)].map((k) => k[1]))
+    const ALLOWED = new Set(['stage', 'kind', 'httpStatus', 'shopifyRequestId', 'apiVersionRequested', 'apiVersionActual', 'apiVersion', 'shopDomain', 'tokenAuthenticates'])
+    const bad = [...new Set(diagKeys)].filter((k) => !ALLOWED.has(k))
+    check('8c: every diagnostic field is on the safe allow-list (stage, kind, status, api version, shop domain, request id)',
+      bad.length === 0, bad.join(', '))
+    check('8d: the response body to the client is still just a stable reason code',
+      /NextResponse\.json\(\{ error: reason \}, \{ status \}\)/.test(src))
+  }
+
+  console.log('\n9) PRESERVED — PR #37 ownership, PR #38 reinstall, App Bridge, CSP, HMAC, billing identity guard')
+  {
+    check('9a: ownership RPC still the single transition point',
+      /claim_shopify_shop_ownership/.test(read('lib/shopify/connection-ownership.ts')))
+    check('9b: archived rows still excluded from live lookups',
+      /\.is\('archived_at', null\)/.test(read('app/api/shopify/app-home/route.ts')))
+    check('9c: the reinstall (needsInstall) entry from PR #38 is intact',
+      /needsInstallReason: 'app_uninstalled'/.test(read('app/api/shopify/app-home/route.ts')))
+    check('9d: App Bridge is still a real synchronous script tag',
+      /<script src="https:\/\/cdn\.shopify\.com\/shopifycloud\/app-bridge\.js"/.test(read('app/shopify/app/layout.tsx')))
+    check('9e: frame-ancestors CSP still scoped to /shopify/app',
+      /source:\s*'\/shopify\/app\/:path\*'/.test(read('next.config.ts')))
+    const oauth = strip(read('lib/shopify/oauth.ts'))
+    check('9f: HMAC canonicalization unchanged (cbd889f still excluded)',
+      /\.map\(\(k\) => `\$\{k\}=\$\{params\[k\]\}`\)/.test(oauth) && !/encodeURIComponent\(params\[k\]\)/.test(oauth))
+    check('9g: billing still refuses an unverified shop identity',
+      /shop_identity_unverified/.test(read('app/api/shopify/app-home/route.ts')))
+  }
+
+  console.log(`\n${pass} passed, ${fail} failed`)
+  if (fail > 0) process.exitCode = 1
+}
+
+main()

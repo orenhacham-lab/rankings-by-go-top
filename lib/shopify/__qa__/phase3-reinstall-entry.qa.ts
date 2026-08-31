@@ -126,8 +126,11 @@ async function main() {
   {
     const src = strip(read('app/api/shopify/embedded-install/route.ts'))
     const testIdx = src.indexOf('const test = await testShopifyConnection(creds)')
-    const testGuard = src.indexOf("if (!test.ok) return fail(502, 'token_verification_failed')")
-    const gidGuard = src.indexOf("if (!shopGid) return fail(502, 'shop_identity_unverified')")
+    // The guards now pass structured diagnostics, so match the call prefix
+    // rather than the old single-line form. The guarantee under test is
+    // unchanged: both abort before any pending install exists.
+    const testGuard = src.indexOf("return fail(502, 'token_verification_failed'")
+    const gidGuard = src.indexOf("return fail(502, 'shop_identity_unverified'")
     const pendingIdx = src.indexOf('createPendingInstall(admin, {')
     check('5a: the freshly exchanged token is verified against Shopify', testIdx !== -1)
     check('5b: a failed verification aborts with token_verification_failed', testGuard !== -1)
@@ -136,6 +139,7 @@ async function main() {
     check('5e: that guard also runs BEFORE the pending install', gidGuard !== -1 && gidGuard < pendingIdx)
     check('5f: NEGATIVE CONTROL — the results are no longer computed and discarded',
       !/const test = await testShopifyConnection\(creds\)\s*\n\s*const grantedScopes/.test(src))
+    check('5h: the failure path now reports WHICH stage failed', /stage: test\.diagnostics\?\.stage/.test(src))
     check('5g: storefront_domain comes from the VERIFIED test result', /const storefront = test\.storefrontDomain \?\? null/.test(src))
   }
 
