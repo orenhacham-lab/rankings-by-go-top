@@ -143,6 +143,12 @@ export async function POST(request: Request) {
       kind: test.diagnostics?.kind ?? test.status,
       httpStatus: test.diagnostics?.httpStatus,
       shopifyRequestId: test.diagnostics?.requestId ?? null,
+      // Shopify's OWN structured reason for the refusal — sanitized and capped
+      // in lib/shopify/client.ts. This is what distinguishes "token not
+      // recognised" from "token recognised but refused", which 401/403 both
+      // collapsing to invalid_token had hidden.
+      shopifyMessages: test.diagnostics?.shopifyMessages,
+      shopifyCodes: test.diagnostics?.shopifyCodes,
       apiVersionRequested: test.apiVersionRequested,
       apiVersionActual: test.apiVersionActual ?? null,
       shopDomain,
