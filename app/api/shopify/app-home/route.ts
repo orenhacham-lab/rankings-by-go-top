@@ -23,6 +23,7 @@ import { getActiveShopifySubscription } from '@/lib/shopify/partner-client'
 import { recordShopifyBillingCache } from '@/lib/shopify/billing-cache'
 import { getActiveMigration } from '@/lib/shopify/paypal-migration'
 import { hasWriteContent } from '@/lib/shopify/constants'
+import { classifyReinstallNeed } from '@/lib/shopify/connection-health'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 
@@ -56,27 +57,33 @@ export async function GET(request: Request) {
     })
   }
 
-  // Reinstall entry (production bug): after `app/uninstalled`, the row survives
-  // as a TOMBSTONE — connection_status 'failed', last_error 'app_uninstalled',
-  // scopes cleared, token replaced by the revocation sentinel. It is live
-  // (archived_at IS NULL) but its Admin API token is dead, so it is NOT a
-  // usable connection. This route previously reported `connected: true` for it
-  // purely because a row existed, so the embedded client rendered
-  // "Needs attention / app_uninstalled" and never reached the branch that
-  // calls /api/shopify/embedded-install. No token exchange could ever happen
-  // after a reinstall.
+  // Reinstall entry (production bug + its follow-up dead-end).
   //
-  // Deliberately NARROW — the same predicate the ownership RPC uses. A generic
-  // 'failed' (bad token, missing scopes) still reports as connected-with-a-
-  // problem so the merchant can retry or re-test; only the exact uninstall
-  // tombstone demands a fresh managed install.
-  const uninstalled = (data as { connection_status?: string; last_error?: string | null }).connection_status === 'failed'
-    && (data as { last_error?: string | null }).last_error === 'app_uninstalled'
-  if (uninstalled) {
+  // After `app/uninstalled` the row survives as a TOMBSTONE — connection_status
+  // 'failed', last_error 'app_uninstalled', scopes cleared, token replaced by
+  // the revocation sentinel. It is live (archived_at IS NULL) but its Admin API
+  // token is dead, so it is NOT a usable connection. This route once reported
+  // `connected: true` for it purely because a row existed, so the embedded
+  // client rendered "Needs attention" and never reached the branch that calls
+  // /api/shopify/embedded-install.
+  //
+  // The first fix matched one exact string, `last_error === 'app_uninstalled'`.
+  // POST /api/shopify/test-connection then overwrote that free-text column with
+  // the client's English sentence ("Authentication failed. Check the Admin API
+  // access token."), the predicate stopped matching, and the store was stuck on
+  // "Needs attention" with no way back. Detection now goes through the shared,
+  // language-independent classifier in lib/shopify/connection-health.ts, which
+  // recognises stable machine codes (and normalises legacy prose already in the
+  // table) — and stays NARROW: only an uninstall tombstone or a conclusively
+  // rejected credential (Shopify 401/403) demands a fresh managed install. A
+  // missing scope, a permission refusal or a transport failure still reports as
+  // connected-with-a-problem, which the merchant can retry or re-test.
+  const reinstall = classifyReinstallNeed(data as { connection_status?: string; last_error?: string | null })
+  if (reinstall.needsInstall) {
     return Response.json({
       connected: false,
       needsInstall: true,
-      needsInstallReason: 'app_uninstalled',
+      needsInstallReason: reinstall.reason,
       shopDomain,
       appUrl: config.appUrl,
     })

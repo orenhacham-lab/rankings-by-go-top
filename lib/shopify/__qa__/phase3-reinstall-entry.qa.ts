@@ -33,6 +33,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { createPendingInstall, loadValidPendingInstall, PENDING_LINK_TTL_MS } from '../pending-link'
+import { classifyReinstallNeed } from '../connection-health'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -44,12 +45,14 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 
 const SHOP = 'go-top-seo-test.myshopify.com'
 
-/** Reproduces app-home's connected/needsInstall decision exactly. */
+/**
+ * app-home's connected/needsInstall decision — now built on the SHARED
+ * classifier the route itself calls, so this can no longer drift from it.
+ */
 function appHomeDecision(row: { connection_status: string; last_error: string | null } | null) {
   if (!row) return { connected: false, needsInstall: false }
-  if (row.connection_status === 'failed' && row.last_error === 'app_uninstalled') {
-    return { connected: false, needsInstall: true, needsInstallReason: 'app_uninstalled' }
-  }
+  const r = classifyReinstallNeed(row)
+  if (r.needsInstall) return { connected: false, needsInstall: true, needsInstallReason: r.reason }
   return { connected: true, needsInstall: false }
 }
 /** The PRE-FIX decision, for negative controls: a row existed => connected. */
@@ -79,7 +82,8 @@ async function main() {
   console.log('\n3) Eligibility stays NARROW — a generic failure is not a reinstall')
   {
     for (const [label, row] of [
-      ['failed with a different error (bad token)', { connection_status: 'failed', last_error: 'token_invalid' }],
+      ['failed because the scope read was refused', { connection_status: 'failed', last_error: 'permission_error: Could not read the token\u2019s granted scopes.' }],
+      ['failed with an unrecognised message', { connection_status: 'failed', last_error: 'token_invalid' }],
       ['failed with no error recorded', { connection_status: 'failed', last_error: null }],
       ['untested / mid-setup', { connection_status: 'untested', last_error: null }],
     ] as [string, { connection_status: string; last_error: string | null }][]) {
@@ -173,14 +177,15 @@ async function main() {
   console.log('\n8) app-home source contract — the tombstone branch precedes every connected-only behaviour')
   {
     const src = strip(read('app/api/shopify/app-home/route.ts'))
-    const uninstalledIdx = src.indexOf('const uninstalled =')
+    const uninstalledIdx = src.indexOf('const reinstall = classifyReinstallNeed(')
     const adminIdx = src.indexOf('const isAdmin = await isAdminUser')
     const partnerIdx = src.indexOf('getActiveShopifySubscription(connection.shop_gid')
-    check('8a: the uninstall tombstone is detected', uninstalledIdx !== -1)
+    check('8a: the reinstall decision is taken from the shared classifier', uninstalledIdx !== -1
+      && /import \{ classifyReinstallNeed \} from '@\/lib\/shopify\/connection-health'/.test(src))
     check('8b: it returns needsInstall before the admin lookup', uninstalledIdx !== -1 && adminIdx !== -1 && uninstalledIdx < adminIdx)
     check('8c: and before any live Partner billing call', uninstalledIdx !== -1 && partnerIdx !== -1 && uninstalledIdx < partnerIdx)
-    check('8d: the predicate is the narrow one, not a broad status check',
-      /connection_status === 'failed'[\s\S]{0,120}last_error === 'app_uninstalled'/.test(src)
+    check('8d: the route no longer compares last_error to an exact English string',
+      !/last_error === 'app_uninstalled'/.test(src) && !/Authentication failed/.test(src)
       && !/connection_status !== 'connected'/.test(src))
     check('8e: the live lookup still excludes archived rows (PR #37 preserved)', /\.is\('archived_at', null\)/.test(src))
   }
@@ -211,7 +216,7 @@ async function main() {
     // needsInstall path returns BEFORE any of that — proved by 8b/8c — so no
     // billing state is read from or written for an uninstalled store.
     const home = strip(read('app/api/shopify/app-home/route.ts'))
-    const uninstalledReturn = home.indexOf("needsInstallReason: 'app_uninstalled'")
+    const uninstalledReturn = home.indexOf('needsInstallReason: reinstall.reason')
     // The CALL SITE, not the import at the top of the file.
     const firstBillingWrite = home.indexOf('await recordShopifyBillingCache(admin,')
     check('10b: the needsInstall response is returned before any billing-cache write',

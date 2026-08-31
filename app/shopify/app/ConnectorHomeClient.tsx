@@ -179,7 +179,9 @@ export default function ConnectorHomeClient() {
         </h2>
         <p style={{ color: '#616161', marginBottom: 16 }}>
           {data.needsInstall
-            ? `The app was reinstalled on this store (${data.shopDomain}), so it needs to be authorised again. Continue to finish setting it up.`
+            ? data.needsInstallReason === 'credential_revoked'
+              ? `This store's authorisation is no longer accepted by Shopify (${data.shopDomain}), so it needs to be granted again. Continue to finish setting it up.`
+              : `The app was reinstalled on this store (${data.shopDomain}), so it needs to be authorised again. Continue to finish setting it up.`
             : `This store (${data.shopDomain}) isn't linked to a Rankings project yet. Continue to finish setting it up — you'll sign in (or sign up) and choose which project to publish to.`}
         </p>
         {installError && <p style={{ color: '#b71c1c', fontSize: 13, marginBottom: 12 }}>{installError}</p>}
