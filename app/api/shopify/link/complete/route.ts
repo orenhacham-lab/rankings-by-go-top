@@ -73,9 +73,16 @@ export async function POST(request: Request) {
     storefrontDomain: pending.storefront_domain,
     connectionStatus: status,
     lastError,
+    // The pending-install row this completes was created only after the App
+    // Bridge session token's signature/issuer/audience/expiry/destination were
+    // verified AND the offline token exchange succeeded for the same shop
+    // (app/api/shopify/embedded-install/route.ts). The row itself is not the
+    // proof — that verified exchange is.
+    proof: 'session_token_exchange_verified',
   })
   if (!claim.ok) {
-    return NextResponse.json({ error: claim.reason }, { status: claim.reason === 'shop_already_connected' ? 409 : 500 })
+    const status = claim.reason === 'save_failed' ? 500 : 409
+    return NextResponse.json({ error: claim.reason }, { status })
   }
 
   await consumePendingInstall(admin, token)

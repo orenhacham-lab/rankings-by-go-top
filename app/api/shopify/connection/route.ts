@@ -27,6 +27,7 @@ export async function GET(request: Request) {
     .from('shopify_connections')
     .select('*')
     .eq('project_id', auth.project.id)
+    .is('archived_at', null)
     .maybeSingle()
   if (error) {
     console.error('[Shopify] Connection load failed:', error.message)
@@ -81,6 +82,7 @@ export async function PATCH(request: Request) {
     .from('shopify_connections')
     .update({ default_blog_id: defaultBlogId, updated_at: new Date().toISOString() })
     .eq('project_id', auth.project.id)
+    .is('archived_at', null)
     .select('id')
     .maybeSingle()
   if (error) {
@@ -107,7 +109,7 @@ export async function DELETE(request: Request) {
     return Response.json({ error: 'Failed to disconnect' }, { status: 500 })
   }
 
-  const { error } = await auth.admin.from('shopify_connections').delete().eq('project_id', auth.project.id)
+  const { error } = await auth.admin.from('shopify_connections').delete().eq('project_id', auth.project.id).is('archived_at', null)
   if (error) {
     console.error('[Shopify] Disconnect failed:', error.message)
     return Response.json({ error: 'Failed to disconnect' }, { status: 500 })

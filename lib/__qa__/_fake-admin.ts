@@ -347,6 +347,95 @@ export class FakeAdmin {
       return { data: [{ outcome: 'released' }], error: null }
     }
 
+    if (name === 'claim_shopify_shop_ownership') {
+      // Faithful model of the DECISION TABLE in
+      // supabase/migrations/20260830000000_shopify_reconnect_after_uninstall.sql.
+      // As with reserve_usage above, this mock CANNOT prove the advisory lock,
+      // SELECT ... FOR UPDATE, or transactional rollback — every branch below
+      // runs synchronously, so no two calls can interleave here regardless of
+      // whether the real SQL locks. Those properties are proved by
+      // source-contract assertions in
+      // supabase/migrations/__qa__/phase3-shopify-reconnect-ownership.qa.ts.
+      // What this DOES model exactly is the eligibility predicate, the
+      // same-project vs cross-project split, and the no-carry-over policy.
+      const rows = (this.tables.shopify_connections ??= [])
+      const p = params as Record<string, string | string[] | null>
+      const shopDomain = p.p_shop_domain as string
+      const projectId = p.p_project_id as string
+      const shopGid = (p.p_shop_gid as string | null) ?? null
+      const now = nowIso()
+
+      const live = rows.find((r) => r.shop_domain === shopDomain && !r.archived_at)
+
+      const finish = (outcome: string, connectionId: string | null) =>
+        ({ data: [{ outcome, connection_id: connectionId }], error: null })
+
+      if (live) {
+        if (live.project_id === projectId) {
+          live.user_id = p.p_user_id
+          live.shop_gid = shopGid ?? live.shop_gid
+          live.storefront_domain = p.p_storefront_domain
+          live.access_token_encrypted = p.p_access_token_encrypted
+          live.api_version = p.p_api_version
+          live.granted_scopes = p.p_granted_scopes
+          live.connection_status = p.p_connection_status
+          live.last_error = p.p_last_error
+          live.last_tested_at = now
+          live.updated_at = now
+          return finish('reactivated', String(live.id))
+        }
+        const scopes = (live.granted_scopes ?? []) as string[]
+        const eligible = live.connection_status === 'failed'
+          && live.last_error === 'app_uninstalled'
+          && scopes.length === 0
+          && live.shopify_subscription_status !== 'active'
+        if (!eligible) {
+          return finish(live.connection_status === 'connected' ? 'shop_already_connected' : 'blocked_not_eligible', null)
+        }
+        live.archived_at = now
+        live.archived_reason = 'superseded_after_uninstall'
+        live.shopify_plan_handle = null
+        live.shopify_subscription_status = null
+        live.shopify_billing_verified_at = null
+        live.shopify_current_period_end = null
+        live.shopify_current_period_start = null
+        live.shopify_trial_ends_at = null
+        live.shopify_cancel_at_end_of_cycle = false
+        live.shopify_billing_last_error = null
+        live.updated_at = now
+      }
+
+      if (shopGid) {
+        const gidConflict = rows.find((r) => r.shop_gid === shopGid && !r.archived_at && r.project_id !== projectId)
+        if (gidConflict) {
+          return finish(gidConflict.connection_status === 'connected' ? 'shop_already_connected' : 'blocked_not_eligible', null)
+        }
+      }
+
+      const existingForProject = rows.find((r) => r.project_id === projectId && !r.archived_at)
+      if (existingForProject) {
+        Object.assign(existingForProject, {
+          shop_domain: shopDomain, shop_gid: shopGid, storefront_domain: p.p_storefront_domain,
+          access_token_encrypted: p.p_access_token_encrypted, api_version: p.p_api_version,
+          granted_scopes: p.p_granted_scopes, connection_status: p.p_connection_status,
+          last_error: p.p_last_error, last_tested_at: now, updated_at: now,
+        })
+        return finish('claimed', String(existingForProject.id))
+      }
+
+      // A CLEAN row: no billing/plan/subscription/entitlement field is copied
+      // from the archived row — they simply are not set.
+      const id = `fake-conn-${++fakeRpcIdCounter}`
+      rows.push({
+        id, user_id: p.p_user_id, project_id: projectId, shop_domain: shopDomain, shop_gid: shopGid,
+        storefront_domain: p.p_storefront_domain, access_token_encrypted: p.p_access_token_encrypted,
+        api_version: p.p_api_version, granted_scopes: p.p_granted_scopes,
+        connection_status: p.p_connection_status, last_error: p.p_last_error,
+        last_tested_at: now, created_at: now, updated_at: now, archived_at: null, archived_reason: null,
+      })
+      return finish('claimed', id)
+    }
+
     return { data: null, error: { message: `unknown rpc: ${name}` } }
   }
 }

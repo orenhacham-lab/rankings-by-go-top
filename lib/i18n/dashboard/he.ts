@@ -1742,6 +1742,8 @@ export const dashboardHe = {
           token_exchange_failed: 'לא ניתן להשלים את ההרשאה מול Shopify. נסו שוב.',
           missing_scopes: 'החיבור בוצע, אך הרשאות הקריאה הנדרשות לא אושרו (read_products, read_content).',
           forbidden: 'לא ניתן לאמת חיבור זה עבור החשבון שלכם.',
+          shop_already_connected: 'חנות Shopify זו כבר מחוברת לפרויקט אחר. נתקו אותה שם, או הסירו את האפליקציה מהחנות, לפני חיבורה כאן.',
+          shop_not_reclaimable: 'לא ניתן לחבר את חנות Shopify הזו כרגע כיוון שחיבור קודם נמצא במצב לא צפוי. הסירו את האפליקציה מהחנות ונסו שוב, או פנו לתמיכה.',
           save_failed: 'לא ניתן היה לשמור את חיבור ה-Shopify. נסו שוב.',
           encryption_failed: 'הצפנת השרת אינה מוגדרת. פנו למנהל המערכת.',
           state_error: 'לא ניתן היה להתחיל את חיבור ה-Shopify. נסו שוב.',

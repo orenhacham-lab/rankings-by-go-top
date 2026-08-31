@@ -126,13 +126,27 @@ async function main() {
 
   console.log('\n9) the OAuth callback rejects a shop already claimed by a DIFFERENT project BEFORE writing the connection')
   {
+    // Updated by the reconnect-after-uninstall fix: the callback no longer
+    // carries its own pre-check + upsert (three unsynchronised statements with
+    // a near-duplicate twin in connection-ownership.ts). Both now delegate to
+    // ONE atomic transition — claim_shopify_shop_ownership — so the invariant
+    // this test protects (a shop claimed by a DIFFERENT project is rejected
+    // before anything is written) is enforced inside a single transaction
+    // under a per-shop lock. See
+    // supabase/migrations/__qa__/phase3-shopify-reconnect-ownership.qa.ts.
     const src = strip(read('app/api/shopify/oauth/callback/route.ts'))
-    const domainCheckIdx = src.indexOf("shop_already_connected")
-    const upsertIdx = src.indexOf(".from('shopify_connections').upsert(")
-    check('a shop_already_connected rejection path exists', domainCheckIdx !== -1)
-    check('the ownership pre-check runs before the upsert write', domainCheckIdx !== -1 && upsertIdx !== -1 && domainCheckIdx < upsertIdx)
-    check('a race-condition (unique-violation code 23505) is also mapped to the same clear reason, never a raw DB error',
-      /code === '23505'[\s\S]{0,40}shop_already_connected/.test(src))
+    check('the callback delegates ownership to the shared, atomic claim',
+      /claimShopForProject\(auth\.admin, \{/.test(src))
+    check('it no longer writes the connection itself (no inline upsert to race against)',
+      !/\.from\('shopify_connections'\)\.upsert\(/.test(src))
+    check('a rejected claim aborts with the reason and never falls through to a write',
+      /if \(!claim\.ok\) \{[\s\S]{0,220}return toProject\(st\.project_id, \{ shopify: 'error', reason: claim\.reason \}\)/.test(src))
+    const ownership = strip(read('lib/shopify/connection-ownership.ts'))
+    check('the shared claim still surfaces shop_already_connected for a live foreign owner',
+      /shop_already_connected/.test(ownership))
+    const mig = read('supabase/migrations/20260830000000_shopify_reconnect_after_uninstall.sql')
+    check('the decision and the write happen in one locked transaction, so a 23505 race cannot leave a partial state',
+      /pg_advisory_xact_lock/.test(mig) && /EXCEPTION WHEN unique_violation THEN/.test(mig))
   }
 
   console.log('\n10) the embedded connector-home API route trusts ONLY the verified session token for shop identity — never a query param')

@@ -28,6 +28,9 @@ function fakeAdmin(script: Record<string, Result> = {}) {
       update(patch: Record<string, unknown>) { st.op = 'update'; st.patch = patch; return api },
       delete() { st.op = 'delete'; return api },
       eq(col: string, val: unknown) { st.filters[col] = val; return api },
+      // Live-connection lookups now exclude archived rows; the fake must
+      // accept .is('archived_at', null) in the chain and record it.
+      is(col: string, val: unknown) { st.filters[col] = val; return api },
       in(col: string, vals: unknown) { st.filters[col] = vals; return api },
       maybeSingle() { return api },
       then(resolve: (v: Result) => unknown, reject?: (e: unknown) => unknown) {

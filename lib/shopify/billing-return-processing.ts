@@ -67,7 +67,8 @@ export async function processShopifyBillingReturn(
   const { data: connData } = await admin
     .from('shopify_connections')
     .select('id, project_id, user_id, shop_domain, shop_gid')
-    .eq('id', intent.connection_id)
+        .eq('id', intent.connection_id)
+    .is('archived_at', null)
     .maybeSingle()
   const connection = connData as { id: string; project_id: string; user_id: string; shop_domain: string; shop_gid: string | null } | null
   if (!connection) return { outcome: 'connection_not_found', projectId: intent.project_id }

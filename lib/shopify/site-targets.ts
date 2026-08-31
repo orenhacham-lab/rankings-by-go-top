@@ -65,6 +65,7 @@ export async function getShopifyIndexSummary(admin: Admin, projectId: string): P
       .from('shopify_connections')
       .select('last_synced_at, last_error, connection_status')
       .eq('project_id', projectId)
+      .is('archived_at', null)
       .maybeSingle()
     if (!conn) return empty
     const c = conn as { last_synced_at: string | null; last_error: string | null; connection_status: ShopifyIndexSummary['connectionStatus'] }

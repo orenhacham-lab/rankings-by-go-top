@@ -62,7 +62,8 @@ export async function POST(request: Request) {
   const { data: existing } = await admin
     .from('shopify_connections')
     .select('id')
-    .eq('shop_domain', shopDomain)
+        .eq('shop_domain', shopDomain)
+    .is('archived_at', null)
     .eq('connection_status', 'connected')
     .limit(1)
     .maybeSingle()

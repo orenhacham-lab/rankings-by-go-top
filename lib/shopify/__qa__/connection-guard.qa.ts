@@ -28,7 +28,9 @@ function makeRow(status: 'connected' | 'failed' | 'untested') {
   }
 }
 function admin(row: Record<string, unknown> | null, error: unknown = null) {
-  const api = { select() { return api }, eq() { return api }, maybeSingle() { return Promise.resolve({ data: row, error }) } }
+  // `is()` is accepted because live-connection lookups now chain
+  // .is('archived_at', null) to exclude superseded rows.
+  const api = { select() { return api }, eq() { return api }, is() { return api }, maybeSingle() { return Promise.resolve({ data: row, error }) } }
   return { from: () => api } as never
 }
 

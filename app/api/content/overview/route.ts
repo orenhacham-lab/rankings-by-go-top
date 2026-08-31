@@ -175,6 +175,7 @@ export async function GET(request: Request) {
     .from('shopify_connections')
     .select('shop_domain, connection_status, granted_scopes, default_blog_id')
     .eq('project_id', projectId)
+    .is('archived_at', null)
     .maybeSingle()
   if (shError) {
     if ((shError as { code?: string }).code !== '42P01') console.error('[content overview] shopify status load failed:', shError.message)

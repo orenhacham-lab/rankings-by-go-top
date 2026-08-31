@@ -37,7 +37,8 @@ export async function hasActiveShopifyConnection(admin: Admin, userId: string): 
     .from('shopify_connections')
     .select('id')
     .eq('user_id', userId)
-    .eq('connection_status', 'connected')
+        .eq('connection_status', 'connected')
+    .is('archived_at', null)
     .limit(1)
     .maybeSingle()
   return !!data
