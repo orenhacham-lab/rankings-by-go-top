@@ -79,10 +79,25 @@ export interface PendingInstallRow {
   consumed_at: string | null
 }
 
+/**
+ * Create the pending install for a shop, REPLACING any earlier one.
+ *
+ * Reinstall entry (production bug): a merchant who uninstalls and reinstalls
+ * generates a brand-new offline token, and the previous pending row — whether
+ * consumed, expired, or simply superseded — is worthless. Leaving it behind
+ * meant the table could still hold only a stale row from a previous install
+ * (consumed_at set, expires_at long past) with no fresh one beside it, which
+ * made it impossible to tell "the new install never ran" from "it ran and
+ * reused something". Prior rows for this shop are deleted first, so the row
+ * present for a shop is always the newest install attempt and can never be
+ * reused. Deletion is scoped to shopify_pending_installs: it is a short-lived
+ * handoff table with no children, and nothing references it.
+ */
 export async function createPendingInstall(
   admin: Admin,
   fields: Omit<PendingInstallRow, 'token' | 'expires_at' | 'consumed_at'>,
 ): Promise<string> {
+  await admin.from('shopify_pending_installs').delete().eq('shop_domain', fields.shop_domain)
   const token = generatePendingLinkToken()
   await admin.from('shopify_pending_installs').insert({
     token,
