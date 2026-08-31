@@ -255,7 +255,11 @@ async function main() {
     const route = read('app/api/shopify/embedded-install/route.ts')
     check('10g: the new route never logs the shop, token, or secret',
       !(/console\.\w+\([^\n]*(shopDomain|accessToken|clientSecret|sessionToken|token\b)/.test(strip(route))))
-    check('10h: its rejection log carries only a stable reason code', /console\.warn\('\[Shopify embedded install\] rejected', \{ route: 'embedded_install', reason \}\)/.test(route))
+    // The log now also carries a caller-supplied diagnostic object whose
+    // fields are constrained to a safe allow-list (proved in
+    // phase3-token-exchange-verification.qa.ts section 8).
+    check('10h: its rejection log carries a stable reason code plus only safe diagnostics',
+      /console\.warn\('\[Shopify embedded install\] rejected', \{ route: 'embedded_install', reason, \.\.\.\(diag \?\? \{\}\) \}\)/.test(route))
   }
 
   console.log('\n11) shopify.app.toml keeps the embedded configuration from the previous commit')

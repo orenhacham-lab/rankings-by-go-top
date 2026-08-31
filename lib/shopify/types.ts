@@ -39,6 +39,16 @@ export interface ShopifyEntity {
 }
 
 export interface ShopifyTestResult {
+  /** Safe, structured diagnostics for the stage that failed. Contains ONLY
+   *  non-sensitive values — never a token, secret, auth header, cookie or
+   *  response body. `requestId` is Shopify's opaque `x-request-id`. */
+  diagnostics?: {
+    stage: 'shop_query' | 'access_scopes'
+    kind: string
+    httpStatus?: number
+    requestId?: string | null
+  }
+
   /** True when the token is valid and the store is reachable (may still warn). */
   ok: boolean
   /** Precise classification of the test. */

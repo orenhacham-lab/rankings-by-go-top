@@ -30,10 +30,17 @@ const MAX_PAGES_PER_TYPE = 20 // bounded pagination: ≤ 2000 entities/type
 
 export class ShopifyClientError extends Error {
   kind: ShopifyErrorKind
-  constructor(kind: ShopifyErrorKind, message: string) {
+  /** Shopify's HTTP status, when the failure came from a response. */
+  status?: number
+  /** Shopify's `x-request-id`, for correlating with Shopify's own logs.
+   *  Opaque and non-sensitive — safe to log. */
+  requestId?: string | null
+  constructor(kind: ShopifyErrorKind, message: string, meta?: { status?: number; requestId?: string | null }) {
     super(message)
     this.name = 'ShopifyClientError'
     this.kind = kind
+    if (meta?.status !== undefined) this.status = meta.status
+    if (meta?.requestId !== undefined) this.requestId = meta.requestId
   }
 }
 
@@ -97,13 +104,18 @@ async function graphql<T>(creds: ShopifyCredentials, query: string, variables: R
       clearTimeout(timer)
     }
 
+    // Opaque correlation id Shopify returns on every response — carries no
+    // secret and lets a failure here be matched against Shopify's own logs.
+    const reqId = res.headers.get('x-request-id')
+    const meta = { status: res.status, requestId: reqId }
+
     if (res.status === 401 || res.status === 403) {
-      throw new ShopifyClientError('invalid_token', 'Authentication failed. Check the Admin API access token.')
+      throw new ShopifyClientError('invalid_token', 'Authentication failed. Check the Admin API access token.', meta)
     }
-    if (res.status === 429) { lastErr = new ShopifyClientError('rate_limited', 'Shopify API rate limit reached.'); continue }
-    if (res.status >= 500) { lastErr = new ShopifyClientError('api_error', `Shopify server error (HTTP ${res.status}).`); continue }
+    if (res.status === 429) { lastErr = new ShopifyClientError('rate_limited', 'Shopify API rate limit reached.', meta); continue }
+    if (res.status >= 500) { lastErr = new ShopifyClientError('api_error', `Shopify server error (HTTP ${res.status}).`, meta); continue }
     if (res.status < 200 || res.status >= 300) {
-      throw new ShopifyClientError('api_error', `Shopify returned HTTP ${res.status}.`)
+      throw new ShopifyClientError('api_error', `Shopify returned HTTP ${res.status}.`, meta)
     }
 
     // Shopify echoes the version it ACTUALLY served here — used to detect a
@@ -112,14 +124,16 @@ async function graphql<T>(creds: ShopifyCredentials, query: string, variables: R
 
     let json: GraphQLResponse<T>
     try { json = (await res.json()) as GraphQLResponse<T> } catch {
-      throw new ShopifyClientError('api_error', 'Shopify returned an invalid response.')
+      throw new ShopifyClientError('api_error', 'Shopify returned an invalid response.', meta)
     }
     if (json.errors && json.errors.length) {
       const err = classifyGraphqlErrors(json.errors)
+      err.status = res.status
+      err.requestId = reqId
       if (err.kind === 'rate_limited') { lastErr = err; continue } // transient
       throw err
     }
-    if (!json.data) throw new ShopifyClientError('api_error', 'Shopify returned no data.')
+    if (!json.data) throw new ShopifyClientError('api_error', 'Shopify returned no data.', meta)
     const available = json.extensions?.cost?.throttleStatus?.currentlyAvailable ?? null
     return { data: json.data, available, apiVersion }
   }
@@ -133,15 +147,25 @@ async function graphql<T>(creds: ShopifyCredentials, query: string, variables: R
  * or errors, so the caller can distinguish "no required scope" from "can't tell".
  * Never returns the token.
  */
-export async function getGrantedScopes(creds: ShopifyCredentials): Promise<{ scopes: string[]; readable: boolean; apiVersion: string | null }> {
+export async function getGrantedScopes(creds: ShopifyCredentials): Promise<{
+  scopes: string[]; readable: boolean; apiVersion: string | null
+  /** Why the scopes could not be read. Non-sensitive; previously the error was
+   *  swallowed entirely, which made an unreadable-scopes failure
+   *  indistinguishable from a bad token in logs. */
+  failure?: { kind: ShopifyErrorKind | 'malformed'; status?: number; requestId?: string | null }
+}> {
   const query = `{ currentAppInstallation { accessScopes { handle } } }`
   try {
     const { data, apiVersion } = await graphql<{ currentAppInstallation?: { accessScopes?: { handle?: string }[] } }>(creds, query)
     const list = data.currentAppInstallation?.accessScopes
-    if (!Array.isArray(list)) return { scopes: [], readable: false, apiVersion }
+    if (!Array.isArray(list)) return { scopes: [], readable: false, apiVersion, failure: { kind: 'malformed' } }
     return { scopes: list.map((s) => String(s?.handle || '').trim()).filter(Boolean), readable: true, apiVersion }
-  } catch {
-    return { scopes: [], readable: false, apiVersion: null }
+  } catch (err) {
+    const e = err instanceof ShopifyClientError ? err : null
+    return {
+      scopes: [], readable: false, apiVersion: null,
+      failure: { kind: e?.kind ?? 'api_error', status: e?.status, requestId: e?.requestId ?? null },
+    }
   }
 }
 
@@ -173,7 +197,12 @@ export async function testShopifyConnection(creds: ShopifyCredentials): Promise<
     // A bad/expired token is a hard failure; scope denial on the shop query maps
     // to permission_error (we could reach the API but were refused).
     const status = kind === 'invalid_token' ? 'invalid_token' : kind === 'missing_scope' ? 'permission_error' : 'permission_error'
-    return { ok: false, status, error: err instanceof ShopifyClientError ? err.message : 'Connection failed.', kind, apiVersionRequested: creds.apiVersion, apiVersionActual }
+    const e = err instanceof ShopifyClientError ? err : null
+    return {
+      ok: false, status, error: e ? e.message : 'Connection failed.', kind,
+      apiVersionRequested: creds.apiVersion, apiVersionActual,
+      diagnostics: { stage: 'shop_query', kind, httpStatus: e?.status, requestId: e?.requestId ?? null },
+    }
   }
 
   // Token is valid + store reachable → verify granted scopes explicitly.
@@ -202,6 +231,16 @@ export async function testShopifyConnection(creds: ShopifyCredentials): Promise<
     apiVersionRequested: creds.apiVersion,
     apiVersionActual,
     ...(error ? { error } : {}),
+    // When the shop query succeeded but the scope read did not, THIS is the
+    // stage that turned an otherwise-usable token into ok:false.
+    ...(granted.readable ? {} : {
+      diagnostics: {
+        stage: 'access_scopes' as const,
+        kind: granted.failure?.kind ?? 'api_error',
+        httpStatus: granted.failure?.status,
+        requestId: granted.failure?.requestId ?? null,
+      },
+    }),
   }
 }
 
