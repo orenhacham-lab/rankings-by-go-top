@@ -71,7 +71,8 @@ export async function loadShopifyConnection(
   const { data, error } = await admin
     .from('shopify_connections')
     .select('*')
-    .eq('project_id', projectId)
+        .eq('project_id', projectId)
+    .is('archived_at', null)
     .maybeSingle()
 
   if (error) {

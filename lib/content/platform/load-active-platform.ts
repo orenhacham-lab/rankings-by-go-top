@@ -12,7 +12,7 @@ type Admin = ReturnType<typeof createAdminClient>
 export async function loadActivePlatform(admin: Admin, projectId: string): Promise<ActivePlatformResult> {
   const [{ data: wp }, { data: sh }] = await Promise.all([
     admin.from('wordpress_connections').select('connection_status').eq('project_id', projectId).maybeSingle(),
-    admin.from('shopify_connections').select('connection_status, granted_scopes').eq('project_id', projectId).maybeSingle(),
+    admin.from('shopify_connections').select('connection_status, granted_scopes').eq('project_id', projectId).is('archived_at', null).maybeSingle(),
   ])
   const wpRow = wp as { connection_status?: string | null } | null
   const shRow = sh as { connection_status?: string | null; granted_scopes?: string[] | null } | null

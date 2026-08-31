@@ -121,6 +121,7 @@ export async function POST(request: Request) {
       .from('shopify_connections')
       .select('id')
       .eq('project_id', auth.project.id)
+      .is('archived_at', null)
       .maybeSingle()
     if (shopify) {
       return Response.json({ error: 'platform_already_connected', reason: 'platform_already_connected', platform: 'shopify' }, { status: 409 })

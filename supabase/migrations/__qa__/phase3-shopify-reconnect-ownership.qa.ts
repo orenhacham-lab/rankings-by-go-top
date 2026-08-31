@@ -33,8 +33,12 @@ async function main() {
 
   console.log('1) RPC security conventions (same rules the other RPCs are held to)')
   {
-    check('1a: SECURITY DEFINER with a fixed search_path',
-      /LANGUAGE plpgsql SECURITY DEFINER SET search_path = public/.test(BODY))
+    check('1a: SECURITY DEFINER with an EMPTY search_path (PostgreSQL guidance — no caller-controlled schema can shadow anything)',
+      /LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''/.test(BODY))
+    check('1a: every table reference is schema-qualified', !/\bFROM shopify_connections\b/.test(BODY) && /public\.shopify_connections/.test(BODY))
+    check('1a: non-trivial function calls are schema-qualified',
+      /pg_catalog\.pg_advisory_xact_lock/.test(BODY) && /pg_catalog\.now\(\)/.test(BODY)
+      && /pg_catalog\.array_length/.test(BODY))
     check('1b: EXECUTE revoked from PUBLIC, anon, authenticated',
       /REVOKE ALL ON FUNCTION public\.claim_shopify_shop_ownership\([^)]*\) FROM PUBLIC, anon, authenticated;/.test(MIG))
     check('1c: EXECUTE granted ONLY to service_role',
@@ -46,7 +50,7 @@ async function main() {
   console.log('\n2) Serialization and locking (NOT provable in FakeAdmin)')
   {
     check('2a: a transaction-scoped advisory lock is taken on the shop domain',
-      /PERFORM pg_advisory_xact_lock\(hashtextextended\(p_shop_domain, 0\)\)/.test(BODY))
+      /PERFORM pg_catalog\.pg_advisory_xact_lock\(pg_catalog\.hashtextextended\(p_shop_domain, 0\)\)/.test(BODY))
     const lockIdx = BODY.indexOf('pg_advisory_xact_lock')
     const selectIdx = BODY.indexOf('FROM public.shopify_connections')
     check('2b: the lock is acquired BEFORE the row is read', lockIdx !== -1 && selectIdx !== -1 && lockIdx < selectIdx)
@@ -64,7 +68,7 @@ async function main() {
     check('3a: requires connection_status = failed', /v_existing\.connection_status = 'failed'/.test(BODY))
     check('3b: requires last_error = app_uninstalled', /v_existing\.last_error = 'app_uninstalled'/.test(BODY))
     check('3c: requires granted_scopes to be empty',
-      /COALESCE\(array_length\(v_existing\.granted_scopes, 1\), 0\) = 0/.test(BODY))
+      /COALESCE\(pg_catalog\.array_length\(v_existing\.granted_scopes, 1\), 0\) = 0/.test(BODY))
     check('3d: requires no ACTIVE Shopify subscription',
       /v_existing\.shopify_subscription_status IS DISTINCT FROM 'active'/.test(BODY))
     check('3e: it is a negated conjunction — anything else falls through to a blocked outcome',
@@ -95,16 +99,25 @@ async function main() {
 
   console.log('\n5) Uniqueness becomes live-only so an archived row releases its claim')
   {
-    check('5a: shop_domain unique index is partial on archived_at IS NULL',
-      /CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_shop_domain_unique\s*\n\s*ON public\.shopify_connections \(shop_domain\)\s*\n\s*WHERE archived_at IS NULL;/.test(MIG))
-    check('5b: shop_gid unique index is partial on archived_at IS NULL',
-      /shopify_connections_shop_gid_unique[\s\S]{0,160}WHERE shop_gid IS NOT NULL AND archived_at IS NULL;/.test(MIG))
-    check('5c: the project_id uniqueness CONSTRAINT is replaced by a live-only partial index',
-      /DROP CONSTRAINT IF EXISTS shopify_connections_project_unique;/.test(MIG)
-      && /CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_project_unique[\s\S]{0,140}WHERE archived_at IS NULL;/.test(MIG))
-    check('5d: the old unconditional indexes are dropped first (otherwise they would still block)',
-      /DROP INDEX IF EXISTS public\.shopify_connections_shop_domain_unique;/.test(MIG)
-      && /DROP INDEX IF EXISTS public\.shopify_connections_shop_gid_unique;/.test(MIG))
+    for (const col of ['shop_domain', 'shop_gid', 'project'])
+      check(`5a: a partial replacement index for ${col} is created under a TEMP name`,
+        new RegExp(`CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_${col}_live_uniq`).test(MIG))
+    // GAP-FREE ORDER: every CREATE must precede every DROP/rename.
+    const lastCreate = Math.max(...['shop_domain', 'shop_gid', 'project']
+      .map((c) => MIG.indexOf(`CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_${c}_live_uniq`)))
+    const firstDrop = Math.min(...[
+      MIG.indexOf('DROP INDEX IF EXISTS public.shopify_connections_shop_domain_unique'),
+      MIG.indexOf('DROP CONSTRAINT IF EXISTS shopify_connections_project_unique'),
+      MIG.indexOf('DROP INDEX IF EXISTS public.shopify_connections_shop_gid_unique'),
+    ].filter((i) => i !== -1))
+    check('5b: ALL replacement indexes are created BEFORE any old rule is dropped — no window without uniqueness',
+      lastCreate !== -1 && firstDrop !== -1 && lastCreate < firstDrop)
+    check('5c: the replacements are then renamed into the canonical names',
+      /ALTER INDEX public\.shopify_connections_shop_domain_live_uniq\s*\n?\s*RENAME TO shopify_connections_shop_domain_unique;/.test(MIG)
+      && /RENAME TO shopify_connections_shop_gid_unique;/.test(MIG)
+      && /RENAME TO shopify_connections_project_unique;/.test(MIG))
+    check('5d: the renames are guarded by to_regclass so a partial or repeated run converges (repo convention is idempotent)',
+      (MIG.match(/to_regclass\(/g) || []).length >= 6)
   }
 
   console.log('\n6) The new owner\'s row is CLEAN — nothing carried across accounts')

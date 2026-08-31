@@ -47,26 +47,59 @@ ALTER TABLE public.shopify_connections
     CHECK (archived_reason IN ('superseded_after_uninstall') OR archived_reason IS NULL);
 
 -- ── 2) Uniqueness applies to LIVE rows only ─────────────────────────────────
--- Dropping and recreating as partial indexes. An archived row keeps its
--- shop_domain, shop_gid and project_id values but no longer competes for them.
+--
+-- ORDER MATTERS. The new PARTIAL unique indexes are created FIRST, under
+-- temporary names, while the old stronger rules are still in force; only then
+-- are the old ones dropped and the new ones renamed into place. There is
+-- therefore no window — not even if the migration runner does not wrap this
+-- file in a single transaction — during which the shop_domain, shop_gid or
+-- project_id uniqueness is absent. Creating the weaker (partial) rule under
+-- the stronger one always succeeds, because any data satisfying the
+-- unconditional rule necessarily satisfies the partial one.
+--
+-- Idempotent, matching this repo's convention (every existing migration uses
+-- IF NOT EXISTS / OR REPLACE): each step is guarded so a re-run is a no-op.
 
-DROP INDEX IF EXISTS public.shopify_connections_shop_domain_unique;
-CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_shop_domain_unique
+-- 2a) Create the replacements alongside the originals.
+CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_shop_domain_live_uniq
   ON public.shopify_connections (shop_domain)
   WHERE archived_at IS NULL;
 
-DROP INDEX IF EXISTS public.shopify_connections_shop_gid_unique;
-CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_shop_gid_unique
+CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_shop_gid_live_uniq
   ON public.shopify_connections (shop_gid)
   WHERE shop_gid IS NOT NULL AND archived_at IS NULL;
 
--- project_id uniqueness must also become live-only: a project whose Shopify
--- connection was archived must still be able to connect a different store.
-ALTER TABLE public.shopify_connections
-  DROP CONSTRAINT IF EXISTS shopify_connections_project_unique;
-CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_project_unique
+CREATE UNIQUE INDEX IF NOT EXISTS shopify_connections_project_live_uniq
   ON public.shopify_connections (project_id)
   WHERE archived_at IS NULL;
+
+-- 2b) Only now retire the originals, and rename the replacements into their
+--     canonical names. Guarded so a partial or repeated run converges.
+DO $$
+BEGIN
+  DROP INDEX IF EXISTS public.shopify_connections_shop_domain_unique;
+  ALTER TABLE public.shopify_connections DROP CONSTRAINT IF EXISTS shopify_connections_project_unique;
+  DROP INDEX IF EXISTS public.shopify_connections_project_unique;
+  DROP INDEX IF EXISTS public.shopify_connections_shop_gid_unique;
+
+  IF to_regclass('public.shopify_connections_shop_domain_live_uniq') IS NOT NULL
+     AND to_regclass('public.shopify_connections_shop_domain_unique') IS NULL THEN
+    ALTER INDEX public.shopify_connections_shop_domain_live_uniq
+      RENAME TO shopify_connections_shop_domain_unique;
+  END IF;
+
+  IF to_regclass('public.shopify_connections_shop_gid_live_uniq') IS NOT NULL
+     AND to_regclass('public.shopify_connections_shop_gid_unique') IS NULL THEN
+    ALTER INDEX public.shopify_connections_shop_gid_live_uniq
+      RENAME TO shopify_connections_shop_gid_unique;
+  END IF;
+
+  IF to_regclass('public.shopify_connections_project_live_uniq') IS NOT NULL
+     AND to_regclass('public.shopify_connections_project_unique') IS NULL THEN
+    ALTER INDEX public.shopify_connections_project_live_uniq
+      RENAME TO shopify_connections_project_unique;
+  END IF;
+END $$;
 
 -- Archived rows are read rarely and only for audit; index them separately so
 -- the live-path queries above stay on the partial indexes.
@@ -108,9 +141,14 @@ CREATE OR REPLACE FUNCTION public.claim_shopify_shop_ownership(
   p_connection_status text,
   p_last_error text
 ) RETURNS TABLE(outcome text, connection_id uuid)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+-- SECURITY DEFINER hardening (PostgreSQL guidance): an EMPTY search_path so
+-- no schema controlled by a caller can shadow anything this body resolves.
+-- pg_catalog is always searched implicitly, so built-in types and operators
+-- still resolve; every table and every non-trivial function call below is
+-- schema-qualified regardless.
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  v_now timestamptz := now();
+  v_now timestamptz := pg_catalog.now();
   v_existing record;
   v_conflict record;
   v_id uuid;
@@ -118,7 +156,7 @@ BEGIN
   -- Serialize every concurrent reconnect attempt for THIS shop. The advisory
   -- lock is transaction-scoped, so it is released on commit or rollback and a
   -- crashed session cannot wedge the shop.
-  PERFORM pg_advisory_xact_lock(hashtextextended(p_shop_domain, 0));
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_shop_domain, 0));
 
   -- Re-read INSIDE the lock: any decision made by the caller before this point
   -- is advisory only.
@@ -163,7 +201,7 @@ BEGIN
     IF NOT (
       v_existing.connection_status = 'failed'
       AND v_existing.last_error = 'app_uninstalled'
-      AND COALESCE(array_length(v_existing.granted_scopes, 1), 0) = 0
+      AND COALESCE(pg_catalog.array_length(v_existing.granted_scopes, 1), 0) = 0
       AND v_existing.shopify_subscription_status IS DISTINCT FROM 'active'
     ) THEN
       IF v_existing.connection_status = 'connected' THEN

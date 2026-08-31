@@ -105,6 +105,7 @@ export async function applyAppUninstalled(admin: Admin, shopDomain: string): Pro
       updated_at: new Date().toISOString(),
     })
     .eq('shop_domain', shopDomain)
+    .is('archived_at', null)
   if (error) return { ok: false, error: 'connection_update_failed' }
   return { ok: true }
 }

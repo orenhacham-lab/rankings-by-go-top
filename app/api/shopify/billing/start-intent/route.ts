@@ -79,7 +79,8 @@ export async function GET(request: Request) {
     const { data } = await admin
       .from('shopify_connections')
       .select('id, user_id, project_id, shop_domain, shop_gid')
-      .eq('shop_domain', verified.shopDomain)
+            .eq('shop_domain', verified.shopDomain)
+      .is('archived_at', null)
       .eq('connection_status', 'connected')
       .maybeSingle()
     connection = data as ResolvedConnection | null
@@ -98,6 +99,7 @@ export async function GET(request: Request) {
       .select('id, user_id, project_id, shop_domain, shop_gid')
       .eq('user_id', user.id)
       .eq('connection_status', 'connected')
+      .is('archived_at', null)
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle()

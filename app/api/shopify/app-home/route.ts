@@ -44,7 +44,8 @@ export async function GET(request: Request) {
   const { data } = await admin
     .from('shopify_connections')
     .select('id, user_id, project_id, shop_gid, connection_status, granted_scopes, last_error')
-    .eq('shop_domain', shopDomain)
+        .eq('shop_domain', shopDomain)
+    .is('archived_at', null)
     .maybeSingle()
 
   if (!data) {

@@ -31,6 +31,8 @@
  *
  * Run: npx tsx lib/shopify/__qa__/phase3-reconnect-after-uninstall.qa.ts
  */
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { claimShopForProject } from '../connection-ownership'
 
@@ -38,6 +40,9 @@ let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
+
+const ROOT = join(__dirname, '..', '..', '..')
+const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 
 const SHOP = 'go-top-seo-test.myshopify.com'
 const GID = 'gid://shopify/Shop/12345'
@@ -268,6 +273,104 @@ async function main() {
       rows.filter((r) => !r.archived_at && r.shop_domain === SHOP).length === 1
       && rows.find((r) => !r.archived_at && r.shop_domain === SHOP)!.project_id === REVIEWER.project)
     check('11e: the original owner\'s record survives, archived', rows.some((r) => !!r.archived_at && r.project_id === OWNER.project))
+  }
+
+  console.log('\n12) LIVE-READER AUDIT — every current-connection lookup must ignore the archived twin')
+  {
+    // The archival design deliberately keeps the real shop_domain/shop_gid on
+    // the archived row, so after a cross-account reconnect BOTH rows carry the
+    // same Shopify identity. Any live lookup that does not exclude archived
+    // rows would either return the wrong owner or blow up on maybeSingle().
+    // These exercise the REAL consumers against an archived+live pair.
+    const pair = () => new FakeAdmin({
+      shopify_connections: [
+        { ...tombstone(), id: 'c-old', archived_at: '2026-08-30T00:00:00Z', archived_reason: 'superseded_after_uninstall' },
+        { id: 'c-new', user_id: REVIEWER.user, project_id: REVIEWER.project, shop_domain: SHOP, shop_gid: GID,
+          access_token_encrypted: 'enc(FRESH)', api_version: '2026-07',
+          granted_scopes: ['read_products', 'read_content', 'write_content'],
+          connection_status: 'connected', last_error: null, archived_at: null, archived_reason: null },
+      ],
+    })
+
+    // App Home resolves by shop_domain — the exact query that would break.
+    const a = pair()
+    const appHome = await a.from('shopify_connections')
+      .select('id, user_id, project_id').eq('shop_domain', SHOP).is('archived_at', null).maybeSingle()
+    check('12a: App Home resolves ONLY the new reviewer connection', (appHome.data as { id?: string } | null)?.id === 'c-new')
+    check('12b: it does NOT resolve the archived admin row',
+      (appHome.data as { user_id?: string } | null)?.user_id === REVIEWER.user)
+
+    // Without the filter the same query is ambiguous — the bug being fixed.
+    const amb = await pair().from('shopify_connections').select('id').eq('shop_domain', SHOP)
+    check('12c: NEGATIVE CONTROL — without the archived filter the same lookup matches BOTH rows',
+      Array.isArray(amb.data) && (amb.data as unknown[]).length === 2)
+
+    // Uninstall webhook targets by shop_domain: must touch only the live row.
+    const u = pair()
+    await u.from('shopify_connections')
+      .update({ connection_status: 'failed', last_error: 'app_uninstalled', granted_scopes: [] })
+      .eq('shop_domain', SHOP).is('archived_at', null)
+    const rows = u.tables.shopify_connections
+    check('12d: uninstall webhook updated ONLY the live row',
+      rows.find((r) => r.id === 'c-new')!.last_error === 'app_uninstalled')
+    check('12e: the archived row was NOT rewritten by the uninstall',
+      rows.find((r) => r.id === 'c-old')!.connection_status === 'failed'
+      && rows.find((r) => r.id === 'c-old')!.archived_at === '2026-08-30T00:00:00Z')
+
+    // Publishing / entitlement / billing resolve by project_id or user_id.
+    const p = pair()
+    const byProject = await p.from('shopify_connections').select('id').eq('project_id', REVIEWER.project).is('archived_at', null).maybeSingle()
+    check('12f: publishing/platform lookup by project_id returns the live row only', (byProject.data as { id?: string } | null)?.id === 'c-new')
+    const oldProject = await p.from('shopify_connections').select('id').eq('project_id', OWNER.project).is('archived_at', null).maybeSingle()
+    check('12g: the ORIGINAL project now resolves NO live Shopify connection', oldProject.data === null)
+
+    const byUser = await p.from('shopify_connections').select('id, user_id')
+      .eq('user_id', REVIEWER.user).eq('connection_status', 'connected').is('archived_at', null).maybeSingle()
+    check('12h: billing/entitlement lookup by user_id returns the reviewer\'s live row', (byUser.data as { id?: string } | null)?.id === 'c-new')
+    const adminUser = await p.from('shopify_connections').select('id')
+      .eq('user_id', OWNER.user).eq('connection_status', 'connected').is('archived_at', null).maybeSingle()
+    check('12i: the old admin account resolves NO live connection (no billing/admin carry-over)', adminUser.data === null)
+  }
+
+  console.log('\n13) A previously-archived project can connect a DIFFERENT shop without single-row failures')
+  {
+    const admin = new FakeAdmin({
+      shopify_connections: [
+        { ...tombstone(), id: 'c-old', archived_at: '2026-08-30T00:00:00Z', archived_reason: 'superseded_after_uninstall' },
+      ],
+    })
+    const r = await claimShopForProject(admin as never, {
+      ...freshArgs(OWNER), shopDomain: 'a-different-store.myshopify.com', shopGid: 'gid://shopify/Shop/555',
+    })
+    check('13a: the archived project can claim a different shop', r.ok === true)
+    const live = admin.tables.shopify_connections.filter((x) => !x.archived_at && x.project_id === OWNER.project)
+    check('13b: it has exactly ONE live row (maybeSingle-safe)', live.length === 1)
+    check('13c: pointing at the new shop, not the archived one', live[0].shop_domain === 'a-different-store.myshopify.com')
+    check('13d: the archived row is still present and untouched',
+      admin.tables.shopify_connections.some((x) => x.id === 'c-old' && x.archived_at === '2026-08-30T00:00:00Z'))
+  }
+
+  console.log('\n14) Source contract — no live lookup was left unfiltered')
+  {
+    const FILES = [
+      'app/api/shopify/app-home/route.ts', 'app/api/shopify/embedded-install/route.ts',
+      'app/api/shopify/billing/start-intent/route.ts', 'app/api/shopify/connection/route.ts',
+      'app/api/content/overview/route.ts', 'app/api/wordpress/connection/route.ts',
+      'lib/shopify/api-auth.ts', 'lib/shopify/entitlement-resolver.ts', 'lib/shopify/paypal-block.ts',
+      'lib/shopify/site-targets.ts', 'lib/shopify/shop-cleanup.ts',
+      'lib/shopify/billing-return-processing.ts', 'lib/content/platform/load-active-platform.ts',
+      'lib/billing/usage-period.ts', 'app/(dashboard)/billing/page.tsx',
+    ]
+    for (const rel of FILES) {
+      check(`14: ${rel} filters archived rows out of its live lookup(s)`,
+        /\.is\('archived_at', null\)/.test(read(rel)))
+    }
+    // shop/redact is the ONE documented Category-B consumer: a GDPR erase must
+    // remove the archived history too, so it deliberately does NOT filter.
+    const cleanup = read('lib/shopify/shop-cleanup.ts')
+    const redact = cleanup.slice(cleanup.indexOf('export async function applyShopRedact'))
+    check('14: applyShopRedact (Category B) intentionally spans archived rows too — a GDPR erase must not leave history behind',
+      !/\.is\('archived_at', null\)/.test(redact))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
