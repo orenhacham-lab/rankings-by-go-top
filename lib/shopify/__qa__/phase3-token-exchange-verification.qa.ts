@@ -40,7 +40,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { ShopifyClientError, testShopifyConnection, getGrantedScopes, getShopIdentity } from '../client'
+import { ShopifyClientError, testShopifyConnection, getGrantedScopes, getShopIdentity, sanitizeShopifyMessage, extractShopifyErrorDetail } from '../client'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
 import { SHOPIFY_API_VERSION } from '../constants'
 
@@ -220,7 +220,16 @@ async function main() {
     // Every field actually passed as a diagnostic must be on the allowed list.
     const diagKeys = [...src.matchAll(/fail\(\d+, '[a-z_]+', \{([\s\S]*?)\}\)/g)]
       .flatMap((m) => [...m[1].matchAll(/^\s*(\w+):/gm)].map((k) => k[1]))
-    const ALLOWED = new Set(['stage', 'kind', 'httpStatus', 'shopifyRequestId', 'apiVersionRequested', 'apiVersionActual', 'apiVersion', 'shopDomain', 'tokenAuthenticates'])
+    const ALLOWED = new Set([
+      'stage', 'kind', 'httpStatus', 'shopifyRequestId', 'apiVersionRequested', 'apiVersionActual',
+      'apiVersion', 'shopDomain', 'tokenAuthenticates',
+      // token-exchange response SHAPE — statuses, booleans, lengths, a fixed
+      // classification label, and public scope NAMES. No token bytes.
+      'exchangeHttpStatus', 'exchangeRequestId', 'hasAccessToken', 'tokenType', 'tokenLength',
+      'scopes', 'scopeCount', 'associatedUserScope', 'expiresIn', 'requestedTokenType',
+      // Shopify's own structured error reason, sanitized and capped in client.ts.
+      'shopifyMessages', 'shopifyCodes',
+    ])
     const bad = [...new Set(diagKeys)].filter((k) => !ALLOWED.has(k))
     check('8c: every diagnostic field is on the safe allow-list (stage, kind, status, api version, shop domain, request id)',
       bad.length === 0, bad.join(', '))
@@ -245,6 +254,102 @@ async function main() {
       /\.map\(\(k\) => `\$\{k\}=\$\{params\[k\]\}`\)/.test(oauth) && !/encodeURIComponent\(params\[k\]\)/.test(oauth))
     check('9g: billing still refuses an unverified shop identity',
       /shop_identity_unverified/.test(read('app/api/shopify/app-home/route.ts')))
+  }
+
+  console.log('\n12) Shopify\'s structured 403 reason is captured, not discarded')
+  {
+    const realFetch = globalThis.fetch
+    // A 403 whose body names the missing access — the case production hit.
+    const { impl } = captureFetch((): StubResponse => ({
+      status: 403,
+      body: { errors: [{ message: 'Access denied for shop field. Required access: `read_content` access scope.', extensions: { code: 'ACCESS_DENIED' } }] },
+      headers: { 'x-request-id': 'req-403-abc' },
+    }))
+    globalThis.fetch = impl
+    const res = await testShopifyConnection({ shopDomain: SHOP, accessToken: RAW_TOKEN, apiVersion: SHOPIFY_API_VERSION })
+    globalThis.fetch = realFetch
+
+    check('12a: still fails closed', res.ok === false)
+    check('12b: HTTP 403 recorded', res.diagnostics?.httpStatus === 403)
+    check('12c: Shopify\'s message is captured', (res.diagnostics?.shopifyMessages ?? [])[0]?.includes('Required access'))
+    check('12d: the GraphQL extensions.code is captured', (res.diagnostics?.shopifyCodes ?? [])[0] === 'ACCESS_DENIED')
+    check('12e: the request id is still captured', res.diagnostics?.requestId === 'req-403-abc')
+  }
+
+  console.log('\n13) Body parsing is safe, capped, and never returns the body')
+  {
+    // Top-level string form.
+    const strForm = await extractShopifyErrorDetail({ text: async () => JSON.stringify({ errors: '[API] Invalid API key or access token' }) })
+    check('13a: a top-level `errors` string is extracted', strForm.messages[0] === '[API] Invalid API key or access token')
+
+    // Object-map form.
+    const objForm = await extractShopifyErrorDetail({ text: async () => JSON.stringify({ errors: { shop: 'not permitted' } }) })
+    check('13b: an object-map `errors` is extracted', objForm.messages[0] === 'not permitted')
+
+    // Non-JSON must not throw.
+    const html = await extractShopifyErrorDetail({ text: async () => '<html>500</html>' })
+    check('13c: a non-JSON body yields nothing and does not throw', html.messages.length === 0 && html.codes.length === 0)
+
+    // Caps.
+    const many = await extractShopifyErrorDetail({ text: async () => JSON.stringify({ errors: Array.from({ length: 20 }, (_, i) => ({ message: `e${i}`, extensions: { code: `C${i}` } })) }) })
+    check('13d: at most 3 messages are kept', many.messages.length <= 3)
+    check('13e: at most 3 codes are kept', many.codes.length <= 3)
+
+    const long = await extractShopifyErrorDetail({ text: async () => JSON.stringify({ errors: 'x'.repeat(5000) }) })
+    check('13f: a single message is capped to 200 chars', (long.messages[0] ?? '').length <= 200)
+
+    // A giant body is truncated before parsing (so it fails to parse, safely).
+    const giant = await extractShopifyErrorDetail({ text: async () => '{"errors":"' + 'y'.repeat(20000) + '"}' })
+    check('13g: an oversized body is truncated and yields nothing rather than being logged', giant.messages.length === 0)
+  }
+
+  console.log('\n14) SANITIZER — no credential shape can survive into a message')
+  {
+    const SECRETS: [string, string][] = [
+      ['Shopify offline token', 'shpat_' + 'a'.repeat(32)],
+      ['Shopify online token', 'shpca_' + 'b'.repeat(32)],
+      ['Shopify app secret', 'shpss_' + 'c'.repeat(32)],
+      ['bearer header', 'Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature'],
+      ['JWT session token', 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJlAAAA'],
+      ['long hex secret', 'd'.repeat(48)],
+    ]
+    for (const [label, secret] of SECRETS) {
+      const out = sanitizeShopifyMessage(`Shopify said: ${secret} was rejected`)
+      check(`14: ${label} is redacted from a Shopify message`, !out.includes(secret))
+      check(`14: ${label} — a 12-char fragment does not survive either`, !out.includes(secret.slice(0, 12)))
+    }
+    check('14: ordinary Shopify text is preserved so the reason stays readable',
+      sanitizeShopifyMessage('Required access: `read_content` access scope.').includes('read_content'))
+
+    // End-to-end: a 403 body echoing a token must not reach the diagnostics.
+    const realFetch = globalThis.fetch
+    const LEAK = 'shpat_' + 'e'.repeat(32)
+    const { impl } = captureFetch((): StubResponse => ({
+      status: 403, body: { errors: [{ message: `token ${LEAK} denied` }] }, headers: { 'x-request-id': 'r' },
+    }))
+    globalThis.fetch = impl
+    const res = await testShopifyConnection({ shopDomain: SHOP, accessToken: RAW_TOKEN, apiVersion: SHOPIFY_API_VERSION })
+    globalThis.fetch = realFetch
+    const serialized = JSON.stringify(res.diagnostics)
+    check('14: a token echoed by Shopify never reaches the diagnostics', !serialized.includes(LEAK))
+    check('14: it is replaced by a redaction marker', serialized.includes('[redacted-token]'))
+  }
+
+  console.log('\n15) Fail-closed behaviour is unchanged by the added detail')
+  {
+    const route = strip(read('app/api/shopify/embedded-install/route.ts'))
+    const testGuard = route.indexOf("return fail(502, 'token_verification_failed'")
+    const gidGuard = route.indexOf("return fail(502, 'shop_identity_unverified'")
+    const pending = route.indexOf('createPendingInstall(admin, {')
+    check('15a: verification failure still aborts before any pending install',
+      testGuard !== -1 && pending !== -1 && testGuard < pending)
+    check('15b: a missing shop_gid still aborts before any pending install',
+      gidGuard !== -1 && gidGuard < pending)
+    const client = read('lib/shopify/client.ts')
+    check('15c: 401/403 still throw invalid_token (classification unchanged)',
+      /if \(res\.status === 401 \|\| res\.status === 403\) \{\s*\n\s*throw new ShopifyClientError\('invalid_token'/.test(client))
+    check('15d: the body is read ONLY on a non-2xx, so the 2xx path is untouched',
+      /if \(res\.status < 200 \|\| res\.status >= 300\) \{\s*\n\s*detail = await extractShopifyErrorDetail/.test(client))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

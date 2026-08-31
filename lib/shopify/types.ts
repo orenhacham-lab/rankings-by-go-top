@@ -47,6 +47,10 @@ export interface ShopifyTestResult {
     kind: string
     httpStatus?: number
     requestId?: string | null
+    /** Sanitized, capped messages Shopify itself returned on a non-2xx. */
+    shopifyMessages?: string[]
+    /** Sanitized GraphQL extensions.code values, when Shopify supplies them. */
+    shopifyCodes?: string[]
   }
 
   /** True when the token is valid and the store is reachable (may still warn). */

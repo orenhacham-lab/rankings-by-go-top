@@ -28,19 +28,104 @@ const MAX_TRANSIENT_RETRIES = 4
 const PAGE_SIZE = 100
 const MAX_PAGES_PER_TYPE = 20 // bounded pagination: ≤ 2000 entities/type
 
+
+/** Hard caps so a hostile or oversized Shopify body can never flood a log. */
+const MAX_ERROR_BODY_CHARS = 4096
+const MAX_ERROR_MESSAGE_CHARS = 200
+const MAX_ERROR_ITEMS = 3
+
+/**
+ * Redact anything credential-shaped before a Shopify message can be logged.
+ *
+ * Shopify's error strings are its own text and should not contain our
+ * credentials, but this is defence in depth: a body that echoed a header, a
+ * token, or a JWT must not become a log line. Patterns cover Shopify access
+ * tokens (shpat_/shpca_/shpss_), bearer headers, JWT-shaped triples, and any
+ * long hex/base64 run that could be a secret.
+ */
+export function sanitizeShopifyMessage(input: string): string {
+  return input
+    .replace(/shp(at|ca|ss)_[A-Za-z0-9._-]+/g, '[redacted-token]')
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, '[redacted-authorization]')
+    .replace(/\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted-jwt]')
+    .replace(/\b[A-Fa-f0-9]{32,}\b/g, '[redacted-hex]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_ERROR_MESSAGE_CHARS)
+}
+
+/**
+ * Extract ONLY documented, non-secret error fields from a non-2xx Shopify
+ * response: the top-level `errors` (string or array) and, for a GraphQL error
+ * array, each entry's `message` and `extensions.code`.
+ *
+ * Reads the body ONCE as text, capped, and never returns or logs the body
+ * itself. Returns empty arrays rather than throwing — diagnosis must never
+ * change control flow.
+ */
+export async function extractShopifyErrorDetail(res: {
+  text?: () => Promise<string>
+  json?: () => Promise<unknown>
+}): Promise<{ messages: string[]; codes: string[] }> {
+  const empty = { messages: [] as string[], codes: [] as string[] }
+  let parsed: unknown = null
+  try {
+    if (typeof res.text === 'function') {
+      const raw = (await res.text()).slice(0, MAX_ERROR_BODY_CHARS)
+      parsed = JSON.parse(raw)
+    } else if (typeof res.json === 'function') {
+      parsed = await res.json()
+    }
+  } catch {
+    return empty // non-JSON or unreadable — report nothing rather than guess
+  }
+  if (!parsed || typeof parsed !== 'object') return empty
+
+  const messages: string[] = []
+  const codes: string[] = []
+  const errors = (parsed as { errors?: unknown }).errors
+
+  if (typeof errors === 'string') {
+    messages.push(sanitizeShopifyMessage(errors))
+  } else if (Array.isArray(errors)) {
+    for (const e of errors.slice(0, MAX_ERROR_ITEMS)) {
+      if (typeof e === 'string') { messages.push(sanitizeShopifyMessage(e)); continue }
+      if (!e || typeof e !== 'object') continue
+      const msg = (e as { message?: unknown }).message
+      if (typeof msg === 'string') messages.push(sanitizeShopifyMessage(msg))
+      const code = (e as { extensions?: { code?: unknown } }).extensions?.code
+      if (typeof code === 'string') codes.push(sanitizeShopifyMessage(code))
+    }
+  } else if (errors && typeof errors === 'object') {
+    // Shopify sometimes returns { errors: { <field>: "message" } }.
+    for (const v of Object.values(errors as Record<string, unknown>).slice(0, MAX_ERROR_ITEMS)) {
+      if (typeof v === 'string') messages.push(sanitizeShopifyMessage(v))
+    }
+  }
+  return { messages: messages.filter(Boolean).slice(0, MAX_ERROR_ITEMS), codes: codes.filter(Boolean).slice(0, MAX_ERROR_ITEMS) }
+}
+
 export class ShopifyClientError extends Error {
   kind: ShopifyErrorKind
+  /** Sanitized, capped messages Shopify itself returned. Never a body. */
+  shopifyMessages?: string[]
+  /** Sanitized GraphQL `extensions.code` values, when present. */
+  shopifyCodes?: string[]
   /** Shopify's HTTP status, when the failure came from a response. */
   status?: number
   /** Shopify's `x-request-id`, for correlating with Shopify's own logs.
    *  Opaque and non-sensitive — safe to log. */
   requestId?: string | null
-  constructor(kind: ShopifyErrorKind, message: string, meta?: { status?: number; requestId?: string | null }) {
+  constructor(kind: ShopifyErrorKind, message: string, meta?: {
+    status?: number; requestId?: string | null; shopifyMessages?: string[]; shopifyCodes?: string[]
+  }) {
     super(message)
     this.name = 'ShopifyClientError'
     this.kind = kind
     if (meta?.status !== undefined) this.status = meta.status
     if (meta?.requestId !== undefined) this.requestId = meta.requestId
+    if (meta?.shopifyMessages) this.shopifyMessages = meta.shopifyMessages
+    if (meta?.shopifyCodes) this.shopifyCodes = meta.shopifyCodes
   }
 }
 
@@ -107,7 +192,17 @@ async function graphql<T>(creds: ShopifyCredentials, query: string, variables: R
     // Opaque correlation id Shopify returns on every response — carries no
     // secret and lets a failure here be matched against Shopify's own logs.
     const reqId = res.headers.get('x-request-id')
-    const meta = { status: res.status, requestId: reqId }
+
+    // Non-2xx: read Shopify's STRUCTURED error once, before deciding. 401 and
+    // 403 both map to invalid_token, which hid the difference between "token
+    // not recognised" and "token recognised but refused" — Shopify states
+    // which in the payload, so capture it (sanitized and capped) instead of
+    // discarding it. The body itself is never retained or logged.
+    let detail = { messages: [] as string[], codes: [] as string[] }
+    if (res.status < 200 || res.status >= 300) {
+      detail = await extractShopifyErrorDetail(res as unknown as { text?: () => Promise<string> })
+    }
+    const meta = { status: res.status, requestId: reqId, shopifyMessages: detail.messages, shopifyCodes: detail.codes }
 
     if (res.status === 401 || res.status === 403) {
       throw new ShopifyClientError('invalid_token', 'Authentication failed. Check the Admin API access token.', meta)
@@ -152,7 +247,7 @@ export async function getGrantedScopes(creds: ShopifyCredentials): Promise<{
   /** Why the scopes could not be read. Non-sensitive; previously the error was
    *  swallowed entirely, which made an unreadable-scopes failure
    *  indistinguishable from a bad token in logs. */
-  failure?: { kind: ShopifyErrorKind | 'malformed'; status?: number; requestId?: string | null }
+  failure?: { kind: ShopifyErrorKind | 'malformed'; status?: number; requestId?: string | null; messages?: string[]; codes?: string[] }
 }> {
   const query = `{ currentAppInstallation { accessScopes { handle } } }`
   try {
@@ -164,7 +259,10 @@ export async function getGrantedScopes(creds: ShopifyCredentials): Promise<{
     const e = err instanceof ShopifyClientError ? err : null
     return {
       scopes: [], readable: false, apiVersion: null,
-      failure: { kind: e?.kind ?? 'api_error', status: e?.status, requestId: e?.requestId ?? null },
+      failure: {
+        kind: e?.kind ?? 'api_error', status: e?.status, requestId: e?.requestId ?? null,
+        messages: e?.shopifyMessages, codes: e?.shopifyCodes,
+      },
     }
   }
 }
@@ -201,7 +299,10 @@ export async function testShopifyConnection(creds: ShopifyCredentials): Promise<
     return {
       ok: false, status, error: e ? e.message : 'Connection failed.', kind,
       apiVersionRequested: creds.apiVersion, apiVersionActual,
-      diagnostics: { stage: 'shop_query', kind, httpStatus: e?.status, requestId: e?.requestId ?? null },
+      diagnostics: {
+        stage: 'shop_query', kind, httpStatus: e?.status, requestId: e?.requestId ?? null,
+        shopifyMessages: e?.shopifyMessages, shopifyCodes: e?.shopifyCodes,
+      },
     }
   }
 
@@ -239,6 +340,8 @@ export async function testShopifyConnection(creds: ShopifyCredentials): Promise<
         kind: granted.failure?.kind ?? 'api_error',
         httpStatus: granted.failure?.status,
         requestId: granted.failure?.requestId ?? null,
+        shopifyMessages: granted.failure?.messages,
+        shopifyCodes: granted.failure?.codes,
       },
     }),
   }
