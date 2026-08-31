@@ -31,7 +31,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { SHOPIFY_API_VERSION } from '@/lib/shopify/constants'
 import { testShopifyConnection, getShopIdentity } from '@/lib/shopify/client'
-import { getShopifyOAuthConfig, exchangeSessionTokenForOfflineToken } from '@/lib/shopify/oauth'
+import { getShopifyOAuthConfig, exchangeSessionTokenForOfflineToken, TokenExchangeError } from '@/lib/shopify/oauth'
+import type { TokenExchangeDiagnostics } from '@/lib/shopify/oauth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
 import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
 
   // 3) Token exchange — the managed-installation replacement for the
   //    authorization-code redirect. Uses the VERIFIED shop domain.
-  let exchanged: { accessToken: string; scope: string }
+  let exchanged: { accessToken: string; scope: string; diagnostics: TokenExchangeDiagnostics }
   try {
     exchanged = await exchangeSessionTokenForOfflineToken({
       shop: shopDomain,
@@ -93,11 +94,18 @@ export async function POST(request: Request) {
       clientSecret: config.clientSecret,
     })
   } catch (err) {
+    const d = err instanceof TokenExchangeError ? err.diagnostics : {}
     return fail(502, 'token_exchange_failed', {
       stage: 'token_exchange',
       kind: err instanceof Error ? err.message : 'unknown',
       apiVersion: SHOPIFY_API_VERSION,
       shopDomain,
+      exchangeHttpStatus: d.httpStatus,
+      exchangeRequestId: d.shopifyRequestId ?? null,
+      hasAccessToken: d.hasAccessToken,
+      tokenType: d.tokenType,
+      scopes: d.scopes,
+      scopeCount: d.scopeCount,
     })
   }
 
@@ -140,6 +148,22 @@ export async function POST(request: Request) {
       shopDomain,
       // Did the freshly exchanged token authenticate as this shop at all?
       tokenAuthenticates: identityMatches,
+      // THE EXCHANGE RESPONSE SHAPE. A 403 on the first Admin API call with a
+      // token the exchange happily returned points at WHAT was returned, so
+      // report it: an empty `scopes` list means Shopify granted nothing (the
+      // Admin API then refuses every query), and tokenType 'online' would mean
+      // an offline/online mismatch despite requesting offline. None of these
+      // fields contain token bytes — tokenType is a classification, not a
+      // prefix taken from the value.
+      exchangeHttpStatus: exchanged.diagnostics.httpStatus,
+      exchangeRequestId: exchanged.diagnostics.shopifyRequestId,
+      tokenType: exchanged.diagnostics.tokenType,
+      tokenLength: exchanged.diagnostics.tokenLength,
+      scopes: exchanged.diagnostics.scopes,
+      scopeCount: exchanged.diagnostics.scopeCount,
+      associatedUserScope: exchanged.diagnostics.associatedUserScope,
+      expiresIn: exchanged.diagnostics.expiresIn,
+      requestedTokenType: exchanged.diagnostics.requestedTokenType,
     })
   }
 
