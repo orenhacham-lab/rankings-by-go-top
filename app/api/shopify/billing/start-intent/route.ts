@@ -15,13 +15,31 @@
  * connection id / shop domain from the request) and refuses to mint an
  * intent for a connection with no verified shop_gid.
  *
- * Response shape depends on how it was called: with an Authorization header
- * (the embedded fetch() case, which cannot itself trigger a top-level
- * navigation) it returns JSON `{ redirectUrl }` for the client to navigate
- * to; without one (a plain top-level `<a href>` navigation from the external
- * dashboard) it issues the 302 redirect directly. Either way the intent
- * cookie is set on this SAME response, before the browser ever reaches
- * Shopify.
+ * Response shape depends on how it was called, and the two cases now differ in
+ * WHERE the intent cookie comes from:
+ *
+ *   EMBEDDED (Authorization header). This fetch() runs inside the Shopify
+ *   Admin iframe, a THIRD-PARTY context for this origin, so a SameSite=Lax
+ *   cookie set on its response is dropped by modern Chrome. That is the
+ *   production defect: the merchant selected and approved a plan, Shopify
+ *   returned them to the app, and no request ever reached
+ *   /api/shopify/billing/return because the intent cookie had never been
+ *   stored. This branch therefore sets NO cookie and returns a fixed
+ *   `resumePath` plus a signed, opaque `handoff`; the client posts that
+ *   TOP-LEVEL to /api/shopify/billing/resume, which is first-party and can
+ *   establish the cookie for real. No caller-controlled redirect URL is
+ *   returned — the Shopify pricing URL is built server-side at the resume
+ *   step, from the intent's own canonical shop domain.
+ *
+ *   EXTERNAL DASHBOARD (no Authorization header). A plain top-level `<a href>`
+ *   navigation from BillingView.tsx. This is ALREADY first-party, so it keeps
+ *   setting the cookie on its own 302 to Shopify — unchanged, and deliberately
+ *   so: adding a hop there would be pure risk for no benefit.
+ *
+ * Everything before that split — session-token / Supabase authentication, the
+ * admin gate, the server-side connection resolution, the billing-authority
+ * gate, the shop_gid requirement and the intent row itself — is identical for
+ * both callers and unchanged by this fix.
  */
 
 import { isAdminUser } from '@/lib/auth/admin-role'
@@ -33,7 +51,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { buildShopifyPricingUrl } from '@/lib/shopify/billing-urls'
-import { createBillingIntent, BILLING_INTENT_COOKIE, BILLING_INTENT_COOKIE_PATH, BILLING_INTENT_TTL_MS } from '@/lib/shopify/billing-intent'
+import { createBillingIntent, signBillingIntentHandoff, BILLING_INTENT_COOKIE, BILLING_INTENT_COOKIE_PATH, BILLING_INTENT_TTL_MS, BILLING_INTENT_RESUME_PATH } from '@/lib/shopify/billing-intent'
+import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 
 interface ResolvedConnection {
   id: string
@@ -152,19 +171,37 @@ export async function GET(request: Request) {
     shopGid: connection.shop_gid,
   })
 
-  const setIntentCookie = (res: NextResponse) => {
-    res.cookies.set(BILLING_INTENT_COOKIE, nonce, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: BILLING_INTENT_COOKIE_PATH,
-      maxAge: BILLING_INTENT_TTL_MS / 1000,
+  // EMBEDDED CALLER — hand back a signed, opaque handoff instead of a cookie.
+  //
+  // The handoff is the same nonce the cookie would have carried, HMAC-signed
+  // so the resume endpoint can reject anything we did not issue before it
+  // touches the database. It is delivered in the body of an ALREADY
+  // AUTHENTICATED response (a verified App Bridge session token for this exact
+  // shop got us here) to the merchant's own browser — the same party that
+  // would have received the cookie. It never enters a URL, a query string, a
+  // fragment, browser storage or a log, because the resume leg is a POST.
+  //
+  // `resumePath` is a fixed server constant, and NO pricing URL is returned:
+  // the client is given nothing it could navigate to of its own choosing.
+  if (isApiCall) {
+    const config = getShopifyOAuthConfig()
+    if (!config) return Response.json({ error: 'shopify_oauth_not_configured' }, { status: 500 })
+    return NextResponse.json({
+      resumePath: BILLING_INTENT_RESUME_PATH,
+      handoff: signBillingIntentHandoff(nonce, config.clientSecret),
     })
-    return res
   }
 
-  if (isApiCall) {
-    return setIntentCookie(NextResponse.json({ redirectUrl: pricing.url }))
-  }
-  return setIntentCookie(NextResponse.redirect(pricing.url))
+  // EXTERNAL DASHBOARD CALLER — unchanged. A top-level GET from a first-party
+  // page: the cookie it sets here is first-party and is accepted, so this path
+  // still sets the cookie and redirects straight to Shopify.
+  const res = NextResponse.redirect(pricing.url)
+  res.cookies.set(BILLING_INTENT_COOKIE, nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: BILLING_INTENT_COOKIE_PATH,
+    maxAge: BILLING_INTENT_TTL_MS / 1000,
+  })
+  return res
 }

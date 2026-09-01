@@ -66,31 +66,36 @@ function navigateTopLevel(url: string) {
 }
 
 /**
- * The ONE resume endpoint this client will ever post the linking handoff to.
- * The server sends its own copy back as `resumePath`; this constant exists so
- * the client can assert the two match exactly before submitting, which means a
- * tampered or unexpected response can never redirect the merchant elsewhere.
- * Mirrors PENDING_LINK_RESUME_PATH in lib/shopify/pending-link.ts.
+ * The ONLY two resume endpoints this client will ever post a handoff to. Each
+ * server response sends its own copy back as `resumePath`; these constants
+ * exist so the client can assert the two match exactly before submitting,
+ * which means a tampered or unexpected response can never send the merchant
+ * somewhere else. Mirrors PENDING_LINK_RESUME_PATH in lib/shopify/pending-link.ts
+ * and BILLING_INTENT_RESUME_PATH in lib/shopify/billing-intent.ts.
  */
 const LINK_RESUME_PATH = '/api/shopify/link/resume'
+const BILLING_RESUME_PATH = '/api/shopify/billing/resume'
 
 /**
- * Hand the signed pending-link handoff to the app's own origin as a TOP-LEVEL
- * form POST.
+ * Hand a signed handoff to the app's own origin as a TOP-LEVEL form POST.
+ *
+ * Used for BOTH first-party handoffs this embedded client performs: the
+ * pending-link one after an install, and the billing-intent one before
+ * Shopify's hosted pricing page. Both exist for the same reason — a
+ * SameSite=Lax cookie set on a fetch() response inside the Shopify Admin
+ * iframe is third-party for this origin and gets dropped by modern Chrome, so
+ * the cookie has to be established by a first-party request instead.
  *
  * Why a form and not `window.top.location.href`: the handoff must not travel in
  * a URL. In a GET it would sit in browser history, in the Referer of the next
  * request and in every intermediary's access log. A form POST with
- * target="_top" breaks out of the Shopify Admin iframe exactly the same way,
- * but carries the value in a urlencoded body instead — and because the
- * resulting document IS first-party gotopseo.com, the pending-link cookie that
- * response sets is a first-party cookie the browser accepts. That is the whole
- * point: the cookie could not be set from the embedded fetch() response, which
- * is third-party for this origin and gets dropped by modern Chrome.
+ * target="_top" breaks out of the iframe exactly the same way, but carries the
+ * value in a urlencoded body instead — and the document it lands on IS
+ * first-party gotopseo.com, so the cookie that response sets is accepted.
  *
  * The value is never written to localStorage, sessionStorage or the URL.
  */
-function submitLinkHandoffTopLevel(appUrl: string, resumePath: string, handoff: string) {
+function submitHandoffTopLevel(appUrl: string, resumePath: string, handoff: string) {
   const form = document.createElement('form')
   form.method = 'POST'
   form.action = `${appUrl}${resumePath}`
@@ -140,7 +145,7 @@ export default function ConnectorHomeClient() {
       // Both halves must be present AND the path must be exactly the one this
       // client knows about — anything else is not submitted at all.
       if (json.resumePath === LINK_RESUME_PATH && json.handoff) {
-        submitLinkHandoffTopLevel(data?.appUrl ?? '', LINK_RESUME_PATH, json.handoff)
+        submitHandoffTopLevel(data?.appUrl ?? '', LINK_RESUME_PATH, json.handoff)
         return
       }
       setInstallError('We couldn’t finish setting up this store. Please try again.')
@@ -151,11 +156,19 @@ export default function ConnectorHomeClient() {
     }
   }
 
-  // Phase 2 (blocker fix) — never a pre-built Shopify URL: fetches a FRESH
-  // App Bridge session token (recommended to re-fetch per request rather
-  // than cache) and exchanges it at /api/shopify/billing/start-intent,
-  // which authenticates the request, mints a single-use billing intent, and
-  // returns a just-in-time redirect URL.
+  // Never a pre-built Shopify URL: fetches a FRESH App Bridge session token
+  // (recommended to re-fetch per request rather than cache) and exchanges it at
+  // /api/shopify/billing/start-intent, which authenticates the request, resolves
+  // the connection and billing authority server-side, and mints a single-use
+  // billing intent.
+  //
+  // That response no longer carries a redirect URL, and no longer tries to set
+  // the intent cookie: this fetch runs in the Shopify Admin iframe, where the
+  // browser treats our cookie as third-party and drops it — which is why a
+  // merchant could approve a plan and still be shown "No active plan", with no
+  // request ever reaching /api/shopify/billing/return. The signed handoff is
+  // posted TOP-LEVEL instead, and the resume endpoint establishes the cookie
+  // first-party and builds the Shopify destination itself.
   const startBillingIntent = async () => {
     setManagePlanBusy(true)
     try {
@@ -164,9 +177,14 @@ export default function ConnectorHomeClient() {
       const token = await bridge.idToken()
       const res = await fetch('/api/shopify/billing/start-intent', { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { setManagePlanBusy(false); return }
-      const json = (await res.json()) as { redirectUrl?: string }
-      if (json.redirectUrl) navigateTopLevel(json.redirectUrl)
-      else setManagePlanBusy(false)
+      const json = (await res.json()) as { resumePath?: string | null; handoff?: string | null }
+      // Both halves must be present AND the path must be exactly the one this
+      // client knows about — anything else is not submitted at all.
+      if (json.resumePath === BILLING_RESUME_PATH && json.handoff) {
+        submitHandoffTopLevel(data?.appUrl ?? '', BILLING_RESUME_PATH, json.handoff)
+        return
+      }
+      setManagePlanBusy(false)
     } catch {
       setManagePlanBusy(false)
     }
