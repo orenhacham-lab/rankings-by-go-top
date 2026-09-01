@@ -13,7 +13,7 @@ import { getActiveShopifySubscription } from '../partner-client'
 import {
   resolveShopifyGovernedEntitlement, isShopifyGovernedAndActive,
 } from '../entitlement-resolver'
-import { isShopifyBillingRequiredForUser, hasActiveShopifyConnection } from '../paypal-block'
+import { isShopifyBillingRequiredForUser } from '../paypal-block'
 import {
   signPendingLinkCookieValue, verifyPendingLinkCookieValue, createPendingInstall,
   loadValidPendingInstall, consumePendingInstall, hasPendingShopifyLinkCookie, PENDING_LINK_COOKIE,
@@ -218,7 +218,8 @@ async function main() {
       shopify_connections: [{ id: 'c1', user_id: 'u1', connection_status: 'failed' }],
       shopify_billing_migrations: [{ id: 'm1', user_id: 'u1', project_id: 'p1', status: 'pending', paypal_cancel_attempts: 0 }],
     })
-    check('hasActiveShopifyConnection alone would miss this (connection is "failed")', await hasActiveShopifyConnection(admin as unknown as Admin, 'u1') === false)
+    // The connection is 'failed' AND the user is website-authority, so nothing
+    // about the connection blocks PayPal — the in-flight MIGRATION does.
     check('isShopifyBillingRequiredForUser correctly still blocks PayPal via the migration', await isShopifyBillingRequiredForUser(admin as unknown as Admin, 'u1') === true)
   }
 

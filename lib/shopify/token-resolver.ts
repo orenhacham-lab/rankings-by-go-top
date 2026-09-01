@@ -51,6 +51,12 @@ export const REFRESH_SKEW_SECONDS = 300
 export const REFRESH_LEASE_SECONDS = 60
 /** Bounded wait for another invocation's in-flight rotation. */
 export const LOCK_RETRY_DELAYS_MS = [200, 400, 800]
+/**
+ * Attempts to PERSIST a pair Shopify has already returned. Retried WITHOUT
+ * calling Shopify again: the rotation happened, the old refresh token is spent,
+ * and asking for another pair would strand the one we are holding.
+ */
+export const PERSIST_RETRY_DELAYS_MS = [100, 300]
 
 export type ResolvedTokenFailure =
   /** Stored ciphertext could not be decrypted, or a new pair could not be encrypted. */
@@ -260,28 +266,76 @@ export async function resolveShopifyAccessToken(admin: Admin, connection: Resolv
 
     // ── 3) Store the WHOLE pair atomically, still holding the lease. ──────
     const now = Date.now()
-    const { data: doneData, error: doneErr } = await admin.rpc('complete_shopify_token_refresh', {
-      p_connection_id: connection.id,
-      p_lease_token: leaseToken,
-      p_expected_access_token_encrypted: expectedAccess,
-      p_access_token_encrypted: accessEncrypted,
-      p_refresh_token_encrypted: refreshEncrypted,
-      p_access_token_expires_at: expiryFromNow(rotated.expiresIn, now),
-      p_refresh_token_expires_at: rotated.refreshTokenExpiresIn === null
+    // PERSIST the pair Shopify already returned. Retried on a DATABASE error
+    // WITHOUT contacting Shopify again — the rotation is done and the old
+    // refresh token is spent, so a second call would strand this pair.
+    const persisted = await persistRotatedPair(admin, {
+      connectionId: connection.id,
+      leaseToken,
+      expectedAccessTokenEncrypted: expectedAccess,
+      accessTokenEncrypted: accessEncrypted,
+      refreshTokenEncrypted: refreshEncrypted,
+      accessTokenExpiresAt: expiryFromNow(rotated.expiresIn, now),
+      refreshTokenExpiresAt: rotated.refreshTokenExpiresIn === null
         ? null
         : expiryFromNow(rotated.refreshTokenExpiresIn, now),
     })
-    if (doneErr) return { ok: false, reason: 'token_refresh_failed' }
-    const doneOutcome = ((Array.isArray(doneData) ? doneData[0] : doneData) as { outcome?: string } | null)?.outcome
+    if (persisted.outcome === 'rotated') return { ok: true, accessToken: rotated.accessToken, rotated: true }
 
-    if (doneOutcome === 'rotated') return { ok: true, accessToken: rotated.accessToken, rotated: true }
+    if (persisted.outcome === 'persist_failed') {
+      // The pair IS valid — Shopify issued it — but we could not store it. That
+      // is TRANSIENT: the connection is not marked failed and billing authority
+      // is untouched. The lease is released so the next request can retry
+      // cleanly rather than waiting it out.
+      await releaseLease(admin, connection.id, leaseToken, expectedAccess, false)
+      return { ok: false, reason: 'token_refresh_failed' }
+    }
 
     // 'lease_lost' — our lease expired, or the credential was replaced or the
     // store uninstalled while we were talking to Shopify. Our pair is retired
     // and was NOT written. Re-read and use whatever actually landed.
-    if (doneOutcome === 'lease_lost' && attempt < LOCK_RETRY_DELAYS_MS.length) continue
+    if (attempt < LOCK_RETRY_DELAYS_MS.length) continue
     return { ok: false, reason: 'token_refresh_failed' }
   }
+}
+
+/**
+ * Store an already-issued rotated pair, retrying a DATABASE failure in place.
+ *
+ * Shopify is never called again from here: by this point the rotation has
+ * happened and the previous refresh token is spent, so a second exchange would
+ * abandon a valid pair. Only transport/DB errors are retried; a definite
+ * 'lease_lost' or 'invalid_rotation' answer is returned immediately.
+ */
+async function persistRotatedPair(admin: Admin, args: {
+  connectionId: string
+  leaseToken: string
+  expectedAccessTokenEncrypted: string
+  accessTokenEncrypted: string
+  refreshTokenEncrypted: string
+  accessTokenExpiresAt: string
+  refreshTokenExpiresAt: string | null
+}): Promise<{ outcome: 'rotated' | 'lease_lost' | 'persist_failed' }> {
+  for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
+    const { data, error } = await admin.rpc('complete_shopify_token_refresh', {
+      p_connection_id: args.connectionId,
+      p_lease_token: args.leaseToken,
+      p_expected_access_token_encrypted: args.expectedAccessTokenEncrypted,
+      p_access_token_encrypted: args.accessTokenEncrypted,
+      p_refresh_token_encrypted: args.refreshTokenEncrypted,
+      p_access_token_expires_at: args.accessTokenExpiresAt,
+      p_refresh_token_expires_at: args.refreshTokenExpiresAt,
+    })
+    if (!error) {
+      const outcome = ((Array.isArray(data) ? data[0] : data) as { outcome?: string } | null)?.outcome
+      if (outcome === 'rotated') return { outcome: 'rotated' }
+      // A definite answer — retrying cannot change it.
+      return { outcome: 'lease_lost' }
+    }
+    if (attempt < PERSIST_RETRY_DELAYS_MS.length) await sleep(PERSIST_RETRY_DELAYS_MS[attempt])
+  }
+  console.warn('[shopify-tokens] rotated pair could not be persisted', { route: 'token_refresh', connectionId: args.connectionId })
+  return { outcome: 'persist_failed' }
 }
 
 /**

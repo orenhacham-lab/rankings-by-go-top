@@ -2528,10 +2528,14 @@ export const dashboardHe = {
     },
     shopify: {
       title: 'החיוב מנוהל דרך Shopify',
-      description: 'החנות שלך מחוברת לאפליקציית Shopify, ולכן התוכנית שלך מחויבת דרך Shopify App Pricing — לא דרך PayPal.',
+      description: 'החשבון הזה מחויב דרך Shopify App Pricing ולא דרך PayPal. חיבור חנות לצורך פרסום אינו משנה זאת בפני עצמו.',
       manageButton: 'ניהול תוכנית ב-Shopify',
       migrationPending: 'אנחנו מסיימים לקשר את החיוב שלך ל-Shopify. זה עשוי לקחת רגע — רענן/י את הדף בקרוב.',
       migrationNeedsAttention: 'התוכנית שלך ב-Shopify פעילה, אך אנחנו עדיין משלימים את סגירת החיוב הקודם. אם זה לא נפתר מעצמו, צרו איתנו קשר.',
+    },
+    unavailable: {
+      title: 'מצב החיוב אינו זמין כרגע',
+      description: 'לא הצלחנו לאמת איזה ספק חיוב מנהל את החשבון, ולכן שינויי תוכנית מושהים לרגע. דבר לא השתנה — רעננו את הדף בעוד רגע.',
     },
     admin: {
       title: 'חשבון מנהל — גישה מלאה',

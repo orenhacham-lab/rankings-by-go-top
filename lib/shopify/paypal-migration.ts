@@ -111,7 +111,11 @@ export async function initiateMigrationIfPayPalSubscriber(
   const paypalSubscriptionId = (sub as { paypal_subscription_id: string | null } | null)?.paypal_subscription_id
   if (!paypalSubscriptionId) return // no real PayPal subscription to migrate away from
 
-  const existing = await getActiveMigration(admin, args.userId)
+  // CRITICAL PATH — a lookup failure must not read as "no migration", which
+  // would insert a duplicate row for an account already mid-migration.
+  const existingResult = await getActiveMigrationResult(admin, args.userId)
+  if (!existingResult.ok) return
+  const existing = existingResult.migration
   if (existing) {
     // Re-connecting (possibly a different project/connection) while a
     // migration is already in flight — keep the SAME migration row (never a
@@ -135,6 +139,8 @@ export async function initiateMigrationIfPayPalSubscriber(
 export interface AdvanceMigrationResult {
   status: MigrationStatus
   cancelFailed: boolean
+  /** The migration state could not be READ — nothing was attempted at all. */
+  lookupFailed?: boolean
   // Blocker fix — true when PayPal cancellation succeeded but the DB write
   // recording 'completed' could not be confirmed after retries. The DB row
   // is left non-terminal ('pending'/'shopify_confirmed') in that case —
@@ -164,7 +170,15 @@ export async function confirmShopifyActiveAndAdvance(
   userId: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<AdvanceMigrationResult | null> {
-  const migration = await getActiveMigration(admin, userId)
+  // CRITICAL PATH — reading this wrong decides whether a PayPal subscription
+  // gets cancelled. A lookup FAILURE is reported as such and stops here, before
+  // any PayPal call; it is never treated as "not a migrating account".
+  const migrationResult = await getActiveMigrationResult(admin, userId)
+  if (!migrationResult.ok) {
+    console.error('[shopify-migration] migration lookup failed; PayPal was NOT contacted', { userId, reason: migrationResult.reason })
+    return { status: 'pending', cancelFailed: false, dbWriteUnconfirmed: true, lookupFailed: true }
+  }
+  const migration = migrationResult.migration
   if (!migration) return null // not a migrating account — nothing to do
 
   if (migration.status === 'pending') {
@@ -213,10 +227,12 @@ export async function confirmShopifyActiveAndAdvance(
     let completed = false
     let lastRpcError: string | null = null
     for (let i = 0; i < 3 && !completed; i++) {
+      // The subscription id is NOT passed in: the function reads it from the
+      // locked migration row itself and scopes the mirror update by user_id, so
+      // no caller can aim the cancellation mirror at another user's row.
       const { data, error } = await admin.rpc('complete_shopify_paypal_migration', {
         p_migration_id: migration.id,
         p_user_id: userId,
-        p_paypal_subscription_id: migration.paypal_subscription_id,
       })
       if (error) { lastRpcError = error.code || error.message || 'rpc_failed'; continue }
       const outcome = ((Array.isArray(data) ? data[0] : data) as { outcome?: string } | null)?.outcome

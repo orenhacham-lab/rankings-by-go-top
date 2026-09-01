@@ -233,7 +233,7 @@ async function main() {
     const partnerIdx = home.indexOf('getActiveShopifySubscription(connection.shop_gid')
     check('8a: isAdmin is still resolved before the live Partner billing call', isAdminIdx !== -1 && partnerIdx !== -1 && isAdminIdx < partnerIdx)
     check('8b: the admin branch still makes no Partner call and no billing-cache write',
-      /if \(isAdmin\) \{\s*\n(\s*\/\/[^\n]*\n)*\s*\} else if \(!connection\.shop_gid\)/.test(home))
+      /if \(isAdmin\) \{\s*\n(\s*\/\/[^\n]*\n)*\s*\} else if \(!shopifyBills\)/.test(home))
     const adminFake = new FakeAdmin({ profiles: [{ id: 'u-admin', role: 'admin' }] })
     check('8c: isAdminUser still true for role=admin', await isAdminUser(adminFake as unknown, 'u-admin') === true)
     const client = strip(read('app/shopify/app/ConnectorHomeClient.tsx'))

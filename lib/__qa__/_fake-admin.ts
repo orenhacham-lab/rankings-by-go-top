@@ -620,9 +620,12 @@ export class FakeAdmin {
       const migs = (this.tables.shopify_billing_migrations ??= [])
       const now = nowIso()
       const one = (outcome: string) => ({ data: [{ outcome }], error: null })
+      // The (migration, user) pair must match, and the subscription id comes
+      // from the locked row — never from a parameter.
       const mig = migs.find((m) => m.id === p.p_migration_id && m.user_id === p.p_user_id
         && ['pending', 'shopify_confirmed', 'paypal_cancel_failed'].includes(String(m.status)))
       if (!mig) return one('unexpected_status')
+      const boundSubscriptionId = mig.paypal_subscription_id as string | null
       mig.status = 'completed'
       mig.last_error = null
       mig.updated_at = now
@@ -637,9 +640,10 @@ export class FakeAdmin {
         gov.push({ user_id: p.p_user_id, signup_origin: 'unknown', billing_authority: 'shopify',
           authority_reason: 'paypal_migration_completed', authority_changed_at: now, created_at: now, updated_at: now })
       }
-      if (p.p_paypal_subscription_id) {
+      if (boundSubscriptionId) {
         for (const sub of (this.tables.subscriptions ??= [])) {
-          if (sub.paypal_subscription_id === p.p_paypal_subscription_id && sub.status !== 'cancelled') {
+          // Double-scoped: the bound id AND the same user.
+          if (sub.paypal_subscription_id === boundSubscriptionId && sub.user_id === p.p_user_id && sub.status !== 'cancelled') {
             sub.status = 'cancelled'; sub.updated_at = now
           }
         }

@@ -150,14 +150,48 @@ BEGIN
   -- ── confirmed PayPal migration ──
   SELECT id INTO mid FROM public.shopify_billing_migrations WHERE user_id = u_pp AND status = 'pending';
   PERFORM chk('6a: completing a confirmed migration succeeds',
-    (SELECT outcome FROM public.complete_shopify_paypal_migration(mid, u_pp, 'I-PAYPAL')) = 'completed');
+    (SELECT outcome FROM public.complete_shopify_paypal_migration(mid, u_pp)) = 'completed');
   PERFORM chk('6b: status is completed', (SELECT status FROM public.shopify_billing_migrations WHERE id = mid) = 'completed');
   PERFORM chk('6c: authority is now shopify', (SELECT billing_authority FROM public.billing_governance WHERE user_id = u_pp) = 'shopify');
   PERFORM chk('6d: historical signup origin is UNCHANGED', (SELECT signup_origin FROM public.billing_governance WHERE user_id = u_pp) = 'website');
   PERFORM chk('6e: the local PayPal mirror is cancelled',
     (SELECT status FROM public.subscriptions WHERE paypal_subscription_id = 'I-PAYPAL') = 'cancelled');
   PERFORM chk('6f: repeating it is refused, not silently re-applied',
-    (SELECT outcome FROM public.complete_shopify_paypal_migration(mid, u_pp, 'I-PAYPAL')) = 'unexpected_status');
+    (SELECT outcome FROM public.complete_shopify_paypal_migration(mid, u_pp)) = 'unexpected_status');
+
+  -- ── PayPal completion is BOUND to the locked migration row ──────────────
+  -- The subscription id is no longer a parameter, so no caller can aim the
+  -- cancellation mirror at somebody else's subscription.
+  DECLARE
+    u_victim uuid := gen_random_uuid();
+    u_attacker uuid := gen_random_uuid();
+    mid2 uuid;
+  BEGIN
+    INSERT INTO auth.users (id) VALUES (u_victim), (u_attacker);
+    INSERT INTO public.subscriptions (user_id, status, paypal_subscription_id) VALUES (u_victim, 'active', 'I-VICTIM');
+    INSERT INTO public.subscriptions (user_id, status, paypal_subscription_id) VALUES (u_attacker, 'active', 'I-ATTACKER');
+    INSERT INTO public.shopify_billing_migrations (user_id, paypal_subscription_id, status)
+    VALUES (u_attacker, 'I-ATTACKER', 'shopify_confirmed') RETURNING id INTO mid2;
+
+    -- A MISMATCHED (migration, user) pair writes nothing at all.
+    PERFORM chk('6g: a mismatched user/migration pair is refused',
+      (SELECT outcome FROM public.complete_shopify_paypal_migration(mid2, u_victim)) = 'unexpected_status');
+    PERFORM chk('6h: …and nothing was written by that attempt',
+      (SELECT status FROM public.shopify_billing_migrations WHERE id = mid2) = 'shopify_confirmed'
+      AND (SELECT status FROM public.subscriptions WHERE paypal_subscription_id = 'I-VICTIM') = 'active'
+      AND (SELECT count(*) FROM public.billing_governance WHERE user_id = u_victim) = 0);
+
+    -- The correct pair cancels ONLY its own subscription.
+    PERFORM chk('6i: the matching pair completes',
+      (SELECT outcome FROM public.complete_shopify_paypal_migration(mid2, u_attacker)) = 'completed');
+    PERFORM chk('6j: the CORRECT PayPal subscription was cancelled',
+      (SELECT status FROM public.subscriptions WHERE paypal_subscription_id = 'I-ATTACKER') = 'cancelled');
+    PERFORM chk('6k: the OTHER user''s subscription is untouched',
+      (SELECT status FROM public.subscriptions WHERE paypal_subscription_id = 'I-VICTIM') = 'active');
+    PERFORM chk('6l: migration, authority and the mirror committed together',
+      (SELECT status FROM public.shopify_billing_migrations WHERE id = mid2) = 'completed'
+      AND (SELECT billing_authority FROM public.billing_governance WHERE user_id = u_attacker) = 'shopify');
+  END;
 
   -- ── refresh lease ──
   SELECT id INTO cid FROM public.shopify_connections WHERE shop_domain = 'web.myshopify.com';
@@ -217,8 +251,8 @@ BEGIN
     has_function_privilege('service_role','public.complete_shopify_app_store_link(text,uuid,uuid,text,text)','EXECUTE')
     AND NOT has_function_privilege('authenticated','public.complete_shopify_app_store_link(text,uuid,uuid,text,text)','EXECUTE'));
   PERFORM chk('9b: so is the migration RPC',
-    has_function_privilege('service_role','public.complete_shopify_paypal_migration(uuid,uuid,text)','EXECUTE')
-    AND NOT has_function_privilege('anon','public.complete_shopify_paypal_migration(uuid,uuid,text)','EXECUTE'));
+    has_function_privilege('service_role','public.complete_shopify_paypal_migration(uuid,uuid)','EXECUTE')
+    AND NOT has_function_privilege('anon','public.complete_shopify_paypal_migration(uuid,uuid)','EXECUTE'));
   SELECT count(*) INTO n FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace
    WHERE ns.nspname='public' AND p.proname IN
      ('complete_shopify_app_store_link','complete_shopify_paypal_migration','begin_shopify_token_refresh',

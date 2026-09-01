@@ -41,6 +41,10 @@ const OUTCOME_TO_QUERY: Record<BillingReturnOutcome, { shopify: string; reason: 
   billing_verification_unavailable: { shopify: 'error', reason: 'billing_verification_unavailable' },
   no_active_plan: { shopify: 'warning', reason: 'no_active_plan' },
   unrecognized_plan: { shopify: 'warning', reason: 'unrecognized_plan' },
+  // The Shopify plan IS active, but the PayPal→Shopify migration did not
+  // finish — never reported as a plain success, because the customer's PayPal
+  // subscription may still be live.
+  migration_incomplete: { shopify: 'warning', reason: 'migration_incomplete' },
   success: { shopify: 'success', reason: 'billing_confirmed' },
 }
 

@@ -51,9 +51,13 @@ const shopifyGoverned = (userId: string) => ({
 const unbilledConnection = (userId: string, over: Record<string, unknown> = {}) => ({
   id: `conn-${userId}`, user_id: userId, project_id: `proj-${userId}`, shop_domain: SHOP,
   connection_status: 'connected', archived_at: null, granted_scopes: ['read_products', 'read_content', 'write_content'],
-  shopify_plan_handle: null, shopify_subscription_status: null,
+  // A VERIFIED "no active plan" cache: this is the real billing_required
+  // state. An UNVERIFIED cache would trigger a live Partner API call, whose
+  // failure is now honestly reported as entitlement_unavailable rather than as
+  // a billing verdict.
+  shopify_plan_handle: null, shopify_subscription_status: 'none',
   shopify_current_period_end: null, shopify_current_period_start: null,
-  shopify_billing_verified_at: null, shop_gid: 'gid://shopify/Shop/1',
+  shopify_billing_verified_at: new Date().toISOString(), shop_gid: 'gid://shopify/Shop/1',
   updated_at: '2026-09-01T00:00:00Z', ...over,
 })
 

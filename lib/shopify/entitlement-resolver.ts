@@ -199,11 +199,12 @@ export async function resolveShopifyGovernedEntitlement(admin: Admin, userId: st
       shopify_cancel_at_end_of_cycle: false,
       shopify_billing_last_error: `verification_failed: ${result.reason}`,
     })
-    // API outage etc. Fail closed for THIS Shopify-governed user only — this
-    // never touches or removes access for users who never installed
-    // Shopify (they never reach this function at all: it returned null
-    // above for them).
-    return { kind: 'governed', entitlement: { governed: true, planCode: null, hasActiveSubscription: false, currentPeriodEnd: null, verificationError: result.reason } }
+    // A PARTNER API OUTAGE is an infrastructure failure, not a billing verdict.
+    // Reporting it as a governed account with no plan produced
+    // `billing_required` — telling a paying merchant to buy a plan because
+    // Shopify's API was briefly unreachable. It is now 'unavailable', which the
+    // callers surface as a retryable 503-shaped state.
+    return { kind: 'unavailable', reason: result.reason }
   }
 
   if (!result.active) {

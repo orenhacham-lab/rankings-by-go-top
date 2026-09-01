@@ -192,7 +192,8 @@ async function main() {
     const isAdminIdx = routeSrc.indexOf('const isAdmin = await isAdminUser(admin, connection.user_id)')
     const partnerCallIdx = routeSrc.indexOf('getActiveShopifySubscription(connection.shop_gid')
     check('9: isAdmin is resolved BEFORE the live Partner API billing call', isAdminIdx !== -1 && partnerCallIdx !== -1 && isAdminIdx < partnerCallIdx)
-    check('9: the admin branch makes NO Partner API call and NO billing-cache write (an explicit no-op branch, not a fallthrough)', /if \(isAdmin\) \{\s*\n(\s*\/\/[^\n]*\n)*\s*\} else if \(!connection\.shop_gid\)/.test(routeSrc))
+    check('9: the admin branch makes NO Partner API call and NO billing-cache write (an explicit no-op branch, not a fallthrough)', /if \(isAdmin\) \{\s*\n(\s*\/\/[^\n]*\n)*\s*\} else if \(!shopifyBills\)/.test(routeSrc))
+    check('9b: a WEBSITE-billed merchant also gets no Partner call and no cache write', /\} else if \(!shopifyBills\) \{\s*\n(\s*\/\/[^\n]*\n)*\s*\} else if \(!connection\.shop_gid\)/.test(routeSrc))
     check('9: isAdmin is included in the JSON response', /isAdmin,\s*\n\s*billing,/.test(routeSrc))
   }
 
@@ -209,7 +210,8 @@ async function main() {
     const clientSrc = strip(read('app/shopify/app/ConnectorHomeClient.tsx'))
     const isAdminGateIdx = clientSrc.indexOf('data.isAdmin ?')
     check('11: an explicit data.isAdmin branch exists', isAdminGateIdx !== -1)
-    const adminBranch = clientSrc.slice(isAdminGateIdx, clientSrc.indexOf(') : (', isAdminGateIdx))
+    // The admin branch now ends at the website-billed branch that follows it.
+    const adminBranch = clientSrc.slice(isAdminGateIdx, clientSrc.indexOf(") : data.billingProvider === 'website'", isAdminGateIdx))
     check('11: the admin branch contains NO "Choose a plan" / "Manage plan" / startBillingIntent wiring', !/startBillingIntent|Choose a plan|Manage plan/.test(adminBranch))
     check('11: the admin branch renders a plain full-access notice, not a <Card title="Billing">', /Admin account — full access/.test(adminBranch) && !/title="Billing"/.test(adminBranch))
     const nonAdminBranch = clientSrc.slice(clientSrc.indexOf(') : (', isAdminGateIdx))

@@ -98,7 +98,10 @@ async function main() {
   {
     const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [shopifyConnRow()], shopify_billing_migrations: [], profiles: [], subscriptions: [] })
     const e = await withFetch(fakePartnerFetch(() => ({ status: 500, body: {} })), () => getUserEntitlement('u1', admin as unknown as Admin))
-    check('plan is "shopify_billing_required"', e.plan === 'shopify_billing_required')
+    // A Partner API OUTAGE is no longer reported as "buy a plan": it is its own
+    // zero-entitlement state, so a paying merchant is never told to purchase
+    // because Shopify's API was briefly unreachable. The floor is unchanged.
+    check('plan is "entitlement_unavailable" during an outage, never "buy a plan"', e.plan === 'entitlement_unavailable')
     check('all limits zero even during an outage', e.limits.maxProjects === 0)
   }
 

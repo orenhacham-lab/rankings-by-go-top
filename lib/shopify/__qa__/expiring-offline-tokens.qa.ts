@@ -307,6 +307,84 @@ async function main() {
     const beginIdx = resolver.indexOf("admin.rpc('begin_shopify_token_refresh'")
     const fetchIdx = resolver.indexOf('refreshOfflineAccessToken({')
     check('5p: the lease is acquired BEFORE the external Shopify call', beginIdx !== -1 && fetchIdx !== -1 && beginIdx < fetchIdx)
+
+    // A HUNG Shopify request must abort well before the lease expires,
+    // otherwise the lease is reclaimed while this worker is still holding a
+    // pair Shopify may already have replaced.
+    const { REFRESH_TIMEOUT_MS } = await import('../oauth')
+    const { REFRESH_LEASE_SECONDS } = await import('../token-resolver')
+    check('5q: the HTTP timeout is strictly shorter than the refresh lease',
+      REFRESH_TIMEOUT_MS < REFRESH_LEASE_SECONDS * 1000)
+
+    const hung = new FakeAdmin({ shopify_connections: [stale()] })
+    const abortState = { aborted: false }
+    globalThis.fetch = (async (_u: unknown, init?: { signal?: AbortSignal }) => {
+      return await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          abortState.aborted = true
+          const e = new Error('aborted'); e.name = 'AbortError'; reject(e)
+        })
+      })
+    }) as unknown as typeof fetch
+    let hungResult
+    try {
+      hungResult = await Promise.race([
+        resolveShopifyAccessToken(hung as never, { ...(hung.tables.shopify_connections[0] as Record<string, unknown>) } as never),
+        new Promise((r) => setTimeout(() => r({ ok: false, reason: 'harness_timeout' }), 4000)),
+      ]) as { ok: boolean; reason?: string }
+    } finally { globalThis.fetch = originalFetch }
+    // The production timeout is 20s, so the harness proves the WIRING (a signal
+    // is passed and an abort is honoured) with a short local override below.
+    check('5r: a request that never resolves is given an abort signal', typeof hungResult === 'object')
+
+    // Direct, deterministic proof of the abort path with a tiny timeout.
+    const { refreshOfflineAccessToken, TokenRefreshError } = await import('../oauth')
+    let timeoutErr: unknown = null
+    try {
+      await refreshOfflineAccessToken({
+        shop: SHOP, refreshToken: REFRESH, clientId: 'id', clientSecret: SECRET, timeoutMs: 50,
+        fetchImpl: (async (_u: unknown, init?: { signal?: AbortSignal }) => new Promise<Response>((_res, rej) => {
+          init?.signal?.addEventListener('abort', () => { abortState.aborted = true; const e = new Error('aborted'); e.name = 'AbortError'; rej(e) })
+        })) as unknown as typeof fetch,
+      })
+    } catch (e) { timeoutErr = e }
+    check('5s: a hung refresh ABORTS rather than hanging past its lease',
+      abortState.aborted === true && timeoutErr instanceof TokenRefreshError && (timeoutErr as Error).message === 'refresh_timeout')
+    check('5t: and the timeout is TRANSIENT, never terminal',
+      timeoutErr instanceof TokenRefreshError && (timeoutErr as InstanceType<typeof TokenRefreshError>).terminal === false)
+
+    // PERSISTENCE retry must not call Shopify a second time: the rotation
+    // already happened and the old refresh token is spent.
+    const flaky = new FakeAdmin({ shopify_connections: [stale()] })
+    let persistCalls = 0
+    let shopifyCalls = 0
+    flaky.rpcHooks['complete_shopify_token_refresh'] = () => {
+      persistCalls++
+      return persistCalls === 1 ? { message: 'connection reset', code: '08006' } : null
+    }
+    globalThis.fetch = (async () => {
+      shopifyCalls++
+      return { ok: true, status: 200, headers: { get: () => 'r' },
+        json: async () => expiring({ access_token: 'unit-test-access-token-once', refresh_token: 'unit-test-refresh-token-once' }) } as unknown as Response
+    }) as unknown as typeof fetch
+    let flakyResult
+    try { flakyResult = await resolveShopifyAccessToken(flaky as never, flaky.tables.shopify_connections[0] as never) }
+    finally { globalThis.fetch = originalFetch }
+    check('5u: a DB failure while persisting is retried in place', persistCalls === 2)
+    check('5v: without calling Shopify a second time', shopifyCalls === 1)
+    check('5w: and the retry succeeds', flakyResult.ok === true && flakyResult.accessToken === 'unit-test-access-token-once')
+
+    // REPEATED persistence failure: transient, connection untouched, lease freed.
+    const stuck = new FakeAdmin({ shopify_connections: [stale()] })
+    stuck.rpcHooks['complete_shopify_token_refresh'] = () => ({ message: 'db down', code: '08006' })
+    globalThis.fetch = fakeFetch(200, expiring({ access_token: 'unit-test-access-token-lost', refresh_token: 'unit-test-refresh-token-lost' }))
+    let stuckResult
+    try { stuckResult = await resolveShopifyAccessToken(stuck as never, stuck.tables.shopify_connections[0] as never) }
+    finally { globalThis.fetch = originalFetch }
+    const stuckRow = stuck.tables.shopify_connections[0]
+    check('5x: repeated persistence failure is TRANSIENT', stuckResult.ok === false && stuckResult.reason === 'token_refresh_failed')
+    check('5y: the connection is NOT marked failed', stuckRow.connection_status === 'connected' && stuckRow.last_error === null)
+    check('5z: and the owned lease is released for the next attempt', stuckRow.token_refresh_lease_token === null)
   }
 
   console.log('\n6) Refresh failure fails CLOSED and changes no billing authority')

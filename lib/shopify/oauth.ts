@@ -518,14 +518,26 @@ export class TokenRefreshError extends Error {
 
 export const REFRESH_TOKEN_GRANT_TYPE = 'refresh_token'
 
+/**
+ * Hard ceiling on ONE refresh request, deliberately shorter than the refresh
+ * lease (lib/shopify/token-resolver.ts REFRESH_LEASE_SECONDS). A request that
+ * outlives its own lease is the dangerous case: the lease gets reclaimed, a
+ * second worker rotates, and the first one returns holding a pair Shopify has
+ * already replaced. Aborting first makes that impossible.
+ */
+export const REFRESH_TIMEOUT_MS = 20_000
+
 export async function refreshOfflineAccessToken(opts: {
   shop: string
   refreshToken: string
   clientId: string
   clientSecret: string
   fetchImpl?: typeof fetch
+  timeoutMs?: number
 }): Promise<ExpiringOfflineToken> {
   const doFetch = opts.fetchImpl ?? fetch
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? REFRESH_TIMEOUT_MS)
   let res: Response
   try {
     res = await doFetch(`https://${opts.shop}/admin/oauth/access_token`, {
@@ -538,10 +550,15 @@ export async function refreshOfflineAccessToken(opts: {
         client_secret: opts.clientSecret,
       }),
       redirect: 'error',
+      signal: controller.signal,
     })
-  } catch {
-    // Could not reach Shopify at all — transient by definition.
-    throw new TokenRefreshError('refresh_unreachable', false, { httpStatus: null, shopifyRequestId: null })
+  } catch (err) {
+    // Unreachable OR aborted by the timeout above. Both are TRANSIENT: nothing
+    // is known about the credential, so nothing about it may be changed.
+    const aborted = err instanceof Error && err.name === 'AbortError'
+    throw new TokenRefreshError(aborted ? 'refresh_timeout' : 'refresh_unreachable', false, { httpStatus: null, shopifyRequestId: null })
+  } finally {
+    clearTimeout(timer)
   }
   const shopifyRequestId = res.headers?.get?.('x-request-id') ?? null
   if (!res.ok) {

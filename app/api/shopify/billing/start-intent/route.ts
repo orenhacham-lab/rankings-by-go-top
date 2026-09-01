@@ -25,6 +25,8 @@
  */
 
 import { isAdminUser } from '@/lib/auth/admin-role'
+import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -106,6 +108,27 @@ export async function GET(request: Request) {
     return isApiCall
       ? Response.json({ error: 'no_shopify_connection' }, { status: 404 })
       : NextResponse.redirect(new URL('/billing?shopify=error&reason=no_shopify_connection', request.url))
+  }
+
+  // BILLING AUTHORITY GATE. Having a connected store is NOT permission to buy a
+  // Shopify plan: a website customer who connected Shopify purely to publish is
+  // billed on the website, and minting a Shopify billing intent for them would
+  // start a second, wrong subscription. Shopify pricing is offered only when
+  // Shopify is the durable authority, or while an explicit PayPal→Shopify
+  // migration is in flight (that is what the migration is FOR).
+  //
+  // Fails CLOSED: an unreadable governance or migration state mints nothing.
+  const authority = await resolveBillingAuthority(admin, connection.user_id)
+  const migration = await getActiveMigrationResult(admin, connection.user_id)
+  if (!authority.ok || !migration.ok) {
+    return isApiCall
+      ? Response.json({ error: 'entitlement_unavailable' }, { status: 503 })
+      : NextResponse.redirect(new URL('/billing?shopify=error&reason=entitlement_unavailable', request.url))
+  }
+  if (authority.authority !== 'shopify' && !migration.migration) {
+    return isApiCall
+      ? Response.json({ error: 'shopify_billing_not_applicable' }, { status: 403 })
+      : NextResponse.redirect(new URL('/billing?shopify=error&reason=shopify_billing_not_applicable', request.url))
   }
   if (!connection.shop_gid) {
     return isApiCall

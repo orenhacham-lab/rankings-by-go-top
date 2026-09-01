@@ -34,6 +34,15 @@ export type BillingReturnOutcome =
   | 'billing_verification_unavailable'
   | 'no_active_plan'
   | 'unrecognized_plan'
+  /**
+   * Shopify confirmed the plan, but finishing the PayPal→Shopify migration did
+   * NOT complete: the migration state could not be read, the PayPal
+   * cancellation failed, or the atomic completion could not be confirmed.
+   * Reporting 'success' here would tell a customer their migration is done
+   * while their PayPal subscription is still live or their billing authority
+   * never moved.
+   */
+  | 'migration_incomplete'
   | 'success'
 
 export interface BillingReturnResult {
@@ -117,7 +126,18 @@ export async function processShopifyBillingReturn(
     shopify_trial_ends_at: result.trialEndsAt, shopify_current_period_end: result.currentPeriodEnd,
     shopify_cancel_at_end_of_cycle: result.cancelAtEndOfCycle, shopify_billing_last_error: null,
   })
-  await confirmShopifyActiveAndAdvance(admin, connection.user_id, fetchImpl)
+  // The migration's own result decides the outcome. It used to be discarded,
+  // so a failed PayPal cancellation or an unconfirmed completion still
+  // reported success.
+  const advanced = await confirmShopifyActiveAndAdvance(admin, connection.user_id, fetchImpl)
+  if (advanced && (advanced.cancelFailed || advanced.dbWriteUnconfirmed || advanced.status !== 'completed')) {
+    console.warn('[shopify-billing-return] plan confirmed but the migration did not complete', {
+      status: advanced.status,
+      cancelFailed: advanced.cancelFailed === true,
+      dbWriteUnconfirmed: advanced.dbWriteUnconfirmed === true,
+    })
+    return { outcome: 'migration_incomplete', projectId: intent.project_id }
+  }
 
   return { outcome: 'success', projectId: intent.project_id }
 }

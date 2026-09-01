@@ -203,10 +203,13 @@ GRANT EXECUTE ON FUNCTION public.complete_shopify_app_store_link(text, uuid, uui
 -- The status transition is conditional on the expected prior state, so a
 -- concurrent transition cannot be clobbered; a mismatch returns
 -- 'unexpected_status' and writes nothing.
+-- The PayPal subscription id is deliberately NOT a parameter. It is read from
+-- the LOCKED migration row, and the mirror update is scoped by that row's
+-- user_id as well, so no caller can aim a cancellation at another user's
+-- subscription by passing an arbitrary id.
 CREATE OR REPLACE FUNCTION public.complete_shopify_paypal_migration(
   p_migration_id uuid,
-  p_user_id uuid,
-  p_paypal_subscription_id text
+  p_user_id uuid
 ) RETURNS TABLE(outcome text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
@@ -214,13 +217,17 @@ DECLARE
   v_id uuid;
   v_rows integer;
   v_origin text;
+  v_paypal_subscription_id text;
 BEGIN
+  -- Lock the row and take the subscription id FROM IT. The id and the user must
+  -- belong to the same migration row, so a mismatched (migration, user) pair
+  -- matches nothing and writes nothing at all.
   UPDATE public.shopify_billing_migrations m
      SET status = 'completed', last_error = NULL, updated_at = v_now
    WHERE m.id = p_migration_id
      AND m.user_id = p_user_id
      AND m.status IN ('pending', 'shopify_confirmed', 'paypal_cancel_failed')
-   RETURNING m.id INTO v_id;
+   RETURNING m.id, m.paypal_subscription_id INTO v_id, v_paypal_subscription_id;
 
   IF v_id IS NULL THEN
     RETURN QUERY SELECT 'unexpected_status';
@@ -246,10 +253,14 @@ BEGIN
 
   -- Local mirror of the cancellation. PayPal's own webhook applies the same
   -- update idempotently; doing it here keeps the two consistent immediately.
-  IF p_paypal_subscription_id IS NOT NULL THEN
+  -- DOUBLE-SCOPED: the subscription id came from the locked migration row, and
+  -- the update is additionally restricted to that row's own user, so it can
+  -- never touch another account's subscription.
+  IF v_paypal_subscription_id IS NOT NULL THEN
     UPDATE public.subscriptions s
        SET status = 'cancelled', updated_at = v_now
-     WHERE s.paypal_subscription_id = p_paypal_subscription_id
+     WHERE s.paypal_subscription_id = v_paypal_subscription_id
+       AND s.user_id = p_user_id
        AND s.status <> 'cancelled';
   END IF;
 
@@ -257,7 +268,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.complete_shopify_paypal_migration(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.complete_shopify_paypal_migration(uuid, uuid, text) TO service_role;
+REVOKE ALL ON FUNCTION public.complete_shopify_paypal_migration(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_shopify_paypal_migration(uuid, uuid) TO service_role;
 
 COMMIT;

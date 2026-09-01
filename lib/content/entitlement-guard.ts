@@ -96,8 +96,14 @@ export async function assertContentGenerationAllowedForUser(admin: Admin, userId
  * caller's own not-found/ownership handling take over downstream.
  */
 export async function assertContentGenerationAllowedForProject(admin: Admin, projectId: string): Promise<ContentGenerationGateResult> {
-  const { data } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
+  const { data, error } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
+  // A FAILED owner lookup used to fall through to `allowed: true`, so a
+  // database error opened the gate for everyone. It is an infrastructure
+  // failure and is reported as one.
+  if (error) return { allowed: false, reason: 'entitlement_unavailable', detail: 'project_owner_lookup_failed' }
   const userId = (data as { user_id?: string } | null)?.user_id
+  // A project with no resolvable owner is not a Shopify-governance question —
+  // the caller's own not-found/ownership handling takes over downstream.
   if (!userId) return { allowed: true }
   return assertContentGenerationAllowedForUser(admin, userId)
 }
