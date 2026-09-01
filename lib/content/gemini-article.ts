@@ -10,7 +10,7 @@
  * topic-suggestions model. No Anthropic.
  */
 
-import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import {
   validateAnchorPlacement, scanAnchorHits, isAnchorTooEarly,
@@ -795,9 +795,10 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string)
     const model = client.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json', temperature: 0.75 } })
     const prompt = buildPrompt(brief, opts)
     promptChars = prompt.length
-    // 3rd review correction — bounded well under the 30-min reservation TTL;
-    // see the constant's definition for the full rationale.
-    const result = await model.generateContent(prompt, { timeout: GEMINI_REQUEST_TIMEOUT_MS })
+    // The dedicated LONG-FORM budget — not the shared 60s classifier timeout,
+    // which is what aborted real Hebrew deep articles in production. See
+    // GEMINI_ARTICLE_TIMEOUT_MS for the arithmetic against maxDuration = 300.
+    const result = await model.generateContent(prompt, { timeout: GEMINI_ARTICLE_TIMEOUT_MS })
     const text = result.response.text()
     let parsed: Record<string, unknown>
     try { parsed = JSON.parse(text) } catch { const m = text.match(/\{[\s\S]*\}/); if (!m) return { error: 'gemini_no_json' }; parsed = JSON.parse(m[0]) }
@@ -830,6 +831,34 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string)
 
 /** Terminal/config error codes whose sanitized message preview is surfaced to the UI. */
 const DIAGNOSTIC_CODES = new Set(['gemini_invalid_request', 'gemini_auth_error', 'gemini_unknown_provider_error'])
+
+/**
+ * The long-form article budget for ONE Gemini call.
+ *
+ * PRODUCTION REGRESSION this fixes. Commit 1b7ab923 put this path on the shared
+ * GEMINI_REQUEST_TIMEOUT_MS (60s) alongside the semantic classifiers, topic
+ * suggestions and image calls. Those are short, cheap requests; a deep Hebrew
+ * article of 1,900-2,300 words from a ~6,800-character prompt on
+ * gemini-2.5-pro is not, and it routinely needs longer than a minute. Our own
+ * timeout aborted it and the merchant saw
+ * "הבקשה ל-Gemini עברה את זמן ההמתנה. נסו שוב." — a failure the application
+ * caused, not the provider. Before that commit this path had no
+ * application-imposed timeout at all and worked in production.
+ *
+ * THE BUDGET. generateValidatedArticle makes at most TWO sequential calls (the
+ * draft and one repair attempt — the loop is `attempt < 2` and nothing retries
+ * inside it), so the worst case is 2 x 120s = 240s against the route's
+ * maxDuration = 300. That leaves 60s — a fifth of the budget — for prompt
+ * assembly, the quality audit, HTML sanitisation, persistence and reservation
+ * finalisation. It is also still far inside the 30-minute usage-reservation TTL
+ * and the 60-minute scan-claim lease, so a slow worker can never outlive its
+ * own reservation.
+ *
+ * Deliberately NOT applied to the classifiers, topic suggestions, images or any
+ * other Gemini caller: they keep the shorter shared timeout, which is correct
+ * for them.
+ */
+export const GEMINI_ARTICLE_TIMEOUT_MS = 120_000
 
 /** Transient provider failures that are worth retrying (do not consume the retry cap). */
 export const TRANSIENT_GEN_REASONS = new Set(['gemini_quota_exceeded', 'gemini_overloaded', 'gemini_timeout'])
