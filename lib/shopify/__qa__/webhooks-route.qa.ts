@@ -27,6 +27,31 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
 
 const sign = (raw: Buffer) => crypto.createHmac('sha256', SECRET).update(raw).digest('base64')
 
+/**
+ * Run `fn` with the Supabase env vars REMOVED.
+ *
+ * createAdminClient() reads them at call time and throws ("supabaseUrl is required")
+ * when they are absent, so any code path that reaches the database rejects instead of
+ * silently constructing a client. That is what turns every "(no DB)" claim below from a
+ * LABEL into a PROOF: a route that touched Supabase cannot return a 400 here, it throws.
+ * The env is always restored, and a positive control below shows the harness really does
+ * catch a DB touch (so these checks cannot pass vacuously).
+ */
+async function withoutSupabaseEnv<T>(fn: () => Promise<T>): Promise<{ reached: false; value: T } | { reached: true; error: string }> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY
+  try {
+    return { reached: false, value: await fn() }
+  } catch (e) {
+    return { reached: true, error: e instanceof Error ? e.message : 'unknown' }
+  } finally {
+    if (url !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = url
+    if (key !== undefined) process.env.SUPABASE_SERVICE_ROLE_KEY = key
+  }
+}
+
 function req(url: string, raw: Buffer, headers: Record<string, string>) {
   // Uint8Array is a valid BodyInit (ArrayBufferView); Buffer is not accepted by the DOM types.
   return new Request(url, { method: 'POST', body: new Uint8Array(raw), headers })
@@ -105,14 +130,29 @@ async function main() {
   }
 
   // (9) A signed but non-object JSON payload (null/array/string/number/boolean) → 400
-  //     invalid_payload, before any DB access (the 400 returns before createAdminClient).
+  //     invalid_payload, and the database is never reached. Both halves are PROVED:
+  //     the status/error come from the real response, and the run happens with the
+  //     Supabase env stripped, so reaching createAdminClient would throw instead.
   {
+    // POSITIVE CONTROL first — a payload that DOES reach the cleanup path must throw
+    // under this harness. Without it, every "(no DB)" check below could pass simply
+    // because nothing in the suite ever touches Supabase.
+    const reaching = Buffer.from(JSON.stringify({ shop_domain: 'acme.myshopify.com' }), 'utf8')
+    const control = await withoutSupabaseEnv(() => POST(req(URL_NOSLASH, reaching, { 'x-shopify-hmac-sha256': sign(reaching), 'x-shopify-topic': 'shop/redact' })))
+    check('(9-control) the no-DB harness DOES catch a database touch (not vacuous)',
+      control.reached === true && /supabaseUrl is required/i.test(control.error))
+
     const bodies: [string, string][] = [['null', 'null'], ['[1,2]', 'array'], ['"hi"', 'string'], ['5', 'number'], ['true', 'boolean']]
     for (const [body, label] of bodies) {
       const raw = Buffer.from(body, 'utf8')
-      const r = await POST(req(URL_NOSLASH, raw, { 'x-shopify-hmac-sha256': sign(raw), 'x-shopify-topic': 'shop/redact' }))
-      const j = (await r.json()) as { error?: string }
-      check(`(9) signed ${label} payload → 400 invalid_payload (no DB)`, r.status === 400 && j.error === 'invalid_payload')
+      const out = await withoutSupabaseEnv(() => POST(req(URL_NOSLASH, raw, { 'x-shopify-hmac-sha256': sign(raw), 'x-shopify-topic': 'shop/redact' })))
+      if (out.reached) {
+        check(`(9) signed ${label} payload → 400 invalid_payload (no DB)`, false, `reached the database: ${out.error}`)
+        continue
+      }
+      const j = (await out.value.json()) as { error?: string }
+      check(`(9) signed ${label} payload → 400 invalid_payload, and the database is never reached`,
+        out.value.status === 400 && j.error === 'invalid_payload')
     }
   }
 
@@ -140,17 +180,26 @@ async function main() {
     check('(10i) neither topic uses an arbitrary payload.domain fallback', 'error' in noFallbackRedact && 'error' in noFallbackUninstall)
   }
 
-  // (11) route POST proves the shop-identity 400s reach the client before any DB access.
+  // (11) route POST proves the shop-identity 400s reach the client BEFORE any DB access —
+  //      again with the Supabase env stripped, so "no DB" is verified, not asserted.
   {
-    const redactMismatch = Buffer.from(JSON.stringify({ shop_domain: 'acme.myshopify.com' }), 'utf8')
-    const r1 = await POST(req(URL_NOSLASH, redactMismatch, { 'x-shopify-hmac-sha256': sign(redactMismatch), 'x-shopify-topic': 'shop/redact', 'x-shopify-shop-domain': 'other.myshopify.com' }))
-    check('(11) shop/redact body/header mismatch → 400 (no DB)', r1.status === 400)
-    const uMissing = Buffer.from(JSON.stringify({}), 'utf8')
-    const r2 = await POST(req(URL_NOSLASH, uMissing, { 'x-shopify-hmac-sha256': sign(uMissing), 'x-shopify-topic': 'app/uninstalled' }))
-    check('(11b) app/uninstalled missing header → 400 (no DB)', r2.status === 400)
-    const uMismatch = Buffer.from(JSON.stringify({ myshopify_domain: 'other.myshopify.com' }), 'utf8')
-    const r3 = await POST(req(URL_NOSLASH, uMismatch, { 'x-shopify-hmac-sha256': sign(uMismatch), 'x-shopify-topic': 'app/uninstalled', 'x-shopify-shop-domain': 'acme.myshopify.com' }))
-    check('(11c) app/uninstalled header/myshopify_domain mismatch → 400 (no DB)', r3.status === 400)
+    const cases: [string, Buffer, Record<string, string>][] = [
+      ['(11) shop/redact body/header mismatch',
+        Buffer.from(JSON.stringify({ shop_domain: 'acme.myshopify.com' }), 'utf8'),
+        { 'x-shopify-topic': 'shop/redact', 'x-shopify-shop-domain': 'other.myshopify.com' }],
+      ['(11b) app/uninstalled missing header',
+        Buffer.from(JSON.stringify({}), 'utf8'),
+        { 'x-shopify-topic': 'app/uninstalled' }],
+      ['(11c) app/uninstalled header/myshopify_domain mismatch',
+        Buffer.from(JSON.stringify({ myshopify_domain: 'other.myshopify.com' }), 'utf8'),
+        { 'x-shopify-topic': 'app/uninstalled', 'x-shopify-shop-domain': 'acme.myshopify.com' }],
+    ]
+    for (const [label, raw, headers] of cases) {
+      const out = await withoutSupabaseEnv(() => POST(req(URL_NOSLASH, raw, { 'x-shopify-hmac-sha256': sign(raw), ...headers })))
+      check(`${label} → 400, and the database is never reached`,
+        out.reached === false && out.value.status === 400,
+        out.reached ? `reached the database: ${out.error}` : undefined)
+    }
   }
 
   // (8) Source-contract regression: NO product feature flag and NO 404 gate in the route,

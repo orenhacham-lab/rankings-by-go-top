@@ -30,6 +30,35 @@ const req = (url: string, raw: Buffer, headers: Record<string, string>) =>
   new Request(url, { method: 'POST', body: new Uint8Array(raw), headers })
 const jbody = (o: unknown) => Buffer.from(JSON.stringify(o), 'utf8')
 
+/**
+ * Run `fn` with the Supabase env vars REMOVED, so any path that reaches
+ * createAdminClient() throws ("supabaseUrl is required") rather than quietly building a
+ * client. This makes every "no DB" claim below a PROOF instead of a label; the positive
+ * control in each block shows the harness genuinely catches a database touch. The env is
+ * always restored.
+ */
+async function withoutSupabaseEnv<T>(fn: () => Promise<T>): Promise<{ reached: false; value: T } | { reached: true; error: string }> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY
+  try {
+    return { reached: false, value: await fn() }
+  } catch (e) {
+    return { reached: true, error: e instanceof Error ? e.message : 'unknown' }
+  } finally {
+    if (url !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = url
+    if (key !== undefined) process.env.SUPABASE_SERVICE_ROLE_KEY = key
+  }
+}
+
+/** Assert a request returns `status` AND never reached the database. */
+async function checkNoDb(label: string, run: () => Promise<Response>, status: number) {
+  const out = await withoutSupabaseEnv(run)
+  check(label, out.reached === false && out.value.status === status,
+    out.reached ? `reached the database: ${out.error}` : undefined)
+}
+
 async function main() {
   console.log('Shopify PUBLIC-app compliance routes — offline')
   const { POST: compliancePOST } = await import('../../../app/api/shopify/webhooks/compliance/route')
@@ -50,28 +79,46 @@ async function main() {
     const nul = Buffer.from('null', 'utf8')
     const nulRes = await compliancePOST(req(CU, nul, { 'x-shopify-hmac-sha256': sign(nul), 'x-shopify-topic': 'shop/redact' }))
     check('compliance: signed non-object payload → 400 invalid_payload', nulRes.status === 400 && ((await nulRes.json()) as { error?: string }).error === 'invalid_payload')
+    // POSITIVE CONTROL — a request that DOES reach the cleanup path must throw under the
+    // no-DB harness, so the checks that follow cannot pass vacuously.
+    const reaching = jbody({ shop_domain: 'acme.myshopify.com' })
+    const control = await withoutSupabaseEnv(() => compliancePOST(req(CU, reaching, { 'x-shopify-hmac-sha256': sign(reaching), 'x-shopify-topic': 'shop/redact' })))
+    check('compliance: the no-DB harness DOES catch a database touch (not vacuous)',
+      control.reached === true && /supabaseUrl is required/i.test(control.error))
     const noShop = jbody({})
-    check('compliance: signed shop/redact missing shop → 400 (no DB)', (await compliancePOST(req(CU, noShop, { 'x-shopify-hmac-sha256': sign(noShop), 'x-shopify-topic': 'shop/redact' }))).status === 400)
+    await checkNoDb('compliance: signed shop/redact missing shop → 400, database never reached',
+      () => compliancePOST(req(CU, noShop, { 'x-shopify-hmac-sha256': sign(noShop), 'x-shopify-topic': 'shop/redact' })), 400)
     const badShop = jbody({ shop_domain: 'not a host/admin' })
-    check('compliance: signed shop/redact invalid shop → 400 (no DB)', (await compliancePOST(req(CU, badShop, { 'x-shopify-hmac-sha256': sign(badShop), 'x-shopify-topic': 'shop/redact' }))).status === 400)
+    await checkNoDb('compliance: signed shop/redact invalid shop → 400, database never reached',
+      () => compliancePOST(req(CU, badShop, { 'x-shopify-hmac-sha256': sign(badShop), 'x-shopify-topic': 'shop/redact' })), 400)
     const mism = jbody({ shop_domain: 'acme.myshopify.com' })
-    check('compliance: signed shop/redact body/header mismatch → 400 (no DB)', (await compliancePOST(req(CU, mism, { 'x-shopify-hmac-sha256': sign(mism), 'x-shopify-topic': 'shop/redact', 'x-shopify-shop-domain': 'other.myshopify.com' }))).status === 400)
+    await checkNoDb('compliance: signed shop/redact body/header mismatch → 400, database never reached',
+      () => compliancePOST(req(CU, mism, { 'x-shopify-hmac-sha256': sign(mism), 'x-shopify-topic': 'shop/redact', 'x-shopify-shop-domain': 'other.myshopify.com' })), 400)
     const unk = jbody({ id: 1 })
-    check('compliance: signed unrelated topic → 200 no-op', (await compliancePOST(req(CU, unk, { 'x-shopify-hmac-sha256': sign(unk), 'x-shopify-topic': 'orders/create' }))).status === 200)
+    await checkNoDb('compliance: signed unrelated topic → 200 no-op, database never reached',
+      () => compliancePOST(req(CU, unk, { 'x-shopify-hmac-sha256': sign(unk), 'x-shopify-topic': 'orders/create' })), 200)
   }
 
   // ── /app-uninstalled ──
   {
     const raw = jbody({})
     check('uninstalled: unsigned → 401', (await uninstallPOST(req(UU, raw, { 'x-shopify-topic': 'app/uninstalled', 'x-shopify-shop-domain': 'acme.myshopify.com' }))).status === 401)
+    // POSITIVE CONTROL for this endpoint's own harness.
+    const reaching = jbody({})
+    const control = await withoutSupabaseEnv(() => uninstallPOST(req(UU, reaching, { 'x-shopify-hmac-sha256': sign(reaching), 'x-shopify-topic': 'app/uninstalled', 'x-shopify-shop-domain': 'acme.myshopify.com' })))
+    check('uninstalled: the no-DB harness DOES catch a database touch (not vacuous)',
+      control.reached === true && /supabaseUrl is required/i.test(control.error))
     const unk = jbody({ id: 1 })
-    check('uninstalled: signed unrelated topic → 200 (reachable, signature accepted, no DB)', (await uninstallPOST(req(UU, unk, { 'x-shopify-hmac-sha256': sign(unk), 'x-shopify-topic': 'orders/create' }))).status === 200)
+    await checkNoDb('uninstalled: signed unrelated topic → 200 (signature accepted), database never reached',
+      () => uninstallPOST(req(UU, unk, { 'x-shopify-hmac-sha256': sign(unk), 'x-shopify-topic': 'orders/create' })), 200)
     const bad = Buffer.from('nope', 'utf8')
     check('uninstalled: signed malformed JSON → 400', (await uninstallPOST(req(UU, bad, { 'x-shopify-hmac-sha256': sign(bad), 'x-shopify-topic': 'app/uninstalled' }))).status === 400)
     const noHdr = jbody({})
-    check('uninstalled: signed app/uninstalled missing shop header → 400 (no DB)', (await uninstallPOST(req(UU, noHdr, { 'x-shopify-hmac-sha256': sign(noHdr), 'x-shopify-topic': 'app/uninstalled' }))).status === 400)
+    await checkNoDb('uninstalled: signed app/uninstalled missing shop header → 400, database never reached',
+      () => uninstallPOST(req(UU, noHdr, { 'x-shopify-hmac-sha256': sign(noHdr), 'x-shopify-topic': 'app/uninstalled' })), 400)
     const mism = jbody({ myshopify_domain: 'other.myshopify.com' })
-    check('uninstalled: signed header/myshopify_domain mismatch → 400 (no DB)', (await uninstallPOST(req(UU, mism, { 'x-shopify-hmac-sha256': sign(mism), 'x-shopify-topic': 'app/uninstalled', 'x-shopify-shop-domain': 'acme.myshopify.com' }))).status === 400)
+    await checkNoDb('uninstalled: signed header/myshopify_domain mismatch → 400, database never reached',
+      () => uninstallPOST(req(UU, mism, { 'x-shopify-hmac-sha256': sign(mism), 'x-shopify-topic': 'app/uninstalled', 'x-shopify-shop-domain': 'acme.myshopify.com' })), 400)
   }
 
   // ── Source contracts ──
