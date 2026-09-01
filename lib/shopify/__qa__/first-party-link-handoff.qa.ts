@@ -202,13 +202,15 @@ async function main() {
       /const LINK_RESUME_PATH = '\/api\/shopify\/link\/resume'/.test(client)
       && /json\.resumePath === LINK_RESUME_PATH && json\.handoff/.test(client))
     check('3h: and it posts its OWN constant, so a tampered path can never be used as the action',
-      /submitLinkHandoffTopLevel\(data\?\.appUrl \?\? '', LINK_RESUME_PATH, json\.handoff\)/.test(client))
+      /submitHandoffTopLevel\(data\?\.appUrl \?\? '', LINK_RESUME_PATH, json\.handoff\)/.test(client))
     check('3i: the existing alreadyConnected behaviour is unchanged',
       /if \(json\.alreadyConnected\) \{ setInstallBusy\(false\); retry\(\); return \}/.test(client)
       && /alreadyConnected: true, next: null/.test(installRoute))
-    check('3j: top-level navigation is PRESERVED for billing and dashboard destinations',
+    // Billing has since moved to the SAME first-party handoff (see
+    // lib/shopify/__qa__/first-party-billing-intent.qa.ts), so the surviving
+    // navigateTopLevel caller is the full-dashboard button.
+    check('3j: plain top-level navigation is PRESERVED for the dashboard destination',
       /function navigateTopLevel\(url: string\)/.test(client)
-      && /if \(json\.redirectUrl\) navigateTopLevel\(json\.redirectUrl\)/.test(client)
       && /navigateTopLevel\(data\.dashboardUrl!\)/.test(client))
     check('3k: SCOPE — a source contract on the form; it does not prove a browser accepts the cookie',
       true)

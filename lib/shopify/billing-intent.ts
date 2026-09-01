@@ -32,6 +32,54 @@ export const BILLING_INTENT_COOKIE = 'shopify_billing_intent'
 export const BILLING_INTENT_COOKIE_PATH = '/api/shopify/billing'
 export const BILLING_INTENT_TTL_MS = 15 * 60_000
 
+/**
+ * The ONE first-party endpoint that may turn a signed billing handoff into the
+ * scoped intent cookie. Fixed here, server-side, and echoed to the embedded
+ * client as `resumePath` so that client never composes a destination of its
+ * own (and can check the value it got is exactly this one). Never
+ * caller-supplied.
+ */
+export const BILLING_INTENT_RESUME_PATH = '/api/shopify/billing/resume'
+
+/**
+ * Domain separator mixed into the handoff HMAC. The pending-link handoff
+ * (lib/shopify/pending-link.ts) signs with the SAME app secret in the same
+ * `${value}.${mac}` shape, so without this a valid pending-link handoff would
+ * verify as a valid billing handoff and vice versa. Neither would survive the
+ * database lookup that follows — they address different tables — but two
+ * distinct credentials must not share a signature space in the first place.
+ */
+const BILLING_HANDOFF_DOMAIN = 'shopify_billing_intent_handoff:'
+
+/**
+ * Sign the raw nonce for the ONE hop from the embedded fetch response to the
+ * first-party resume POST: `${nonce}.${hmac}`. PURE.
+ *
+ * The nonce inside is the same credential the cookie itself carries — the
+ * signature exists so the resume endpoint can reject anything it did not
+ * issue BEFORE it touches the database, not to hide the nonce from the
+ * merchant's own browser (which is the only party that ever receives it, over
+ * an already-authenticated response).
+ */
+export function signBillingIntentHandoff(nonce: string, secret: string): string {
+  const mac = crypto.createHmac('sha256', secret).update(`${BILLING_HANDOFF_DOMAIN}${nonce}`).digest('hex')
+  return `${nonce}.${mac}`
+}
+
+/** Verify a signed handoff; returns the raw nonce or null (missing/tampered). PURE, constant-time. */
+export function verifyBillingIntentHandoff(value: string | undefined | null, secret: string): string | null {
+  if (!value || typeof value !== 'string') return null
+  const dot = value.lastIndexOf('.')
+  if (dot <= 0) return null
+  const nonce = value.slice(0, dot)
+  const provided = value.slice(dot + 1)
+  const expected = crypto.createHmac('sha256', secret).update(`${BILLING_HANDOFF_DOMAIN}${nonce}`).digest('hex')
+  const a = Buffer.from(provided, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  if (a.length !== b.length) return null
+  return crypto.timingSafeEqual(a, b) ? nonce : null
+}
+
 export function generateBillingIntentNonce(): string {
   return crypto.randomBytes(32).toString('hex')
 }
