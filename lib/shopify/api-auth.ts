@@ -5,8 +5,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { decryptCredential, CredentialsCryptoError } from '@/lib/security/credentials-crypto'
 import { SHOPIFY_API_VERSION, hasWriteContent } from './constants'
+import { resolveShopifyAccessToken } from './token-resolver'
 import type { ShopifyCredentials } from './types'
 
 export type ShopifyConnectionRow = {
@@ -16,6 +16,13 @@ export type ShopifyConnectionRow = {
   shop_domain: string
   storefront_domain: string | null
   access_token_encrypted: string
+  // Expiring offline grant. The refresh token uses the same AES-256-GCM
+  // mechanism as the access token and is decrypted ONLY inside
+  // lib/shopify/token-resolver.ts, only to perform one rotation. Nullable for
+  // connections created before expiring grants existed.
+  refresh_token_encrypted: string | null
+  access_token_expires_at: string | null
+  refresh_token_expires_at: string | null
   api_version: string
   connection_status: 'untested' | 'connected' | 'failed'
   last_tested_at: string | null
@@ -65,7 +72,7 @@ export async function loadShopifyConnection(
   projectId: string,
   opts?: { allowInactive?: boolean },
 ): Promise<
-  | { error: string; status: 404 | 409 | 500 }
+  | { error: string; status: 404 | 409 | 500 | 503 }
   | { connection: ShopifyConnectionRow; creds: ShopifyCredentials }
 > {
   const { data, error } = await admin
@@ -85,17 +92,33 @@ export async function loadShopifyConnection(
   if (connection.connection_status !== 'connected' && !opts?.allowInactive) {
     return { error: 'Shopify connection is not active', status: 409 }
   }
-  try {
-    const accessToken = decryptCredential(connection.access_token_encrypted)
-    return {
-      connection,
-      // Always the server-pinned version (centralized), never a stale stored value.
-      creds: { shopDomain: connection.shop_domain, accessToken, apiVersion: SHOPIFY_API_VERSION },
+  // THE credential resolution point. Every Admin API caller in the app reaches
+  // Shopify through this one function, so refreshing an expiring offline grant
+  // belongs here and nowhere else: the resolver reuses a token that is still
+  // safely valid and otherwise rotates it, storing the whole new pair under
+  // optimistic concurrency. It needs no merchant session, which is what
+  // background publishing requires.
+  const resolved = await resolveShopifyAccessToken(admin, connection)
+  if (!resolved.ok) {
+    // Stable, non-sensitive reason codes only — never a token or ciphertext.
+    console.error('[Shopify] Could not resolve an Admin API credential:', resolved.reason)
+    if (resolved.reason === 'reauthorization_required') {
+      // TERMINAL: Shopify refused the refresh token. The connection is already
+      // marked so the UI can offer a reconnect. Billing authority is untouched.
+      return { error: 'Shopify authorization expired — reconnect the store', status: 409 }
     }
-  } catch (err) {
-    const reason = err instanceof CredentialsCryptoError ? err.message : 'decryption failed'
-    console.error('[Shopify] Token decryption failed:', reason)
+    if (resolved.reason === 'token_refresh_failed') {
+      // TRANSIENT: Shopify was unreachable or briefly failing. Retry later;
+      // nothing about the connection or its billing has changed.
+      return { error: 'Shopify credentials could not be refreshed, try again', status: 503 }
+    }
     return { error: 'Stored Shopify credentials could not be decrypted', status: 500 }
+  }
+
+  return {
+    connection,
+    // Always the server-pinned version (centralized), never a stale stored value.
+    creds: { shopDomain: connection.shop_domain, accessToken: resolved.accessToken, apiVersion: SHOPIFY_API_VERSION },
   }
 }
 

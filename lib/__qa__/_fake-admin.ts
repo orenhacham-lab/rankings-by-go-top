@@ -376,6 +376,9 @@ export class FakeAdmin {
           live.shop_gid = shopGid ?? live.shop_gid
           live.storefront_domain = p.p_storefront_domain
           live.access_token_encrypted = p.p_access_token_encrypted
+          live.refresh_token_encrypted = p.p_refresh_token_encrypted ?? null
+          live.access_token_expires_at = p.p_access_token_expires_at ?? null
+          live.refresh_token_expires_at = p.p_refresh_token_expires_at ?? null
           live.api_version = p.p_api_version
           live.granted_scopes = p.p_granted_scopes
           live.connection_status = p.p_connection_status
@@ -416,7 +419,11 @@ export class FakeAdmin {
       if (existingForProject) {
         Object.assign(existingForProject, {
           shop_domain: shopDomain, shop_gid: shopGid, storefront_domain: p.p_storefront_domain,
-          access_token_encrypted: p.p_access_token_encrypted, api_version: p.p_api_version,
+          access_token_encrypted: p.p_access_token_encrypted,
+          refresh_token_encrypted: p.p_refresh_token_encrypted ?? null,
+          access_token_expires_at: p.p_access_token_expires_at ?? null,
+          refresh_token_expires_at: p.p_refresh_token_expires_at ?? null,
+          api_version: p.p_api_version,
           granted_scopes: p.p_granted_scopes, connection_status: p.p_connection_status,
           last_error: p.p_last_error, last_tested_at: now, updated_at: now,
         })
@@ -429,6 +436,9 @@ export class FakeAdmin {
       rows.push({
         id, user_id: p.p_user_id, project_id: projectId, shop_domain: shopDomain, shop_gid: shopGid,
         storefront_domain: p.p_storefront_domain, access_token_encrypted: p.p_access_token_encrypted,
+        refresh_token_encrypted: p.p_refresh_token_encrypted ?? null,
+        access_token_expires_at: p.p_access_token_expires_at ?? null,
+        refresh_token_expires_at: p.p_refresh_token_expires_at ?? null,
         api_version: p.p_api_version, granted_scopes: p.p_granted_scopes,
         connection_status: p.p_connection_status, last_error: p.p_last_error,
         last_tested_at: now, created_at: now, updated_at: now, archived_at: null, archived_reason: null,

@@ -229,6 +229,11 @@ async function main() {
       'scopes', 'scopeCount', 'associatedUserScope', 'expiresIn', 'requestedTokenType',
       // Shopify's own structured error reason, sanitized and capped in client.ts.
       'shopifyMessages', 'shopifyCodes',
+      // EXPIRING-grant shape. `requestedExpiring` and `hasRefreshToken` are
+      // booleans, `refreshTokenLength` and `refreshTokenExpiresIn` are numbers,
+      // and `missingFields` is a list of Shopify's own PUBLIC field names —
+      // none of them is, or is derived from, a token value.
+      'requestedExpiring', 'hasRefreshToken', 'refreshTokenLength', 'refreshTokenExpiresIn', 'missingFields',
     ])
     const bad = [...new Set(diagKeys)].filter((k) => !ALLOWED.has(k))
     check('8c: every diagnostic field is on the safe allow-list (stage, kind, status, api version, shop domain, request id)',
@@ -274,10 +279,21 @@ async function main() {
       json: async () => body,
     })) as unknown as typeof fetch
 
+    // Every fixture below is now an EXPIRING grant: Shopify no longer accepts
+    // non-expiring Admin API tokens, so the exchange REQUIRES access_token +
+    // refresh_token + expires_in + refresh_token_expires_in and rejects
+    // anything less (proved separately in
+    // lib/shopify/__qa__/phase3-expiring-offline-tokens.qa.ts). The diagnostics
+    // guarantees under test here are unchanged.
+    const REFRESH = 'shpr_' + 'e'.repeat(32)
+    const expiring = (over: Record<string, unknown>) => ({
+      access_token: OFFLINE, refresh_token: REFRESH, expires_in: 86400, refresh_token_expires_in: 2592000, ...over,
+    })
+
     // Happy path: the diagnostics describe the response without quoting it.
     const okRes = await exchangeSessionTokenForOfflineToken({
       shop: SHOP, sessionToken: 'sess.tok', clientId: 'id', clientSecret: 'sec',
-      fetchImpl: stub(200, { access_token: OFFLINE, scope: 'read_products,read_content,write_content', expires_in: 0 }),
+      fetchImpl: stub(200, expiring({ scope: 'read_products,read_content,write_content' })),
     })
     const d = okRes.diagnostics
     check('10a: HTTP status recorded', d.httpStatus === 200)
@@ -293,7 +309,7 @@ async function main() {
     // An ONLINE token returned despite requesting offline — the mismatch case.
     const onlineRes = await exchangeSessionTokenForOfflineToken({
       shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x',
-      fetchImpl: stub(200, { access_token: 'shpca_' + 'a'.repeat(32), scope: 'read_products', associated_user_scope: 'read_products', expires_in: 86399 }),
+      fetchImpl: stub(200, expiring({ access_token: 'shpca_' + 'a'.repeat(32), scope: 'read_products', associated_user_scope: 'read_products', expires_in: 86399 })),
     })
     check('10i: an online token is classified as such (offline/online mismatch is visible)',
       onlineRes.diagnostics.tokenType === 'online')
@@ -303,9 +319,15 @@ async function main() {
     // ZERO granted scopes — the state that makes the Admin API 403 every query.
     const noScope = await exchangeSessionTokenForOfflineToken({
       shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x',
-      fetchImpl: stub(200, { access_token: OFFLINE, scope: '' }),
+      fetchImpl: stub(200, expiring({ scope: '' })),
     })
     check('10l: an empty scope grant is visible as scopeCount 0', noScope.diagnostics.scopeCount === 0)
+    check('10l2: the expiring-grant shape is reported too, without any value',
+      okRes.diagnostics.requestedExpiring === true
+      && okRes.diagnostics.hasRefreshToken === true
+      && okRes.diagnostics.refreshTokenLength === REFRESH.length
+      && okRes.diagnostics.refreshTokenExpiresIn === 2592000
+      && !JSON.stringify(okRes.diagnostics).includes(REFRESH))
 
     // Failure paths still carry diagnostics.
     let thrown: unknown = null
@@ -321,6 +343,20 @@ async function main() {
     try {
       await exchangeSessionTokenForOfflineToken({ shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x', fetchImpl: stub(200, { scope: 'read_products' }) })
     } catch (e) { thrown2 = e }
+    // The PRODUCTION failure: a 200 with a perfectly good offline token and no
+    // refresh material. Refused, with the missing PUBLIC field names reported.
+    let thrown3: unknown = null
+    try {
+      await exchangeSessionTokenForOfflineToken({ shop: SHOP, sessionToken: 's', clientId: 'i', clientSecret: 'x', fetchImpl: stub(200, { access_token: OFFLINE, scope: 'read_products' }) })
+    } catch (e) { thrown3 = e }
+    check('10q: a NON-EXPIRING 200 is refused', thrown3 instanceof TokenExchangeError
+      && (thrown3 as Error).message === 'token_exchange_not_expiring')
+    // refresh_token_expires_in is OPTIONAL by Shopify's contract, so it is not
+    // listed as missing — only the fields an expiring grant must always carry.
+    check('10r: naming the missing REQUIRED fields, and nothing from the body',
+      JSON.stringify((thrown3 as InstanceType<typeof TokenExchangeError>).diagnostics.missingFields)
+        === JSON.stringify(['refresh_token', 'expires_in'])
+      && !JSON.stringify((thrown3 as InstanceType<typeof TokenExchangeError>).diagnostics).includes(OFFLINE))
     check('10o: a 200 with no access_token still throws', thrown2 instanceof TokenExchangeError)
     check('10p: reporting hasAccessToken:false and tokenType absent',
       (thrown2 as InstanceType<typeof TokenExchangeError>).diagnostics.hasAccessToken === false
@@ -335,10 +371,16 @@ async function main() {
     const SECRET = 'super-secret-client-secret-value'
     const SESSION = 'eyJhbGciOiJIUzI1NiJ9.sessionpayload.signature'
     const TOKEN = 'shpat_' + 'd'.repeat(40)
+    // An EXPIRING grant, so the refresh token is a SECOND secret this must
+    // prove cannot leak.
+    const REFRESH_TOKEN = 'shpr_' + 'c'.repeat(40)
     const stub = (async () => ({
       ok: true, status: 200,
       headers: { get: () => 'req-z' },
-      json: async () => ({ access_token: TOKEN, scope: 'read_products' }),
+      json: async () => ({
+        access_token: TOKEN, refresh_token: REFRESH_TOKEN,
+        expires_in: 86400, refresh_token_expires_in: 2592000, scope: 'read_products',
+      }),
     })) as unknown as typeof fetch
 
     const res = await exchangeSessionTokenForOfflineToken({
@@ -349,18 +391,23 @@ async function main() {
       ['the access token', TOKEN],
       ['the session token', SESSION],
       ['the client secret', SECRET],
+      ['the REFRESH token', REFRESH_TOKEN],
     ] as [string, string][]) {
       check(`11: ${label} never appears in the diagnostics object`, !serialized.includes(secret))
     }
     // Not even a fragment: a prefix long enough to be identifying must be absent.
     check('11: no 12-character fragment of the access token leaks', !serialized.includes(TOKEN.slice(0, 12)))
+    check('11: no 12-character fragment of the refresh token leaks', !serialized.includes(REFRESH_TOKEN.slice(0, 12)))
     check('11: the classification is a fixed label, not bytes taken from the token',
       /"tokenType":"(offline|online|app_secret_shaped|unrecognised|absent)"/.test(serialized))
     check('11: only shape fields are present',
       Object.keys(res.diagnostics).every((k) => [
         'httpStatus', 'shopifyRequestId', 'hasAccessToken', 'tokenLength', 'tokenType',
         'scopes', 'scopeCount', 'associatedUserScope', 'expiresIn', 'requestedTokenType',
+        'requestedExpiring', 'hasRefreshToken', 'refreshTokenLength', 'refreshTokenExpiresIn',
       ].includes(k)))
+    check('11: the refresh token is reported as a LENGTH and a boolean only',
+      res.diagnostics.hasRefreshToken === true && res.diagnostics.refreshTokenLength === REFRESH_TOKEN.length)
 
     // The route must never hand a raw credential to fail().
     const route = strip(read('app/api/shopify/embedded-install/route.ts'))

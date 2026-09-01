@@ -69,6 +69,12 @@ export async function POST(request: Request) {
     shopDomain: pending.shop_domain,
     shopGid: pending.shop_gid,
     accessTokenEncrypted: pending.access_token_encrypted,
+    // Carried straight through from the pending row: all four values land in
+    // the live connection in the single claim_shopify_shop_ownership
+    // statement, so the row can never mix two different grants.
+    refreshTokenEncrypted: pending.refresh_token_encrypted ?? null,
+    accessTokenExpiresAt: pending.access_token_expires_at ?? null,
+    refreshTokenExpiresAt: pending.refresh_token_expires_at ?? null,
     apiVersion: pending.api_version,
     grantedScopes: pending.granted_scopes,
     storefrontDomain: pending.storefront_domain,

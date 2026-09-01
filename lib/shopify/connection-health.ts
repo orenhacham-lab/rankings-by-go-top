@@ -47,6 +47,7 @@ export const SHOPIFY_UNINSTALL_CODE = 'app_uninstalled'
 export const SHOPIFY_CONNECTION_ERROR_CODES = [
   'app_uninstalled',
   'invalid_token',
+  'refresh_token_invalid',
   'permission_error',
   'missing_scopes',
   'api_version_fallback',
@@ -135,7 +136,14 @@ export function classifyReinstallNeed(
   const errorCode = normalizeConnectionErrorCode(row.last_error)
   if (row.connection_status !== 'failed') return { needsInstall: false, reason: null, errorCode }
   if (errorCode === 'app_uninstalled') return { needsInstall: true, reason: 'app_uninstalled', errorCode }
-  if (errorCode === 'invalid_token') return { needsInstall: true, reason: 'credential_revoked', errorCode }
+  // A terminal refresh failure is the same class of fact as a rejected access
+  // token: Shopify will not accept the credential this connection holds, and
+  // retrying cannot change that. Written only by the token resolver's terminal
+  // path (never by a transient failure), so it cannot manufacture a reconnect
+  // out of a network blip.
+  if (errorCode === 'invalid_token' || errorCode === 'refresh_token_invalid') {
+    return { needsInstall: true, reason: 'credential_revoked', errorCode }
+  }
   return { needsInstall: false, reason: null, errorCode }
 }
 

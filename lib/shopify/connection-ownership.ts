@@ -71,6 +71,14 @@ export async function claimShopForProject(admin: Admin, args: {
   shopDomain: string
   shopGid: string | null
   accessTokenEncrypted: string
+  /**
+   * The rest of the expiring offline grant. Passed to the RPC in the SAME call
+   * as the access token, so a live row can never hold an access token from one
+   * exchange beside a refresh token from another.
+   */
+  refreshTokenEncrypted: string | null
+  accessTokenExpiresAt: string | null
+  refreshTokenExpiresAt: string | null
   apiVersion: string
   grantedScopes: string[]
   storefrontDomain: string | null
@@ -97,6 +105,9 @@ export async function claimShopForProject(admin: Admin, args: {
     p_storefront_domain: args.storefrontDomain,
     p_connection_status: args.connectionStatus,
     p_last_error: args.lastError,
+    p_refresh_token_encrypted: args.refreshTokenEncrypted,
+    p_access_token_expires_at: args.accessTokenExpiresAt,
+    p_refresh_token_expires_at: args.refreshTokenExpiresAt,
   })
 
   if (error) return { ok: false, reason: 'save_failed' }

@@ -69,7 +69,12 @@ const liveConnected = (over: Record<string, unknown> = {}) => tombstone({
 
 const freshArgs = (who: { user: string; project: string }, over: Record<string, unknown> = {}) => ({
   userId: who.user, projectId: who.project, shopDomain: SHOP, shopGid: GID,
-  accessTokenEncrypted: 'enc(FRESH_token)', apiVersion: '2026-07',
+  accessTokenEncrypted: 'enc(FRESH_token)',
+  // Expiring offline grant — carried through the claim in one statement.
+  refreshTokenEncrypted: 'enc(FRESH_refresh)',
+  accessTokenExpiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+  refreshTokenExpiresAt: new Date(Date.now() + 30 * 24 * 3600_000).toISOString(),
+  apiVersion: '2026-07',
   grantedScopes: ['read_products', 'read_content', 'write_content'],
   storefrontDomain: null, connectionStatus: 'connected' as const, lastError: null,
   proof: 'oauth_callback_verified' as const, ...over,
