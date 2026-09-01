@@ -21,7 +21,7 @@ import {
 } from '@/lib/shopify/oauth'
 import type { ExpiringOfflineToken } from '@/lib/shopify/oauth'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
-import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
+import { createPendingInstall, signPendingLinkCookieValue, PendingInstallPersistenceError, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
 import { claimShopForProject } from '@/lib/shopify/connection-ownership'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -105,28 +105,38 @@ async function completePreAuthInstall(
   if (!tokenEncrypted || !refreshTokenEncrypted) return fail('encryption_failed')
   const grantIssuedAt = Date.now()
 
-  const pendingToken = await createPendingInstall(admin, {
-    shop_domain: shop,
-    shop_gid: shopGid,
-    access_token_encrypted: tokenEncrypted,
-    // TRUSTED PROVENANCE. This is completePreAuthInstall: an
-    // App-Store-initiated OAuth completion with NO authenticated Rankings user
-    // yet — the merchant arrived from Shopify, not from the dashboard. The
-    // callback HMAC, the signed nonce and the one-time state were all verified
-    // before this point. Stamped server-side; never from request input.
-    install_origin: 'shopify_app_store',
-    // Whichever app this flow actually resolved is recorded with the token it
-    // issued, so a later refresh signs with the right pair.
-    oauth_app_edition: config.edition,
-    refresh_token_encrypted: refreshTokenEncrypted,
-    access_token_expires_at: expiryFromNow(token.expiresIn, grantIssuedAt),
-    refresh_token_expires_at: token.refreshTokenExpiresIn === null
-      ? null
-      : expiryFromNow(token.refreshTokenExpiresIn, grantIssuedAt),
-    api_version: SHOPIFY_API_VERSION,
-    granted_scopes: grantedScopes,
-    storefront_domain: storefront,
-  })
+  // createPendingInstall now fails closed when Supabase rejects the delete or
+  // the insert, instead of returning a token for a row that was never written.
+  // Same treatment as the other persistence failures on this path: a stable,
+  // non-sensitive reason on the error redirect — never the database's message.
+  let pendingToken: string
+  try {
+    pendingToken = await createPendingInstall(admin, {
+      shop_domain: shop,
+      shop_gid: shopGid,
+      access_token_encrypted: tokenEncrypted,
+      // TRUSTED PROVENANCE. This is completePreAuthInstall: an
+      // App-Store-initiated OAuth completion with NO authenticated Rankings user
+      // yet — the merchant arrived from Shopify, not from the dashboard. The
+      // callback HMAC, the signed nonce and the one-time state were all verified
+      // before this point. Stamped server-side; never from request input.
+      install_origin: 'shopify_app_store',
+      // Whichever app this flow actually resolved is recorded with the token it
+      // issued, so a later refresh signs with the right pair.
+      oauth_app_edition: config.edition,
+      refresh_token_encrypted: refreshTokenEncrypted,
+      access_token_expires_at: expiryFromNow(token.expiresIn, grantIssuedAt),
+      refresh_token_expires_at: token.refreshTokenExpiresIn === null
+        ? null
+        : expiryFromNow(token.refreshTokenExpiresIn, grantIssuedAt),
+      api_version: SHOPIFY_API_VERSION,
+      granted_scopes: grantedScopes,
+      storefront_domain: storefront,
+    })
+  } catch (err) {
+    if (err instanceof PendingInstallPersistenceError) return fail('pending_install_persistence_failed')
+    throw err
+  }
 
   const res = clearNonce(NextResponse.redirect(`${appUrl}/shopify/link`))
   res.cookies.set(PENDING_LINK_COOKIE, signPendingLinkCookieValue(pendingToken, config.clientSecret), {

@@ -18,6 +18,14 @@ type Admin = ReturnType<typeof createAdminClient>
 export const PENDING_LINK_COOKIE = 'shopify_pending_link'
 export const PENDING_LINK_TTL_MS = 30 * 60_000
 
+/**
+ * The ONE first-party endpoint that may turn a signed pending-link handoff
+ * into the browser cookie. Fixed here, server-side, and echoed to the embedded
+ * client as `resumePath` so the client never composes a destination of its own
+ * (and can assert the value it got is exactly this one). Never caller-supplied.
+ */
+export const PENDING_LINK_RESUME_PATH = '/api/shopify/link/resume'
+
 export function generatePendingLinkToken(): string {
   return crypto.randomBytes(32).toString('hex')
 }
@@ -129,18 +137,41 @@ export interface PendingInstallRow {
  * present for a shop is always the newest install attempt and can never be
  * reused. Deletion is scoped to shopify_pending_installs: it is a short-lived
  * handoff table with no children, and nothing references it.
+ *
+ * FAILS CLOSED. Both Supabase results used to be discarded, so a delete or
+ * insert that the database rejected still returned a token: the caller
+ * answered 200 with a handoff for a pending row that does not exist, and the
+ * merchant reached /shopify/link only to be told the linking session had
+ * expired. Each result is now checked explicitly and a failure throws
+ * PendingInstallPersistenceError, so no token is ever handed out for state
+ * that was not persisted.
  */
+export class PendingInstallPersistenceError extends Error {
+  /** WHICH step failed — our own operation name, never a database message. */
+  readonly op: 'delete' | 'insert'
+  constructor(op: 'delete' | 'insert') {
+    super('pending_install_persistence_failed')
+    this.name = 'PendingInstallPersistenceError'
+    this.op = op
+  }
+}
+
 export async function createPendingInstall(
   admin: Admin,
   fields: Omit<PendingInstallRow, 'token' | 'expires_at' | 'consumed_at'>,
 ): Promise<string> {
-  await admin.from('shopify_pending_installs').delete().eq('shop_domain', fields.shop_domain)
+  // The DB error object itself is deliberately NOT captured, logged or
+  // attached to the thrown error: it can echo row contents. Only the fact of
+  // failure and which step it was travel outward.
+  const { error: deleteError } = await admin.from('shopify_pending_installs').delete().eq('shop_domain', fields.shop_domain)
+  if (deleteError) throw new PendingInstallPersistenceError('delete')
   const token = generatePendingLinkToken()
-  await admin.from('shopify_pending_installs').insert({
+  const { error: insertError } = await admin.from('shopify_pending_installs').insert({
     token,
     ...fields,
     expires_at: new Date(Date.now() + PENDING_LINK_TTL_MS).toISOString(),
   })
+  if (insertError) throw new PendingInstallPersistenceError('insert')
   return token
 }
 
