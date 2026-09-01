@@ -26,6 +26,20 @@ export const SHOPIFY_WRITE_SCOPE = 'write_content'
  */
 export const SHOPIFY_PUBLISH_SCOPES = ['read_products', 'read_content', 'write_content'] as const
 
+/**
+ * THE authoritative list of scopes this app requests, and the single source of
+ * truth for it. It must equal the `scopes` line in shopify.app.toml — the
+ * Shopify app configuration — and lib/shopify/__qa__/shopify-scopes.qa.ts
+ * fails if the two ever drift apart.
+ *
+ * Kept separate from SHOPIFY_REQUIRED_SCOPES on purpose: this is what the app
+ * ASKS Shopify for, while SHOPIFY_REQUIRED_SCOPES is the smaller set the
+ * implemented read queries cannot work without. A grant is refused only for
+ * missing a REQUIRED scope — never for lacking an optional one — and a missing
+ * required scope is a reauthorization problem, never a billing problem.
+ */
+export const SHOPIFY_APP_SCOPES = ['read_products', 'read_content', 'write_content'] as const
+
 /** True when the granted set allows creating/updating Blog Articles. */
 export function hasWriteContent(granted: string[] | null | undefined): boolean {
   const g = Array.isArray(granted) ? granted.map((s) => String(s).trim()) : []

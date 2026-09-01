@@ -63,14 +63,27 @@ function connRow(overrides: Record<string, unknown> = {}) {
 }
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
+/**
+ * The resolver now returns a DISCRIMINATED result so that an infrastructure
+ * failure can never be mistaken for "not Shopify-governed". These helpers keep
+ * the existing assertions readable: `governedEntitlement` is the old
+ * `ShopifyGovernedEntitlement | null` shape, and it THROWS on 'unavailable' so
+ * a test can never silently pass through an outage.
+ */
+async function governedEntitlement(adminClient: unknown, userId: string) {
+  const r = await resolveShopifyGovernedEntitlement(adminClient as never, userId)
+  if (r.kind === 'unavailable') throw new Error(`unexpected unavailable: ${r.reason}`)
+  return r.kind === 'governed' ? r.entitlement : null
+}
+
 async function main() {
   console.log('Cache-tightening fix — TTL + invalidation QA\n')
 
   console.log('1) a cached "active" entry verified 4 minutes ago is STILL trusted (within the 5-minute TTL) — no live call')
   {
     liveCallCount = 0
-    const admin = new FakeAdmin({ shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(4) })], shopify_billing_migrations: [] })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(4) })], shopify_billing_migrations: [] })
+    const r = await governedEntitlement(admin, 'u1')
     check('planCode resolved from cache (premium)', r?.planCode === 'premium')
     check('zero live Partner API calls made', liveCallCount === 0)
   }
@@ -78,27 +91,27 @@ async function main() {
   console.log('\n2) a cached "active" entry verified 6 minutes ago is NO LONGER trusted (past the 5-minute TTL) — forces a live re-check')
   {
     liveCallCount = 0
-    const admin = new FakeAdmin({ shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(6) })], shopify_billing_migrations: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(6) })], shopify_billing_migrations: [] })
     const f = fakePartnerFetch(() => ({ status: 200, body: noSubBody })) // the REAL current state has since changed
-    const r = await withFetch(f, () => resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1'))
+    const r = await withFetch(f, () => governedEntitlement(admin, 'u1'))
     check('a live Partner API call was made', liveCallCount === 1)
     check('the STALE cached "active" value is NOT trusted — reflects the live (now inactive) result', r?.planCode === null)
   }
 
   console.log('\n3) isShopifyGovernedAndActive (hasAccess hot path) — same 5-minute TTL, cache-only (never a live call)')
   {
-    const freshAdmin = new FakeAdmin({ shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(4) })] })
+    const freshAdmin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(4) })] })
     const fresh = await isShopifyGovernedAndActive(freshAdmin as unknown as Admin, 'u1')
     check('within 5 min: active:true from cache', fresh.active === true)
 
-    const staleAdmin = new FakeAdmin({ shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(6) })] })
+    const staleAdmin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(6) })] })
     const stale = await isShopifyGovernedAndActive(staleAdmin as unknown as Admin, 'u1')
     check('past 5 min: active:false (a stale cache is never trusted, and this hot path never makes a live call either)', stale.active === false)
   }
 
   console.log('\n4) applyAppUninstalled — immediately clears the billing cache (not just connection_status)')
   {
-    const admin = new FakeAdmin({ shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(1) })] }) // very fresh "active" cache
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(1) })] }) // very fresh "active" cache
     const result = await applyAppUninstalled(admin as unknown as Admin, SHOP_DOMAIN)
     check('cleanup succeeded', result.ok === true)
     const row = admin.tables.shopify_connections[0] as Record<string, unknown>
@@ -110,7 +123,7 @@ async function main() {
 
   console.log('\n5) reinstall edge case — after uninstall + reinstall, a fresh "active" cache from BEFORE the uninstall never leaks through')
   {
-    const admin = new FakeAdmin({ shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(1) })] }) // fresh active cache
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(1) })] }) // fresh active cache
     await applyAppUninstalled(admin as unknown as Admin, SHOP_DOMAIN)
     // Reinstall: connection_status flips back to 'connected' (the OAuth
     // callback's normal upsert path — simulated directly here).
@@ -118,7 +131,7 @@ async function main() {
     row.connection_status = 'connected'
     liveCallCount = 0
     const f = fakePartnerFetch(() => ({ status: 200, body: activeSubBody('regular') }))
-    const r = await withFetch(f, () => resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1'))
+    const r = await withFetch(f, () => governedEntitlement(admin, 'u1'))
     check('a live check was forced immediately after reinstall (cache was invalidated, not stale-trusted)', liveCallCount === 1)
     check('the live (current) plan is what gets granted, not the pre-uninstall cached one', r?.planCode === 'regular')
   }
@@ -126,17 +139,17 @@ async function main() {
   console.log('\n6) migration state is ALWAYS read fresh — never cached, picked up on the very next call with no invalidation needed')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(1) })], // fresh active cache
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_billing_verified_at: minutesAgo(1) })], // fresh active cache
       shopify_billing_migrations: [],
     })
-    const before = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const before = await governedEntitlement(admin, 'u1')
     check('before any migration: cache-derived plan granted', before?.planCode === 'premium')
 
     // A migration starts (e.g. this user just connected while still a real
     // PayPal payer) — nothing "invalidates" the cache; the migration check
     // itself is a fresh read on every call.
     admin.tables.shopify_billing_migrations.push({ id: 'm1', user_id: 'u1', project_id: 'p1', status: 'pending', paypal_cancel_attempts: 0 })
-    const during = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const during = await governedEntitlement(admin, 'u1')
     check('immediately after a migration starts (same fresh cache, no TTL change): entitlement is blocked', during?.planCode === null && during?.verificationError === 'paypal_migration_incomplete')
   }
 

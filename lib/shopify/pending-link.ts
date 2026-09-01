@@ -67,11 +67,48 @@ export function hasPendingShopifyLinkCookie(request: Request): boolean {
   return readPendingLinkTokenFromRequest(request) !== null
 }
 
+/**
+ * How the install that produced this pending row was initiated. Stamped
+ * SERVER-SIDE by the route that created it, from which verified flow it was —
+ * never from a request body, query parameter or header:
+ *
+ *   'shopify_app_store'  a verified App Bridge session token (embedded
+ *                        install) or a signed App-Store-initiated pre-auth
+ *                        OAuth callback. This is the provenance that may make
+ *                        the linked account Shopify-billing-governed.
+ *   'website_connector'  an authenticated website user connecting a store from
+ *                        the dashboard. Billing authority stays with the
+ *                        website.
+ *
+ * Nullable only so a row written before this column existed still reads; every
+ * writer in the codebase supplies it, and an absent value is treated as the
+ * SAFE value ('website_connector') by the consumer.
+ */
+export type PendingInstallOrigin = 'shopify_app_store' | 'website_connector'
+
 export interface PendingInstallRow {
   token: string
   shop_domain: string
   shop_gid: string | null
   access_token_encrypted: string
+  install_origin: PendingInstallOrigin | null
+  /**
+   * Expiring offline grants (Shopify no longer accepts non-expiring Admin API
+   * tokens) come as a PAIR. All of it must survive this handoff table: if only
+   * the access token crossed the bridge, the connection created at
+   * /shopify/link would have nothing to rotate with and would die at the first
+   * expiry with no way back. `refresh_token_expires_at` is nullable because
+   * Shopify may omit the refresh-token lifetime.
+   */
+  refresh_token_encrypted: string | null
+  access_token_expires_at: string | null
+  refresh_token_expires_at: string | null
+  /**
+   * WHICH Shopify app issued this credential — recorded at acquisition and
+   * carried to the live connection, because only that app's client id and
+   * secret can refresh it.
+   */
+  oauth_app_edition: 'public' | 'legacy' | null
   api_version: string
   granted_scopes: string[]
   storefront_domain: string | null

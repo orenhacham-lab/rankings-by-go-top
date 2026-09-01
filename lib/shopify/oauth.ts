@@ -43,6 +43,34 @@ export interface ShopifyOAuthConfig {
  * deployment that has not yet been given public credentials keeps behaving
  * exactly as it does today rather than breaking.
  */
+/**
+ * The credential pair for ONE named app, with NO fallback to the other.
+ *
+ * A stored access token can only be refreshed with the credentials of the app
+ * that ISSUED it: signing a refresh for a legacy-app token with the public
+ * app's client id and secret simply fails. getShopifyOAuthConfig() below picks
+ * whichever pair is configured, preferring public — correct for STARTING a new
+ * flow, and wrong for refreshing an existing credential, which must name its
+ * edition explicitly.
+ *
+ * Returns null when that specific app's pair is not fully configured, so the
+ * caller fails closed rather than silently using the other app's secret.
+ */
+export function getShopifyOAuthConfigForEdition(edition: ShopifyAppEdition): ShopifyOAuthConfig | null {
+  const appUrl = (process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
+  if (!appUrl || !/^https:\/\//.test(appUrl)) return null
+  if (edition === 'public') {
+    const clientId = (process.env.SHOPIFY_PUBLIC_CLIENT_ID || '').trim()
+    const clientSecret = (process.env.SHOPIFY_PUBLIC_CLIENT_SECRET || '').trim()
+    if (!clientId || !clientSecret) return null
+    return { clientId, clientSecret, appUrl, edition: 'public' }
+  }
+  const clientId = (process.env.SHOPIFY_CLIENT_ID || '').trim()
+  const clientSecret = (process.env.SHOPIFY_CLIENT_SECRET || '').trim()
+  if (!clientId || !clientSecret) return null
+  return { clientId, clientSecret, appUrl, edition: 'legacy' }
+}
+
 export function getShopifyOAuthConfig(): ShopifyOAuthConfig | null {
   const appUrl = (process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
   if (!appUrl || !/^https:\/\//.test(appUrl)) return null
@@ -105,9 +133,19 @@ export function contentHubReturnUrl(appUrl: string, projectId: string): string {
 }
 
 /**
- * Build the Shopify authorize URL for an OFFLINE token (no grant_options[] =
- * per-user). Read-only scopes only. PURE.
+ * Build the Shopify authorize URL for an EXPIRING OFFLINE token (no
+ * grant_options[] = per-user). Read-only scopes only. PURE.
+ *
+ * `expiring=1` is REQUIRED. Shopify no longer accepts non-expiring access
+ * tokens on the Admin API — production's own 403 said so verbatim:
+ * "[API] Non-expiring access tokens are no longer accepted for the Admin API.
+ * Start using expiring offline tokens." Without this parameter the flow still
+ * completes and still hands back an access token, but that token is refused by
+ * the very first Admin API call and there is no refresh token to recover with.
  */
+export const SHOPIFY_EXPIRING_TOKEN_PARAM = 'expiring'
+export const SHOPIFY_EXPIRING_TOKEN_VALUE = '1'
+
 export function buildAuthorizeUrl(opts: {
   shop: string
   clientId: string
@@ -121,6 +159,7 @@ export function buildAuthorizeUrl(opts: {
     scope: scopes,
     redirect_uri: opts.redirectUri,
     state: opts.state,
+    [SHOPIFY_EXPIRING_TOKEN_PARAM]: SHOPIFY_EXPIRING_TOKEN_VALUE,
   })
   return `https://${opts.shop}/admin/oauth/authorize?${params.toString()}`
 }
@@ -295,6 +334,17 @@ export interface TokenExchangeDiagnostics {
   associatedUserScope: string | null
   expiresIn: number | null
   requestedTokenType: string
+  /** Whether Shopify returned the refresh token an EXPIRING grant must carry. */
+  hasRefreshToken: boolean
+  /** Length only — never any part of the refresh token itself. */
+  refreshTokenLength: number
+  /** Lifetime of the refresh token in seconds, as Shopify reported it. */
+  refreshTokenExpiresIn: number | null
+  /** True when `expiring=1` was sent on this request. */
+  requestedExpiring: boolean
+  /** PUBLIC FIELD NAMES Shopify omitted, when the grant was not expiring.
+   *  Names only — never a value from the response. */
+  missingFields?: string[]
 }
 
 /** Classify a token by its documented Shopify prefix. Returns a fixed label —
@@ -317,13 +367,71 @@ export class TokenExchangeError extends Error {
   }
 }
 
+export interface ExpiringOfflineToken {
+  accessToken: string
+  refreshToken: string
+  /** Seconds until the ACCESS token expires, as Shopify reported it. */
+  expiresIn: number
+  /**
+   * Seconds until the REFRESH token expires, when Shopify reports it. NULL when
+   * it does not: Shopify documents the refresh-token lifetime as something it
+   * MAY return, so its absence is not a malformed grant — the access token and
+   * the refresh token are what the lifecycle actually needs. A null here simply
+   * means no local refresh-token expiry is recorded; a refresh token Shopify
+   * has since invalidated is still detected the only way it ever can be, by the
+   * refresh call being refused.
+   */
+  refreshTokenExpiresIn: number | null
+  scope: string
+}
+
+/**
+ * The response shape an EXPIRING offline grant must have. A response missing
+ * any of these is not an expiring grant, and storing it would recreate exactly
+ * the production failure this exists to end: an access token the Admin API
+ * refuses, with nothing to refresh it with.
+ *
+ * Returns the parsed grant, or the list of MISSING FIELD NAMES (never values).
+ */
+export function parseExpiringOfflineToken(json: unknown): { ok: true; token: ExpiringOfflineToken } | { ok: false; missing: string[] } {
+  const j = (json ?? {}) as Record<string, unknown>
+  const missing: string[] = []
+  const accessToken = typeof j.access_token === 'string' ? j.access_token : ''
+  const refreshToken = typeof j.refresh_token === 'string' ? j.refresh_token : ''
+  const expiresIn = typeof j.expires_in === 'number' && Number.isFinite(j.expires_in) ? j.expires_in : null
+  // OPTIONAL by Shopify's contract — see ExpiringOfflineToken.refreshTokenExpiresIn.
+  const refreshTokenExpiresIn =
+    typeof j.refresh_token_expires_in === 'number' && Number.isFinite(j.refresh_token_expires_in) ? j.refresh_token_expires_in : null
+  // REQUIRED. Any of these missing means this is not an expiring offline grant,
+  // and an access token with no refresh half is refused outright by today's
+  // Admin API.
+  if (!accessToken) missing.push('access_token')
+  if (!refreshToken) missing.push('refresh_token')
+  if (expiresIn === null) missing.push('expires_in')
+  if (missing.length > 0) return { ok: false, missing }
+  return {
+    ok: true,
+    token: {
+      accessToken, refreshToken,
+      expiresIn: expiresIn as number,
+      refreshTokenExpiresIn,
+      scope: typeof j.scope === 'string' ? j.scope : '',
+    },
+  }
+}
+
+/** Absolute expiry from a relative lifetime. PURE. */
+export function expiryFromNow(seconds: number, now: number = Date.now()): string {
+  return new Date(now + Math.max(0, seconds) * 1000).toISOString()
+}
+
 export async function exchangeSessionTokenForOfflineToken(opts: {
   shop: string
   sessionToken: string
   clientId: string
   clientSecret: string
   fetchImpl?: typeof fetch
-}): Promise<{ accessToken: string; scope: string; diagnostics: TokenExchangeDiagnostics }> {
+}): Promise<ExpiringOfflineToken & { diagnostics: TokenExchangeDiagnostics }> {
   const doFetch = opts.fetchImpl ?? fetch
   const res = await doFetch(`https://${opts.shop}/admin/oauth/access_token`, {
     method: 'POST',
@@ -335,33 +443,139 @@ export async function exchangeSessionTokenForOfflineToken(opts: {
       subject_token: opts.sessionToken,
       subject_token_type: TOKEN_EXCHANGE_SUBJECT_TOKEN_TYPE,
       requested_token_type: TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE,
+      // REQUIRED — see SHOPIFY_EXPIRING_TOKEN_PARAM. Without it Shopify mints a
+      // non-expiring offline token, which the Admin API now rejects outright.
+      [SHOPIFY_EXPIRING_TOKEN_PARAM]: SHOPIFY_EXPIRING_TOKEN_VALUE,
     }),
     redirect: 'error',
   })
   const shopifyRequestId = res.headers?.get?.('x-request-id') ?? null
-  const base = { httpStatus: res.status, shopifyRequestId, requestedTokenType: TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE }
+  const base = {
+    httpStatus: res.status, shopifyRequestId,
+    requestedTokenType: TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE,
+    requestedExpiring: true,
+  }
 
-  if (!res.ok) throw new TokenExchangeError(`token_exchange_http_${res.status}`, { ...base, hasAccessToken: false, tokenType: 'absent' })
+  if (!res.ok) {
+    throw new TokenExchangeError(`token_exchange_http_${res.status}`, {
+      ...base, hasAccessToken: false, tokenType: 'absent', hasRefreshToken: false, refreshTokenLength: 0,
+    })
+  }
 
-  const json = (await res.json().catch(() => null)) as
-    | { access_token?: string; scope?: string; associated_user_scope?: string; expires_in?: number }
-    | null
-  const scopes = typeof json?.scope === 'string' && json.scope ? json.scope.split(/[,\s]+/).filter(Boolean) : []
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null
+  const rawScope = typeof json?.scope === 'string' ? json.scope : ''
+  const scopes = rawScope ? rawScope.split(/[,\s]+/).filter(Boolean) : []
+  const rawAccess = typeof json?.access_token === 'string' ? json.access_token : ''
+  const rawRefresh = typeof json?.refresh_token === 'string' ? json.refresh_token : ''
   const diagnostics: TokenExchangeDiagnostics = {
     ...base,
-    hasAccessToken: typeof json?.access_token === 'string' && !!json.access_token,
-    tokenLength: typeof json?.access_token === 'string' ? json.access_token.length : 0,
-    tokenType: classifyShopifyToken(json?.access_token),
+    hasAccessToken: !!rawAccess,
+    tokenLength: rawAccess.length,
+    tokenType: classifyShopifyToken(rawAccess),
     scopes,
     scopeCount: scopes.length,
     associatedUserScope: typeof json?.associated_user_scope === 'string' ? json.associated_user_scope : null,
     expiresIn: typeof json?.expires_in === 'number' ? json.expires_in : null,
+    hasRefreshToken: !!rawRefresh,
+    refreshTokenLength: rawRefresh.length,
+    refreshTokenExpiresIn: typeof json?.refresh_token_expires_in === 'number' ? json.refresh_token_expires_in : null,
   }
 
-  if (!json || typeof json.access_token !== 'string' || !json.access_token) {
-    throw new TokenExchangeError('token_exchange_no_token', diagnostics)
+  const parsed = parseExpiringOfflineToken(json)
+  if (!parsed.ok) {
+    // FAIL CLOSED. `missing` is a list of Shopify's own PUBLIC FIELD NAMES —
+    // never any value from the response body.
+    throw new TokenExchangeError(
+      parsed.missing.includes('access_token') ? 'token_exchange_no_token' : 'token_exchange_not_expiring',
+      { ...diagnostics, missingFields: parsed.missing },
+    )
   }
-  return { accessToken: json.access_token, scope: typeof json.scope === 'string' ? json.scope : '', diagnostics }
+  return { ...parsed.token, diagnostics }
+}
+
+/**
+ * Rotate an expiring offline grant with the stored refresh token.
+ *
+ * Called ONLY by lib/shopify/token-resolver.ts, which holds the per-connection
+ * refresh lease — never directly by a route. Returns a complete new grant
+ * (Shopify rotates the refresh token too, so both halves must be stored).
+ *
+ * Distinguishes TERMINAL from TRANSIENT failure, because the two must lead to
+ * completely different states: a terminal failure means the merchant has to
+ * reconnect, a transient one must never touch the stored credential.
+ */
+export class TokenRefreshError extends Error {
+  /** True when Shopify rejected the grant itself — retrying cannot help. */
+  terminal: boolean
+  diagnostics: { httpStatus: number | null; shopifyRequestId: string | null; missingFields?: string[] }
+  constructor(message: string, terminal: boolean, diagnostics: { httpStatus: number | null; shopifyRequestId: string | null; missingFields?: string[] }) {
+    super(message)
+    this.name = 'TokenRefreshError'
+    this.terminal = terminal
+    this.diagnostics = diagnostics
+  }
+}
+
+export const REFRESH_TOKEN_GRANT_TYPE = 'refresh_token'
+
+/**
+ * Hard ceiling on ONE refresh request, deliberately shorter than the refresh
+ * lease (lib/shopify/token-resolver.ts REFRESH_LEASE_SECONDS). A request that
+ * outlives its own lease is the dangerous case: the lease gets reclaimed, a
+ * second worker rotates, and the first one returns holding a pair Shopify has
+ * already replaced. Aborting first makes that impossible.
+ */
+export const REFRESH_TIMEOUT_MS = 20_000
+
+export async function refreshOfflineAccessToken(opts: {
+  shop: string
+  refreshToken: string
+  clientId: string
+  clientSecret: string
+  fetchImpl?: typeof fetch
+  timeoutMs?: number
+}): Promise<ExpiringOfflineToken> {
+  const doFetch = opts.fetchImpl ?? fetch
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? REFRESH_TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await doFetch(`https://${opts.shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        grant_type: REFRESH_TOKEN_GRANT_TYPE,
+        refresh_token: opts.refreshToken,
+        client_id: opts.clientId,
+        client_secret: opts.clientSecret,
+      }),
+      redirect: 'error',
+      signal: controller.signal,
+    })
+  } catch (err) {
+    // Unreachable OR aborted by the timeout above. Both are TRANSIENT: nothing
+    // is known about the credential, so nothing about it may be changed.
+    const aborted = err instanceof Error && err.name === 'AbortError'
+    throw new TokenRefreshError(aborted ? 'refresh_timeout' : 'refresh_unreachable', false, { httpStatus: null, shopifyRequestId: null })
+  } finally {
+    clearTimeout(timer)
+  }
+  const shopifyRequestId = res.headers?.get?.('x-request-id') ?? null
+  if (!res.ok) {
+    // 400/401/403 = Shopify rejected the refresh token itself (revoked,
+    // expired, or belonging to a different app). 429/5xx = try again later.
+    const terminal = res.status === 400 || res.status === 401 || res.status === 403
+    throw new TokenRefreshError(`refresh_http_${res.status}`, terminal, { httpStatus: res.status, shopifyRequestId })
+  }
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null
+  const parsed = parseExpiringOfflineToken(json)
+  if (!parsed.ok) {
+    // A 200 that is not an expiring grant is terminal: repeating the same call
+    // cannot turn it into one, and storing half of it would retire a working
+    // refresh token for an unusable pair.
+    throw new TokenRefreshError('refresh_not_expiring', true, { httpStatus: res.status, shopifyRequestId, missingFields: parsed.missing })
+  }
+  return parsed.token
 }
 
 /**
@@ -379,15 +593,35 @@ export async function exchangeCodeForToken(opts: {
   code: string
   clientId: string
   clientSecret: string
-}): Promise<{ accessToken: string; scope: string }> {
-  const res = await fetch(`https://${opts.shop}/admin/oauth/access_token`, {
+  fetchImpl?: typeof fetch
+}): Promise<ExpiringOfflineToken> {
+  const doFetch = opts.fetchImpl ?? fetch
+  const res = await doFetch(`https://${opts.shop}/admin/oauth/access_token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ client_id: opts.clientId, client_secret: opts.clientSecret, code: opts.code }),
+    body: JSON.stringify({
+      client_id: opts.clientId,
+      client_secret: opts.clientSecret,
+      code: opts.code,
+      // Same requirement as the token-exchange path: the authorize URL already
+      // asked for an expiring grant (buildAuthorizeUrl), and this repeats it so
+      // the code exchange cannot silently fall back to a non-expiring token.
+      [SHOPIFY_EXPIRING_TOKEN_PARAM]: SHOPIFY_EXPIRING_TOKEN_VALUE,
+    }),
     redirect: 'error',
   })
   if (!res.ok) throw new Error(`token_exchange_http_${res.status}`)
-  const json = (await res.json().catch(() => null)) as { access_token?: string; scope?: string } | null
-  if (!json || typeof json.access_token !== 'string' || !json.access_token) throw new Error('token_exchange_no_token')
-  return { accessToken: json.access_token, scope: typeof json.scope === 'string' ? json.scope : '' }
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null
+  const parsed = parseExpiringOfflineToken(json)
+  if (!parsed.ok) {
+    // FAIL CLOSED, same rule as the embedded path — an access token with no
+    // refresh material is unusable on today's Admin API. The thrown message is
+    // a stable code plus Shopify's own PUBLIC field names, never any value.
+    throw new Error(
+      parsed.missing.includes('access_token')
+        ? 'token_exchange_no_token'
+        : `token_exchange_not_expiring:${parsed.missing.join(',')}`,
+    )
+  }
+  return parsed.token
 }

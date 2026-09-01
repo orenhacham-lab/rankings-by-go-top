@@ -29,9 +29,9 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
-import { SHOPIFY_API_VERSION } from '@/lib/shopify/constants'
+import { SHOPIFY_API_VERSION, SHOPIFY_REQUIRED_SCOPES, missingScopes } from '@/lib/shopify/constants'
 import { testShopifyConnection, getShopIdentity } from '@/lib/shopify/client'
-import { getShopifyOAuthConfig, exchangeSessionTokenForOfflineToken, TokenExchangeError } from '@/lib/shopify/oauth'
+import { getShopifyOAuthConfigForEdition, exchangeSessionTokenForOfflineToken, TokenExchangeError, expiryFromNow } from '@/lib/shopify/oauth'
 import type { TokenExchangeDiagnostics } from '@/lib/shopify/oauth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
@@ -49,6 +49,38 @@ import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, 
  * store address, already visible in the URL, and without it a failure cannot be
  * attributed to a store.
  */
+/**
+ * The STABLE, non-sensitive failure codes this route may return, and the HTTP
+ * status each carries. The client sees only the code — never Shopify's own
+ * error text, response body, or any token material.
+ *
+ *   reauthorization_required   a predictable, recoverable condition the merchant
+ *                              can fix by reconnecting: Shopify issued a
+ *                              non-expiring grant, or refused the credential.
+ *                              Deliberately NOT the generic 502 it used to
+ *                              return — a 502 reads as "our server is broken"
+ *                              and gives the UI nothing to act on.
+ *   token_exchange_failed      the exchange itself failed (network, 5xx, or an
+ *                              unparseable response). Retryable.
+ *   token_refresh_failed       a rotation attempt failed transiently.
+ *   shop_identity_unverified   the Admin API did not confirm this exact shop.
+ *   insufficient_scopes        the grant lacks a scope the implemented queries
+ *                              require. A REAUTHORIZATION result, never a
+ *                              billing failure.
+ */
+export const EMBEDDED_INSTALL_ERROR_STATUS = {
+  reauthorization_required: 409,
+  token_exchange_failed: 502,
+  token_refresh_failed: 503,
+  token_verification_failed: 502,
+  shop_identity_unverified: 409,
+  insufficient_scopes: 409,
+  invalid_session_token: 401,
+  shopify_oauth_not_configured: 500,
+  not_configured: 500,
+  encryption_failed: 500,
+} as const
+
 function fail(status: number, reason: string, diag?: Record<string, unknown>) {
   console.warn('[Shopify embedded install] rejected', { route: 'embedded_install', reason, ...(diag ?? {}) })
   return NextResponse.json({ error: reason }, { status })
@@ -57,7 +89,12 @@ function fail(status: number, reason: string, diag?: Record<string, unknown>) {
 export async function POST(request: Request) {
   if (!isContentModuleEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const config = getShopifyOAuthConfig()
+  // The embedded/App Store flow belongs to the PUBLIC "Go Top SEO" app and to
+  // no other: its session tokens are signed by that app's secret, and any token
+  // it obtains can later be refreshed only with that app's pair. Resolved
+  // EXPLICITLY, with no fallback to the legacy custom app — silently using the
+  // other app's credentials would produce a credential nothing can refresh.
+  const config = getShopifyOAuthConfigForEdition('public')
   if (!config) return fail(500, 'shopify_oauth_not_configured')
 
   // 1) Identity — a verified App Bridge session token and nothing else.
@@ -85,7 +122,11 @@ export async function POST(request: Request) {
 
   // 3) Token exchange — the managed-installation replacement for the
   //    authorization-code redirect. Uses the VERIFIED shop domain.
-  let exchanged: { accessToken: string; scope: string; diagnostics: TokenExchangeDiagnostics }
+  let exchanged: {
+    accessToken: string; refreshToken: string
+    expiresIn: number; refreshTokenExpiresIn: number | null
+    scope: string; diagnostics: TokenExchangeDiagnostics
+  }
   try {
     exchanged = await exchangeSessionTokenForOfflineToken({
       shop: shopDomain,
@@ -95,7 +136,19 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     const d = err instanceof TokenExchangeError ? err.diagnostics : {}
-    return fail(502, 'token_exchange_failed', {
+    // A 200 that is not an EXPIRING grant gets its own stable reason. Storing
+    // it would recreate the production failure — an access token the Admin API
+    // refuses ("Non-expiring access tokens are no longer accepted for the Admin
+    // API") with nothing to refresh it with — so it fails closed here, BEFORE
+    // any pending install exists.
+    // A non-expiring grant is PREDICTABLE and recoverable: the merchant
+    // reconnects and Shopify issues an expiring one. It gets the stable
+    // reauthorization code and a 409, not the generic 502 that used to hide it.
+    const nonExpiring = err instanceof TokenExchangeError && err.message === 'token_exchange_not_expiring'
+    const reason = nonExpiring ? 'reauthorization_required' : 'token_exchange_failed'
+    return fail(EMBEDDED_INSTALL_ERROR_STATUS[reason], reason, {
+      // The precise internal cause stays in the LOG, never in the response.
+      cause: nonExpiring ? 'non_expiring_token_rejected' : undefined,
       stage: 'token_exchange',
       kind: err instanceof Error ? err.message : 'unknown',
       apiVersion: SHOPIFY_API_VERSION,
@@ -106,6 +159,14 @@ export async function POST(request: Request) {
       tokenType: d.tokenType,
       scopes: d.scopes,
       scopeCount: d.scopeCount,
+      // Expiring-grant shape: booleans, lengths and Shopify's OWN public field
+      // names — never a token, never a value from the response.
+      requestedExpiring: d.requestedExpiring,
+      hasRefreshToken: d.hasRefreshToken,
+      refreshTokenLength: d.refreshTokenLength,
+      expiresIn: d.expiresIn,
+      refreshTokenExpiresIn: d.refreshTokenExpiresIn,
+      missingFields: d.missingFields,
     })
   }
 
@@ -185,19 +246,60 @@ export async function POST(request: Request) {
   }
 
   const grantedScopes = test.grantedScopes ?? exchanged.scope.split(/[,\s]+/).filter(Boolean)
+
+  // SCOPE VERIFICATION, against the ONE authoritative required-scope list in
+  // lib/shopify/constants.ts. A grant that cannot run the implemented queries
+  // is not silently accepted as a working connection: the merchant is asked to
+  // reauthorize. This is explicitly NOT a billing failure — it never touches
+  // billing authority and never produces `billing_required`. A granted write_x
+  // satisfies the corresponding read_x requirement (see missingScopes).
+  const missing = missingScopes(grantedScopes, SHOPIFY_REQUIRED_SCOPES)
+  if (missing.length > 0) {
+    return fail(EMBEDDED_INSTALL_ERROR_STATUS.insufficient_scopes, 'insufficient_scopes', {
+      stage: 'scope_verification',
+      shopDomain,
+      // Scope NAMES are public Shopify API identifiers, never credentials.
+      requiredScopes: [...SHOPIFY_REQUIRED_SCOPES],
+      grantedScopes,
+      missingScopes: missing,
+    })
+  }
   const storefront = test.storefrontDomain ?? null
 
+  // BOTH halves of the expiring grant use the same encryption helper. Neither
+  // is ever written, logged or returned in plaintext, and an empty encrypted
+  // credential is never stored — a throw here aborts before persistence.
   let tokenEncrypted: string
+  let refreshTokenEncrypted: string
   try {
     tokenEncrypted = encryptCredential(exchanged.accessToken)
+    refreshTokenEncrypted = encryptCredential(exchanged.refreshToken)
   } catch {
     return fail(500, 'encryption_failed')
   }
+  if (!tokenEncrypted || !refreshTokenEncrypted) return fail(500, 'encryption_failed')
 
+  const grantIssuedAt = Date.now()
   const pendingToken = await createPendingInstall(admin, {
     shop_domain: shopDomain,
     shop_gid: shopGid,
     access_token_encrypted: tokenEncrypted,
+    // TRUSTED PROVENANCE. This route is reachable only with a verified App
+    // Bridge session token for this exact shop (step 1 above), i.e. the
+    // merchant is inside Shopify Admin — a direct App Store install. The value
+    // is written here, server-side, from which flow this is; it is never read
+    // from the request body, a query parameter or a header, so a browser
+    // cannot claim App Store provenance to change who bills the account.
+    install_origin: 'shopify_app_store',
+    // The issuing app travels with the credential it issued.
+    oauth_app_edition: config.edition,
+    refresh_token_encrypted: refreshTokenEncrypted,
+    // Absolute expiries, derived server-side ONCE from Shopify's relative
+    // lifetimes, so every later reader compares against the same instant.
+    access_token_expires_at: expiryFromNow(exchanged.expiresIn, grantIssuedAt),
+    refresh_token_expires_at: exchanged.refreshTokenExpiresIn === null
+      ? null
+      : expiryFromNow(exchanged.refreshTokenExpiresIn, grantIssuedAt),
     api_version: SHOPIFY_API_VERSION,
     granted_scopes: grantedScopes,
     storefront_domain: storefront,

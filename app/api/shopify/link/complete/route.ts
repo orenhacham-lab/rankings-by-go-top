@@ -15,8 +15,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
-import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue, loadValidPendingInstall, consumePendingInstall } from '@/lib/shopify/pending-link'
-import { claimShopForProject } from '@/lib/shopify/connection-ownership'
+import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue, loadValidPendingInstall } from '@/lib/shopify/pending-link'
+import { completeShopifyAppStoreLink } from '@/lib/shopify/app-store-link'
 import { missingScopes } from '@/lib/shopify/constants'
 import { buildShopifyAdminAppUrl } from '@/lib/shopify/billing-urls'
 
@@ -62,30 +62,42 @@ export async function POST(request: Request) {
   const status: 'connected' | 'failed' = missing.length > 0 ? 'failed' : 'connected'
   const lastError = missing.length > 0 ? `missing_scopes: ${missing.join(', ')}` : null
 
-  const claim = await claimShopForProject(admin, {
+  // ── ONE ATOMIC TRANSITION ────────────────────────────────────────────────
+  //
+  // Claiming the connection, applying the install provenance, creating or
+  // deferring the PayPal migration, setting billing authority and consuming the
+  // one-time pending install all happen inside a single database transaction
+  // (complete_shopify_app_store_link). Previously these were separate writes
+  // whose results this route ignored, so a direct App Store installation could
+  // end up connected as a website-billed account, or the one-time token could
+  // be consumed with no governance written.
+  //
+  // The billing decision inside comes from the pending row's own
+  // `install_origin`, stamped server-side by the route that created it — by
+  // app/api/shopify/embedded-install after verifying an App Bridge session
+  // token, or by the pre-auth OAuth branch after verifying the callback HMAC,
+  // the signed nonce and the one-time state. This request's body carries only
+  // `projectId` and can never claim App Store provenance.
+  //
+  // ANTI-BYPASS (App Store review): the provenance travels with the install,
+  // not with the session, so an App Store installer signing into a website
+  // account does not escape Shopify Billing. And an account with an ACTIVE
+  // PayPal subscription is not switched by installing — it goes through the
+  // explicit migration workflow, and authority moves only when that migration
+  // is confirmed complete.
+  const linked = await completeShopifyAppStoreLink(admin, {
+    pendingToken: token,
     userId: user.id,
     projectId,
-    shopDomain: pending.shop_domain,
-    shopGid: pending.shop_gid,
-    accessTokenEncrypted: pending.access_token_encrypted,
-    apiVersion: pending.api_version,
-    grantedScopes: pending.granted_scopes,
-    storefrontDomain: pending.storefront_domain,
     connectionStatus: status,
     lastError,
-    // The pending-install row this completes was created only after the App
-    // Bridge session token's signature/issuer/audience/expiry/destination were
-    // verified AND the offline token exchange succeeded for the same shop
-    // (app/api/shopify/embedded-install/route.ts). The row itself is not the
-    // proof — that verified exchange is.
-    proof: 'session_token_exchange_verified',
   })
-  if (!claim.ok) {
-    const status = claim.reason === 'save_failed' ? 500 : 409
-    return NextResponse.json({ error: claim.reason }, { status })
+  if (!linked.ok) {
+    // NOTHING was written on any failure path — the transaction rolled back, so
+    // the one-time token is still unconsumed and can be retried.
+    const httpStatus = linked.reason === 'save_failed' ? 500 : linked.reason === 'pending_invalid' ? 400 : 409
+    return clearCookie(NextResponse.json({ error: linked.reason }, { status: httpStatus }))
   }
-
-  await consumePendingInstall(admin, token)
 
   // Send the merchant back INTO the embedded app in Shopify Admin (where the
   // connector home's live billing check will prompt them to choose a plan)

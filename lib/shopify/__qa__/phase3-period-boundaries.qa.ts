@@ -4,11 +4,8 @@
  * the cycle (no hardcoded "never resets" logic). Run:
  *   npx tsx lib/shopify/__qa__/phase3-period-boundaries.qa.ts
  */
-import type { createAdminClient } from '@/lib/supabase/admin'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { resolveShopifyGovernedEntitlement } from '../entitlement-resolver'
-
-type Admin = ReturnType<typeof createAdminClient>
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -45,17 +42,30 @@ function connRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * The resolver now returns a DISCRIMINATED result so that an infrastructure
+ * failure can never be mistaken for "not Shopify-governed". These helpers keep
+ * the existing assertions readable: `governedEntitlement` is the old
+ * `ShopifyGovernedEntitlement | null` shape, and it THROWS on 'unavailable' so
+ * a test can never silently pass through an outage.
+ */
+async function governedEntitlement(adminClient: unknown, userId: string) {
+  const r = await resolveShopifyGovernedEntitlement(adminClient as never, userId)
+  if (r.kind === 'unavailable') throw new Error(`unexpected unavailable: ${r.reason}`)
+  return r.kind === 'governed' ? r.entitlement : null
+}
+
 async function main() {
   console.log('Phase 3 — Shopify authoritative period boundaries QA\n')
 
   console.log('1) Live check caches BOTH currentBillingCycle.startTime AND endTime from the Partner API')
   {
-    const admin = new FakeAdmin({ shopify_connections: [connRow()], shopify_billing_migrations: [] })
+    const admin = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow()], shopify_billing_migrations: [] })
     const f = fakePartnerFetch(() => ({
       status: 200,
       body: { data: { activeSubscription: { shop: { id: SHOP_GID, myshopifyDomain: SHOP_DOMAIN }, trialEndsAt: null, cancelAtEndOfCycle: false, currentBillingCycle: { startTime: '2026-08-01T00:00:00Z', endTime: '2026-09-01T00:00:00Z' }, items: [{ handle: 'premium', price: { __typename: 'FlatRatePrice', active: true } }] } } },
     }))
-    await withFetch(f, () => resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1'))
+    await withFetch(f, () => governedEntitlement(admin, 'u1'))
     const row = admin.tables.shopify_connections[0] as Record<string, unknown>
     check('shopify_current_period_start cached', row.shopify_current_period_start === '2026-08-01T00:00:00Z')
     check('shopify_current_period_end cached', row.shopify_current_period_end === '2026-09-01T00:00:00Z')
@@ -65,7 +75,7 @@ async function main() {
   {
     // Cache from BEFORE the upgrade — an old cycle.
     const admin = new FakeAdmin({
-      shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
       shopify_billing_migrations: [],
     })
     // Live check (cache is stale by construction of the test — 6+ min old
@@ -77,7 +87,7 @@ async function main() {
       status: 200,
       body: { data: { activeSubscription: { shop: { id: SHOP_GID, myshopifyDomain: SHOP_DOMAIN }, trialEndsAt: null, cancelAtEndOfCycle: false, currentBillingCycle: { startTime: '2026-08-20T00:00:00Z', endTime: '2026-09-20T00:00:00Z' }, items: [{ handle: 'premium', price: { __typename: 'FlatRatePrice', active: true } }] } } },
     }))
-    const result = await withFetch(f, () => resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1'))
+    const result = await withFetch(f, () => governedEntitlement(admin, 'u1'))
     check('the NEW plan is granted (premium, upgraded from regular)', result?.planCode === 'premium')
     const row = admin.tables.shopify_connections[0] as Record<string, unknown>
     check('the cache reflects the NEW cycle start (Aug 20), overwriting the old one (Jul 1)', row.shopify_current_period_start === '2026-08-20T00:00:00Z')
@@ -87,11 +97,11 @@ async function main() {
   console.log('\n3) Inactive subscription clears both period fields (no stale boundaries survive a cancellation)')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connRow({ shopify_plan_handle: 'regular', shopify_subscription_status: 'active', shopify_current_period_start: '2026-07-01T00:00:00Z', shopify_current_period_end: '2026-08-01T00:00:00Z', shopify_billing_verified_at: '2026-07-15T00:00:00Z' })],
       shopify_billing_migrations: [],
     })
     const f = fakePartnerFetch(() => ({ status: 200, body: { data: { activeSubscription: null } } }))
-    await withFetch(f, () => resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1'))
+    await withFetch(f, () => governedEntitlement(admin, 'u1'))
     const row = admin.tables.shopify_connections[0] as Record<string, unknown>
     check('period start cleared', row.shopify_current_period_start === null)
     check('period end cleared', row.shopify_current_period_end === null)

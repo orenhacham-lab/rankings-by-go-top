@@ -80,11 +80,17 @@ async function main() {
 
   console.log('1) (proof) Token exchange requests an OFFLINE token, exactly as Shopify documents')
   {
-    const { impl, calls } = stubFetch(200, { access_token: 'shpat_offline_xyz', scope: 'read_products,write_content' })
+    // The response is an EXPIRING offline grant — the only shape the exchange
+    // accepts since Shopify stopped honouring non-expiring Admin API tokens.
+    const { impl, calls } = stubFetch(200, {
+      access_token: 'unit-test-access-token', refresh_token: 'unit-test-refresh-token',
+      expires_in: 86400, refresh_token_expires_in: 2592000,
+      scope: 'read_products,write_content',
+    })
     const out = await exchangeSessionTokenForOfflineToken({
       shop: SHOP, sessionToken: 'the.session.token', clientId: 'pub-id', clientSecret: 'pub-secret', fetchImpl: impl,
     })
-    check('1a: returns the offline access token', out.accessToken === 'shpat_offline_xyz')
+    check('1a: returns the offline access token', out.accessToken === 'unit-test-access-token')
     check('1a: returns the granted scope string', out.scope === 'read_products,write_content')
     check('1b: posts to the shop\'s access_token endpoint', calls[0].url === `https://${SHOP}/admin/oauth/access_token`)
     const body = JSON.parse(String(calls[0].init.body))
@@ -97,6 +103,10 @@ async function main() {
       body.requested_token_type === TOKEN_EXCHANGE_OFFLINE_TOKEN_TYPE
       && body.requested_token_type === 'urn:shopify:params:oauth:token-type:offline-access-token')
     check('1e: the app credentials are sent as client_id/client_secret', body.client_id === 'pub-id' && body.client_secret === 'pub-secret')
+    check('1d2: expiring=1 is requested, so Shopify issues an EXPIRING offline token',
+      body.expiring === '1')
+    check('1d3: and the refresh half is returned to the caller for storage',
+      out.refreshToken === 'unit-test-refresh-token' && out.expiresIn === 86400 && out.refreshTokenExpiresIn === 2592000)
     check('1f: never follows a redirect (a redirect would mean something other than the token endpoint answered)',
       calls[0].init.redirect === 'error')
   }
@@ -114,6 +124,14 @@ async function main() {
     try { await exchangeSessionTokenForOfflineToken({ shop: SHOP, sessionToken: 'x', clientId: 'a', clientSecret: 'b', fetchImpl: empty.impl }) }
     catch { threw2 = true }
     check('2b: a 200 with no access_token throws (never invents a token)', threw2)
+
+    // A 200 carrying only an access token is the NON-EXPIRING grant production
+    // received. It is refused for the same fail-closed reason.
+    const nonExpiring = stubFetch(200, { access_token: 'unit-test-access-token', scope: 'read_products' })
+    let threw2b = false
+    try { await exchangeSessionTokenForOfflineToken({ shop: SHOP, sessionToken: 'x', clientId: 'a', clientSecret: 'b', fetchImpl: nonExpiring.impl }) }
+    catch (e) { threw2b = e instanceof Error && e.message === 'token_exchange_not_expiring' }
+    check('2b2: a NON-EXPIRING 200 throws token_exchange_not_expiring', threw2b)
 
     const junk = stubFetch(200, null)
     let threw3 = false
@@ -215,7 +233,7 @@ async function main() {
     const partnerIdx = home.indexOf('getActiveShopifySubscription(connection.shop_gid')
     check('8a: isAdmin is still resolved before the live Partner billing call', isAdminIdx !== -1 && partnerIdx !== -1 && isAdminIdx < partnerIdx)
     check('8b: the admin branch still makes no Partner call and no billing-cache write',
-      /if \(isAdmin\) \{\s*\n(\s*\/\/[^\n]*\n)*\s*\} else if \(!connection\.shop_gid\)/.test(home))
+      /if \(isAdmin\) \{\s*\n(\s*\/\/[^\n]*\n)*\s*\} else if \(!shopifyBills\)/.test(home))
     const adminFake = new FakeAdmin({ profiles: [{ id: 'u-admin', role: 'admin' }] })
     check('8c: isAdminUser still true for role=admin', await isAdminUser(adminFake as unknown, 'u-admin') === true)
     const client = strip(read('app/shopify/app/ConnectorHomeClient.tsx'))

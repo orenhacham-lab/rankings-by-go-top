@@ -15,7 +15,6 @@ import { getActiveShopifySubscription } from '../partner-client'
 import { verifyShopifySessionToken } from '../session-token'
 import { shopHandleFromMyshopifyDomain, buildShopifyPricingUrl } from '../billing-urls'
 import { checkShopifyPublishEntitlement } from '../billing-guard'
-import { hasActiveShopifyConnection } from '../paypal-block'
 import { initiateMigrationIfPayPalSubscriber, confirmShopifyActiveAndAdvance, getActiveMigration } from '../paypal-migration'
 import type { ShopifyConnectionRow } from '../api-auth'
 
@@ -72,7 +71,10 @@ const noSubBody = { data: { activeSubscription: null } }
 function baseConnection(overrides: Partial<ShopifyConnectionRow> = {}): ShopifyConnectionRow {
   return {
     id: 'conn-1', user_id: 'user-1', project_id: 'project-1', shop_domain: 'test-shop.myshopify.com',
-    storefront_domain: null, access_token_encrypted: 'enc', api_version: '2026-07',
+    storefront_domain: null, access_token_encrypted: 'enc',
+    refresh_token_encrypted: null, access_token_expires_at: null, refresh_token_expires_at: null,
+    oauth_app_edition: null,
+    api_version: '2026-07',
     connection_status: 'connected', last_tested_at: null, last_synced_at: null, last_error: null,
     default_blog_id: null, granted_scopes: ['read_products', 'read_content', 'write_content'], auth_method: 'oauth',
     shop_gid: DEFAULT_SHOP_GID, shopify_plan_handle: null, shopify_subscription_status: null,
@@ -298,14 +300,25 @@ async function main() {
   }
 
   // ── PayPal-checkout blocking ──
-  console.log('\n22) hasActiveShopifyConnection — true only for connection_status="connected"')
+  console.log('\n22) A CONNECTED Shopify store no longer blocks PayPal by itself')
   {
-    const connected = new FakeAdmin({ shopify_connections: [{ id: 'c1', user_id: 'u1', connection_status: 'connected' }] })
-    check('true when connected', await hasActiveShopifyConnection(connected as unknown as Admin, 'u1') === true)
-    const uninstalled = new FakeAdmin({ shopify_connections: [{ id: 'c1', user_id: 'u1', connection_status: 'failed' }] })
-    check('false when uninstalled (failed) — reverts to the PayPal population', await hasActiveShopifyConnection(uninstalled as unknown as Admin, 'u1') === false)
-    const none = new FakeAdmin({ shopify_connections: [] })
-    check('false when no connection at all', await hasActiveShopifyConnection(none as unknown as Admin, 'u1') === false)
+    // The old hasActiveShopifyConnection() gate is gone: a website customer who
+    // connects Shopify to publish keeps their PayPal controls. Only billing
+    // AUTHORITY (or an in-flight migration) blocks PayPal now.
+    const { isShopifyBillingRequiredForUser } = await import('../paypal-block')
+    const connectedWebsiteUser = new FakeAdmin({
+      billing_governance: [{ user_id: 'u1', signup_origin: 'website', billing_authority: 'website' }],
+      shopify_connections: [{ id: 'c1', user_id: 'u1', connection_status: 'connected', archived_at: null }],
+      shopify_billing_migrations: [],
+    })
+    check('a website-authority user with a CONNECTED store keeps PayPal',
+      await isShopifyBillingRequiredForUser(connectedWebsiteUser as unknown as Admin, 'u1') === false)
+    const shopifyAuthority = new FakeAdmin({
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
+      shopify_connections: [], shopify_billing_migrations: [],
+    })
+    check('a Shopify-authority user is blocked from PayPal even with NO connection row',
+      await isShopifyBillingRequiredForUser(shopifyAuthority as unknown as Admin, 'u1') === true)
   }
 
   // ── PayPal → Shopify migration state machine ──

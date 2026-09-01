@@ -13,7 +13,7 @@ import { getActiveShopifySubscription } from '../partner-client'
 import {
   resolveShopifyGovernedEntitlement, isShopifyGovernedAndActive,
 } from '../entitlement-resolver'
-import { isShopifyBillingRequiredForUser, hasActiveShopifyConnection } from '../paypal-block'
+import { isShopifyBillingRequiredForUser } from '../paypal-block'
 import {
   signPendingLinkCookieValue, verifyPendingLinkCookieValue, createPendingInstall,
   loadValidPendingInstall, consumePendingInstall, hasPendingShopifyLinkCookie, PENDING_LINK_COOKIE,
@@ -68,6 +68,19 @@ function connectionRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * The resolver now returns a DISCRIMINATED result so that an infrastructure
+ * failure can never be mistaken for "not Shopify-governed". These helpers keep
+ * the existing assertions readable: `governedEntitlement` is the old
+ * `ShopifyGovernedEntitlement | null` shape, and it THROWS on 'unavailable' so
+ * a test can never silently pass through an outage.
+ */
+async function governedEntitlement(adminClient: unknown, userId: string) {
+  const r = await resolveShopifyGovernedEntitlement(adminClient as never, userId)
+  if (r.kind === 'unavailable') throw new Error(`unexpected unavailable: ${r.reason}`)
+  return r.kind === 'governed' ? r.entitlement : null
+}
+
 async function main() {
   console.log('Phase 2 blocker-fix QA\n')
 
@@ -75,7 +88,7 @@ async function main() {
   console.log('1) resolveShopifyGovernedEntitlement — a non-Shopify user is untouched (returns null)')
   {
     const admin = new FakeAdmin({ shopify_connections: [], shopify_billing_migrations: [] })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u-no-shopify')
+    const r = await governedEntitlement(admin, 'u-no-shopify')
     check('null — caller falls back to normal PayPal/trial logic', r === null)
   }
 
@@ -89,10 +102,10 @@ async function main() {
       // the cache-read mapping (the path getUserEntitlement actually uses
       // per-request) is correct for every supported handle.
       const cached = new FakeAdmin({
-        shopify_connections: [connectionRow({ shopify_plan_handle: handle, shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
+        billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_plan_handle: handle, shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
         shopify_billing_migrations: [],
       })
-      const cr = await resolveShopifyGovernedEntitlement(cached as unknown as Admin, 'u1')
+      const cr = await governedEntitlement(cached, 'u1')
       check(`${handle} -> ${expectedCode}: governed with the right planCode`, cr?.governed === true && cr.planCode === expectedCode)
       check(`${handle} -> ${expectedCode}: limits are EXACTLY PLAN_LIMITS.${expectedCode} (same object identity)`,
         cr?.planCode != null && PLAN_LIMITS[cr.planCode] === PLAN_LIMITS[expectedCode as keyof typeof PLAN_LIMITS])
@@ -103,30 +116,30 @@ async function main() {
   {
     const admin = new FakeAdmin({
       subscriptions: [{ id: 'sub-1', user_id: 'u1', plan_code: 'large_agency', status: 'active', paypal_subscription_id: null }],
-      shopify_connections: [connectionRow({ shopify_subscription_status: 'none', shopify_billing_verified_at: nowIso() })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_subscription_status: 'none', shopify_billing_verified_at: nowIso() })],
       shopify_billing_migrations: [],
     })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const r = await governedEntitlement(admin, 'u1')
     check('governed:true but planCode is null (NOT large_agency) — the subscriptions row is never read for this user', r?.governed === true && r.planCode === null)
   }
 
   console.log('\n4) resolveShopifyGovernedEntitlement — an in-progress PayPal migration never grants a Shopify plan_code, even with a stale-active cache')
   {
     const admin = new FakeAdmin({
-      shopify_connections: [connectionRow({ shopify_plan_handle: 'premium', shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
+      billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_plan_handle: 'premium', shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })],
       shopify_billing_migrations: [{ id: 'm1', user_id: 'u1', project_id: 'p1', status: 'pending', paypal_cancel_attempts: 0 }],
     })
-    const r = await resolveShopifyGovernedEntitlement(admin as unknown as Admin, 'u1')
+    const r = await governedEntitlement(admin, 'u1')
     check('governed:true, planCode null, verificationError paypal_migration_incomplete', r?.governed === true && r.planCode === null && r.verificationError === 'paypal_migration_incomplete')
   }
 
   console.log('\n5) isShopifyGovernedAndActive (hasAccess hot-path) — cache-only, fails closed on a never-verified connection')
   {
-    const neverVerified = new FakeAdmin({ shopify_connections: [connectionRow({ shopify_billing_verified_at: null })] })
+    const neverVerified = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_billing_verified_at: null })] })
     const r1 = await isShopifyGovernedAndActive(neverVerified as unknown as Admin, 'u1')
     check('governed:true, active:false (no live call possible on this hot path)', r1.governed === true && r1.active === false)
 
-    const freshActive = new FakeAdmin({ shopify_connections: [connectionRow({ shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })] })
+    const freshActive = new FakeAdmin({ billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }], shopify_connections: [connectionRow({ shopify_subscription_status: 'active', shopify_billing_verified_at: nowIso() })] })
     const r2 = await isShopifyGovernedAndActive(freshActive as unknown as Admin, 'u1')
     check('governed:true, active:true with a fresh active cache', r2.governed === true && r2.active === true)
 
@@ -151,7 +164,13 @@ async function main() {
   {
     const admin = new FakeAdmin({ shopify_pending_installs: [] })
     const token = await createPendingInstall(admin as unknown as Admin, {
-      shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, access_token_encrypted: 'enc', api_version: '2026-07',
+      shop_domain: SHOP_DOMAIN, shop_gid: SHOP_GID, access_token_encrypted: 'enc',
+      install_origin: 'shopify_app_store',
+      refresh_token_encrypted: 'enc(refresh)',
+      oauth_app_edition: 'public' as const,
+      access_token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
+      api_version: '2026-07',
       granted_scopes: ['read_products'], storefront_domain: null,
     })
     const loaded = await loadValidPendingInstall(admin as unknown as Admin, token)
@@ -199,7 +218,8 @@ async function main() {
       shopify_connections: [{ id: 'c1', user_id: 'u1', connection_status: 'failed' }],
       shopify_billing_migrations: [{ id: 'm1', user_id: 'u1', project_id: 'p1', status: 'pending', paypal_cancel_attempts: 0 }],
     })
-    check('hasActiveShopifyConnection alone would miss this (connection is "failed")', await hasActiveShopifyConnection(admin as unknown as Admin, 'u1') === false)
+    // The connection is 'failed' AND the user is website-authority, so nothing
+    // about the connection blocks PayPal — the in-flight MIGRATION does.
     check('isShopifyBillingRequiredForUser correctly still blocks PayPal via the migration', await isShopifyBillingRequiredForUser(admin as unknown as Admin, 'u1') === true)
   }
 

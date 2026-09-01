@@ -26,6 +26,8 @@ interface AppHomeData {
   /** Reinstall entry: the stored connection is an app_uninstalled tombstone,
    *  so its Admin API token is dead and a fresh managed install (token
    *  exchange) is required before anything works again. */
+  /** Which provider bills this store: 'shopify' | 'website' | 'unavailable'. */
+  billingProvider?: 'shopify' | 'website' | 'unavailable'
   needsInstall?: boolean
   needsInstallReason?: string
   billing?: {
@@ -211,6 +213,24 @@ export default function ConnectorHomeClient() {
         <Card title="Access">
           <p style={{ color: '#202223', fontSize: 14 }}>
             Admin account — full access. This account has full access to the system and does not require a billing plan.
+          </p>
+        </Card>
+      ) : data.billingProvider === 'website' ? (
+        /* This merchant registered on the website and connected Shopify as a
+           publishing destination, so the website bills them. No Shopify plan
+           control is offered, and app-home made no Partner billing call for
+           them at all. Connecting a store never moves billing by itself. */
+        <Card title="Billing">
+          <p style={{ color: '#202223', fontSize: 14 }}>
+            Billing for this account is managed on the Rankings website, not through Shopify.
+            Your store is connected here as a publishing destination.
+          </p>
+        </Card>
+      ) : data.billingProvider === 'unavailable' ? (
+        <Card title="Billing">
+          <p style={{ color: '#8a6d3b', fontSize: 14 }}>
+            We couldn&apos;t confirm which billing provider manages this account, so plan changes are
+            paused for a moment. Nothing has changed — reopen this page shortly.
           </p>
         </Card>
       ) : (

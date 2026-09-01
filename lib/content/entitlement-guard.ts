@@ -12,6 +12,10 @@
  * reason; the route layer is the actual narrowest shared point there, since
  * that subsystem has no queue/cron/retry indirection).
  *
+ * Evaluation order (matches lib/subscription.ts's getUserEntitlement):
+ *   1. a verified administrator is allowed through, before any billing check;
+ *   2. otherwise Shopify governance decides, when it governs this account.
+ *
  * Deliberately narrow in scope: this enforces ONLY the new
  * 'shopify_billing_required' zero-entitlement state introduced by Phase 2.
  * A website-only trial or PayPal user's content-generation behavior is
@@ -33,13 +37,22 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
+import { isAdminUser } from '@/lib/auth/admin-role'
 import { resolveShopifyGovernedEntitlement } from '@/lib/shopify/entitlement-resolver'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 export type ContentGenerationGateResult =
   | { allowed: true }
+  /** Shopify governs this account and it has no verified plan — a real billing answer. */
   | { allowed: false; reason: 'shopify_billing_required' }
+  /**
+   * The entitlement could not be DETERMINED: the governance record, the
+   * connection or the migration state was unreadable. This is an infrastructure
+   * failure, and it must never be presented as "buy a plan" — the caller should
+   * surface a retryable 503-shaped error.
+   */
+  | { allowed: false; reason: 'entitlement_unavailable'; detail: string }
 
 /**
  * Resolve straight from a known, already-trusted userId (e.g.
@@ -48,8 +61,31 @@ export type ContentGenerationGateResult =
  * contract).
  */
 export async function assertContentGenerationAllowedForUser(admin: Admin, userId: string): Promise<ContentGenerationGateResult> {
-  const governed = await resolveShopifyGovernedEntitlement(admin, userId)
-  if (governed && governed.planCode === null) return { allowed: false, reason: 'shopify_billing_required' }
+  // PRODUCTION BUG this closes. lib/subscription.ts's getUserEntitlement() and
+  // hasAccess() both let a verified administrator through BEFORE consulting
+  // Shopify governance, and app/api/shopify/billing/start-intent keeps admins
+  // away from Shopify billing entirely. This gate — which every AI-generation
+  // action funnels through — went straight to resolveShopifyGovernedEntitlement
+  // with no such check, so an administrator whose account happened to carry a
+  // Shopify connection was refused with `billing_required` while the rest of
+  // the app treated them as fully entitled.
+  //
+  // The role is read server-side from profiles.role with the service-role
+  // client (lib/auth/admin-role.ts). It cannot be asserted by a request
+  // parameter, a body field or a header, and it fails closed: an unreadable or
+  // absent role is NOT an admin. Ownership and authentication checks upstream
+  // are untouched — this only decides billing entitlement, never access.
+  if (await isAdminUser(admin, userId)) return { allowed: true }
+
+  const resolution = await resolveShopifyGovernedEntitlement(admin, userId)
+  // An outage is NOT a billing verdict. Telling a paying customer to purchase a
+  // plan because a query failed is worse than refusing the request honestly.
+  if (resolution.kind === 'unavailable') {
+    return { allowed: false, reason: 'entitlement_unavailable', detail: resolution.reason }
+  }
+  if (resolution.kind === 'governed' && resolution.entitlement.planCode === null) {
+    return { allowed: false, reason: 'shopify_billing_required' }
+  }
   return { allowed: true }
 }
 
@@ -60,8 +96,14 @@ export async function assertContentGenerationAllowedForUser(admin: Admin, userId
  * caller's own not-found/ownership handling take over downstream.
  */
 export async function assertContentGenerationAllowedForProject(admin: Admin, projectId: string): Promise<ContentGenerationGateResult> {
-  const { data } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
+  const { data, error } = await admin.from('projects').select('user_id').eq('id', projectId).maybeSingle()
+  // A FAILED owner lookup used to fall through to `allowed: true`, so a
+  // database error opened the gate for everyone. It is an infrastructure
+  // failure and is reported as one.
+  if (error) return { allowed: false, reason: 'entitlement_unavailable', detail: 'project_owner_lookup_failed' }
   const userId = (data as { user_id?: string } | null)?.user_id
+  // A project with no resolvable owner is not a Shopify-governance question —
+  // the caller's own not-found/ownership handling takes over downstream.
   if (!userId) return { allowed: true }
   return assertContentGenerationAllowedForUser(admin, userId)
 }

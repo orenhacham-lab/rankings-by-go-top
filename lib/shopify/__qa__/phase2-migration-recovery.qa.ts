@@ -10,7 +10,7 @@
  *   npx tsx lib/shopify/__qa__/phase2-migration-recovery.qa.ts
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { FakeAdmin, type ErrorHooks } from '../../__qa__/_fake-admin'
+import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { confirmShopifyActiveAndAdvance } from '../paypal-migration'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -42,38 +42,43 @@ async function main() {
 
   console.log('1) PayPal cancel succeeds, but the "completed" DB write fails EVERY retry attempt — never falsely recorded as completed')
   {
+    // The completion is now ONE atomic transition
+    // (complete_shopify_paypal_migration), so the failure is injected at the
+    // RPC rather than at a single table update. The guarantee under test is
+    // unchanged — and is now stronger, because the migration status, the
+    // billing authority and the PayPal mirror either all land or none do.
     let updateAttempts = 0
-    const hooks: Record<string, ErrorHooks> = {
-      shopify_billing_migrations: { update: () => { updateAttempts++; return { code: '500', message: 'connection reset' } } },
-    }
-    const admin = new FakeAdmin({ shopify_billing_migrations: [baseMigration({ status: 'shopify_confirmed' })], subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }] }, hooks)
+    const admin = new FakeAdmin({ shopify_billing_migrations: [baseMigration({ status: 'shopify_confirmed' })], subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }] })
+    admin.rpcHooks['complete_shopify_paypal_migration'] = () => { updateAttempts++; return { code: '500', message: 'connection reset' } }
     const result = await confirmShopifyActiveAndAdvance(admin as unknown as Admin, 'u1', fakePayPalFetch())
     check('result reports dbWriteUnconfirmed:true', result?.dbWriteUnconfirmed === true)
     check('result reports cancelFailed:false (PayPal itself DID succeed)', result?.cancelFailed === false)
     check('result status is the LAST CONFIRMED status, never "completed"', result?.status === 'shopify_confirmed' && (result?.status as string) !== 'completed')
     check('the DB row itself is still non-terminal (never silently marked completed)', (admin.tables.shopify_billing_migrations[0] as Record<string, unknown>).status === 'shopify_confirmed')
     check('exactly 3 write attempts were made (bounded retry, not silently given up on the first failure, not unbounded)', updateAttempts === 3)
+    check('billing authority was NOT moved to Shopify by an unconfirmed completion',
+      (admin.tables.billing_governance ?? []).length === 0)
     check('the subscriptions row was NOT touched (no completion mirror without a confirmed migration write)', (admin.tables.subscriptions[0] as Record<string, unknown>).status === 'active')
   }
 
   console.log('\n2) the write fails once, then succeeds on retry — recovers WITHIN the same call')
   {
     let attempts = 0
-    const hooks: Record<string, ErrorHooks> = {
-      shopify_billing_migrations: { update: () => { attempts++; return attempts < 2 ? { code: '500', message: 'transient' } : null } },
-    }
-    const admin = new FakeAdmin({ shopify_billing_migrations: [baseMigration({ status: 'shopify_confirmed' })], subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }] }, hooks)
+    const admin = new FakeAdmin({ shopify_billing_migrations: [baseMigration({ status: 'shopify_confirmed' })], subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }] })
+    admin.rpcHooks['complete_shopify_paypal_migration'] = () => { attempts++; return attempts < 2 ? { code: '500', message: 'transient' } : null }
     const result = await confirmShopifyActiveAndAdvance(admin as unknown as Admin, 'u1', fakePayPalFetch())
     check('result status completed (in-call retry recovered it)', result?.status === 'completed' && !result?.dbWriteUnconfirmed)
     check('the DB row reflects completed', (admin.tables.shopify_billing_migrations[0] as Record<string, unknown>).status === 'completed')
+    check('and the SAME transition moved billing authority to Shopify',
+      (admin.tables.billing_governance ?? [])[0]?.billing_authority === 'shopify')
+    check('…while preserving historical signup provenance as unknown, not invented',
+      (admin.tables.billing_governance ?? [])[0]?.signup_origin === 'unknown')
   }
 
   console.log('\n3) the merchant safely recovers via a LATER call (new billing intent) after a permanent write failure')
   {
-    const failingHooks: Record<string, ErrorHooks> = {
-      shopify_billing_migrations: { update: () => ({ code: '500', message: 'db down' }) },
-    }
-    const admin = new FakeAdmin({ shopify_billing_migrations: [baseMigration({ status: 'shopify_confirmed' })], subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }] }, failingHooks)
+    const admin = new FakeAdmin({ shopify_billing_migrations: [baseMigration({ status: 'shopify_confirmed' })], subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }] })
+    admin.rpcHooks['complete_shopify_paypal_migration'] = () => ({ code: '500', message: 'db down' })
     const first = await confirmShopifyActiveAndAdvance(admin as unknown as Admin, 'u1', fakePayPalFetch())
     check('first attempt: dbWriteUnconfirmed, row still non-terminal', first?.dbWriteUnconfirmed === true && (admin.tables.shopify_billing_migrations[0] as Record<string, unknown>).status !== 'completed')
 

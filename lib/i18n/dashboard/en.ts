@@ -2517,10 +2517,14 @@ export const dashboardEn = {
     },
     shopify: {
       title: 'Billing is managed through Shopify',
-      description: 'Your store is connected to the Shopify app, so your plan is billed through Shopify App Pricing — not PayPal.',
+      description: 'This account is billed through Shopify App Pricing, not PayPal. Connecting a store for publishing does not change that on its own.',
       manageButton: 'Manage plan in Shopify',
       migrationPending: 'We’re finishing linking your billing to Shopify. This can take a moment — refresh this page shortly.',
       migrationNeedsAttention: 'Your Shopify plan is active, but we’re still finalizing your previous billing. If this doesn’t resolve on its own, contact us.',
+    },
+    unavailable: {
+      title: 'Billing status is temporarily unavailable',
+      description: 'We could not confirm which billing provider manages this account, so plan changes are paused for a moment. Nothing has changed — refresh this page shortly.',
     },
     admin: {
       title: 'Admin account — full access',

@@ -69,7 +69,13 @@ const liveConnected = (over: Record<string, unknown> = {}) => tombstone({
 
 const freshArgs = (who: { user: string; project: string }, over: Record<string, unknown> = {}) => ({
   userId: who.user, projectId: who.project, shopDomain: SHOP, shopGid: GID,
-  accessTokenEncrypted: 'enc(FRESH_token)', apiVersion: '2026-07',
+  accessTokenEncrypted: 'enc(FRESH_token)',
+  // Expiring offline grant — carried through the claim in one statement.
+  refreshTokenEncrypted: 'enc(FRESH_refresh)',
+  oauthAppEdition: 'public' as const,
+  accessTokenExpiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+  refreshTokenExpiresAt: new Date(Date.now() + 30 * 24 * 3600_000).toISOString(),
+  apiVersion: '2026-07',
   grantedScopes: ['read_products', 'read_content', 'write_content'],
   storefrontDomain: null, connectionStatus: 'connected' as const, lastError: null,
   proof: 'oauth_callback_verified' as const, ...over,
@@ -356,11 +362,18 @@ async function main() {
       'app/api/shopify/app-home/route.ts', 'app/api/shopify/embedded-install/route.ts',
       'app/api/shopify/billing/start-intent/route.ts', 'app/api/shopify/connection/route.ts',
       'app/api/content/overview/route.ts', 'app/api/wordpress/connection/route.ts',
-      'lib/shopify/api-auth.ts', 'lib/shopify/entitlement-resolver.ts', 'lib/shopify/paypal-block.ts',
+      'lib/shopify/api-auth.ts', 'lib/shopify/entitlement-resolver.ts',
       'lib/shopify/site-targets.ts', 'lib/shopify/shop-cleanup.ts',
       'lib/shopify/billing-return-processing.ts', 'lib/content/platform/load-active-platform.ts',
-      'lib/billing/usage-period.ts', 'app/(dashboard)/billing/page.tsx',
+      'lib/billing/usage-period.ts',
     ]
+    // STRONGER than an archived filter: these two decide a BILLING PROVIDER and
+    // must not read the connection table at all. A connection is an
+    // integration record; billing authority is what decides the provider.
+    for (const rel of ['lib/shopify/paypal-block.ts', 'app/(dashboard)/billing/page.tsx']) {
+      check(`14: ${rel} no longer reads shopify_connections at all`,
+        !/from\('shopify_connections'\)/.test(read(rel)))
+    }
     for (const rel of FILES) {
       check(`14: ${rel} filters archived rows out of its live lookup(s)`,
         /\.is\('archived_at', null\)/.test(read(rel)))

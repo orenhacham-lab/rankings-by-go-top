@@ -21,11 +21,12 @@ import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { getActiveShopifySubscription } from '@/lib/shopify/partner-client'
 import { recordShopifyBillingCache } from '@/lib/shopify/billing-cache'
-import { getActiveMigration } from '@/lib/shopify/paypal-migration'
 import { hasWriteContent } from '@/lib/shopify/constants'
 import { classifyReinstallNeed } from '@/lib/shopify/connection-health'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
+import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -117,6 +118,17 @@ export async function GET(request: Request) {
   // than a 5th independent inline copy of the role check.
   const isAdmin = await isAdminUser(admin, connection.user_id)
 
+  // BILLING PROVIDER. A connected store does not mean Shopify bills this
+  // account: almost every customer registers on the website and may connect
+  // Shopify purely as a publishing destination. For those merchants the
+  // embedded app must say billing lives on the website, must NOT offer a
+  // Shopify plan button, and must NOT call the Partner billing API at all.
+  const authority = await resolveBillingAuthority(admin, connection.user_id)
+  const migrationResult = await getActiveMigrationResult(admin, connection.user_id)
+  const billingStateUnavailable = !authority.ok || !migrationResult.ok
+  const shopifyBills = !billingStateUnavailable
+    && ((authority.ok && authority.authority === 'shopify') || !!migrationResult.migration)
+
   let billing: {
     status: 'active' | 'none' | 'unknown'
     planHandle: string | null
@@ -127,6 +139,9 @@ export async function GET(request: Request) {
   if (isAdmin) {
     // No live billing check, no cache write — admins are never Shopify
     // billing-governed.
+  } else if (!shopifyBills) {
+    // Website-billed (or an unreadable state): no live Partner API call, no
+    // billing cache write, and the client renders no plan control.
   } else if (!connection.shop_gid) {
     billing = { status: 'unknown', planHandle: null, trialEndsAt: null, currentPeriodEnd: null, verificationError: 'shop_identity_unverified' }
   } else {
@@ -159,8 +174,6 @@ export async function GET(request: Request) {
     }
   }
 
-  const migration = await getActiveMigration(admin, connection.user_id)
-
   return Response.json({
     connected: true,
     shopDomain,
@@ -179,7 +192,10 @@ export async function GET(request: Request) {
     // client. The "Manage plan" button in ConnectorHomeClient fetches
     // /api/shopify/billing/start-intent (with this same session token) to
     // mint a billing intent and get a fresh redirect URL just-in-time.
-    migrationStatus: migration?.status ?? null,
+    migrationStatus: migrationResult.ok ? (migrationResult.migration?.status ?? null) : null,
+    // Which provider bills this store, so the embedded client never offers a
+    // Shopify plan to a website-billed merchant.
+    billingProvider: billingStateUnavailable ? 'unavailable' : (shopifyBills ? 'shopify' : 'website'),
     lastPublish: lastArticle
       ? { status: lastArticle.shopify_status, lastError: lastArticle.shopify_last_error, lastSyncedAt: lastArticle.shopify_last_synced_at }
       : null,

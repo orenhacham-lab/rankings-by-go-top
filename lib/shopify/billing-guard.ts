@@ -23,7 +23,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ShopifyConnectionRow } from './api-auth'
 import { getActiveShopifySubscription } from './partner-client'
-import { getActiveMigration } from './paypal-migration'
+import { getActiveMigrationResult } from './paypal-migration'
 import { recordShopifyBillingCache } from './billing-cache'
 import type { ShopifyPlanHandle } from './constants'
 
@@ -32,6 +32,8 @@ type Admin = ReturnType<typeof createAdminClient>
 export type ShopifyPublishDenyReason =
   | 'shop_identity_unverified'
   | 'paypal_migration_incomplete'
+  /** The migration state itself could not be read — an outage, not a verdict. */
+  | 'migration_state_unavailable'
   | 'billing_verification_unavailable'
   | 'no_active_shopify_plan'
 
@@ -64,9 +66,15 @@ export async function checkShopifyPublishEntitlement(
   //    but not yet safely stopped PayPal (shopify_confirmed), or the PayPal
   //    cancellation itself failed (paypal_cancel_failed) and needs manual
   //    attention before this account is safe to treat as fully migrated.
-  const activeMigration = await getActiveMigration(admin, connection.user_id)
-  if (activeMigration) {
-    return { ok: false, reason: 'paypal_migration_incomplete', detail: activeMigration.status }
+  //    A FAILED lookup is not "no migration": treating it as none would let a
+  //    database error unlock publishing for an account mid-migration, so it
+  //    fails closed with its own reason.
+  const migration = await getActiveMigrationResult(admin, connection.user_id)
+  if (!migration.ok) {
+    return { ok: false, reason: 'migration_state_unavailable', detail: migration.reason }
+  }
+  if (migration.migration) {
+    return { ok: false, reason: 'paypal_migration_incomplete', detail: migration.migration.status }
   }
 
   // 3) The live, authoritative check. Every failure mode of this call is

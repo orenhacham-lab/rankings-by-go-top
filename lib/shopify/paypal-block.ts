@@ -27,29 +27,38 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getActiveMigration } from './paypal-migration'
+import { getActiveMigrationResult } from './paypal-migration'
+import { resolveBillingAuthority } from '@/lib/billing/governance'
 
 type Admin = ReturnType<typeof createAdminClient>
-
-/** Narrow check: is there a CONNECTED Shopify store for this user right now. */
-export async function hasActiveShopifyConnection(admin: Admin, userId: string): Promise<boolean> {
-  const { data } = await admin
-    .from('shopify_connections')
-    .select('id')
-    .eq('user_id', userId)
-        .eq('connection_status', 'connected')
-    .is('archived_at', null)
-    .limit(1)
-    .maybeSingle()
-  return !!data
-}
 
 /**
  * The full per-user check every PayPal checkout/upgrade route must call.
  * True = block PayPal for this user.
+ *
+ * A CONNECTED SHOPIFY STORE IS NOT ONE OF THE REASONS. It used to be — the
+ * function opened with `hasActiveShopifyConnection()` — and that is the
+ * cross-layer bug this fixes: almost every customer registers on the website,
+ * and a website customer may connect Shopify purely as a publishing
+ * destination. Blocking their PayPal controls because a publishing integration
+ * exists took away the only billing provider they actually have.
+ *
+ * PayPal is blocked for exactly two reasons, both about who BILLS the account:
+ *   * Shopify is the durable billing authority (a verified direct App Store
+ *     install, or a completed migration);
+ *   * an explicit PayPal→Shopify migration is in flight, during which the old
+ *     PayPal subscription must not be changed.
+ *
+ * Fails CLOSED on an unreadable governance record or migration state: a
+ * database error must not open a second billing channel for an account that
+ * may already be Shopify-governed.
  */
 export async function isShopifyBillingRequiredForUser(admin: Admin, userId: string): Promise<boolean> {
-  if (await hasActiveShopifyConnection(admin, userId)) return true
-  const migration = await getActiveMigration(admin, userId)
-  return !!migration
+  const authority = await resolveBillingAuthority(admin, userId)
+  if (!authority.ok) return true
+  if (authority.authority === 'shopify') return true
+
+  const migration = await getActiveMigrationResult(admin, userId)
+  if (!migration.ok) return true
+  return !!migration.migration
 }

@@ -30,6 +30,9 @@ interface BillingViewProps {
    *  PayPal checkout/upgrade/cancel UI is hidden entirely — this merchant
    *  must use Shopify App Pricing exclusively. */
   shopifyConnected: boolean
+  /** Governance/migration state could not be read: offer NEITHER provider's
+   *  mutations, and say so, rather than guessing a billing provider. */
+  billingStateUnavailable?: boolean
   shopifyMigrationStatus: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | null
   /** Phase 3 — resolved server-side from the durable user_metadata.locale,
    *  NEVER from the dashboard display-language toggle. `null` means a
@@ -49,6 +52,7 @@ export default function BillingView({
   hasPaypalSubscriptionId,
   renewalCancelled,
   shopifyConnected,
+  billingStateUnavailable = false,
   shopifyMigrationStatus,
   market,
   planPricesILS,
@@ -131,7 +135,12 @@ export default function BillingView({
         </div>
       )}
 
-      {shopifyConnected ? (
+      {billingStateUnavailable ? (
+        <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.unavailable.title}</h2>
+          <p className="text-slate-600 dark:text-slate-300 text-sm">{t.unavailable.description}</p>
+        </div>
+      ) : shopifyConnected ? (
         <div className="mb-8 p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{t.shopify.title}</h2>
           <p className="text-slate-600 dark:text-slate-300 mb-4 text-sm">{t.shopify.description}</p>

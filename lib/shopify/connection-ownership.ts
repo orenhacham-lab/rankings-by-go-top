@@ -6,6 +6,11 @@
  *      callback HMAC is verified, the signed nonce matches the one-time state,
  *      the state is atomically consumed, the code is exchanged for a token, and
  *      the Shopify-returned identity matches the requested shop.
+ * This helper claims OWNERSHIP ONLY. It has no billing side effects: it never
+ * starts a PayPal migration and never changes billing authority. The website
+ * connector uses it directly; the App Store path reaches it through the atomic
+ * complete_shopify_app_store_link, which adds the billing transitions.
+ *
  *   B. embedded managed install — app/api/shopify/link/complete/route.ts,
  *      completing a pending install created by
  *      app/api/shopify/embedded-install/route.ts after the App Bridge session
@@ -38,7 +43,6 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { initiateMigrationIfPayPalSubscriber } from './paypal-migration'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -71,6 +75,16 @@ export async function claimShopForProject(admin: Admin, args: {
   shopDomain: string
   shopGid: string | null
   accessTokenEncrypted: string
+  /**
+   * The rest of the expiring offline grant. Passed to the RPC in the SAME call
+   * as the access token, so a live row can never hold an access token from one
+   * exchange beside a refresh token from another.
+   */
+  refreshTokenEncrypted: string | null
+  accessTokenExpiresAt: string | null
+  refreshTokenExpiresAt: string | null
+  /** The app that issued the credential. Only it can refresh the token later. */
+  oauthAppEdition: 'public' | 'legacy' | null
   apiVersion: string
   grantedScopes: string[]
   storefrontDomain: string | null
@@ -97,6 +111,10 @@ export async function claimShopForProject(admin: Admin, args: {
     p_storefront_domain: args.storefrontDomain,
     p_connection_status: args.connectionStatus,
     p_last_error: args.lastError,
+    p_refresh_token_encrypted: args.refreshTokenEncrypted,
+    p_access_token_expires_at: args.accessTokenExpiresAt,
+    p_refresh_token_expires_at: args.refreshTokenExpiresAt,
+    p_oauth_app_edition: args.oauthAppEdition,
   })
 
   if (error) return { ok: false, reason: 'save_failed' }
@@ -114,14 +132,15 @@ export async function claimShopForProject(admin: Admin, args: {
   if (outcome !== 'reactivated' && outcome !== 'claimed') return { ok: false, reason: 'save_failed' }
   if (!row?.connection_id) return { ok: false, reason: 'save_failed' }
 
-  // PayPal→Shopify migration is keyed on the NEW owner only. A reactivated
-  // same-project connection and a freshly claimed one are treated identically
-  // here; nothing about the archived row's billing is consulted or copied.
-  await initiateMigrationIfPayPalSubscriber(admin, {
-    userId: args.userId,
-    projectId: args.projectId,
-    shopifyConnectionId: row.connection_id,
-  })
-
+  // NO BILLING SIDE EFFECT. This helper used to start a PayPal→Shopify
+  // migration for anyone whose account had an active PayPal subscription,
+  // which meant an ordinary website customer connecting Shopify purely as a
+  // publishing destination was pushed into a billing migration they never
+  // asked for — the exact product-policy violation this repository is fixing.
+  //
+  // Claiming a shop is an INTEGRATION operation. Migration is a BILLING
+  // operation, and it now happens only inside the trusted App Store completion
+  // (complete_shopify_app_store_link), whose provenance comes from a pending
+  // install stamped server-side — never from a request.
   return { ok: true, connectionId: row.connection_id, outcome }
 }
