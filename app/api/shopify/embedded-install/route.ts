@@ -35,7 +35,7 @@ import { getShopifyOAuthConfigForEdition, exchangeSessionTokenForOfflineToken, T
 import type { TokenExchangeDiagnostics } from '@/lib/shopify/oauth'
 import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
-import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
+import { createPendingInstall, signPendingLinkCookieValue, PendingInstallPersistenceError, PENDING_LINK_RESUME_PATH } from '@/lib/shopify/pending-link'
 
 /**
  * A stable, non-sensitive failure code, optionally with structured diagnostics.
@@ -67,6 +67,11 @@ import { createPendingInstall, signPendingLinkCookieValue, PENDING_LINK_COOKIE, 
  *   insufficient_scopes        the grant lacks a scope the implemented queries
  *                              require. A REAUTHORIZATION result, never a
  *                              billing failure.
+ *   pending_install_persistence_failed
+ *                              the pending-install row could not be written.
+ *                              Nothing downstream can work without it, so the
+ *                              route refuses rather than returning a handoff
+ *                              for state that does not exist. Retryable.
  */
 export const EMBEDDED_INSTALL_ERROR_STATUS = {
   reauthorization_required: 409,
@@ -75,6 +80,7 @@ export const EMBEDDED_INSTALL_ERROR_STATUS = {
   token_verification_failed: 502,
   shop_identity_unverified: 409,
   insufficient_scopes: 409,
+  pending_install_persistence_failed: 503,
   invalid_session_token: 401,
   shopify_oauth_not_configured: 500,
   not_configured: 500,
@@ -280,40 +286,78 @@ export async function POST(request: Request) {
   if (!tokenEncrypted || !refreshTokenEncrypted) return fail(500, 'encryption_failed')
 
   const grantIssuedAt = Date.now()
-  const pendingToken = await createPendingInstall(admin, {
-    shop_domain: shopDomain,
-    shop_gid: shopGid,
-    access_token_encrypted: tokenEncrypted,
-    // TRUSTED PROVENANCE. This route is reachable only with a verified App
-    // Bridge session token for this exact shop (step 1 above), i.e. the
-    // merchant is inside Shopify Admin — a direct App Store install. The value
-    // is written here, server-side, from which flow this is; it is never read
-    // from the request body, a query parameter or a header, so a browser
-    // cannot claim App Store provenance to change who bills the account.
-    install_origin: 'shopify_app_store',
-    // The issuing app travels with the credential it issued.
-    oauth_app_edition: config.edition,
-    refresh_token_encrypted: refreshTokenEncrypted,
-    // Absolute expiries, derived server-side ONCE from Shopify's relative
-    // lifetimes, so every later reader compares against the same instant.
-    access_token_expires_at: expiryFromNow(exchanged.expiresIn, grantIssuedAt),
-    refresh_token_expires_at: exchanged.refreshTokenExpiresIn === null
-      ? null
-      : expiryFromNow(exchanged.refreshTokenExpiresIn, grantIssuedAt),
-    api_version: SHOPIFY_API_VERSION,
-    granted_scopes: grantedScopes,
-    storefront_domain: storefront,
-  })
+  // FAIL CLOSED ON PERSISTENCE. createPendingInstall used to discard both
+  // Supabase results, so a rejected delete or insert still produced a token
+  // and this route still answered 200 — the merchant was handed a linking
+  // continuation for a row that was never written and hit "Linking session
+  // expired" at /shopify/link. A persistence failure now aborts here: no
+  // handoff is returned and no cookie is established.
+  let pendingToken: string
+  try {
+    pendingToken = await createPendingInstall(admin, {
+      shop_domain: shopDomain,
+      shop_gid: shopGid,
+      access_token_encrypted: tokenEncrypted,
+      // TRUSTED PROVENANCE. This route is reachable only with a verified App
+      // Bridge session token for this exact shop (step 1 above), i.e. the
+      // merchant is inside Shopify Admin — a direct App Store install. The value
+      // is written here, server-side, from which flow this is; it is never read
+      // from the request body, a query parameter or a header, so a browser
+      // cannot claim App Store provenance to change who bills the account.
+      install_origin: 'shopify_app_store',
+      // The issuing app travels with the credential it issued.
+      oauth_app_edition: config.edition,
+      refresh_token_encrypted: refreshTokenEncrypted,
+      // Absolute expiries, derived server-side ONCE from Shopify's relative
+      // lifetimes, so every later reader compares against the same instant.
+      access_token_expires_at: expiryFromNow(exchanged.expiresIn, grantIssuedAt),
+      refresh_token_expires_at: exchanged.refreshTokenExpiresIn === null
+        ? null
+        : expiryFromNow(exchanged.refreshTokenExpiresIn, grantIssuedAt),
+      api_version: SHOPIFY_API_VERSION,
+      granted_scopes: grantedScopes,
+      storefront_domain: storefront,
+    })
+  } catch (err) {
+    if (err instanceof PendingInstallPersistenceError) {
+      // `op` is our own step name ('delete' | 'insert'); the database's error
+      // object is never captured, so nothing here can expose row data.
+      return fail(EMBEDDED_INSTALL_ERROR_STATUS.pending_install_persistence_failed, 'pending_install_persistence_failed', {
+        stage: 'pending_install',
+        op: err.op,
+        shopDomain,
+      })
+    }
+    throw err
+  }
 
-  // 5) Hand back the internal, server-chosen continuation path. Never a
-  //    caller-supplied URL, so this can't become an open redirect.
-  const res = NextResponse.json({ alreadyConnected: false, next: '/shopify/link' })
-  res.cookies.set(PENDING_LINK_COOKIE, signPendingLinkCookieValue(pendingToken, config.clientSecret), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: PENDING_LINK_TTL_MS / 1000,
+  // 5) Hand back the server-chosen continuation and a SIGNED, OPAQUE HANDOFF.
+  //
+  //    This response is read by a fetch() running inside the Shopify Admin
+  //    iframe, i.e. in a THIRD-PARTY context for this origin. Setting the
+  //    pending-link cookie on it — which is what this route used to do — is
+  //    not something the server can rely on: modern Chrome rejects a
+  //    SameSite=Lax cookie written from an embedded cross-site response, so
+  //    the browser arrived at /shopify/link with no cookie and the merchant
+  //    was told the linking session had expired. Weakening the cookie to
+  //    SameSite=None is NOT the fix here: it would make the linking session
+  //    itself cross-site-attachable.
+  //
+  //    Instead the token is returned as the same HMAC-signed opaque value the
+  //    cookie would have carried, in the body of this ALREADY-AUTHENTICATED
+  //    response (a verified App Bridge session token for this exact shop got
+  //    us here). The client posts it back top-level to `resumePath`, which is
+  //    a first-party navigation, and only THAT response sets the cookie.
+  //
+  //    The handoff is not a credential: it is a reference to a random,
+  //    single-use, 30-minute pending row and carries no Shopify token, no
+  //    secret and no user identity. It never appears in a GET URL, a query
+  //    string, a fragment or a log — the resume path is a POST for exactly
+  //    that reason. `resumePath` is a fixed server constant, never a
+  //    caller-supplied URL, so this cannot become an open redirect.
+  return NextResponse.json({
+    alreadyConnected: false,
+    resumePath: PENDING_LINK_RESUME_PATH,
+    handoff: signPendingLinkCookieValue(pendingToken, config.clientSecret),
   })
-  return res
 }

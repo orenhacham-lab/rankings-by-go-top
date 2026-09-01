@@ -65,6 +65,46 @@ function navigateTopLevel(url: string) {
   else window.location.href = url
 }
 
+/**
+ * The ONE resume endpoint this client will ever post the linking handoff to.
+ * The server sends its own copy back as `resumePath`; this constant exists so
+ * the client can assert the two match exactly before submitting, which means a
+ * tampered or unexpected response can never redirect the merchant elsewhere.
+ * Mirrors PENDING_LINK_RESUME_PATH in lib/shopify/pending-link.ts.
+ */
+const LINK_RESUME_PATH = '/api/shopify/link/resume'
+
+/**
+ * Hand the signed pending-link handoff to the app's own origin as a TOP-LEVEL
+ * form POST.
+ *
+ * Why a form and not `window.top.location.href`: the handoff must not travel in
+ * a URL. In a GET it would sit in browser history, in the Referer of the next
+ * request and in every intermediary's access log. A form POST with
+ * target="_top" breaks out of the Shopify Admin iframe exactly the same way,
+ * but carries the value in a urlencoded body instead — and because the
+ * resulting document IS first-party gotopseo.com, the pending-link cookie that
+ * response sets is a first-party cookie the browser accepts. That is the whole
+ * point: the cookie could not be set from the embedded fetch() response, which
+ * is third-party for this origin and gets dropped by modern Chrome.
+ *
+ * The value is never written to localStorage, sessionStorage or the URL.
+ */
+function submitLinkHandoffTopLevel(appUrl: string, resumePath: string, handoff: string) {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = `${appUrl}${resumePath}`
+  form.target = '_top'
+  const field = document.createElement('input')
+  field.type = 'hidden'
+  field.name = 'handoff'
+  field.value = handoff
+  form.appendChild(field)
+  document.body.appendChild(form)
+  form.submit()
+  form.remove()
+}
+
 export default function ConnectorHomeClient() {
   const [state, setState] = useState<'loading' | 'no_app_bridge' | 'auth_failed' | 'error' | 'ready'>('loading')
   const [data, setData] = useState<AppHomeData | null>(null)
@@ -79,10 +119,12 @@ export default function ConnectorHomeClient() {
    * authorization redirect, so nothing is ever navigated to Shopify and
    * nothing can be blocked by iframe framing rules.
    *
-   * `next` is an internal path chosen by the server (never a URL from this
-   * client), so this cannot become an open redirect. It is opened top-level
-   * because /shopify/link signs the merchant in to Rankings, which needs a
-   * first-party context.
+   * The continuation is an internal path chosen by the server (never a URL
+   * from this client, and checked against LINK_RESUME_PATH below), so this
+   * cannot become an open redirect. It is opened TOP-LEVEL because the pending
+   * link has to be established in a first-party gotopseo.com context: the
+   * cookie cannot be set on this fetch response, which the browser treats as
+   * third-party inside the Shopify Admin iframe.
    */
   const startEmbeddedInstall = async () => {
     setInstallError(null)
@@ -93,10 +135,16 @@ export default function ConnectorHomeClient() {
       const token = await bridge.idToken()
       const res = await fetch('/api/shopify/embedded-install', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) { setInstallError('We couldn’t finish setting up this store. Please try again.'); setInstallBusy(false); return }
-      const json = (await res.json()) as { alreadyConnected?: boolean; next?: string | null }
+      const json = (await res.json()) as { alreadyConnected?: boolean; resumePath?: string | null; handoff?: string | null }
       if (json.alreadyConnected) { setInstallBusy(false); retry(); return }
-      if (json.next) navigateTopLevel(`${data?.appUrl ?? ''}${json.next}`)
-      else setInstallBusy(false)
+      // Both halves must be present AND the path must be exactly the one this
+      // client knows about — anything else is not submitted at all.
+      if (json.resumePath === LINK_RESUME_PATH && json.handoff) {
+        submitLinkHandoffTopLevel(data?.appUrl ?? '', LINK_RESUME_PATH, json.handoff)
+        return
+      }
+      setInstallError('We couldn’t finish setting up this store. Please try again.')
+      setInstallBusy(false)
     } catch {
       setInstallError('We couldn’t finish setting up this store. Please try again.')
       setInstallBusy(false)

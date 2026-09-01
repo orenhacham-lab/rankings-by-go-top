@@ -148,10 +148,19 @@ async function main() {
     check('3b: it fails closed (401) when that verification fails', /if \(!verified\.ok\) return fail\(401, 'invalid_session_token'\)/.test(route))
     check('3c: the exchange uses the VERIFIED shop domain, never a query/body value',
       /shop: shopDomain/.test(route) && !/searchParams|request\.json\(\)/.test(route))
-    check('3d: it produces the SAME pending-install state the OAuth path produced',
-      /createPendingInstall\(admin, \{/.test(route) && /PENDING_LINK_COOKIE/.test(route))
-    check('3e: the continuation path is server-chosen and internal (no open redirect)',
-      /next: '\/shopify\/link'/.test(route) && !/next:\s*(body|json|params)/.test(route))
+    check('3d: it produces the SAME pending-install row the OAuth path produced',
+      /createPendingInstall\(admin, \{/.test(route))
+    // UPDATED with the first-party handoff fix. This response is read by a
+    // fetch() inside the Shopify Admin iframe — a third-party context for this
+    // origin — so it must NOT try to establish the pending-link cookie: modern
+    // Chrome drops it, which is exactly how production reached /shopify/link
+    // with no cookie and rendered "Linking session expired". The cookie is now
+    // set by the first-party POST resume endpoint instead.
+    check('3d2: the embedded response no longer attempts to set the pending-link cookie',
+      !/PENDING_LINK_COOKIE/.test(route) && !/res\.cookies\.set/.test(route))
+    check('3e: the continuation path is a fixed server constant, never caller-supplied (no open redirect)',
+      /resumePath: PENDING_LINK_RESUME_PATH/.test(route)
+      && !/resumePath:\s*(body|json|params)/.test(route))
 
     const client = strip(read('app/shopify/app/ConnectorHomeClient.tsx'))
     check('3f: the not-connected branch drives the install instead of dead-ending at a login link',
